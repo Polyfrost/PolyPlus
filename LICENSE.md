@@ -1,4 +1,4 @@
-# Copyright 2024 Polyfrost
+# Copyright 2024 Polyfrost Inc.
 
 Do not redistribute.
 All rights reserved.
