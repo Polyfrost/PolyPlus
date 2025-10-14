@@ -1,8 +1,10 @@
+@file:Suppress("PropertyName")
+
 import groovy.lang.MissingPropertyException
 
 pluginManagement {
     repositories {
-        // Repositories
+        // Releases
         maven("https://maven.deftu.dev/releases")
         maven("https://maven.fabricmc.net")
         maven("https://maven.architectury.dev/")
@@ -15,22 +17,28 @@ pluginManagement {
         maven("https://maven.deftu.dev/snapshots")
         mavenLocal()
 
-        // Default repositories
+        // Default
         gradlePluginPortal()
         mavenCentral()
     }
 
     plugins {
-        kotlin("jvm") version("2.0.0")
-        id("dev.deftu.gradle.multiversion-root") version("2.13.0")
+        kotlin("jvm") version("2.2.10")
+        id("dev.deftu.gradle.multiversion-root") version("2.51.0")
     }
 }
 
 val projectName: String = extra["mod.name"]?.toString()
     ?: throw MissingPropertyException("mod.name has not been set.")
+
+// Configures the root project Gradle name based on the value in `gradle.properties`
 rootProject.name = projectName
 rootProject.buildFileName = "root.gradle.kts"
 
+// Adds all of our build target versions to the classpath if we need to add version-specific code.
+// Update this list if you want to remove/add a version and/or mod loader.
+// The format is: version-modloader (f.ex: 1.8.9-forge, 1.17.1-fabric, etc)
+// **REMEMBER TO ALSO UPDATE THE `root.gradle.kts` FILE WITH THE NEW VERSION(S).
 listOf(
     "1.8.9-forge",
     "1.8.9-fabric",
@@ -38,37 +46,27 @@ listOf(
     "1.12.2-forge",
     "1.12.2-fabric",
 
-//    "1.16.5-forge",
-//    "1.16.5-fabric",
-//
-//    "1.17.1-forge",
-//    "1.17.1-fabric",
-//
-//    "1.18.2-forge",
-//    "1.18.2-fabric",
-//
-//    "1.19.2-forge",
-//    "1.19.2-fabric",
-//
-//    "1.19.4-forge",
-//    "1.19.4-fabric",
-//
-//    "1.20.1-forge",
-//    "1.20.1-fabric",
-//
-//    "1.20.2-forge",
-//    "1.20.2-neoforge",
-//    "1.20.2-fabric",
-//
-//    "1.20.4-forge",
-//    "1.20.4-neoforge",
-//    "1.20.4-fabric",
-//
-//    "1.20.6-neoforge",
-//    "1.20.6-fabric",
-//
-//    "1.21-neoforge",
-//    "1.21-fabric"
+    "1.16.5-forge",
+    "1.16.5-fabric",
+
+    "1.20.1-forge",
+    "1.20.1-fabric",
+
+    "1.20.4-forge",
+    "1.20.4-neoforge",
+    "1.20.4-fabric",
+
+    "1.21.1-neoforge",
+    "1.21.1-fabric",
+
+    "1.21.4-neoforge",
+    "1.21.4-fabric",
+
+    "1.21.5-neoforge",
+    "1.21.5-fabric",
+
+    "1.21.8-neoforge",
+    "1.21.8-fabric",
 ).forEach { version ->
     include(":$version")
     project(":$version").apply {

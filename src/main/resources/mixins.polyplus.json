@@ -1,14 +1,13 @@
 {
-    "required": true,
-    "package": "dev.deftu.modtemplate.mixins",
-    "compatibilityLevel": "${java_version}",
-    "injectors": {
-        "defaultRequire": 1
-    },
-    "mixins": [
-    ],
-    "client": [
-    ],
-    "server": [
-    ]
+  "compatibilityLevel": "${java_version}",
+  "minVersion": "0.8",
+  "package": "org.polyfrost.polyplus.client.mixin",
+  "refmap": "mixins.${mod_id}.refmap.json",
+  "injectors": {
+    "maxShiftBy": 5
+  },
+  "client": [
+    "Mixin_ReplaceCapeTexture"
+  ],
+  "verbose": true
 }

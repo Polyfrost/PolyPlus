@@ -5,19 +5,18 @@
     "name": "${mod_name}",
     "description": "${mod_description}",
     "authors": [
-        "Polyfrost"
+        "Your Name"
     ],
-    "contact": {
-        "issues": "https://github.com/Polyfrost/${mod_name}/issues",
-        "sources": "https://github.com/Polyfrost/${mod_name}"
-    },
-    "license": "LGPL-3.0-or-later",
     "environment": "*",
     "entrypoints": {
         "main": [
             {
-                "adapter": "kotlin",
-                "value": "dev.deftu.modtemplate.entrypoint.ModTemplateEntrypoint"
+                "value": "org.polyfrost.polyplus.PolyPlus"
+            }
+        ],
+        "client": [
+            {
+                "value": "org.polyfrost.polyplus.PolyPlus"
             }
         ]
     },
@@ -26,7 +25,6 @@
     ],
     "depends": {
         "minecraft": "~${minor_mc_version}",
-        "fabricloader": ">=0.15.11",
-        "fabric-language-kotlin": "*"
+        "fabricloader": ">=0.15.11"
     }
 }
