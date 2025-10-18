@@ -17,12 +17,12 @@ public class Mixin_ReplaceCapeTexture {
 
     @Inject(method = "getSkinTextures", at = @At("HEAD"), cancellable = true)
     void polyplus$onGetSkinTextures(CallbackInfoReturnable<SkinTextures> cir) {
-        if (playerListEntry == null) return;
-        var oldskinTexures = playerListEntry.getSkinTextures();
+        if (this.playerListEntry == null) return;
+        var oldskinTexures = this.playerListEntry.getSkinTextures();
         var newSkinTextures = new SkinTextures(
                 oldskinTexures.comp_1626(),
                 oldskinTexures.comp_1911(),
-                Identifier.of(PolyPlus.ID, "randomcape2.png"),
+                Identifier.of(PolyPlus.ID, "moon.png"),
                 oldskinTexures.comp_1628(),
                 oldskinTexures.comp_1629(),
                 oldskinTexures.comp_1630()

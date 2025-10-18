@@ -1,8 +1,14 @@
 package org.polyfrost.polyplus.discordrpc
 
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.request
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.polyfrost.oneconfig.utils.v1.dsl.mc
+import org.polyfrost.polyplus.PolyPlus.Companion.client
 import java.io.BufferedInputStream
 import java.io.File
 import java.net.URI
@@ -31,11 +37,9 @@ object DownloadSDK {
     val url = URI.create(SDK_URL).toURL()
 
     suspend fun download(): File? = withContext(Dispatchers.IO) {
-        val connection = url.openConnection().apply {
-            setRequestProperty("User-Agent", "todo")
-        }
+        val test = client.get(url)
 
-        ZipInputStream(BufferedInputStream(connection.getInputStream())).use { stream ->
+        ZipInputStream(BufferedInputStream(test.bodyAsChannel().toInputStream())).use { stream ->
             for (entry in generateSequence { stream.nextEntry }) {
                 if (entry.name != path) continue
 

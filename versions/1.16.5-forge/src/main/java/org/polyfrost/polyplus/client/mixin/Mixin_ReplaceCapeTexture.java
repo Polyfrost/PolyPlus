@@ -18,6 +18,6 @@ public class Mixin_ReplaceCapeTexture {
 
     @Inject(method = "getCloakTextureLocation", at = @At("RETURN"), cancellable = true)
     private void polyplus$onGetCapeTexture(CallbackInfoReturnable<ResourceLocation> cir) {
-        cir.setReturnValue(new ResourceLocation(PolyPlus.ID, "randomcape2.png"));
+        cir.setReturnValue(new ResourceLocation(PolyPlus.ID, "64px_poly.png"));
     }
 }

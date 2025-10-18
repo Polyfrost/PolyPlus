@@ -7,6 +7,7 @@ import de.jcm.discordgamesdk.activity.Activity
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import org.polyfrost.polyplus.PolyPlus
+import org.polyfrost.polyplus.PolyPlus.Companion.logger
 import org.polyfrost.polyplus.client.Config.rpcEnabled
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
@@ -19,7 +20,7 @@ object RPC {
     fun start() {
         if (!rpcEnabled || running.getAndSet(true)) return
         PolyPlus.scope.launch { run().onFailure {
-            println("[PolyPlus] Failed to start Discord RPC: ${it.message}")
+            logger.warning("Failed to start Discord RPC: ${it.message}")
             running.set(false)
         } }
     }

@@ -20,6 +20,6 @@ public class Mixin_ReplaceCapeTexture {
 
     @Inject(method = "getLocationCape", at = @org.spongepowered.asm.mixin.injection.At("HEAD"))
     private void polyplus$onGetCape(CallbackInfoReturnable<ResourceLocation> cir) {
-        this.locationCape = new ResourceLocation(PolyPlus.ID, "randomcape2.png");
+        this.locationCape = new ResourceLocation(PolyPlus.ID, "64px_poly.png");
     }
 }

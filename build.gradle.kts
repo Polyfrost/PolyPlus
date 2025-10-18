@@ -2,6 +2,7 @@
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.deftu.gradle.utils.GameSide
+import dev.deftu.gradle.utils.includeOrShade
 
 plugins {
     java
@@ -13,6 +14,11 @@ plugins {
     id("dev.deftu.gradle.tools.shadow") // Applies the Shadow plugin, which allows us to shade our dependencies into our mod JAR. This is NOT recommended for Fabric mods, but we have an *additional* configuration for those!
     id("dev.deftu.gradle.tools.minecraft.loom") // Applies the Loom plugin, which automagically configures Essential's Architectury Loom plugin for you.
     id("dev.deftu.gradle.tools.minecraft.releases") // Applies the Minecraft auto-releasing plugin, which allows you to automatically release your mod to CurseForge and Modrinth.
+    kotlin("plugin.serialization")
+}
+
+repositories {
+    mavenCentral()
 }
 
 toolkitLoomHelper {
@@ -59,4 +65,19 @@ dependencies {
         }
     }
     modImplementation("com.github.JnCrMx:discord-game-sdk4j:v0.5.5")
+
+    implementation("io.ktor:ktor-client-core:3.3.1")
+    shade("io.ktor:ktor-client-core:3.3.1")
+    implementation("io.ktor:ktor-client-cio:3.3.1")
+    shade("io.ktor:ktor-client-cio:3.3.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
+    shade("io.ktor:ktor-client-content-negotiation:3.3.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
+    shade("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
+}
+
+tasks {
+    named("build") {
+        dependsOn("fatJar")
+    }
 }

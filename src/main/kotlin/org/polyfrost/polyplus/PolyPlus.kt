@@ -1,12 +1,20 @@
 package org.polyfrost.polyplus
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.userAgent
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.commands.v1.CommandManager
 import org.polyfrost.polyplus.client.ExampleCommand
 import org.polyfrost.polyplus.client.Config
+import org.polyfrost.polyplus.discordrpc.RPC
+import java.time.Instant
+import java.util.logging.Logger
 
 //#if FABRIC
 //$$ import net.fabricmc.api.ModInitializer
@@ -23,9 +31,6 @@ import org.polyfrost.polyplus.client.Config
 //#else
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
-import org.polyfrost.polyplus.discordrpc.RPC
-import java.time.Instant
-
 //#endif
 //#elseif NEOFORGE
 //$$ import net.neoforged.bus.api.IEventBus
@@ -37,7 +42,6 @@ import java.time.Instant
 
 
 //#if FORGE-LIKE
-//$$ import org.polyfrost.example.ExampleConstants
 //#if MC >= 1.16.5
 //$$ @Mod(PolyPlus.ID)
 //#else
@@ -91,7 +95,7 @@ class PolyPlus
         //#endif
         //#endif
     ) {
-        //#if MC <= 1.12.2
+        //#if FORGE-LIKE && MC <= 1.12.2
         if (!event.side.isClient) return
         //#endif
 
@@ -109,6 +113,17 @@ class PolyPlus
     //#endif
 
     companion object {
+        val logger = Logger.getLogger(NAME)
+
+        val client = HttpClient(CIO) {
+            defaultRequest {
+                userAgent("todo")
+            }
+
+            install(ContentNegotiation) {
+                json()
+            }
+        }
         var launch: Instant? = null
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
