@@ -54,6 +54,14 @@ toolkitLoomHelper {
 }
 
 dependencies {
+    implementation(libs.discord.game.sdk4j)
+    includeOrShade(libs.discord.game.sdk4j)
+
+    implementation(libs.bundles.ktor.client)
+    includeOrShade(libs.bundles.ktor.client)
+    implementation(libs.bundles.ktor.serialization)
+    includeOrShade(libs.bundles.ktor.serialization)
+
     // Add (Legacy) Fabric API as dependencies (these are both optional but are particularly useful).
     if (mcData.isFabric) {
         if (mcData.isLegacyFabric) {
@@ -63,21 +71,5 @@ dependencies {
             // 1.16.5+
             modImplementation("net.fabricmc.fabric-api:fabric-api:${mcData.dependencies.fabric.fabricApiVersion}")
         }
-    }
-    modImplementation("com.github.JnCrMx:discord-game-sdk4j:v0.5.5")
-
-    implementation("io.ktor:ktor-client-core:3.3.1")
-    shade("io.ktor:ktor-client-core:3.3.1")
-    implementation("io.ktor:ktor-client-cio:3.3.1")
-    shade("io.ktor:ktor-client-cio:3.3.1")
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
-    shade("io.ktor:ktor-client-content-negotiation:3.3.1")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
-    shade("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
-}
-
-tasks {
-    named("build") {
-        dependsOn("fatJar")
     }
 }
