@@ -23,7 +23,7 @@ repositories {
 
 toolkitLoomHelper {
     useOneConfig {
-        version = "1.0.0-alpha.175"
+        version = "1.0.0-alpha.176"
         loaderVersion = "1.1.0-alpha.53"
 
         usePolyMixin = true
@@ -59,6 +59,8 @@ dependencies {
 
     implementation(libs.bundles.ktor.client)
     includeOrShade(libs.bundles.ktor.client)
+    implementation(libs.bundles.ktor.server)
+    includeOrShade(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
     includeOrShade(libs.bundles.ktor.serialization)
 
