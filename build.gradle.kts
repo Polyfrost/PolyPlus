@@ -27,7 +27,7 @@ toolkitLoomHelper {
         loaderVersion = "1.1.0-alpha.53"
 
         usePolyMixin = true
-        polyMixinVersion = "0.8.4+build.2"
+        polyMixinVersion = "0.8.4+build.7"
 
         applyLoaderTweaker = true
 
