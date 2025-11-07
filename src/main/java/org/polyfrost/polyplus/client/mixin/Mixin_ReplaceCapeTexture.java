@@ -10,6 +10,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import static org.polyfrost.polyplus.network.plus.cache.CosmeticCache.getCosmetic;
+
 @Mixin(NetworkPlayerInfo.class)
 public class Mixin_ReplaceCapeTexture {
     @Shadow
@@ -20,6 +22,12 @@ public class Mixin_ReplaceCapeTexture {
 
     @Inject(method = "getLocationCape", at = @org.spongepowered.asm.mixin.injection.At("HEAD"))
     private void polyplus$onGetCape(CallbackInfoReturnable<ResourceLocation> cir) {
-        this.locationCape = new ResourceLocation(PolyPlus.ID, "64px_poly.png");
+        ResourceLocation cape = getCosmetic(gameProfile.getId(), "cape");
+        if (cape != null) {
+            System.out.println("Replacing cape for " + gameProfile.getName() + " with " + cape);
+            this.locationCape = cape;
+        } else {
+            System.out.println("No cape found for " + gameProfile.getName());
+        }
     }
 }

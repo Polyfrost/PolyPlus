@@ -33,15 +33,14 @@ object Auth {
     var authJob: Deferred<AuthResponse>? = null
 
     suspend fun getToken(): String {
-        return authLock.withLock {
-            authRes?.token ?: refreshToken()
-        }
+        val token = authLock.withLock { authRes?.token }
+        return token ?: refreshToken()
     }
 
     suspend fun refreshToken(): String {
         authJob?.let { return it.await().token }
 
-        return authLock.withLock {
+        val lockedJob = authLock.withLock {
             authJob?.let { return it.await().token }
 
             val job = PolyPlus.scope.async(start = CoroutineStart.LAZY) {
@@ -55,8 +54,10 @@ object Auth {
 
             authJob = job
             job.start()
-            job.await().token
+            job
         }
+
+        return lockedJob.await().token
     }
 
     suspend inline fun HttpClient.authRequest(method: HttpMethod, url: String, noinline builder: HttpRequestBuilder.() -> Unit): Result<HttpResponse> = runCatching {
@@ -76,7 +77,7 @@ object Auth {
             }
         }
 
-        return Result.success(response)
+        return@runCatching response
     }
 
     suspend fun runAuth() = withContext(Dispatchers.IO) {
@@ -88,6 +89,7 @@ object Auth {
     }
 
     suspend inline fun <reified T> HttpClient.authRequest(method: HttpMethod, url: String) = runCatching {
+        logger.info("Requesting: $url")
         val response = this.authRequest(method, url) {}
         response.getOrElse { return Result.failure<T>(it) }.body<T>()
     }

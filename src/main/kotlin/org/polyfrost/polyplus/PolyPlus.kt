@@ -1,14 +1,22 @@
 package org.polyfrost.polyplus
 
+import com.sun.org.apache.xpath.internal.operations.Plus
+import dev.deftu.eventbus.EventBus
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
 import org.polyfrost.oneconfig.api.commands.v1.CommandManager
 import org.polyfrost.polyplus.client.ExampleCommand
 import org.polyfrost.polyplus.client.Config
@@ -31,6 +39,14 @@ import java.util.logging.Logger
 //#else
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
+import org.polyfrost.oneconfig.api.event.v1.EventManager
+import org.polyfrost.polyplus.network.plus.cache.CosmeticCache
+import org.polyfrost.polyplus.network.plus.Cosmetics
+import org.polyfrost.polyplus.network.plus.Cosmetics.getOwned
+import org.polyfrost.polyplus.network.plus.PlusWebSocket
+import org.polyfrost.polyplus.network.plus.responses.WebSocketPacket
+import org.polyfrost.polyplus.utils.PlayerUtils
+
 //#endif
 //#elseif NEOFORGE
 //$$ import net.neoforged.bus.api.IEventBus
@@ -101,7 +117,26 @@ class PolyPlus
 
         launch = Instant.now()
         RPC.start()
+        PlusWebSocket.start()
+        PlusWebSocket.setOnMessage {
+            val res: WebSocketPacket.ClientBound.FallibleResponse = json.decodeFromString(it)
+            println("websocket message: ${json.encodeToString(res)}")
+        }
+        scope.launch {
+            delay(3000)
+            PlusWebSocket.getActiveCosmetics(PlayerUtils.uuid.toString())
+        }
         Config.preload()
+        scope.launch {
+            val res = Cosmetics.getAll().await().getOrNull() ?: return@launch
+            CosmeticCache.put(res.cosmetics)
+            println("cosmetics: $res")
+            getOwned().await()
+        }
+
+//        listOf(
+//            Cosmetics
+//        ).forEach { EventManager.INSTANCE.register(it) }
         CommandManager.register(ExampleCommand)
     }
 
@@ -113,7 +148,12 @@ class PolyPlus
     //#endif
 
     companion object {
-        val logger = Logger.getLogger(NAME)
+        val json = Json {
+            prettyPrint = true
+            isLenient = true
+        }
+
+        val logger: Logger = Logger.getLogger(NAME)
 
         val client = HttpClient(CIO) {
             defaultRequest {
@@ -121,8 +161,10 @@ class PolyPlus
             }
 
             install(ContentNegotiation) {
-                json()
+                json(json)
             }
+
+            install(WebSockets)
         }
         var launch: Instant? = null
 

@@ -2,12 +2,18 @@ package org.polyfrost.polyplus.network.plus
 
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.client.request.url
 import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.closeExceptionally
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.PolyPlus
+import org.polyfrost.polyplus.client.Config
+import org.polyfrost.polyplus.network.plus.responses.WebSocketPacket
+import org.polyfrost.polyui.utils.mapToArray
 
 object PlusWebSocket {
     private var session: DefaultClientWebSocketSession? = null
@@ -20,12 +26,19 @@ object PlusWebSocket {
 
     fun start() = PolyPlus.scope.launch {
         try {
-            PolyPlus.client.webSocket {
+            PolyPlus.client.webSocket("${Config.apiUrl.replace("http", "ws")}websocket") {
                 session = this
+
+                PolyPlus.logger.info("Connected to PolyPlus WebSocket")
 
                 val sender = launch {
                     for (message in _outgoing) {
-                        send(Frame.Text(message))
+                        try {
+                            send(Frame.Text(message))
+                        } catch (e: Exception) {
+                            PolyPlus.logger.warning("Failed to send message over websocket: ${e.message}")
+                            return@launch
+                        }
                     }
                 }
 
@@ -48,12 +61,24 @@ object PlusWebSocket {
     }
 
     fun send(message: String): Result<Unit> {
+        PolyPlus.logger.info("Tryna send ${message}")
         if (session == null) return Result.failure(IllegalStateException("WebSocket is not connected"))
 
         PolyPlus.scope.launch {
-            _outgoing.send(message)
+            try {
+                _outgoing.send(message)
+            } catch (e: Exception) {
+                PolyPlus.logger.warning("Failed to send message to the send channel: ${e.message}")
+                session?.closeExceptionally(e)
+            }
         }
 
         return Result.success(Unit)
+    }
+
+    fun getActiveCosmetics(vararg players: String): Result<Unit> {
+        val message = WebSocketPacket.ServerBound.Packet.GetActiveCosmetics(players.toList())
+        val jsonMessage = PolyPlus.json.encodeToString(WebSocketPacket.ServerBound.Packet.serializer(), message)
+        return send(jsonMessage)
     }
 }

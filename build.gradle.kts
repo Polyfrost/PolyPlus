@@ -74,6 +74,8 @@ dependencies {
     shade("io.ktor:ktor-client-content-negotiation:3.3.1")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
     shade("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
+    implementation("io.ktor:ktor-server-websockets:3.3.1")
+    shade("io.ktor:ktor-server-websockets:3.3.1")
 }
 
 tasks {
