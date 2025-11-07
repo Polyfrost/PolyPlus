@@ -4,53 +4,61 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import org.polyfrost.polyplus.PolyPlus
-import org.polyfrost.polyplus.network.plus.cache.CosmeticCache.DIRECTORY
+import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
 
-class HashManager(val directory: String) {
+class HashManager(val file: File) {
     private var hashes: HashMap<String, String>? = null
-    private var updated: Boolean = false
-    private var hashJob: Deferred<Unit> = CompletableDeferred();
-
-    suspend fun awaitHashes() {
-        if (hashJob.isActive || hashes == null) { hashJob.await() }
-    }
-
-    fun updateHash(key: String, hash: String): Boolean {
-        hashes?.let {
-            val existingHash = it[key]
-            if (existingHash != null && existingHash == hash) return false
-            it[key] = hash
-            updated = true
-            return true
-        }
-        return false
-    }
+    private var isUpToDate: Boolean = false
+    private var hashJob: Deferred<Unit> = CompletableDeferred()
 
     init {
-        hashJob = PolyPlus.scope.async {
-            val file = File(directory)
+        hashJob = PolyPlusClient.SCOPE.async {
             if (!file.exists()) {
                 file.parentFile?.mkdirs()
                 file.createNewFile()
             }
 
             val json = file.readText()
-            hashes = if (json.isBlank()) HashMap() else PolyPlus.json.decodeFromString<HashMap<String, String>>(json)
+            hashes = if (json.isNotBlank()) {
+                PolyPlusClient.JSON.decodeFromString<HashMap<String, String>>(json)
+            } else HashMap()
         }
     }
 
+    suspend fun awaitHashes() {
+        if (hashJob.isActive || hashes == null) {
+            hashJob.await()
+        }
+    }
+
+    fun updateHash(key: String, hash: String): Boolean {
+        hashes?.let {
+            val existingHash = it[key]
+            if (existingHash != null && existingHash == hash) {
+                return false
+            }
+
+            it[key] = hash
+            isUpToDate = true
+            return true
+        }
+
+        return false
+    }
+
     fun saveHashes() {
-        if (!updated) return
-        hashJob = PolyPlus.scope.async(Dispatchers.IO)  {
-            val file = File(directory)
+        if (!isUpToDate) {
+            return
+        }
+
+        hashJob = PolyPlusClient.SCOPE.async(Dispatchers.IO)  {
             if (!file.exists()) {
                 file.parentFile?.mkdirs()
                 file.createNewFile()
             }
-            val json = PolyPlus.json.encodeToString(hashes)
+
+            val json = PolyPlusClient.JSON.encodeToString(hashes)
             file.writeText(json)
         }
     }

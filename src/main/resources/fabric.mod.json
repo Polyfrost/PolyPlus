@@ -9,16 +9,7 @@
     ],
     "environment": "*",
     "entrypoints": {
-        "main": [
-            {
-                "value": "org.polyfrost.polyplus.PolyPlus"
-            }
-        ],
-        "client": [
-            {
-                "value": "org.polyfrost.polyplus.PolyPlus"
-            }
-        ]
+        "client": ["org.polyfrost.polyplus.PolyPlusEntrypoint"]
     },
     "mixins": [
         "mixins.${mod_id}.json"
