@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class Mixin_ReplaceCapeTexture {
     @Shadow @Final private GameProfile gameProfile;
 
-    @Inject(method = "getLocationCape", at = @At("HEAD"))
+    @Inject(method = "getLocationCape", at = @At("HEAD"), cancellable = true)
     private void polyplus$useCustomCape(CallbackInfoReturnable<ResourceLocation> cir) {
         ResourceLocation capeLocation = CosmeticManager.get(this.gameProfile.getId(), "cape");
         if (capeLocation != null) {
