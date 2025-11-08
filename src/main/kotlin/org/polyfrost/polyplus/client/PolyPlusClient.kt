@@ -14,16 +14,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.api.event.v1.EventManager
-import org.polyfrost.oneconfig.api.event.v1.events.InitializationEvent
 import org.polyfrost.oneconfig.utils.v1.dsl.addDefaultCommand
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
 import org.polyfrost.polyplus.client.discord.DiscordPresence
+import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
-import java.util.function.Consumer
 
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
@@ -50,22 +48,42 @@ object PolyPlusClient {
     fun initialize() {
         PolyPlusConfig.preload()
         DiscordPresence.initialize()
-        PolyConnection.initialize()
+        PolyConnection.initialize {
+            LOGGER.info("Connected to PolyPlus WebSocket server.")
 
-        SCOPE.launch {
-            val all = PolyCosmetics.getAll()
-                .await()
-                .getOrNull() ?: return@launch
-            CosmeticManager.putAll(all.contents)
-            PolyCosmetics.updateOwned()
-        }
-
-        EventManager.register(InitializationEvent::class.java, Consumer {
+            // Request the local player's active cosmetics
             SCOPE.launch {
                 PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(playerUuid.toString()))
             }
-        })
+        }
 
+        refresh()
         PolyPlusConfig.addDefaultCommand(PolyPlusConstants.ID)
+    }
+
+    fun refresh() {
+        LOGGER.info("Refreshing PolyPlus Client...")
+
+        // Synchronously (yet asynchronously) refresh all API data in such a way that we authenticate first,
+        // then give ourselves time to cache cosmetics, then use said known cached cosmetics to update owned cosmetics.
+        SCOPE.launch {
+            // Reset authentication
+            runCatching { PolyAuthorization.reset() }
+
+            // Reset existing caches
+            runCatching { PolyCosmetics.reset() }
+            runCatching { CosmeticManager.reset() }
+
+            // Cache all available cosmetics
+            runCatching {
+                val all = PolyCosmetics.getAll()
+                    .await()
+                    .getOrNull() ?: return@runCatching
+                CosmeticManager.putAll(all.contents)
+            }
+
+            // Update the local player's owned cosmetics
+            runCatching { PolyCosmetics.updateOwned() }
+        }
     }
 }

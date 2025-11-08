@@ -29,6 +29,10 @@ object CosmeticManager {
         return CACHE[type]?.get(id)?.asResource()
     }
 
+    fun reset() {
+        CACHE.clear()
+    }
+
     suspend fun putAll(cosmetics: List<Cosmetic>) {
         withContext(Dispatchers.IO) {
             hashManager.awaitHashes()

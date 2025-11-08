@@ -55,6 +55,13 @@ object PolyAuthorization {
         return lockedJob.await().token
     }
 
+    suspend fun reset() {
+        LOCK.withLock {
+            cachedResponse = null
+            currentJob = null
+        }
+    }
+
     private suspend fun authorize(): AuthResponse {
         val serverId = generateServerId()
         authorizeSessionService(serverId)

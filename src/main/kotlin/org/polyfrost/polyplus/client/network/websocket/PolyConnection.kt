@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
 
+    private var connectionCallback: (() -> Unit)? = null
     private var job: Job? = null
     private var session: DefaultClientWebSocketSession? = null
     private val _outgoing = Channel<String>(Channel.Factory.UNLIMITED)
@@ -23,7 +24,8 @@ object PolyConnection {
     val isConnected: Boolean
         get() = session != null
 
-    fun initialize() {
+    fun initialize(callback: (() -> Unit)? = null) {
+        this.connectionCallback = callback
         start() // Just cold start and set up
     }
 
@@ -80,6 +82,7 @@ object PolyConnection {
                         }
                     }
 
+                    connectionCallback?.invoke()
                     for (frame in incoming) {
                         val text = (frame as? Frame.Text)?.readText() ?: continue
                         process(this, text)
