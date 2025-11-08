@@ -15,6 +15,10 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
+//#if MC >= 1.20.4
+//$$ import dev.deftu.omnicore.api.client.player.uuid
+//#endif
+
 @OptIn(ExperimentalAtomicApi::class)
 object PolyAuthorization {
     private val LOGGER = LogManager.getLogger()
