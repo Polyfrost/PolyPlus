@@ -14,7 +14,9 @@ sealed interface CachedCosmetic {
 
         override fun asResource(): ResourceLocation? {
             if (texture == null) {
-                texture = OmniTextures.load(OmniImages.from(image))
+                val newTexture = OmniTextures.load(OmniImages.from(image))
+                texture = newTexture
+                return OmniTextures.register(newTexture.location, newTexture)
             }
 
             return texture?.location
