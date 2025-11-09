@@ -1,4 +1,4 @@
-package org.polyfrost.polyplus.client.mixin;
+package org.polyfrost.polyplus.mixin.client;
 
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;

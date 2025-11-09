@@ -1,4 +1,4 @@
-package org.polyfrost.polyplus.client.mixin;
+package org.polyfrost.polyplus.mixin.client;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.network.NetworkPlayerInfo;
