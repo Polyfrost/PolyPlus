@@ -10,8 +10,13 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.serializer
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
+import org.polyfrost.polyplus.client.network.http.PolyCosmetics
+import org.polyfrost.polyplus.events.WebSocketMessage
+import java.util.UUID
 
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
@@ -99,12 +104,15 @@ object PolyConnection {
     }
 
     private fun process(scope: CoroutineScope, message: String) {
-        println("Received message: $message")
         val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
-        println("Decoded packet: $packet")
+        if (packet is ClientboundPacket.Error) {
+            LOGGER.error("Error packet received: ${packet.message}")
+        }
+
+        EventManager.INSTANCE.post(WebSocketMessage(packet))
     }
 
     private inline fun <reified T : ServerboundPacket> T.string(): String {
-        return PolyPlusClient.JSON.encodeToString(serializer(), this)
+        return PolyPlusClient.JSON.encodeToString(ServerboundPacket.serializer(), this)
     }
 }
