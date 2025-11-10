@@ -25,6 +25,7 @@ object ApplyCosmetics {
 
     @Subscribe
     fun onPlayerList(event: PacketEvent.Receive) {
+        // Not sure how to cleanly make this version agnostic atm.
         val packet = try { event.getPacket<S38PacketPlayerListItem>() ?: return } catch (e: Exception) { return }
         when (packet.action) {
             S38PacketPlayerListItem.Action.ADD_PLAYER -> {
