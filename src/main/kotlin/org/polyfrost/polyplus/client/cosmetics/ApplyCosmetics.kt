@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import dev.deftu.omnicore.api.client.player
 import net.minecraft.network.play.server.S38PacketPlayerListItem
 import net.minecraftforge.event.world.WorldEvent
 import org.apache.logging.log4j.LogManager
@@ -10,6 +11,8 @@ import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
+import org.polyfrost.polyplus.utils.Batcher
+import java.time.Duration
 import java.util.UUID
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -17,6 +20,9 @@ import kotlin.collections.iterator
 
 object ApplyCosmetics {
     private val LOGGER = LogManager.getLogger()
+    private val BATCHER = Batcher(Duration.ofMillis(200), HashSet<String>()) { players ->
+        PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(players.toList()))
+    }
 
     @Subscribe
     fun onWorldLoad(event: WorldEvent.Load) {
@@ -29,9 +35,10 @@ object ApplyCosmetics {
         val packet = try { event.getPacket<S38PacketPlayerListItem>() ?: return } catch (e: Exception) { return }
         when (packet.action) {
             S38PacketPlayerListItem.Action.ADD_PLAYER -> {
-                val players = packet.entries.mapNotNull { it.profile.id.takeUnless { it.version() == 2 }?.toString() } // mojang only uses UUIDv2 so if its not, its a bot and wont have a cape.
-                PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(players))
-                LOGGER.info("Requested cosmetics for players: $players")
+                packet.entries.forEach {
+                    // mojang doesnt use uuidv2 so if it is, its a bot and wont have a cape.
+                    if (it.profile.id.version() != 2) BATCHER.add(it.profile.id.toString())
+                }
             }
 
             S38PacketPlayerListItem.Action.REMOVE_PLAYER -> {
