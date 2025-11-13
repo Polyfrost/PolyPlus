@@ -1,10 +1,9 @@
 package org.polyfrost.polyplus.client.gui
 
-import net.minecraft.client.gui.GuiScreen
+import dev.deftu.omnicore.api.client.screen.OmniScreen
 import org.polyfrost.oneconfig.api.ui.v1.OCPolyUIBuilder
 import org.polyfrost.oneconfig.api.ui.v1.UIManager
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyui.animate.SetAnimation
 import org.polyfrost.polyui.color.rgba
 import org.polyfrost.polyui.component.Drawable
 import org.polyfrost.polyui.component.extensions.disable
@@ -32,7 +31,7 @@ object FullscreenLockerUI {
     private var backArrow: Drawable? = null
     private var forwardArrow: Drawable? = null
 
-    fun create(): GuiScreen {
+    fun create(): OmniScreen {
         val uiManager = UIManager.INSTANCE
         val builder = OCPolyUIBuilder.create()
             .blurs()
@@ -42,7 +41,7 @@ object FullscreenLockerUI {
             .translatorDelegate("assets/${PolyPlusConstants.ID}/lang")
                 as OCPolyUIBuilder
 
-        val cartCount = State(0)
+        val cartCount = State(3)
         val polyUI = builder.make(
             Group(
                 // Header
@@ -86,15 +85,15 @@ object FullscreenLockerUI {
                         (this[1] as TextInput).text = ""
                     }.withBorder(1f) { page.border5 }.named("SearchField"),
 
-                    size = Vec2(1482f, 78f),
-                    alignment = Align(main = Align.Content.SpaceBetween, line = Align.Line.Center),
+                    size = Vec2(1482f, 36f),
+                    alignment = Align(main = Align.Content.SpaceBetween, cross = Align.Content.Center, line = Align.Line.Center, padEdges = Vec2(0f, 21f)),
                 ),
 
                 // Content
                 Group(
                     // Cosmetic list
                     CosmeticList(
-                        size = Vec2(972f, 802f),
+                        size = Vec2(1010f, 973f),
                     ),
 
                     // Sidebar
@@ -104,7 +103,13 @@ object FullscreenLockerUI {
 
                         // Player preview
                         PlayerPreview(),
+
+                        size = Vec2(465f, 973f),
+                        alignment = Align(mode = Align.Mode.Vertical, padBetween = Vec2(0f, 12f), padEdges = Vec2(2f, 2f))
                     ),
+
+                    size = Vec2(1499f, 973f),
+                    alignment = Align(padEdges = Vec2.ZERO, padBetween = Vec2(24f, 0f))
                 ),
 
                 size = Vec2(1499f, 1080f),
