@@ -6,8 +6,13 @@
     "injectors": {
         "maxShiftBy": 5
     },
+    "mixins": [
+        "Mixin_NoAI"
+    ],
     "client": [
-        "client.Mixin_ReplaceCapeTexture"
+        "client.Mixin_AddCosmeticsPage",
+        "client.Mixin_ReplaceCapeTexture",
+        "client.Mixin_ReplaceOneConfigLogo"
     ],
     "verbose": true
 }

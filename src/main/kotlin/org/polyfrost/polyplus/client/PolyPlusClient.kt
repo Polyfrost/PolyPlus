@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client
 
+import dev.deftu.omnicore.api.client.commands.OmniClientCommands
 import dev.deftu.omnicore.api.client.player.playerUuid
+import dev.deftu.textile.Text
+import dev.deftu.textile.minecraft.MCTextStyle
+import dev.deftu.textile.minecraft.TextColors
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -20,10 +24,14 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.ApplyCosmetics
 import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
 import org.polyfrost.polyplus.client.discord.DiscordPresence
+import org.polyfrost.polyplus.client.gui.FullscreenLockerUI
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.utils.EarlyInitializable
+import org.polyfrost.polyui.data.PolyImage
+import org.polyfrost.polyui.utils.image
 
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
@@ -52,9 +60,7 @@ object PolyPlusClient {
 
         listOf(
             ApplyCosmetics
-        ).forEach {
-            EventManager.INSTANCE.register(it)
-        }
+        ).forEach(EarlyInitializable::earlyInitialize)
 
         DiscordPresence.initialize()
         PolyConnection.initialize {
@@ -68,6 +74,25 @@ object PolyPlusClient {
 
         refresh()
         PolyPlusConfig.addDefaultCommand(PolyPlusConstants.ID)
+            .then(OmniClientCommands.literal("locker")
+                .executes { ctx ->
+                    ctx.source.openScreen(FullscreenLockerUI.create())
+                })
+            .then(OmniClientCommands.literal("refresh")
+                .executes { ctx ->
+                    refresh()
+                    LOGGER.info("PolyPlus Client refresh triggered via command.")
+                    val text = Text.literal("PolyPlus will refresh in the background.")
+                        .setStyle(MCTextStyle.color(TextColors.GREEN))
+                    ctx.source.replyChat(text)
+                })
+            .then(OmniClientCommands.literal("version")
+                .executes { ctx ->
+                    val text = Text.literal("PolyPlus Client version: ${PolyPlusConstants.VERSION}")
+                        .setStyle(MCTextStyle.color(TextColors.AQUA))
+                    ctx.source.replyChat(text)
+                })
+            .apply(OmniClientCommands::register)
     }
 
     fun refresh() {
@@ -94,5 +119,11 @@ object PolyPlusClient {
             // Update the local player's owned cosmetics
             runCatching { PolyCosmetics.updateOwned() }
         }
+    }
+
+    @JvmStatic
+    fun getOneClientLogo(): PolyImage {
+        val image = "assets/polyplus/brand/oneclient.svg".image()
+        return image
     }
 }
