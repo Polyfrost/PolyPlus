@@ -8,27 +8,22 @@ import kotlinx.coroutines.async
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.responses.Cosmetic
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticList
 import org.polyfrost.polyplus.client.network.http.responses.PlayerCosmetics
 import java.util.UUID
 
 object PolyCosmetics {
     private val LOGGER = LogManager.getLogger()
+    private var OWNED: List<Cosmetic> = emptyList()
     private val CACHE = HashMap<UUID, HashMap<String, Int>>()
 
     suspend fun updateOwned() {
-        val cosmetics = PolyPlusClient.HTTP
+        val playerCosmetics = PolyPlusClient.HTTP
             .getBodyAuthorized<PlayerCosmetics>("${PolyPlusConfig.apiUrl}/cosmetics/player")
             .onFailure { LOGGER.error("Failed to fetch owned cosmetics", it) }
             .getOrElse { return LOGGER.warn("Could not fetch owned cosmetics for player $playerUuid") }
-            .owned
-        for (cosmetic in cosmetics) {
-            CACHE[playerUuid] = CACHE.getOrPut(playerUuid) {
-                HashMap()
-            }.apply {
-                set(cosmetic.type, cosmetic.id)
-            }
-        }
+        OWNED = playerCosmetics.owned
     }
 
     fun getAll(): Deferred<Result<CosmeticList>> = PolyPlusClient.SCOPE.async {
@@ -42,10 +37,19 @@ object PolyCosmetics {
     }
 
     fun reset() {
+        LOGGER.info("Resetting cosmetics cache: Size before reset: ${CACHE.size}")
         CACHE.clear()
     }
 
     fun getFor(uuid: UUID): HashMap<String, Int>? {
         return CACHE[uuid]
+    }
+
+    fun cacheActive(uuid: UUID, type: String, id: Int) {
+        CACHE.getOrPut(uuid) { HashMap() }[type] = id
+    }
+
+    fun removeFromCache(uuid: UUID) {
+        CACHE.remove(uuid)
     }
 }
