@@ -6,6 +6,9 @@
     "injectors": {
         "maxShiftBy": 5
     },
+    "mixins": [
+        "Mixin_NoAI"
+    ],
     "client": [
         "client.Mixin_ReplaceCapeTexture"
     ],
