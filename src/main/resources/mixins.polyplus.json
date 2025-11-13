@@ -10,7 +10,8 @@
         "Mixin_NoAI"
     ],
     "client": [
-        "client.Mixin_ReplaceCapeTexture"
+        "client.Mixin_ReplaceCapeTexture",
+        "client.Mixin_ReplaceOneConfigLogo"
     ],
     "verbose": true
 }

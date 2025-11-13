@@ -95,4 +95,10 @@ object PolyPlusClient {
             runCatching { PolyCosmetics.updateOwned() }
         }
     }
+
+    @JvmStatic
+    fun getOneClientLogo(): PolyImage {
+        val image = "assets/polyplus/brand/oneclient.svg".image()
+        return image
+    }
 }
