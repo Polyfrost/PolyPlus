@@ -13,7 +13,7 @@ class HashManager(val file: File) {
     private var hashJob: Deferred<Unit> = CompletableDeferred()
 
     init {
-        hashJob = PolyPlusClient.SCOPE.async {
+        hashJob = PolyPlusClient.SCOPE.async(Dispatchers.IO) {
             if (!file.exists()) {
                 file.parentFile?.mkdirs()
                 file.createNewFile()
