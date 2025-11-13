@@ -17,7 +17,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(CrashReport.class)
 public class Mixin_NoAI {
     @SuppressWarnings("StringBufferReplaceableByString")
-    @Inject(method = "getCompleteReport", at = @At("RETURN"), cancellable = true)
+    @Inject(
+            //#if MC >= 1.21.1
+            //$$ method = "getFriendlyReport(Lnet/minecraft/ReportType;Ljava/util/List;)Ljava/lang/String;",
+            //#else
+            method = "getCompleteReport",
+            //#endif
+            at = @At("RETURN"),
+            cancellable = true
+    )
     private void addNoAIComment(CallbackInfoReturnable<String> cir) {
         StringBuilder builder = new StringBuilder(cir.getReturnValue());
         builder.append("\n\n").append("---").append("\n");
