@@ -29,6 +29,7 @@ import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.utils.EarlyInitializable
 import org.polyfrost.polyui.data.PolyImage
 import org.polyfrost.polyui.utils.image
 
@@ -59,9 +60,7 @@ object PolyPlusClient {
 
         listOf(
             ApplyCosmetics
-        ).forEach {
-            EventManager.INSTANCE.register(it)
-        }
+        ).forEach(EarlyInitializable::earlyInitialize)
 
         DiscordPresence.initialize()
         PolyConnection.initialize {
