@@ -1,4 +1,4 @@
-@file:Suppress("FunctionName")
+@file:Suppress("FunctionName", "UnstableApiUsage")
 
 package org.polyfrost.polyplus.client.gui
 
@@ -19,6 +19,8 @@ import org.polyfrost.polyui.event.State
 import org.polyfrost.polyui.unit.Align
 import org.polyfrost.polyui.unit.Vec2
 import org.polyfrost.polyui.utils.image
+
+private val ICON_SIZE = Vec2(16f, 16f)
 
 fun CartControls(count: State<Int>): Drawable {
     var cartButton: Drawable? = null
@@ -41,7 +43,7 @@ fun CartControls(count: State<Int>): Drawable {
     val currentCartCount = count.value
     return Group(
         PlusButton(
-            image = createCartIconPath(currentCartCount).image(),
+            image = createCartIcon(currentCartCount),
             text = "Cart",
             radii = floatArrayOf(6f),
             size = Vec2(146f, 32f)
@@ -81,17 +83,19 @@ private fun PlusButton(
     ).withHoverStates().namedId("PlusButton")
 }
 
-private fun createCartIconPath(count: Int): String {
-    if (true) {
-        // Just until the rest are done
-        return "/assets/polyplus/ico/shopping-cart/0.svg"
-    }
-
-    return when {
+private fun createCartIcon(count: Int): PolyImage {
+    val image = if (true) {
+        "/assets/polyplus/ico/shopping-cart/0.svg".image()
+    } else when {
         count <= 0 -> "/assets/polyplus/ico/shopping-cart/0.svg"
         count in 1..9 -> "/assets/polyplus/ico/shopping-cart/$count.svg"
         else -> "/assets/polyplus/ico/shopping-cart/9+.svg"
+    }.image()
+    if (image.size != ICON_SIZE) {
+        PolyImage.setImageSize(image, ICON_SIZE)
     }
+    
+    return image
 }
 
 private fun updateCartIcon(button: Drawable, count: Int) {
@@ -100,7 +104,7 @@ private fun updateCartIcon(button: Drawable, count: Int) {
         icon = button[1]
     }
 
-    (icon as? Image)?.image = createCartIconPath(count).image()
+    (icon as? Image)?.image = createCartIcon(count)
 }
 
 private fun createCheckoutButtonText(count: Int): String {
