@@ -10,6 +10,7 @@
         "Mixin_NoAI"
     ],
     "client": [
+        "client.Mixin_AddCosmeticsPage",
         "client.Mixin_ReplaceCapeTexture",
         "client.Mixin_ReplaceOneConfigLogo"
     ],

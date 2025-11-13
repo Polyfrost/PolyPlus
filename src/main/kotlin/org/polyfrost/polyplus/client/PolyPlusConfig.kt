@@ -1,17 +1,25 @@
 package org.polyfrost.polyplus.client
 
+import dev.deftu.omnicore.api.client.screen.openScreen
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
+import org.polyfrost.oneconfig.api.config.v1.annotations.Button
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.discord.DiscordPresence
+import org.polyfrost.polyplus.client.gui.FullscreenLockerUI
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 
 object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants.NAME, Category.OTHER) {
     @Transient
     private val LOGGER = LogManager.getLogger()
+
+    @Button(title = "Open Locker", description = "Open the PolyPlus Locker UI")
+    fun openLocker() {
+        FullscreenLockerUI.create().openScreen()
+    }
 
     @JvmStatic @Switch(title = "Discord RPC")
     var isDiscordEnabled = true

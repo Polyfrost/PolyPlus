@@ -24,6 +24,7 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.ApplyCosmetics
 import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
 import org.polyfrost.polyplus.client.discord.DiscordPresence
+import org.polyfrost.polyplus.client.gui.FullscreenLockerUI
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -74,6 +75,10 @@ object PolyPlusClient {
 
         refresh()
         PolyPlusConfig.addDefaultCommand(PolyPlusConstants.ID)
+            .then(OmniClientCommands.literal("locker")
+                .executes { ctx ->
+                    ctx.source.openScreen(FullscreenLockerUI.create())
+                })
             .then(OmniClientCommands.literal("refresh")
                 .executes { ctx ->
                     refresh()
