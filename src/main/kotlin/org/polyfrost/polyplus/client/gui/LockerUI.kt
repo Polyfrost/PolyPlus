@@ -25,8 +25,8 @@ object LockerUI {
 private fun LockerPage(): Drawable {
     return Group(
         // Cosmetics List
-        Group(
-            visibleSize = Vec2(610f, 614f),
+        CosmeticList(
+            size = Vec2(610f, 614f),
         ),
 
         // Right sidebar

@@ -5,6 +5,7 @@ import org.polyfrost.oneconfig.api.ui.v1.OCPolyUIBuilder
 import org.polyfrost.oneconfig.api.ui.v1.UIManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyui.animate.SetAnimation
+import org.polyfrost.polyui.color.rgba
 import org.polyfrost.polyui.component.Drawable
 import org.polyfrost.polyui.component.extensions.disable
 import org.polyfrost.polyui.component.extensions.named
@@ -18,6 +19,7 @@ import org.polyfrost.polyui.component.impl.Group
 import org.polyfrost.polyui.component.impl.Image
 import org.polyfrost.polyui.component.impl.Text
 import org.polyfrost.polyui.component.impl.TextInput
+import org.polyfrost.polyui.event.State
 import org.polyfrost.polyui.unit.Align
 import org.polyfrost.polyui.unit.Vec2
 import org.polyfrost.polyui.utils.image
@@ -35,9 +37,12 @@ object FullscreenLockerUI {
         val builder = OCPolyUIBuilder.create()
             .blurs()
             .atResolution(DESIGNED_WIDTH, DESIGNED_HEIGHT)
-            .renderer(uiManager.renderer)
-            .translatorDelegate("assets/${PolyPlusConstants.ID}")
+            .backgroundColor(rgba(21, 21, 21))
+            .size(1499f, 1080f)
+            .translatorDelegate("assets/${PolyPlusConstants.ID}/lang")
+                as OCPolyUIBuilder
 
+        val cartCount = State(0)
         val polyUI = builder.make(
             Group(
                 // Header
@@ -45,7 +50,7 @@ object FullscreenLockerUI {
                     // Left
                     Group(
                         // TODO: Implement navigation history
-                        Image("assets/oneconfig/ico/left-arrow.svg".image()).disable().onClick {
+                        Image("/assets/polyplus/ico/left-arrow.svg".image()).disable().onClick {
 //                            val prev = previous.removeLastOrNull() ?: return@onClick false
 //                            if (previous.isEmpty()) prevArrow?.disable()
 //                            val current = current
@@ -54,7 +59,7 @@ object FullscreenLockerUI {
 //                            nextArrow?.disable(false)
                             false
                         }.named("Back").bindTo(::backArrow),
-                        Image("assets/oneconfig/ico/right-arrow.svg".image()).disable().onClick {
+                        Image("/assets/polyplus/ico/right-arrow.svg".image()).disable().onClick {
 //                            val nextDrawable = next.removeLastOrNull() ?: return@onClick false
 //                            if (next.isEmpty()) nextArrow?.disable()
 //                            openPage(nextDrawable, clearNext = false)
@@ -66,33 +71,39 @@ object FullscreenLockerUI {
 
                     // Right
                     Block(
-                        Image("assets/oneconfig/ico/search.svg".image()).named("SearchIcon"),
+                        Image("/assets/polyplus/ico/search.svg".image()).named("SearchIcon"),
                         TextInput(
                             placeholder = "polyplus.search.placeholder",
-                            visibleSize = Vec2(256f, 32f)
+                            visibleSize = Vec2(210f, 12f)
                         ).onChange { text: String ->
                             // TODO: Filter cosmetics list based on search input
                             false
-                        }.named("SearchInput")
+                        }.named("SearchInput"),
+
+                        size = Vec2(256f, 32f),
+                        alignment = Align(pad = Vec2(10f, 7f))
                     ).onRightClick {
                         (this[1] as TextInput).text = ""
-                    }.withBorder(1f) { page.border5 }.named("SearchField")
+                    }.withBorder(1f) { page.border5 }.named("SearchField"),
+
+                    size = Vec2(1482f, 78f),
+                    alignment = Align(main = Align.Content.SpaceBetween, line = Align.Line.Center),
                 ),
 
                 // Content
                 Group(
                     // Cosmetic list
-                    Group(),
+                    CosmeticList(
+                        size = Vec2(972f, 802f),
+                    ),
 
                     // Sidebar
                     Group(
                         // Purchasing options
-                        Group(
-
-                        ),
+                        CartControls(cartCount),
 
                         // Player preview
-                        Group()
+                        PlayerPreview(),
                     ),
                 ),
 
@@ -100,9 +111,8 @@ object FullscreenLockerUI {
             ),
         )
 
-        val screen = uiManager.createPolyUIScreen(polyUI, DESIGNED_WIDTH, DESIGNED_HEIGHT, false, true) { }
         polyUI.window = uiManager.createWindow()
-        return screen
+        return uiManager.createPolyUIScreen(polyUI, DESIGNED_WIDTH, DESIGNED_HEIGHT, false, true) { }
     }
 
     private fun Drawable.bindTo(ref: KMutableProperty0<Drawable?>): Drawable {
