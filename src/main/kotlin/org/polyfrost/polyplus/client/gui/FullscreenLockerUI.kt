@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.gui
 
+import dev.deftu.omnicore.api.client.player
 import dev.deftu.omnicore.api.client.screen.OmniScreen
 import org.polyfrost.oneconfig.api.ui.v1.OCPolyUIBuilder
 import org.polyfrost.oneconfig.api.ui.v1.UIManager
@@ -81,7 +82,9 @@ object FullscreenLockerUI {
 
                         size = Vec2(256f, 32f),
                         alignment = Align(pad = Vec2(10f, 7f))
-                    ).onRightClick {
+                    ).onClick {
+                        polyUI.focus((this[1] as TextInput))
+                    }.onRightClick {
                         (this[1] as TextInput).text = ""
                     }.withBorder(1f) { page.border5 }.named("SearchField"),
 
@@ -102,7 +105,10 @@ object FullscreenLockerUI {
                         CartControls(cartCount),
 
                         // Player preview
-                        PlayerPreview(),
+                        PlayerPreview(
+                            player = player!!,
+                            size = Vec2(465f, 916f)
+                        ),
 
                         size = Vec2(465f, 973f),
                         alignment = Align(mode = Align.Mode.Vertical, padBetween = Vec2(0f, 12f), padEdges = Vec2(2f, 2f))

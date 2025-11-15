@@ -1,0 +1,2 @@
+net.minecraft.client.gui.screens.inventory.InventoryScreen net.minecraft.client.gui.inventory.GuiInventory
+net.minecraft.client.gui.screens.inventory.InventoryScreen renderEntityInInventory() drawEntityOnScreen()

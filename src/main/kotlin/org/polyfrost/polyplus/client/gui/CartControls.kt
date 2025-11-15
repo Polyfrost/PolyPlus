@@ -94,7 +94,7 @@ private fun createCartIcon(count: Int): PolyImage {
     if (image.size != ICON_SIZE) {
         PolyImage.setImageSize(image, ICON_SIZE)
     }
-    
+
     return image
 }
 
