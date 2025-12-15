@@ -23,6 +23,12 @@ import javax.imageio.ImageIO
  * @author Chris Molini
  */
 object IconLoader {
+    @JvmField
+    val IMAGE_SIZES = when {
+        OmniDesktop.isWindows -> intArrayOf(16, 32)
+        OmniDesktop.isMac -> intArrayOf(128)
+        else -> intArrayOf(32)
+    }
     /*************************************************************************
      * Loads an icon in ByteBuffer form.
      *
@@ -61,17 +67,9 @@ object IconLoader {
 
     @JvmStatic
     fun load(image: BufferedImage): Array<ByteBuffer?> {
-        val buffers: Array<ByteBuffer?>
-        if (OmniDesktop.isWindows) {
-            buffers = arrayOfNulls(2)
-            buffers[0] = loadInstance(image, 16)
-            buffers[1] = loadInstance(image, 32)
-        } else if (OmniDesktop.isMac) {
-            buffers = arrayOfNulls(1)
-            buffers[0] = loadInstance(image, 128)
-        } else {
-            buffers = arrayOfNulls(1)
-            buffers[0] = loadInstance(image, 32)
+        val buffers: Array<ByteBuffer?> = arrayOfNulls(IMAGE_SIZES.size)
+        for (i in IMAGE_SIZES.indices) {
+            buffers[i] = loadInstance(image, IMAGE_SIZES[i])
         }
         return buffers
     }
