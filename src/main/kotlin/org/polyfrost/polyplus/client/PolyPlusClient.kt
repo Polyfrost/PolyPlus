@@ -18,13 +18,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.oneconfig.utils.v1.dsl.addDefaultCommand
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.ApplyCosmetics
 import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
 import org.polyfrost.polyplus.client.discord.DiscordPresence
-import org.polyfrost.polyplus.client.gui.FullscreenLockerUI
+import org.polyfrost.polyplus.client.gui.FullscreenBrowserUI
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -76,7 +75,7 @@ object PolyPlusClient {
         PolyPlusConfig.addDefaultCommand(PolyPlusConstants.ID)
             .then(OmniClientCommands.literal("locker")
                 .executes { ctx ->
-                    ctx.source.openScreen(FullscreenLockerUI.create())
+                    ctx.source.openScreen(FullscreenBrowserUI.create())
                 })
             .then(OmniClientCommands.literal("refresh")
                 .executes { ctx ->
