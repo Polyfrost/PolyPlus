@@ -1,4 +1,4 @@
-package org.polyfrost.polyplus.utils
+package org.polyfrost.polyplus.client.utils
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred

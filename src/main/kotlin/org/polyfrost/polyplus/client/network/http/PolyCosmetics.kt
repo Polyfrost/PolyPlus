@@ -7,7 +7,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.Cosmetic
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticList
 import org.polyfrost.polyplus.client.network.http.responses.PlayerCosmetics
@@ -20,7 +19,7 @@ object PolyCosmetics {
 
     suspend fun updateOwned() {
         val playerCosmetics = PolyPlusClient.HTTP
-            .getBodyAuthorized<PlayerCosmetics>("${PolyPlusConfig.apiUrl}/cosmetics/player")
+            .getBodyAuthorized<PlayerCosmetics>("${PolyPlusClient.apiUrl}/cosmetics/player")
             .onFailure { LOGGER.error("Failed to fetch owned cosmetics", it) }
             .getOrElse { return LOGGER.warn("Could not fetch owned cosmetics for player $playerUuid") }
         OWNED = playerCosmetics.owned
@@ -29,7 +28,7 @@ object PolyCosmetics {
     fun getAll(): Deferred<Result<CosmeticList>> = PolyPlusClient.SCOPE.async {
         runCatching {
             PolyPlusClient.HTTP
-                .get("${PolyPlusConfig.apiUrl}/cosmetics")
+                .get("${PolyPlusClient.apiUrl}/cosmetics")
                 .body<CosmeticList>()
         }.onFailure {
             LOGGER.warn("Failed to fetch all cosmetics: ${it.message}")

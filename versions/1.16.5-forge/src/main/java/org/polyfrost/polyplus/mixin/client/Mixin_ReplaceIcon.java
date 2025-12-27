@@ -1,4 +1,4 @@
-package org.polyfrost.polyplus.mixin;
+package org.polyfrost.polyplus.mixin.client;
 
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
@@ -14,14 +14,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
 @Mixin(value = Minecraft.class, priority = Integer.MIN_VALUE)
 public class Mixin_ReplaceIcon {
-
     @Shadow @Final private Window window;
 
     @Inject(method = "<init>", at = @At("TAIL"), cancellable = true)
@@ -46,4 +44,3 @@ public class Mixin_ReplaceIcon {
         }
     }
 }
-   

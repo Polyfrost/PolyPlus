@@ -11,7 +11,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -66,7 +65,7 @@ object PolyAuthorization {
         val serverId = generateServerId()
         authorizeSessionService(serverId)
         val response = PolyPlusClient.HTTP
-            .post("${PolyPlusConfig.apiUrl}/account/login?server_id=$serverId&username=${playerName}")
+            .post("${PolyPlusClient.apiUrl}/account/login?server_id=$serverId&username=${playerName}")
             .body<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
         return response

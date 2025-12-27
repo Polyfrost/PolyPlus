@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.network.websocket
 
+import dev.deftu.omnicore.api.eventBus
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
@@ -8,15 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.serialization.serializer
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
-import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.events.WebSocketMessage
-import java.util.UUID
 
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
@@ -71,7 +66,7 @@ object PolyConnection {
     private fun start() {
         job = PolyPlusClient.SCOPE.launch {
             try {
-                val apiUrl = PolyPlusConfig.apiUrl.toString()
+                val apiUrl = PolyPlusClient.apiUrl.toString()
                     .replace("http", "ws")
                     .removeSuffix("/")
                 PolyPlusClient.HTTP.webSocket("${apiUrl}/websocket") {
@@ -109,7 +104,7 @@ object PolyConnection {
             LOGGER.error("Error packet received: ${packet.message}")
         }
 
-        EventManager.INSTANCE.post(WebSocketMessage(packet))
+        eventBus.post(WebSocketMessage(packet))
     }
 
     private inline fun <reified T : ServerboundPacket> T.string(): String {

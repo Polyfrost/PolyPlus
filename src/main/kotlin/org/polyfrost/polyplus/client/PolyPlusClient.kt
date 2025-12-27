@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.client
 
 import dev.deftu.omnicore.api.client.commands.OmniClientCommands
+import dev.deftu.omnicore.api.client.commands.argument
+import dev.deftu.omnicore.api.client.commands.command
 import dev.deftu.omnicore.api.client.player.playerUuid
+import dev.deftu.omnicore.api.commands.types.enumerable.EnumArgumentType
+import dev.deftu.omnicore.api.configDirectory
 import dev.deftu.textile.Text
 import dev.deftu.textile.minecraft.MCTextStyle
 import dev.deftu.textile.minecraft.TextColors
@@ -18,22 +22,22 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.utils.v1.dsl.addDefaultCommand
+import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.ApplyCosmetics
 import org.polyfrost.polyplus.client.cosmetics.CosmeticManager
-import org.polyfrost.polyplus.client.discord.DiscordPresence
-import org.polyfrost.polyplus.client.gui.FullscreenBrowserUI
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.utils.EarlyInitializable
-import org.polyfrost.polyui.data.PolyImage
-import org.polyfrost.polyui.utils.image
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
+    private var _cachedApiUrl: BackendUrl? = null
 
     @JvmField val SCOPE = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -54,14 +58,35 @@ object PolyPlusClient {
         install(WebSockets)
     }
 
-    fun initialize() {
-        PolyPlusConfig.preload()
+    @JvmStatic var apiUrl: BackendUrl
+        get() {
+            if (_cachedApiUrl != null) {
+                return _cachedApiUrl!!
+            }
 
+            val file = configDirectory.resolve("${PolyPlusConstants.ID}_api_url.txt")
+            val url = if (file.exists()) {
+                val text = file.readText().trim()
+                BackendUrl.entries.find { it.url == text } ?: BackendUrl.PRODUCTION
+            } else {
+                BackendUrl.PRODUCTION
+            }
+
+            _cachedApiUrl = url
+            return url
+        }
+        set(value) {
+            _cachedApiUrl = value
+
+            val file = configDirectory.resolve("${PolyPlusConstants.ID}_api_url.txt")
+            file.writeText(value.url)
+        }
+
+    fun initialize() {
         listOf(
             ApplyCosmetics
         ).forEach(EarlyInitializable::earlyInitialize)
 
-        DiscordPresence.initialize()
         PolyConnection.initialize {
             LOGGER.info("Connected to PolyPlus WebSocket server.")
 
@@ -72,26 +97,33 @@ object PolyPlusClient {
         }
 
         refresh()
-        PolyPlusConfig.addDefaultCommand(PolyPlusConstants.ID)
-            .then(OmniClientCommands.literal("locker")
-                .executes { ctx ->
-                    ctx.source.openScreen(FullscreenBrowserUI.create())
-                })
-            .then(OmniClientCommands.literal("refresh")
-                .executes { ctx ->
-                    refresh()
-                    LOGGER.info("PolyPlus Client refresh triggered via command.")
-                    val text = Text.literal("PolyPlus will refresh in the background.")
-                        .setStyle(MCTextStyle.color(TextColors.GREEN))
-                    ctx.source.replyChat(text)
-                })
-            .then(OmniClientCommands.literal("version")
-                .executes { ctx ->
+
+        OmniClientCommands.command(PolyPlusConstants.ID) {
+            then("version") {
+                runs { ctx ->
                     val text = Text.literal("PolyPlus Client version: ${PolyPlusConstants.VERSION}")
                         .setStyle(MCTextStyle.color(TextColors.AQUA))
                     ctx.source.replyChat(text)
-                })
-            .apply(OmniClientCommands::register)
+                }
+            }
+
+            then("api") {
+                argument("url", EnumArgumentType.of(BackendUrl.entries.toTypedArray())) {
+                    runs { ctx ->
+                        val url = ctx.argument<BackendUrl>("url")
+                        apiUrl = url
+
+                        LOGGER.info("API URL changed to $apiUrl, refreshing API data...")
+
+                        PolyConnection.reconnect() // Reconnect WebSocket under new URL
+                        refresh() // Refresh API tokens, cosmetic data, etc.
+
+                        ctx.source.replyChat(Text.literal("API URL changed to ${url.url}, refreshing data...")
+                            .setStyle(MCTextStyle.color(TextColors.GREEN)))
+                    }
+                }
+            }
+        }.register()
     }
 
     fun refresh() {
@@ -118,11 +150,5 @@ object PolyPlusClient {
             // Update the local player's owned cosmetics
             runCatching { PolyCosmetics.updateOwned() }
         }
-    }
-
-    @JvmStatic
-    fun getOneClientLogo(): PolyImage {
-        val image = "assets/polyplus/brand/oneclient.svg".image()
-        return image
     }
 }

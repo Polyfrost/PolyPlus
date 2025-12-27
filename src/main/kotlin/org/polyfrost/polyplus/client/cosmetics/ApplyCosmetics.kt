@@ -1,16 +1,17 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import dev.deftu.eventbus.on
+import dev.deftu.omnicore.api.eventBus
 import net.minecraft.network.play.server.S38PacketPlayerListItem
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.api.event.v1.eventHandler
-import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
-import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
+import org.polyfrost.polyplus.client.events.LevelLoadEvent
+import org.polyfrost.polyplus.client.events.ReceivePacketEvent
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.Batcher
+import org.polyfrost.polyplus.client.utils.Batcher
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Duration
 import java.util.UUID
@@ -29,12 +30,12 @@ object ApplyCosmetics : EarlyInitializable {
     }
 
     override fun earlyInitialize() {
-        eventHandler<WorldEvent.Load> {
+        eventBus.on<LevelLoadEvent> {
             PolyCosmetics.reset()
-        }.register()
+        }
 
-        eventHandler<WebSocketMessage> { event ->
-            val cosmeticInfo = event.packet as? ClientboundPacket.CosmeticsInfo ?: return@eventHandler
+        eventBus.on<WebSocketMessage> {
+            val cosmeticInfo = packet as? ClientboundPacket.CosmeticsInfo ?: return@on
 
             // todo: have a map of type to valid ids? or ask ty to include type in the returned info. for now theyre all capes.
             for ((uuid, active) in cosmeticInfo.all) {
@@ -43,10 +44,10 @@ object ApplyCosmetics : EarlyInitializable {
                     LOGGER.info("Cached cosmetic for player $uuid: cape -> $it")
                 }
             }
-        }.register()
+        }
 
-        eventHandler<PacketEvent.Receive> { event ->
-            val packet = event.getPacket<Any>() as? S38PacketPlayerListItem ?: return@eventHandler
+        eventBus.on<ReceivePacketEvent> {
+            val packet = packet as? S38PacketPlayerListItem ?: return@on
 
             //#if MC >= 1.20.1
             //$$ for (action in packet.actions()) {
@@ -58,8 +59,8 @@ object ApplyCosmetics : EarlyInitializable {
         }
 
         //#if MC >= 1.20.1
-        //$$ eventHandler<PacketEvent.Receive> { event ->
-        //$$     val packet = event.getPacket<Any>() as? ClientboundPlayerInfoRemovePacket ?: return@eventHandler
+        //$$ eventBus.on<ReceivePacketEvent> {
+        //$$     val packet = packet as? ClientboundPlayerInfoRemovePacket ?: return@on
         //$$     for (uuid in packet.profileIds) {
         //$$         PolyCosmetics.removeFromCache(uuid)
         //$$     }

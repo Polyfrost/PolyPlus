@@ -11,7 +11,7 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.PolyCosmetics
 import org.polyfrost.polyplus.client.network.http.responses.Cosmetic
-import org.polyfrost.polyplus.utils.HashManager
+import org.polyfrost.polyplus.client.utils.HashManager
 import java.io.File
 import java.util.UUID
 import javax.imageio.ImageIO

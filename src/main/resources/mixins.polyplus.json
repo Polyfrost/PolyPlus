@@ -1,19 +1,19 @@
 {
-  "compatibilityLevel": "${java_version}",
-  "minVersion": "0.8",
-  "package": "org.polyfrost.polyplus.mixin",
-  "refmap": "mixins.${mod_id}.refmap.json",
-  "injectors": {
-    "maxShiftBy": 5
-  },
-  "mixins": [
-    "Mixin_NoAI",
-    "Mixin_ReplaceIcon"
-  ],
-  "client": [
-    "client.Mixin_AddCosmeticsPage",
-    "client.Mixin_ReplaceCapeTexture",
-    "client.Mixin_ReplaceOneConfigLogo"
-  ],
-  "verbose": true
+    "compatibilityLevel": "${java_version}",
+    "minVersion": "0.8",
+    "package": "org.polyfrost.polyplus.mixin",
+    "refmap": "mixins.${mod_id}.refmap.json",
+    "injectors": {
+        "maxShiftBy": 5
+    },
+    "mixins": [
+        "Mixin_NoAI"
+    ],
+    "client": [
+        "client.Mixin_LevelLoadEvent",
+        "client.Mixin_ReceivePacketEvent",
+        "client.Mixin_ReplaceCapeTexture",
+        "client.Mixin_ReplaceIcon"
+    ],
+    "verbose": true
 }

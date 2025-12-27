@@ -3,6 +3,7 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.deftu.gradle.utils.GameSide
 import dev.deftu.gradle.utils.includeOrShade
+import dev.deftu.gradle.utils.version.MinecraftVersions
 
 plugins {
     java
@@ -22,20 +23,6 @@ repositories {
 }
 
 toolkitLoomHelper {
-    useOneConfig {
-        version = "1.0.0-alpha.177"
-        loaderVersion = "1.1.0-alpha.53"
-
-        usePolyMixin = true
-        polyMixinVersion = "0.8.4+build.7"
-
-        applyLoaderTweaker = true
-
-        for (module in arrayOf("commands", "config", "config-impl", "events", "internal", "ui", "utils")) {
-            +module
-        }
-    }
-
     useDevAuth("1.2.1")
     useMixinExtras("0.5.0")
 
@@ -54,6 +41,19 @@ toolkitLoomHelper {
 }
 
 dependencies {
+    modImplementation("dev.deftu:textile-$mcData:1.0.0-beta.13")
+    modImplementation("dev.deftu:omnicore-$mcData:1.0.0-beta.40")
+    if (mcData.version <= MinecraftVersions.VERSION_1_12_2) {
+        implementation(includeOrShade("org.spongepowered:mixin:0.7.11-SNAPSHOT")!!)
+
+        includeOrShade("dev.deftu:textile-$mcData:1.0.0-beta.13")
+        includeOrShade("dev.deftu:omnicore-$mcData:1.0.0-beta.41")
+
+        includeOrShade("org.jetbrains.kotlinx:atomicfu:0.29.0")
+    }
+
+    implementation("org.jetbrains.kotlinx:atomicfu:0.29.0")
+
     implementation(libs.discord.game.sdk4j)
     includeOrShade(libs.discord.game.sdk4j)
 
