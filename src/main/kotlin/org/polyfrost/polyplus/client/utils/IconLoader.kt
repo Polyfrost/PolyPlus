@@ -2,10 +2,10 @@ package org.polyfrost.polyplus.client.utils
 
 
 import dev.deftu.omnicore.api.client.OmniDesktop
+import org.lwjgl.BufferUtils
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
 import java.nio.ByteBuffer
 import javax.imageio.ImageIO
 
@@ -84,7 +84,8 @@ object IconLoader {
      *
      * @return A ByteBuffer of pixel data at the indicated size.
      */
-    private fun loadInstance(image: BufferedImage, dimension: Int): ByteBuffer {
+    @JvmStatic
+    fun loadInstance(image: BufferedImage, dimension: Int): ByteBuffer {
         val scaledIcon = BufferedImage(dimension, dimension, BufferedImage.TYPE_INT_ARGB_PRE)
         val g = scaledIcon.createGraphics()
         val ratio = getIconRatio(image, scaledIcon)
@@ -138,16 +139,18 @@ object IconLoader {
      * @return A ByteBuffer that contains the pixel data of the supplied image.
      */
     fun convertToByteBuffer(image: BufferedImage): ByteBuffer {
-        val buffer = ByteArray(image.width * image.height * 4)
-        var counter = 0
-        for (i in 0..<image.height) for (j in 0..<image.width) {
-            val colorSpace = image.getRGB(j, i)
-            buffer[counter] = ((colorSpace shl 8) shr 24).toByte()
-            buffer[counter + 1] = ((colorSpace shl 16) shr 24).toByte()
-            buffer[counter + 2] = ((colorSpace shl 24) shr 24).toByte()
-            buffer[counter + 3] = (colorSpace shr 24).toByte()
-            counter += 4
+        val (width, height) = image.width to image.height
+        val buffer = BufferUtils.createByteBuffer(width * height * 4)
+
+        for (y in 0..<height) for (x in 0..<width) {
+            val colorSpace = image.getRGB(x, y)
+            val index = (y * width + x) * 4
+            buffer.put(index, ((colorSpace shr 16) and 0xFF).toByte())
+            buffer.put(index + 1, ((colorSpace shr 8) and 0xFF).toByte())
+            buffer.put(index + 2, (colorSpace and 0xFF).toByte())
+            buffer.put(index + 3, ((colorSpace shr 24) and 0xFF).toByte())
         }
-        return ByteBuffer.wrap(buffer)
+
+        return buffer
     }
 }

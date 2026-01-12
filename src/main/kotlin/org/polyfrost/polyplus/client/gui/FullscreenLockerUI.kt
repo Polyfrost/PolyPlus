@@ -5,6 +5,7 @@ import dev.deftu.omnicore.api.client.screen.OmniScreen
 import org.polyfrost.oneconfig.api.ui.v1.OCPolyUIBuilder
 import org.polyfrost.oneconfig.api.ui.v1.UIManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyui.color.Colors
 import org.polyfrost.polyui.color.rgba
 import org.polyfrost.polyui.component.Drawable
 import org.polyfrost.polyui.component.extensions.disable
@@ -75,7 +76,7 @@ object FullscreenLockerUI {
                         TextInput(
                             placeholder = "polyplus.search.placeholder",
                             visibleSize = Vec2(210f, 12f)
-                        ).onChange { text: String ->
+                        ).onChange { text: Colors.Palette ->
                             // TODO: Filter cosmetics list based on search input
                             false
                         }.named("SearchInput"),

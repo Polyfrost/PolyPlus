@@ -24,23 +24,39 @@ public class Mixin_ReplaceIcon {
 
     @Shadow @Final private Window window;
 
-    @Inject(method = "<init>", at = @At("TAIL"), cancellable = true)
+    @Inject(method = "<init>", at = @At("TAIL"))
     private void setWindowIcon(CallbackInfo ci) {
         try (InputStream stream = PolyPlusClient.class.getResourceAsStream("/assets/polyplus/PolyPlusIcon.png")) {
             GLFWImage.Buffer icons = GLFWImage.malloc(2);
             ByteBuffer[] buffers = IconLoader.load(ImageIO.read(Objects.requireNonNull(stream)));
             for (int i = 0; i < buffers.length; i++) {
-                try (GLFWImage image = GLFWImage.malloc()) {
-                    int[] sizes = IconLoader.IMAGE_SIZES;
-                    image.height(sizes[i]);
-                    image.width(sizes[i]);
-                    image.pixels(buffers[i]);
-                    icons.put(i, image);
-                }
+                GLFWImage image = GLFWImage.malloc();
+                int size = IconLoader.IMAGE_SIZES[i];
+
+                image.height(size).width(size).pixels(buffers[i]);
+
+                icons.put(i, image);
             }
 
-            GLFW.glfwSetWindowIcon(this.window.getWindow(), icons);
-            ci.cancel();
+            for (int i = 0; i < buffers.length; i++) {
+                int expected = IconLoader.IMAGE_SIZES[i]
+                        * IconLoader.IMAGE_SIZES[i] * 4;
+
+                System.out.println(
+                        "[PolyPlus] icon " + i +
+                                " expected=" + expected +
+                                " actual=" + buffers[i].remaining() +
+                                " direct=" + buffers[i].isDirect()
+                );
+            }
+
+
+            Minecraft.getInstance().execute(() -> {
+                GLFW.glfwSetWindowIcon(this.window.getWindow(), icons);
+
+                icons.forEach(GLFWImage::free);
+                icons.free();
+            });
         } catch (Exception e) {
             e.printStackTrace();
         }
