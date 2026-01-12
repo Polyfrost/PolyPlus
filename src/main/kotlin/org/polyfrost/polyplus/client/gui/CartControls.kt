@@ -57,8 +57,9 @@ fun CartControls(count: State<Int>): Drawable {
             count.value++
             Unit
         }.setPalette { brand.fg }.named("CheckoutButton").also { checkoutButton = it },
+
         size = Vec2(465f, 32f),
-        alignment = Align(padBetween = Vec2(13f, 0f), padEdges = Vec2.ZERO, wrap = Align.Wrap.NEVER)
+        alignment = Align(padBetween = Vec2(3f, 0f), padEdges = Vec2.ZERO, wrap = Align.Wrap.NEVER)
     ).events {
         Event.Lifetime.Removed then {
             count.removeListener(countListener)
@@ -76,7 +77,7 @@ private fun PlusButton(
 ): Block {
     return Block(
         Image(image).named("Icon"),
-        Text(text, fontSize = 12f),
+        Text(text, fontSize = 14f),
         radii = radii,
         size = size,
         alignment = Align(main = Align.Content.Center, wrap = Align.Wrap.NEVER, pad = padding)
