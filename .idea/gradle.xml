@@ -5,28 +5,17 @@
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="gradleJvm" value="azul-25 (2)" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/versions/1.12.2-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.12.2-forge" />
-            <option value="$PROJECT_DIR$/versions/1.16.5-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.16.5-forge" />
-            <option value="$PROJECT_DIR$/versions/1.20.1-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.20.1-forge" />
-            <option value="$PROJECT_DIR$/versions/1.20.4-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.20.4-forge" />
-            <option value="$PROJECT_DIR$/versions/1.20.4-neoforge" />
             <option value="$PROJECT_DIR$/versions/1.21.1-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.21.1-neoforge" />
+            <option value="$PROJECT_DIR$/versions/1.21.10-fabric" />
+            <option value="$PROJECT_DIR$/versions/1.21.11-fabric" />
             <option value="$PROJECT_DIR$/versions/1.21.4-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.21.4-neoforge" />
             <option value="$PROJECT_DIR$/versions/1.21.5-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.21.5-neoforge" />
             <option value="$PROJECT_DIR$/versions/1.21.8-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.21.8-neoforge" />
-            <option value="$PROJECT_DIR$/versions/1.8.9-fabric" />
-            <option value="$PROJECT_DIR$/versions/1.8.9-forge" />
+            <option value="$PROJECT_DIR$/versions/26.1-fabric" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="true" />

@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.utils
 
 
-import dev.deftu.omnicore.api.client.OmniDesktop
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.lwjgl.BufferUtils
 import java.awt.image.BufferedImage
 import java.io.File
@@ -25,8 +25,8 @@ import javax.imageio.ImageIO
 object IconLoader {
     @JvmField
     val IMAGE_SIZES = when {
-        OmniDesktop.isWindows -> intArrayOf(16, 32)
-        OmniDesktop.isMac -> intArrayOf(128)
+        ClientPlatform.isWindows -> intArrayOf(16, 32)
+        ClientPlatform.isMac -> intArrayOf(128)
         else -> intArrayOf(32)
     }
     /*************************************************************************

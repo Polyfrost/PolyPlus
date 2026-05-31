@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import net.minecraft.network.play.server.S38PacketPlayerListItem
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
@@ -14,13 +15,6 @@ import org.polyfrost.polyplus.utils.Batcher
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Duration
 import java.util.UUID
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.iterator
-
-//#if MC >= 1.20.1
-//$$ import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
-//#endif
 
 object ApplyCosmetics : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -36,7 +30,6 @@ object ApplyCosmetics : EarlyInitializable {
         eventHandler<WebSocketMessage> { event ->
             val cosmeticInfo = event.packet as? ClientboundPacket.CosmeticsInfo ?: return@eventHandler
 
-            // todo: have a map of type to valid ids? or ask ty to include type in the returned info. for now theyre all capes.
             for ((uuid, active) in cosmeticInfo.all) {
                 active.forEach {
                     PolyCosmetics.cacheActive(UUID.fromString(uuid), "cape", it)
@@ -46,45 +39,33 @@ object ApplyCosmetics : EarlyInitializable {
         }.register()
 
         eventHandler<PacketEvent.Receive> { event ->
-            val packet = event.getPacket<Any>() as? S38PacketPlayerListItem ?: return@eventHandler
-
-            //#if MC >= 1.20.1
-            //$$ for (action in packet.actions()) {
-            //$$     processPlayerInfoAction(action, packet.entries())
-            //$$ }
-            //#else
-            processPlayerInfoAction(packet.action, packet.entries)
-            //#endif
+            val packet = event.getPacket<Any>() as? ClientboundPlayerInfoUpdatePacket ?: return@eventHandler
+            for (action in packet.actions()) {
+                processPlayerInfoAction(action, packet.entries())
+            }
         }
 
-        //#if MC >= 1.20.1
-        //$$ eventHandler<PacketEvent.Receive> { event ->
-        //$$     val packet = event.getPacket<Any>() as? ClientboundPlayerInfoRemovePacket ?: return@eventHandler
-        //$$     for (uuid in packet.profileIds) {
-        //$$         PolyCosmetics.removeFromCache(uuid)
-        //$$     }
-        //$$ }
-        //#endif
+        eventHandler<PacketEvent.Receive> { event ->
+            val packet = event.getPacket<Any>() as? ClientboundPlayerInfoRemovePacket ?: return@eventHandler
+            for (uuid in packet.profileIds()) {
+                PolyCosmetics.removeFromCache(uuid)
+            }
+        }
     }
 
-    private fun processPlayerInfoAction(action: S38PacketPlayerListItem.Action, entries: List<S38PacketPlayerListItem.AddPlayerData>) {
+    private fun processPlayerInfoAction(
+        action: ClientboundPlayerInfoUpdatePacket.Action,
+        entries: List<ClientboundPlayerInfoUpdatePacket.Entry>,
+    ) {
         when (action) {
-            S38PacketPlayerListItem.Action.ADD_PLAYER -> {
-                entries.forEach { playerData ->
-                    val uuid = playerData.profile?.id ?: return@forEach
+            ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER -> {
+                entries.forEach { entry ->
+                    val uuid = entry.profileId()
                     if (uuid.isRealPlayer()) {
                         BATCHER.add(uuid.toString())
                     }
                 }
             }
-
-            //#if MC < 1.20.1
-            S38PacketPlayerListItem.Action.REMOVE_PLAYER -> {
-                for (entry in entries) {
-                    PolyCosmetics.removeFromCache(entry.profile.id)
-                }
-            }
-            //#endif
 
             else -> return
         }

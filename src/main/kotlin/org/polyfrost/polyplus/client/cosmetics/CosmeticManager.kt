@@ -1,11 +1,11 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import dev.deftu.omnicore.api.client.OmniClientRuntime
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.minecraft.util.ResourceLocation
+import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -24,7 +24,7 @@ object CosmeticManager {
     private val hashManager = HashManager(DIRECTORY.resolve("hashes.json"))
 
     @JvmStatic
-    fun get(uuid: UUID, type: String): ResourceLocation? {
+    fun get(uuid: UUID, type: String): Identifier? {
         val id = PolyCosmetics.getFor(uuid)?.get(type) ?: return null
         return CACHE[type]?.get(id)?.asResource()
     }
@@ -59,7 +59,7 @@ object CosmeticManager {
                         bytes.inputStream()
                     } else file.inputStream()
 
-                    OmniClientRuntime.runOnMain {
+                    ClientPlatform.runOnMain {
                         CACHE.getOrPut(cosmetic.type) {
                             HashMap()
                         }[cosmetic.id] = when (cosmetic.type) {

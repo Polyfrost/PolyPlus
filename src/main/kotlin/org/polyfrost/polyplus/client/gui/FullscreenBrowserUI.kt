@@ -1,7 +1,8 @@
+/*
 package org.polyfrost.polyplus.client.gui
 
-import dev.deftu.omnicore.api.client.player
-import dev.deftu.omnicore.api.client.screen.OmniScreen
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.OCPolyUIBuilder
 import org.polyfrost.oneconfig.api.ui.v1.UIManager
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -33,7 +34,8 @@ object FullscreenBrowserUI {
     private var backArrow: Drawable? = null
     private var forwardArrow: Drawable? = null
 
-    fun create(): OmniScreen {
+    @Suppress("UNCHECKED_CAST")
+    fun create(): Screen {
         val uiManager = UIManager.INSTANCE
         val builder = OCPolyUIBuilder.create()
             .blurs()
@@ -46,7 +48,7 @@ object FullscreenBrowserUI {
         val polyUI = builder.make(Group(size = Vec2(1499f, 1080f))) // Initialize with a dummy root
         polyUI.window = uiManager.createWindow()
         polyUI.master[0] = createContents(polyUI)
-        return uiManager.createPolyUIScreen(polyUI, DESIGNED_WIDTH, DESIGNED_HEIGHT, false, true) { }
+        return uiManager.createPolyUIScreen(polyUI, DESIGNED_WIDTH, DESIGNED_HEIGHT, false, true) { } as Screen
     }
 
     private fun createContents(polyUI: PolyUI): Drawable {
@@ -117,7 +119,7 @@ object FullscreenBrowserUI {
 
                     // Player preview
                     PlayerPreview(
-                        player = player!!,
+                        player = Minecraft.getInstance().player!!,
                         size = Vec2(465f, 916f)
                     ),
 
@@ -138,3 +140,4 @@ object FullscreenBrowserUI {
         return this
     }
 }
+*/

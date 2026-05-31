@@ -1,29 +1,33 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import dev.deftu.omnicore.api.client.image.OmniImages
-import dev.deftu.omnicore.api.client.textures.OmniTextureHandle
-import dev.deftu.omnicore.api.client.textures.OmniTextures
-import net.minecraft.util.ResourceLocation
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.utils.toNativeImage
 import java.awt.image.BufferedImage
 
 sealed interface CachedCosmetic {
     data object None : CachedCosmetic
 
     data class Cape(val image: BufferedImage) : CachedCosmetic {
-        private var texture: OmniTextureHandle? = null
+        private var location: Identifier? = null
 
-        override fun asResource(): ResourceLocation? {
-            if (texture == null) {
-                val newTexture = OmniTextures.load(OmniImages.from(image))
-                texture = newTexture
-                return OmniTextures.register(newTexture.location, newTexture)
+        override fun asResource(): Identifier? {
+            if (location == null) {
+                val texture = DynamicTexture({ "polyplus:cape/${image.hashCode()}" }, image.toNativeImage())
+                val id = Identifier.fromNamespaceAndPath(
+                    PolyPlusConstants.ID,
+                    "cape/${image.hashCode()}",
+                )
+                Minecraft.getInstance().textureManager.register(id, texture)
+                location = id
             }
-
-            return texture?.location
+            return location
         }
     }
 
-    fun asResource(): ResourceLocation? {
+    fun asResource(): Identifier? {
         return null
     }
 }

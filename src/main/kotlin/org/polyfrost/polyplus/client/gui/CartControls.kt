@@ -1,3 +1,4 @@
+/*
 @file:Suppress("FunctionName", "UnstableApiUsage")
 
 package org.polyfrost.polyplus.client.gui
@@ -124,3 +125,4 @@ private fun updateCheckoutButtonText(button: Drawable, count: Int) {
 
     (text as? Text)?.text = createCheckoutButtonText(count)
 }
+*/

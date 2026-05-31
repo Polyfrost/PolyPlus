@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.discord
 
-import dev.deftu.omnicore.api.client.OmniDesktop
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.utils.io.jvm.javaio.toInputStream
@@ -21,9 +21,9 @@ object DiscordSDK {
     private val fileSuffix: String
         get() {
             return when {
-                OmniDesktop.isWindows -> ".dll"
-                OmniDesktop.isMac -> ".dylib"
-                OmniDesktop.isLinux -> ".so"
+                ClientPlatform.isWindows -> ".dll"
+                ClientPlatform.isMac -> ".dylib"
+                ClientPlatform.isLinux -> ".so"
                 else -> throw UnsupportedOperationException("Unsupported OS for Discord SDK")
             }
         }

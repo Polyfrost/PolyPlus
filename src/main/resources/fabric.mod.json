@@ -5,17 +5,22 @@
     "name": "${mod_name}",
     "description": "${mod_description}",
     "authors": [
-        "Deftu", "SubAt0mic"
+        "Deftu",
+        "SubAt0mic"
     ],
-    "environment": "*",
+    "environment": "client",
     "entrypoints": {
-        "client": ["org.polyfrost.polyplus.PolyPlusEntrypoint"]
+        "client": [
+            "org.polyfrost.polyplus.PolyPlusEntrypoint"
+        ]
     },
     "mixins": [
         "mixins.${mod_id}.json"
     ],
     "depends": {
-        "minecraft": "~${minor_mc_version}",
-        "fabricloader": ">=0.15.11"
+        "minecraft": "${minor_mc_version}",
+        "fabricloader": ">=0.16.0",
+        "java": ">=21",
+        "oneconfigv1": "*"
     }
 }

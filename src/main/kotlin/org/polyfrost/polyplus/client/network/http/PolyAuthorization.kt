@@ -1,7 +1,5 @@
 package org.polyfrost.polyplus.client.network.http
 
-import dev.deftu.omnicore.api.client.client
-import dev.deftu.omnicore.api.client.player.playerName
 import io.ktor.client.call.body
 import io.ktor.client.request.post
 import kotlinx.coroutines.CoroutineStart
@@ -9,15 +7,13 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-
-//#if MC >= 1.20.4
-//$$ import dev.deftu.omnicore.api.client.player.uuid
-//#endif
 
 @OptIn(ExperimentalAtomicApi::class)
 object PolyAuthorization {
@@ -65,8 +61,9 @@ object PolyAuthorization {
     private suspend fun authorize(): AuthResponse {
         val serverId = generateServerId()
         authorizeSessionService(serverId)
+        val playerName = ClientPlatform.localPlayerName()
         val response = PolyPlusClient.HTTP
-            .post("${PolyPlusConfig.apiUrl}/account/login?server_id=$serverId&username=${playerName}")
+            .post("${PolyPlusConfig.apiUrl}/account/login?server_id=$serverId&username=$playerName")
             .body<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
         return response
@@ -79,13 +76,12 @@ object PolyAuthorization {
 
     private fun authorizeSessionService(serverId: String) {
         try {
-            //#if MC >= 1.20.4
-            //$$ val profile = client.uuid
-            //#else
-            val profile = client.session.profile
-            //#endif
-
-            client.sessionService.joinServer(profile, client.session.token, serverId)
+            val client = Minecraft.getInstance()
+            client.services().sessionService.joinServer(
+                ClientPlatform.localPlayerUuid(),
+                client.user.accessToken,
+                serverId,
+            )
         } catch (e: Exception) {
             LOGGER.error("Failed to authenticate with Mojang", e)
         }

@@ -1,8 +1,18 @@
 [versions]
-discord-game-sdk4j = "v0.5.5"
+kotlin = "2.3.0"
+kotlinx-serialization = "2.3.0"
+atomicfu = "0.27.0"
 ktor = "3.3.1"
+discord-game-sdk4j = "v0.5.5"
+mixin-extras = "0.5.0"
+mixin-squared = "0.3.7-beta.1"
+polymixin = "0.8.4+build.7"
+devauth = "1.2.1"
 
 [libraries]
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+
 discord-game-sdk4j = { group = "com.github.JnCrMx", name = "discord-game-sdk4j", version.ref = "discord-game-sdk4j" }
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
@@ -10,7 +20,18 @@ ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-conte
 ktor-server-websockets = { group = "io.ktor", name = "ktor-server-websockets", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
+mixin-extras = { module = "io.github.llamalad7:mixinextras-common", version.ref = "mixin-extras" }
+mixin-squared = { module = "com.github.bawnorton.mixinsquared:mixinsquared-common", version.ref = "mixin-squared" }
+polymixin = { module = "org.polyfrost:polymixin", version.ref = "polymixin" }
+
+devauth-fabric = { module = "me.djtheredstoner:DevAuth-fabric", version.ref = "devauth" }
+
 [bundles]
 ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation"]
 ktor-server = ["ktor-server-websockets"]
 ktor-serialization = ["ktor-serialization-kotlinx-json"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinx-serialization" }
+atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "atomicfu" }

@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.network.http
 
-import dev.deftu.omnicore.api.client.player.playerUuid
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.Deferred
@@ -22,7 +22,7 @@ object PolyCosmetics {
         val playerCosmetics = PolyPlusClient.HTTP
             .getBodyAuthorized<PlayerCosmetics>("${PolyPlusConfig.apiUrl}/cosmetics/player")
             .onFailure { LOGGER.error("Failed to fetch owned cosmetics", it) }
-            .getOrElse { return LOGGER.warn("Could not fetch owned cosmetics for player $playerUuid") }
+            .getOrElse { return LOGGER.warn("Could not fetch owned cosmetics for player ${ClientPlatform.localPlayerUuid()}") }
         OWNED = playerCosmetics.owned
     }
 

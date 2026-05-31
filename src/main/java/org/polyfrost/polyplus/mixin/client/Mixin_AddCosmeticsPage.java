@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import dev.deftu.omnicore.api.client.screen.OmniScreen;
 import org.polyfrost.oneconfig.internal.ui.OneConfigUI;
 import org.polyfrost.polyplus.client.gui.LockerUI;
 import org.polyfrost.polyui.component.Component;
@@ -24,7 +23,7 @@ public class Mixin_AddCosmeticsPage {
     )
     private void polyplus$addCosmeticsButton(
             Component initialScreen,
-            CallbackInfoReturnable<OmniScreen> cir,
+            CallbackInfoReturnable<?> cir,
             @Local Component[] var10005
     ) {
         // Push index 8 and onwards one position to the right

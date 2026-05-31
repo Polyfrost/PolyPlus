@@ -1,3 +1,4 @@
+/*
 package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.gui.inventory.GuiInventory
@@ -23,3 +24,4 @@ fun PlayerPreview(
         }
     }.named("PlayerPreview")
 }
+*/

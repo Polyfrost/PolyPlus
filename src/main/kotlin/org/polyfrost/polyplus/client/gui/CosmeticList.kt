@@ -1,3 +1,4 @@
+/*
 @file:Suppress("FunctionName")
 
 package org.polyfrost.polyplus.client.gui
@@ -169,3 +170,4 @@ private fun CosmeticCard(cosmetic: Cosmetic): Drawable {
         radii = floatArrayOf(12f),
     ).named("CosmeticCard")
 }
+*/

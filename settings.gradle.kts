@@ -1,77 +1,86 @@
-@file:Suppress("PropertyName")
-
-import groovy.lang.MissingPropertyException
+@file:Suppress("UnstableApiUsage")
 
 pluginManagement {
     repositories {
-        // Releases
-        maven("https://maven.deftu.dev/releases")
-        maven("https://maven.fabricmc.net")
-        maven("https://maven.architectury.dev/")
-        maven("https://maven.minecraftforge.net")
-        maven("https://repo.essential.gg/repository/maven-public")
-        maven("https://server.bbkr.space/artifactory/libs-release/")
-        maven("https://jitpack.io/")
-
-        // Snapshots
-        maven("https://maven.deftu.dev/snapshots")
-        mavenLocal()
-
-        // Default
         gradlePluginPortal()
+        maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
+        maven("https://maven.fabricmc.net/")
+        maven("https://repo.polyfrost.org/releases")
         mavenCentral()
     }
 
     plugins {
-        kotlin("jvm") version("2.2.10")
-        kotlin("plugin.serialization") version("2.2.10")
-        id("dev.deftu.gradle.multiversion-root") version("2.62.0")
+        kotlin("jvm") version "2.3.0"
+        kotlin("plugin.serialization") version "2.3.0"
+        id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
+        id("net.fabricmc.fabric-loom-remap") version "1.16-SNAPSHOT"
+        id("org.jetbrains.kotlinx.atomicfu") version "0.27.0"
     }
 }
 
-val projectName: String = extra["mod.name"]?.toString()
-    ?: throw MissingPropertyException("mod.name has not been set.")
+plugins {
+    id("dev.kikugie.stonecutter") version "0.9.4"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 
-// Configures the root project Gradle name based on the value in `gradle.properties`
-rootProject.name = projectName
-rootProject.buildFileName = "root.gradle.kts"
+rootProject.name = "PolyPlus"
 
-// Adds all of our build target versions to the classpath if we need to add version-specific code.
-// Update this list if you want to remove/add a version and/or mod loader.
-// The format is: version-modloader (f.ex: 1.8.9-forge, 1.17.1-fabric, etc)
-// **REMEMBER TO ALSO UPDATE THE `root.gradle.kts` FILE WITH THE NEW VERSION(S).
-listOf(
-    "1.8.9-forge",
-    "1.8.9-fabric",
+val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1")
+val loaders = listOf("fabric")
 
-    "1.12.2-forge",
-    "1.12.2-fabric",
+/** 1.21.11 and below: remapping Loom + Mojang/Parchment mappings. 26.1+ is unobfuscated (no mappings). */
+fun usesFabricObfLoom(mc: String): Boolean {
+    val major = mc.substringBefore('.').toIntOrNull() ?: return true
+    return major < 26
+}
 
-    "1.16.5-forge",
-    "1.16.5-fabric",
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://maven.fabricmc.net/")
+        maven("https://repo.polyfrost.org/releases")
+        maven("https://repo.polyfrost.org/snapshots")
+        maven("https://jitpack.io")
+        maven("https://maven.terraformersmc.com/")
+        maven("https://maven.bawnorton.com/releases")
+        maven("https://maven.parchmentmc.org")
+    }
 
-    "1.20.1-forge",
-    "1.20.1-fabric",
+    versionCatalogs {
+        create("fabric") {
+            from(files("gradle/fabric.versions.toml"))
+        }
 
-    "1.20.4-forge",
-    "1.20.4-neoforge",
-    "1.20.4-fabric",
+        for (mc in mcVersions) {
+            val commonName = "common${mc.replace(".", "")}"
+            create(commonName) {
+                from(files("gradle/common/$mc.versions.toml"))
+            }
+            for (loader in loaders) {
+                val catalogName = "$loader${mc.replace(".", "")}"
+                val file = file("gradle/$loader/$mc.versions.toml")
+                if (file.exists() && file.length() > 0) {
+                    create(catalogName) {
+                        from(files(file))
+                    }
+                } else {
+                    create(catalogName) {
+                        from(files("gradle/common/$mc.versions.toml"))
+                    }
+                }
+            }
+        }
+    }
+}
 
-    "1.21.1-neoforge",
-    "1.21.1-fabric",
+stonecutter.create(rootProject) {
+    vcsVersion = "1.21.8-fabric"
 
-    "1.21.4-neoforge",
-    "1.21.4-fabric",
-
-    "1.21.5-neoforge",
-    "1.21.5-fabric",
-
-    "1.21.8-neoforge",
-    "1.21.8-fabric",
-).forEach { version ->
-    include(":$version")
-    project(":$version").apply {
-        projectDir = file("versions/$version")
-        buildFileName = "../../build.gradle.kts"
+    for (mc in mcVersions) {
+        for (loader in loaders) {
+            val projectName = "$mc-$loader"
+            val buildscript = if (usesFabricObfLoom(mc)) "fabric.obf.gradle.kts" else "fabric.gradle.kts"
+            version(projectName, mc).buildscript = buildscript
+        }
     }
 }
