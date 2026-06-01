@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -14,20 +15,20 @@ internal object RemoteTextures {
     private val registered = LinkedHashMap<Identifier, DynamicTexture>()
 
     fun register(textureId: Identifier, pngFile: Path): Identifier {
-        val client = Minecraft.getInstance()
-        release(textureId)
-
         val nativeImage = Files.newInputStream(pngFile).use(NativeImage::read)
-        val dynamicTexture = DynamicTexture(
-            //? if >= 1.21.5 {
-            { textureId.toString() },
-            //?}
-            nativeImage,
-        )
-        client.textureManager.register(textureId, dynamicTexture)
-        registered[textureId] = dynamicTexture
-        logger.debug("Registered remote texture {}", textureId)
-        return textureId
+        return ClientPlatform.runOnMainSync {
+            release(textureId)
+            val dynamicTexture = DynamicTexture(
+                //? if >= 1.21.5 {
+                { textureId.toString() },
+                //?}
+                nativeImage,
+            )
+            Minecraft.getInstance().textureManager.register(textureId, dynamicTexture)
+            registered[textureId] = dynamicTexture
+            logger.debug("Registered remote texture {}", textureId)
+            textureId
+        }
     }
 
     fun findTexture(root: Path, baseName: String): Path? {
@@ -41,11 +42,13 @@ internal object RemoteTextures {
     }
 
     fun releaseAll() {
-        val client = Minecraft.getInstance()
-        for (id in registered.keys.toList()) {
-            client.textureManager.release(id)
+        ClientPlatform.runOnMainSync {
+            val client = Minecraft.getInstance()
+            for (id in registered.keys.toList()) {
+                client.textureManager.release(id)
+            }
+            registered.clear()
         }
-        registered.clear()
     }
 
     private fun release(textureId: Identifier) {

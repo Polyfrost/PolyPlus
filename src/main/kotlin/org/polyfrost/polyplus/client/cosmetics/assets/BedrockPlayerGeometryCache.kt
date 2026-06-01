@@ -15,14 +15,39 @@ internal object BedrockPlayerGeometryCache {
 
     private val baseDir = File("${PolyPlusConstants.NAME}/cosmetics/_base")
 
+    private val cachedGeometryFile = File(baseDir, "player.geo.json")
+
     @Volatile
     var playerGeometryFile: File? = null
         private set
 
-    fun getOrThrow(): BedrockGeometry =
-        cached ?: playerGeometryFile?.let { path ->
+    fun isReady(): Boolean = cached != null || playerGeometryFile != null
+
+    fun ensureFromDisk() {
+        if (playerGeometryFile == null && cachedGeometryFile.isFile) {
+            playerGeometryFile = cachedGeometryFile
+            cached = null
+        }
+    }
+
+    fun scanCosmeticDirs(cosmeticsBase: File) {
+        ensureFromDisk()
+        if (isReady()) return
+        cosmeticsBase.listFiles()
+            ?.asSequence()
+            ?.filter { it.isDirectory && it.name != "_base" }
+            ?.forEach { dir ->
+                tryCaptureFrom(dir.toPath())
+                if (isReady()) return
+            }
+    }
+
+    fun getOrThrow(): BedrockGeometry {
+        ensureFromDisk()
+        return cached ?: playerGeometryFile?.let { path ->
             Files.newInputStream(path.toPath()).use(BedrockGeometryParser::parse).also { cached = it }
         } ?: throw IllegalStateException("Player geometry has not been downloaded yet")
+    }
 
     fun tryCaptureFrom(root: java.nio.file.Path) {
         val asset = DiskAssetReader.findFirst(root) {

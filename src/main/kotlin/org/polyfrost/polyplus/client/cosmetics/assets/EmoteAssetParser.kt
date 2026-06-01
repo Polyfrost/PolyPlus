@@ -109,7 +109,7 @@ internal object EmoteAssetParser {
 
                 val textureId = Identifier.fromNamespaceAndPath(
                     PolyPlusConstants.ID,
-                    "cosmetics/$pack.name/texture",
+                    "cosmetics/${pack.name}/texture",
                 )
                 listOf(
                     EmoteEffect(

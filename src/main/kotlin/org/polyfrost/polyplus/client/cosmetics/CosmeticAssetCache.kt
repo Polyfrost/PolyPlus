@@ -63,18 +63,29 @@ object CosmeticAssetCache {
 
     suspend fun preloadDefinitions(definitions: Collection<CosmeticDefinition>) {
         withContext(Dispatchers.IO) {
-            hashManager.awaitHashes()
-            if (!baseDir.exists() && !baseDir.mkdirs()) {
-                LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
-                return@withContext
-            }
+            loadLock.withLock {
+                hashManager.awaitHashes()
+                if (!baseDir.exists() && !baseDir.mkdirs()) {
+                    LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
+                    return@withLock
+                }
 
-            for (definition in definitions) {
-                runCatching { ensureLoadedLocked(definition) }
-                    .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
-            }
+                for (definition in definitions) {
+                    runCatching { materializeCosmeticLocked(definition) }
+                        .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it) }
+                }
 
-            hashManager.saveHashes()
+                //? if >= 1.21.1 {
+                BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
+                //?}
+
+                for (definition in definitions) {
+                    runCatching { loadCosmeticAssetsLocked(definition) }
+                        .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
+                }
+
+                hashManager.saveHashes()
+            }
         }
     }
 
@@ -96,6 +107,11 @@ object CosmeticAssetCache {
     }
 
     private suspend fun ensureLoadedLocked(definition: CosmeticDefinition) {
+        materializeCosmeticLocked(definition)
+        loadCosmeticAssetsLocked(definition)
+    }
+
+    private suspend fun materializeCosmeticLocked(definition: CosmeticDefinition) {
         val url = definition.url
         if (url == null && definition.type != CosmeticType.Cape) {
             LOGGER.warn("Cosmetic {} has no download URL", definition.id)
@@ -118,6 +134,11 @@ object CosmeticAssetCache {
             val bytes = PolyPlusClient.HTTP.get(definition.url).bodyAsBytes()
             AssetArchive.materialize(bytes, cosmeticDir)
         }
+    }
+
+    private fun loadCosmeticAssetsLocked(definition: CosmeticDefinition) {
+        val cosmeticDir = baseDir.resolve(definition.id.toString()).toPath()
+        if (!cosmeticDir.toFile().exists()) return
 
         when (definition.type) {
             CosmeticType.Cape -> loadCape(definition.id, cosmeticDir)
@@ -142,6 +163,15 @@ object CosmeticAssetCache {
 
     //? if >= 1.21.1 {
     private fun loadEmote(id: Int, dir: java.nio.file.Path) {
+        BedrockPlayerGeometryCache.tryCaptureFrom(dir)
+        BedrockPlayerGeometryCache.ensureFromDisk()
+        if (!BedrockPlayerGeometryCache.isReady()) {
+            BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
+        }
+        if (!BedrockPlayerGeometryCache.isReady()) {
+            LOGGER.warn("Skipping emote cosmetic {} until player geometry is available", id)
+            return
+        }
         val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
         val parsed = EmoteAssetParser.parse(id, dir, playerGeometry)
         if (parsed.isEmpty()) {
