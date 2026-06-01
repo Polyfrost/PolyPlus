@@ -8,14 +8,17 @@ fun BufferedImage.toNativeImage(): NativeImage {
     for (y in 0 until height) {
         for (x in 0 until width) {
             val argb = getRGB(x, y)
-            val a = (argb ushr 24) and 0xFF
-            val r = (argb ushr 16) and 0xFF
-            val g = (argb ushr 8) and 0xFF
-            val b = argb and 0xFF
 
-            //~ if >= 1.21.4 'setPixelRGBA' -> 'setPixel'
-            native.setPixel(x, y, (a shl 24) or (b shl 16) or (g shl 8) or r)
+            //? if >= 1.21.4
+            native.setPixel(x, y, argb)
+            //? if < 1.21.4
+            /*native.setPixelRGBA(x, y, argb.toAbgr())*/
         }
     }
     return native
 }
+
+private fun Int.toAbgr(): Int =
+    (this and 0xFF00FF00.toInt()) or
+        ((this and 0x00FF0000) ushr 16) or
+        ((this and 0x000000FF) shl 16)

@@ -15,17 +15,28 @@ sealed interface CachedCosmetic {
 
         override fun asResource(): Identifier? {
             if (location == null) {
+                val hash = image.hashCode()
                 val texture = DynamicTexture(
                     //?if >= 1.21.5 {
-                     { "polyplus:cape/${image.hashCode()}" },
+                     { "polyplus:cape/$hash" },
                     //?}
                     image.toNativeImage())
-                val id = Identifier.fromNamespaceAndPath(
+                //? if >= 1.21.10 {
+                val textureId = Identifier.fromNamespaceAndPath(
                     PolyPlusConstants.ID,
-                    "cape/${image.hashCode()}",
+                    "textures/cape/$hash.png",
                 )
-                Minecraft.getInstance().textureManager.register(id, texture)
-                location = id
+                //?} else {
+                /*val textureId = Identifier.fromNamespaceAndPath(
+                    PolyPlusConstants.ID,
+                    "cape/$hash",
+                )*/
+                //?}
+                Minecraft.getInstance().textureManager.register(textureId, texture)
+                location = Identifier.fromNamespaceAndPath(
+                    PolyPlusConstants.ID,
+                    "cape/$hash",
+                )
             }
             return location
         }
