@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.network.websocket
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 
 @Serializable
 sealed interface ServerboundPacket {
@@ -27,7 +27,7 @@ sealed interface ServerboundPacket {
     @Serializable
     @SerialName("SetEquippedCosmetic")
     data class SetEquippedCosmetic(
-        val slot: BodySlot,
+        val slot: CosmeticType,
         @SerialName("cosmetic_id") val cosmeticId: Int?,
     ) : ServerboundPacket
 

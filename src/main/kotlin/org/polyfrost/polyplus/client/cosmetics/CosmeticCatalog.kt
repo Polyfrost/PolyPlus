@@ -12,7 +12,6 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.getBodyAuthorized
 import org.polyfrost.polyplus.client.network.http.putAuthorized
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticList
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -30,7 +29,7 @@ object CosmeticCatalog {
 
     private val cosmeticDefinitions = ConcurrentHashMap<Int, CosmeticDefinition>()
     private val emoteDefinitions = ConcurrentHashMap<Int, CosmeticDefinition>()
-    private val remoteEquipped = ConcurrentHashMap<UUID, Map<BodySlot, Int>>()
+    private val remoteEquipped = ConcurrentHashMap<UUID, Map<CosmeticType, Int>>()
     private var localEquipped: EquippedCosmetics = EquippedCosmetics()
     private var selectedEmoteId: Int? = null
     private var ownedCosmeticIds: Set<Int> = emptySet()
@@ -48,12 +47,12 @@ object CosmeticCatalog {
 
     fun allEmoteDefinitions(): Collection<CosmeticDefinition> = emoteDefinitions.values
 
-    fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[uuid]
+    fun getRemoteEquipped(uuid: UUID): Map<CosmeticType, Int>? = remoteEquipped[uuid]
 
     fun getActiveId(uuid: UUID, type: CosmeticType): Int? =
-        BodySlot.defaultFor(type)?.let { remoteEquipped[uuid]?.get(it) }
+        remoteEquipped[uuid]?.get(type)
 
-    fun getEquippedId(uuid: UUID, slot: BodySlot): Int? =
+    fun getEquippedId(uuid: UUID, slot: CosmeticType): Int? =
         remoteEquipped[uuid]?.get(slot)
 
     fun localEquipped(): EquippedCosmetics = localEquipped
@@ -141,16 +140,16 @@ object CosmeticCatalog {
     }
 
     fun applyRemoteActive(uuid: UUID, cosmeticIds: List<Int>) {
-        val map = mutableMapOf<BodySlot, Int>()
+        val map = mutableMapOf<CosmeticType, Int>()
         for (id in cosmeticIds) {
             val definition = getCosmeticDefinition(id) ?: continue
-            val slot = BodySlot.defaultFor(definition.type) ?: continue
-            map[slot] = id
+            if (!CosmeticType.isEquippableSlot(definition.type)) continue
+            map[definition.type] = id
         }
         applyRemoteEquipped(uuid, map)
     }
 
-    fun applyRemoteEquipped(uuid: UUID, equipment: Map<BodySlot, Int>) {
+    fun applyRemoteEquipped(uuid: UUID, equipment: Map<CosmeticType, Int>) {
         if (equipment.isEmpty()) {
             remoteEquipped.remove(uuid)
         } else {
@@ -158,7 +157,7 @@ object CosmeticCatalog {
         }
     }
 
-    fun applyRemoteEquippedSlot(uuid: UUID, slot: BodySlot, cosmeticId: Int?) {
+    fun applyRemoteEquippedSlot(uuid: UUID, slot: CosmeticType, cosmeticId: Int?) {
         val next = remoteEquipped[uuid].orEmpty().toMutableMap()
         if (cosmeticId == null) {
             next.remove(slot)

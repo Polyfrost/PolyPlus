@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.network.websocket
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 
 @Serializable
 sealed interface ClientboundPacket {
@@ -17,7 +17,7 @@ sealed interface ClientboundPacket {
     @Serializable
     @SerialName("SubscriptionSnapshot")
     data class SubscriptionSnapshot(
-        val equipped: Map<String, Map<BodySlot, Int>>,
+        val equipped: Map<String, Map<CosmeticType, Int>>,
         @SerialName("active_emotes") val activeEmotes: Map<String, Int>,
     ) : ClientboundPacket
 
@@ -25,7 +25,7 @@ sealed interface ClientboundPacket {
     @SerialName("PlayerCosmeticEquipped")
     data class PlayerCosmeticEquipped(
         val player: String,
-        val slot: BodySlot,
+        val slot: CosmeticType,
         @SerialName("cosmetic_id") val cosmeticId: Int?,
     ) : ClientboundPacket
 

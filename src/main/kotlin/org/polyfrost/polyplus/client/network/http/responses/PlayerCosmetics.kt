@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class PlayerCosmetics(
     @SerialName("cosmetics") val owned: List<CosmeticDefinition>,
     val emotes: List<EmoteDefinition> = emptyList(),
-    val equipped: Map<BodySlot, Int> = emptyMap(),
+    val equipped: Map<CosmeticType, Int> = emptyMap(),
 )

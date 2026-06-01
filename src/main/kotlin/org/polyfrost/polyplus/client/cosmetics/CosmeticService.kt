@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -9,7 +8,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object CosmeticService {
     suspend fun equipCape(cosmeticId: Int): Result<Unit> =
-        equip(cosmeticId, BodySlot.Cape)
+        equip(cosmeticId, CosmeticType.Cape)
 
     suspend fun equipEmote(emoteId: Int): Result<Unit> = runCatching {
         require(emoteId in CosmeticCatalog.ownedEmoteIds()) { "Emote #$emoteId is not in your locker" }
@@ -17,7 +16,7 @@ object CosmeticService {
     }
 
     suspend fun clearCape(): Result<Unit> =
-        clearSlot(BodySlot.Cape)
+        clearSlot(CosmeticType.Cape)
 
     suspend fun clearEmote(): Result<Unit> = runCatching {
         CosmeticCatalog.setSelectedEmote(null)
@@ -25,18 +24,25 @@ object CosmeticService {
         PolyConnection.sendPacket(ServerboundPacket.StopEmote).getOrThrow()
     }
 
-    suspend fun equip(cosmeticId: Int, slot: BodySlot? = null): Result<Unit> {
+    suspend fun equip(cosmeticId: Int, slot: CosmeticType? = null): Result<Unit> {
         val definition = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
             ?: return Result.failure(IllegalArgumentException("Unknown cosmetic id $cosmeticId"))
         if (definition.type == CosmeticType.Emote) {
             return equipEmote(cosmeticId)
         }
-        val targetSlot = slot ?: BodySlot.defaultFor(definition.type)
-            ?: return Result.failure(IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped"))
+        val targetSlot = slot ?: definition.type
+        if (!CosmeticType.isEquippableSlot(targetSlot)) {
+            return Result.failure(IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped"))
+        }
+        if (targetSlot != definition.type) {
+            return Result.failure(
+                IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped in slot ${targetSlot.serializedName}"),
+            )
+        }
         return setEquippedAndSync(targetSlot, cosmeticId)
     }
 
-    suspend fun clearSlot(slot: BodySlot): Result<Unit> =
+    suspend fun clearSlot(slot: CosmeticType): Result<Unit> =
         setEquippedAndSync(slot, null)
 
     fun playEmote(emoteId: Int): Result<Unit> = runCatching {
@@ -67,7 +73,7 @@ object CosmeticService {
         }
     }
 
-    private suspend fun setEquippedAndSync(slot: BodySlot, cosmeticId: Int?): Result<Unit> {
+    private suspend fun setEquippedAndSync(slot: CosmeticType, cosmeticId: Int?): Result<Unit> {
         val setResult = CosmeticCatalog.setEquipped(PartialEquippedCosmetics(mapOf(slot to cosmeticId)))
         if (setResult.isFailure) {
             return setResult

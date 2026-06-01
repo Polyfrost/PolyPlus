@@ -11,7 +11,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.emotes.EmoteApi
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -43,14 +42,14 @@ object CosmeticCommands {
                             .then(
                                 commands.argument("slot", StringArgumentType.word())
                                     .suggests { _, builder ->
-                                        for (slot in BodySlot.entries) {
+                                        for (slot in CosmeticType.equippableSlots) {
                                             builder.suggest(slot.serializedName)
                                         }
                                         builder.buildFuture()
                                     }
                                     .executes {
                                         val slotName = StringArgumentType.getString(it, "slot")
-                                        val slot = BodySlot.fromSerializedName(slotName)
+                                        val slot = CosmeticType.fromSerializedName(slotName)
                                         if (slot == null) {
                                             it.source.sendFeedback(
                                                 Component.literal("Unknown cosmetic slot '$slotName'.")
@@ -66,12 +65,11 @@ object CosmeticCommands {
             )
             .then(
                 commands.literal("clear")
-                    .then(commands.literal("cape").executes { clear(it.source, BodySlot.Cape) })
-                    .then(commands.literal("backpack").executes { clear(it.source, BodySlot.Backpack) })
-                    .then(commands.literal("glasses").executes { clear(it.source, BodySlot.Glasses) })
-                    .then(commands.literal("wings").executes { clear(it.source, BodySlot.Wings) })
-                    .then(commands.literal("left_hand").executes { clear(it.source, BodySlot.LeftHand) })
-                    .then(commands.literal("right_hand").executes { clear(it.source, BodySlot.RightHand) })
+                    .then(commands.literal("cape").executes { clear(it.source, CosmeticType.Cape) })
+                    .then(commands.literal("backpack").executes { clear(it.source, CosmeticType.Backpack) })
+                    .then(commands.literal("glasses").executes { clear(it.source, CosmeticType.Glasses) })
+                    .then(commands.literal("wings").executes { clear(it.source, CosmeticType.Wings) })
+                    .then(commands.literal("glove").executes { clear(it.source, CosmeticType.Glove) })
                     .then(commands.literal("emote").executes { clearEmote(it.source) }),
             )
             .then(
@@ -128,14 +126,14 @@ object CosmeticCommands {
     private fun active(source: Source): Int {
         val active = CosmeticCatalog.localEquipped()
         source.sendFeedback(Component.literal("Active cosmetics:").withStyle(ChatFormatting.GRAY))
-        for (slot in BodySlot.entries) {
+        for (slot in CosmeticType.equippableSlots) {
             source.sendFeedback(formatActiveSlot(slot.displayName, active.equipped[slot]))
         }
         source.sendFeedback(formatActiveSlot("Selected emote", CosmeticCatalog.selectedEmoteId()))
         return Command.SINGLE_SUCCESS
     }
 
-    private fun equip(source: Source, cosmeticId: Int, slot: BodySlot?): Int {
+    private fun equip(source: Source, cosmeticId: Int, slot: CosmeticType?): Int {
         PolyPlusClient.refreshCosmeticsIfNeeded()
 
         if (slot == null && CosmeticCatalog.getCosmeticDefinition(cosmeticId) == null && CosmeticCatalog.getEmoteDefinition(cosmeticId) != null) {
@@ -202,7 +200,7 @@ object CosmeticCommands {
         return Command.SINGLE_SUCCESS
     }
 
-    private fun clear(source: Source, slot: BodySlot): Int {
+    private fun clear(source: Source, slot: CosmeticType): Int {
         val label = slot.displayName.lowercase()
         source.sendFeedback(
             Component.literal("Clearing active $label...")

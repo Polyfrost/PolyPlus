@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SetEquippedCosmeticsRequest(
-    val equipped: Map<BodySlot, Int?>,
+    val equipped: Map<CosmeticType, Int?>,
 )
