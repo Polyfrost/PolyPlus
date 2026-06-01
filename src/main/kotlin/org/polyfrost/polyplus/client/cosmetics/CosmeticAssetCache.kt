@@ -46,9 +46,9 @@ object CosmeticAssetCache {
     }
 
     //? if >= 1.21.1 {
-    fun getEmote(cosmeticId: Int): Emote? = emotesById[cosmeticId]
+    fun getEmote(emoteId: Int): Emote? = emotesById[emoteId]
 
-    fun getEmotesForCosmetic(cosmeticId: Int): List<Emote> = emotesByCosmeticId[cosmeticId].orEmpty()
+    fun getEmotesForCosmetic(emoteId: Int): List<Emote> = emotesByCosmeticId[emoteId].orEmpty()
     //?}
 
     fun reset() {
@@ -91,6 +91,22 @@ object CosmeticAssetCache {
 
     suspend fun ensureLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getDefinition(id) ?: return false
+        return ensureLoaded(definition)
+    }
+
+    suspend fun ensureCosmeticLoaded(id: Int): Boolean {
+        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return false
+        return ensureLoaded(definition)
+    }
+
+    //? if >= 1.21.1 {
+    suspend fun ensureEmoteLoaded(id: Int): Boolean {
+        val definition = CosmeticCatalog.getEmoteDefinition(id) ?: return false
+        return ensureLoaded(definition)
+    }
+    //?}
+
+    private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
         return withContext(Dispatchers.IO) {
             loadLock.withLock {
                 runCatching {
@@ -99,7 +115,7 @@ object CosmeticAssetCache {
                     hashManager.saveHashes()
                     true
                 }.getOrElse {
-                    LOGGER.error("Failed to ensure cosmetic {} is loaded", id, it)
+                    LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
                     false
                 }
             }
@@ -118,8 +134,8 @@ object CosmeticAssetCache {
             return
         }
 
-        val cosmeticDir = baseDir.resolve(definition.id.toString()).toPath()
-        val hashKey = definition.id.toString()
+        val cosmeticDir = baseDir.resolve(definition.cacheKey()).toPath()
+        val hashKey = definition.cacheKey()
         val needsDownload = definition.url != null && hashManager.updateHash(hashKey, definition.hash)
 
         if (needsDownload) {
@@ -127,7 +143,7 @@ object CosmeticAssetCache {
             if (cosmeticDirFile.exists()) {
                 cosmeticDirFile.deleteRecursively()
             }
-            val bytes = PolyPlusClient.HTTP.get(definition.url!!).bodyAsBytes()
+            val bytes = PolyPlusClient.HTTP.get(url).bodyAsBytes()
             AssetArchive.materialize(bytes, cosmeticDir)
         } else if (!cosmeticDir.toFile().exists()) {
             if (definition.url == null) return
@@ -137,11 +153,15 @@ object CosmeticAssetCache {
     }
 
     private fun loadCosmeticAssetsLocked(definition: CosmeticDefinition) {
-        val cosmeticDir = baseDir.resolve(definition.id.toString()).toPath()
+        val cosmeticDir = baseDir.resolve(definition.cacheKey()).toPath()
         if (!cosmeticDir.toFile().exists()) return
 
         when (definition.type) {
             CosmeticType.Cape -> loadCape(definition.id, cosmeticDir)
+            CosmeticType.Backpack,
+            CosmeticType.Glasses,
+            CosmeticType.Wings,
+            CosmeticType.Glove -> Unit
             //? if >= 1.21.1 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
             //?} else {
@@ -185,4 +205,10 @@ object CosmeticAssetCache {
         }
     }
     //?}
+
+    private fun CosmeticDefinition.cacheKey(): String =
+        when (type) {
+            CosmeticType.Emote -> "emote-$id"
+            else -> "cosmetic-$id"
+        }
 }

@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.network.websocket
 
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.client.request.bearerAuth
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.events.WebSocketMessage
 
 object PolyConnection {
@@ -50,14 +52,14 @@ object PolyConnection {
             return Result.failure(IllegalStateException("WebSocket is not connected"))
         }
 
-        PolyPlusClient.SCOPE.launch {
-            try {
-                _outgoing.send(message)
-            } catch (e: Exception) {
-                LOGGER.error("Failed to enqueue WebSocket message", e)
+        val result = _outgoing.trySend(message)
+        if (result.isFailure) {
+            val error = result.exceptionOrNull()
+            if (error != null) {
+                LOGGER.error("Failed to enqueue WebSocket message", error)
             }
+            return Result.failure(error ?: IllegalStateException("WebSocket outgoing queue rejected message"))
         }
-
         return Result.success(Unit)
     }
 
@@ -71,7 +73,10 @@ object PolyConnection {
                 val apiUrl = PolyPlusConfig.apiUrl.toString()
                     .replace("http", "ws")
                     .removeSuffix("/")
-                PolyPlusClient.HTTP.webSocket("${apiUrl}/websocket") {
+                val token = PolyAuthorization.current()
+                PolyPlusClient.HTTP.webSocket("${apiUrl}/websocket", request = {
+                    bearerAuth(token)
+                }) {
                     session = this
 
                     val sender = launch {

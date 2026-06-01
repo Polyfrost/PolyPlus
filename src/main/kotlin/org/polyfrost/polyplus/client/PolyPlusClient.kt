@@ -40,6 +40,7 @@ object PolyPlusClient {
     @JvmField val JSON = Json {
         prettyPrint = true
         isLenient = true
+        ignoreUnknownKeys = true
     }
 
     @JvmField val HTTP = HttpClient(CIO) {
@@ -69,6 +70,8 @@ object PolyPlusClient {
 
             SCOPE.launch {
                 PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
+                //? if >= 1.21.1
+                CosmeticSync.resubscribeVisiblePlayers()
                 if (net.minecraft.client.Minecraft.getInstance().player != null) {
                     refreshCosmetics()
                 }

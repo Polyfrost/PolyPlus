@@ -8,6 +8,18 @@ enum class CosmeticType {
     @SerialName("cape")
     Cape,
 
+    @SerialName("backpack")
+    Backpack,
+
+    @SerialName("glasses")
+    Glasses,
+
+    @SerialName("wings")
+    Wings,
+
+    @SerialName("glove")
+    Glove,
+
     @SerialName("emote")
     Emote,
 }

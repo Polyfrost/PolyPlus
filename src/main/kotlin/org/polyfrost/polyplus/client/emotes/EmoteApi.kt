@@ -6,15 +6,16 @@ import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.emotes.conditions.EmoteConditions
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object EmoteApi {
-    fun findEmote(cosmeticId: Int): Emote? = CosmeticAssetCache.getEmote(cosmeticId)
+    fun findEmote(emoteId: Int): Emote? = CosmeticAssetCache.getEmote(emoteId)
 
-    fun play(player: AbstractClientPlayer, cosmeticId: Int): Boolean {
-        val emote = findEmote(cosmeticId) ?: return false
+    fun play(player: AbstractClientPlayer, emoteId: Int): Boolean {
+        val emote = findEmote(emoteId) ?: return false
         return play(player, emote)
     }
 
@@ -27,10 +28,10 @@ object EmoteApi {
         return true
     }
 
-    fun playRemote(cosmeticId: Int) {
+    fun playRemote(emoteId: Int) {
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureLoaded(cosmeticId)) return@launch
-            val emote = findEmote(cosmeticId) ?: return@launch
+            if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
+            val emote = findEmote(emoteId) ?: return@launch
             ClientPlatform.runOnMain {
                 val player = net.minecraft.client.Minecraft.getInstance().player ?: return@runOnMain
                 play(player, emote)
@@ -42,17 +43,11 @@ object EmoteApi {
         (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
     }
 
-    fun playOwnedEmote(player: AbstractClientPlayer, cosmeticId: Int): Boolean {
-        if (cosmeticId !in CosmeticCatalog.ownedIds()) {
+    fun playOwnedEmote(player: AbstractClientPlayer, emoteId: Int): Boolean {
+        if (emoteId !in CosmeticCatalog.ownedEmoteIds()) {
             return false
         }
-        PolyPlusClient.SCOPE.launch {
-            CosmeticAssetCache.ensureLoaded(cosmeticId)
-            ClientPlatform.runOnMain {
-                play(player, cosmeticId)
-            }
-        }
-        return true
+        return CosmeticService.playEmote(emoteId).isSuccess
     }
 }
 //?}

@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client
 
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.IntegerArgumentType
+import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import kotlinx.coroutines.launch
 import net.minecraft.ChatFormatting
@@ -10,6 +11,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.emotes.EmoteApi
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -32,18 +34,45 @@ object CosmeticCommands {
                     .then(
                         commands.argument("id", IntegerArgumentType.integer(1))
                             .suggests { _, builder ->
-                                for (id in CosmeticCatalog.ownedIds().sorted()) {
+                                for (id in CosmeticCatalog.ownedCosmeticIds().sorted()) {
                                     builder.suggest(id)
                                 }
                                 builder.buildFuture()
                             }
-                            .executes { equip(it.source, IntegerArgumentType.getInteger(it, "id")) },
+                            .executes { equip(it.source, IntegerArgumentType.getInteger(it, "id"), slot = null) }
+                            .then(
+                                commands.argument("slot", StringArgumentType.word())
+                                    .suggests { _, builder ->
+                                        for (slot in BodySlot.entries) {
+                                            builder.suggest(slot.serializedName)
+                                        }
+                                        builder.buildFuture()
+                                    }
+                                    .executes {
+                                        val slotName = StringArgumentType.getString(it, "slot")
+                                        val slot = BodySlot.fromSerializedName(slotName)
+                                        if (slot == null) {
+                                            it.source.sendFeedback(
+                                                Component.literal("Unknown cosmetic slot '$slotName'.")
+                                                    .withStyle(ChatFormatting.RED),
+                                            )
+                                            Command.SINGLE_SUCCESS
+                                        } else {
+                                            equip(it.source, IntegerArgumentType.getInteger(it, "id"), slot)
+                                        }
+                                    },
+                            ),
                     ),
             )
             .then(
                 commands.literal("clear")
-                    .then(commands.literal("cape").executes { clear(it.source, CosmeticType.Cape) })
-                    .then(commands.literal("emote").executes { clear(it.source, CosmeticType.Emote) }),
+                    .then(commands.literal("cape").executes { clear(it.source, BodySlot.Cape) })
+                    .then(commands.literal("backpack").executes { clear(it.source, BodySlot.Backpack) })
+                    .then(commands.literal("glasses").executes { clear(it.source, BodySlot.Glasses) })
+                    .then(commands.literal("wings").executes { clear(it.source, BodySlot.Wings) })
+                    .then(commands.literal("left_hand").executes { clear(it.source, BodySlot.LeftHand) })
+                    .then(commands.literal("right_hand").executes { clear(it.source, BodySlot.RightHand) })
+                    .then(commands.literal("emote").executes { clearEmote(it.source) }),
             )
             .then(
                 commands.literal("play")
@@ -67,8 +96,9 @@ object CosmeticCommands {
         }
 
         val definitions = if (ownedOnly) {
-            CosmeticCatalog.ownedIds()
-                .mapNotNull(CosmeticCatalog::getDefinition)
+            CosmeticCatalog.ownedCosmeticIds()
+                .mapNotNull(CosmeticCatalog::getCosmeticDefinition)
+                .plus(CosmeticCatalog.ownedEmoteIds().mapNotNull(CosmeticCatalog::getEmoteDefinition))
                 .sortedBy(CosmeticDefinition::id)
         } else {
             CosmeticCatalog.allDefinitions().sortedBy(CosmeticDefinition::id)
@@ -96,17 +126,31 @@ object CosmeticCommands {
     }
 
     private fun active(source: Source): Int {
-        val active = CosmeticCatalog.localActive()
+        val active = CosmeticCatalog.localEquipped()
         source.sendFeedback(Component.literal("Active cosmetics:").withStyle(ChatFormatting.GRAY))
-        source.sendFeedback(formatActiveSlot("Cape", active.cape))
-        source.sendFeedback(formatActiveSlot("Emote", active.emote))
+        for (slot in BodySlot.entries) {
+            source.sendFeedback(formatActiveSlot(slot.displayName, active.equipped[slot]))
+        }
+        source.sendFeedback(formatActiveSlot("Selected emote", CosmeticCatalog.selectedEmoteId()))
         return Command.SINGLE_SUCCESS
     }
 
-    private fun equip(source: Source, cosmeticId: Int): Int {
+    private fun equip(source: Source, cosmeticId: Int, slot: BodySlot?): Int {
         PolyPlusClient.refreshCosmeticsIfNeeded()
 
-        if (cosmeticId !in CosmeticCatalog.ownedIds()) {
+        if (slot == null && CosmeticCatalog.getCosmeticDefinition(cosmeticId) == null && CosmeticCatalog.getEmoteDefinition(cosmeticId) != null) {
+            return selectEmote(source, cosmeticId)
+        }
+
+        if (slot == null && CosmeticCatalog.getCosmeticDefinition(cosmeticId) == null) {
+            source.sendFeedback(
+                Component.literal("Cosmetic #$cosmeticId is not in the catalog.")
+                    .withStyle(ChatFormatting.RED),
+            )
+            return Command.SINGLE_SUCCESS
+        }
+
+        if (cosmeticId !in CosmeticCatalog.ownedCosmeticIds()) {
             source.sendFeedback(
                 Component.literal("Cosmetic #$cosmeticId is not in your locker.")
                     .withStyle(ChatFormatting.RED),
@@ -120,7 +164,7 @@ object CosmeticCommands {
         )
 
         PolyPlusClient.SCOPE.launch {
-            val result = CosmeticService.equip(cosmeticId)
+            val result = CosmeticService.equip(cosmeticId, slot)
             ClientPlatform.runOnMain {
                 result.fold(
                     onSuccess = {
@@ -141,18 +185,32 @@ object CosmeticCommands {
         return Command.SINGLE_SUCCESS
     }
 
-    private fun clear(source: Source, type: CosmeticType): Int {
-        val label = type.name.lowercase()
+    private fun selectEmote(source: Source, emoteId: Int): Int {
+        if (emoteId !in CosmeticCatalog.ownedEmoteIds()) {
+            source.sendFeedback(
+                Component.literal("Emote #$emoteId is not in your locker.")
+                    .withStyle(ChatFormatting.RED),
+            )
+            return Command.SINGLE_SUCCESS
+        }
+
+        CosmeticCatalog.setSelectedEmote(emoteId)
+        source.sendFeedback(
+            Component.literal("Selected emote #$emoteId.")
+                .withStyle(ChatFormatting.GREEN),
+        )
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun clear(source: Source, slot: BodySlot): Int {
+        val label = slot.displayName.lowercase()
         source.sendFeedback(
             Component.literal("Clearing active $label...")
                 .withStyle(ChatFormatting.GRAY),
         )
 
         PolyPlusClient.SCOPE.launch {
-            val result = when (type) {
-                CosmeticType.Cape -> CosmeticService.clearCape()
-                CosmeticType.Emote -> CosmeticService.clearEmote()
-            }
+            val result = CosmeticService.clearSlot(slot)
             ClientPlatform.runOnMain {
                 result.fold(
                     onSuccess = {
@@ -173,6 +231,16 @@ object CosmeticCommands {
         return Command.SINGLE_SUCCESS
     }
 
+    private fun clearEmote(source: Source): Int {
+        CosmeticCatalog.setSelectedEmote(null)
+        CosmeticService.stopEmote()
+        source.sendFeedback(
+            Component.literal("Cleared selected emote.")
+                .withStyle(ChatFormatting.GREEN),
+        )
+        return Command.SINGLE_SUCCESS
+    }
+
     private fun play(source: Source, cosmeticId: Int?): Int {
         val player = Minecraft.getInstance().player
         if (player == null) {
@@ -183,16 +251,16 @@ object CosmeticCommands {
             return Command.SINGLE_SUCCESS
         }
 
-        val id = cosmeticId ?: CosmeticCatalog.localActive().emote
+        val id = cosmeticId ?: CosmeticCatalog.selectedEmoteId()
         if (id == null) {
             source.sendFeedback(
-                Component.literal("No active emote. Use /polyplus cosmetics equip <id> or play <id>.")
+                Component.literal("No selected emote. Use /polyplus cosmetics equip <id> or play <id>.")
                     .withStyle(ChatFormatting.RED),
             )
             return Command.SINGLE_SUCCESS
         }
 
-        if (id !in CosmeticCatalog.ownedIds()) {
+        if (id !in CosmeticCatalog.ownedEmoteIds()) {
             source.sendFeedback(
                 Component.literal("Emote #$id is not in your locker.")
                     .withStyle(ChatFormatting.RED),
@@ -200,10 +268,10 @@ object CosmeticCommands {
             return Command.SINGLE_SUCCESS
         }
 
-        val definition = CosmeticCatalog.getDefinition(id)
+        val definition = CosmeticCatalog.getEmoteDefinition(id)
         if (definition?.type != CosmeticType.Emote) {
             source.sendFeedback(
-                Component.literal("Cosmetic #$id is not an emote.")
+                Component.literal("Emote #$id is not in the emote catalog.")
                     .withStyle(ChatFormatting.RED),
             )
             return Command.SINGLE_SUCCESS
@@ -234,6 +302,7 @@ object CosmeticCommands {
             return Command.SINGLE_SUCCESS
         }
 
+        CosmeticService.stopEmote()
         EmoteApi.stop(player)
         source.sendFeedback(
             Component.literal("Stopped emote playback.")
@@ -244,7 +313,7 @@ object CosmeticCommands {
 
     private fun formatDefinition(definition: CosmeticDefinition): Component {
         val typeLabel = definition.type.name.lowercase()
-        return Component.literal("#${definition.id} $typeLabel")
+        return Component.literal("#${definition.id} $typeLabel ${definition.name}")
             .withStyle(ChatFormatting.GREEN)
     }
 
@@ -256,9 +325,8 @@ object CosmeticCommands {
     }
 
     private fun ownedEmoteIds(): List<Int> =
-        CosmeticCatalog.ownedIds()
-            .mapNotNull(CosmeticCatalog::getDefinition)
-            .filter { it.type == CosmeticType.Emote }
+        CosmeticCatalog.ownedEmoteIds()
+            .mapNotNull(CosmeticCatalog::getEmoteDefinition)
             .map { it.id }
 }
 //?}
