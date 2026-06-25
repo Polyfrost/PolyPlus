@@ -114,6 +114,7 @@ object BedrockGeometryParser {
             inflate = obj.optionalFloat("inflate", 0f),
             pivot = if (obj.has("pivot")) obj.getAsJsonArray("pivot").toVec3() else null,
             rotation = obj.optionalArray("rotation").toVec3(),
+            mirror = obj.has("mirror") && obj.get("mirror").asBoolean,
         )
     }
 

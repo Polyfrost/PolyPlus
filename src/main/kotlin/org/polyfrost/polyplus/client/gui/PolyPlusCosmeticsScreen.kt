@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,8 +59,8 @@ import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.ceil
@@ -113,16 +114,24 @@ private enum class ShopPanel {
     Cart,
 }
 
+private data class CosmeticVariantUi(val id: Int, val name: String)
+
 private data class CosmeticUiItem(
-    val id: Int,
+    val groupId: Int,
     val type: CosmeticType,
     val name: String,
     val collection: String,
     val owned: Boolean,
     val equipped: Boolean,
+    /** User-facing variants (slim/wide model axis collapsed away). >= 1 entry. */
+    val variants: List<CosmeticVariantUi>,
+    /** Which variant id is currently equipped for this group, if any. */
+    val equippedVariantId: Int?,
 ) {
-    val isNew: Boolean get() = id % 3 == 0
-    val discounted: Boolean get() = id % 5 == 0
+    val id: Int get() = groupId
+    val isNew: Boolean get() = groupId % 3 == 0
+    val discounted: Boolean get() = groupId % 5 == 0
+    val hasVariants: Boolean get() = variants.size > 1
 }
 
 @Composable
@@ -135,6 +144,9 @@ private fun PolyPlusCosmeticsScreen() {
     val allItems = rememberCosmeticItems(refreshKey)
     var selectedId by remember(allItems) { mutableStateOf(allItems.firstOrNull()?.id) }
     val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
+    // User's chosen variant per group (groupId -> variantId). Falls back to the
+    // equipped/first variant via selectedVariantId().
+    val variantPicks = remember { mutableStateMapOf<Int, Int>() }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -172,12 +184,19 @@ private fun PolyPlusCosmeticsScreen() {
                 items = allItems.filter { it.owned },
                 selected = selected,
                 status = status,
+                variantPicks = variantPicks,
                 onSelect = { selectedId = it.id },
+                onSelectVariant = { groupId, variantId -> variantPicks[groupId] = variantId },
                 onEquip = { item ->
-                    status = "Equipping ${item.name}..."
-                    equip(item) {
-                        refreshKey++
-                        status = it
+                    val variantId = selectedVariantId(item, variantPicks)
+                    if (variantId == null) {
+                        status = "${item.name} has no variant to equip."
+                    } else {
+                        status = "Equipping ${item.name}..."
+                        equip(item, variantId) {
+                            refreshKey++
+                            status = it
+                        }
                     }
                 },
             )
@@ -272,7 +291,9 @@ private fun WardrobeScreen(
     items: List<CosmeticUiItem>,
     selected: CosmeticUiItem?,
     status: String?,
+    variantPicks: Map<Int, Int>,
     onSelect: (CosmeticUiItem) -> Unit,
+    onSelectVariant: (Int, Int) -> Unit,
     onEquip: (CosmeticUiItem) -> Unit,
 ) {
     var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
@@ -286,6 +307,7 @@ private fun WardrobeScreen(
         }
     }
 
+    val previewItem = selected?.takeIf { it.type == selectedType } ?: displayItems.firstOrNull()
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(19.dp)) {
         CategoryRail(
             selected = selectedType,
@@ -299,8 +321,12 @@ private fun WardrobeScreen(
             onPrimaryAction = onEquip,
         )
         PreviewPanel(
-            selected = selected?.takeIf { it.type == selectedType } ?: displayItems.firstOrNull(),
+            selected = previewItem,
             status = status,
+            selectedVariantId = previewItem?.let { selectedVariantId(it, variantPicks) },
+            onSelectVariant = { variantId ->
+                previewItem?.let { onSelectVariant(it.groupId, variantId) }
+            },
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
@@ -350,7 +376,7 @@ private fun CategoryRail(
     onSelect: (CosmeticType) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.width(58.dp)) {
-        CosmeticType.entries.forEach { type ->
+        CosmeticType.entries.filter { it != CosmeticType.Unknown }.forEach { type ->
             val isSelected = type == selected
             Box(
                 modifier = Modifier.fillMaxWidth().height(57.dp)
@@ -481,6 +507,8 @@ private fun PreviewPanel(
     selected: CosmeticUiItem?,
     status: String?,
     modifier: Modifier,
+    selectedVariantId: Int? = null,
+    onSelectVariant: (Int) -> Unit = {},
 ) {
     Box(
         modifier = modifier.clip(RoundedCornerShape(12.dp))
@@ -489,13 +517,59 @@ private fun PreviewPanel(
     ) {
         PlayerPreview(Modifier.align(Alignment.Center).size(190.dp, 330.dp))
         if (selected != null) {
-            Column(Modifier.align(Alignment.TopStart).padding(18.dp)) {
-                GuiText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                GuiText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+            Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column {
+                    GuiText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    GuiText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                }
+                if (selected.hasVariants) {
+                    VariantPicker(
+                        variants = selected.variants,
+                        selectedVariantId = selectedVariantId,
+                        onSelect = onSelectVariant,
+                    )
+                }
             }
         }
         if (status != null) {
             GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(18.dp))
+        }
+    }
+}
+
+/**
+ * Chips for selecting which variant of a grouped cosmetic to equip. The chosen
+ * variant is what the Equip button acts on (the client then auto-resolves the
+ * slim/wide model to the player's skin).
+ */
+@Composable
+private fun VariantPicker(
+    variants: List<CosmeticVariantUi>,
+    selectedVariantId: Int?,
+    onSelect: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(220.dp)) {
+        GuiText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        for (row in variants.chunked(2)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (variant in row) {
+                    val isSelected = variant.id == selectedVariantId
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSelected) Accent else LocalTheme.current.chipBackground)
+                            .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, RoundedCornerShape(6.dp))
+                            .clickable { onSelect(variant.id) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    ) {
+                        GuiText(
+                            variant.name,
+                            color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -643,21 +717,53 @@ private fun GuiText(
 private fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
     remember(refreshKey) {
         val ownedIds = CosmeticCatalog.ownedIds()
-        val equipped = CosmeticCatalog.localEquipped().equipped
-        val definitions = CosmeticCatalog.allDefinitions().sortedWith(compareBy<CosmeticDefinition> { it.type.ordinal }.thenBy { it.id })
-        definitions.map { definition ->
-            CosmeticUiItem(
-                id = definition.id,
-                type = definition.type,
-                name = definition.name,
-                collection = "${definition.type.displayName} Collection",
-                owned = definition.id in ownedIds,
-                equipped = equipped[definition.type] == definition.id || definition.type == CosmeticType.Emote && CosmeticCatalog.selectedEmoteId() == definition.id,
-            )
-        }
+        val equippedIds = CosmeticCatalog.localEquipped().equipped.values.toSet()
+        val selectedEmote = CosmeticCatalog.selectedEmoteId()
+
+        val groupItems = CosmeticCatalog.cosmeticGroupViews()
+            .sortedWith(compareBy<CosmeticGroupView> { it.type.ordinal }.thenBy { it.groupId })
+            .map { group ->
+                val byLabel = LinkedHashMap<String, CosmeticVariantUi>()
+                for (variant in group.variants) {
+                    byLabel.getOrPut(variant.variantName) {
+                        CosmeticVariantUi(variant.id, variant.variantName)
+                    }
+                }
+                val equippedVariantId = group.variants.firstOrNull { it.id in equippedIds }?.id
+                CosmeticUiItem(
+                    groupId = group.groupId,
+                    type = group.type,
+                    name = group.name,
+                    collection = "${group.type.displayName} Collection",
+                    owned = group.variants.any { it.id in ownedIds },
+                    equipped = equippedVariantId != null,
+                    variants = byLabel.values.toList(),
+                    equippedVariantId = equippedVariantId,
+                )
+            }
+
+        val emoteItems = CosmeticCatalog.allEmoteDefinitions()
+            .sortedBy { it.id }
+            .map { emote ->
+                CosmeticUiItem(
+                    groupId = emote.id,
+                    type = CosmeticType.Emote,
+                    name = emote.name,
+                    collection = "${CosmeticType.Emote.displayName} Collection",
+                    owned = emote.id in ownedIds,
+                    equipped = selectedEmote == emote.id,
+                    variants = listOf(CosmeticVariantUi(emote.id, emote.name)),
+                    equippedVariantId = if (selectedEmote == emote.id) emote.id else null,
+                )
+            }
+
+        groupItems + emoteItems
     }
 
-private fun equip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
+private fun selectedVariantId(item: CosmeticUiItem, picks: Map<Int, Int>): Int? =
+    picks[item.groupId] ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
+
+private fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) -> Unit) {
     if (!item.owned) {
         onComplete("${item.name} is not in your locker.")
         return
@@ -665,9 +771,9 @@ private fun equip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
 
     PolyPlusClient.SCOPE.launch {
         val result = if (item.type == CosmeticType.Emote) {
-            CosmeticService.equipEmote(item.id)
+            CosmeticService.equipEmote(variantId)
         } else {
-            CosmeticService.equip(item.id, item.type)
+            CosmeticService.equip(variantId)
         }
         ClientPlatform.runOnMain {
             onComplete(

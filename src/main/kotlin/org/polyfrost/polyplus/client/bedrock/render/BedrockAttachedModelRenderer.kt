@@ -43,10 +43,12 @@ object BedrockAttachedModelRenderer {
         for (draw in draws) {
             prepare(draw)
 
-            //? if >= 1.21.11 {
-            val renderType = RenderTypes.entitySolid(draw.texture)
+            //? if >= 26.1 {
+            /*val renderType = RenderTypes.entityCutout(draw.texture)
+            *///?} elif >= 1.21.11 {
+            val renderType = RenderTypes.entityCutoutNoCull(draw.texture)
             //?} else {
-            /*val renderType = RenderType.entitySolid(draw.texture)
+            /*val renderType = RenderType.entityCutoutNoCull(draw.texture)
             *///?}
 
             for (attachment in draw.model.attachments) {
@@ -74,7 +76,7 @@ object BedrockAttachedModelRenderer {
     ) {
         for (draw in draws) {
             prepare(draw)
-            val renderType = RenderType.entitySolid(draw.texture)
+            val renderType = RenderType.entityCutoutNoCull(draw.texture)
             val buffer = bufferSource.getBuffer(renderType)
 
             for (attachment in draw.model.attachments) {

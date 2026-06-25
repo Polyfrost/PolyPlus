@@ -57,6 +57,9 @@ repositories {
     }
     maven("https://redirector.kotlinlang.org/maven/compose-dev")
     maven("https://nexus.prsm.wtf/repository/maven-public/maven-repo/releases/")
+    maven("https://central.sonatype.com/repository/maven-snapshots") {
+        content { includeGroup("net.kyori") }
+    }
     google()
 }
 

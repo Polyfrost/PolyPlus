@@ -6,12 +6,15 @@ import net.minecraft.resources.Identifier
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
-import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 
 object CosmeticApi {
     fun equipped(player: AbstractClientPlayer): Collection<CosmeticEquipment.EquippedEntry> =
         (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped()
+
+    fun equippedSlot(player: AbstractClientPlayer, slot: BodySlot): CosmeticEquipment.EquippedEntry? =
+        (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().get(slot)
 
     fun equipLocal(player: AbstractClientPlayer, cosmetic: AttachedCosmetic): CosmeticEquipResult =
         (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equip(cosmetic)
@@ -19,7 +22,7 @@ object CosmeticApi {
     fun unequip(player: AbstractClientPlayer, cosmeticId: Identifier): Boolean =
         (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().unequip(cosmeticId)
 
-    fun unequipSlot(player: AbstractClientPlayer, slot: PlayerModelBone): Boolean =
+    fun unequipSlot(player: AbstractClientPlayer, slot: BodySlot): Boolean =
         (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().unequip(slot)
 
     fun clear(player: AbstractClientPlayer) {

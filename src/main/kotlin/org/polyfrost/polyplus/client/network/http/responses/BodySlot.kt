@@ -8,18 +8,18 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-@Serializable(with = CosmeticType.Serializer::class)
-enum class CosmeticType {
+@Serializable(with = BodySlot.Serializer::class)
+enum class BodySlot {
     Cape,
     Backpack,
     Glasses,
     Wings,
-    Glove,
+    LeftHand,
+    RightHand,
     Hat,
     Aura,
     Boots,
     Shoulder,
-    Emote,
     Unknown;
 
     val serializedName: String
@@ -28,12 +28,12 @@ enum class CosmeticType {
             Backpack -> "backpack"
             Glasses -> "glasses"
             Wings -> "wings"
-            Glove -> "glove"
+            LeftHand -> "left_hand"
+            RightHand -> "right_hand"
             Hat -> "hat"
             Aura -> "aura"
             Boots -> "boots"
             Shoulder -> "shoulder"
-            Emote -> "emote"
             Unknown -> "unknown"
         }
 
@@ -43,42 +43,47 @@ enum class CosmeticType {
             Backpack -> "Backpack"
             Glasses -> "Glasses"
             Wings -> "Wings"
-            Glove -> "Glove"
+            LeftHand -> "Left Hand"
+            RightHand -> "Right Hand"
             Hat -> "Hat"
             Aura -> "Aura"
             Boots -> "Boots"
             Shoulder -> "Shoulder"
-            Emote -> "Emote"
             Unknown -> "Unknown"
         }
 
-    fun defaultSlot(): BodySlot? = when (this) {
-        Cape -> BodySlot.Cape
-        Backpack -> BodySlot.Backpack
-        Glasses -> BodySlot.Glasses
-        Wings -> BodySlot.Wings
-        Glove -> BodySlot.RightHand
-        Hat -> BodySlot.Hat
-        Aura -> BodySlot.Aura
-        Boots -> BodySlot.Boots
-        Shoulder -> BodySlot.Shoulder
-        Emote, Unknown -> null
+    fun cosmeticType(): CosmeticType = when (this) {
+        Cape -> CosmeticType.Cape
+        Backpack -> CosmeticType.Backpack
+        Glasses -> CosmeticType.Glasses
+        Wings -> CosmeticType.Wings
+        LeftHand, RightHand -> CosmeticType.Glove
+        Hat -> CosmeticType.Hat
+        Aura -> CosmeticType.Aura
+        Boots -> CosmeticType.Boots
+        Shoulder -> CosmeticType.Shoulder
+        Unknown -> CosmeticType.Unknown
     }
 
     companion object {
-        fun fromSerializedName(name: String): CosmeticType? =
+        val equippableSlots: List<BodySlot> =
+            listOf(Cape, Backpack, Glasses, Wings, LeftHand, RightHand, Hat, Aura, Boots, Shoulder)
+
+        fun fromSerializedName(name: String): BodySlot? =
             entries.firstOrNull { it != Unknown && it.serializedName == name }
+
+        fun isEquippableSlot(slot: BodySlot): Boolean = slot in equippableSlots
     }
 
-    internal object Serializer : KSerializer<CosmeticType> {
+    internal object Serializer : KSerializer<BodySlot> {
         override val descriptor: SerialDescriptor =
-            PrimitiveSerialDescriptor("CosmeticType", PrimitiveKind.STRING)
+            PrimitiveSerialDescriptor("BodySlot", PrimitiveKind.STRING)
 
-        override fun serialize(encoder: Encoder, value: CosmeticType) {
+        override fun serialize(encoder: Encoder, value: BodySlot) {
             encoder.encodeString(value.serializedName)
         }
 
-        override fun deserialize(decoder: Decoder): CosmeticType =
+        override fun deserialize(decoder: Decoder): BodySlot =
             fromSerializedName(decoder.decodeString()) ?: Unknown
     }
 }

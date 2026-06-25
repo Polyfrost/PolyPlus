@@ -4,14 +4,14 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class EquippedCosmetics(
-    val equipped: Map<CosmeticType, Int> = emptyMap(),
+    val equipped: Map<BodySlot, Int> = emptyMap(),
 ) {
     val cape: Int?
-        get() = equipped[CosmeticType.Cape]
+        get() = equipped[BodySlot.Cape]
 
     fun ids(): List<Int> = equipped.values.toList()
 
-    fun with(slot: CosmeticType, cosmeticId: Int?): EquippedCosmetics {
+    fun with(slot: BodySlot, cosmeticId: Int?): EquippedCosmetics {
         val next = equipped.toMutableMap()
         if (cosmeticId == null) {
             next.remove(slot)
@@ -24,5 +24,5 @@ data class EquippedCosmetics(
 
 @Serializable
 data class PartialEquippedCosmetics(
-    val equipped: Map<CosmeticType, Int?>,
+    val equipped: Map<BodySlot, Int?>,
 )

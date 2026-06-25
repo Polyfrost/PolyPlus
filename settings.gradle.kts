@@ -26,7 +26,7 @@ plugins {
 
 rootProject.name = "PolyPlus"
 
-val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1")
+val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2")
 val loaders = listOf("fabric")
 
 /** 1.21.11 and below: remapping Loom + Mojang/Parchment mappings. 26.1+ is unobfuscated (no mappings). */

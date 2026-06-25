@@ -12,7 +12,9 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.getBodyAuthorized
 import org.polyfrost.polyplus.client.network.http.putAuthorized
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticGroupResponse
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticList
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.EmoteList
@@ -29,7 +31,9 @@ object CosmeticCatalog {
 
     private val cosmeticDefinitions = ConcurrentHashMap<Int, CosmeticDefinition>()
     private val emoteDefinitions = ConcurrentHashMap<Int, CosmeticDefinition>()
-    private val remoteEquipped = ConcurrentHashMap<UUID, Map<CosmeticType, Int>>()
+
+    private val groupMeta = ConcurrentHashMap<Int, GroupMeta>()
+    private val remoteEquipped = ConcurrentHashMap<UUID, Map<BodySlot, Int>>()
     private var localEquipped: EquippedCosmetics = EquippedCosmetics()
     private var selectedEmoteId: Int? = null
     private var ownedCosmeticIds: Set<Int> = emptySet()
@@ -47,12 +51,12 @@ object CosmeticCatalog {
 
     fun allEmoteDefinitions(): Collection<CosmeticDefinition> = emoteDefinitions.values
 
-    fun getRemoteEquipped(uuid: UUID): Map<CosmeticType, Int>? = remoteEquipped[uuid]
+    fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[uuid]
 
-    fun getActiveId(uuid: UUID, type: CosmeticType): Int? =
-        remoteEquipped[uuid]?.get(type)
+    fun getActiveId(uuid: UUID, slot: BodySlot): Int? =
+        remoteEquipped[uuid]?.get(slot)
 
-    fun getEquippedId(uuid: UUID, slot: CosmeticType): Int? =
+    fun getEquippedId(uuid: UUID, slot: BodySlot): Int? =
         remoteEquipped[uuid]?.get(slot)
 
     fun localEquipped(): EquippedCosmetics = localEquipped
@@ -80,10 +84,23 @@ object CosmeticCatalog {
         }.onFailure { LOGGER.error("Failed to fetch emote catalog", it) }
             .getOrNull()
 
+        // Drop groups whose type this client version doesn't recognize
+        val knownGroups = cosmetics.contents.filter { it.type != CosmeticType.Unknown }
+        val skipped = cosmetics.contents.size - knownGroups.size
+        if (skipped > 0) {
+            LOGGER.warn("Ignored {} cosmetic group(s) with unknown type/slot", skipped)
+        }
+
+        val flattened = knownGroups.flatMap { it.flatten() }
+
         lock.withLock {
             cosmeticDefinitions.clear()
-            for (definition in cosmetics.contents) {
+            for (definition in flattened) {
                 cosmeticDefinitions[definition.id] = definition
+            }
+            groupMeta.clear()
+            for (group in knownGroups) {
+                groupMeta[group.id] = group.toMeta()
             }
             emoteDefinitions.clear()
             for (definition in emotes?.contents.orEmpty()) {
@@ -92,11 +109,12 @@ object CosmeticCatalog {
         }
 
         //? if >= 1.21.1 {
-        CosmeticAssetCache.preloadDefinitions(cosmetics.contents + emotes?.contents.orEmpty().map { it.asCosmeticDefinition() })
+        CosmeticAssetCache.preloadDefinitions(flattened + emotes?.contents.orEmpty().map { it.asCosmeticDefinition() })
         //?}
         LOGGER.info(
-            "Loaded {} cosmetic definition(s) and {} emote definition(s) from API",
-            cosmetics.contents.size,
+            "Loaded {} cosmetic group(s) ({} variant(s)) and {} emote definition(s) from API",
+            knownGroups.size,
+            flattened.size,
             emotes?.contents?.size ?: 0,
         )
     }
@@ -107,17 +125,24 @@ object CosmeticCatalog {
             .onFailure { LOGGER.error("Failed to fetch player cosmetics", it) }
             .getOrNull() ?: return
 
+        val ownedGroups = player.owned.filter { it.type != CosmeticType.Unknown }
+        val ownedDefs = ownedGroups.flatMap { it.flatten() }
+        val equippedKnown = player.equipped.filterKeys { it != BodySlot.Unknown }
+
         lock.withLock {
-            localEquipped = EquippedCosmetics(player.equipped)
-            ownedCosmeticIds = player.owned.map { it.id }.toSet()
+            localEquipped = EquippedCosmetics(equippedKnown)
+            ownedCosmeticIds = ownedDefs.map { it.id }.toSet()
             ownedEmoteIds = player.emotes.map { it.id }.toSet()
             selectedEmoteId?.let {
                 if (it !in ownedEmoteIds) {
                     selectedEmoteId = null
                 }
             }
-            for (definition in player.owned) {
+            for (definition in ownedDefs) {
                 cosmeticDefinitions[definition.id] = definition
+            }
+            for (group in ownedGroups) {
+                groupMeta[group.id] = group.toMeta()
             }
             for (definition in player.emotes) {
                 emoteDefinitions[definition.id] = definition.asCosmeticDefinition()
@@ -125,7 +150,7 @@ object CosmeticCatalog {
         }
 
         //? if >= 1.21.1 {
-        CosmeticAssetCache.preloadDefinitions(player.owned + player.emotes.map { it.asCosmeticDefinition() })
+        CosmeticAssetCache.preloadDefinitions(ownedDefs + player.emotes.map { it.asCosmeticDefinition() })
         //?}
     }
 
@@ -140,24 +165,26 @@ object CosmeticCatalog {
     }
 
     fun applyRemoteActive(uuid: UUID, cosmeticIds: List<Int>) {
-        val map = mutableMapOf<CosmeticType, Int>()
+        val map = mutableMapOf<BodySlot, Int>()
         for (id in cosmeticIds) {
             val definition = getCosmeticDefinition(id) ?: continue
-            if (!CosmeticType.isEquippableSlot(definition.type)) continue
-            map[definition.type] = id
+            val slot = definition.preferredSlot() ?: continue
+            map[slot] = id
         }
         applyRemoteEquipped(uuid, map)
     }
 
-    fun applyRemoteEquipped(uuid: UUID, equipment: Map<CosmeticType, Int>) {
-        if (equipment.isEmpty()) {
+    fun applyRemoteEquipped(uuid: UUID, equipment: Map<BodySlot, Int>) {
+        val known = equipment.filterKeys { it != BodySlot.Unknown }
+        if (known.isEmpty()) {
             remoteEquipped.remove(uuid)
         } else {
-            remoteEquipped[uuid] = equipment
+            remoteEquipped[uuid] = known
         }
     }
 
-    fun applyRemoteEquippedSlot(uuid: UUID, slot: CosmeticType, cosmeticId: Int?) {
+    fun applyRemoteEquippedSlot(uuid: UUID, slot: BodySlot, cosmeticId: Int?) {
+        if (slot == BodySlot.Unknown) return
         val next = remoteEquipped[uuid].orEmpty().toMutableMap()
         if (cosmeticId == null) {
             next.remove(slot)
@@ -171,13 +198,84 @@ object CosmeticCatalog {
         remoteEquipped.remove(uuid)
     }
 
+    /**
+     * Cosmetic groups for the picker UI: one entry per buyable cosmetic
+     * Emotes are excluded (they have their own list)
+     */
+    fun cosmeticGroupViews(): List<CosmeticGroupView> =
+        groupMeta.values.mapNotNull { meta ->
+            val variants = meta.variantIds.mapNotNull { cosmeticDefinitions[it] }
+            if (variants.isEmpty()) {
+                null
+            } else {
+                CosmeticGroupView(meta.id, meta.type, meta.name, meta.allowedSlots, variants)
+            }
+        }
+
+    fun groupContaining(id: Int): CosmeticGroupView? =
+        cosmeticGroupViews().firstOrNull { group ->
+            group.groupId == id || group.variants.any { it.id == id }
+        }
+
+    /**
+     * The user-facing variants of a group (label -> representative variant id),
+     * in backend order, with the slim/wide model axis collapsed away.
+     */
+    fun userFacingVariants(group: CosmeticGroupView): List<Pair<String, Int>> {
+        val byLabel = LinkedHashMap<String, Int>()
+        for (variant in group.variants) {
+            byLabel.getOrPut(variant.variantName) { variant.id }
+        }
+        return byLabel.map { it.key to it.value }
+    }
+
+    fun ownedCosmeticGroupIds(): List<Int> =
+        cosmeticGroupViews()
+            .filter { group -> group.variants.any { it.id in ownedCosmeticIds } }
+            .map { it.groupId }
+
+    /**
+     * Resolves the variant id to actually equip for a user-facing choice
+     */
+    fun resolveVariantForSkin(variantId: Int, slim: Boolean): Int {
+        val definition = cosmeticDefinitions[variantId] ?: return variantId
+        if (definition.model == null) return variantId
+        val meta = groupMeta[definition.groupId] ?: return variantId
+        val wanted = if (slim) "slim" else "wide"
+        val sibling = meta.variantIds
+            .asSequence()
+            .mapNotNull { cosmeticDefinitions[it] }
+            .firstOrNull { it.variantName == definition.variantName && it.model == wanted }
+        return sibling?.id ?: variantId
+    }
+
     fun reset() {
         cosmeticDefinitions.clear()
         emoteDefinitions.clear()
+        groupMeta.clear()
         remoteEquipped.clear()
         localEquipped = EquippedCosmetics()
         selectedEmoteId = null
         ownedCosmeticIds = emptySet()
         ownedEmoteIds = emptySet()
     }
+
+    private data class GroupMeta(
+        val id: Int,
+        val type: CosmeticType,
+        val name: String,
+        val allowedSlots: List<BodySlot>,
+        val variantIds: List<Int>,
+    )
+
+    private fun CosmeticGroupResponse.toMeta(): GroupMeta =
+        GroupMeta(id, type, name, allowedSlots, variants.map { it.id })
 }
+
+data class CosmeticGroupView(
+    val groupId: Int,
+    val type: CosmeticType,
+    val name: String,
+    val allowedSlots: List<BodySlot>,
+    val variants: List<CosmeticDefinition>,
+)

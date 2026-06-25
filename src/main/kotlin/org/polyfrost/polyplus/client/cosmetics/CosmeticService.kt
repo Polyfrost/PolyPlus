@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosmetics
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -8,7 +9,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object CosmeticService {
     suspend fun equipCape(cosmeticId: Int): Result<Unit> =
-        equip(cosmeticId, CosmeticType.Cape)
+        equip(cosmeticId, BodySlot.Cape)
 
     suspend fun equipEmote(emoteId: Int): Result<Unit> = runCatching {
         require(emoteId in CosmeticCatalog.ownedEmoteIds()) { "Emote #$emoteId is not in your locker" }
@@ -16,7 +17,7 @@ object CosmeticService {
     }
 
     suspend fun clearCape(): Result<Unit> =
-        clearSlot(CosmeticType.Cape)
+        clearSlot(BodySlot.Cape)
 
     suspend fun clearEmote(): Result<Unit> = runCatching {
         CosmeticCatalog.setSelectedEmote(null)
@@ -24,25 +25,35 @@ object CosmeticService {
         PolyConnection.sendPacket(ServerboundPacket.StopEmote).getOrThrow()
     }
 
-    suspend fun equip(cosmeticId: Int, slot: CosmeticType? = null): Result<Unit> {
-        val definition = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
+    suspend fun equip(cosmeticId: Int, slot: BodySlot? = null): Result<Unit> {
+        val requested = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
             ?: return Result.failure(IllegalArgumentException("Unknown cosmetic id $cosmeticId"))
-        if (definition.type == CosmeticType.Emote) {
+        if (requested.type == CosmeticType.Emote) {
             return equipEmote(cosmeticId)
         }
-        val targetSlot = slot ?: definition.type
-        if (!CosmeticType.isEquippableSlot(targetSlot)) {
-            return Result.failure(IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped"))
+        // slim/wide is auto-picked by the local player's skin model, not chosen
+        // by the user
+        val resolvedId = if (requested.model != null) {
+            val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+            CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
+        } else {
+            cosmeticId
         }
-        if (targetSlot != definition.type) {
+        val definition = CosmeticCatalog.getCosmeticDefinition(resolvedId) ?: requested
+        val targetSlot = slot ?: definition.preferredSlot()
+            ?: return Result.failure(IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped"))
+        if (!BodySlot.isEquippableSlot(targetSlot)) {
+            return Result.failure(IllegalArgumentException("Cosmetic #$resolvedId cannot be equipped"))
+        }
+        if (!definition.allowsSlot(targetSlot)) {
             return Result.failure(
-                IllegalArgumentException("Cosmetic #$cosmeticId cannot be equipped in slot ${targetSlot.serializedName}"),
+                IllegalArgumentException("Cosmetic #$resolvedId cannot be equipped in slot ${targetSlot.serializedName}"),
             )
         }
-        return setEquippedAndSync(targetSlot, cosmeticId)
+        return setEquippedAndSync(targetSlot, resolvedId)
     }
 
-    suspend fun clearSlot(slot: CosmeticType): Result<Unit> =
+    suspend fun clearSlot(slot: BodySlot): Result<Unit> =
         setEquippedAndSync(slot, null)
 
     fun playEmote(emoteId: Int): Result<Unit> = runCatching {
@@ -73,7 +84,7 @@ object CosmeticService {
         }
     }
 
-    private suspend fun setEquippedAndSync(slot: CosmeticType, cosmeticId: Int?): Result<Unit> {
+    private suspend fun setEquippedAndSync(slot: BodySlot, cosmeticId: Int?): Result<Unit> {
         val setResult = CosmeticCatalog.setEquipped(PartialEquippedCosmetics(mapOf(slot to cosmeticId)))
         if (setResult.isFailure) {
             return setResult

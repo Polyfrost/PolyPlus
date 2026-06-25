@@ -39,6 +39,12 @@ data class BedrockCube(
     val inflate: Float,
     val pivot: Vector3f? = null,
     val rotation: Vector3f = Vector3f(),
+    /**
+     * Horizontal texture flip (Bedrock `"mirror"`). Independent of a negative
+     * [size]
+     * Auto-detected for mirrored bone pairs in AttachedCosmeticParser.
+     */
+    val mirror: Boolean = false,
 )
 
 data class BedrockCubeUv(

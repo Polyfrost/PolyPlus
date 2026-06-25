@@ -14,10 +14,13 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 //? if >= 1.21.1 {
+import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
 import org.polyfrost.polyplus.client.cosmetics.assets.BedrockPlayerGeometryCache
 import org.polyfrost.polyplus.client.cosmetics.assets.EmoteAssetParser
+import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.emotes.Emote
 //?}
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.utils.HashManager
@@ -37,11 +40,12 @@ object CosmeticAssetCache {
     //? if >= 1.21.1 {
     private val emotesByCosmeticId = HashMap<Int, List<Emote>>()
     private val emotesById = HashMap<Int, Emote>()
+    private val attachedById = HashMap<Int, AttachedCosmetic>()
     //?}
 
     @JvmStatic
     fun getCapeTexture(uuid: UUID): Identifier? {
-        val id = CosmeticCatalog.getActiveId(uuid, CosmeticType.Cape) ?: return null
+        val id = CosmeticCatalog.getActiveId(uuid, BodySlot.Cape) ?: return null
         return capes[id]?.asResource()
     }
 
@@ -49,6 +53,10 @@ object CosmeticAssetCache {
     fun getEmote(emoteId: Int): Emote? = emotesById[emoteId]
 
     fun getEmotesForCosmetic(emoteId: Int): List<Emote> = emotesByCosmeticId[emoteId].orEmpty()
+
+    fun getAttachedCosmetic(id: Int): AttachedCosmetic? = attachedById[id]
+
+    fun attachedCosmeticId(id: Int): Identifier = AttachedCosmeticParser.attachedCosmeticId(id)
     //?}
 
     fun reset() {
@@ -56,6 +64,7 @@ object CosmeticAssetCache {
         //? if >= 1.21.1 {
         emotesByCosmeticId.clear()
         emotesById.clear()
+        attachedById.clear()
         RemoteTextures.releaseAll()
         BedrockPlayerGeometryCache.reset()
         //?}
@@ -161,7 +170,17 @@ object CosmeticAssetCache {
             CosmeticType.Backpack,
             CosmeticType.Glasses,
             CosmeticType.Wings,
-            CosmeticType.Glove -> Unit
+            CosmeticType.Glove,
+            CosmeticType.Hat,
+            CosmeticType.Aura,
+            CosmeticType.Boots,
+            CosmeticType.Shoulder ->
+                //? if >= 1.21.1 {
+                loadAttachedCosmetic(definition.id, cosmeticDir, definition.preferredSlot() ?: return)
+                //?} else {
+                /*LOGGER.warn("Attached cosmetics require Minecraft 1.21.1+")*/
+                //?}
+            CosmeticType.Unknown -> LOGGER.warn("Ignoring cosmetic {} with unknown type/slot", definition.id)
             //? if >= 1.21.1 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
             //?} else {
@@ -176,12 +195,36 @@ object CosmeticAssetCache {
             ?: dir.resolve("asset.bin").toFile().takeIf { it.exists() }
             ?: return
 
+        val image = runCatching { ImageIO.read(png) }.getOrNull()
+        if (image == null) {
+            LOGGER.warn("Failed to decode cape image for cosmetic {} from {}", id, png)
+            return
+        }
+
         ClientPlatform.runOnMain {
-            capes[id] = CachedCosmetic.Cape(ImageIO.read(png))
+            capes[id] = CachedCosmetic.Cape(image)
         }
     }
 
     //? if >= 1.21.1 {
+    private fun loadAttachedCosmetic(id: Int, dir: java.nio.file.Path, slot: BodySlot) {
+        BedrockPlayerGeometryCache.tryCaptureFrom(dir)
+        BedrockPlayerGeometryCache.ensureFromDisk()
+        if (!BedrockPlayerGeometryCache.isReady()) {
+            BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
+        }
+        if (!BedrockPlayerGeometryCache.isReady()) {
+            LOGGER.warn("Skipping cosmetic {} until player geometry is available", id)
+            return
+        }
+        val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
+        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry) ?: return
+
+        ClientPlatform.runOnMain {
+            attachedById[id] = attached
+        }
+    }
+
     private fun loadEmote(id: Int, dir: java.nio.file.Path) {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()

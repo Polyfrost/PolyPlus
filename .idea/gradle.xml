@@ -16,6 +16,7 @@
             <option value="$PROJECT_DIR$/versions/1.21.5-fabric" />
             <option value="$PROJECT_DIR$/versions/1.21.8-fabric" />
             <option value="$PROJECT_DIR$/versions/26.1-fabric" />
+            <option value="$PROJECT_DIR$/versions/26.2-fabric" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="true" />

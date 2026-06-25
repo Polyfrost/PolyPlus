@@ -4,6 +4,11 @@ plugins {
 
 stonecutter active "1.21.11-fabric"
 
+// Used to preprocess mixin json file
+stonecutter handlers {
+    inherit("json5", "json")
+}
+
 stonecutter parameters {
     constants {
         match(current.project.substringAfterLast("-"), "fabric")

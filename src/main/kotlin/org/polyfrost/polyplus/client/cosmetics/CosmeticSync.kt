@@ -11,6 +11,7 @@ import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -165,14 +166,25 @@ object CosmeticSync : EarlyInitializable {
             return
         }
 
+        //? if >= 1.21.1 {
+        reconcileAttachedCosmetics(player, uuid)
+        //?}
+
         for (id in cosmeticIds) {
             val definition = CosmeticCatalog.getDefinition(id) ?: continue
             when (definition.type) {
                 CosmeticType.Cape -> Unit
+                // Backpack/Glasses/Wings/Glove are reconciled from the catalog
+                // above so unequips are handled even when no id is passed here.
                 CosmeticType.Backpack,
                 CosmeticType.Glasses,
                 CosmeticType.Wings,
-                CosmeticType.Glove -> Unit
+                CosmeticType.Glove,
+                CosmeticType.Hat,
+                CosmeticType.Aura,
+                CosmeticType.Boots,
+                CosmeticType.Shoulder -> Unit
+                CosmeticType.Unknown -> Unit
                 //? if >= 1.21.1 {
                 CosmeticType.Emote -> applyEmote(player, id)
                 //?}
@@ -181,6 +193,45 @@ object CosmeticSync : EarlyInitializable {
     }
 
     //? if >= 1.21.1 {
+    private val ATTACHED_SLOTS = listOf(
+        BodySlot.Backpack,
+        BodySlot.Glasses,
+        BodySlot.Wings,
+        BodySlot.LeftHand,
+        BodySlot.RightHand,
+        BodySlot.Hat,
+        BodySlot.Aura,
+        BodySlot.Boots,
+        BodySlot.Shoulder,
+    )
+
+    private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
+        val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
+        for (slot in ATTACHED_SLOTS) {
+            val desiredId = equipped[slot]
+            val current = CosmeticApi.equippedSlot(player, slot)
+
+            if (desiredId == null) {
+                if (current != null) CosmeticApi.unequipSlot(player, slot)
+                continue
+            }
+
+            if (current != null && current.cosmetic.id == CosmeticAssetCache.attachedCosmeticId(desiredId)) {
+                continue
+            }
+
+            PolyPlusClient.SCOPE.launch {
+                if (!CosmeticAssetCache.ensureCosmeticLoaded(desiredId)) return@launch
+                val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId) ?: return@launch
+                ClientPlatform.runOnMain {
+                    if (CosmeticCatalog.getActiveId(uuid, slot) != desiredId) return@runOnMain
+                    CosmeticApi.unequipSlot(player, slot)
+                    CosmeticApi.equipLocal(player, attached.copy(slot = slot))
+                }
+            }
+        }
+    }
+
     private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
