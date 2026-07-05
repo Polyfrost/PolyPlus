@@ -13,8 +13,8 @@ pluginManagement {
         kotlin("jvm") version "2.3.0"
         kotlin("plugin.serialization") version "2.3.0"
         kotlin("plugin.compose") version "2.3.0"
-        id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
-        id("net.fabricmc.fabric-loom-remap") version "1.16-SNAPSHOT"
+        id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
+        id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT"
         id("org.jetbrains.kotlinx.atomicfu") version "0.27.0"
     }
 }
@@ -42,7 +42,9 @@ dependencyResolutionManagement {
         maven("https://repo.polyfrost.org/releases")
         maven("https://repo.polyfrost.org/snapshots")
         maven("https://jitpack.io")
-        maven("https://maven.terraformersmc.com/")
+        maven("https://maven.terraformersmc.com/releases") {
+            content { includeGroup("com.terraformersmc") }
+        }
         maven("https://maven.bawnorton.com/releases")
         maven("https://maven.parchmentmc.org")
         maven("https://redirector.kotlinlang.org/maven/compose-dev")

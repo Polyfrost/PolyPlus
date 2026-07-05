@@ -20,6 +20,14 @@ sealed interface ClientboundPacket {
         val equipped: Map<String, Map<BodySlot, Int>>,
         @SerialName("active_emotes") val activeEmotes: Map<String, Int>,
         @SerialName("particle_colors") val particleColors: Map<String, Int> = emptyMap(),
+        val users: List<String> = emptyList(),
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayerPresence")
+    data class PlayerPresence(
+        val player: String,
+        val online: Boolean,
     ) : ClientboundPacket
 
     @Serializable

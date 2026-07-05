@@ -82,6 +82,7 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
 
 //? if >= 1.21.4 {
 private fun resolveEquipment(entityId: Int): CosmeticEquipment? {
+    org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewEquipment(entityId)?.let { return it }
     val level = Minecraft.getInstance().level ?: return null
     val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return null
     if (entity !is PlayerCosmeticsAccess) return null

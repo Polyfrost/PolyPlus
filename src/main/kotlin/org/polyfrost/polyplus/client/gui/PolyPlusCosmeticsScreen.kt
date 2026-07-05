@@ -58,9 +58,13 @@ import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.ceil
@@ -515,7 +519,10 @@ private fun PreviewPanel(
             .background(cardBrush())
             .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
     ) {
-        PlayerPreview(Modifier.align(Alignment.Center).size(190.dp, 330.dp))
+        PlayerPreview(
+            Modifier.align(Alignment.Center).size(190.dp, 330.dp),
+            source = rememberPreviewSource(selectedVariantId),
+        )
         if (selected != null) {
             Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column {
@@ -673,19 +680,21 @@ private fun CheckerThumbnail(modifier: Modifier) {
 }
 
 @Composable
-private fun PlayerPreview(modifier: Modifier) {
-    Box(modifier) {
-        Box(Modifier.align(Alignment.TopCenter).offset(y = 8.dp).size(72.dp).background(Color(0xFFC58A5C), RoundedCornerShape(6.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(y = 8.dp).size(72.dp, 22.dp).background(Color(0xFF6B3F25), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(y = 86.dp).size(88.dp, 116.dp).background(Color(0xFF163D9E), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset((-62).dp, 96.dp).size(34.dp, 112.dp).background(Color(0xFF244FB8), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(62.dp, 96.dp).size(34.dp, 112.dp).background(Color(0xFF244FB8), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset((-24).dp, 204.dp).size(34.dp, 112.dp).background(Color(0xFF151A21), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(24.dp, 204.dp).size(34.dp, 112.dp).background(Color(0xFF151A21), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(y = 122.dp).size(18.dp, 94.dp).background(Color(0xFFE4BD56), RoundedCornerShape(8.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(y = 196.dp).size(112.dp, 18.dp).background(Color(0xFF7E2419), RoundedCornerShape(4.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset((-24).dp, 300.dp).size(36.dp, 20.dp).background(Color(0xFF8F271C), RoundedCornerShape(5.dp)))
-        Box(Modifier.align(Alignment.TopCenter).offset(24.dp, 300.dp).size(36.dp, 20.dp).background(Color(0xFF8F271C), RoundedCornerShape(5.dp)))
+private fun rememberPreviewSource(selectedVariantId: Int?): PlayerPreviewSource {
+    if (selectedVariantId == null) return PlayerPreviewSource.LocalLive
+
+    var loadTick by remember(selectedVariantId) { mutableIntStateOf(0) }
+    LaunchedEffect(selectedVariantId) {
+        if (CosmeticAssetCache.getAttachedCosmetic(selectedVariantId) == null) {
+            CosmeticAssetCache.ensureCosmeticLoaded(selectedVariantId)
+            loadTick++
+        }
+    }
+
+    return remember(selectedVariantId, loadTick) {
+        val equipment = CosmeticEquipment()
+        CosmeticAssetCache.getAttachedCosmetic(selectedVariantId)?.let { equipment.equip(it) }
+        PlayerPreviewSource.Override(equipment)
     }
 }
 

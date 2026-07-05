@@ -36,6 +36,7 @@ object CosmeticCatalog {
     private val groupMeta = ConcurrentHashMap<Int, GroupMeta>()
     private val remoteEquipped = ConcurrentHashMap<UUID, Map<BodySlot, Int>>()
     private val particleColors = ConcurrentHashMap<UUID, Int>()
+    private val polyPlusUsers = ConcurrentHashMap.newKeySet<UUID>()
     private var localEquipped: EquippedCosmetics = EquippedCosmetics()
     private var selectedEmoteId: Int? = null
     private var ownedCosmeticIds: Set<Int> = emptySet()
@@ -63,6 +64,16 @@ object CosmeticCatalog {
 
     fun clearParticleColor(uuid: UUID) {
         particleColors.remove(uuid)
+    }
+
+    fun isPolyPlusUser(uuid: UUID): Boolean = uuid in polyPlusUsers
+
+    fun setPolyPlusUser(uuid: UUID, online: Boolean) {
+        if (online) polyPlusUsers.add(uuid) else polyPlusUsers.remove(uuid)
+    }
+
+    fun clearPolyPlusUser(uuid: UUID) {
+        polyPlusUsers.remove(uuid)
     }
 
     fun getActiveId(uuid: UUID, slot: BodySlot): Int? =
@@ -216,6 +227,7 @@ object CosmeticCatalog {
     fun removeRemote(uuid: UUID) {
         remoteEquipped.remove(uuid)
         particleColors.remove(uuid)
+        polyPlusUsers.remove(uuid)
     }
 
     /**
@@ -275,6 +287,7 @@ object CosmeticCatalog {
         groupMeta.clear()
         remoteEquipped.clear()
         particleColors.clear()
+        polyPlusUsers.clear()
         localEquipped = EquippedCosmetics()
         selectedEmoteId = null
         ownedCosmeticIds = emptySet()

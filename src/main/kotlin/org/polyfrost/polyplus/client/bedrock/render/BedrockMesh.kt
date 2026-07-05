@@ -290,11 +290,11 @@ class BedrockMesh private constructor(
                 return quads
             }
 
-            addFace(arrayOf(south1, south0, north0, north1), u2, v0, u22, v1, Direction.DOWN)
-            addFace(arrayOf(north2, north3, south3, south2), u1, v1, u2, v0, Direction.UP)
-            addFace(arrayOf(north0, south0, south3, north3), u2, v1, u3, v2, Direction.WEST)
+            addFace(arrayOf(south1, south0, north0, north1), u1, v1, u2, v0, Direction.DOWN)
+            addFace(arrayOf(north2, north3, south3, south2), u2, v0, u22, v1, Direction.UP)
+            addFace(arrayOf(north0, south0, south3, north3), u0, v1, u1, v2, Direction.WEST)
             addFace(arrayOf(north1, north0, north3, north2), u1, v1, u2, v2, Direction.NORTH)
-            addFace(arrayOf(south1, north1, north2, south2), u0, v1, u1, v2, Direction.EAST)
+            addFace(arrayOf(south1, north1, north2, south2), u2, v1, u3, v2, Direction.EAST)
             addFace(arrayOf(south0, south1, south2, south3), u3, v1, u4, v2, Direction.SOUTH)
             return quads
         }

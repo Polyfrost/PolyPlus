@@ -1,0 +1,17 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "polyplus:badge_font.png",
+      "ascent": 7,
+      "height": 8,
+      "chars": ["\uE000"]
+    },
+    {
+      "type": "space",
+      "advances": {
+        "\uE001": 2
+      }
+    }
+  ]
+}

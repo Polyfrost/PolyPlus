@@ -50,6 +50,10 @@ object CosmeticSync : EarlyInitializable {
                 is ClientboundPacket.SubscriptionSnapshot -> handleSubscriptionSnapshot(packet)
                 is ClientboundPacket.PlayerCosmeticEquipped -> handlePlayerCosmeticEquipped(packet)
                 is ClientboundPacket.PlayerParticleColorChanged -> handleParticleColorChanged(packet)
+                is ClientboundPacket.PlayerPresence -> {
+                    LOGGER.info("PolyPlus presence: {} is now {}", packet.player, if (packet.online) "online" else "offline")
+                    CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.online)
+                }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
                 //? if >= 1.21.1 {
                 is ClientboundPacket.PlayerEmoteStarted -> handleEmotePlay(packet.player, packet.emoteId)
@@ -127,6 +131,12 @@ object CosmeticSync : EarlyInitializable {
         }
         for ((uuidString, emoteId) in packet.activeEmotes) {
             handleEmotePlay(uuidString, emoteId)
+        }
+        if (packet.users.isNotEmpty()) {
+            LOGGER.info("PolyPlus presence snapshot: {} online user(s): {}", packet.users.size, packet.users)
+        }
+        for (uuidString in packet.users) {
+            CosmeticCatalog.setPolyPlusUser(UUID.fromString(uuidString), true)
         }
     }
 
@@ -294,6 +304,9 @@ object CosmeticSync : EarlyInitializable {
             .filter(subscribedPlayers::remove)
         if (removed.isEmpty()) {
             return Result.success(Unit)
+        }
+        for (uuidString in removed) {
+            CosmeticCatalog.clearPolyPlusUser(UUID.fromString(uuidString))
         }
         return PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
     }

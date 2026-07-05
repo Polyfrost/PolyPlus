@@ -12,7 +12,20 @@
     "client.Mixin_ReplaceCapeTexture",
     "client.Mixin_OneConfigNavigationGraph",
     "client.Mixin_OneConfigNavigationGroups",
-    "client.Mixin_ThemeRegistryBranding"
+    "client.Mixin_ThemeRegistryBranding",
+    "client.NameTagBadgeMixin",
+    "client.Mixin_ReplaceMainMenuEarly",
+    "client.Mixin_ReplaceMainMenu",
+    "client.Mixin_TrackRecentServers",
+    "client.Mixin_MainMenuFpsLimit"
+    //? if < 26.1 {
+    /*,
+    "client.Mixin_PanoramaBlurRadius"
+    *///?}
+    //? if >= 1.21.11 && < 26.1 {
+    /*,
+    "client.PlayerTabBadgeMixin"
+    *///?}
     //? if >= 1.21.1 {
     ,
     "client.cosmetics.AbstractClientPlayerMixin",

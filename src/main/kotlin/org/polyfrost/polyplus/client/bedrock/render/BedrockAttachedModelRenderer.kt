@@ -46,10 +46,10 @@ object BedrockAttachedModelRenderer {
             prepare(draw)
 
             //? if >= 26.1 {
-            /*val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutout(draw.texture)
-            *///?} elif >= 1.21.11 {
-            val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutoutNoCull(draw.texture)
-            //?} else {
+            val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutout(draw.texture)
+            //?} elif >= 1.21.11 {
+            /*val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutoutNoCull(draw.texture)
+            *///?} else {
             /*val renderType = if (draw.translucent) RenderType.entityTranslucent(draw.texture) else RenderType.entityCutoutNoCull(draw.texture)
             *///?}
 

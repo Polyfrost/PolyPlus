@@ -11,10 +11,10 @@ object PolyPlusCommands {
 
     internal typealias commands =
         //? if >= 26.1 {
-        /*net.fabricmc.fabric.api.client.command.v2.ClientCommands
-        *///?} else {
-        net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
-        //?}
+        net.fabricmc.fabric.api.client.command.v2.ClientCommands
+        //?} else {
+        /*net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
+        *///?}
 
     fun register() {
         //? if fabric {
@@ -43,6 +43,17 @@ object PolyPlusCommands {
                     Component.literal("PolyPlus Client version: ${PolyPlusConstants.VERSION}")
                         .withStyle(ChatFormatting.AQUA),
                 )
+                Command.SINGLE_SUCCESS
+            })
+            .then(commands.literal("mainmenu").executes { _ ->
+                val client = net.minecraft.client.Minecraft.getInstance()
+                if (client.isSameThread) {
+                    client.setScreen(org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen())
+                } else {
+                    client.execute {
+                        client.setScreen(org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen())
+                    }
+                }
                 Command.SINGLE_SUCCESS
             })
 
