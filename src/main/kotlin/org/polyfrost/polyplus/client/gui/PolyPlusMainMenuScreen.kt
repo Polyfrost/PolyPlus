@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -339,6 +340,20 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
     return PolyPlusConfig.mainMenuBackground == MainMenuBackground.PANORAMA
 }
 
+private fun mcGuiScaleFactor(): Float {
+    val mc = net.minecraft.client.Minecraft.getInstance()
+    val current = mc.window.guiScale.toFloat()
+    val auto = mc.window.calculateScale(0, mc.isEnforceUnicode).toFloat().coerceAtLeast(1f)
+    return (current / auto).coerceIn(0.01f, 1f)
+}
+
+private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier =
+    graphicsLayer {
+        scaleX = factor
+        scaleY = factor
+        transformOrigin = origin
+    }
+
 @Composable
 private fun MainMenu(
     actions: MenuActions,
@@ -372,7 +387,8 @@ private fun MainMenu(
             },
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val scale = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
+            val guiScale = mcGuiScaleFactor()
+            val scale = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT) * guiScale
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -383,12 +399,18 @@ private fun MainMenu(
                     },
             ) {
                 CenterColumn(Modifier.align(Alignment.Center), actions, assetsReady)
-                LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
+                if (!PolyPlusConfig.hideMainMenuQuickplay) {
+                    LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
+                }
                 RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady)
             }
+            WindowControls(
+                Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
+                actions,
+                assetsReady,
+            )
+            Footer(Modifier.fillMaxSize(), scale, assetsReady)
         }
-        WindowControls(Modifier.align(Alignment.TopEnd).padding(16.dp), actions, assetsReady)
-        Footer(Modifier.fillMaxSize(), assetsReady)
     }
 }
 
@@ -479,6 +501,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (!PolyPlusConfig.hideMainMenuPlayerPreview) {
         Box(modifier = Modifier.fillMaxWidth().height(210.dp)) {
             if (assetsReady) {
                 PlayerPreview(
@@ -493,9 +516,16 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
                 )
             }
         }
-        AccountPill(name = playerName(), assetsReady = assetsReady)
-        PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
-        PillButton("Cosmetics", ASSETS + "diamond-01.svg", Modifier.fillMaxWidth(), assetsReady)
+        }
+        if (!PolyPlusConfig.hideMainMenuAltManager) {
+            AccountPill(name = playerName(), assetsReady = assetsReady)
+        }
+        if (!PolyPlusConfig.hideMainMenuSocial) {
+            PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
+        }
+        if (!PolyPlusConfig.hideMainMenuCosmetics) {
+            PillButton("Cosmetics", ASSETS + "diamond-01.svg", Modifier.fillMaxWidth(), assetsReady)
+        }
     }
 }
 
@@ -512,10 +542,13 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady
 }
 
 @Composable
-private fun Footer(modifier: Modifier, assetsReady: Boolean) {
+private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
     Box(modifier) {
         Row(
-            modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 18.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 24.dp, bottom = 18.dp)
+                .guiScaled(guiScale, TransformOrigin(0f, 1f)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -526,7 +559,10 @@ private fun Footer(modifier: Modifier, assetsReady: Boolean) {
             "Copyright Mojang AB, Do Not distribute!",
             fontSize = 13.sp,
             color = TextSecondary,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 18.dp),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 18.dp)
+                .guiScaled(guiScale, TransformOrigin(1f, 1f)),
         )
     }
 }

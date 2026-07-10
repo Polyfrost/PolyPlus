@@ -18,9 +18,11 @@ import net.minecraft.client.renderer.entity.state.PlayerRenderState
 import net.minecraft.client.renderer.entity.RenderLayerParent
 import net.minecraft.client.renderer.entity.layers.RenderLayer
 import net.minecraft.world.entity.EquipmentSlot
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
 
 //? if >= 1.21.10 {
@@ -37,7 +39,7 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
     ) {
         val equipment = resolveEquipment(state.id) ?: return
         if (equipment.equipped().isEmpty()) return
-        CosmeticRenderer.submit(poseStack, submitNodeCollector, lightCoords, state, parentModel, equipment, resolveParticleColor(state.id), resolveChestplateEquipped(state.id))
+        CosmeticRenderer.submit(poseStack, submitNodeCollector, lightCoords, state, parentModel, equipment, resolveParticleColor(state.id), resolveChestplateEquipped(state.id), resolveHiddenSlots(state.id))
     }
 }
 //?} elif >= 1.21.4 {
@@ -54,7 +56,7 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
     ) {
         val equipment = resolveEquipment(state.id) ?: return
         if (equipment.equipped().isEmpty()) return
-        CosmeticRenderer.render(poseStack, bufferSource, lightCoords, state, parentModel, equipment, resolveParticleColor(state.id), resolveChestplateEquipped(state.id))
+        CosmeticRenderer.render(poseStack, bufferSource, lightCoords, state, parentModel, equipment, resolveParticleColor(state.id), resolveChestplateEquipped(state.id), resolveHiddenSlots(state.id))
     }
 }
 *///?} else {
@@ -76,7 +78,7 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
         val equipment = resolveEquipment(player) ?: return
         if (equipment.equipped().isEmpty()) return
         val renderContext = PlayerRenderContext.from(player, partialTicks, limbSwingAmount, ageInTicks)
-        CosmeticRenderer.render(poseStack, bufferSource, lightCoords, player, renderContext, parentModel, equipment, resolveParticleColor(player), resolveChestplateEquipped(player))
+        CosmeticRenderer.render(poseStack, bufferSource, lightCoords, player, renderContext, parentModel, equipment, resolveParticleColor(player), resolveChestplateEquipped(player), resolveHiddenSlots(player))
     }
 }
 *///?}
@@ -102,6 +104,12 @@ private fun resolveChestplateEquipped(entityId: Int): Boolean {
     val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return false
     return !entity.getItemBySlot(EquipmentSlot.CHEST).isEmpty
 }
+
+private fun resolveHiddenSlots(entityId: Int): Set<BodySlot> {
+    val level = Minecraft.getInstance().level ?: return emptySet()
+    val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return emptySet()
+    return hiddenSlotsFor(entity)
+}
 //?} else {
 /*private fun resolveEquipment(player: AbstractClientPlayer): CosmeticEquipment? {
     org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewEquipment(player.id)?.let { return it }
@@ -115,5 +123,18 @@ private fun resolveParticleColor(player: AbstractClientPlayer): Int? =
 
 private fun resolveChestplateEquipped(player: AbstractClientPlayer): Boolean =
     !player.getItemBySlot(EquipmentSlot.CHEST).isEmpty
+
+private fun resolveHiddenSlots(player: AbstractClientPlayer): Set<BodySlot> = hiddenSlotsFor(player)
 *///?}
+
+private fun hiddenSlotsFor(player: AbstractClientPlayer): Set<BodySlot> {
+    val hidden = mutableSetOf<BodySlot>()
+    if (PolyPlusConfig.hideHeadCosmeticsWithHelmet && !player.getItemBySlot(EquipmentSlot.HEAD).isEmpty) {
+        hidden += BodySlot.Hat
+    }
+    if (PolyPlusConfig.hideFeetCosmeticsWithBoots && !player.getItemBySlot(EquipmentSlot.FEET).isEmpty) {
+        hidden += BodySlot.Boots
+    }
+    return hidden
+}
 //?}

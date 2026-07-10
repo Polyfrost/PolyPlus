@@ -22,6 +22,59 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     @Transient
     private val LOGGER = LogManager.getLogger()
 
+    @JvmStatic
+    @Switch(
+        title = "Vanilla Main Menu",
+        description = "Disable the PolyPlus main menu and use the vanilla Minecraft title screen instead.",
+        category = "Main Menu",
+    )
+    var useVanillaMainMenu = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Quickplay",
+        description = "Hide the Quickplay recent servers panel on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuQuickplay = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Player Preview",
+        description = "Hide the 3D player preview on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuPlayerPreview = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Alt Manager",
+        description = "Hide the account/alt manager pill on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuAltManager = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Social Button",
+        description = "Hide the Social button on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuSocial = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Cosmetics Button",
+        description = "Hide the Cosmetics button on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuCosmetics = false
+
     @JvmStatic @Switch(title = "Discord RPC")
     var isDiscordEnabled = true
 
@@ -40,10 +93,27 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var showChatEmoji = true
 
     @JvmStatic
+    @Switch(
+        title = "Hide Head Cosmetics With Helmet",
+        description = "Automatically hide hat cosmetics when a helmet is equipped to avoid clipping.",
+        category = "Cosmetics",
+    )
+    var hideHeadCosmeticsWithHelmet = false
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Feet Cosmetics With Boots",
+        description = "Automatically hide boots cosmetics when boots are equipped to avoid clipping.",
+        category = "Cosmetics",
+    )
+    var hideFeetCosmeticsWithBoots = true
+
+    @JvmStatic
     @Dropdown(
         title = "Main Menu FPS Limit",
         description = "Choose how the PolyPlus main menu frame cap is selected.",
         options = ["Vanilla (60 FPS limit)", "Smart (monitor refresh rate + 60)", "Custom (15-260 value)"],
+        category = "Main Menu",
     )
     var mainMenuFpsLimitMode: MainMenuFpsLimitMode = MainMenuFpsLimitMode.SMART
 
@@ -54,6 +124,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
         min = 15f,
         max = MAX_CUSTOM_MAIN_MENU_FPS_LIMIT,
         step = 5f,
+        category = "Main Menu",
     )
     var mainMenuFpsLimit = 260
 
@@ -62,6 +133,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
         title = "Menu Backdrop",
         description = "Choose what appears behind the PolyPlus main menu.",
         options = ["PolyPlus", "Minecraft Panorama"],
+        category = "Main Menu",
     )
     var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
 

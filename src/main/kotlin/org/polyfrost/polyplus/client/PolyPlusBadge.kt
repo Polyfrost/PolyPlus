@@ -42,25 +42,27 @@ object PolyPlusBadge {
         /*Style.EMPTY.withFont(FONT)
         *///?}
 
+    @JvmField
+    val badgeGlyph: Component = Component.literal(GLYPH).setStyle(BADGE_STYLE)
+
     @JvmStatic
     fun decorate(name: Component, uuid: UUID): Component {
         if (!shouldBadge(uuid)) return name
 
-        val badge = Component.literal(GLYPH).setStyle(BADGE_STYLE)
         return Component.empty()
-            .append(badge)
+            .append(badgeGlyph)
             .append(name)
     }
 
     //? if >= 1.21.1 {
     private val BADGE_TEXTURE: Identifier = Identifier.fromNamespaceAndPath("polyplus", "textures/badge.png")
 
-    private const val TEX_W = 788
-    private const val TEX_H = 748
+    private const val TEX_W = 48
+    private const val TEX_H = 45
 
     private const val TEXT_H = 8
 
-    private const val BADGE_H = 6
+    private const val BADGE_H = 8
     private const val BADGE_W = (BADGE_H * TEX_W + TEX_H / 2) / TEX_H
 
     private const val BADGE_Y_OFFSET = (TEXT_H - BADGE_H) / 2

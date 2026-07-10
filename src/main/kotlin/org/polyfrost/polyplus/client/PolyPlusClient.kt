@@ -56,7 +56,9 @@ object PolyPlusClient {
             socketTimeoutMillis = 30_000
         }
 
-        install(WebSockets)
+        install(WebSockets) {
+            pingIntervalMillis = 15_000
+        }
     }
 
     fun initialize() {

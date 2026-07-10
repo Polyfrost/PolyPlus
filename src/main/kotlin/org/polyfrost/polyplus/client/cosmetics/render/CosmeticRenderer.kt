@@ -32,9 +32,10 @@ object CosmeticRenderer {
         equipment: CosmeticEquipment,
         particleColor: Int?,
         chestplateEquipped: Boolean,
+        hiddenSlots: Set<BodySlot>,
     ) {
         val overlay = LivingEntityRenderer.getOverlayCoords(state, 0f)
-        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped)
+        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.submit(poseStack, submitNodeCollector, lightCoords, overlay, playerModel, draws)
     }
     //?} elif >= 1.21.4 {
@@ -47,9 +48,10 @@ object CosmeticRenderer {
         equipment: CosmeticEquipment,
         particleColor: Int?,
         chestplateEquipped: Boolean,
+        hiddenSlots: Set<BodySlot>,
     ) {
         val overlay = LivingEntityRenderer.getOverlayCoords(state, 0f)
-        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped)
+        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
     }
     *///?} else {
@@ -63,9 +65,10 @@ object CosmeticRenderer {
         equipment: CosmeticEquipment,
         particleColor: Int?,
         chestplateEquipped: Boolean,
+        hiddenSlots: Set<BodySlot>,
     ) {
         val overlay = LivingEntityRenderer.getOverlayCoords(player, 0f)
-        val draws = draws(equipment, renderContext, particleColor, chestplateEquipped)
+        val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
     }
     *///?}
@@ -75,8 +78,9 @@ object CosmeticRenderer {
         renderContext: PlayerRenderContext,
         particleColor: Int?,
         chestplateEquipped: Boolean,
+        hiddenSlots: Set<BodySlot>,
     ): List<BedrockAttachedModelRenderer.DrawCall> =
-        equipment.equipped().map { entry ->
+        equipment.equipped().filterNot { it.cosmetic.slot in hiddenSlots }.map { entry ->
             val tinted = entry.cosmetic.slot == BodySlot.Aura && particleColor != null
             val color = if (tinted) particleColor!! else -1
             val translucent = tinted && (color ushr 24) != 0xFF
