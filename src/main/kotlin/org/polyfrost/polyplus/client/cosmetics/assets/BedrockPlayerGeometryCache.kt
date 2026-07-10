@@ -11,6 +11,7 @@ import java.nio.file.StandardCopyOption
 
 internal object BedrockPlayerGeometryCache {
     private val logger = LoggerFactory.getLogger("polyplus/player-geometry")
+    private const val BUNDLED_GEOMETRY = "/assets/polycosmetics/models/player.geo.json"
     private var cached: BedrockGeometry? = null
 
     private val baseDir = File("${PolyPlusConstants.NAME}/cosmetics/_base")
@@ -40,10 +41,29 @@ internal object BedrockPlayerGeometryCache {
                 tryCaptureFrom(dir.toPath())
                 if (isReady()) return
             }
+        ensureFromResource()
+    }
+
+    fun ensureFromResource() {
+        if (isReady()) return
+        val stream = BedrockPlayerGeometryCache::class.java
+            .getResourceAsStream(BUNDLED_GEOMETRY) ?: return
+        if (!baseDir.exists()) {
+            baseDir.mkdirs()
+        }
+        stream.use { input ->
+            Files.copy(input, cachedGeometryFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        playerGeometryFile = cachedGeometryFile
+        cached = null
+        logger.info("Using bundled fallback player geometry")
     }
 
     fun getOrThrow(): BedrockGeometry {
         ensureFromDisk()
+        if (!isReady()) {
+            ensureFromResource()
+        }
         return cached ?: playerGeometryFile?.let { path ->
             Files.newInputStream(path.toPath()).use(BedrockGeometryParser::parse).also { cached = it }
         } ?: throw IllegalStateException("Player geometry has not been downloaded yet")

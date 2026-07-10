@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -81,21 +82,23 @@ object CosmeticAssetCache {
                     return@withLock
                 }
 
-                for (definition in definitions) {
-                    runCatching { materializeCosmeticLocked(definition) }
-                        .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it) }
+                try {
+                    for (definition in definitions) {
+                        runCatching { materializeCosmeticLocked(definition) }
+                            .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it) }
+                    }
+
+                    //? if >= 1.21.1 {
+                    BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
+                    //?}
+
+                    for (definition in definitions) {
+                        runCatching { loadCosmeticAssetsLocked(definition) }
+                            .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
+                    }
+                } finally {
+                    hashManager.saveHashes()
                 }
-
-                //? if >= 1.21.1 {
-                BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
-                //?}
-
-                for (definition in definitions) {
-                    runCatching { loadCosmeticAssetsLocked(definition) }
-                        .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
-                }
-
-                hashManager.saveHashes()
             }
         }
     }
@@ -145,21 +148,21 @@ object CosmeticAssetCache {
             return
         }
 
+        if (url == null) return
+
         val cosmeticDir = baseDir.resolve(definition.cacheKey()).toPath()
         val hashKey = definition.cacheKey()
-        val needsDownload = definition.url != null && hashManager.updateHash(hashKey, definition.hash)
+        val hashChanged = !hashManager.isCurrent(hashKey, definition.hash)
+        val needsDownload = hashChanged || !cosmeticDir.toFile().exists()
 
         if (needsDownload) {
             val cosmeticDirFile = cosmeticDir.toFile()
             if (cosmeticDirFile.exists()) {
                 cosmeticDirFile.deleteRecursively()
             }
-            val bytes = PolyPlusClient.HTTP.get(url).bodyAsBytes()
+            val bytes = PolyPlusClient.HTTP.get(url) { timeout { requestTimeoutMillis = 60_000 } }.bodyAsBytes()
             AssetArchive.materialize(bytes, cosmeticDir)
-        } else if (!cosmeticDir.toFile().exists()) {
-            if (definition.url == null) return
-            val bytes = PolyPlusClient.HTTP.get(definition.url).bodyAsBytes()
-            AssetArchive.materialize(bytes, cosmeticDir)
+            hashManager.updateHash(hashKey, definition.hash)
         }
     }
 

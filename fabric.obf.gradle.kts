@@ -18,6 +18,13 @@ val stonecutter = extensions.getByName("stonecutter") as StonecutterBuildExtensi
 val mcVersion = stonecutter.current.version
 val catalogVersion = mcVersion.replace(".", "")
 
+run {
+    val (version, loader) = stonecutter.current.project.split("-", limit = 2)
+    stonecutter.properties.tags(version, loader)
+}
+
+val minecraftPredicate = property("mod.mc_compat") as String
+
 fun versionCatalog(name: String) =
     extensions.getByType<org.gradle.api.artifacts.VersionCatalogsExtension>().named(name)
 
@@ -97,7 +104,7 @@ dependencies {
     catalogLib("fabric-loader")?.let { modImplementation(it) { isTransitive = true } }
 
     modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
-    for (module in listOf("commands", "compose-bundle", "config", "config-impl", "hud", "poly-compose", "utils", "internal", "ui", "events")) {
+    for (module in listOf("commands", "compose-bundle", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
@@ -107,9 +114,21 @@ dependencies {
     implementation(libs.bundles.ktor.serialization)
 
     include(libs.discord.game.sdk4j)
-    libs.bundles.ktor.client.get().forEach { include(it) }
-    libs.bundles.ktor.server.get().forEach { include(it) }
-    libs.bundles.ktor.serialization.get().forEach { include(it) }
+}
+
+run {
+    val ktorRoots = libs.bundles.ktor.client.get() +
+        libs.bundles.ktor.server.get() +
+        libs.bundles.ktor.serialization.get()
+    val closure = configurations.detachedConfiguration(
+        *ktorRoots.map { dependencies.create(it) }.toTypedArray()
+    )
+    closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
+        val id = art.moduleVersion.id
+        if (id.group != "org.jetbrains.kotlin") {
+            dependencies.include("${id.group}:${id.name}:${id.version}")
+        }
+    }
 }
 
 val modId = property("mod.id") as String
@@ -132,7 +151,7 @@ tasks.withType<ProcessResources>().configureEach {
                 "mod_name" to modName,
                 "mod_version" to modVersion,
                 "mod_description" to "PolyPlus cosmetics for OneConfig",
-                "minor_mc_version" to mcVersion,
+                "minor_mc_version" to minecraftPredicate,
             ),
         )
     }

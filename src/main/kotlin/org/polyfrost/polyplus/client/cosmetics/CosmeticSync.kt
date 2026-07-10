@@ -7,6 +7,8 @@ import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
+//? if >= 1.21.1
+import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -30,12 +32,27 @@ object CosmeticSync : EarlyInitializable {
     }
     private val subscribedPlayers = HashSet<String>()
 
+    //? if >= 1.21.1 {
+    private const val RECONCILE_INTERVAL_TICKS = 20
+    private var reconcileTicks = 0
+    //?}
+
     override fun earlyInitialize() {
         eventHandler<WorldEvent.Load> {
             PolyPlusClient.refreshCosmetics()
             refreshVisibleSubscriptions()
             Unit
         }.register()
+
+        //? if >= 1.21.1 {
+        eventHandler<TickEvent.End> {
+            if (++reconcileTicks >= RECONCILE_INTERVAL_TICKS) {
+                reconcileTicks = 0
+                reconcileVisiblePlayers()
+            }
+            Unit
+        }.register()
+        //?}
 
         eventHandler<WorldEvent.Unload> {
             unsubscribeAllPlayers()
@@ -94,12 +111,15 @@ object CosmeticSync : EarlyInitializable {
     }
 
     fun refreshVisibleSubscriptions(): Result<Unit> {
-        val level = Minecraft.getInstance().level
+        val mc = Minecraft.getInstance()
+        val level = mc.level
             ?: return Result.failure(IllegalStateException("No world is loaded"))
-        val visible = level.players()
-            .map { it.uuid }
-            .filter { it.isRealPlayer() }
-            .map(UUID::toString)
+
+        val known = HashSet<String>()
+        mc.connection?.onlinePlayerIds?.forEach { known.add(it.toString()) }
+        level.players().forEach { known.add(it.uuid.toString()) }
+        val visible = known
+            .mapNotNull(::normalizePlayerUuid)
             .toSet()
 
         val stale = subscribedPlayers.filter { it !in visible }
@@ -227,6 +247,16 @@ object CosmeticSync : EarlyInitializable {
         BodySlot.Boots,
         BodySlot.Shoulder,
     )
+
+    private fun reconcileVisiblePlayers() {
+        val level = Minecraft.getInstance().level ?: return
+        for (player in level.players()) {
+            val uuid = player.uuid
+            if (!uuid.isRealPlayer()) continue
+            if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
+            reconcileAttachedCosmetics(player, uuid)
+        }
+    }
 
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()

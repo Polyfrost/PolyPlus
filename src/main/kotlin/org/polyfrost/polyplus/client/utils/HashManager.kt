@@ -32,6 +32,8 @@ class HashManager(val file: File) {
         }
     }
 
+    fun isCurrent(key: String, hash: String): Boolean = hashes?.get(key) == hash
+
     fun updateHash(key: String, hash: String): Boolean {
         hashes?.let {
             val existingHash = it[key]

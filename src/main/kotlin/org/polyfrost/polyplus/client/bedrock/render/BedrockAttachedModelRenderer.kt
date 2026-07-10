@@ -24,6 +24,7 @@ object BedrockAttachedModelRenderer {
         val poseWeight: Float,
         val color: Int = -1,
         val translucent: Boolean = false,
+        val backOffset: Float = 0f,
     )
 
     private fun prepare(draw: DrawCall) {
@@ -56,6 +57,9 @@ object BedrockAttachedModelRenderer {
             for (attachment in draw.model.attachments) {
                 poseStack.pushPose()
                 attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
+                if (draw.backOffset != 0f) {
+                    poseStack.translate(0f, 0f, draw.backOffset)
+                }
 
                 submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
                     val localStack = PoseStack()
@@ -84,6 +88,9 @@ object BedrockAttachedModelRenderer {
             for (attachment in draw.model.attachments) {
                 poseStack.pushPose()
                 attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
+                if (draw.backOffset != 0f) {
+                    poseStack.translate(0f, 0f, draw.backOffset)
+                }
                 attachment.rootBone.render(poseStack, buffer, lightCoords, overlayCoords, draw.color)
                 poseStack.popPose()
             }

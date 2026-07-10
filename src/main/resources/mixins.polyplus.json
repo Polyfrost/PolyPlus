@@ -19,11 +19,8 @@
     "client.Mixin_ReplaceMainMenuEarly",
     "client.Mixin_ReplaceMainMenu",
     "client.Mixin_TrackRecentServers",
-    "client.Mixin_MainMenuFpsLimit"
-    //? if < 26.1 {
-    /*,
+    "client.Mixin_MainMenuFpsLimit",
     "client.Mixin_PanoramaBlurRadius"
-    *///?}
     //? if >= 1.21.8 && < 26.1 {
     /*,
     "client.PlayerTabBadgeMixin"

@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.websocket.WebSockets
@@ -48,6 +49,11 @@ object PolyPlusClient {
 
         install(ContentNegotiation) {
             json(JSON)
+        }
+
+        install(HttpTimeout) {
+            connectTimeoutMillis = 15_000
+            socketTimeoutMillis = 30_000
         }
 
         install(WebSockets)
@@ -123,11 +129,15 @@ object PolyPlusClient {
         LOGGER.info("Refreshing cosmetics catalog and player data...")
 
         runCatching { CosmeticCatalog.refreshCatalog() }
+            .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
         runCatching { CosmeticCatalog.refreshPlayer() }
+            .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
         //? if >= 1.21.1 {
         runCatching { CosmeticService.syncLocalActive() }
+            .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
         //?} else {
-        /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }*/
+        /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
+            .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/
         //?}
     }
 }

@@ -109,9 +109,9 @@ public abstract class ChatScreenEmojiMixin {
                 polyplus$selected = (polyplus$selected - 1 + n) % n;
                 return true;
             case 264: // GLFW_KEY_DOWN
-            case 258: // TAB - cycle forward through options
                 polyplus$selected = (polyplus$selected + 1) % n;
                 return true;
+            case 258: // TAB - complete highlighted emoji
             case 257: // ENTER
             case 335: // KP_ENTER
                 return polyplus$accept();

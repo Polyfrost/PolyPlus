@@ -5,6 +5,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.LogManager
@@ -127,15 +128,19 @@ object CosmeticCatalog {
             }
         }
 
-        //? if >= 1.21.1 {
-        CosmeticAssetCache.preloadDefinitions(flattened + flattenedEmotes)
-        //?}
         LOGGER.info(
             "Loaded {} cosmetic group(s) ({} variant(s)) and {} emote definition(s) from API",
             cosmeticGroups.size,
             flattened.size,
             flattenedEmotes.size,
         )
+
+        //? if >= 1.21.1 {
+        PolyPlusClient.SCOPE.launch {
+            runCatching { CosmeticAssetCache.preloadDefinitions(flattened + flattenedEmotes) }
+                .onFailure { LOGGER.error("Failed to preload cosmetic assets", it) }
+        }
+        //?}
     }
 
     suspend fun refreshPlayer() {
@@ -176,7 +181,11 @@ object CosmeticCatalog {
         }
 
         //? if >= 1.21.1 {
-        CosmeticAssetCache.preloadDefinitions(ownedDefs + player.emotes.map { it.asCosmeticDefinition() })
+        PolyPlusClient.SCOPE.launch {
+            runCatching {
+                CosmeticAssetCache.preloadDefinitions(ownedDefs + player.emotes.map { it.asCosmeticDefinition() })
+            }.onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it) }
+        }
         //?}
     }
 
