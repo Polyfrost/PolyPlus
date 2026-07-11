@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +70,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import org.jetbrains.skia.Image as SkiaImage
 import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -389,27 +391,31 @@ private fun MainMenu(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val guiScale = mcGuiScaleFactor()
             val scale = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT) * guiScale
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
+            CompositionLocalProvider(
+                LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
             ) {
-                CenterColumn(Modifier.align(Alignment.Center), actions, assetsReady)
-                if (!PolyPlusConfig.hideMainMenuQuickplay) {
-                    LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                ) {
+                    CenterColumn(Modifier.align(Alignment.Center), actions, assetsReady)
+                    if (!PolyPlusConfig.hideMainMenuQuickplay) {
+                        LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
+                    }
+                    RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady)
                 }
-                RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady)
+                WindowControls(
+                    Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
+                    actions,
+                    assetsReady,
+                )
+                Footer(Modifier.fillMaxSize(), scale, assetsReady)
             }
-            WindowControls(
-                Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
-                actions,
-                assetsReady,
-            )
-            Footer(Modifier.fillMaxSize(), scale, assetsReady)
         }
     }
 }
@@ -502,16 +508,22 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!PolyPlusConfig.hideMainMenuPlayerPreview) {
-        Box(modifier = Modifier.fillMaxWidth().height(210.dp)) {
+        val hasHeadCosmetic = org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+            .localEquipped().equipped
+            .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
+        val previewHeight = if (hasHeadCosmetic) 270.dp else 210.dp
+        val previewScale = if (hasHeadCosmetic) 0.82f else 1.05f
+        val previewFadeStart = if (hasHeadCosmetic) 0.784f else 0.72243f
+        Box(modifier = Modifier.fillMaxWidth().height(previewHeight)) {
             if (assetsReady) {
                 PlayerPreview(
-                    Modifier.fillMaxWidth().height(210.dp),
+                    Modifier.fillMaxWidth().height(previewHeight),
                     source = PlayerPreviewSource.LocalLive,
                     bottomFade = Brush.verticalGradient(
-                        0.72243f to PreviewGradient.copy(alpha = 0f),
+                        previewFadeStart to PreviewGradient.copy(alpha = 0f),
                         1f to PreviewGradient.copy(alpha = 0.84f),
                     ),
-                    modelScale = 1.05f,
+                    modelScale = previewScale,
                     verticalAnchor = 1.0f,
                 )
             }
