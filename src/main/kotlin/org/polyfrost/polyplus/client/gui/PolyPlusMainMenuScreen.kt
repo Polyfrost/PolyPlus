@@ -1,29 +1,42 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -36,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -74,6 +88,9 @@ import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.host.E4mcSupport
+import org.polyfrost.polyplus.client.host.HostWorldManager
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
@@ -166,6 +183,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         Theme {
             MainMenu(
+                screen = this,
                 actions = MenuActions(
                     singleplayer = {
                         //? if >= 26.2 {
@@ -336,6 +354,11 @@ private val PanelBackground = Color(0x80273137)
 private val PanelBorder = Color(0x99FFFFFF)
 private val ServerIconBackground = Color(0x33FFFFFF)
 private val CloseBackground = Color(0x80FF4444)
+private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
+
+private val Scrim = Color(0xB3000000)
+private val WarnColor = Color(0xFFF5A623)
+private val DangerColor = Color(0xFFFF5A5A)
 private val TextPrimary = Color.White
 private val TextSecondary = Color(0xBFFFFFFF)
 
@@ -370,6 +393,7 @@ private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier
 
 @Composable
 private fun MainMenu(
+    screen: net.minecraft.client.gui.screens.Screen,
     actions: MenuActions,
     servers: List<net.minecraft.client.multiplayer.ServerData>,
     pingTick: Int,
@@ -419,7 +443,7 @@ private fun MainMenu(
                     if (!PolyPlusConfig.hideMainMenuQuickplay) {
                         LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
                     }
-                    RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady)
+                    RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady, screen)
                 }
                 WindowControls(
                     Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
@@ -513,7 +537,7 @@ private fun serverStatusText(server: net.minecraft.client.multiplayer.ServerData
 }
 
 @Composable
-private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
+private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
     Column(
         modifier = modifier.width(300.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -544,6 +568,9 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
         if (!PolyPlusConfig.hideMainMenuAltManager) {
             AccountPill(name = playerName(), assetsReady = assetsReady)
         }
+        if (!PolyPlusConfig.hideMainMenuHostWorld) {
+            HostWorldButton(assetsReady, screen)
+        }
         if (!PolyPlusConfig.hideMainMenuSocial) {
             PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
         }
@@ -552,6 +579,334 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean) {
         }
     }
 }
+
+@Composable
+private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
+    val enabled = E4mcSupport.isPresent
+    var showPopup by remember { mutableStateOf(false) }
+    var showHint by remember { mutableStateOf(false) }
+    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(modifier = Modifier.fillMaxWidth().onSizeChanged { buttonSize = it }) {
+        PillButton(
+            label = "Host World",
+            icon = ASSETS + "log-in-04.svg",
+            modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f),
+            assetsReady = assetsReady,
+            onClick = {
+                if (enabled) {
+                    showPopup = true
+                } else {
+                    showHint = !showHint
+                }
+            },
+        )
+        if (showPopup && enabled) {
+            Popup(
+                alignment = Alignment.Center,
+                onDismissRequest = { showPopup = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Scrim)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                        ) { showPopup = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HostWorldPopup(
+                        screen = screen,
+                        assetsReady = assetsReady,
+                        onDismiss = { showPopup = false },
+                    )
+                }
+            }
+        }
+        if (showHint && !enabled) {
+            Popup(
+                alignment = Alignment.TopCenter,
+                offset = IntOffset(0, buttonSize.height + 8),
+                onDismissRequest = { showHint = false },
+            ) {
+                HintBubble("Install the e4mc mod to host worlds")
+            }
+        }
+    }
+}
+
+@Composable
+private fun HintBubble(text: String) {
+    Box(
+        modifier = Modifier
+            .width(280.dp)
+            .clip(PanelShape)
+            .background(PanelBackground)
+            .border(BorderWidth, PanelBorder, PanelShape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        MenuText(text, fontSize = 13.sp, color = TextSecondary)
+    }
+}
+
+@Composable
+private fun HostWorldPopup(
+    screen: net.minecraft.client.gui.screens.Screen,
+    assetsReady: Boolean,
+    onDismiss: () -> Unit,
+) {
+    var worlds by remember { mutableStateOf<List<HostWorldManager.HostWorldEntry>?>(null) }
+    var selected by remember { mutableStateOf<HostWorldManager.HostWorldEntry?>(null) }
+    var gameMode by remember { mutableStateOf(net.minecraft.world.level.GameType.SURVIVAL) }
+    var allowCheats by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val loaded = HostWorldManager.loadWorlds()
+        worlds = loaded
+        selected = loaded.firstOrNull()
+    }
+    LaunchedEffect(selected) {
+        selected?.let { gameMode = it.gameMode }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(0.56f)
+            .widthIn(max = 560.dp)
+            .fillMaxHeight(0.86f)
+            .clip(PanelShape)
+            .background(PageBackground.copy(alpha = 0.9f))
+            .border(BorderWidth, LocalTheme.current.borderColor, PanelShape)
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            MenuText("Host World", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        }
+
+        val loadedWorlds = worlds
+        when {
+            loadedWorlds == null -> {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    MenuText("Loading worlds…", fontSize = 15.sp, color = TextSecondary, fontWeight = FontWeight.Light)
+                }
+            }
+            loadedWorlds.isEmpty() -> {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    MenuText("No singleplayer worlds found", fontSize = 15.sp, color = TextSecondary, fontWeight = FontWeight.Light)
+                }
+            }
+            else -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    loadedWorlds.forEach { entry ->
+                        WorldRow(
+                            entry = entry,
+                            selected = entry.id == selected?.id,
+                            assetsReady = assetsReady,
+                            onClick = { selected = entry },
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) { GameModeDropdown(gameMode, assetsReady) { gameMode = it } }
+            Box(Modifier.weight(1f)) { CheatsToggle(allowCheats) { allowCheats = !allowCheats } }
+        }
+
+        val chosen = selected
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PillButton(
+                label = "Cancel",
+                icon = ASSETS + "x-close.svg",
+                modifier = Modifier.weight(1f),
+                assetsReady = assetsReady,
+                onClick = onDismiss,
+                borderColor = LocalTheme.current.borderColor,
+            )
+            PillButton(
+                label = "Host",
+                icon = ASSETS + "log-in-04.svg",
+                modifier = Modifier.weight(1f).alpha(if (chosen != null) 1f else 0.5f),
+                assetsReady = assetsReady,
+                onClick = {
+                    if (chosen != null) {
+                        onDismiss()
+                        HostWorldManager.host(screen, chosen, gameMode, allowCheats)
+                    }
+                },
+                borderColor = LocalTheme.current.borderColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorldRow(
+    entry: HostWorldManager.HostWorldEntry,
+    selected: Boolean,
+    assetsReady: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .clip(PanelShape)
+            .background(if (selected) Accent.asSelectedBackground else PanelBackground)
+            .border(BorderWidth, if (selected) Accent else LocalTheme.current.borderColor, PanelShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val iconModifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp))
+        val favicon = rememberFavicon(entry.iconBytes)
+        if (favicon != null) {
+            Image(favicon, contentDescription = null, modifier = iconModifier, contentScale = ContentScale.Crop)
+        } else {
+            Box(iconModifier.background(ServerIconBackground))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            MenuText(entry.name, fontSize = 15.sp, fontWeight = FontWeight.Light)
+            MenuText(worldSubtitle(entry), fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Light)
+            MenuText(worldVersionLine(entry), fontSize = 12.sp, color = compatColor(entry.compat), fontWeight = FontWeight.Light)
+        }
+    }
+}
+
+private fun compatColor(compat: HostWorldManager.Compat): Color = when (compat) {
+    HostWorldManager.Compat.CURRENT -> TextSecondary
+    HostWorldManager.Compat.OLDER -> WarnColor
+    HostWorldManager.Compat.NEWER -> DangerColor
+    HostWorldManager.Compat.INCOMPATIBLE -> DangerColor
+}
+
+@Composable
+private fun GameModeDropdown(
+    selected: net.minecraft.world.level.GameType,
+    assetsReady: Boolean,
+    onSelect: (net.minecraft.world.level.GameType) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        net.minecraft.world.level.GameType.SURVIVAL,
+        net.minecraft.world.level.GameType.CREATIVE,
+        net.minecraft.world.level.GameType.ADVENTURE,
+        net.minecraft.world.level.GameType.SPECTATOR,
+    )
+    Column(Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(45.dp)
+                .clip(PanelShape)
+                .background(PanelBackground)
+                .border(BorderWidth, LocalTheme.current.borderColor, PanelShape)
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "gamemode-chevron")
+            MenuText("Mode", fontSize = 14.sp, color = TextSecondary, fontWeight = FontWeight.Light, modifier = Modifier.align(Alignment.CenterStart))
+            MenuText(gameModeLabel(selected), fontSize = 15.sp, fontWeight = FontWeight.Light, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 24.dp))
+            MenuIcon(ASSETS + "chevron-up.svg", TextPrimary, Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronAngle), assetsReady)
+        }
+        AnimatedVisibility(visible = expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+            Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                options.forEach { mode ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                            .clip(PanelShape)
+                            .background(if (mode == selected) Accent.asSelectedBackground else PanelBackground)
+                            .border(BorderWidth, if (mode == selected) Accent else LocalTheme.current.borderColor, PanelShape)
+                            .clickable { onSelect(mode); expanded = false }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        MenuText(gameModeLabel(mode), fontSize = 14.sp, fontWeight = FontWeight.Light)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheatsToggle(checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(45.dp)
+            .clip(PanelShape)
+            .background(PanelBackground)
+            .border(BorderWidth, LocalTheme.current.borderColor, PanelShape)
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MenuText("Allow Cheats", fontSize = 15.sp, fontWeight = FontWeight.Light, modifier = Modifier.weight(1f))
+        val theme = LocalTheme.current
+        val interaction = remember { MutableInteractionSource() }
+        val isHovered by interaction.collectIsHoveredAsState()
+        val boxColor by animateColorAsState(if (checked) Accent else theme.componentBackground, label = "cheatsBox")
+        val boxBorder by animateColorAsState(
+            when {
+                checked -> Accent
+                isHovered -> theme.textColorSecondary
+                else -> theme.borderColor
+            },
+            label = "cheatsBoxBorder",
+        )
+        val tickColor = theme.textColor
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(theme.checkBoxShape)
+                .background(boxColor)
+                .border(1.5.dp, boxBorder, theme.checkBoxShape)
+                .hoverable(interaction),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Canvas(Modifier.size(13.dp)) {
+                    val w = size.width
+                    val h = size.height
+                    val tick = Path().apply {
+                        moveTo(w * 0.2f, h * 0.52f)
+                        lineTo(w * 0.42f, h * 0.72f)
+                        lineTo(w * 0.8f, h * 0.3f)
+                    }
+                    drawPath(tick, color = tickColor, style = Stroke(width = w * 0.15f, cap = StrokeCap.Round))
+                }
+            }
+        }
+    }
+}
+
+private fun gameModeLabel(mode: net.minecraft.world.level.GameType): String =
+    mode.getName().replaceFirstChar { it.uppercase() }
+
+private fun worldSubtitle(entry: HostWorldManager.HostWorldEntry): String {
+    if (entry.lastPlayed <= 0L) return entry.id
+    val date = runCatching {
+        java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(entry.lastPlayed))
+    }.getOrNull() ?: return entry.id
+    return "${entry.id} ($date)"
+}
+
+private fun worldVersionLine(entry: HostWorldManager.HostWorldEntry): String =
+    "${entry.versionName} · ${gameModeLabel(entry.gameMode)}"
 
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
@@ -614,13 +969,13 @@ private fun FooterBrandText(platform: String, assetsReady: Boolean) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}) {
+private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderColor: Color = PanelBorder) {
     Row(
         modifier = modifier
             .height(45.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, borderColor, PanelShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),

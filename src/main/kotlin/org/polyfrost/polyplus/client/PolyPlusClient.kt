@@ -93,6 +93,7 @@ object PolyPlusClient {
 
         refreshCosmetics()
         PolyPlusCommands.register()
+        org.polyfrost.polyplus.client.host.HostWorldManager.registerLanPublishHook()
     }
 
     /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */

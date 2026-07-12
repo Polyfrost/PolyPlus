@@ -75,6 +75,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     )
     var hideMainMenuCosmetics = false
 
+    @JvmStatic
+    @Switch(
+        title = "Hide Host World Button",
+        description = "Hide the Host World button (opens a world to LAN via e4mc) on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuHostWorld = false
+
     @JvmStatic @Switch(title = "Discord RPC")
     var isDiscordEnabled = true
 
