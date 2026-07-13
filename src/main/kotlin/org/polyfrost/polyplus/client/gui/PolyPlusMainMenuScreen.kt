@@ -51,17 +51,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
@@ -107,6 +103,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     //? if <26.1 {
     /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             renderPanorama(ctx, tickDelta)
             if (firstFrameDrawn) {
@@ -123,6 +120,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
     *///?} else {
     override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             net.minecraft.client.Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
@@ -399,31 +397,7 @@ private fun MainMenu(
     pingTick: Int,
     assetsReady: Boolean,
 ) {
-    val time by rememberFxTime()
-    val target = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
-    val mouse by rememberParallaxOffset(target, ease = 0.02f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val pos = awaitPointerEvent(PointerEventPass.Initial).changes.lastOrNull()?.position
-                        if (pos != null && size.width > 0 && size.height > 0) {
-                            target.value = Offset((pos.x / size.width).coerceIn(0f, 1f), (pos.y / size.height).coerceIn(0f, 1f))
-                        }
-                    }
-                }
-            }
-            .drawBehind {
-                if (mainMenuPanoramaEnabled()) {
-                    drawPanoramaOverlay()
-                } else {
-                    drawMenuBackground(time, mouse)
-                }
-            },
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val guiScale = mcGuiScaleFactor()
             val scale = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT) * guiScale
@@ -561,6 +535,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
                     ),
                     modelScale = previewScale,
                     verticalAnchor = 1.0f,
+                    initialYaw = 180f + 22.9f,
                     live = true,
                     bottomFadeFraction = 1f - previewFadeStart,
                 )
@@ -573,11 +548,17 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         if (!PolyPlusConfig.hideMainMenuHostWorld) {
             HostWorldButton(assetsReady, screen)
         }
-        if (!PolyPlusConfig.hideMainMenuSocial) {
-            PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
-        }
+        // if (!PolyPlusConfig.hideMainMenuSocial) {
+        //     PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
+        // }
         if (!PolyPlusConfig.hideMainMenuCosmetics) {
-            PillButton("Cosmetics", ASSETS + "diamond-01.svg", Modifier.fillMaxWidth(), assetsReady)
+            PillButton(
+                "Cosmetics",
+                ASSETS + "diamond-01.svg",
+                Modifier.fillMaxWidth(),
+                assetsReady,
+                onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
+            )
         }
     }
 }

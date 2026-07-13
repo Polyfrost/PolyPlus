@@ -28,6 +28,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.delay
 
+val LocalPlayerPreviewOpacity = androidx.compose.runtime.compositionLocalOf { 1f }
+
 @Composable
 fun PlayerPreview(
     modifier: Modifier = Modifier,
@@ -65,6 +67,7 @@ private fun PlayerPreviewLive(
     bottomFadeFraction: Float,
 ) {
     val entry = remember { PlayerPreviewOverlay.register() }
+    val overlayOpacity = LocalPlayerPreviewOpacity.current
     androidx.compose.runtime.DisposableEffect(entry) {
         onDispose {
             PlayerPreviewOverlay.reportBounds(entry, 0f, 0f, 0f, 0f, visible = false)
@@ -86,6 +89,7 @@ private fun PlayerPreviewLive(
         entry.previewKey = previewKey
         entry.allowDrag = allowDrag
         entry.bottomFade = bottomFadeFraction
+        entry.opacity = overlayOpacity.coerceIn(0f, 1f)
     }
 
     val holeModifier: Modifier = Modifier

@@ -25,6 +25,8 @@ object PlayerPreviewOverlay {
         @Volatile @JvmField var fadeEdges: Boolean = true
         @Volatile @JvmField var bottomFade: Float = 0f
 
+        @Volatile @JvmField var opacity: Float = 1f
+
         @Volatile @JvmField var fx: Float = 0f
         @Volatile @JvmField var fy: Float = 0f
         @Volatile @JvmField var fw: Float = 0f
@@ -63,7 +65,7 @@ object PlayerPreviewOverlay {
         *///?}
         val nowNanos = System.nanoTime()
         for (e in entries.values) {
-            if (!e.visible || e.fw <= 0f || e.fh <= 0f) continue
+            if (!e.visible || e.fw <= 0f || e.fh <= 0f || e.opacity <= 0.001f) continue
             val x = (e.fx * fbW).toInt()
             val y = (e.fy * fbH).toInt()
             val w = (e.fw * fbW).toInt()

@@ -30,7 +30,11 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,8 +71,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
+import org.polyfrost.oneconfig.internal.ui.shell.LocalNavController
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -80,6 +86,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
+import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
@@ -124,11 +131,42 @@ object PolyPlusOneConfigIntegration {
     fun addRoutes(builder: NavGraphBuilder) {
         builder.polyPlusCosmeticsGraph()
     }
+
+    @JvmStatic
+    fun openCosmetics() {
+        val mc = net.minecraft.client.Minecraft.getInstance()
+        //? if >= 26.2 {
+        /*mc.gui.setScreen(OneConfigUIScreen())
+        *///?} else {
+        mc.setScreen(OneConfigUIScreen())
+        //?}
+        Thread({
+            var attempts = 0
+            while (attempts++ < 600) {
+                val ready = LocalNavController.isReady &&
+                    runCatching { LocalNavController.current.graph; true }.getOrDefault(false)
+                if (ready) {
+                    mc.execute { runCatching { LocalNavController.wrapper.navigate(PolyPlusCosmeticsRoute) } }
+                    return@Thread
+                }
+                Thread.sleep(16L)
+            }
+        }, "polyplus-open-cosmetics").apply {
+            isDaemon = true
+            start()
+        }
+    }
 }
 
 fun NavGraphBuilder.polyPlusCosmeticsGraph() {
     composable<PolyPlusCosmeticsRoute> {
-        PolyPlusCosmeticsScreen()
+        val previewAlpha by transition.animateFloat(
+            transitionSpec = { tween(durationMillis = 250) },
+            label = "polyplus-preview-fade",
+        ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+        CompositionLocalProvider(LocalPlayerPreviewOpacity provides previewAlpha) {
+            PolyPlusCosmeticsScreen()
+        }
     }
 }
 
@@ -907,6 +945,7 @@ private fun PreviewPanel(
                 source = PlayerPreviewSource.LocalLive,
                 autoSpin = false,
                 verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+                initialYaw = FRONT_YAW_DEG,
                 live = true,
             )
             if (selected != null) {

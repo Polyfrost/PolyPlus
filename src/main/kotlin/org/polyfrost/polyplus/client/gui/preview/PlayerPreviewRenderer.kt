@@ -236,23 +236,23 @@ object PlayerPreviewRenderer {
         return a
     }
 
-    private fun buildFadeQuad(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+    private fun buildFadeQuad(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         for (iy in 0 until GRID_Y) {
             val ty0 = iy / GRID_Y.toFloat(); val ty1 = (iy + 1) / GRID_Y.toFloat()
             for (ix in 0 until GRID_X) {
                 val tx0 = ix / GRID_X.toFloat(); val tx1 = (ix + 1) / GRID_X.toFloat()
-                addFadeVertex(bb, x, y, w, h, tx0, ty0, fadeEdges, bottomFade)
-                addFadeVertex(bb, x, y, w, h, tx0, ty1, fadeEdges, bottomFade)
-                addFadeVertex(bb, x, y, w, h, tx1, ty1, fadeEdges, bottomFade)
-                addFadeVertex(bb, x, y, w, h, tx1, ty0, fadeEdges, bottomFade)
+                addFadeVertex(bb, x, y, w, h, tx0, ty0, fadeEdges, bottomFade, opacity)
+                addFadeVertex(bb, x, y, w, h, tx0, ty1, fadeEdges, bottomFade, opacity)
+                addFadeVertex(bb, x, y, w, h, tx1, ty1, fadeEdges, bottomFade, opacity)
+                addFadeVertex(bb, x, y, w, h, tx1, ty0, fadeEdges, bottomFade, opacity)
             }
         }
     }
 
-    private fun addFadeVertex(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float) {
+    private fun addFadeVertex(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         val px = x + tx * w
         val py = y + ty * h
-        val a = (fadeAlpha(tx, ty, fadeEdges, bottomFade) * 255f).toInt().coerceIn(0, 255)
+        val a = (fadeAlpha(tx, ty, fadeEdges, bottomFade) * opacity * 255f).toInt().coerceIn(0, 255)
         bb.addVertex(px, py, 0f).setUv(tx, 1f - ty).setColor(255, 255, 255, a)
     }
 
@@ -370,10 +370,10 @@ object PlayerPreviewRenderer {
         val h = (rectH * fit).toInt().coerceAtLeast(1)
         val fbo = renderSceneIntoTarget(e.source, yawDeg, pitchDeg, w, h, e.modelScale, e.verticalAnchor) ?: return
         val srcView = fbo.colorTextureView ?: return
-        compositeOntoTarget(target, srcView, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade)
+        compositeOntoTarget(target, srcView, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade, e.opacity)
     }
 
-    private fun compositeOntoTarget(target: RenderTarget, srcView: GpuTextureView, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+    private fun compositeOntoTarget(target: RenderTarget, srcView: GpuTextureView, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         val dstView = target.colorTextureView ?: return
         val fbW = target.width
         val fbH = target.height
@@ -385,7 +385,7 @@ object PlayerPreviewRenderer {
         *///?} else {
         val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
         //?}
-        buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade)
+        buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade, opacity)
         //? if >= 26.2 {
         /*val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: run { byteBuilder.close(); return }
         *///?} else {
@@ -464,7 +464,7 @@ object PlayerPreviewRenderer {
         player.setXRot(0f); player.xRotO = 0f
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
-        state.showCape = equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
+        state.showCape = source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
         capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
         state.bodyRot = yawDeg
         state.yRot = 0f
@@ -518,7 +518,7 @@ object PlayerPreviewRenderer {
 
         val state = directState(skin)
         state.id = PREVIEW_ENTITY_ID
-        if (equipment.get(BodySlot.Backpack) != null) state.showCape = false
+        if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
         //? if >= 1.21.10 {
         state.bodyRot = yawDeg
         //?} else {
@@ -600,8 +600,13 @@ object PlayerPreviewRenderer {
         return equipment
     }
 
-    private fun capeOverride(source: PlayerPreviewSource): Identifier? =
-        (source as? PlayerPreviewSource.Override)?.capeTexture
+    private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
+        is PlayerPreviewSource.Override -> source.capeTexture
+        PlayerPreviewSource.LocalLive ->
+            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
+                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            }
+    }
 
     //? if >= 1.21.10 {
     private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
@@ -895,8 +900,13 @@ object PlayerPreviewRenderer {
         f.get(null) as sun.misc.Unsafe
     }
 
-    private fun capeOverrideLegacy(source: PlayerPreviewSource): ResourceLocation? =
-        (source as? PlayerPreviewSource.Override)?.capeTexture
+    private fun capeOverrideLegacy(source: PlayerPreviewSource): ResourceLocation? = when (source) {
+        is PlayerPreviewSource.Override -> source.capeTexture
+        PlayerPreviewSource.LocalLive ->
+            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
+                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            }
+    }
 
     private fun withCapeLegacy(skin: PlayerSkin, cape: ResourceLocation): PlayerSkin =
         PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
@@ -1087,10 +1097,10 @@ object PlayerPreviewRenderer {
         val h = (rectH * fit).toInt().coerceAtLeast(1)
         val fbo = renderLegacySceneIntoTarget(e.source, yawDeg, w, h, e.modelScale, e.verticalAnchor) ?: return
         if (java.lang.Boolean.getBoolean("pp.overlay.nocomposite")) return
-        compositeOntoTargetLegacy(target, fbo, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade)
+        compositeOntoTargetLegacy(target, fbo, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade, e.opacity)
     }
 
-    private fun compositeOntoTargetLegacy(target: RenderTarget, fbo: TextureTarget, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+    private fun compositeOntoTargetLegacy(target: RenderTarget, fbo: TextureTarget, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         val fbW = target.width
         val fbH = target.height
         com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0)
@@ -1116,7 +1126,7 @@ object PlayerPreviewRenderer {
         RenderSystem.setShaderTexture(0, fbo.colorTextureId)
         try {
             val bb = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR)
-            buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade)
+            buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade, opacity)
             BufferUploader.drawWithShader(bb.buildOrThrow())
         } finally {
             RenderSystem.restoreProjectionMatrix()
