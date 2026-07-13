@@ -6,15 +6,25 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 //? if >= 1.21.8 {
 import com.mojang.blaze3d.ProjectionType
 import com.mojang.blaze3d.buffers.GpuBuffer
 import kotlinx.coroutines.launch
+import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.platform.Lighting
 import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.textures.FilterMode
+import com.mojang.blaze3d.textures.GpuTextureView
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
+//? if < 26.2 {
+import com.mojang.blaze3d.vertex.Tesselator
+//?}
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.RenderPipelines
 //? if >= 1.21.10 {
 import net.minecraft.client.model.HumanoidModel
 //?}
@@ -56,12 +66,18 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 /*import org.polyfrost.polyplus.client.utils.ClientPlatform
 *///?}
 //? if >= 1.21.1 && < 1.21.5 {
-/*import com.mojang.blaze3d.pipeline.TextureTarget
+/*import com.mojang.blaze3d.pipeline.RenderTarget
+import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.platform.Lighting
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.BufferUploader
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.Tesselator
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.GameRenderer
 import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
@@ -128,6 +144,8 @@ object PlayerPreviewRenderer {
         }
 
     private val latestByKey = java.util.concurrent.ConcurrentHashMap<Any, ImageBitmap>()
+
+    fun cached(key: Any): ImageBitmap? = latestByKey[key]
 
     fun capture(
         source: PlayerPreviewSource,
@@ -199,6 +217,45 @@ object PlayerPreviewRenderer {
         return (if (s > 255) 255 else s).toByte()
     }
 
+    private const val GRID_X = 24
+    private const val GRID_Y = 16
+
+    private fun smooth(t: Float): Float {
+        val c = t.coerceIn(0f, 1f)
+        return c * c * c * (c * (c * 6f - 15f) + 10f)
+    }
+
+    private fun fadeAlpha(tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float): Float {
+        var a = 1f
+        if (fadeEdges) {
+            val ef = EDGE_FADE_FRACTION
+            a *= smooth(minOf(tx, 1f - tx) / ef)
+            a *= smooth(ty / ef)
+        }
+        if (bottomFade > 0f) a *= smooth((1f - ty) / bottomFade)
+        return a
+    }
+
+    private fun buildFadeQuad(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+        for (iy in 0 until GRID_Y) {
+            val ty0 = iy / GRID_Y.toFloat(); val ty1 = (iy + 1) / GRID_Y.toFloat()
+            for (ix in 0 until GRID_X) {
+                val tx0 = ix / GRID_X.toFloat(); val tx1 = (ix + 1) / GRID_X.toFloat()
+                addFadeVertex(bb, x, y, w, h, tx0, ty0, fadeEdges, bottomFade)
+                addFadeVertex(bb, x, y, w, h, tx0, ty1, fadeEdges, bottomFade)
+                addFadeVertex(bb, x, y, w, h, tx1, ty1, fadeEdges, bottomFade)
+                addFadeVertex(bb, x, y, w, h, tx1, ty0, fadeEdges, bottomFade)
+            }
+        }
+    }
+
+    private fun addFadeVertex(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float) {
+        val px = x + tx * w
+        val py = y + ty * h
+        val a = (fadeAlpha(tx, ty, fadeEdges, bottomFade) * 255f).toInt().coerceIn(0, 255)
+        bb.addVertex(px, py, 0f).setUv(tx, 1f - ty).setColor(255, 255, 255, a)
+    }
+
     //? if >= 1.21.8 {
     private val LOG = org.slf4j.LoggerFactory.getLogger("polyplus/preview")
     private const val MAX_DIM = 512
@@ -231,12 +288,18 @@ object PlayerPreviewRenderer {
     }
 
     private fun renderAndReadback(source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
+        val fbo = renderSceneIntoTarget(source, yawDeg, pitchDeg, w, h, modelScale, verticalAnchor) ?: return
+        val colorTex = fbo.colorTexture ?: return
+        readback(colorTex, w, h, key)
+    }
+
+    private fun renderSceneIntoTarget(source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): TextureTarget? {
         val mc = Minecraft.getInstance()
         val fbo = ensureTarget(w, h)
-        val colorTex = fbo.colorTexture ?: return
-        val depthTex = fbo.depthTexture ?: return
-        val colorView = fbo.colorTextureView ?: return
-        val depthView = fbo.depthTextureView ?: return
+        val colorTex = fbo.colorTexture ?: return null
+        val depthTex = fbo.depthTexture ?: return null
+        val colorView = fbo.colorTextureView ?: return null
+        val depthView = fbo.depthTextureView ?: return null
 
         val savedLights = RenderSystem.getShaderLights()
         val savedFog = RenderSystem.getShaderFog()
@@ -261,6 +324,14 @@ object PlayerPreviewRenderer {
         //?}
         RenderSystem.outputColorTextureOverride = colorView
         RenderSystem.outputDepthTextureOverride = depthView
+        //? if >= 26.1 {
+        val scissor = RenderSystem.getScissorStateForRenderTypeDraws()
+        val hadScissor = scissor.enabled()
+        val scX = scissor.x(); val scY = scissor.y(); val scW = scissor.width(); val scH = scissor.height()
+        RenderSystem.disableScissorForRenderTypeDraws()
+        //?} else {
+        /*RenderSystem.disableScissorForRenderTypeDraws()
+        *///?}
         //? if >= 26.2 {
         /*val modelViewStack = RenderSystem.getModelViewStack()
         modelViewStack.pushMatrix()
@@ -283,9 +354,104 @@ object PlayerPreviewRenderer {
             RenderSystem.restoreProjectionMatrix()
             savedLights?.let { RenderSystem.setShaderLights(it) }
             savedFog?.let { RenderSystem.setShaderFog(it) }
+            //? if >= 26.1 {
+            if (hadScissor) RenderSystem.enableScissorForRenderTypeDraws(scX, scY, scW, scH)
+            //?}
         }
 
-        readback(colorTex, w, h, key)
+        return fbo
+    }
+
+    @JvmStatic
+    fun renderOverlayEntry(target: RenderTarget, e: PlayerPreviewOverlay.Entry, yawDeg: Float, pitchDeg: Float, rectX: Int, rectY: Int, rectW: Int, rectH: Int) {
+        if (rectW <= 0 || rectH <= 0) return
+        val fit = minOf(1f, MAX_DIM.toFloat() / maxOf(rectW, rectH))
+        val w = (rectW * fit).toInt().coerceAtLeast(1)
+        val h = (rectH * fit).toInt().coerceAtLeast(1)
+        val fbo = renderSceneIntoTarget(e.source, yawDeg, pitchDeg, w, h, e.modelScale, e.verticalAnchor) ?: return
+        val srcView = fbo.colorTextureView ?: return
+        compositeOntoTarget(target, srcView, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade)
+    }
+
+    private fun compositeOntoTarget(target: RenderTarget, srcView: GpuTextureView, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+        val dstView = target.colorTextureView ?: return
+        val fbW = target.width
+        val fbH = target.height
+
+        val fmt = DefaultVertexFormat.POSITION_TEX_COLOR
+        //? if >= 26.2 {
+        /*val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(1024)
+        val bb: com.mojang.blaze3d.vertex.VertexConsumer = com.mojang.blaze3d.vertex.BufferBuilder(byteBuilder, com.mojang.blaze3d.PrimitiveTopology.QUADS, fmt)
+        *///?} else {
+        val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
+        //?}
+        buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade)
+        //? if >= 26.2 {
+        /*val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: run { byteBuilder.close(); return }
+        *///?} else {
+        val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: return
+        //?}
+        val indexCount = GRID_X * GRID_Y * 6
+
+        try {
+            val device = RenderSystem.getDevice()
+            val vbuf = device.createBuffer({ "polyplus_preview_quad" }, GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer())
+            try {
+                //? if >= 26.2 {
+                /*val seq = RenderSystem.getSequentialBuffer(com.mojang.blaze3d.PrimitiveTopology.QUADS)
+                *///?} else {
+                val seq = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)
+                //?}
+                val ibuf = seq.getBuffer(indexCount)
+                val itype = seq.type()
+
+                RenderSystem.backupProjectionMatrix()
+                //? if >= 26.2 {
+                /*RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
+                *///?} elif >= 26.1 {
+                RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
+                //?} else {
+                /*RenderSystem.setProjectionMatrix(projection.getBuffer(fbW.toFloat(), fbH.toFloat()), ProjectionType.ORTHOGRAPHIC)
+                *///?}
+                val encoder = device.createCommandEncoder()
+                //? if >= 26.2 {
+                /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.Optional.empty())
+                *///?} else {
+                val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.OptionalInt.empty())
+                //?}
+                try {
+                    pass.setPipeline(RenderPipelines.GUI_TEXTURED)
+                    RenderSystem.bindDefaultUniforms(pass)
+                    //? if >= 1.21.11 {
+                    val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
+                    pass.bindTexture("Sampler0", srcView, sampler)
+                    //?} else {
+                    /*pass.bindSampler("Sampler0", srcView)
+                    *///?}
+                    //? if >= 26.2 {
+                    /*pass.setVertexBuffer(0, vbuf.slice())
+                    *///?} else {
+                    pass.setVertexBuffer(0, vbuf)
+                    //?}
+                    pass.setIndexBuffer(ibuf, itype)
+                    //? if >= 26.2 {
+                    /*pass.drawIndexed(0, 0, indexCount, 0, 1)
+                    *///?} else {
+                    pass.drawIndexed(0, 0, indexCount, 1)
+                    //?}
+                } finally {
+                    pass.close()
+                    RenderSystem.restoreProjectionMatrix()
+                }
+            } finally {
+                vbuf.close()
+            }
+        } finally {
+            mesh.close()
+            //? if >= 26.2 {
+            /*byteBuilder.close()
+            *///?}
+        }
     }
 
     //? if >= 1.21.10 {
@@ -298,7 +464,7 @@ object PlayerPreviewRenderer {
         player.setXRot(0f); player.xRotO = 0f
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
-        state.showCape = true
+        state.showCape = equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
         capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
         state.bodyRot = yawDeg
         state.yRot = 0f
@@ -352,6 +518,7 @@ object PlayerPreviewRenderer {
 
         val state = directState(skin)
         state.id = PREVIEW_ENTITY_ID
+        if (equipment.get(BodySlot.Backpack) != null) state.showCape = false
         //? if >= 1.21.10 {
         state.bodyRot = yawDeg
         //?} else {
@@ -810,11 +977,11 @@ object PlayerPreviewRenderer {
     }
     //?}
 
-    private fun renderLegacy(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
+    private fun renderLegacySceneIntoTarget(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): TextureTarget? {
         val mc = Minecraft.getInstance()
 
         //? if >= 1.21.4 {
-        val skin = legacySkin(mc) ?: return
+        val skin = legacySkin(mc) ?: return null
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
             PlayerPreviewSource.LocalLive ->
@@ -822,13 +989,13 @@ object PlayerPreviewRenderer {
         }
         equipmentByEntityId[LEGACY_PREVIEW_ENTITY_ID] = equipment
         val state = legacyState(skin, yawDeg)
-        val renderer = legacyPlayerRenderer(mc, skin) ?: return
+        val renderer = legacyPlayerRenderer(mc, skin) ?: return null
         //?}
         //? if < 1.21.4 {
         /*// 1.21.1 has no render states: it must render a real entity, which needs a client
-        val level = mc.level ?: PreviewWorld.level() ?: return
+        val level = mc.level ?: PreviewWorld.level() ?: return null
         val skin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
-        val player = legacyDummy(mc, level) ?: return
+        val player = legacyDummy(mc, level) ?: return null
         val cape = capeOverrideLegacy(source)
             ?: org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
         player.skinOverride = cape?.let { withCapeLegacy(skin, it) } ?: skin
@@ -877,6 +1044,9 @@ object PlayerPreviewRenderer {
         //? if < 1.21.4 {
         /*val prevCamera = dispatcher.camera
         *///?}
+        val realMainTarget = mc.mainRenderTarget
+        (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+            .`polyplus$setMainRenderTarget`(fbo)
         try {
             //? if >= 1.21.4 {
             renderer.render(state, pose, bufferSource, 0xF000F0)
@@ -887,8 +1057,11 @@ object PlayerPreviewRenderer {
             dispatcher.overrideCameraOrientation(Quaternionf().rotateY(Math.PI.toFloat()))
             dispatcher.render(player, 0.0, 0.0, 0.0, 0f, 1f, pose, bufferSource, 0xF000F0)
             *///?}
+            fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
+            (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+                .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
             //? if < 1.21.4 {
             /*dispatcher.camera = prevCamera
@@ -898,7 +1071,59 @@ object PlayerPreviewRenderer {
             mc.mainRenderTarget.bindWrite(true)
         }
 
+        return fbo
+    }
+
+    private fun renderLegacy(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
+        val fbo = renderLegacySceneIntoTarget(source, yawDeg, w, h, modelScale, verticalAnchor) ?: return
         readbackLegacy(fbo, w, h, key)
+    }
+
+    @JvmStatic
+    fun renderOverlayEntry(target: RenderTarget, e: PlayerPreviewOverlay.Entry, yawDeg: Float, pitchDeg: Float, rectX: Int, rectY: Int, rectW: Int, rectH: Int) {
+        if (rectW <= 0 || rectH <= 0) return
+        val fit = minOf(1f, LEGACY_MAX_DIM.toFloat() / maxOf(rectW, rectH))
+        val w = (rectW * fit).toInt().coerceAtLeast(1)
+        val h = (rectH * fit).toInt().coerceAtLeast(1)
+        val fbo = renderLegacySceneIntoTarget(e.source, yawDeg, w, h, e.modelScale, e.verticalAnchor) ?: return
+        if (java.lang.Boolean.getBoolean("pp.overlay.nocomposite")) return
+        compositeOntoTargetLegacy(target, fbo, rectX, rectY, rectW, rectH, e.fadeEdges, e.bottomFade)
+    }
+
+    private fun compositeOntoTargetLegacy(target: RenderTarget, fbo: TextureTarget, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float) {
+        val fbW = target.width
+        val fbH = target.height
+        com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0)
+        com.mojang.blaze3d.platform.GlStateManager._viewport(0, 0, fbW, fbH)
+        RenderSystem.backupProjectionMatrix()
+        val ortho = Matrix4f().setOrtho(0f, fbW.toFloat(), fbH.toFloat(), 0f, -1000f, 1000f)
+        //? if >= 1.21.4 {
+        RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC)
+        //?}
+        //? if < 1.21.4 {
+        /*RenderSystem.setProjectionMatrix(ortho, com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z)
+        *///?}
+        RenderSystem.enableBlend()
+        RenderSystem.defaultBlendFunc()
+        RenderSystem.disableDepthTest()
+        RenderSystem.disableCull()
+        //? if >= 1.21.4 {
+        RenderSystem.setShader(net.minecraft.client.renderer.CoreShaders.POSITION_TEX_COLOR)
+        //?}
+        //? if < 1.21.4 {
+        /*RenderSystem.setShader(GameRenderer::getPositionTexColorShader)
+        *///?}
+        RenderSystem.setShaderTexture(0, fbo.colorTextureId)
+        try {
+            val bb = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR)
+            buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade)
+            BufferUploader.drawWithShader(bb.buildOrThrow())
+        } finally {
+            RenderSystem.restoreProjectionMatrix()
+            RenderSystem.enableDepthTest()
+            RenderSystem.enableCull()
+            RenderSystem.disableBlend()
+        }
     }
 
     private fun readbackLegacy(fbo: TextureTarget, w: Int, h: Int, key: Any) {

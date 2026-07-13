@@ -19,8 +19,8 @@ object HostWorldManager {
 
     val clientVersionName: String by lazy {
         //? if <1.21.6 {
-        /*net.minecraft.SharedConstants.getCurrentVersion().name*/
-        //?} else
+        /*net.minecraft.SharedConstants.getCurrentVersion().name
+        *///?} else
         net.minecraft.SharedConstants.getCurrentVersion().name()
     }
 

@@ -1,5 +1,9 @@
 package org.polyfrost.polyplus.client
 
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.ServerResponseException
 import io.sentry.Sentry
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -32,8 +36,30 @@ object PolyPlusSentry {
     @JvmStatic
     fun capture(throwable: Throwable) {
         initialize()
+        if (isTransientNetworkFailure(throwable)) return
         if (!seen.add(throwable)) return
         Sentry.captureException(throwable)
+    }
+
+    private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            when (cause) {
+                is ServerResponseException,
+                is HttpRequestTimeoutException,
+                is ConnectTimeoutException,
+                is SocketTimeoutException,
+                is java.net.SocketTimeoutException,
+                is java.net.ConnectException,
+                is java.net.UnknownHostException,
+                is java.net.SocketException,
+                -> return true
+            }
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
     }
 
     @JvmStatic

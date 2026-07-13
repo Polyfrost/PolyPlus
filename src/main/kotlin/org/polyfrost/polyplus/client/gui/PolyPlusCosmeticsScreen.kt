@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.IntOffset
@@ -76,10 +79,12 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
@@ -129,9 +134,31 @@ fun NavGraphBuilder.polyPlusCosmeticsGraph() {
 
 private enum class PolyPlusTab {
     Wardrobe,
+    Store,
     Bundles,
     History,
 }
+
+private data class CartEntry(
+    val key: String,
+    val name: String,
+    val description: String?,
+    val basePrice: Float?,
+    val finalPrice: Float?,
+    val discountRate: Int?,
+    val stripePriceId: String?,
+) {
+    val discounted: Boolean get() = (discountRate ?: 0) > 0
+}
+
+private fun BundleInfo.toCartEntry(): CartEntry =
+    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
+
+private fun CosmeticStoreInfo.toCartEntry(stripePriceId: String?): CartEntry =
+    CartEntry("cosmetic-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
+
+private val BundleInfo.cartKey: String get() = "bundle-$id"
+private val CosmeticStoreInfo.cartKey: String get() = "cosmetic-$id"
 
 private data class CosmeticVariantUi(val id: Int, val name: String)
 
@@ -157,7 +184,7 @@ private fun PolyPlusCosmeticsScreen() {
     var showCart by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
-    val cart = remember { mutableStateListOf<BundleInfo>() }
+    val cart = remember { mutableStateListOf<CartEntry>() }
     val allItems = rememberCosmeticItems(refreshKey)
     var selectedId by remember { mutableStateOf<Int?>(null) }
     val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
@@ -183,6 +210,10 @@ private fun PolyPlusCosmeticsScreen() {
             cartSize = cart.size,
             onWardrobe = {
                 tab = PolyPlusTab.Wardrobe
+                status = null
+            },
+            onStore = {
+                tab = PolyPlusTab.Store
                 status = null
             },
             onBundles = {
@@ -251,15 +282,57 @@ private fun PolyPlusCosmeticsScreen() {
                 },
             )
 
+            PolyPlusTab.Store -> StoreScreen(
+                cart = cart,
+                status = status,
+                onAddToCart = { info ->
+                    if (cart.any { it.key == info.cartKey }) {
+                        status = "${info.name} is already in your cart."
+                    } else {
+                        status = "Adding ${info.name} to cart..."
+                        PolyPlusClient.SCOPE.launch {
+                            val view = CosmeticStore.view(info.id).getOrNull()
+                            ClientPlatform.runOnMain {
+                                val priceId = view?.stripePriceId
+                                if (priceId.isNullOrBlank()) {
+                                    status = "${info.name} isn't purchasable yet."
+                                } else if (cart.none { it.key == info.cartKey }) {
+                                    cart += info.toCartEntry(priceId)
+                                    status = "${info.name} added to cart."
+                                }
+                            }
+                        }
+                    }
+                },
+                onBuyNow = { info ->
+                    status = "Opening checkout..."
+                    PolyPlusClient.SCOPE.launch {
+                        val view = CosmeticStore.view(info.id).getOrNull()
+                        val priceId = view?.stripePriceId
+                        if (priceId.isNullOrBlank()) {
+                            ClientPlatform.runOnMain { status = "${info.name} isn't purchasable yet." }
+                        } else {
+                            val result = BillingService.checkoutAndOpen(listOf(priceId))
+                            ClientPlatform.runOnMain {
+                                status = result.fold(
+                                    onSuccess = { "Checkout opened in your browser." },
+                                    onFailure = { "Checkout failed: ${it.message}" },
+                                )
+                            }
+                        }
+                    }
+                },
+            )
+
             PolyPlusTab.Bundles -> BundlesScreen(
                 cart = cart,
                 showCart = showCart,
                 status = status,
                 onAddToCart = { bundle ->
-                    if (cart.none { it.id == bundle.id }) cart += bundle
+                    if (cart.none { it.key == bundle.cartKey }) cart += bundle.toCartEntry()
                     status = "${bundle.name} added to cart."
                 },
-                onRemoveFromCart = { id -> cart.removeAll { it.id == id } },
+                onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
                 onBackToBrowse = { showCart = false },
                 onCheckout = {
                     val priceIds = cart.mapNotNull { it.stripePriceId }
@@ -291,6 +364,7 @@ private fun Toolbar(
     activeTab: PolyPlusTab,
     cartSize: Int,
     onWardrobe: () -> Unit,
+    onStore: () -> Unit,
     onBundles: () -> Unit,
     onHistory: () -> Unit,
     onCart: () -> Unit,
@@ -298,6 +372,8 @@ private fun Toolbar(
 ) {
     Row(modifier = Modifier.fillMaxWidth().height(33.dp), verticalAlignment = Alignment.CenterVertically) {
         TabButton("Wardrobe", activeTab == PolyPlusTab.Wardrobe, onWardrobe)
+        Spacer(Modifier.width(8.dp))
+        TabButton("Store", activeTab == PolyPlusTab.Store, onStore)
         Spacer(Modifier.width(8.dp))
         TabButton("Bundles", activeTab == PolyPlusTab.Bundles, onBundles)
         Spacer(Modifier.width(8.dp))
@@ -406,11 +482,11 @@ private fun WardrobeScreen(
 
 @Composable
 private fun BundlesScreen(
-    cart: List<BundleInfo>,
+    cart: List<CartEntry>,
     showCart: Boolean,
     status: String?,
     onAddToCart: (BundleInfo) -> Unit,
-    onRemoveFromCart: (Int) -> Unit,
+    onRemoveFromCart: (String) -> Unit,
     onBackToBrowse: () -> Unit,
     onCheckout: () -> Unit,
     onStatus: (String?) -> Unit,
@@ -453,7 +529,7 @@ private fun BundlesScreen(
                 bundles.isEmpty() -> CenteredNote("No bundles available yet.")
                 else -> BundleGrid(
                     bundles = bundles,
-                    cartIds = cart.map { it.id }.toSet(),
+                    cartKeys = cart.map { it.key }.toSet(),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     onSelect = { selectedBundleId = it.id },
                     onAddToCart = onAddToCart,
@@ -645,7 +721,7 @@ private fun CosmeticCard(
 @Composable
 private fun BundleGrid(
     bundles: List<BundleInfo>,
-    cartIds: Set<Int>,
+    cartKeys: Set<String>,
     modifier: Modifier,
     onSelect: (BundleInfo) -> Unit,
     onAddToCart: (BundleInfo) -> Unit,
@@ -659,7 +735,7 @@ private fun BundleGrid(
         items(bundles, key = { it.id }) { bundle ->
             BundleCard(
                 bundle = bundle,
-                inCart = bundle.id in cartIds,
+                inCart = bundle.cartKey in cartKeys,
                 onSelect = { onSelect(bundle) },
                 onAddToCart = { onAddToCart(bundle) },
             )
@@ -728,19 +804,26 @@ private fun BundleCard(
 }
 
 @Composable
-private fun PriceLabel(bundle: BundleInfo) {
-    val base = bundle.basePrice
-    val final = bundle.finalPrice
+private fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
     when {
-        final == null -> GuiText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
-        bundle.discounted && base != null -> {
-            GuiText(money(base), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
+        finalPrice == null -> GuiText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
+        discounted && basePrice != null -> {
+            GuiText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
             Spacer(Modifier.width(4.dp))
-            GuiText(money(final), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            GuiText(money(finalPrice), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
-        else -> GuiText(money(final), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        else -> GuiText(money(finalPrice), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
+
+@Composable
+private fun PriceLabel(bundle: BundleInfo) = PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted)
+
+@Composable
+private fun PriceLabel(info: CosmeticStoreInfo) = PriceLabel(info.basePrice, info.finalPrice, info.discounted)
+
+@Composable
+private fun PriceLabel(entry: CartEntry) = PriceLabel(entry.basePrice, entry.finalPrice, entry.discounted)
 
 @Composable
 private fun BundleDetailPanel(
@@ -822,7 +905,9 @@ private fun PreviewPanel(
             PlayerPreview(
                 Modifier.align(Alignment.Center).size(190.dp, 330.dp),
                 source = PlayerPreviewSource.LocalLive,
+                autoSpin = false,
                 verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+                live = true,
             )
             if (selected != null) {
                 Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1188,10 +1273,10 @@ private fun AuraColorPicker(
 
 @Composable
 private fun CartPanel(
-    items: List<BundleInfo>,
+    items: List<CartEntry>,
     status: String?,
     modifier: Modifier,
-    onRemove: (Int) -> Unit,
+    onRemove: (String) -> Unit,
     onCheckout: () -> Unit,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -1203,8 +1288,8 @@ private fun CartPanel(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            items(items, key = { it.id }) { item ->
-                CartRow(item = item, onRemove = { onRemove(item.id) })
+            items(items, key = { it.key }) { item ->
+                CartRow(item = item, onRemove = { onRemove(item.key) })
             }
         }
 
@@ -1227,7 +1312,7 @@ private fun CartPanel(
 }
 
 @Composable
-private fun CartRow(item: BundleInfo, onRemove: () -> Unit) {
+private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(81.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -1270,25 +1355,50 @@ private fun CenteredNote(text: String) {
 @Composable
 private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
     val source = rememberCosmeticPreviewSource(item)
+    val framing = cosmeticPreviewFraming(item.type)
     Box(modifier) {
         CheckerThumbnail(Modifier.fillMaxSize())
         if (source != null) {
             PlayerPreview(
                 Modifier.fillMaxSize(),
                 source = source,
+                autoSpin = false,
                 allowDrag = false,
-                modelScale = 0.42f,
-                verticalAnchor = if (item.type == CosmeticType.Hat) 0.64f else 0.52f,
+                modelScale = framing.modelScale,
+                verticalAnchor = framing.verticalAnchor,
+                initialYaw = framing.yawDeg,
                 previewKey = "card-${item.groupId}",
             )
         }
     }
 }
 
+private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)
+
+private const val FRONT_YAW_DEG = 180f + 22.9f
+private const val BACK_YAW_DEG = 22.9f
+
+private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (type) {
+    CosmeticType.Hat, CosmeticType.Glasses -> PreviewFraming(FRONT_YAW_DEG, 1.0f, 1.5f)
+    CosmeticType.Boots -> PreviewFraming(FRONT_YAW_DEG, 0.85f, 0.26f)
+    CosmeticType.Shoulder -> PreviewFraming(FRONT_YAW_DEG, 0.58f, 0.62f)
+    CosmeticType.Wings -> PreviewFraming(BACK_YAW_DEG, 0.5f, 0.5f)
+    CosmeticType.Backpack -> PreviewFraming(BACK_YAW_DEG, 0.55f, 0.55f)
+    CosmeticType.Cape -> PreviewFraming(BACK_YAW_DEG, 0.42f, 0.5f)
+    CosmeticType.Aura -> PreviewFraming(FRONT_YAW_DEG, 0.5f, 0.5f)
+    CosmeticType.Glove -> PreviewFraming(FRONT_YAW_DEG, 0.7f, 0.42f)
+    else -> PreviewFraming(FRONT_YAW_DEG, 0.42f, 0.52f)
+}
+
 @Composable
 private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): PlayerPreviewSource? {
     val cosmeticId = item.equippedVariantId ?: item.variants.firstOrNull()?.id ?: return null
-    val isCape = item.type == CosmeticType.Cape
+    return rememberCosmeticPreviewSource(cosmeticId, item.type)
+}
+
+@Composable
+private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): PlayerPreviewSource? {
+    val isCape = type == CosmeticType.Cape
 
     var loadTick by remember(cosmeticId) { mutableIntStateOf(0) }
     LaunchedEffect(cosmeticId) {
@@ -1311,6 +1421,334 @@ private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): PlayerPreviewSo
             val equipment = CosmeticEquipment()
             equipment.equip(attached)
             PlayerPreviewSource.Override(equipment)
+        }
+    }
+}
+
+private fun isNewItem(createdAt: String): Boolean {
+    if (createdAt.isBlank()) return false
+    return runCatching {
+        val created = java.time.OffsetDateTime.parse(createdAt).toInstant()
+        created.isAfter(java.time.Instant.now().minus(java.time.Duration.ofDays(7)))
+    }.getOrDefault(false)
+}
+
+@Composable
+private fun StoreScreen(
+    cart: List<CartEntry>,
+    status: String?,
+    onAddToCart: (CosmeticStoreInfo) -> Unit,
+    onBuyNow: (CosmeticStoreInfo) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var submitted by remember { mutableStateOf("") }
+    var page by remember { mutableIntStateOf(1) }
+    var items by remember { mutableStateOf<List<CosmeticStoreInfo>>(emptyList()) }
+    var totalPages by remember { mutableIntStateOf(1) }
+    var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var selectedId by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(submitted, page) {
+        loading = true
+        loadError = null
+        CosmeticStore.search(page = page, text = submitted.ifBlank { null })
+            .onSuccess { resp ->
+                items = resp.results
+                totalPages = resp.pagination.totalPages.toInt().coerceAtLeast(1)
+                if (selectedId == null || items.none { it.id == selectedId }) {
+                    selectedId = items.firstOrNull()?.id
+                }
+            }
+            .onFailure { loadError = "Couldn't load store: ${it.message}" }
+        loading = false
+    }
+
+    val cartKeys = cart.map { it.key }.toSet()
+    val selected = items.firstOrNull { it.id == selectedId }
+
+    fun submit() {
+        submitted = query.trim()
+        page = 1
+    }
+
+    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(25.dp)) {
+        Column(modifier = Modifier.width(596.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+            StoreSearchBar(query = query, onQueryChange = { query = it }, onSubmit = { submit() })
+            when {
+                loading && items.isEmpty() -> CenteredNote("Loading cosmetics...")
+                loadError != null && items.isEmpty() -> CenteredNote(loadError!!)
+                items.isEmpty() -> CenteredNote(
+                    if (submitted.isBlank()) "No cosmetics available yet." else "No cosmetics match \"$submitted\".",
+                )
+                else -> StoreGrid(
+                    items = items,
+                    cartKeys = cartKeys,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    onSelect = { selectedId = it.id },
+                    onAddToCart = onAddToCart,
+                )
+            }
+            if (totalPages > 1) {
+                PageNav(
+                    page = page,
+                    totalPages = totalPages,
+                    onPrev = { if (page > 1) page-- },
+                    onNext = { if (page < totalPages) page++ },
+                )
+            }
+        }
+
+        StoreDetailPanel(
+            info = selected,
+            status = status,
+            inCart = selected?.let { it.cartKey in cartKeys } ?: false,
+            onAddToCart = onAddToCart,
+            onBuyNow = onBuyNow,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+}
+
+@Composable
+private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSubmit: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(33.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = TextStyle(
+                color = LocalTheme.current.textColor,
+                fontSize = 13.sp,
+                fontFamily = LocalTheme.current.typography.family,
+            ),
+            cursorBrush = SolidColor(LocalTheme.current.textColor),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+            modifier = Modifier.weight(1f).fillMaxHeight()
+                .clip(RoundedCornerShape(7.dp))
+                .background(LocalTheme.current.chipBackground)
+                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(7.dp))
+                .padding(horizontal = 12.dp),
+            decorationBox = { inner ->
+                Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        if (query.isEmpty()) {
+                            GuiText("Search cosmetics...", color = LocalTheme.current.textColorSecondary, fontSize = 13.sp)
+                        }
+                        inner()
+                    }
+                }
+            },
+        )
+        SmallButton("Search", iconPath = "assets/polyplus/ico/search.svg", primary = true, onClick = onSubmit)
+    }
+}
+
+@Composable
+private fun StoreGrid(
+    items: List<CosmeticStoreInfo>,
+    cartKeys: Set<String>,
+    modifier: Modifier,
+    onSelect: (CosmeticStoreInfo) -> Unit,
+    onAddToCart: (CosmeticStoreInfo) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(19.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(items, key = { it.id }) { info ->
+            StoreCard(
+                info = info,
+                inCart = info.cartKey in cartKeys,
+                onSelect = { onSelect(info) },
+                onAddToCart = { onAddToCart(info) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoreCard(
+    info: CosmeticStoreInfo,
+    inCart: Boolean,
+    onSelect: () -> Unit,
+    onAddToCart: () -> Unit,
+) {
+    val border = when {
+        inCart -> Accent
+        info.discounted -> Color(0xFF239A60)
+        else -> LocalTheme.current.borderColor
+    }
+    val buttonColor = if (inCart) Accent else Color(0xB3232D32)
+
+    Box(
+        modifier = Modifier.size(180.dp, 258.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(cardBrush())
+            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .clickable(onClick = onSelect),
+    ) {
+        StoreThumbnail(info, Modifier.offset(17.dp, 17.dp).size(144.dp))
+        GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically) {
+            PriceLabel(info)
+        }
+
+        if (isNewItem(info.createdAt)) {
+            Box(
+                modifier = Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Accent)
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                GuiText("NEW", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+
+        if (info.discounted) {
+            Box(
+                modifier = Modifier.align(Alignment.TopEnd).size(66.dp, 21.dp)
+                    .background(Color(0xFF239A60), RoundedCornerShape(bottomStart = 4.dp, topEnd = 12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                GuiText("${info.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+
+        Row(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
+                .background(buttonColor)
+                .clickable(onClick = if (inCart) onSelect else onAddToCart),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GuiText(if (inCart) "In cart" else "Add to cart", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun StoreThumbnail(info: CosmeticStoreInfo, modifier: Modifier) {
+    val source = rememberCosmeticPreviewSource(info.id, info.type)
+    val framing = cosmeticPreviewFraming(info.type)
+    Box(modifier) {
+        CheckerThumbnail(Modifier.fillMaxSize())
+        if (source != null) {
+            PlayerPreview(
+                Modifier.fillMaxSize(),
+                source = source,
+                autoSpin = false,
+                allowDrag = false,
+                modelScale = framing.modelScale,
+                verticalAnchor = framing.verticalAnchor,
+                initialYaw = framing.yawDeg,
+                previewKey = "store-${info.id}",
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoreDetailPanel(
+    info: CosmeticStoreInfo?,
+    status: String?,
+    inCart: Boolean,
+    onAddToCart: (CosmeticStoreInfo) -> Unit,
+    onBuyNow: (CosmeticStoreInfo) -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(300.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(cardBrush())
+                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+        ) {
+            if (info == null) {
+                CenteredNote("Select a cosmetic to preview it.")
+            } else {
+                val source = rememberCosmeticPreviewSource(info.id, info.type)
+                val framing = cosmeticPreviewFraming(info.type)
+                PlayerPreview(
+                    Modifier.align(Alignment.Center).size(190.dp, 300.dp),
+                    source = source ?: PlayerPreviewSource.LocalLive,
+                    autoSpin = false,
+                    modelScale = framing.modelScale,
+                    verticalAnchor = framing.verticalAnchor,
+                    initialYaw = framing.yawDeg,
+                    previewKey = "store-detail-${info.id}",
+                    live = true,
+                )
+                if (isNewItem(info.createdAt)) {
+                    Box(
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Accent)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        GuiText("NEW", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(cardBrush())
+                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+        ) {
+            if (info == null) {
+                CenteredNote("Browse the store to buy individual cosmetics.")
+            } else {
+                Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GuiText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                    GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
+                    if (info.tags.all.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (tag in info.tags.all.take(4)) {
+                                Box(
+                                    modifier = Modifier.clip(RoundedCornerShape(5.dp))
+                                        .background(LocalTheme.current.chipBackground)
+                                        .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(5.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                ) {
+                                    GuiText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    info.description?.takeIf { it.isNotBlank() }?.let {
+                        GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    } ?: Spacer(Modifier.weight(1f))
+                    if (status != null) {
+                        GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SmallButton(
+                            label = if (inCart) "In cart" else "Add to cart",
+                            iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
+                            primary = false,
+                            onClick = { if (!inCart) onAddToCart(info) },
+                        )
+                        SmallButton(
+                            label = "Buy now",
+                            iconPath = "assets/polyplus/ico/shopping-bag.svg",
+                            primary = true,
+                            onClick = { onBuyNow(info) },
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1353,7 +1791,9 @@ private fun BundlePreviewPanel(
         PlayerPreview(
             Modifier.align(Alignment.Center).size(190.dp, 300.dp),
             source = bundleSource,
+            autoSpin = false,
             verticalAnchor = if (bundleHasHat) 0.64f else 0.5f,
+            live = true,
         )
     }
 }

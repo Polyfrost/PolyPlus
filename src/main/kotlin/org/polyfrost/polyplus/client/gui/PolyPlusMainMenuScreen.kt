@@ -561,6 +561,8 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
                     ),
                     modelScale = previewScale,
                     verticalAnchor = 1.0f,
+                    live = true,
+                    bottomFadeFraction = 1f - previewFadeStart,
                 )
             }
         }

@@ -36,6 +36,22 @@
     ,
     "client.PlayerTabBadgeModernMixin"
     //?}
+    //? if < 1.21.5 || >= 1.21.8 && < 26.1 {
+    /*,
+    "client.Mixin_PreviewComposeOverlay"
+    *///?}
+    //? if < 1.21.5 {
+    /*,
+    "client.MinecraftMainRenderTargetAccessor"
+    *///?}
+    //? if >= 26.1 && < 26.2 {
+    ,
+    "client.Mixin_PreviewPresent"
+    //?}
+    //? if >= 26.2 {
+    /*,
+    "client.Mixin_PreviewPresent26_2"
+    *///?}
     //? if >= 1.21.1 {
     ,
     "client.cosmetics.AbstractClientPlayerMixin",

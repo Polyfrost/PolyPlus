@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import io.ktor.client.call.body
+import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -98,7 +99,9 @@ object CosmeticCatalog {
 
     suspend fun refreshCatalog() {
         val cosmetics = runCatching {
-            PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics").body<CosmeticList>()
+            PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics") {
+                expectSuccess = true
+            }.body<CosmeticList>()
         }.onFailure { LOGGER.error("Failed to fetch cosmetic catalog", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
             .getOrNull() ?: return
 
