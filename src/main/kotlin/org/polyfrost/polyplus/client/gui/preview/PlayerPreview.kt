@@ -67,6 +67,9 @@ private fun PlayerPreviewLive(
     bottomFadeFraction: Float,
 ) {
     val entry = remember { PlayerPreviewOverlay.register() }
+    // TODO: uncomment in beta.8
+    //  val overlayOpacity = LocalPlayerPreviewOpacity.current *
+    //      org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha.current
     val overlayOpacity = LocalPlayerPreviewOpacity.current
     androidx.compose.runtime.DisposableEffect(entry) {
         onDispose {
