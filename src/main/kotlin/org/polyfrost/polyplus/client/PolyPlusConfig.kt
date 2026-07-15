@@ -24,6 +24,12 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     private val LOGGER = LogManager.getLogger()
 
     @JvmStatic @Include
+    var defaultSettingsApplied = false
+
+    @JvmStatic @Include
+    var appliedDefaults = ""
+
+    @JvmStatic @Include
     var onboardingCompleted = false
 
     @JvmStatic @Include
