@@ -16,24 +16,34 @@ import net.minecraft.client.player.AbstractClientPlayer;
 @Mixin(AbstractClientPlayer.class)
 public abstract class AbstractClientPlayerMixin implements PlayerEmotesAccess, PlayerCosmeticsAccess {
     @Unique
-    private final EmoteController polyplus$emoteController = new EmoteController();
+    private EmoteController polyplus$emoteController;
 
     @Unique
-    private final CosmeticEquipment polyplus$cosmeticEquipment = new CosmeticEquipment();
+    private CosmeticEquipment polyplus$cosmeticEquipment;
 
     @Override
     public EmoteController polyplus$emoteController() {
-        return polyplus$emoteController;
+        EmoteController controller = polyplus$emoteController;
+        if (controller == null) {
+            controller = new EmoteController();
+            polyplus$emoteController = controller;
+        }
+        return controller;
     }
 
     @Override
     public CosmeticEquipment polyplus$cosmeticEquipment() {
-        return polyplus$cosmeticEquipment;
+        CosmeticEquipment equipment = polyplus$cosmeticEquipment;
+        if (equipment == null) {
+            equipment = new CosmeticEquipment();
+            polyplus$cosmeticEquipment = equipment;
+        }
+        return equipment;
     }
 
     @Inject(method = "tick", at = @At("RETURN"))
     private void polyplus$tickEmote(CallbackInfo ci) {
-        polyplus$emoteController.tick((AbstractClientPlayer) (Object) this);
+        polyplus$emoteController().tick((AbstractClientPlayer) (Object) this);
     }
 }
 //?}

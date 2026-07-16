@@ -44,9 +44,11 @@ public class AvatarRendererMixin {
 
         EmoteController controller = entity instanceof PlayerEmotesAccess playerAccess
             ? playerAccess.polyplus$emoteController()
-            : new EmoteController();
+            : null;
 
-        renderAccess.polyplus$bindEmoteController(controller);
+        if (controller != null) {
+            renderAccess.polyplus$bindEmoteController(controller);
+        }
     }
 }
 //?}

@@ -23,14 +23,19 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 *///?}
 public class AvatarRenderStateMixin implements AvatarEmoteRenderAccess {
     @Unique
-    private EmoteController polyplus$boundEmoteController = new EmoteController();
+    private EmoteController polyplus$boundEmoteController;
 
     @Unique
-    private Map<String, BoneTransform> polyplus$lastEmoteSample = Collections.emptyMap();
+    private Map<String, BoneTransform> polyplus$lastEmoteSample;
 
     @Override
     public EmoteController polyplus$boundEmoteController() {
-        return polyplus$boundEmoteController;
+        EmoteController controller = polyplus$boundEmoteController;
+        if (controller == null) {
+            controller = new EmoteController();
+            polyplus$boundEmoteController = controller;
+        }
+        return controller;
     }
 
     @Override
@@ -40,12 +45,13 @@ public class AvatarRenderStateMixin implements AvatarEmoteRenderAccess {
 
     @Override
     public Map<String, BoneTransform> polyplus$lastEmoteSample() {
-        return polyplus$lastEmoteSample;
+        Map<String, BoneTransform> sample = polyplus$lastEmoteSample;
+        return sample == null ? Collections.emptyMap() : sample;
     }
 
     @Override
     public void polyplus$setLastEmoteSample(Map<String, BoneTransform> sample) {
-        polyplus$lastEmoteSample = sample;
+        polyplus$lastEmoteSample = sample == null ? Collections.emptyMap() : sample;
     }
 }
 //?}
