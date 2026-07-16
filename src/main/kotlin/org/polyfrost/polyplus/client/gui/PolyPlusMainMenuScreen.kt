@@ -52,14 +52,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.LinearGradientShader
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -347,8 +353,28 @@ private const val ASSETS = "assets/polyplus/mainmenu/"
 
 private val PageBackground = Color(0xFF11171C)
 private val PreviewGradient = Color(0xFF0F1C33)
-private val PanelBackground = Color(0x80273137)
-private val PanelBorder = Color(0x99FFFFFF)
+private val PanelBackground: Color
+    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
+private const val PanelBorderAngleDeg = 20.0
+
+private val PanelBorderBrush: Brush = object : ShaderBrush() {
+    override fun createShader(size: Size): Shader {
+        val radians = Math.toRadians(PanelBorderAngleDeg)
+        val ux = kotlin.math.cos(radians).toFloat()
+        val uy = kotlin.math.sin(radians).toFloat()
+        val len = size.width * ux + size.height * uy
+        return LinearGradientShader(
+            from = Offset.Zero,
+            to = Offset(ux * len, uy * len),
+            colors = listOf(
+                Color.White.copy(alpha = 0.5f),
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.5f),
+            ),
+            colorStops = listOf(0f, 0.5f, 1f),
+        )
+    }
+}
 private val ServerIconBackground = Color(0x33FFFFFF)
 private val CloseBackground = Color(0x80FF4444)
 private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
@@ -356,11 +382,13 @@ private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
 private val Scrim = Color(0xB3000000)
 private val WarnColor = Color(0xFFF5A623)
 private val DangerColor = Color(0xFFFF5A5A)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xBFFFFFFF)
+private val TextPrimary: Color
+    @Composable get() = LocalTheme.current.textColor
+private val TextSecondary: Color
+    @Composable get() = LocalTheme.current.textColorSecondary
 
 private val PanelShape = RoundedCornerShape(9.dp)
-private val BorderWidth = 0.75.dp
+private val BorderWidth = 1.5.dp
 
 private val Outfit: FontFamily by lazy {
     runCatching {
@@ -403,6 +431,10 @@ private fun MainMenu(
             CompositionLocalProvider(
                 LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
             ) {
+                val density = LocalDensity.current
+                var rightColumnHeightPx by remember { mutableStateOf(0) }
+                val rightColumnHeightDp = rightColumnHeightPx / density.density
+                val columnBottomPadding = ((BASE_HEIGHT - rightColumnHeightDp) / 2f).coerceAtLeast(0f)
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -412,11 +444,22 @@ private fun MainMenu(
                             scaleY = scale
                         },
                 ) {
-                    CenterColumn(Modifier.align(Alignment.Center), actions, assetsReady)
+                    CenterColumn(
+                        Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding.dp),
+                        actions,
+                        assetsReady,
+                    )
                     if (!PolyPlusConfig.hideMainMenuQuickplay) {
                         LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
                     }
-                    RightColumn(Modifier.align(Alignment.CenterEnd).padding(end = 48.dp), assetsReady, screen)
+                    RightColumn(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 48.dp, bottom = columnBottomPadding.dp)
+                            .onSizeChanged { rightColumnHeightPx = it.height },
+                        assetsReady,
+                        screen,
+                    )
                 }
                 WindowControls(
                     Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
@@ -513,7 +556,7 @@ private fun serverStatusText(server: net.minecraft.client.multiplayer.ServerData
 private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
     Column(
         modifier = modifier.width(300.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!PolyPlusConfig.hideMainMenuPlayerPreview) {
@@ -626,7 +669,7 @@ private fun HintBubble(text: String) {
             .width(280.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -712,7 +755,6 @@ private fun HostWorldPopup(
                 modifier = Modifier.weight(1f),
                 assetsReady = assetsReady,
                 onClick = onDismiss,
-                borderColor = LocalTheme.current.borderColor,
             )
             PillButton(
                 label = "Host",
@@ -725,7 +767,6 @@ private fun HostWorldPopup(
                         HostWorldManager.host(screen, chosen, gameMode, allowCheats)
                     }
                 },
-                borderColor = LocalTheme.current.borderColor,
             )
         }
     }
@@ -765,6 +806,7 @@ private fun WorldRow(
     }
 }
 
+@Composable
 private fun compatColor(compat: HostWorldManager.Compat): Color = when (compat) {
     HostWorldManager.Compat.CURRENT -> TextSecondary
     HostWorldManager.Compat.OLDER -> WarnColor
@@ -931,13 +973,15 @@ private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
 @Composable
 private fun FooterBrandText(platform: String, assetsReady: Boolean) {
     val bodyFont = LocalTheme.current.typography.family
+    val primary = TextPrimary
+    val secondary = TextSecondary
 
     BasicText(
         text = buildAnnotatedString {
-            withStyle(SpanStyle(color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = if (assetsReady) Outfit else FontFamily.Default)) {
+            withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold, fontFamily = if (assetsReady) Outfit else FontFamily.Default)) {
                 append("ONECLIENT")
             }
-            withStyle(SpanStyle(color = TextSecondary, fontFamily = bodyFont)) {
+            withStyle(SpanStyle(color = secondary, fontFamily = bodyFont)) {
                 append("   ")
                 append(platform)
             }
@@ -951,13 +995,13 @@ private fun FooterBrandText(platform: String, assetsReady: Boolean) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderColor: Color = PanelBorder) {
+private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush) {
     Row(
         modifier = modifier
             .height(45.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, borderColor, PanelShape)
+            .border(BorderWidth, borderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -976,7 +1020,7 @@ private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, 
             .height(45.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
@@ -1008,7 +1052,7 @@ private fun ServerRow(
             .height(64.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1044,7 +1088,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             .height(45.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
             .clickable {}
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
@@ -1074,7 +1118,7 @@ private fun IconButton(
             .size(45.dp)
             .clip(PanelShape)
             .background(background)
-            .border(BorderWidth, PanelBorder, PanelShape)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
