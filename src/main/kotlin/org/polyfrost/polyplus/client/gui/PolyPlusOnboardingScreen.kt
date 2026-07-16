@@ -35,7 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.LinearGradientShader
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.skiaCanvas
@@ -53,6 +60,7 @@ import org.jetbrains.skia.Image as SkiaImage
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -177,8 +185,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                     spotColor = ShadowColor,
                                 )
                                 .clip(PANEL_SHAPE)
-                                .background(PanelBackground)
-                                .border(1.3.dp, PanelBorder, PANEL_SHAPE),
+                                .background(PageBackground.copy(alpha = 0.9f))
+                                .border(BorderWidth, LocalTheme.current.borderColor, PANEL_SHAPE),
                         ) {
                             when (pages[page]) {
                                 OnboardingPage.LOOK_AND_FEEL ->
@@ -340,10 +348,10 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
                     .width(332.dp)
                     .height(7.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0x80273137))
-                    .border(1.dp, PanelBorder, RoundedCornerShape(4.dp)),
+                    .background(ChoiceBackground)
+                    .border(1.dp, PanelBorderBrush, RoundedCornerShape(4.dp)),
             ) {
-                Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Brand))
+                Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Accent))
             }
             Box(
                 Modifier
@@ -356,8 +364,8 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
         }
         Spacer(Modifier.width(18.dp))
         Box(
-            Modifier.width(64.dp).height(26.dp).clip(RoundedCornerShape(6.dp)).background(Color(0x80273137))
-                .border(1.dp, PanelBorder, RoundedCornerShape(6.dp)),
+            Modifier.width(64.dp).height(26.dp).clip(RoundedCornerShape(6.dp)).background(ChoiceBackground)
+                .border(1.dp, PanelBorderBrush, RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.CenterStart,
         ) { OnboardingText(motionBlur.toString(), 12, Modifier.padding(start = 8.dp)) }
     }
@@ -379,8 +387,8 @@ private fun CosmeticsPage(onClaim: () -> Unit, onStore: () -> Unit) {
         CosmeticCard("Starter Cape")
         CosmeticCard("Starter Bag")
     }
-    ChoiceButton("Claim Free Cosmetics", ONBOARDING_ASSETS + "diamond.svg", true, 272f, Modifier.offset(304.dp, 445.dp), onClaim)
-    ChoiceButton("Check Out the Store", ONBOARDING_ASSETS + "shopping-bag.svg", false, 272f, Modifier.offset(304.dp, 493.dp), onStore)
+    ChoiceButton("Claim Free Cosmetics", ONBOARDING_ASSETS + "diamond.svg", true, 272f, Modifier.offset(304.dp, 445.dp), onClick = onClaim)
+    ChoiceButton("Check Out the Store", ONBOARDING_ASSETS + "shopping-bag.svg", false, 272f, Modifier.offset(304.dp, 493.dp), onClick = onStore)
 }
 
 @Composable
@@ -414,29 +422,38 @@ private fun ChoiceButton(
     selected: Boolean,
     width: Float,
     modifier: Modifier = Modifier,
+    primary: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val contentColor = if (primary) Color.White else TextPrimary
     Row(
         modifier
             .width(width.dp)
             .height(32.dp)
             .clip(ButtonShape)
-            .background(ChoiceBackground)
-            .border(if (selected) 2.dp else 1.dp, if (selected) Brand else PanelBorder, ButtonShape)
+            .background(
+                when {
+                    primary -> Accent
+                    selected -> Accent.asSelectedBackground
+                    else -> ChoiceBackground
+                },
+            )
+            .border(BorderWidth, if (selected || primary) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OnboardingIcon(icon, TextPrimary, Modifier.size(17.dp))
-        OnboardingText(label, 14, color = TextPrimary, weight = FontWeight.Medium)
+        OnboardingIcon(icon, contentColor, Modifier.size(17.dp))
+        OnboardingText(label, 14, color = contentColor, weight = FontWeight.Medium)
     }
 }
 
 @Composable
 private fun StyleCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.size(198.dp, 155.dp).clip(ButtonShape).background(ChoiceBackground)
-            .border(if (selected) 2.dp else 1.dp, if (selected) Brand else PanelBorder, ButtonShape)
+        Modifier.size(198.dp, 155.dp).clip(ButtonShape)
+            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
+            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         UiPreview(Modifier.offset(13.dp, 12.dp), rounded)
@@ -449,7 +466,7 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
     val shape = if (rounded) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp)
     Row(modifier.size(172.dp, 108.dp).clip(shape).border(1.dp, Color(0x1AFFFFFF), shape)) {
         Column(Modifier.width(44.dp).height(108.dp).background(Color(0xB3151C22)).padding(8.dp, 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(Modifier.size(29.dp, 7.dp).background(Brand))
+            Box(Modifier.size(29.dp, 7.dp).background(Accent))
             repeat(3) { Box(Modifier.width(if (it == 0) 20.dp else 29.dp).height(4.dp).background(if (it == 0) TextSecondary else TextPrimary)) }
         }
         Column(Modifier.width(128.dp).height(108.dp).background(Color(0xF211171C)).padding(8.dp, 7.dp)) {
@@ -457,7 +474,7 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
             Spacer(Modifier.height(8.dp))
             repeat(3) {
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    repeat(3) { Box(Modifier.size(34.dp, 23.dp).background(Color(0xFF1A2229)).border(0.dp, Color.Transparent).padding(top = 17.dp).background(Brand)) }
+                    repeat(3) { Box(Modifier.size(34.dp, 23.dp).background(Color(0xFF1A2229)).border(0.dp, Color.Transparent).padding(top = 17.dp).background(Accent)) }
                 }
                 Spacer(Modifier.height(5.dp))
             }
@@ -468,8 +485,9 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
 @Composable
 private fun HudCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.size(198.dp, 94.dp).clip(ButtonShape).background(ChoiceBackground)
-            .border(if (selected) 2.dp else 1.dp, if (selected) Brand else PanelBorder, ButtonShape)
+        Modifier.size(198.dp, 94.dp).clip(ButtonShape)
+            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
+            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         Box(
@@ -484,7 +502,7 @@ private fun HudCard(label: String, selected: Boolean, rounded: Boolean, onClick:
 
 @Composable
 private fun CosmeticCard(label: String) {
-    Box(Modifier.size(180.dp, 202.dp).clip(RoundedCornerShape(10.dp)).background(ChoiceBackground).border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(10.dp))) {
+    Box(Modifier.size(180.dp, 202.dp).clip(RoundedCornerShape(10.dp)).background(ChoiceBackground).border(BorderWidth, PanelBorderBrush, RoundedCornerShape(10.dp))) {
         Checkerboard(Modifier.offset(17.dp, 18.dp).size(146.dp, 146.dp).clip(RoundedCornerShape(4.dp)))
         OnboardingText(label, 14, Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp), TextPrimary, FontWeight.Medium)
     }
@@ -513,11 +531,11 @@ private fun Checkerboard(modifier: Modifier) {
 @Composable
 private fun BottomNavigation(page: Int, pageCount: Int, onSkip: () -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
     if (page == 0) {
-        ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onSkip)
+        ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onSkip)
     } else {
-        ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onBack)
+        ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onBack)
     }
-    ChoiceButton(if (page == pageCount - 1) "Finish" else "Next", MAIN_MENU_ASSETS + "chevron-right.svg", true, 100f, Modifier.offset(754.dp, 604.dp), onNext)
+    ChoiceButton(if (page == pageCount - 1) "Finish" else "Next", "assets/polyplus/ico/right-arrow.svg", false, 100f, Modifier.offset(754.dp, 604.dp), primary = true, onClick = onNext)
     Row(Modifier.offset(((PANEL_WIDTH - (pageCount * 17f - 5f)) / 2f).dp, 614.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(pageCount) { index ->
             Box(
@@ -555,7 +573,7 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
         modifier
             .clip(shape)
             .background(Color(0xFF273137))
-            .border(1.dp, Color.White, shape),
+            .border(1.dp, PanelBorderBrush, shape),
     ) {
         if (image != null) {
             Canvas(Modifier.fillMaxSize()) {
@@ -622,12 +640,38 @@ private const val BLUR_PREVIEW_HEIGHT = 115f
 private const val BLUR_SECTION_HEIGHT = BLUR_PREVIEW_OFFSET + BLUR_PREVIEW_HEIGHT
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
-private val PANEL_SHAPE = RoundedCornerShape(10.345.dp)
-private val ButtonShape = RoundedCornerShape(6.dp)
-private val PanelBackground = Color(0x73232D32)
-private val PanelBorder = Color(0x66FFFFFF)
+
+private val PANEL_SHAPE = RoundedCornerShape(9.dp)
+private val ButtonShape = RoundedCornerShape(9.dp)
+private val BorderWidth = 1.5.dp
+private const val PanelBorderAngleDeg = 20.0
+
+private val PageBackground = Color(0xFF11171C)
 private val ShadowColor = Color(0x26000000)
-private val ChoiceBackground = Color(0x80273137)
-private val Brand = Color(0xFF3F7CE4)
-private val TextPrimary = Color(0xFFD5DBFF)
-private val TextSecondary = Color(0xFF78818D)
+
+private val ChoiceBackground: Color
+    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
+private val TextPrimary: Color
+    @Composable get() = LocalTheme.current.textColor
+private val TextSecondary: Color
+    @Composable get() = LocalTheme.current.textColorSecondary
+private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
+
+private val PanelBorderBrush: Brush = object : ShaderBrush() {
+    override fun createShader(size: Size): Shader {
+        val radians = Math.toRadians(PanelBorderAngleDeg)
+        val ux = kotlin.math.cos(radians).toFloat()
+        val uy = kotlin.math.sin(radians).toFloat()
+        val len = size.width * ux + size.height * uy
+        return LinearGradientShader(
+            from = Offset.Zero,
+            to = Offset(ux * len, uy * len),
+            colors = listOf(
+                Color.White.copy(alpha = 0.5f),
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.5f),
+            ),
+            colorStops = listOf(0f, 0.5f, 1f),
+        )
+    }
+}

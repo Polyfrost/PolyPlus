@@ -449,18 +449,28 @@ private fun MainMenu(
                         actions,
                         assetsReady,
                     )
-                    if (!PolyPlusConfig.hideMainMenuQuickplay) {
-                        LeftColumn(Modifier.align(Alignment.CenterStart).padding(start = 48.dp), servers, pingTick, actions, assetsReady)
-                    }
-                    RightColumn(
+                }
+                if (!PolyPlusConfig.hideMainMenuQuickplay) {
+                    LeftColumn(
                         Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 48.dp, bottom = columnBottomPadding.dp)
-                            .onSizeChanged { rightColumnHeightPx = it.height },
+                            .align(Alignment.CenterStart)
+                            .padding(start = 50.dp)
+                            .guiScaled(scale, TransformOrigin(0f, 0.5f)),
+                        servers,
+                        pingTick,
+                        actions,
                         assetsReady,
-                        screen,
                     )
                 }
+                RightColumn(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 50.dp)
+                        .guiScaled(scale, TransformOrigin(1f, 0.5f))
+                        .onSizeChanged { rightColumnHeightPx = it.height },
+                    assetsReady,
+                    screen,
+                )
                 WindowControls(
                     Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
                     actions,

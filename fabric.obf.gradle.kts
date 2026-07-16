@@ -143,6 +143,21 @@ loomExt.runs.named("client") {
     runDir("../../run")
 }
 
+// Every version node declares its own `runClient`/`runServer` + `downloadAssets`, all
+// pointing at the shared `run/` dir. A bare `./gradlew runClient` matches the run task
+// in every version, dragging in each version's `downloadAssets` — which all write to the
+// same directory the active client reads, a hard "implicit dependency" validation
+// failure on Gradle 9 (and a needless download of every MC version's assets). Only the
+// Stonecutter-active version can actually be launched, so disable these tasks on the
+// rest; the bare command then resolves to just the active node.
+if (!stonecutter.current.isActive) {
+    tasks.matching {
+        it.name == "runClient" || it.name == "runServer" || it.name == "downloadAssets"
+    }.configureEach {
+        enabled = false
+    }
+}
+
 tasks.withType<ProcessResources>().configureEach {
     val modName = project.property("mod.name") as String
     val modVersion = project.property("mod.version") as String
