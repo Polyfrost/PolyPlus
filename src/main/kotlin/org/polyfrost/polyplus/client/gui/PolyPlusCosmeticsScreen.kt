@@ -2,15 +2,20 @@ package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,10 +27,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -36,6 +42,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,9 +50,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -53,9 +62,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -65,6 +79,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import kotlinx.coroutines.delay
@@ -186,6 +202,7 @@ private data class CartEntry(
     val finalPrice: Float?,
     val discountRate: Int?,
     val stripePriceId: String?,
+    val coverAssetId: Int? = null,
 ) {
     val discounted: Boolean get() = (discountRate ?: 0) > 0
 }
@@ -193,13 +210,49 @@ private data class CartEntry(
 private fun BundleInfo.toCartEntry(): CartEntry =
     CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
 
-private fun CosmeticStoreInfo.toCartEntry(stripePriceId: String?): CartEntry =
-    CartEntry("cosmetic-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
+private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, stripePriceId: String?): CartEntry =
+    CartEntry(
+        cosmeticCartKey(variant.id),
+        cartName(variant),
+        description,
+        basePrice,
+        finalPrice,
+        discountRate,
+        stripePriceId,
+        coverAssetId,
+    )
 
 private val BundleInfo.cartKey: String get() = "bundle-$id"
-private val CosmeticStoreInfo.cartKey: String get() = "cosmetic-$id"
+private fun cosmeticCartKey(variantId: Int): String = "cosmetic-$variantId"
+
+private fun CosmeticStoreInfo.cartName(variant: CosmeticVariantUi): String =
+    if (variantList.size > 1 && !variant.name.equals(name, ignoreCase = true)) "$name - ${variant.name}" else name
 
 private data class CosmeticVariantUi(val id: Int, val name: String)
+
+private fun CosmeticStoreInfo.uiVariants(): List<CosmeticVariantUi> {
+    val byLabel = LinkedHashMap<String, CosmeticVariantUi>()
+    for (variant in variantList.sortedBy { it.variantOrder }) {
+        val label = variant.variantName ?: name
+        byLabel.getOrPut(label) { CosmeticVariantUi(variant.id, label) }
+    }
+    return byLabel.values.toList()
+}
+
+private fun CosmeticStoreInfo.fullyOwned(ownedIds: Set<Int>): Boolean =
+    uiVariants().all { it.id in ownedIds }
+
+private fun selectedStoreVariant(
+    info: CosmeticStoreInfo,
+    picks: Map<Int, Int>,
+    ownedIds: Set<Int>,
+): CosmeticVariantUi {
+    val variants = info.uiVariants()
+    val picked = picks[info.id]
+    return variants.firstOrNull { it.id == picked }
+        ?: variants.firstOrNull { it.id !in ownedIds }
+        ?: variants.first()
+}
 
 private data class CosmeticUiItem(
     val groupId: Int,
@@ -225,6 +278,7 @@ private fun PolyPlusCosmeticsScreen() {
     var status by remember { mutableStateOf<String?>(null) }
     val cart = remember { mutableStateListOf<CartEntry>() }
     val allItems = rememberCosmeticItems(refreshKey)
+    val ownedIds = remember(refreshKey) { CosmeticCatalog.ownedIds() }
     var selectedId by remember { mutableStateOf<Int?>(null) }
     val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
     // User's chosen variant per group (groupId -> variantId). Falls back to the
@@ -243,6 +297,24 @@ private fun PolyPlusCosmeticsScreen() {
         }
     }
 
+    fun checkout() {
+        val priceIds = cart.mapNotNull { it.stripePriceId }
+        if (priceIds.isEmpty()) {
+            status = "Nothing purchasable in your cart yet."
+            return
+        }
+        status = "Opening checkout..."
+        PolyPlusClient.SCOPE.launch {
+            val result = BillingService.checkoutAndOpen(priceIds)
+            ClientPlatform.runOnMain {
+                status = result.fold(
+                    onSuccess = { "Checkout opened in your browser." },
+                    onFailure = { "Checkout failed: ${it.message}" },
+                )
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Toolbar(
             activeTab = tab,
@@ -253,6 +325,7 @@ private fun PolyPlusCosmeticsScreen() {
             },
             onStore = {
                 tab = PolyPlusTab.Store
+                showCart = false
                 status = null
             },
             onBundles = {
@@ -265,7 +338,7 @@ private fun PolyPlusCosmeticsScreen() {
                 status = null
             },
             onCart = {
-                tab = PolyPlusTab.Bundles
+                tab = PolyPlusTab.Store
                 showCart = true
             },
             onRefresh = {
@@ -300,10 +373,20 @@ private fun PolyPlusCosmeticsScreen() {
                     }
                 },
                 onSelect = { selectedId = it.id },
-                onSelectVariant = { groupId, variantId -> variantPicks[groupId] = variantId },
+                onSelectVariant = { groupId, variantId ->
+                    variantPicks[groupId] = variantId
+                    val item = allItems.firstOrNull { it.groupId == groupId }
+                    if (item != null && item.equipped && item.equippedVariantId != variantId) {
+                        status = "Equipping ${item.name}..."
+                        equip(item, variantId) {
+                            refreshKey++
+                            status = it
+                        }
+                    }
+                },
                 onEquip = { item ->
                     val variantId = selectedVariantId(item, variantPicks)
-                    if (item.equipped) {
+                    if (item.equipped && variantId == item.equippedVariantId) {
                         status = "Unequipping ${item.name}..."
                         unequip(item) {
                             refreshKey++
@@ -323,33 +406,47 @@ private fun PolyPlusCosmeticsScreen() {
 
             PolyPlusTab.Store -> StoreScreen(
                 cart = cart,
+                showCart = showCart,
                 status = status,
-                onAddToCart = { info ->
-                    if (cart.any { it.key == info.cartKey }) {
-                        status = "${info.name} is already in your cart."
+                ownedIds = ownedIds,
+                onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
+                onBackToBrowse = { showCart = false },
+                onCheckout = { checkout() },
+                onAddToCart = { info, variant ->
+                    val key = cosmeticCartKey(variant.id)
+                    val label = info.cartName(variant)
+                    if (variant.id in ownedIds) {
+                        status = "You already own $label."
+                    } else if (cart.any { it.key == key }) {
+                        status = "$label is already in your cart."
                     } else {
-                        status = "Adding ${info.name} to cart..."
+                        status = "Adding $label to cart..."
                         PolyPlusClient.SCOPE.launch {
-                            val view = CosmeticStore.view(info.id).getOrNull()
+                            val view = CosmeticStore.view(variant.id).getOrNull()
                             ClientPlatform.runOnMain {
                                 val priceId = view?.stripePriceId
                                 if (priceId.isNullOrBlank()) {
-                                    status = "${info.name} isn't purchasable yet."
-                                } else if (cart.none { it.key == info.cartKey }) {
-                                    cart += info.toCartEntry(priceId)
-                                    status = "${info.name} added to cart."
+                                    status = "$label isn't purchasable yet."
+                                } else if (cart.none { it.key == key }) {
+                                    cart += info.toCartEntry(variant, priceId)
+                                    status = "$label added to cart."
                                 }
                             }
                         }
                     }
                 },
-                onBuyNow = { info ->
+                onBuyNow = { info, variant ->
+                    val label = info.cartName(variant)
+                    if (variant.id in ownedIds) {
+                        status = "You already own $label."
+                        return@StoreScreen
+                    }
                     status = "Opening checkout..."
                     PolyPlusClient.SCOPE.launch {
-                        val view = CosmeticStore.view(info.id).getOrNull()
+                        val view = CosmeticStore.view(variant.id).getOrNull()
                         val priceId = view?.stripePriceId
                         if (priceId.isNullOrBlank()) {
-                            ClientPlatform.runOnMain { status = "${info.name} isn't purchasable yet." }
+                            ClientPlatform.runOnMain { status = "$label isn't purchasable yet." }
                         } else {
                             val result = BillingService.checkoutAndOpen(listOf(priceId))
                             ClientPlatform.runOnMain {
@@ -373,23 +470,7 @@ private fun PolyPlusCosmeticsScreen() {
                 },
                 onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
                 onBackToBrowse = { showCart = false },
-                onCheckout = {
-                    val priceIds = cart.mapNotNull { it.stripePriceId }
-                    if (priceIds.isEmpty()) {
-                        status = "Nothing purchasable in your cart yet."
-                    } else {
-                        status = "Opening checkout..."
-                        PolyPlusClient.SCOPE.launch {
-                            val result = BillingService.checkoutAndOpen(priceIds)
-                            ClientPlatform.runOnMain {
-                                status = result.fold(
-                                    onSuccess = { "Checkout opened in your browser." },
-                                    onFailure = { "Checkout failed: ${it.message}" },
-                                )
-                            }
-                        }
-                    }
-                },
+                onCheckout = { checkout() },
                 onStatus = { status = it },
             )
 
@@ -414,8 +495,8 @@ private fun Toolbar(
         Spacer(Modifier.width(8.dp))
         TabButton("Store", activeTab == PolyPlusTab.Store, onStore)
         Spacer(Modifier.width(8.dp))
-        TabButton("Bundles", activeTab == PolyPlusTab.Bundles, onBundles)
-        Spacer(Modifier.width(8.dp))
+        // TabButton("Bundles", activeTab == PolyPlusTab.Bundles, onBundles)
+        // Spacer(Modifier.width(8.dp))
         TabButton("History", activeTab == PolyPlusTab.History, onHistory)
         Spacer(Modifier.weight(1f))
         SmallButton("Refresh", iconPath = "refresh", primary = false, onClick = onRefresh)
@@ -428,9 +509,9 @@ private fun Toolbar(
 private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier.height(33.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(ppShape(7.dp))
             .background(if (selected) Accent else LocalTheme.current.chipBackground)
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(7.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
@@ -453,9 +534,9 @@ private fun SmallButton(
 ) {
     Row(
         modifier = Modifier.height(33.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(ppShape(7.dp))
             .background(if (primary) Accent else LocalTheme.current.chipBackground)
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(7.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
@@ -481,6 +562,26 @@ private fun WardrobeScreen(
     onEquip: (CosmeticUiItem) -> Unit,
 ) {
     var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
+    var stockedTypes by remember {
+        mutableStateOf(CosmeticType.entries.filter { it != CosmeticType.Unknown })
+    }
+    LaunchedEffect(Unit) {
+        stockedTypes = CosmeticStore.stockedTypes()
+    }
+
+    val railTypes = remember(stockedTypes, items) {
+        val owned = items.mapTo(mutableSetOf()) { it.type }
+        CosmeticType.entries.filter {
+            it != CosmeticType.Unknown && (it in stockedTypes || it in owned)
+        }
+    }
+
+    LaunchedEffect(railTypes) {
+        if (railTypes.isNotEmpty() && selectedType !in railTypes) {
+            selectedType = railTypes.first()
+        }
+    }
+
     val displayItems = remember(items, selectedType) {
         items.filter { it.type == selectedType }
     }
@@ -496,6 +597,7 @@ private fun WardrobeScreen(
         CategoryRail(
             selected = selectedType,
             onSelect = { selectedType = it },
+            types = railTypes,
         )
         CosmeticGrid(
             items = displayItems,
@@ -626,9 +728,9 @@ private fun HistoryScreen(refreshKey: Int) {
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+        modifier = Modifier.fillMaxSize().clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
             .padding(18.dp),
     ) {
         when {
@@ -646,8 +748,8 @@ private fun HistoryScreen(refreshKey: Int) {
 private fun TransactionRow(tx: TransactionInfo) {
     Row(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(8.dp))
+            .clip(ppShape(8.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 13.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
@@ -678,15 +780,16 @@ private fun statusColor(status: TransactionStatus): Color = when (status) {
 private fun CategoryRail(
     selected: CosmeticType,
     onSelect: (CosmeticType) -> Unit,
+    types: List<CosmeticType> = CosmeticType.entries.filter { it != CosmeticType.Unknown },
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.width(58.dp)) {
-        CosmeticType.entries.filter { it != CosmeticType.Unknown }.forEach { type ->
+        types.forEach { type ->
             val isSelected = type == selected
             Box(
                 modifier = Modifier.fillMaxWidth().height(57.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(ppShape(7.dp))
                     .background(if (isSelected) Accent else LocalTheme.current.chipBackground)
-                    .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(7.dp))
+                    .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
                     .clickable { onSelect(type) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -736,9 +839,9 @@ private fun CosmeticCard(
 
     Box(
         modifier = Modifier.size(180.dp, 258.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .border(1.dp, border, ppShape(12.dp))
             .clickable(onClick = activate),
     ) {
         CosmeticThumbnail(item, Modifier.offset(17.dp, 17.dp).size(144.dp))
@@ -804,9 +907,9 @@ private fun BundleCard(
 
     Box(
         modifier = Modifier.size(180.dp, 258.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .border(1.dp, border, ppShape(12.dp))
             .clickable(onClick = onSelect),
     ) {
         CheckerThumbnail(Modifier.offset(17.dp, 17.dp).size(144.dp))
@@ -818,7 +921,7 @@ private fun BundleCard(
         if (bundle.discounted) {
             Box(
                 modifier = Modifier.align(Alignment.TopCenter).size(81.dp, 21.dp)
-                    .background(Color(0xFF239A60), RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)),
+                    .background(Color(0xFF239A60), ppShapeOf(bottomStart = 4.dp, bottomEnd = 4.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 GuiText("${bundle.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -872,9 +975,9 @@ private fun BundleDetailPanel(
     modifier: Modifier,
 ) {
     Box(
-        modifier = modifier.clip(RoundedCornerShape(12.dp))
+        modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
         if (bundle == null) {
             CenteredNote("Select a bundle to see what's inside.")
@@ -933,49 +1036,248 @@ private fun PreviewPanel(
     onPreviewAuraColor: (Int) -> Unit = {},
     onSelectAuraColor: (Int?) -> Unit = {},
 ) {
-    Row(
-        modifier = modifier.clip(RoundedCornerShape(12.dp))
+    Box(
+        modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
-                .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
-            PlayerPreview(
-                Modifier.align(Alignment.Center).size(190.dp, 330.dp),
-                source = PlayerPreviewSource.LocalLive,
-                autoSpin = false,
-                verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
-                initialYaw = FRONT_YAW_DEG,
-                live = true,
-            )
+        val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
+            .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
+        PlayerPreview(
+            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+            source = PlayerPreviewSource.LocalLive,
+            autoSpin = false,
+            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+            initialYaw = FRONT_YAW_DEG,
+            live = true,
+        )
+        Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (selected != null) {
-                Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        GuiText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        GuiText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    }
-                    if (selected.hasVariants) {
-                        VariantPicker(
-                            variants = selected.variants,
-                            selectedVariantId = selectedVariantId,
-                            onSelect = onSelectVariant,
-                        )
-                    }
+                Column {
+                    GuiText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    GuiText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                 }
             }
             if (status != null) {
-                GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomStart).padding(18.dp))
+                GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
-        if (showAuraColor) {
-            AuraColorPicker(
-                selectedColor = auraColor,
-                onPreview = onPreviewAuraColor,
-                onCommit = onSelectAuraColor,
-                modifier = Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(18.dp),
+        val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
+        if (variants.isNotEmpty() || showAuraColor) {
+            PreviewPill(
+                variants = variants,
+                selectedVariantId = selectedVariantId,
+                onSelectVariant = onSelectVariant,
+                showAuraColor = showAuraColor,
+                auraColor = auraColor,
+                onPreviewAuraColor = onPreviewAuraColor,
+                onSelectAuraColor = onSelectAuraColor,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(18.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun PreviewPill(
+    variants: List<CosmeticVariantUi>,
+    selectedVariantId: Int?,
+    onSelectVariant: (Int) -> Unit,
+    showAuraColor: Boolean,
+    auraColor: Int?,
+    onPreviewAuraColor: (Int) -> Unit,
+    onSelectAuraColor: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var customOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(showAuraColor) { if (!showAuraColor) customOpen = false }
+
+    var pillHeight by remember { mutableIntStateOf(0) }
+    val popoverGapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
+
+    Box(modifier) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { pillHeight = it.height }
+                .clip(ppShape(PILL_RADIUS))
+                .background(LocalTheme.current.chipBackground)
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(PILL_RADIUS))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (variants.isNotEmpty()) {
+                VariantStrip(
+                    variants = variants,
+                    selectedVariantId = selectedVariantId,
+                    onSelect = onSelectVariant,
+                )
+            }
+            if (variants.isNotEmpty() && showAuraColor) {
+                Box(Modifier.width(1.dp).height(20.dp).background(LocalTheme.current.borderColor))
+            }
+            if (showAuraColor) {
+                AuraSwatchRow(
+                    selectedColor = auraColor,
+                    customOpen = customOpen,
+                    onToggleCustom = { customOpen = !customOpen },
+                    onCommit = onSelectAuraColor,
+                )
+            }
+        }
+        if (customOpen && showAuraColor) {
+            Popup(
+                alignment = Alignment.TopEnd,
+                offset = IntOffset(0, pillHeight + popoverGapPx),
+                onDismissRequest = { customOpen = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                AuraCustomPopover(
+                    selectedColor = auraColor,
+                    onPreview = onPreviewAuraColor,
+                    onCommit = onSelectAuraColor,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.VariantStrip(
+    variants: List<CosmeticVariantUi>,
+    selectedVariantId: Int?,
+    onSelect: (Int) -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val wheelStep = with(LocalDensity.current) { VARIANT_WHEEL_STEP.toPx() }
+    val arrowStep = with(LocalDensity.current) { VARIANT_ARROW_STEP.toPx() }
+    val overflows = scrollState.maxValue > 0 && scrollState.maxValue != Int.MAX_VALUE
+
+    if (overflows) {
+        ScrollArrow(
+            iconName = "left-arrow",
+            enabled = scrollState.value > 0,
+            onClick = { scope.launch { scrollState.animateScrollBy(-arrowStep) } },
+        )
+    }
+    Row(
+        modifier = Modifier.weight(1f, fill = false)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type != PointerEventType.Scroll) continue
+                        val delta = event.changes.first().scrollDelta
+                        if (delta.x == 0f && delta.y != 0f) {
+                            scope.launch { scrollState.scrollBy(delta.y * wheelStep) }
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (variant in variants) {
+            val isSelected = variant.id == selectedVariantId
+            Box(
+                modifier = Modifier
+                    .clip(ppShape(6.dp))
+                    .background(if (isSelected) Accent else LocalTheme.current.componentBackground)
+                    .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, ppShape(6.dp))
+                    .clickable { onSelect(variant.id) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            ) {
+                GuiText(
+                    variant.name,
+                    color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+    if (overflows) {
+        ScrollArrow(
+            iconName = "right-arrow",
+            enabled = scrollState.value < scrollState.maxValue,
+            onClick = { scope.launch { scrollState.animateScrollBy(arrowStep) } },
+        )
+    }
+}
+
+@Composable
+private fun ScrollArrow(iconName: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(18.dp)
+            .clip(ppShape(4.dp))
+            .background(LocalTheme.current.componentBackground)
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(4.dp))
+            .alpha(if (enabled) 1f else 0.35f)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(iconName, color = LocalTheme.current.textColor, modifier = Modifier.size(10.dp))
+    }
+}
+
+@Composable
+private fun AuraSwatchRow(
+    selectedColor: Int?,
+    customOpen: Boolean,
+    onToggleCustom: () -> Unit,
+    onCommit: (Int?) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        AuraDot(
+            color = Color(DEFAULT_AURA_ARGB),
+            isSelected = selectedColor == null,
+            onClick = { onCommit(null) },
+        )
+        for (color in AURA_PRESETS) {
+            AuraDot(
+                color = Color(color),
+                isSelected = selectedColor == color,
+                onClick = { onCommit(color) },
+            )
+        }
+        val isCustom = selectedColor != null && selectedColor !in AURA_PRESETS
+        AuraDot(
+            color = if (isCustom) Color(selectedColor!!) else LocalTheme.current.componentBackground,
+            isSelected = isCustom || customOpen,
+            onClick = onToggleCustom,
+        ) {
+            if (!isCustom) {
+                GuiText("+", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuraDot(
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit = {},
+) {
+    Box(
+        modifier = Modifier.size(18.dp)
+            .clip(ppShape(4.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        AlphaCheckerboard(Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().background(color))
+        Box(
+            Modifier.fillMaxSize().border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) Accent else LocalTheme.current.borderColor,
+                shape = ppShape(4.dp),
+            ),
+        )
+        content()
     }
 }
 
@@ -989,6 +1291,7 @@ private fun VariantPicker(
     variants: List<CosmeticVariantUi>,
     selectedVariantId: Int?,
     onSelect: (Int) -> Unit,
+    ownedVariantIds: Set<Int> = emptySet(),
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(220.dp)) {
         GuiText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
@@ -998,9 +1301,10 @@ private fun VariantPicker(
                     val isSelected = variant.id == selectedVariantId
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .alpha(if (variant.id in ownedVariantIds && !isSelected) 0.55f else 1f)
+                            .clip(ppShape(6.dp))
                             .background(if (isSelected) Accent else LocalTheme.current.chipBackground)
-                            .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, RoundedCornerShape(6.dp))
+                            .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, ppShape(6.dp))
                             .clickable { onSelect(variant.id) }
                             .padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
@@ -1016,6 +1320,12 @@ private fun VariantPicker(
     }
 }
 
+private val PILL_RADIUS = 18.dp
+
+private val VARIANT_WHEEL_STEP = 48.dp
+
+private val VARIANT_ARROW_STEP = 96.dp
+
 private val AURA_COLORS: List<Int> = listOf(
     0xFFFF4444.toInt(), // red
     0xFFFF9E3D.toInt(), // orange
@@ -1030,6 +1340,10 @@ private val AURA_COLORS: List<Int> = listOf(
     0xFF3A3F43.toInt(), // dark
     0xFF9BA2A6.toInt(), // gray
 )
+
+private const val DEFAULT_AURA_ARGB: Int = -1
+
+private val AURA_PRESETS: List<Int> = AURA_COLORS.filter { it != DEFAULT_AURA_ARGB }
 
 private fun argbToHsb(argb: Int): FloatArray {
     val r = ((argb shr 16) and 0xFF) / 255f
@@ -1067,26 +1381,27 @@ private fun hsbToColor(hue: Float, saturation: Float, brightness: Float): Color 
 private fun argbHex(argb: Int): String =
     "%02X%02X%02X".format((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
 
-private fun hexToArgb(hex: String): Int? {
+private fun hexToArgb(hex: String, alpha: Float): Int? {
     val h = hex.removePrefix("#").trim()
     if (h.length != 6) return null
     return try {
-        0xFF000000.toInt() or Integer.parseInt(h, 16)
+        ((alpha.coerceIn(0f, 1f) * 255f).roundToInt() shl 24) or Integer.parseInt(h, 16)
     } catch (_: Exception) {
         null
     }
 }
 
-private fun Color.toRgbArgb(): Int = 0xFF000000.toInt() or (
-    (red.coerceIn(0f, 1f) * 255f).roundToInt() shl 16 or
+private fun Color.toArgb(alpha: Float): Int =
+    ((alpha.coerceIn(0f, 1f) * 255f).roundToInt() shl 24) or
+        ((red.coerceIn(0f, 1f) * 255f).roundToInt() shl 16) or
         ((green.coerceIn(0f, 1f) * 255f).roundToInt() shl 8) or
         (blue.coerceIn(0f, 1f) * 255f).roundToInt()
-    )
 
 private class AuraPickerState(argb: Int) {
     var hue by mutableFloatStateOf(0f)
     var saturation by mutableFloatStateOf(0f)
     var brightness by mutableFloatStateOf(0f)
+    var alpha by mutableFloatStateOf(1f)
 
     var lastEmitted: Int? = null
 
@@ -1099,13 +1414,34 @@ private class AuraPickerState(argb: Int) {
         hue = hsb[0]
         saturation = hsb[1]
         brightness = hsb[2]
+        alpha = ((argb ushr 24) and 0xFF) / 255f
     }
 
-    fun currentArgb(): Int = hsbToColor(hue, saturation, brightness).toRgbArgb()
+    fun currentArgb(): Int = hsbToColor(hue, saturation, brightness).toArgb(alpha)
 }
 
 @Composable
-private fun AuraColorPicker(
+private fun AlphaCheckerboard(modifier: Modifier) {
+    Box(
+        modifier = modifier.drawBehind {
+            val cell = 4.dp.toPx()
+            val cols = ceil(size.width / cell).toInt()
+            val rows = ceil(size.height / cell).toInt()
+            for (x in 0..cols) {
+                for (y in 0..rows) {
+                    drawRect(
+                        color = if ((x + y) % 2 == 0) Color(0xFF5F6568) else Color(0xFF3D4245),
+                        topLeft = Offset(x * cell, y * cell),
+                        size = Size(cell, cell),
+                    )
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun AuraCustomPopover(
     selectedColor: Int?,
     onPreview: (Int) -> Unit,
     onCommit: (Int?) -> Unit,
@@ -1136,15 +1472,23 @@ private fun AuraColorPicker(
     val hue = state.hue
     val saturation = state.saturation
     val brightness = state.brightness
+    val alpha = state.alpha
     val current = hsbToColor(hue, saturation, brightness)
 
-    Column(modifier = modifier.width(190.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = modifier.width(190.dp)
+            .clip(ppShape(10.dp))
+            .background(LocalTheme.current.popupBackground)
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(10.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         GuiText("Aura Color", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
 
         var paneSize by remember { mutableStateOf(Size.Zero) }
         Box(
             modifier = Modifier.fillMaxWidth().height(120.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(ppShape(6.dp))
                 .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .drawWithCache {
                     val hueColor = hsbToColor(hue, 1f, 1f)
@@ -1183,15 +1527,15 @@ private fun AuraColorPicker(
                 modifier = Modifier
                     .offset { IntOffset((selX - 7.dp.toPx()).roundToInt(), (selY - 7.dp.toPx()).roundToInt()) }
                     .size(14.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(ppShape(7.dp))
                     .background(current)
-                    .border(2.dp, Color.White, RoundedCornerShape(7.dp)),
+                    .border(2.dp, Color.White, ppShape(7.dp)),
             )
         }
 
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(ppShape(4.dp))
                 .drawWithCache {
                     val gradient = Brush.horizontalGradient(
                         listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
@@ -1225,25 +1569,68 @@ private fun AuraColorPicker(
                 modifier = Modifier.align(Alignment.CenterStart)
                     .offset { IntOffset(((hue / 360f) * barWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
                     .size(10.dp)
-                    .clip(RoundedCornerShape(5.dp))
+                    .clip(ppShape(5.dp))
                     .background(Color.White)
-                    .border(1.dp, Color.White.copy(0.5f), RoundedCornerShape(5.dp)),
+                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
+            )
+        }
+
+        Box(
+            modifier = Modifier.fillMaxWidth().height(14.dp)
+                .clip(ppShape(4.dp))
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        fun update(x: Float) {
+                            state.alpha = (x / size.width).coerceIn(0f, 1f)
+                            emitPreview()
+                        }
+                        update(down.position.x)
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { ch ->
+                                if (ch.pressed) {
+                                    update(ch.position.x)
+                                    ch.consume()
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        emitCommit()
+                    }
+                },
+        ) {
+            AlphaCheckerboard(Modifier.fillMaxWidth().height(14.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().height(14.dp)
+                    .drawWithCache {
+                        val gradient = Brush.horizontalGradient(listOf(current.copy(alpha = 0f), current))
+                        onDrawBehind { drawRect(gradient) }
+                    },
+            )
+            var alphaBarWidth by remember { mutableStateOf(0f) }
+            Box(Modifier.fillMaxWidth().height(14.dp).onSizeChanged { alphaBarWidth = it.width.toFloat() })
+            Box(
+                modifier = Modifier.align(Alignment.CenterStart)
+                    .offset { IntOffset((alpha * alphaBarWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
+                    .size(10.dp)
+                    .clip(ppShape(5.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
             )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier.size(28.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(current)
-                    .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(5.dp)),
-            )
+            Box(modifier = Modifier.size(28.dp).clip(ppShape(5.dp))) {
+                AlphaCheckerboard(Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
+                Box(Modifier.fillMaxSize().border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)))
+            }
             BasicTextField(
                 value = hexText,
                 onValueChange = { input ->
                     val filtered = input.filter { it.isLetterOrDigit() }.take(6)
                     hexText = filtered
-                    hexToArgb(filtered)?.let { argb ->
+                    hexToArgb(filtered, state.alpha)?.let { argb ->
                         state.applyFrom(argb)
                         state.lastEmitted = argb
                         onCommit(argb)
@@ -1257,9 +1644,9 @@ private fun AuraColorPicker(
                 ),
                 cursorBrush = SolidColor(LocalTheme.current.textColor),
                 modifier = Modifier.weight(1f)
-                    .clip(RoundedCornerShape(5.dp))
+                    .clip(ppShape(5.dp))
                     .background(LocalTheme.current.chipBackground)
-                    .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(5.dp))
+                    .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1270,44 +1657,6 @@ private fun AuraColorPicker(
             )
         }
 
-        for (row in AURA_COLORS.chunked(6)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (color in row) {
-                    val isSelected = selectedColor == color
-                    Box(
-                        modifier = Modifier.size(22.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(Color(color))
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) Accent else LocalTheme.current.borderColor,
-                                shape = RoundedCornerShape(5.dp),
-                            )
-                            .clickable {
-                                state.applyFrom(color)
-                                state.lastEmitted = color
-                                hexText = argbHex(color)
-                                onCommit(color)
-                            },
-                    )
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(if (selectedColor == null) Accent else LocalTheme.current.chipBackground)
-                .border(1.dp, if (selectedColor == null) Accent else LocalTheme.current.borderColor, RoundedCornerShape(6.dp))
-                .clickable { onCommit(null) }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-        ) {
-            GuiText(
-                "Default",
-                color = if (selectedColor == null) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
-                fontSize = 12.sp,
-            )
-        }
     }
 }
 
@@ -1337,7 +1686,9 @@ private fun CartPanel(
         val total = items.sumOf { (it.finalPrice ?: it.basePrice ?: 0f).toDouble() }.toFloat()
         val discount = (subtotal - total).coerceAtLeast(0f)
         RowTotals("Subtotal", money(subtotal), LocalTheme.current.textColor)
-        RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
+        if (discount > 0f) {
+            RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
+        }
         RowTotals("Total", money(total), Color.White, large = true)
         if (status != null) {
             GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
@@ -1355,14 +1706,14 @@ private fun CartPanel(
 private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(81.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
             .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        CheckerThumbnail(Modifier.size(58.dp))
+        CoverThumbnail(item.coverAssetId, Modifier.size(58.dp))
         Column(Modifier.weight(1f)) {
             GuiText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             item.description?.takeIf { it.isNotBlank() }?.let {
@@ -1408,6 +1759,7 @@ private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
                 verticalAnchor = framing.verticalAnchor,
                 initialYaw = framing.yawDeg,
                 previewKey = "card-${item.groupId}",
+                live = item.type == CosmeticType.Aura,
             )
         }
     }
@@ -1417,6 +1769,7 @@ private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val 
 
 private const val FRONT_YAW_DEG = 180f + 22.9f
 private const val BACK_YAW_DEG = 22.9f
+private const val STORE_PREVIEW_FADE_FRACTION = 0.22f
 
 private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (type) {
     CosmeticType.Hat, CosmeticType.Glasses -> PreviewFraming(FRONT_YAW_DEG, 1.0f, 1.5f)
@@ -1440,24 +1793,28 @@ private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): PlayerPreviewSo
 private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): PlayerPreviewSource? {
     val isCape = type == CosmeticType.Cape
 
+    var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
     var loadTick by remember(cosmeticId) { mutableIntStateOf(0) }
     LaunchedEffect(cosmeticId) {
+        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+        val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
+        previewId = id
         val loaded = if (isCape) {
-            CosmeticAssetCache.getCapeResource(cosmeticId) != null
+            CosmeticAssetCache.getCapeResource(id) != null
         } else {
-            CosmeticAssetCache.getAttachedCosmetic(cosmeticId) != null
+            CosmeticAssetCache.getAttachedCosmetic(id) != null
         }
         if (!loaded) {
-            CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)
+            CosmeticAssetCache.ensureCosmeticLoaded(id)
             loadTick++
         }
     }
 
-    return remember(cosmeticId, loadTick, isCape) {
+    return remember(previewId, loadTick, isCape) {
         if (isCape) {
-            PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = CosmeticAssetCache.getCapeResource(cosmeticId))
+            PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = CosmeticAssetCache.getCapeResource(previewId))
         } else {
-            val attached = CosmeticAssetCache.getAttachedCosmetic(cosmeticId) ?: return@remember null
+            val attached = CosmeticAssetCache.getAttachedCosmetic(previewId) ?: return@remember null
             val equipment = CosmeticEquipment()
             equipment.equip(attached)
             PlayerPreviewSource.Override(equipment)
@@ -1473,80 +1830,164 @@ private fun isNewItem(createdAt: String): Boolean {
     }.getOrDefault(false)
 }
 
+private const val STORE_PAGE_SIZE = CosmeticStore.MAX_PAGE_SIZE
+
+private const val STORE_PREFETCH_DISTANCE = 6
+
 @Composable
 private fun StoreScreen(
     cart: List<CartEntry>,
+    showCart: Boolean,
     status: String?,
-    onAddToCart: (CosmeticStoreInfo) -> Unit,
-    onBuyNow: (CosmeticStoreInfo) -> Unit,
+    ownedIds: Set<Int>,
+    onRemoveFromCart: (String) -> Unit,
+    onBackToBrowse: () -> Unit,
+    onCheckout: () -> Unit,
+    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
+    onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
 ) {
+    val variantPicks = remember { mutableStateMapOf<Int, Int>() }
     var query by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf("") }
-    var page by remember { mutableIntStateOf(1) }
-    var items by remember { mutableStateOf<List<CosmeticStoreInfo>>(emptyList()) }
-    var totalPages by remember { mutableIntStateOf(1) }
+    var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
+    var nextPage by remember { mutableIntStateOf(1) }
+    var results by remember { mutableStateOf<List<CosmeticStoreInfo>>(emptyList()) }
+    var hasMore by remember { mutableStateOf(true) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var selectedId by remember { mutableStateOf<Int?>(null) }
+    var stockedTypes by remember {
+        mutableStateOf(CosmeticType.entries.filter { it != CosmeticType.Unknown })
+    }
+    val gridState = rememberLazyGridState()
 
-    LaunchedEffect(submitted, page) {
+    LaunchedEffect(Unit) {
+        stockedTypes = CosmeticStore.stockedTypes()
+    }
+
+    LaunchedEffect(submitted, selectedType, nextPage) {
         loading = true
         loadError = null
-        CosmeticStore.search(page = page, text = submitted.ifBlank { null })
+        CosmeticStore.search(
+            page = nextPage,
+            perPage = STORE_PAGE_SIZE,
+            text = submitted.ifBlank { null },
+            types = listOf(selectedType.serializedName),
+        )
             .onSuccess { resp ->
-                items = resp.results
-                totalPages = resp.pagination.totalPages.toInt().coerceAtLeast(1)
-                if (selectedId == null || items.none { it.id == selectedId }) {
-                    selectedId = items.firstOrNull()?.id
-                }
+                results = if (nextPage == 1) resp.results else results + resp.results
+                hasMore = nextPage < resp.pagination.totalPages
             }
-            .onFailure { loadError = "Couldn't load store: ${it.message}" }
+            .onFailure {
+                loadError = "Couldn't load store: ${it.message}"
+                hasMore = false
+            }
         loading = false
+    }
+
+    val items = remember(results, ownedIds) {
+        results.sortedBy { if (it.fullyOwned(ownedIds)) 1 else 0 }
+    }
+
+    val nearEnd by remember {
+        derivedStateOf {
+            val info = gridState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
+            last.index >= info.totalItemsCount - STORE_PREFETCH_DISTANCE
+        }
+    }
+    LaunchedEffect(nearEnd, hasMore, loading) {
+        if (nearEnd && hasMore && !loading) nextPage++
+    }
+
+    LaunchedEffect(items) {
+        if (selectedId == null || items.none { it.id == selectedId }) {
+            selectedId = items.firstOrNull()?.id
+        }
     }
 
     val cartKeys = cart.map { it.key }.toSet()
     val selected = items.firstOrNull { it.id == selectedId }
 
-    fun submit() {
-        submitted = query.trim()
-        page = 1
+    fun reset() {
+        results = emptyList()
+        hasMore = true
+        nextPage = 1
     }
 
-    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(25.dp)) {
+    fun submit() {
+        submitted = query.trim()
+        reset()
+    }
+
+    LaunchedEffect(stockedTypes) {
+        if (stockedTypes.isNotEmpty() && selectedType !in stockedTypes) {
+            selectedType = stockedTypes.first()
+            reset()
+        }
+    }
+
+    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(19.dp)) {
+        CategoryRail(
+            selected = selectedType,
+            onSelect = {
+                if (it != selectedType) {
+                    selectedType = it
+                    reset()
+                }
+            },
+            types = stockedTypes,
+        )
         Column(modifier = Modifier.width(596.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
             StoreSearchBar(query = query, onQueryChange = { query = it }, onSubmit = { submit() })
             when {
                 loading && items.isEmpty() -> CenteredNote("Loading cosmetics...")
                 loadError != null && items.isEmpty() -> CenteredNote(loadError!!)
                 items.isEmpty() -> CenteredNote(
-                    if (submitted.isBlank()) "No cosmetics available yet." else "No cosmetics match \"$submitted\".",
+                    if (submitted.isBlank()) {
+                        "No ${selectedType.displayName.lowercase()} cosmetics available yet."
+                    } else {
+                        "No cosmetics match \"$submitted\"."
+                    },
                 )
                 else -> StoreGrid(
                     items = items,
                     cartKeys = cartKeys,
+                    ownedIds = ownedIds,
+                    variantPicks = variantPicks,
+                    state = gridState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     onSelect = { selectedId = it.id },
                     onAddToCart = onAddToCart,
                 )
             }
-            if (totalPages > 1) {
-                PageNav(
-                    page = page,
-                    totalPages = totalPages,
-                    onPrev = { if (page > 1) page-- },
-                    onNext = { if (page < totalPages) page++ },
+        }
+
+        val selectedVariant = selected?.let { selectedStoreVariant(it, variantPicks, ownedIds) }
+        Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (showCart) {
+                SmallButton("Back to store", iconPath = "left-arrow", primary = false, onClick = onBackToBrowse)
+                CartPanel(
+                    items = cart,
+                    status = status,
+                    modifier = Modifier.fillMaxSize(),
+                    onRemove = onRemoveFromCart,
+                    onCheckout = onCheckout,
+                )
+            } else {
+                StoreDetailPanel(
+                    info = selected,
+                    variant = selectedVariant,
+                    status = status,
+                    ownedIds = ownedIds,
+                    inCart = selectedVariant?.let { cosmeticCartKey(it.id) in cartKeys } ?: false,
+                    onSelectVariant = { variantId -> selected?.let { variantPicks[it.id] = variantId } },
+                    onAddToCart = onAddToCart,
+                    onBuyNow = onBuyNow,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
-
-        StoreDetailPanel(
-            info = selected,
-            status = status,
-            inCart = selected?.let { it.cartKey in cartKeys } ?: false,
-            onAddToCart = onAddToCart,
-            onBuyNow = onBuyNow,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        )
     }
 }
 
@@ -1570,9 +2011,9 @@ private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSub
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
             modifier = Modifier.weight(1f).fillMaxHeight()
-                .clip(RoundedCornerShape(7.dp))
+                .clip(ppShape(7.dp))
                 .background(LocalTheme.current.chipBackground)
-                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(7.dp))
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
                 .padding(horizontal = 12.dp),
             decorationBox = { inner ->
                 Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -1593,22 +2034,30 @@ private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSub
 private fun StoreGrid(
     items: List<CosmeticStoreInfo>,
     cartKeys: Set<String>,
+    ownedIds: Set<Int>,
+    variantPicks: Map<Int, Int>,
+    state: LazyGridState,
     modifier: Modifier,
     onSelect: (CosmeticStoreInfo) -> Unit,
-    onAddToCart: (CosmeticStoreInfo) -> Unit,
+    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
+        state = state,
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(19.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(items, key = { it.id }) { info ->
+            val variant = selectedStoreVariant(info, variantPicks, ownedIds)
             StoreCard(
                 info = info,
-                inCart = info.cartKey in cartKeys,
+                variant = variant,
+                owned = info.fullyOwned(ownedIds),
+                variantOwned = variant.id in ownedIds,
+                inCart = cosmeticCartKey(variant.id) in cartKeys,
                 onSelect = { onSelect(info) },
-                onAddToCart = { onAddToCart(info) },
+                onAddToCart = { onAddToCart(info, variant) },
             )
         }
     }
@@ -1617,12 +2066,17 @@ private fun StoreGrid(
 @Composable
 private fun StoreCard(
     info: CosmeticStoreInfo,
+    variant: CosmeticVariantUi,
+    owned: Boolean,
+    variantOwned: Boolean,
     inCart: Boolean,
     onSelect: () -> Unit,
     onAddToCart: () -> Unit,
 ) {
+    val variantCount = info.uiVariants().size
     val border = when {
         inCart -> Accent
+        owned -> LocalTheme.current.borderColor
         info.discounted -> Color(0xFF239A60)
         else -> LocalTheme.current.borderColor
     }
@@ -1630,21 +2084,36 @@ private fun StoreCard(
 
     Box(
         modifier = Modifier.size(180.dp, 258.dp)
-            .clip(RoundedCornerShape(12.dp))
+            // Owned listings stay legible but read as already-handled.
+            .alpha(if (owned) 0.6f else 1f)
+            .clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .border(1.dp, border, ppShape(12.dp))
             .clickable(onClick = onSelect),
     ) {
-        StoreThumbnail(info, Modifier.offset(17.dp, 17.dp).size(144.dp))
+        StoreThumbnail(info, variant.id, Modifier.offset(17.dp, 17.dp).size(144.dp))
         GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PriceLabel(info)
+            if (variantCount > 1) {
+                GuiText("$variantCount variants", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
+            }
         }
 
-        if (isNewItem(info.createdAt)) {
+        if (owned) {
             Box(
                 modifier = Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 8.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(ppShape(4.dp))
+                    .background(Color(0xFF239A60))
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                GuiText("OWNED", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            }
+        } else if (isNewItem(info.createdAt)) {
+            Box(
+                modifier = Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 8.dp)
+                    .clip(ppShape(4.dp))
                     .background(Accent)
                     .padding(horizontal = 7.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center,
@@ -1653,10 +2122,10 @@ private fun StoreCard(
             }
         }
 
-        if (info.discounted) {
+        if (info.discounted && !owned) {
             Box(
                 modifier = Modifier.align(Alignment.TopEnd).size(66.dp, 21.dp)
-                    .background(Color(0xFF239A60), RoundedCornerShape(bottomStart = 4.dp, topEnd = 12.dp)),
+                    .background(Color(0xFF239A60), ppShapeOf(bottomStart = 4.dp, topEnd = 12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 GuiText("${info.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -1666,18 +2135,24 @@ private fun StoreCard(
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
                 .background(buttonColor)
-                .clickable(onClick = if (inCart) onSelect else onAddToCart),
+                .clickable(onClick = if (inCart || variantOwned) onSelect else onAddToCart),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GuiText(if (inCart) "In cart" else "Add to cart", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            val label = when {
+                variantOwned && owned -> "Owned"
+                variantOwned -> "Owned - see variants"
+                inCart -> "In cart"
+                else -> "Add to cart"
+            }
+            GuiText(label, color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
 
 @Composable
-private fun StoreThumbnail(info: CosmeticStoreInfo, modifier: Modifier) {
-    val source = rememberCosmeticPreviewSource(info.id, info.type)
+private fun StoreThumbnail(info: CosmeticStoreInfo, variantId: Int, modifier: Modifier) {
+    val source = rememberCosmeticPreviewSource(variantId, info.type)
     val framing = cosmeticPreviewFraming(info.type)
     Box(modifier) {
         CheckerThumbnail(Modifier.fillMaxSize())
@@ -1690,7 +2165,8 @@ private fun StoreThumbnail(info: CosmeticStoreInfo, modifier: Modifier) {
                 modelScale = framing.modelScale,
                 verticalAnchor = framing.verticalAnchor,
                 initialYaw = framing.yawDeg,
-                previewKey = "store-${info.id}",
+                previewKey = "store-$variantId",
+                live = info.type == CosmeticType.Aura,
             )
         }
     }
@@ -1699,38 +2175,62 @@ private fun StoreThumbnail(info: CosmeticStoreInfo, modifier: Modifier) {
 @Composable
 private fun StoreDetailPanel(
     info: CosmeticStoreInfo?,
+    variant: CosmeticVariantUi?,
     status: String?,
+    ownedIds: Set<Int>,
     inCart: Boolean,
-    onAddToCart: (CosmeticStoreInfo) -> Unit,
-    onBuyNow: (CosmeticStoreInfo) -> Unit,
+    onSelectVariant: (Int) -> Unit,
+    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
+    onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     modifier: Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
-            modifier = Modifier.fillMaxWidth().height(300.dp)
-                .clip(RoundedCornerShape(12.dp))
+            modifier = Modifier.fillMaxWidth().height(330.dp)
+                .clip(ppShape(12.dp))
                 .background(cardBrush())
-                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
         ) {
-            if (info == null) {
+            if (info == null || variant == null) {
                 CenteredNote("Select a cosmetic to preview it.")
             } else {
-                val source = rememberCosmeticPreviewSource(info.id, info.type)
-                val framing = cosmeticPreviewFraming(info.type)
+                val source = rememberCosmeticPreviewSource(variant.id, info.type)
+                val fades = info.type != CosmeticType.Boots
                 PlayerPreview(
-                    Modifier.align(Alignment.Center).size(190.dp, 300.dp),
+                    Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
                     source = source ?: PlayerPreviewSource.LocalLive,
                     autoSpin = false,
-                    modelScale = framing.modelScale,
-                    verticalAnchor = framing.verticalAnchor,
-                    initialYaw = framing.yawDeg,
-                    previewKey = "store-detail-${info.id}",
+                    bottomFade = if (fades) {
+                        Brush.verticalGradient(
+                            1f - STORE_PREVIEW_FADE_FRACTION to Color.White,
+                            1f to Color.Transparent,
+                        )
+                    } else {
+                        null
+                    },
+                    bottomFadeFraction = if (fades) STORE_PREVIEW_FADE_FRACTION else 0f,
+                    verticalAnchor = when (info.type) {
+                        CosmeticType.Hat -> 0.70f
+                        CosmeticType.Boots -> 0.44f
+                        else -> 0.56f
+                    },
+                    initialYaw = FRONT_YAW_DEG,
+                    previewKey = "store-detail-${variant.id}",
                     live = true,
                 )
-                if (isNewItem(info.createdAt)) {
+                if (variant.id in ownedIds) {
                     Box(
                         modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(ppShape(4.dp))
+                            .background(Color(0xFF239A60))
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        GuiText("OWNED", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
+                } else if (isNewItem(info.createdAt)) {
+                    Box(
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                            .clip(ppShape(4.dp))
                             .background(Accent)
                             .padding(horizontal = 7.dp, vertical = 2.dp),
                     ) {
@@ -1742,50 +2242,72 @@ private fun StoreDetailPanel(
 
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(ppShape(12.dp))
                 .background(cardBrush())
-                .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
         ) {
-            if (info == null) {
+            if (info == null || variant == null) {
                 CenteredNote("Browse the store to buy individual cosmetics.")
             } else {
+                val variants = info.uiVariants()
                 Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GuiText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
-                    if (info.tags.all.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for (tag in info.tags.all.take(4)) {
-                                Box(
-                                    modifier = Modifier.clip(RoundedCornerShape(5.dp))
-                                        .background(LocalTheme.current.chipBackground)
-                                        .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(5.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                ) {
-                                    GuiText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
+                    Column(
+                        modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        GuiText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
+                        if (variants.size > 1) {
+                            VariantPicker(
+                                variants = variants,
+                                selectedVariantId = variant.id,
+                                onSelect = onSelectVariant,
+                                ownedVariantIds = ownedIds,
+                            )
+                        }
+                        if (info.tags.all.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                for (tag in info.tags.all.take(4)) {
+                                    Box(
+                                        modifier = Modifier.clip(ppShape(5.dp))
+                                            .background(LocalTheme.current.chipBackground)
+                                            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    ) {
+                                        GuiText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
+                        info.description?.takeIf { it.isNotBlank() }?.let {
+                            GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        }
+                        if (status != null) {
+                            GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        }
                     }
-                    info.description?.takeIf { it.isNotBlank() }?.let {
-                        GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    } ?: Spacer(Modifier.weight(1f))
-                    if (status != null) {
-                        GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SmallButton(
-                            label = if (inCart) "In cart" else "Add to cart",
-                            iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
-                            primary = false,
-                            onClick = { if (!inCart) onAddToCart(info) },
+                    if (variant.id in ownedIds) {
+                        GuiText(
+                            "You already own this cosmetic.",
+                            color = LocalTheme.current.textColorSecondary,
+                            fontSize = 12.sp,
                         )
-                        SmallButton(
-                            label = "Buy now",
-                            iconPath = "assets/polyplus/ico/shopping-bag.svg",
-                            primary = true,
-                            onClick = { onBuyNow(info) },
-                        )
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SmallButton(
+                                label = if (inCart) "In cart" else "Add to cart",
+                                iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
+                                primary = false,
+                                onClick = { if (!inCart) onAddToCart(info, variant) },
+                            )
+                            SmallButton(
+                                label = "Buy now",
+                                iconPath = "assets/polyplus/ico/shopping-bag.svg",
+                                primary = true,
+                                onClick = { onBuyNow(info, variant) },
+                            )
+                        }
                     }
                 }
             }
@@ -1794,10 +2316,27 @@ private fun StoreDetailPanel(
 }
 
 @Composable
+private fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
+    val cover = rememberCoverImage(coverAssetId)
+    Box(modifier) {
+        CheckerThumbnail(Modifier.fillMaxSize())
+        if (cover != null) {
+            Image(
+                bitmap = cover,
+                contentDescription = null,
+                filterQuality = FilterQuality.None,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().clip(ppShape(5.dp)),
+            )
+        }
+    }
+}
+
+@Composable
 private fun CheckerThumbnail(modifier: Modifier) {
     Box(
-        modifier = modifier.clip(RoundedCornerShape(5.dp))
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(5.dp))
+        modifier = modifier.clip(ppShape(5.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
             .drawBehind {
                 val cell = 9.dp.toPx()
                 val cols = ceil(size.width / cell).toInt()
@@ -1821,15 +2360,15 @@ private fun BundlePreviewPanel(
     modifier: Modifier,
 ) {
     Box(
-        modifier = modifier.clip(RoundedCornerShape(12.dp))
+        modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, RoundedCornerShape(12.dp)),
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
         val bundleSource = rememberBundlePreviewSource(bundleView)
         val bundleHasHat = (bundleSource as? PlayerPreviewSource.Override)
             ?.equipment?.get(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat) != null
         PlayerPreview(
-            Modifier.align(Alignment.Center).size(190.dp, 300.dp),
+            Modifier.align(Alignment.Center).fillMaxWidth().height(300.dp),
             source = bundleSource,
             autoSpin = false,
             verticalAnchor = if (bundleHasHat) 0.64f else 0.5f,

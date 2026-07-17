@@ -42,40 +42,16 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var onboardingPolyBlurApplied = false
 
     @JvmStatic @Include
-    var onboardingEvergreenApplied = false
-
-    @JvmStatic @Include
     var onboardingLightTheme = false
 
     @JvmStatic @Include
     var onboardingUiStyle = 0
 
     @JvmStatic @Include
-    var onboardingHudStyle = 0
-
-    @JvmStatic @Include
     var onboardingToggleSprint = true
 
     @JvmStatic @Include
-    var onboardingHudFps = true
-
-    @JvmStatic @Include
-    var onboardingHudCps = false
-
-    @JvmStatic @Include
-    var onboardingHudPing = true
-
-    @JvmStatic @Include
-    var onboardingHudTime = true
-
-    @JvmStatic @Include
-    var onboardingHudCoords = false
-
-    @JvmStatic @Include
-    var onboardingHudDirection = false
-
-    @JvmStatic @Include
-    var onboardingMotionBlur = 5
+    var onboardingMotionBlur = 3
 
     @JvmStatic
     @Switch(

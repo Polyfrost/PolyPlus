@@ -3,10 +3,14 @@ package org.polyfrost.polyplus.client.cosmetics
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticSearchResponse
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreView
 
 object CosmeticStore {
@@ -41,6 +45,23 @@ object CosmeticStore {
             if (collection != null) parameter("collection", collection)
         }.body<CosmeticSearchResponse>()
     }.onFailure { LOGGER.error("Failed to search cosmetics", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+
+    private var cachedStockedTypes: List<CosmeticType>? = null
+
+    suspend fun stockedTypes(): List<CosmeticType> {
+        cachedStockedTypes?.let { return it }
+        val types = CosmeticType.entries.filter { it != CosmeticType.Unknown }
+        val stocked = coroutineScope {
+            types.map { type ->
+                async {
+                    val count = search(page = 1, perPage = 1, types = listOf(type.serializedName))
+                        .getOrNull()?.pagination?.totalItems
+                    type.takeIf { count == null || count > 0 }
+                }
+            }.awaitAll()
+        }.filterNotNull()
+        return stocked.also { cachedStockedTypes = it }
+    }
 
     suspend fun view(id: Int): Result<CosmeticStoreView> = runCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics/view/$id").body<CosmeticStoreView>()

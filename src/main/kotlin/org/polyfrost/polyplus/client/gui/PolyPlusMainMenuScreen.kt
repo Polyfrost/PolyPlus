@@ -37,9 +37,9 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -387,7 +388,10 @@ private val TextPrimary: Color
 private val TextSecondary: Color
     @Composable get() = LocalTheme.current.textColorSecondary
 
-private val PanelShape = RoundedCornerShape(9.dp)
+private val PanelShape: Shape
+    @Composable
+    @ReadOnlyComposable
+    get() = ppShape(9.dp)
 private val BorderWidth = 1.5.dp
 
 private val Outfit: FontFamily by lazy {
@@ -492,7 +496,7 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions, assetsReady: 
         Spacer(Modifier.height(16.dp))
         Box(contentAlignment = Alignment.Center) {
             MenuText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color(0x33000000), fontFamily = if (assetsReady) Outfit else FontFamily.Default, modifier = Modifier.offset(y = 3.dp))
-            MenuText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
+            MenuText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color.White, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
         }
         Spacer(Modifier.height(48.dp))
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -510,7 +514,7 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions, assetsReady: 
 private fun MainLogo(assetsReady: Boolean) {
     Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
         MenuIcon(ASSETS + "logo.svg", Color(0x33000000), Modifier.size(96.dp).offset(y = 3.dp), assetsReady)
-        MenuIcon(ASSETS + "logo.svg", TextPrimary, Modifier.size(96.dp), assetsReady)
+        MenuIcon(ASSETS + "logo.svg", Color.White, Modifier.size(96.dp), assetsReady)
     }
 }
 
@@ -801,7 +805,7 @@ private fun WorldRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val iconModifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp))
+        val iconModifier = Modifier.size(48.dp).clip(ppShape(4.dp))
         val favicon = rememberFavicon(entry.iconBytes)
         if (favicon != null) {
             Image(favicon, contentDescription = null, modifier = iconModifier, contentScale = ContentScale.Crop)
@@ -965,7 +969,7 @@ private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MenuIcon(ASSETS + "footer-logo.svg", TextPrimary, Modifier.size(25.dp), assetsReady)
+            MenuIcon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp), assetsReady)
             FooterBrandText(platformLabel(), assetsReady)
         }
         MenuText(
@@ -983,7 +987,7 @@ private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
 @Composable
 private fun FooterBrandText(platform: String, assetsReady: Boolean) {
     val bodyFont = LocalTheme.current.typography.family
-    val primary = TextPrimary
+    val primary = Color.White
     val secondary = TextSecondary
 
     BasicText(
@@ -1068,7 +1072,7 @@ private fun ServerRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        val iconModifier = Modifier.size(42.dp).clip(RoundedCornerShape(6.dp))
+        val iconModifier = Modifier.size(42.dp).clip(ppShape(6.dp))
         if (favicon != null) {
             Image(favicon, contentDescription = null, modifier = iconModifier, contentScale = ContentScale.Crop)
         } else {
@@ -1103,7 +1107,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val avatarModifier = Modifier.align(Alignment.CenterStart).size(28.dp).clip(RoundedCornerShape(3.dp))
+        val avatarModifier = Modifier.align(Alignment.CenterStart).size(28.dp).clip(ppShape(3.dp))
         val currentHead = head
         if (currentHead != null) {
             Image(currentHead, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)

@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -122,32 +125,15 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var page by remember { mutableIntStateOf(0) }
         var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
-        var hudStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingHudStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
-        var hudSelections by remember {
-            mutableStateOf(
-                HudSelections(
-                    fps = PolyPlusConfig.onboardingHudFps,
-                    cps = PolyPlusConfig.onboardingHudCps,
-                    ping = PolyPlusConfig.onboardingHudPing,
-                    time = PolyPlusConfig.onboardingHudTime,
-                    coords = PolyPlusConfig.onboardingHudCoords,
-                    direction = PolyPlusConfig.onboardingHudDirection,
-                ),
-            )
-        }
         var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(0, MOTION_BLUR_MAX)) }
+        LaunchedEffect(lightTheme, uiStyle) {
+            OnboardingFeatures.applyTheme(lightTheme, uiStyle)
+        }
         val finish = {
             PolyPlusConfig.onboardingLightTheme = lightTheme
             PolyPlusConfig.onboardingUiStyle = uiStyle
-            PolyPlusConfig.onboardingHudStyle = hudStyle
             PolyPlusConfig.onboardingToggleSprint = toggleSprint
-            PolyPlusConfig.onboardingHudFps = hudSelections.fps
-            PolyPlusConfig.onboardingHudCps = hudSelections.cps
-            PolyPlusConfig.onboardingHudPing = hudSelections.ping
-            PolyPlusConfig.onboardingHudTime = hudSelections.time
-            PolyPlusConfig.onboardingHudCoords = hudSelections.coords
-            PolyPlusConfig.onboardingHudDirection = hudSelections.direction
             PolyPlusConfig.onboardingMotionBlur = motionBlur
             PolyPlusConfig.onboardingCompleted = true
             PolyPlusConfig.save()
@@ -190,12 +176,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         ) {
                             when (pages[page]) {
                                 OnboardingPage.LOOK_AND_FEEL ->
-                                    LookAndFeelPage(lightTheme, { lightTheme = it }, uiStyle, { uiStyle = it }, hudStyle, { hudStyle = it })
+                                    LookAndFeelPage(lightTheme, { lightTheme = it }, uiStyle, { uiStyle = it })
                                 OnboardingPage.MODS -> ModsPage(
                                     toggleSprint,
                                     { toggleSprint = it },
-                                    hudSelections,
-                                    { hudSelections = it },
                                     motionBlur,
                                     { motionBlur = it },
                                 )
@@ -229,8 +213,6 @@ private fun LookAndFeelPage(
     onLightTheme: (Boolean) -> Unit,
     uiStyle: Int,
     onUiStyle: (Int) -> Unit,
-    hudStyle: Int,
-    onHudStyle: (Int) -> Unit,
 ) {
     Header("Let’s configure the", "Look & Feel")
     SectionLabel("UI Colors", 140f)
@@ -243,29 +225,20 @@ private fun LookAndFeelPage(
         StyleCard("PolyGlass", uiStyle == 0, rounded = true) { onUiStyle(0) }
         StyleCard("Minecraft", uiStyle == 1, rounded = false) { onUiStyle(1) }
     }
-    SectionLabel("HUD Style", 439f)
-    Row(Modifier.offset(232.dp, 471.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        HudCard("PolyGlass", hudStyle == 0, rounded = true) { onHudStyle(0) }
-        HudCard("Minecraft", hudStyle == 1, rounded = false) { onHudStyle(1) }
-    }
 }
 
 @Composable
 private fun ModsPage(
     toggleSprint: Boolean,
     onToggleSprint: (Boolean) -> Unit,
-    hud: HudSelections,
-    onHudChange: (HudSelections) -> Unit,
     motionBlur: Int,
     onMotionBlur: (Int) -> Unit,
 ) {
     Header("Continuing with", "Mods")
     val sprint = OnboardingFeatures.polySprintAvailable
-    val huds = OnboardingFeatures.evergreenAvailable
     val blur = OnboardingFeatures.polyBlurAvailable
     val heights = buildList {
         if (sprint) add(SPRINT_SECTION_HEIGHT)
-        if (huds) add(HUD_SECTION_HEIGHT)
         if (blur) add(BLUR_SECTION_HEIGHT)
     }
     val total = heights.sum() + SECTION_GAP * (heights.size - 1).coerceAtLeast(0)
@@ -273,10 +246,6 @@ private fun ModsPage(
     if (sprint) {
         SprintSection(y, toggleSprint, onToggleSprint)
         y += SPRINT_SECTION_HEIGHT + SECTION_GAP
-    }
-    if (huds) {
-        HudSection(y, hud, onHudChange)
-        y += HUD_SECTION_HEIGHT + SECTION_GAP
     }
     if (blur) MotionBlurSection(y, motionBlur, onMotionBlur)
 }
@@ -287,23 +256,6 @@ private fun SprintSection(y: Float, toggleSprint: Boolean, onToggleSprint: (Bool
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f) { onToggleSprint(true) }
         ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f) { onToggleSprint(false) }
-    }
-}
-
-@Composable
-private fun HudSection(y: Float, hud: HudSelections, onHudChange: (HudSelections) -> Unit) {
-    SectionLabel("HUD Mods", y)
-    Column(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            ChoiceButton("FPS", ONBOARDING_ASSETS + "play-square.svg", hud.fps, 126f) { onHudChange(hud.copy(fps = !hud.fps)) }
-            ChoiceButton("CPS", ONBOARDING_ASSETS + "mouse.svg", hud.cps, 126f) { onHudChange(hud.copy(cps = !hud.cps)) }
-            ChoiceButton("Ping", ONBOARDING_ASSETS + "wifi.svg", hud.ping, 126f) { onHudChange(hud.copy(ping = !hud.ping)) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            ChoiceButton("Time", ONBOARDING_ASSETS + "clock.svg", hud.time, 126f) { onHudChange(hud.copy(time = !hud.time)) }
-            ChoiceButton("Coords", ONBOARDING_ASSETS + "marker-pin.svg", hud.coords, 126f) { onHudChange(hud.copy(coords = !hud.coords)) }
-            ChoiceButton("Direction", ONBOARDING_ASSETS + "compass.svg", hud.direction, 126f) { onHudChange(hud.copy(direction = !hud.direction)) }
-        }
     }
 }
 
@@ -347,9 +299,9 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
                     .align(Alignment.Center)
                     .width(332.dp)
                     .height(7.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(ppShape(4.dp))
                     .background(ChoiceBackground)
-                    .border(1.dp, PanelBorderBrush, RoundedCornerShape(4.dp)),
+                    .border(1.dp, PanelBorderBrush, ppShape(4.dp)),
             ) {
                 Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Accent))
             }
@@ -358,14 +310,14 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
                     .align(Alignment.CenterStart)
                     .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
                     .size(thumbSize)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(ppShape(7.dp))
                     .background(TextPrimary),
             )
         }
         Spacer(Modifier.width(18.dp))
         Box(
-            Modifier.width(64.dp).height(26.dp).clip(RoundedCornerShape(6.dp)).background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, RoundedCornerShape(6.dp)),
+            Modifier.width(64.dp).height(26.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
+                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
             contentAlignment = Alignment.CenterStart,
         ) { OnboardingText(motionBlur.toString(), 12, Modifier.padding(start = 8.dp)) }
     }
@@ -379,7 +331,7 @@ private fun CosmeticsPage(onClaim: () -> Unit, onStore: () -> Unit) {
         "We decided to give you some for free as a warm welcome gift.\nEnjoy them, and check out the store if you want to see more!",
         15,
         Modifier.offset(215.dp, 137.dp).width(450.dp),
-        Color.White,
+        TextPrimary,
         FontWeight.Light,
     )
     Row(Modifier.offset(124.dp, 209.dp), horizontalArrangement = Arrangement.spacedBy(46.dp)) {
@@ -393,26 +345,26 @@ private fun CosmeticsPage(onClaim: () -> Unit, onStore: () -> Unit) {
 
 @Composable
 private fun DonePage() {
-    OnboardingIcon(ONBOARDING_ASSETS + "check-verified.svg", Color.White, Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
+    OnboardingIcon(ONBOARDING_ASSETS + "check-verified.svg", TextPrimary, Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
     OnboardingText("All Done!", 32, Modifier.offset(0.dp, 311.dp).width(PANEL_WIDTH.dp))
     OnboardingText(
         "That’s all for now, thank you for choosing OneClient! We hope you have a nice experience using it.",
         15,
         Modifier.offset(225.dp, 382.dp).width(430.dp),
-        Color.White,
+        TextPrimary,
         FontWeight.Light,
     )
 }
 
 @Composable
 private fun Header(kicker: String, title: String) {
-    OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(PANEL_WIDTH.dp), Color.White, FontWeight.Normal)
-    OnboardingText(title, 32, Modifier.offset(0.dp, 66.dp).width(PANEL_WIDTH.dp), Color.White, FontWeight.Normal)
+    OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Normal)
+    OnboardingText(title, 32, Modifier.offset(0.dp, 66.dp).width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Normal)
 }
 
 @Composable
 private fun SectionLabel(label: String, y: Float) {
-    OnboardingText(label, 15, Modifier.offset(232.dp, y.dp).width(198.dp), Color.White, FontWeight.Normal, TextAlign.Start)
+    OnboardingText(label, 15, Modifier.offset(232.dp, y.dp).width(198.dp), TextPrimary, FontWeight.Normal, TextAlign.Start)
 }
 
 @Composable
@@ -483,27 +435,9 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
 }
 
 @Composable
-private fun HudCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.size(198.dp, 94.dp).clip(ButtonShape)
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
-            .clickableWithSound(onClick),
-    ) {
-        Box(
-            Modifier.offset(31.5.dp, 16.dp).size(134.dp, 38.dp)
-                .clip(if (rounded) RoundedCornerShape(5.dp) else RoundedCornerShape(0.dp))
-                .background(Color(0x80000000)),
-            contentAlignment = Alignment.Center,
-        ) { OnboardingText("FPS: 150", 16) }
-        OnboardingText(label, 14, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), TextPrimary, FontWeight.Medium)
-    }
-}
-
-@Composable
 private fun CosmeticCard(label: String) {
-    Box(Modifier.size(180.dp, 202.dp).clip(RoundedCornerShape(10.dp)).background(ChoiceBackground).border(BorderWidth, PanelBorderBrush, RoundedCornerShape(10.dp))) {
-        Checkerboard(Modifier.offset(17.dp, 18.dp).size(146.dp, 146.dp).clip(RoundedCornerShape(4.dp)))
+    Box(Modifier.size(180.dp, 202.dp).clip(ppShape(10.dp)).background(ChoiceBackground).border(BorderWidth, PanelBorderBrush, ppShape(10.dp))) {
+        Checkerboard(Modifier.offset(17.dp, 18.dp).size(146.dp, 146.dp).clip(ppShape(4.dp)))
         OnboardingText(label, 14, Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp), TextPrimary, FontWeight.Medium)
     }
 }
@@ -540,9 +474,9 @@ private fun BottomNavigation(page: Int, pageCount: Int, onSkip: () -> Unit, onBa
         repeat(pageCount) { index ->
             Box(
                 Modifier.size(if (index == page) 12.dp else 10.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(ppShape(8.dp))
                     .background(if (index == page) Color(0x80EBF2FF) else Color(0x73232D32))
-                    .border(1.dp, if (index == page) Color(0xCCFFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(8.dp)),
+                    .border(1.dp, if (index == page) Color(0xCCFFFFFF) else Color(0x66FFFFFF), ppShape(8.dp)),
             )
         }
     }
@@ -553,7 +487,7 @@ private fun OnboardingText(
     text: String,
     size: Int,
     modifier: Modifier = Modifier,
-    color: Color = Color.White,
+    color: Color = TextPrimary,
     weight: FontWeight = FontWeight.Normal,
     align: TextAlign = TextAlign.Center,
 ) {
@@ -567,7 +501,7 @@ private fun OnboardingIcon(path: String, color: Color, modifier: Modifier) = Ico
 private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
     val image = remember { loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png") }
     val motion = UnityMotionBlur.maxSmear(strength)
-    val shape = RoundedCornerShape(6.dp)
+    val shape = ppShape(6.dp)
 
     Box(
         modifier
@@ -612,15 +546,6 @@ private fun loadOnboardingImage(path: String): SkiaImage? = runCatching {
 
 private enum class OnboardingPage { LOOK_AND_FEEL, MODS, COSMETICS, DONE }
 
-private data class HudSelections(
-    val fps: Boolean,
-    val cps: Boolean,
-    val ping: Boolean,
-    val time: Boolean,
-    val coords: Boolean,
-    val direction: Boolean,
-)
-
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
 private const val PANEL_X = 520f
@@ -634,19 +559,25 @@ private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
 private const val LABEL_HEIGHT = 32f
 private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
-private const val HUD_SECTION_HEIGHT = LABEL_HEIGHT + 82f
 private const val BLUR_PREVIEW_OFFSET = 75f
 private const val BLUR_PREVIEW_HEIGHT = 115f
 private const val BLUR_SECTION_HEIGHT = BLUR_PREVIEW_OFFSET + BLUR_PREVIEW_HEIGHT
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
 
-private val PANEL_SHAPE = RoundedCornerShape(9.dp)
-private val ButtonShape = RoundedCornerShape(9.dp)
+private val PANEL_SHAPE: Shape
+    @Composable
+    @ReadOnlyComposable
+    get() = ppShape(9.dp)
+private val ButtonShape: Shape
+    @Composable
+    @ReadOnlyComposable
+    get() = ppShape(9.dp)
 private val BorderWidth = 1.5.dp
 private const val PanelBorderAngleDeg = 20.0
 
-private val PageBackground = Color(0xFF11171C)
+private val PageBackground: Color
+    @Composable get() = LocalTheme.current.pageBackground
 private val ShadowColor = Color(0x26000000)
 
 private val ChoiceBackground: Color

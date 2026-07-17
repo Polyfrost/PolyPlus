@@ -630,10 +630,22 @@ object PlayerPreviewRenderer {
     }
     *///?}
 
+    private val mountOpacitySetter: java.lang.invoke.MethodHandle? = runCatching {
+        val hook = Class.forName("dev.microcontrollers.mountopacity.hook.EntityRenderStateHook")
+        java.lang.invoke.MethodHandles.lookup()
+            .findVirtual(hook, "mountopacity\$setOpacity", java.lang.invoke.MethodType.methodType(Void.TYPE, Float::class.javaPrimitiveType))
+            .asType(java.lang.invoke.MethodType.methodType(Void.TYPE, Any::class.java, Float::class.javaPrimitiveType))
+    }.getOrNull()
+
+    private fun Any.applyModCompat() {
+        mountOpacitySetter?.invokeExact(this, 100f)
+    }
+
     //? if >= 1.21.10 {
     private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
         (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
             ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        applyModCompat()
         this.skin = skin
         mainArm = HumanoidArm.RIGHT
         leftArmPose = HumanoidModel.ArmPose.EMPTY
@@ -654,6 +666,7 @@ object PlayerPreviewRenderer {
     /*private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
         (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
             ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        applyModCompat()
         this.skin = skin
         showHat = true
         showJacket = true
@@ -968,6 +981,7 @@ object PlayerPreviewRenderer {
     private fun legacyState(skin: PlayerSkin, yawDeg: Float): PlayerRenderState = PlayerRenderState().apply {
         (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
             ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        applyModCompat()
         this.skin = skin
         showHat = true
         showJacket = true

@@ -13,6 +13,16 @@ data class CosmeticTags(
 }
 
 @Serializable
+data class StoreVariant(
+    val id: Int,
+    @SerialName("variant_name") val variantName: String? = null,
+    @SerialName("model_variant") val modelVariant: String? = null,
+    @SerialName("variant_order") val variantOrder: Int = 0,
+    @SerialName("asset_id") val assetId: Int? = null,
+    @SerialName("cover_asset_id") val coverAssetId: Int? = null,
+)
+
+@Serializable
 data class CosmeticStoreInfo(
     val id: Int,
     val name: String = "Cosmetic",
@@ -25,7 +35,11 @@ data class CosmeticStoreInfo(
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
     @SerialName("created_at") val createdAt: String = "",
     val tags: CosmeticTags = CosmeticTags(),
+    val variants: List<StoreVariant>? = null,
 ) {
+    val variantList: List<StoreVariant>
+        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))
+
     val discounted: Boolean get() = (discountRate ?: 0) > 0
 
     val finalPrice: Float?
@@ -47,10 +61,18 @@ data class CosmeticStoreView(
     val id: Int,
     val name: String = "Cosmetic",
     val description: String? = null,
+    val collection: Int? = null,
     val type: CosmeticType = CosmeticType.Unknown,
     @SerialName("base_price") val basePrice: Float? = null,
     @SerialName("discount_rate") val discountRate: Int? = null,
+    @SerialName("asset_id") val assetId: Int? = null,
+    @SerialName("cover_asset_id") val coverAssetId: Int? = null,
+    @SerialName("created_at") val createdAt: String = "",
     val tags: CosmeticTags = CosmeticTags(),
+    val variants: List<StoreVariant>? = null,
 ) {
     val purchasable: Boolean get() = !stripePriceId.isNullOrBlank()
+
+    val variantList: List<StoreVariant>
+        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))
 }

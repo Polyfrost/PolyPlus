@@ -40,7 +40,7 @@ enum class BodySlot {
     val displayName: String
         get() = when (this) {
             Cape -> "Cape"
-            Backpack -> "Backpack"
+            Backpack -> "Back"
             Glasses -> "Glasses"
             Wings -> "Wings"
             LeftHand -> "Left Hand"
