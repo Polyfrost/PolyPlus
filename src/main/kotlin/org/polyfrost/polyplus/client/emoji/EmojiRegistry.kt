@@ -21,6 +21,8 @@ object EmojiRegistry {
 
     private val aliasesSorted: List<String> by lazy { shortcodes.keys.sorted() }
 
+    private val EMOJI_SHORTCODE: Pattern by lazy { Pattern.compile(SHORTCODE) }
+
     private val EMOJI: Pattern by lazy {
         val alts = StringBuilder(SHORTCODE)
         for (seq in unicode.keys) alts.append('|').append(Pattern.quote(seq))
@@ -99,7 +101,7 @@ object EmojiRegistry {
     fun transform(component: Component): Component {
         val contents = component.contents
         val expandedSelf: MutableComponent? = when (contents) {
-            is PlainTextContents -> expand(contents.text(), component.style)
+            is PlainTextContents -> expand(contents.text(), component.style, EMOJI_SHORTCODE)
             is TranslatableContents -> transformTranslatable(contents, component.style)
             else -> null
         }
@@ -136,7 +138,7 @@ object EmojiRegistry {
                     newArgs[i] = t
                 }
                 is String -> {
-                    val expanded = expand(arg, style)
+                    val expanded = expand(arg, style, EMOJI_SHORTCODE)
                     if (expanded != null) { changed = true; newArgs[i] = expanded } else newArgs[i] = arg
                 }
                 else -> newArgs[i] = arg
@@ -148,8 +150,8 @@ object EmojiRegistry {
         return MutableComponent.create(rebuilt).setStyle(style)
     }
 
-    private fun expand(text: String, style: Style): MutableComponent? {
-        val matcher = EMOJI.matcher(text)
+    private fun expand(text: String, style: Style, pattern: Pattern): MutableComponent? {
+        val matcher = pattern.matcher(text)
         var root: MutableComponent? = null
         var last = 0
         while (matcher.find()) {
@@ -168,7 +170,7 @@ object EmojiRegistry {
 
     @JvmStatic
     fun styleInput(text: String, base: Style): net.minecraft.util.FormattedCharSequence? =
-        expand(text, base)?.visualOrderText
+        expand(text, base, EMOJI)?.visualOrderText
 
     @JvmStatic
     fun toShortcodes(text: String): String {
