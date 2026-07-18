@@ -406,7 +406,7 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
     return PolyPlusConfig.mainMenuBackground == MainMenuBackground.PANORAMA
 }
 
-private fun mcGuiScaleFactor(): Float {
+internal fun mcGuiScaleFactor(): Float {
     val mc = net.minecraft.client.Minecraft.getInstance()
     val current = mc.window.guiScale.toFloat()
     val auto = mc.window.calculateScale(0, mc.isEnforceUnicode).toFloat().coerceAtLeast(1f)

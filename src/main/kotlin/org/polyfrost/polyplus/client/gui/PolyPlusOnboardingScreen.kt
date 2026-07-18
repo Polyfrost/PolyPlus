@@ -118,7 +118,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             buildList {
                 add(OnboardingPage.LOOK_AND_FEEL)
                 if (OnboardingFeatures.modsPageAvailable) add(OnboardingPage.MODS)
-                add(OnboardingPage.COSMETICS)
+                // add(OnboardingPage.COSMETICS)
                 add(OnboardingPage.DONE)
             }
         }
@@ -148,7 +148,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
+                val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
+                    mcGuiScaleFactor() * UI_SCALE
                 CompositionLocalProvider(LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f))) {
                     Box(
                         Modifier
@@ -215,13 +216,18 @@ private fun LookAndFeelPage(
     onUiStyle: (Int) -> Unit,
 ) {
     Header("Let’s configure the", "Look & Feel")
-    SectionLabel("UI Colors", 140f)
-    Row(Modifier.offset(232.dp, 172.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+    val colorsHeight = LABEL_HEIGHT + 32f
+    val styleHeight = LABEL_HEIGHT + 155f
+    val total = colorsHeight + SECTION_GAP + styleHeight
+    var y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - total) / 2f
+    SectionLabel("UI Colors", y)
+    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         ChoiceButton("Dark", MAIN_MENU_ASSETS + "moon-star.svg", !lightTheme, 198f) { onLightTheme(false) }
         ChoiceButton("Light", ONBOARDING_ASSETS + "sun.svg", lightTheme, 198f) { onLightTheme(true) }
     }
-    SectionLabel("UI Style", 228f)
-    Row(Modifier.offset(232.dp, 260.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+    y += colorsHeight + SECTION_GAP
+    SectionLabel("UI Style", y)
+    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         StyleCard("PolyGlass", uiStyle == 0, rounded = true) { onUiStyle(0) }
         StyleCard("Minecraft", uiStyle == 1, rounded = false) { onUiStyle(1) }
     }
@@ -548,6 +554,7 @@ private enum class OnboardingPage { LOOK_AND_FEEL, MODS, COSMETICS, DONE }
 
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
+private const val UI_SCALE = DESIGN_WIDTH / 1240f
 private const val PANEL_X = 520f
 private const val PANEL_Y = 210f
 private const val PANEL_WIDTH = 880f

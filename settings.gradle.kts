@@ -16,6 +16,7 @@ pluginManagement {
         id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
         id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT"
         id("org.jetbrains.kotlinx.atomicfu") version "0.27.0"
+        id("me.modmuss50.mod-publish-plugin") version "1.1.0"
     }
 }
 
