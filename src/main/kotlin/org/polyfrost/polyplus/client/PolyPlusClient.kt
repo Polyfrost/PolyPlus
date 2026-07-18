@@ -24,7 +24,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
-import org.polyfrost.polyplus.client.discord.DiscordPresence
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
@@ -81,7 +80,6 @@ object PolyPlusClient {
         }
         earlyHooks.forEach(EarlyInitializable::earlyInitialize)
 
-        DiscordPresence.initialize()
         PolyConnection.initialize {
             LOGGER.info("Connected to PolyPlus WebSocket server.")
 

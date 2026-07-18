@@ -2,8 +2,10 @@ package org.polyfrost.polyplus.client
 
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ServerResponseException
+import io.ktor.http.HttpStatusCode
 import io.sentry.Sentry
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -54,6 +56,8 @@ object PolyPlusSentry {
                 is java.net.UnknownHostException,
                 is java.net.SocketException,
                 -> return true
+                is ClientRequestException ->
+                    if (cause.response.status == HttpStatusCode.Unauthorized) return true
             }
             val next = cause.cause
             if (next === cause) break

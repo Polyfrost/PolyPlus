@@ -10,7 +10,6 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.discord.DiscordPresence
 import org.polyfrost.polyplus.client.gui.MainMenuBackground
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 
@@ -115,9 +114,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     )
     var hideMainMenuHostWorld = false
 
-    @JvmStatic @Switch(title = "Discord RPC")
-    var isDiscordEnabled = true
-
     @JvmStatic
     @Switch(
         title = "PolyPlus User Indicators",
@@ -183,10 +179,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     init {
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
-        }
-
-        addCallback("isDiscordEnabled") {
-            DiscordPresence.start() // Ensure that Discord RPC is restarted if the setting was toggled
         }
 
         addCallback("apiUrl") {

@@ -104,13 +104,10 @@ dependencies {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
-    implementation(libs.discord.game.sdk4j)
     implementation(libs.sentry)
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
-
-    include(libs.discord.game.sdk4j)
 }
 
 run {

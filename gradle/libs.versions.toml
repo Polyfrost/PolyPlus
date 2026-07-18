@@ -3,7 +3,6 @@ kotlin = "2.3.0"
 kotlinx-serialization = "2.3.0"
 atomicfu = "0.27.0"
 ktor = "3.3.1"
-discord-game-sdk4j = "v0.5.5"
 sentry = "7.18.0"
 mixin-extras = "0.5.0"
 mixin-squared = "0.3.7-beta.1"
@@ -14,7 +13,6 @@ devauth = "1.2.2"
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 
-discord-game-sdk4j = { group = "com.github.JnCrMx", name = "discord-game-sdk4j", version.ref = "discord-game-sdk4j" }
 sentry = { group = "io.sentry", name = "sentry", version.ref = "sentry" }
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }

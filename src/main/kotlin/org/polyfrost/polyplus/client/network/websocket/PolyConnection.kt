@@ -100,9 +100,15 @@ object PolyConnection {
                     throw e
                 } catch (e: Exception) {
                     if (closing || !isActive) break
-                    LOGGER.error("PolyPlus WebSocket connection failed", e)
-                    org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
-                    notifyDisconnected(e)
+                    if (isAuthFailure(e)) {
+                        LOGGER.warn("PolyPlus WebSocket authentication failed (401); refreshing token before retry.")
+                        runCatching { PolyAuthorization.reset() }
+                        notifyDisconnected(null)
+                    } else {
+                        LOGGER.error("PolyPlus WebSocket connection failed", e)
+                        org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
+                        notifyDisconnected(e)
+                    }
                 } finally {
                     session = null
                 }
@@ -145,6 +151,10 @@ object PolyConnection {
 
             sender.cancel()
         }
+    }
+
+    private fun isAuthFailure(error: Throwable): Boolean {
+        return generateSequence(error) { it.cause }.any { it.message?.contains("401") == true }
     }
 
     private fun reconnectDelay(attempt: Int): Long {
