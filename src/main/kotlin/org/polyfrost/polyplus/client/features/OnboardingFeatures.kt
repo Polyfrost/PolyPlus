@@ -57,8 +57,27 @@ object OnboardingFeatures {
 
     private fun applyCoreSettings() {
         applyTheme(PolyPlusConfig.onboardingLightTheme, PolyPlusConfig.onboardingUiStyle)
+        applyGuiScale(PolyPlusConfig.onboardingGuiScale)
         PolyPlusConfig.onboardingFeaturesApplied = true
     }
+
+    fun applyGuiScale(value: Int, persist: Boolean = true) {
+        runCatching {
+            val mc = Minecraft.getInstance()
+            mc.options.guiScale().set(value.coerceAtLeast(0))
+            if (persist) mc.options.save()
+            //? if >= 26.1 {
+            mc.resizeGui()
+            //?} else {
+            /*mc.resizeDisplay()
+            *///?}
+        }.onFailure { logger.warn("Could not apply GUI scale preference", it) }
+    }
+
+    fun maxGuiScale(): Int = runCatching {
+        val mc = Minecraft.getInstance()
+        mc.window.calculateScale(0, mc.isEnforceUnicode)
+    }.getOrDefault(4).coerceAtLeast(1)
 
     fun applyTheme(light: Boolean, style: Int) {
         val theme = when {

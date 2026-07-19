@@ -406,12 +406,11 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
     return PolyPlusConfig.mainMenuBackground == MainMenuBackground.PANORAMA
 }
 
-internal fun mcGuiScaleFactor(): Float {
-    val mc = net.minecraft.client.Minecraft.getInstance()
-    val current = mc.window.guiScale.toFloat()
-    val auto = mc.window.calculateScale(0, mc.isEnforceUnicode).toFloat().coerceAtLeast(1f)
-    return (current / auto).coerceIn(0.01f, 1f)
-}
+internal const val REFERENCE_GUI_SCALE = 4f
+
+internal fun mcGuiScaleFactor(): Float = guiScaleFactorFor(net.minecraft.client.Minecraft.getInstance().window.guiScale.toInt())
+
+internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI_SCALE).coerceIn(0.01f, 1f)
 
 private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier =
     graphicsLayer {

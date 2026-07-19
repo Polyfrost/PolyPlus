@@ -127,6 +127,12 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
         var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(0, MOTION_BLUR_MAX)) }
+        val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
+        var guiScale by remember {
+            mutableIntStateOf(
+                net.minecraft.client.Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+            )
+        }
         LaunchedEffect(lightTheme, uiStyle) {
             OnboardingFeatures.applyTheme(lightTheme, uiStyle)
         }
@@ -135,6 +141,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             PolyPlusConfig.onboardingUiStyle = uiStyle
             PolyPlusConfig.onboardingToggleSprint = toggleSprint
             PolyPlusConfig.onboardingMotionBlur = motionBlur
+            PolyPlusConfig.onboardingGuiScale = guiScale
             PolyPlusConfig.onboardingCompleted = true
             PolyPlusConfig.save()
             OnboardingFeatures.applySavedSettings()
@@ -148,8 +155,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
+                val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
                 val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
-                    mcGuiScaleFactor() * UI_SCALE
+                    guiScaleFactor * UI_SCALE
                 CompositionLocalProvider(LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f))) {
                     Box(
                         Modifier
@@ -177,7 +185,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         ) {
                             when (pages[page]) {
                                 OnboardingPage.LOOK_AND_FEEL ->
-                                    LookAndFeelPage(lightTheme, { lightTheme = it }, uiStyle, { uiStyle = it })
+                                    LookAndFeelPage(
+                                        lightTheme, { lightTheme = it },
+                                        uiStyle, { uiStyle = it },
+                                        guiScale, maxGuiScale, { guiScale = it },
+                                    )
                                 OnboardingPage.MODS -> ModsPage(
                                     toggleSprint,
                                     { toggleSprint = it },
@@ -214,11 +226,15 @@ private fun LookAndFeelPage(
     onLightTheme: (Boolean) -> Unit,
     uiStyle: Int,
     onUiStyle: (Int) -> Unit,
+    guiScale: Int,
+    maxGuiScale: Int,
+    onGuiScale: (Int) -> Unit,
 ) {
     Header("Let’s configure the", "Look & Feel")
     val colorsHeight = LABEL_HEIGHT + 32f
     val styleHeight = LABEL_HEIGHT + 155f
-    val total = colorsHeight + SECTION_GAP + styleHeight
+    val scaleHeight = LABEL_HEIGHT + 32f
+    val total = colorsHeight + SECTION_GAP + styleHeight + SECTION_GAP + scaleHeight
     var y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - total) / 2f
     SectionLabel("UI Colors", y)
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -230,6 +246,78 @@ private fun LookAndFeelPage(
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         StyleCard("PolyGlass", uiStyle == 0, rounded = true) { onUiStyle(0) }
         StyleCard("Minecraft", uiStyle == 1, rounded = false) { onUiStyle(1) }
+    }
+    y += styleHeight + SECTION_GAP
+    GuiScaleSection(y, guiScale, maxGuiScale, onGuiScale)
+}
+
+@Composable
+private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: (Int) -> Unit) {
+    SectionLabel("GUI Scale", y)
+    val steps = maxScale.coerceAtLeast(1)
+    fun valueToProgress(v: Int): Float = if (v <= 0) 1f else ((v - 1).toFloat() / steps).coerceIn(0f, 1f)
+    fun indexToValue(index: Int): Int = if (index >= steps) 0 else index + 1
+    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), verticalAlignment = Alignment.CenterVertically) {
+        val thumbSize = 13.dp
+        var trackWidthPx by remember { mutableStateOf(0f) }
+        val progress by animateFloatAsState(
+            valueToProgress(guiScale),
+            animationSpec = spring(),
+        )
+        Box(
+            Modifier
+                .width(332.dp)
+                .height(13.dp)
+                .onSizeChanged { trackWidthPx = it.width.toFloat() }
+                .pointerInput(steps) {
+                    val thumbPx = thumbSize.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        var pending = guiScale
+                        fun update(x: Float) {
+                            val usableWidth = (trackWidthPx - thumbPx).coerceAtLeast(1f)
+                            val p = ((x - thumbPx / 2f) / usableWidth).coerceIn(0f, 1f)
+                            pending = indexToValue((p * steps).roundToInt())
+                            onGuiScale(pending)
+                        }
+                        update(down.position.x)
+                        down.consume()
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            update(change.position.x)
+                            change.consume()
+                        } while (change.pressed)
+                        OnboardingFeatures.applyGuiScale(pending, persist = false)
+                    }
+                },
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .width(332.dp)
+                    .height(7.dp)
+                    .clip(ppShape(4.dp))
+                    .background(ChoiceBackground)
+                    .border(1.dp, PanelBorderBrush, ppShape(4.dp)),
+            ) {
+                Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Accent))
+            }
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
+                    .size(thumbSize)
+                    .clip(ppShape(7.dp))
+                    .background(TextPrimary),
+            )
+        }
+        Spacer(Modifier.width(18.dp))
+        Box(
+            Modifier.width(64.dp).height(26.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
+                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
+            contentAlignment = Alignment.CenterStart,
+        ) { OnboardingText(if (guiScale <= 0) "Auto" else guiScale.toString(), 12, Modifier.padding(start = 8.dp)) }
     }
 }
 

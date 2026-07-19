@@ -52,6 +52,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     @JvmStatic @Include
     var onboardingMotionBlur = 3
 
+    @JvmStatic @Include
+    var onboardingGuiScale = 0
+
     @JvmStatic
     @Switch(
         title = "Vanilla Main Menu",
