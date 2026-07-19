@@ -5,8 +5,7 @@
     "name": "${mod_name}",
     "description": "${mod_description}",
     "authors": [
-        "Deftu",
-        "SubAt0mic"
+        "Polyfrost"
     ],
     "environment": "client",
     "entrypoints": {
