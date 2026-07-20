@@ -34,8 +34,10 @@ object CosmeticRenderer {
         chestplateEquipped: Boolean,
         hiddenSlots: Set<BodySlot>,
     ) {
+        val renderContext = PlayerRenderContext.from(state)
+        if (renderContext.isInvisible) return
         val overlay = LivingEntityRenderer.getOverlayCoords(state, 0f)
-        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped, hiddenSlots)
+        val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.submit(poseStack, submitNodeCollector, lightCoords, overlay, playerModel, draws)
     }
     //?} elif >= 1.21.4 {
@@ -50,8 +52,10 @@ object CosmeticRenderer {
         chestplateEquipped: Boolean,
         hiddenSlots: Set<BodySlot>,
     ) {
+        val renderContext = PlayerRenderContext.from(state)
+        if (renderContext.isInvisible) return
         val overlay = LivingEntityRenderer.getOverlayCoords(state, 0f)
-        val draws = draws(equipment, PlayerRenderContext.from(state), particleColor, chestplateEquipped, hiddenSlots)
+        val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
     }
     *///?} else {
@@ -67,6 +71,7 @@ object CosmeticRenderer {
         chestplateEquipped: Boolean,
         hiddenSlots: Set<BodySlot>,
     ) {
+        if (renderContext.isInvisible) return
         val overlay = LivingEntityRenderer.getOverlayCoords(player, 0f)
         val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
