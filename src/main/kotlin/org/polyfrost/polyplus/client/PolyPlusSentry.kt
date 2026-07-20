@@ -93,7 +93,6 @@ object PolyPlusSentry {
         return false
     }
 
-     */
     private fun isBenignCancellation(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
