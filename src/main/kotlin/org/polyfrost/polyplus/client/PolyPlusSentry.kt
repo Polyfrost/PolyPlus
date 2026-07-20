@@ -26,12 +26,22 @@ object PolyPlusSentry {
 
         val dev = FabricLoader.getInstance().isDevelopmentEnvironment
 
+        val minecraftVersion = FabricLoader.getInstance()
+            .getModContainer("minecraft")
+            .map { it.metadata.version.friendlyString }
+            .orElse("unknown")
+
         Sentry.init { options ->
             options.dsn = DSN
             options.release = "${PolyPlusConstants.ID}@${PolyPlusConstants.VERSION}"
             options.environment = if (dev) "development" else "production"
+            options.setTag("minecraft", minecraftVersion)
             // Verbose SDK logging only in dev.
             options.isDebug = dev
+            options.setBeforeSend { event, _ ->
+                val t = event.throwable
+                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t))) null else event
+            }
         }
     }
 
@@ -46,6 +56,7 @@ object PolyPlusSentry {
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
+            if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return true
             when (cause) {
                 is ServerResponseException,
                 is HttpRequestTimeoutException,
@@ -55,9 +66,76 @@ object PolyPlusSentry {
                 is java.net.ConnectException,
                 is java.net.UnknownHostException,
                 is java.net.SocketException,
+                is java.nio.channels.UnresolvedAddressException, // DNS resolution failed
+                is java.io.EOFException,                          // premature close / not enough data
+                is java.nio.file.FileSystemException,             // disk/fs error materializing assets
                 -> return true
                 is ClientRequestException ->
                     if (cause.response.status == HttpStatusCode.Unauthorized) return true
+                is IllegalStateException ->
+                    // Truncated HTTP body (e.g. "Content-Length ... doesn't match").
+                    if (cause.message?.contains("Content-Length", ignoreCase = true) == true) return true
+                is java.io.IOException ->
+                    // Disk-full / out-of-space IOException while writing cosmetic assets.
+                    cause.message?.let { m ->
+                        if (m.contains("No space left", ignoreCase = true) ||
+                            m.contains("not enough space", ignoreCase = true) ||
+                            m.contains("Content-Length", ignoreCase = true)
+                        ) {
+                            return true
+                        }
+                    }
+            }
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+     */
+    private fun isBenignCancellation(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            if (cause is java.util.concurrent.CancellationException) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    /**
+     * "Reporter artifacts": crash-report events uploaded by the CrashReport mixin that carry no
+     * diagnostic value. Only very specific self-noise signatures are matched here; every other
+     * foreign/vanilla/other-mod crash is intentionally kept.
+     */
+    private fun isReporterArtifact(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog
+            // createWatchdogCrashReport builds a synthetic Error("Watchdog")) — not a fault.
+            if (cause is Error && cause.message == "Watchdog") return true
+
+            val top = cause.stackTrace.firstOrNull()
+            if (top != null) {
+                val cn = top.className
+                val mn = top.methodName
+                // CrashReport.preload() startup warmup ("Don't panic!"): a synthetic throwable
+                // whose only frame is the preload call itself — no usable application/mod frame.
+                if ((cn == "net.minecraft.CrashReport" || cn == "net.minecraft.class_128") &&
+                    (mn == "preload" || mn == "method_24305")
+                ) {
+                    return true
+                }
+                // Reporter self-crash while formatting someone else's crash: NPE thrown inside
+                // CrashReportCategory.validateStackTrace (StackTraceElement.getFileName() == null).
+                if (cause is NullPointerException &&
+                    (cn == "net.minecraft.CrashReportCategory" || cn == "net.minecraft.class_129") &&
+                    (mn == "validateStackTrace" || mn == "method_584")
+                ) {
+                    return true
+                }
             }
             val next = cause.cause
             if (next === cause) break

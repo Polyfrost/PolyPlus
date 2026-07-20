@@ -157,7 +157,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
                 val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
-                    guiScaleFactor * UI_SCALE
+                    guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
                 CompositionLocalProvider(LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f))) {
                     Box(
                         Modifier

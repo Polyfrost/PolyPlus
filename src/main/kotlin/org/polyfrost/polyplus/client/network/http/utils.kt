@@ -2,13 +2,18 @@ package org.polyfrost.polyplus.client.network.http
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.ResponseException
+import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.request
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.isSuccess
 
 suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuilder.() -> Unit): HttpResponse {
     val response = request {
@@ -38,10 +43,22 @@ suspend inline fun HttpClient.requestAuthorized(url: String, noinline block: Htt
     }
 }
 
+suspend inline fun <reified T> HttpResponse.bodyOrThrow(): T {
+    if (!status.isSuccess()) {
+        val text = bodyAsText()
+        throw when {
+            status.value >= 500 -> ServerResponseException(this, text)
+            status.value >= 400 -> ClientRequestException(this, text)
+            else -> ResponseException(this, text)
+        }
+    }
+    return body()
+}
+
 suspend inline fun <reified T> HttpClient.requestBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
     return runCatching {
         val response = requestAuthorized(url, block)
-        response.body<T>()
+        response.bodyOrThrow<T>()
     }
 }
 
@@ -56,7 +73,7 @@ suspend inline fun HttpClient.requestAuthorized(url: String, method: HttpMethod,
 suspend inline fun <reified T> HttpClient.requestBodyAuthorized(url: String, method: HttpMethod, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
     return runCatching {
         val response = requestAuthorized(url, method, block)
-        response.body<T>()
+        response.bodyOrThrow<T>()
     }
 }
 

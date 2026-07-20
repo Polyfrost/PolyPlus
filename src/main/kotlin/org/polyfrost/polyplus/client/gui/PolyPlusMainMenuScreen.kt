@@ -406,11 +406,13 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
     return PolyPlusConfig.mainMenuBackground == MainMenuBackground.PANORAMA
 }
 
-internal const val REFERENCE_GUI_SCALE = 4f
+internal const val REFERENCE_GUI_SCALE = 2f
 
-internal fun mcGuiScaleFactor(): Float = guiScaleFactorFor(net.minecraft.client.Minecraft.getInstance().window.guiScale.toInt())
+internal fun mcGuiScale(): Int = net.minecraft.client.Minecraft.getInstance().window.guiScale.toInt()
 
 internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI_SCALE).coerceIn(0.01f, 1f)
+
+internal const val GUI_DENSITY_TRIM = 0.88f
 
 private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier =
     graphicsLayer {
@@ -429,8 +431,8 @@ private fun MainMenu(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val guiScale = mcGuiScaleFactor()
-            val scale = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT) * guiScale
+            val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
+            val scale = minOf(mcGuiScale() / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
             CompositionLocalProvider(
                 LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
             ) {

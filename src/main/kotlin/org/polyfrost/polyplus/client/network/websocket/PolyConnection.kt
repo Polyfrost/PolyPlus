@@ -154,7 +154,10 @@ object PolyConnection {
     }
 
     private fun isAuthFailure(error: Throwable): Boolean {
-        return generateSequence(error) { it.cause }.any { it.message?.contains("401") == true }
+        return generateSequence(error) { it.cause }.any { cause ->
+            val message = cause.message ?: return@any false
+            message.contains("401") || message.contains("Unauthorized", ignoreCase = true)
+        }
     }
 
     private fun reconnectDelay(attempt: Int): Long {
@@ -184,7 +187,6 @@ object PolyConnection {
         val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
         if (packet is ClientboundPacket.Error) {
             LOGGER.error("Error packet received: ${packet.message}")
-            org.polyfrost.polyplus.client.PolyPlusSentry.captureMessage("Error packet received: ${packet.message}")
         }
 
         EventManager.INSTANCE.post(WebSocketMessage(packet))

@@ -21,11 +21,17 @@ object PolyAuthorization {
     private val LOGGER = LogManager.getLogger()
     private val LOCK = Mutex()
 
+    private const val TOKEN_TTL_MS = 2 * 60 * 60 * 1000L
+    private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L
+
     private var cachedResponse: AuthResponse? = null
+    private var cachedExpiresAtMs = 0L
     private var currentJob: Deferred<AuthResponse>? = null
 
     suspend fun current(): String {
-        val token = LOCK.withLock { cachedResponse?.token }
+        val token = LOCK.withLock {
+            cachedResponse?.token?.takeIf { System.currentTimeMillis() < cachedExpiresAtMs }
+        }
         return token ?: refresh()
     }
 
@@ -39,6 +45,7 @@ object PolyAuthorization {
                 authorize().also {
                     LOCK.withLock {
                         cachedResponse = it
+                        cachedExpiresAtMs = System.currentTimeMillis() + TOKEN_TTL_MS - REFRESH_MARGIN_MS
                         currentJob = null
                     }
                 }
@@ -55,6 +62,7 @@ object PolyAuthorization {
     suspend fun reset() {
         LOCK.withLock {
             cachedResponse = null
+            cachedExpiresAtMs = 0L
             currentJob = null
         }
     }

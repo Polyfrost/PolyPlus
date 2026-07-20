@@ -135,6 +135,20 @@ object PlayerPreviewRenderer {
     @JvmStatic
     fun previewEquipment(entityId: Int): CosmeticEquipment? = equipmentByEntityId[entityId]
 
+    @Volatile
+    private var renderingPreview = false
+
+    @JvmStatic
+    fun isRenderingPreview(): Boolean = renderingPreview
+
+    //? if >= 1.21.10 {
+    @Volatile
+    private var previewCape: Identifier? = null
+
+    @JvmStatic
+    fun previewCapeOverride(): Any? = previewCape
+    //?}
+
     @JvmStatic
     fun previewParticleColor(entityId: Int): Int? =
         if (equipmentByEntityId.containsKey(entityId)) {
@@ -350,9 +364,18 @@ object PlayerPreviewRenderer {
         *///?}
         try {
             //? if >= 1.21.10 {
-            val level = mc.level
-            if (level != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
-            else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+            previewCape = capeOverride(source)?.let { ClientAsset.ResourceTexture(it).texturePath() }
+            renderingPreview = true
+            try {
+                val level = mc.level
+                if (level != null && mc.cameraEntity != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
+                else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+            } catch (t: Throwable) {
+                LOG.error("[preview] entity submit failed; skipping frame", t)
+            } finally {
+                renderingPreview = false
+                previewCape = null
+            }
             //?} else {
             /*renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
             *///?}

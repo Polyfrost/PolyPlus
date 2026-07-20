@@ -64,6 +64,11 @@
     "client.cosmetics.AvatarRenderStateMixin",
     "client.cosmetics.AvatarRendererMixin"
     //?}
+    //? if >= 1.21.10 {
+    ,
+    "client.cosmetics.Mixin_WaveyCapesPreviewSkip",
+    "client.cosmetics.Mixin_WaveyCapesPreviewCape"
+    //?}
     //? if >= 1.21.4 && < 1.21.5 {
     /*,
     "client.cosmetics.EntityRenderDispatcherPlayerAccessor"

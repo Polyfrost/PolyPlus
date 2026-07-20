@@ -32,6 +32,8 @@ object CosmeticSync : EarlyInitializable {
     }
     private val subscribedPlayers = HashSet<String>()
 
+    private const val MAX_PLAYERS_PER_REQUEST = 64
+
     //? if >= 1.21.1 {
     private const val RECONCILE_INTERVAL_TICKS = 20
     private var reconcileTicks = 0
@@ -321,11 +323,14 @@ object CosmeticSync : EarlyInitializable {
             return Result.success(Unit)
         }
 
-        val result = PolyConnection.sendPacket(ServerboundPacket.SubscribePlayers(added))
-        if (result.isFailure) {
-            subscribedPlayers.removeAll(added)
+        for (chunk in added.chunked(MAX_PLAYERS_PER_REQUEST)) {
+            val result = PolyConnection.sendPacket(ServerboundPacket.SubscribePlayers(chunk))
+            if (result.isFailure) {
+                subscribedPlayers.removeAll(added)
+                return result
+            }
         }
-        return result
+        return Result.success(Unit)
     }
 
     private fun unsubscribePlayers(players: Iterable<String>): Result<Unit> {
