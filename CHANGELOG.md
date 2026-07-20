@@ -1,3 +1,3 @@
-1.0.3 changelogs:
+1.0.4 changelogs:
 
-- Fix PolyPlus version always reporting as 1.0.0
+- fix cosmetics showing on invisible players...
