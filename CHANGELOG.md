@@ -1,4 +1,3 @@
-1.0.2 changelogs:
+1.0.3 changelogs:
 
-- Fix compat with WaveyCapes
-- Fix false Sentry errors
+- Fix PolyPlus version always reporting as 1.0.0
