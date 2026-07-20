@@ -40,7 +40,7 @@ object PolyPlusSentry {
             options.isDebug = dev
             options.setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t))) null else event
+                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t))) null else event
             }
         }
     }
@@ -113,8 +113,8 @@ object PolyPlusSentry {
         var cause: Throwable? = throwable
         while (cause != null) {
             // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog
-            // createWatchdogCrashReport builds a synthetic Error("Watchdog")) — not a fault.
-            if (cause is Error && cause.message == "Watchdog") return true
+            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")"),
+            if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
 
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
@@ -136,6 +136,44 @@ object PolyPlusSentry {
                     return true
                 }
             }
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    private fun isForeignPacketNoise(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            val message = cause.message
+            if (message?.contains("Terminal message received in bundle", ignoreCase = true) == true &&
+                cause.stackTrace.any {
+                    it.className == "net.minecraft.network.PacketBundlePacker" || // mojmap
+                        it.className == "net.minecraft.class_8035"                  // intermediary
+                }
+            ) {
+                return true
+            }
+            if (message?.contains("Failed to decode packet", ignoreCase = true) == true &&
+                cause.stackTrace.any {
+                    it.className == "net.minecraft.network.PacketDecoder" || // mojmap
+                        it.className == "net.minecraft.class_2543"             // intermediary
+                }
+            ) {
+                return true
+            }
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    private fun isMemoryExhaustion(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            if (cause is OutOfMemoryError) return true
             val next = cause.cause
             if (next === cause) break
             cause = next
