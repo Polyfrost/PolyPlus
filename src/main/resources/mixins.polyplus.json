@@ -9,70 +9,33 @@
   "client": [
     "Mixin_NoAI",
     "Mixin_SentryCrashReport",
-    "client.Mixin_ReplaceCapeTexture",
-    "client.Mixin_OneConfigNavigationGraph",
-    "client.Mixin_OneConfigNavigationGroups",
-    "client.Mixin_OneConfigUIScreenRoute",
-    "client.Mixin_ThemeRegistryBranding",
-    "client.NameTagBadgeMixin",
     "client.ChatEmojiMixin",
     "client.ChatScreenEmojiMixin",
     "client.ChatSendEmojiMixin",
-    "client.Mixin_ReplaceMainMenuEarly",
-    "client.Mixin_ReplaceMainMenu",
-    "client.Mixin_TrackRecentServers",
+    "client.Mixin_HostWorldButtonLabel",
     "client.Mixin_MainMenuFpsLimit",
+    "client.Mixin_OneConfigNavigationGraph",
+    "client.Mixin_OneConfigNavigationGroups",
+    "client.Mixin_OneConfigUIScreenRoute",
     "client.Mixin_PanoramaBlurRadius",
-    "client.Mixin_HostWorldButtonLabel"
-    //? if >= 1.21.8 && < 26.1 {
-    /*,
-    "client.PlayerTabBadgeMixin"
-    *///?}
-    //? if >= 1.21.1 && < 1.21.8 {
-    /*,
-    "client.PlayerTabBadgeLegacyMixin"
-    *///?}
-    //? if >= 26.1 {
-    ,
-    "client.PlayerTabBadgeModernMixin"
-    //?}
-    //? if < 1.21.5 || >= 1.21.8 && < 26.1 {
-    /*,
-    "client.Mixin_PreviewComposeOverlay"
-    *///?}
-    //? if < 1.21.5 {
-    /*,
-    "client.MinecraftMainRenderTargetAccessor"
-    *///?}
-    //? if >= 26.1 && < 26.2 {
-    ,
-    "client.Mixin_PreviewPresent"
-    //?}
-    //? if >= 26.2 {
-    /*,
-    "client.Mixin_PreviewPresent26_2"
-    *///?}
-    //? if >= 1.21.1 {
-    ,
+    "client.Mixin_PreviewPresent",
+    "client.Mixin_ReplaceCapeTexture",
+    "client.Mixin_ReplaceMainMenu",
+    "client.Mixin_ReplaceMainMenuEarly",
+    "client.Mixin_ThemeRegistryBranding",
+    "client.Mixin_TrackRecentServers",
+    "client.NameTagBadgeMixin",
+    "client.PlayerTabBadgeModernMixin",
+    "client.access.MinecraftAccessor",
+    "client.access.UserAccessor",
     "client.cosmetics.AbstractClientPlayerMixin",
     "client.cosmetics.AvatarRendererInitMixin",
-    "client.cosmetics.LivingEntityRendererInvoker",
-    "client.cosmetics.PlayerModelMixin"
-    //?}
-    //? if >= 1.21.4 {
-    ,
+    "client.cosmetics.AvatarRendererMixin",
     "client.cosmetics.AvatarRenderStateMixin",
-    "client.cosmetics.AvatarRendererMixin"
-    //?}
-    //? if >= 1.21.10 {
-    ,
+    "client.cosmetics.LivingEntityRendererInvoker",
+    "client.cosmetics.Mixin_WaveyCapesPreviewCape",
     "client.cosmetics.Mixin_WaveyCapesPreviewSkip",
-    "client.cosmetics.Mixin_WaveyCapesPreviewCape"
-    //?}
-    //? if >= 1.21.4 && < 1.21.5 {
-    /*,
-    "client.cosmetics.EntityRenderDispatcherPlayerAccessor"
-    *///?}
+    "client.cosmetics.PlayerModelMixin"
   ],
   "verbose": true
 }
