@@ -9,15 +9,23 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Parameters
 import io.ktor.http.contentType
 import io.ktor.http.formUrlEncode
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -25,7 +33,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URLDecoder
@@ -35,7 +43,7 @@ import java.security.SecureRandom
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 object MicrosoftAuth {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -44,13 +52,36 @@ object MicrosoftAuth {
     private const val SCOPES = "XboxLive.SignIn XboxLive.offline_access"
     private const val AUTHORIZE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
     private const val TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    private const val DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
+    private const val DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
 
     private const val LOGIN_TIMEOUT_MS = 5 * 60 * 1000L
 
     private val HTTP get() = PolyPlusClient.HTTP
     private val B64URL = Base64.getUrlEncoder().withoutPadding()
+    private val ERR_JSON = Json { ignoreUnknownKeys = true }
 
-    suspend fun login(): LauncherAccountStore.StoredAccount {
+    class DeviceCode(
+        val userCode: String,
+        val verificationUri: String,
+        val deviceCode: String,
+        val expiresIn: Long,
+        val interval: Long,
+        val message: String,
+    )
+
+    class MicrosoftLoginSession internal constructor(
+        val browserAuthUrl: String,
+        val userCode: String,
+        val verificationUri: String,
+        internal val server: HttpServer,
+        internal val redirectUri: String,
+        internal val verifier: String,
+        internal val device: DeviceCode,
+        internal val codeResult: CompletableDeferred<String>,
+    )
+
+    suspend fun beginLogin(): MicrosoftLoginSession {
         val verifier = randomToken()
         val challenge = pkceChallenge(verifier)
         val csrfState = randomToken()
@@ -63,13 +94,170 @@ object MicrosoftAuth {
         server.executor = null
         server.start()
 
+        val device = try {
+            beginDeviceLogin()
+        } catch (e: Throwable) {
+            server.stop(0)
+            throw e
+        }
+
+        return MicrosoftLoginSession(
+            browserAuthUrl = authorizeUrl(redirectUri, csrfState, challenge),
+            userCode = device.userCode,
+            verificationUri = device.verificationUri,
+            server = server,
+            redirectUri = redirectUri,
+            verifier = verifier,
+            device = device,
+            codeResult = codeResult,
+        )
+    }
+
+    suspend fun finishLogin(session: MicrosoftLoginSession): LauncherAccountStore.StoredAccount {
         try {
-            ClientPlatform.openUri(authorizeUrl(redirectUri, csrfState, challenge))
-            val code = withTimeout(LOGIN_TIMEOUT_MS.milliseconds) { codeResult.await() }
-            val msa = exchangeAuthCode(code, redirectUri, verifier)
+            val timeout = session.device.expiresIn.coerceAtMost(LOGIN_TIMEOUT_MS / 1000).seconds
+            val msa = withTimeout(timeout) { raceLogin(session) }
             return accountFromMsa(msa)
         } finally {
-            server.stop(0)
+            session.server.stop(0)
+        }
+    }
+
+    fun cancelLogin(session: MicrosoftLoginSession) {
+        session.server.stop(0)
+    }
+
+    private suspend fun raceLogin(session: MicrosoftLoginSession): MsaToken = coroutineScope {
+        val browser = async {
+            runCatching {
+                val code = session.codeResult.await()
+                exchangeAuthCode(code, session.redirectUri, session.verifier)
+            }
+        }
+        val device = async { runCatching { pollDeviceToken(session.device) } }
+        try {
+            var browserDone = false
+            var deviceDone = false
+            var lastError: Throwable? = null
+            while (true) {
+                val result: Result<MsaToken> = select {
+                    if (!browserDone) browser.onAwait { browserDone = true; it }
+                    if (!deviceDone) device.onAwait { deviceDone = true; it }
+                }
+                result.onSuccess { return@coroutineScope it }
+                result.onFailure { lastError = it }
+                if (browserDone && deviceDone) break
+            }
+            throw lastError ?: MicrosoftAuthErrors.deviceExpired()
+        } finally {
+            browser.cancel()
+            device.cancel()
+        }
+    }
+
+    suspend fun refreshAccount(account: LauncherAccountStore.StoredAccount): LauncherAccountStore.StoredAccount {
+        val msa = refreshMsaToken(account.refreshToken)
+        return accountFromMsa(msa)
+    }
+
+    private suspend fun refreshMsaToken(refreshToken: String): MsaToken {
+        if (refreshToken.isBlank()) throw MicrosoftAuthErrors.forStep(MsaAuthStep.AuthCodeExchange)
+        val response = try {
+            HTTP.post(TOKEN_URL) {
+                accept(ContentType.Application.Json)
+                setBody(
+                    FormDataContent(
+                        Parameters.build {
+                            append("client_id", CLIENT_ID)
+                            append("grant_type", "refresh_token")
+                            append("refresh_token", refreshToken)
+                            append("scope", SCOPES)
+                        },
+                    ),
+                )
+            }
+        } catch (e: IOException) {
+            throw MicrosoftAuthErrors.network(e)
+        } catch (e: java.nio.channels.UnresolvedAddressException) {
+            throw MicrosoftAuthErrors.network(e)
+        }
+        if (!response.status.isSuccess()) {
+            throw MicrosoftAuthErrors.forStep(MsaAuthStep.AuthCodeExchange)
+        }
+        val body: MsaTokenResponse = response.body()
+        return MsaToken(body.accessToken, body.refreshToken.ifBlank { refreshToken }, body.expiresIn, Instant.now())
+    }
+
+    private suspend fun beginDeviceLogin(): DeviceCode {
+        val response = try {
+            HTTP.post(DEVICE_CODE_URL) {
+                accept(ContentType.Application.Json)
+                setBody(
+                    FormDataContent(
+                        Parameters.build {
+                            append("client_id", CLIENT_ID)
+                            append("scope", SCOPES)
+                        },
+                    ),
+                )
+            }
+        } catch (e: IOException) {
+            throw MicrosoftAuthErrors.network(e)
+        } catch (e: java.nio.channels.UnresolvedAddressException) {
+            throw MicrosoftAuthErrors.network(e)
+        }
+        if (!response.status.isSuccess()) {
+            throw MicrosoftAuthErrors.forStep(MsaAuthStep.DeviceCodeRequest)
+        }
+        val body: DeviceCodeResponse = response.body()
+        return DeviceCode(
+            userCode = body.userCode,
+            verificationUri = body.verificationUri,
+            deviceCode = body.deviceCode,
+            expiresIn = body.expiresIn,
+            interval = body.interval,
+            message = body.message,
+        )
+    }
+
+    private suspend fun pollDeviceToken(device: DeviceCode): MsaToken {
+        var intervalSeconds = device.interval.coerceAtLeast(5)
+        while (true) {
+            val response = try {
+                HTTP.post(TOKEN_URL) {
+                    accept(ContentType.Application.Json)
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("grant_type", DEVICE_GRANT_TYPE)
+                                append("client_id", CLIENT_ID)
+                                append("device_code", device.deviceCode)
+                            },
+                        ),
+                    )
+                }
+            } catch (e: IOException) {
+                throw MicrosoftAuthErrors.network(e)
+            } catch (e: java.nio.channels.UnresolvedAddressException) {
+                throw MicrosoftAuthErrors.network(e)
+            }
+            if (response.status.isSuccess()) {
+                val body: MsaTokenResponse = response.body()
+                return MsaToken(body.accessToken, body.refreshToken, body.expiresIn, Instant.now())
+            }
+            val error = runCatching {
+                ERR_JSON.decodeFromString(OAuthErrorResponse.serializer(), response.bodyAsText())
+            }.getOrNull()
+            when (error?.error) {
+                "authorization_pending" -> delay(intervalSeconds.seconds)
+                "slow_down" -> {
+                    intervalSeconds += 5
+                    delay(intervalSeconds.seconds)
+                }
+                "expired_token" -> throw MicrosoftAuthErrors.deviceExpired()
+                null -> throw MicrosoftAuthErrors.forStep(MsaAuthStep.DeviceCodePoll)
+                else -> throw MicrosoftAuthErrors.deviceFailed(error.errorDescription ?: error.error)
+            }
         }
     }
 
@@ -96,7 +284,16 @@ object MicrosoftAuth {
         val query = exchange.requestURI.rawQuery?.let(::parseQuery).orEmpty()
         val page: RedirectPage = when {
             query["error"] != null -> {
-                result.completeExceptionally(IllegalStateException("Microsoft sign-in failed: ${query["error"]}"))
+                result.completeExceptionally(
+                    MicrosoftAuthException(
+                        "The Microsoft sign-in was cancelled or rejected in your browser (${query["error"]}).",
+                        listOf(
+                            "Start the sign-in again",
+                            "Complete the Microsoft sign-in in your browser without closing the window",
+                            "If your browser blocked the redirect back, allow it and try once more",
+                        ),
+                    ),
+                )
                 RedirectPage.FAILED
             }
             query["state"] != null && query["state"] != expectedState -> RedirectPage.FAILED
@@ -114,7 +311,7 @@ object MicrosoftAuth {
         redirectUri: String,
         verifier: String,
     ): MsaToken {
-        val response: MsaTokenResponse = HTTP.post(TOKEN_URL) {
+        val response = HTTP.post(TOKEN_URL) {
             accept(ContentType.Application.Json)
             setBody(
                 FormDataContent(
@@ -128,15 +325,20 @@ object MicrosoftAuth {
                     },
                 ),
             )
-        }.body()
-        return MsaToken(response.accessToken, response.refreshToken, response.expiresIn, Instant.now())
+        }
+        if (!response.status.isSuccess()) {
+            throw MicrosoftAuthErrors.forStep(MsaAuthStep.AuthCodeExchange)
+        }
+        val body: MsaTokenResponse = response.body()
+        return MsaToken(body.accessToken, body.refreshToken, body.expiresIn, Instant.now())
     }
 
     private suspend fun accountFromMsa(msa: MsaToken): LauncherAccountStore.StoredAccount {
         val xblToken = xblAuthenticate("d=${msa.accessToken}")
         val xsts = xstsAuthorize(xblToken)
-        val xstsToken = xsts.token ?: error("XSTS returned no token")
-        val uhs = xsts.displayClaims?.xui?.firstOrNull()?.uhs ?: error("XSTS returned no user hash")
+        val xstsToken = xsts.token ?: throw MicrosoftAuthErrors.forStep(MsaAuthStep.XstsAuthorize)
+        val uhs = xsts.displayClaims?.xui?.firstOrNull()?.uhs
+            ?: throw MicrosoftAuthErrors.forStep(MsaAuthStep.XstsAuthorize)
 
         val mcToken = minecraftLogin(uhs, xstsToken)
         minecraftEntitlements(mcToken)
@@ -162,13 +364,14 @@ object MicrosoftAuth {
             put("RelyingParty", "http://auth.xboxlive.com")
             put("TokenType", "JWT")
         }
-        val res: XboxTokenResponse = HTTP.post("https://user.auth.xboxlive.com/user/authenticate") {
+        val response = HTTP.post("https://user.auth.xboxlive.com/user/authenticate") {
             accept(ContentType.Application.Json)
             header("x-xbl-contract-version", "1")
             contentType(ContentType.Application.Json)
             setBody(body)
-        }.body()
-        return res.token ?: error("Xbox Live returned no token")
+        }
+        val res = parseXboxResponse(response, MsaAuthStep.XblAuthenticate)
+        return res.token ?: throw MicrosoftAuthErrors.forStep(MsaAuthStep.XblAuthenticate)
     }
 
     private suspend fun xstsAuthorize(userToken: String): XboxTokenResponse {
@@ -180,22 +383,40 @@ object MicrosoftAuth {
             put("RelyingParty", "rp://api.minecraftservices.com/")
             put("TokenType", "JWT")
         }
-        return HTTP.post("https://xsts.auth.xboxlive.com/xsts/authorize") {
+        val response = HTTP.post("https://xsts.auth.xboxlive.com/xsts/authorize") {
             accept(ContentType.Application.Json)
             header("x-xbl-contract-version", "1")
             contentType(ContentType.Application.Json)
             setBody(body)
-        }.body()
+        }
+        return parseXboxResponse(response, MsaAuthStep.XstsAuthorize)
+    }
+
+    private suspend fun parseXboxResponse(response: HttpResponse, step: MsaAuthStep): XboxTokenResponse {
+        val text = response.bodyAsText()
+        if (response.status.isSuccess()) {
+            return ERR_JSON.decodeFromString(XboxTokenResponse.serializer(), text)
+        }
+        val xerr = runCatching {
+            ERR_JSON.decodeFromString(XboxErrorResponse.serializer(), text).xErr
+        }.getOrNull()
+        if (xerr != null && xerr != 0L) {
+            throw MicrosoftAuthErrors.forXerr(xerr)
+        }
+        throw MicrosoftAuthErrors.forService(step, response.status.value)
     }
 
     private suspend fun minecraftLogin(uhs: String, xstsToken: String): String {
         val body = buildJsonObject { put("identityToken", "XBL3.0 x=$uhs;$xstsToken") }
-        val res: MinecraftTokenResponse = HTTP.post("https://api.minecraftservices.com/authentication/login_with_xbox") {
+        val response = HTTP.post("https://api.minecraftservices.com/authentication/login_with_xbox") {
             accept(ContentType.Application.Json)
             contentType(ContentType.Application.Json)
             setBody(body)
-        }.body()
-        return res.accessToken
+        }
+        if (!response.status.isSuccess()) {
+            throw MicrosoftAuthErrors.forService(MsaAuthStep.MinecraftToken, response.status.value)
+        }
+        return response.body<MinecraftTokenResponse>().accessToken
     }
 
     private suspend fun minecraftEntitlements(token: String) {
@@ -207,11 +428,16 @@ object MicrosoftAuth {
         }.onFailure { LOGGER.debug("entitlements check failed", it) }
     }
 
-    private suspend fun minecraftProfile(token: String): MinecraftProfile =
-        HTTP.get("https://api.minecraftservices.com/minecraft/profile") {
+    private suspend fun minecraftProfile(token: String): MinecraftProfile {
+        val response = HTTP.get("https://api.minecraftservices.com/minecraft/profile") {
             accept(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $token")
-        }.body()
+        }
+        if (!response.status.isSuccess()) {
+            throw MicrosoftAuthErrors.forService(MsaAuthStep.MinecraftProfile, response.status.value)
+        }
+        return response.body()
+    }
 
     private fun randomToken(): String {
         val bytes = ByteArray(32)
@@ -322,6 +548,22 @@ object MicrosoftAuth {
     )
 
     @Serializable
+    private data class DeviceCodeResponse(
+        @SerialName("user_code") val userCode: String,
+        @SerialName("device_code") val deviceCode: String,
+        @SerialName("verification_uri") val verificationUri: String,
+        @SerialName("expires_in") val expiresIn: Long = 900,
+        @SerialName("interval") val interval: Long = 5,
+        @SerialName("message") val message: String = "",
+    )
+
+    @Serializable
+    private data class OAuthErrorResponse(
+        @SerialName("error") val error: String,
+        @SerialName("error_description") val errorDescription: String? = null,
+    )
+
+    @Serializable
     private data class MsaTokenResponse(
         @SerialName("access_token") val accessToken: String,
         @SerialName("refresh_token") val refreshToken: String = "",
@@ -332,6 +574,13 @@ object MicrosoftAuth {
     private data class XboxTokenResponse(
         @SerialName("Token") val token: String? = null,
         @SerialName("DisplayClaims") val displayClaims: DisplayClaims? = null,
+    )
+
+    @Serializable
+    private data class XboxErrorResponse(
+        @SerialName("XErr") val xErr: Long = 0,
+        @SerialName("Message") val message: String = "",
+        @SerialName("Redirect") val redirect: String? = null,
     )
 
     @Serializable

@@ -2,7 +2,12 @@ package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
@@ -42,6 +47,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +114,7 @@ import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.host.E4mcSupport
+import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
@@ -761,6 +768,11 @@ private fun HostWorldPopup(
     var gameMode by remember { mutableStateOf(net.minecraft.world.level.GameType.SURVIVAL) }
     var allowCheats by remember { mutableStateOf(false) }
 
+    DisposableEffect(Unit) {
+        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
+        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+    }
+
     LaunchedEffect(Unit) {
         val loaded = HostWorldManager.loadWorlds()
         worlds = loaded
@@ -1152,6 +1164,9 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     var accounts by remember { mutableStateOf<List<OneLauncherAccounts.Account>?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var errorSteps by remember { mutableStateOf<List<String>?>(null) }
+    var loginSession by remember { mutableStateOf<org.polyfrost.polyplus.client.launcher.MicrosoftAuth.MicrosoftLoginSession?>(null) }
+    var loginJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
     var pillBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
 
@@ -1162,6 +1177,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     LaunchedEffect(open) {
         if (open) {
             error = null
+            errorSteps = null
             reload()
         }
     }
@@ -1171,6 +1187,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             scope.launch {
                 busy = "Switching…"
                 error = null
+                errorSteps = null
                 val ok = withContext(Dispatchers.IO) { OneLauncherAccounts.switchTo(account.id) }
                 if (!ok) error = "Couldn't switch to that account"
                 reload()
@@ -1180,11 +1197,56 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     }
     val onAddMicrosoft: () -> Unit = {
         if (busy == null) {
-            scope.launch {
-                busy = "Finish signing in in your browser…"
+            loginJob = scope.launch {
                 error = null
-                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addMicrosoft() } }
-                    .onFailure { error = it.message ?: "Microsoft sign-in failed" }
+                errorSteps = null
+                busy = "Starting Microsoft sign-in…"
+                val session = runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin() } }
+                    .onFailure {
+                        error = it.message ?: "Couldn't start sign-in"
+                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                    }
+                    .getOrNull()
+                if (session == null) {
+                    busy = null
+                    loginJob = null
+                    return@launch
+                }
+                loginSession = session
+                ClientPlatform.openUri(session.browserAuthUrl)
+                busy = "Waiting for you to finish signing in…"
+                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
+                    .onFailure {
+                        error = it.message ?: "Microsoft sign-in failed"
+                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                    }
+                loginSession = null
+                loginJob = null
+                reload()
+                busy = null
+            }
+        }
+    }
+    val onCancelLogin: () -> Unit = {
+        loginJob?.cancel()
+        loginSession?.let { runCatching { OneLauncherAccounts.cancelLogin(it) } }
+        loginJob = null
+        loginSession = null
+        busy = null
+        error = null
+        errorSteps = null
+    }
+    val onRefresh: (OneLauncherAccounts.Account) -> Unit = { account ->
+        if (busy == null) {
+            scope.launch {
+                busy = "Refreshing session…"
+                error = null
+                errorSteps = null
+                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.refresh(account.id) } }
+                    .onFailure {
+                        error = it.message ?: "Couldn't refresh that account"
+                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                    }
                 reload()
                 busy = null
             }
@@ -1195,6 +1257,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             scope.launch {
                 busy = "Adding account…"
                 error = null
+                errorSteps = null
                 runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addOffline(username) } }
                     .onFailure { error = it.message ?: "Couldn't add that account" }
                 reload()
@@ -1207,6 +1270,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             scope.launch {
                 busy = "Removing account…"
                 error = null
+                errorSteps = null
                 val ok = withContext(Dispatchers.IO) { OneLauncherAccounts.remove(account.id) }
                 if (!ok) error = "Couldn't remove that account"
                 reload()
@@ -1282,12 +1346,27 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                     assetsReady = assetsReady,
                     busy = busy,
                     error = error,
+                    errorSteps = errorSteps,
+                    loginSession = loginSession,
                     onSwitch = onSwitch,
                     onRemove = onRemove,
+                    onRefresh = onRefresh,
                     onAddMicrosoft = onAddMicrosoft,
+                    onCancelLogin = onCancelLogin,
                     onAddOffline = onAddOffline,
                 )
             }
+        }
+        val session = loginSession
+        if (session != null) {
+            MicrosoftLoginPopup(
+                code = session.userCode,
+                verificationUri = session.verificationUri,
+                browserAuthUrl = session.browserAuthUrl,
+                status = busy,
+                assetsReady = assetsReady,
+                onCancel = onCancelLogin,
+            )
         }
     }
 }
@@ -1300,9 +1379,13 @@ private fun AccountSwitcherPanel(
     assetsReady: Boolean,
     busy: String?,
     error: String?,
+    errorSteps: List<String>?,
+    loginSession: org.polyfrost.polyplus.client.launcher.MicrosoftAuth.MicrosoftLoginSession?,
     onSwitch: (OneLauncherAccounts.Account) -> Unit,
     onRemove: (OneLauncherAccounts.Account) -> Unit,
+    onRefresh: (OneLauncherAccounts.Account) -> Unit,
     onAddMicrosoft: () -> Unit,
+    onCancelLogin: () -> Unit,
     onAddOffline: (String) -> Unit,
 ) {
     var offlineEntry by remember { mutableStateOf(false) }
@@ -1357,6 +1440,7 @@ private fun AccountSwitcherPanel(
                         enabled = idle,
                         onClick = { onSwitch(account) },
                         onRemove = { onRemove(account) },
+                        onRefresh = { onRefresh(account) },
                     )
                 }
             }
@@ -1396,6 +1480,28 @@ private fun AccountSwitcherPanel(
         if (error != null) {
             MenuText(error, fontSize = 12.sp, color = DangerColor, modifier = Modifier.align(Alignment.Start))
         }
+        if (!errorSteps.isNullOrEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                MenuText(
+                    "What you can do:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.align(Alignment.Start),
+                )
+                errorSteps.forEach { step ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        MenuText("•", fontSize = 12.sp, color = TextSecondary)
+                        MenuText(step, fontSize = 12.sp, color = TextSecondary)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1406,6 +1512,7 @@ private fun AccountRow(
     enabled: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -1439,6 +1546,7 @@ private fun AccountRow(
             )
             val subtitle = when {
                 confirmRemove -> "Remove this account?"
+                account.expired -> "Session expired"
                 account.active -> "Active"
                 account.microsoft -> "Microsoft"
                 else -> "Offline"
@@ -1446,7 +1554,11 @@ private fun AccountRow(
             MenuText(
                 subtitle,
                 fontSize = 11.sp,
-                color = if (confirmRemove) DangerColor else TextSecondary,
+                color = when {
+                    confirmRemove -> DangerColor
+                    account.expired -> WarnColor
+                    else -> TextSecondary
+                },
                 modifier = Modifier.align(Alignment.Start),
             )
         }
@@ -1459,6 +1571,9 @@ private fun AccountRow(
         } else {
             if (account.active) {
                 MenuIcon(ASSETS + "check-circle.svg", SuccessColor, Modifier.size(18.dp), assetsReady)
+            }
+            if (account.expired) {
+                AccountActionIcon(ASSETS + "refresh-cw-01.svg", WarnColor, enabled, onRefresh)
             }
             if (hovered) {
                 AccountActionIcon(ASSETS + "trash-01.svg", TextSecondary, enabled) { confirmRemove = true }
@@ -1542,6 +1657,225 @@ private fun OfflineAccountEntry(
 }
 
 @Composable
+private fun MicrosoftLoginPopup(
+    code: String,
+    verificationUri: String,
+    browserAuthUrl: String,
+    status: String?,
+    assetsReady: Boolean,
+    onCancel: () -> Unit,
+) {
+    DisposableEffect(Unit) {
+        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
+        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+    }
+    Popup(
+        alignment = Alignment.Center,
+        onDismissRequest = onCancel,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Scrim)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onCancel() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(380.dp)
+                    .clip(PanelShape)
+                    .background(PageBackground.copy(alpha = 0.96f))
+                    .border(BorderWidth, PanelBorderBrush, PanelShape)
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
+                    .padding(horizontal = 22.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                MenuText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
+                MenuText(
+                    "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                )
+                LoginModalButton(
+                    label = "Open in browser again",
+                    icon = ASSETS + "link-external-01.svg",
+                    filled = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    assetsReady = assetsReady,
+                    onClick = { ClientPlatform.openUri(browserAuthUrl) },
+                )
+                OrDivider()
+                MenuText(
+                    "Or enter this code at the Microsoft sign-in page:",
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(ppShape(8.dp))
+                        .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
+                        .border(BorderWidth, Accent, ppShape(8.dp))
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MenuText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LoginModalButton(
+                        label = "Copy code",
+                        icon = ASSETS + "copy-01.svg",
+                        filled = false,
+                        modifier = Modifier.weight(1f),
+                        assetsReady = assetsReady,
+                        onClick = {
+                            runCatching {
+                                net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                            }
+                        },
+                    )
+                    LoginModalButton(
+                        label = "Open in browser",
+                        icon = ASSETS + "link-external-01.svg",
+                        filled = true,
+                        modifier = Modifier.weight(1f),
+                        assetsReady = assetsReady,
+                        onClick = { ClientPlatform.openUri(verificationUri) },
+                    )
+                }
+                if (status != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        LoadingSpinner(Modifier.size(14.dp))
+                        MenuText(status, fontSize = 13.sp, color = TextSecondary)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(ppShape(6.dp))
+                        .clickableWithSound(onCancel)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    MenuText("Cancel", fontSize = 14.sp, color = TextPrimary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoginModalButton(
+    label: String,
+    icon: String,
+    filled: Boolean,
+    modifier: Modifier = Modifier,
+    assetsReady: Boolean,
+    onClick: () -> Unit,
+) {
+    val contentColor = if (filled) Color.White else TextPrimary
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(PanelShape)
+            .background(if (filled) Accent else PanelBackground)
+            .border(BorderWidth, if (filled) SolidColor(Accent) else PanelBorderBrush, PanelShape)
+            .clickableWithSound(onClick)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MenuIcon(icon, contentColor, Modifier.size(16.dp), assetsReady)
+        MenuText(label, fontSize = 14.sp, color = contentColor, maxLines = 1)
+    }
+}
+
+@Composable
+private fun OrDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.weight(1f).height(1.dp).background(PanelBorderBrush))
+        MenuText("or", fontSize = 12.sp, color = TextSecondary)
+        Box(Modifier.weight(1f).height(1.dp).background(PanelBorderBrush))
+    }
+}
+
+@Composable
+private fun LoadingSpinner(modifier: Modifier) {
+    // OneClient's Loading02 spoke icon (static, like OneClient).
+    MenuIcon(ASSETS + "loading-02.svg", Accent, modifier, assetsReady = true)
+}
+
+@Composable
+private fun DeviceCodeCard(
+    code: String,
+    verificationUri: String,
+    assetsReady: Boolean,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        MenuText(
+            "We opened Microsoft sign-in in your browser. Finish there, or enter this code instead:",
+            fontSize = 12.sp,
+            color = TextSecondary,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(ppShape(8.dp))
+                .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
+                .border(BorderWidth, Accent, ppShape(8.dp))
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            MenuText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+        }
+        MenuText(verificationUri, fontSize = 11.sp, color = TextSecondary)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AddAccountButton(
+                icon = ASSETS + "copy-01.svg",
+                text = "Copy code",
+                enabled = true,
+                assetsReady = assetsReady,
+                onClick = {
+                    runCatching {
+                        net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                    }
+                },
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AddAccountButton(
+                icon = ASSETS + "link-external-01.svg",
+                text = "Open in browser",
+                enabled = true,
+                assetsReady = assetsReady,
+                onClick = { ClientPlatform.openUri(verificationUri) },
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AddAccountButton(
+                icon = ASSETS + "x-close.svg",
+                text = "Cancel",
+                enabled = true,
+                assetsReady = assetsReady,
+                onClick = onCancel,
+            )
+        }
+    }
+}
+
+@Composable
 private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
@@ -1609,10 +1943,13 @@ private fun MenuText(
     fontWeight: FontWeight = FontWeight.Normal,
     letterSpacing: TextUnit = TextUnit.Unspecified,
     fontFamily: FontFamily = LocalTheme.current.typography.family,
+    maxLines: Int = Int.MAX_VALUE,
 ) {
     BasicText(
         text = text,
         modifier = modifier,
+        maxLines = maxLines,
+        softWrap = maxLines != 1,
         style = TextStyle(
             color = color,
             fontSize = fontSize,

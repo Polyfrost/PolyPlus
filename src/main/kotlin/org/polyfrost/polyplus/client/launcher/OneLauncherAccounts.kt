@@ -11,6 +11,7 @@ object OneLauncherAccounts {
         val username: String,
         val microsoft: Boolean,
         val active: Boolean,
+        val expired: Boolean,
     )
 
     fun list(): List<Account> {
@@ -20,13 +21,20 @@ object OneLauncherAccounts {
 
         return store.users.values.mapNotNull { stored ->
             val id = LauncherAccountStore.parseUuid(stored.id) ?: return@mapNotNull null
+            val microsoft = stored.kind.equals("microsoft", ignoreCase = true)
             Account(
                 id = id,
                 username = stored.username,
-                microsoft = stored.kind.equals("microsoft", ignoreCase = true),
+                microsoft = microsoft,
                 active = id == defaultId,
+                expired = microsoft && isExpired(stored.expires),
             )
         }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })
+    }
+
+    private fun isExpired(expires: String): Boolean {
+        val at = runCatching { java.time.Instant.parse(expires) }.getOrNull() ?: return true
+        return at.isBefore(java.time.Instant.now().plusSeconds(60))
     }
 
     fun switchTo(id: UUID): Boolean {
@@ -51,10 +59,34 @@ object OneLauncherAccounts {
         return true
     }
 
-    suspend fun addMicrosoft(): Account {
-        val account = MicrosoftAuth.login()
+    suspend fun beginLogin(): MicrosoftAuth.MicrosoftLoginSession = MicrosoftAuth.beginLogin()
+
+    suspend fun finishLogin(session: MicrosoftAuth.MicrosoftLoginSession): Account {
+        val account = MicrosoftAuth.finishLogin(session)
         commit(account, makeDefaultIfNone = true)
         return account.toAccount(active = false)
+    }
+
+    fun cancelLogin(session: MicrosoftAuth.MicrosoftLoginSession) = MicrosoftAuth.cancelLogin(session)
+
+    suspend fun refresh(id: UUID): Account {
+        val store = LauncherAccountStore.load()
+        val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id }
+            ?: error("Account not found")
+        val stored = store.users[key] ?: error("Account not found")
+        require(stored.kind.equals("microsoft", ignoreCase = true)) {
+            "Only Microsoft accounts can be refreshed"
+        }
+
+        val refreshed = MicrosoftAuth.refreshAccount(stored)
+
+        val current = LauncherAccountStore.load()
+        val users = current.users.toMutableMap().apply { put(key, refreshed) }
+        LauncherAccountStore.save(current.copy(users = users))
+
+        val isDefault = current.defaultUser == key
+        if (isDefault) AccountSwitch.apply(refreshed)
+        return refreshed.toAccount(active = isDefault)
     }
 
     fun addOffline(rawUsername: String): Account {
@@ -98,5 +130,6 @@ object OneLauncherAccounts {
         username = username,
         microsoft = kind.equals("microsoft", ignoreCase = true),
         active = active,
+        expired = kind.equals("microsoft", ignoreCase = true) && isExpired(expires),
     )
 }
