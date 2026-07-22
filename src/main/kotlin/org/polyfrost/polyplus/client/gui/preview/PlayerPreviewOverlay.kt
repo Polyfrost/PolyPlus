@@ -56,6 +56,16 @@ object PlayerPreviewOverlay {
     @JvmStatic
     fun renderAll(target: RenderTarget) {
         if (java.lang.Boolean.getBoolean("pp.overlay.off")) return
+        val mc = net.minecraft.client.Minecraft.getInstance()
+        //? if >= 26.2 {
+        /*val screen = mc?.gui?.screen()
+        *///?} else {
+        val screen = mc?.screen
+        //?}
+        if (screen !is org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen) {
+            if (entries.isNotEmpty()) entries.clear()
+            return
+        }
         if (entries.isEmpty()) return
         val fbW = target.width
         val fbH = target.height

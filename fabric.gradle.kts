@@ -157,6 +157,10 @@ if (!stonecutter.current.isActive) {
 tasks.withType<ProcessResources>().configureEach {
     val modName = project.property("mod.name") as String
     val modVersion = project.property("mod.version") as String
+    inputs.property("modId", modId)
+    inputs.property("modName", modName)
+    inputs.property("modVersion", modVersion)
+    inputs.property("minorMcVersion", minecraftPredicate)
     filesMatching("fabric.mod.json") {
         expand(
             mapOf(
