@@ -30,6 +30,26 @@ import kotlinx.coroutines.delay
 
 val LocalPlayerPreviewOpacity = androidx.compose.runtime.compositionLocalOf { 1f }
 
+object PlayerPreviewDim {
+    private const val DIMMED = 0.18f
+    var factor by mutableStateOf(1f)
+        private set
+    private var depth = 0
+
+    fun push() {
+        depth++
+        factor = DIMMED
+    }
+
+    fun pop() {
+        depth--
+        if (depth <= 0) {
+            depth = 0
+            factor = 1f
+        }
+    }
+}
+
 @Composable
 fun PlayerPreview(
     modifier: Modifier = Modifier,
@@ -68,7 +88,8 @@ private fun PlayerPreviewLive(
 ) {
     val entry = remember { PlayerPreviewOverlay.register() }
     val overlayOpacity = LocalPlayerPreviewOpacity.current *
-        org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha.current
+        org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha.current *
+        PlayerPreviewDim.factor
     androidx.compose.runtime.DisposableEffect(entry) {
         onDispose {
             PlayerPreviewOverlay.reportBounds(entry, 0f, 0f, 0f, 0f, visible = false)

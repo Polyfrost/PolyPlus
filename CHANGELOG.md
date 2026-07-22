@@ -1,3 +1,4 @@
-1.0.4 changelogs:
+1.1.0 changelogs:
 
-- fix cosmetics showing on invisible players...
+- adds account switcher functionality
+- fixes player preview on 26.2

@@ -287,6 +287,7 @@ object PlayerPreviewRenderer {
 
     private var target: TextureTarget? = null
     private var dummy: AbstractClientPlayer? = null
+    private var dummyProfileId: java.util.UUID? = null
     //? if < 26.1 {
     /*private val projection by lazy { CachedOrthoProjectionMatrixBuffer("polyplus_preview", -1000f, 1000f, true) }
     *///?}
@@ -469,7 +470,7 @@ object PlayerPreviewRenderer {
                     //?}
                     pass.setIndexBuffer(ibuf, itype)
                     //? if >= 26.2 {
-                    /*pass.drawIndexed(0, 0, indexCount, 0, 1)
+                    /*pass.drawIndexed(indexCount, 1, 0, 0, 0)
                     *///?} else {
                     pass.drawIndexed(0, 0, indexCount, 1)
                     //?}
@@ -650,15 +651,48 @@ object PlayerPreviewRenderer {
         PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
     *///?}
 
+    @Volatile
+    private var resolvedProfile: com.mojang.authlib.GameProfile? = null
+    private var resolvingProfileId: java.util.UUID? = null
+
+    private fun texturedProfile(mc: Minecraft): com.mojang.authlib.GameProfile? {
+        val id = mc.user.profileId
+        val startup = mc.gameProfile
+        if (startup.id == id) return startup // no switch: startup profile already carries textures
+        resolvedProfile?.let { if (it.id == id) return it }
+        synchronized(this) {
+            if (resolvingProfileId != id) {
+                resolvingProfileId = id
+                val name = mc.user.name
+                org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                    val fetched = runCatching {
+                        //? if >= 1.21.10 {
+                        mc.services().sessionService().fetchProfile(id, false)?.profile()
+                        //?} else {
+                        /*mc.minecraftSessionService.fetchProfile(id, false)?.profile()
+                        *///?}
+                    }.getOrNull() ?: com.mojang.authlib.GameProfile(id, name)
+                    synchronized(this@PlayerPreviewRenderer) {
+                        if (resolvingProfileId == id) {
+                            resolvedProfile = fetched
+                            resolvingProfileId = null
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
     //? if >= 1.21.10 {
     private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = mc.gameProfile
+        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(com.mojang.authlib.GameProfile(mc.user.profileId, mc.user.name))
         return runCatching { mc.skinManager.createLookup(profile, false).get() }.getOrNull()
             ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
     }
     //?} else {
     /*private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = mc.gameProfile
+        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(com.mojang.authlib.GameProfile(mc.user.profileId, mc.user.name))
         return runCatching { mc.skinManager.getInsecureSkin(profile) }.getOrNull()
             ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
     }
@@ -710,10 +744,14 @@ object PlayerPreviewRenderer {
     private const val PLAYER_BB_HEIGHT = 1.8f
 
     private fun dummy(mc: Minecraft, level: ClientLevel): AbstractClientPlayer? {
-        dummy?.let { return it }
-        return runCatching { RemotePlayer(level, mc.gameProfile) }.getOrNull()?.also {
+        // Skip the frame while the textured profile resolves; a bare-profile dummy would cache the
+        // default skin and never refresh (same uuid), whereas retrying picks up textures once ready.
+        val profile = texturedProfile(mc) ?: return null
+        dummy?.let { if (dummyProfileId == profile.id && it.level() === level) return it }
+        return runCatching { RemotePlayer(level, profile) }.getOrNull()?.also {
             it.id = PREVIEW_ENTITY_ID
             dummy = it
+            dummyProfileId = profile.id
         }
     }
 
