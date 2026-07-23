@@ -69,6 +69,9 @@ repositories {
     maven("https://central.sonatype.com/repository/maven-snapshots") {
         content { includeGroup("net.kyori") }
     }
+    maven("https://repo.hypixel.net/repository/Hypixel/") {
+        content { includeGroup("net.hypixel") }
+    }
     google()
 }
 
