@@ -60,6 +60,7 @@ object DefaultSettings {
     )
     private const val BETTER_SCREENS_CONFIG = "dev.microcontrollers.betterscreens.config.BetterScreensConfig"
     private const val CONFIRM_DISCONNECT_CONFIG = "dev.microcontrollers.confirmdisconnect.config.ConfirmDisconnectConfig"
+    private const val CONTROLIFY_MOD = "dev.isxander.controlify.Controlify"
 
     private class Task(
         val id: String,
@@ -97,6 +98,14 @@ object DefaultSettings {
                 label = "Confirm Disconnect",
                 isPresent = { findClass(CONFIRM_DISCONNECT_CONFIG) != null },
                 apply = ::applyConfirmDisconnect,
+            ),
+        )
+        add(
+            Task(
+                id = "controlify-keyboard-movement",
+                label = "Controlify keyboard-like movement",
+                isPresent = { controlifyGlobalSettings() != null },
+                apply = ::applyControlifyKeyboardMovement,
             ),
         )
         add(
@@ -228,6 +237,26 @@ object DefaultSettings {
 
     private fun applyConfirmDisconnect() {
         setYaclField(CONFIRM_DISCONNECT_CONFIG, "confirmEnabled", false)
+    }
+
+    private fun controlifyConfig(): Any? {
+        val mod = findClass(CONTROLIFY_MOD) ?: return null
+        val instance = mod.getMethod("instance").invoke(null) ?: return null
+        return runCatching { instance.javaClass.getMethod("config").invoke(instance) }.getOrNull()
+    }
+
+    private fun controlifyGlobalSettings(): Any? {
+        val config = controlifyConfig() ?: return null
+        return runCatching { config.javaClass.getMethod("globalSettings").invoke(config) }.getOrNull()
+    }
+
+    private fun applyControlifyKeyboardMovement() {
+        val config = controlifyConfig() ?: error("Controlify config is unavailable")
+        val globalSettings = config.javaClass.getMethod("globalSettings").invoke(config)
+            ?: error("Controlify global settings are unavailable")
+        globalSettings.javaClass.getField("alwaysKeyboardMovement").setBoolean(globalSettings, true)
+        config.javaClass.getMethod("save").invoke(config)
+        logger.info("Enabled Controlify keyboard-like movement")
     }
 
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
