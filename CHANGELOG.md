@@ -1,4 +1,4 @@
-1.1.0 changelogs:
+1.1.1 changelogs:
 
-- adds account switcher functionality
-- fixes player preview on 26.2
+- Fix player preview on Vulkan 26.2
+- Turn on keyboard-like movements on Controlify by default
