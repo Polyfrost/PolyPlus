@@ -23,7 +23,9 @@
     "client.Mixin_TrackRecentServers",
     "client.Mixin_MainMenuFpsLimit",
     "client.Mixin_PanoramaBlurRadius",
-    "client.Mixin_HostWorldButtonLabel"
+    "client.Mixin_HostWorldButtonLabel",
+    "client.access.MinecraftAccessor",
+    "client.access.UserAccessor"
     //? if >= 1.21.8 && < 26.1 {
     /*,
     "client.PlayerTabBadgeMixin"
@@ -33,7 +35,7 @@
     "client.PlayerTabBadgeLegacyMixin"
     *///?}
     //? if >= 26.1 {
-    ,
+  ,
     "client.PlayerTabBadgeModernMixin"
     //?}
     //? if < 1.21.5 || >= 1.21.8 && < 26.1 {
@@ -45,7 +47,7 @@
     "client.MinecraftMainRenderTargetAccessor"
     *///?}
     //? if >= 26.1 && < 26.2 {
-    ,
+  ,
     "client.Mixin_PreviewPresent"
     //?}
     //? if >= 26.2 {
@@ -53,19 +55,19 @@
     "client.Mixin_PreviewPresent26_2"
     *///?}
     //? if >= 1.21.1 {
-    ,
+  ,
     "client.cosmetics.AbstractClientPlayerMixin",
     "client.cosmetics.AvatarRendererInitMixin",
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.PlayerModelMixin"
     //?}
     //? if >= 1.21.4 {
-    ,
+  ,
     "client.cosmetics.AvatarRenderStateMixin",
     "client.cosmetics.AvatarRendererMixin"
     //?}
     //? if >= 1.21.10 {
-    ,
+  ,
     "client.cosmetics.Mixin_WaveyCapesPreviewSkip",
     "client.cosmetics.Mixin_WaveyCapesPreviewCape"
     //?}
