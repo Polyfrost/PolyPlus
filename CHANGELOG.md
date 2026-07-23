@@ -1,3 +1,3 @@
-1.1.2 changelogs:
+1.1.3 changelogs:
 
-- Make GUI scale apply instantly to main menu
+- Adaptively change blur settings
