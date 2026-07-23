@@ -129,10 +129,18 @@ import java.util.concurrent.ConcurrentHashMap
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
 
+    private var menuGuiScale by mutableStateOf(mcGuiScale())
+
+    private fun syncGuiScaleState() {
+        val gs = mcGuiScale()
+        if (gs != menuGuiScale) menuGuiScale = gs
+    }
+
     override fun shouldCloseOnEsc(): Boolean = false
 
     //? if <26.1 {
     /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             renderPanorama(ctx, tickDelta)
@@ -150,6 +158,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
     *///?} else {
     override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             net.minecraft.client.Minecraft.getInstance().gameRenderer
@@ -212,6 +221,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         Theme {
             MainMenu(
                 screen = this,
+                guiScale = menuGuiScale,
                 actions = MenuActions(
                     singleplayer = {
                         //? if >= 26.2 {
@@ -489,6 +499,7 @@ private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier
 @Composable
 private fun MainMenu(
     screen: net.minecraft.client.gui.screens.Screen,
+    guiScale: Int,
     actions: MenuActions,
     servers: List<net.minecraft.client.multiplayer.ServerData>,
     pingTick: Int,
@@ -497,7 +508,7 @@ private fun MainMenu(
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-            val scale = minOf(mcGuiScale() / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+            val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
             CompositionLocalProvider(
                 LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
             ) {

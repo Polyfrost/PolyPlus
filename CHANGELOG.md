@@ -1,4 +1,3 @@
-1.1.1 changelogs:
+1.1.2 changelogs:
 
-- Fix player preview on Vulkan 26.2
-- Turn on keyboard-like movements on Controlify by default
+- Make GUI scale apply instantly to main menu
