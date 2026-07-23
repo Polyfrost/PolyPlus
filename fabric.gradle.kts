@@ -58,7 +58,7 @@ repositories {
     maven("https://jitpack.io") {
         content { includeGroupAndSubgroups("com.github") }
     }
-    maven("https://maven.terraformersmc.com/") {
+    maven("https://maven.terraformersmc.com/releases/") {
         content { includeGroup("com.terraformersmc") }
     }
     maven("https://maven.bawnorton.com/releases") {
