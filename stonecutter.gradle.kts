@@ -27,3 +27,7 @@ stonecutter parameters {
         }
     }
 }
+
+stonecutter tasks {
+    order("runClient")
+}
