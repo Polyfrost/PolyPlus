@@ -69,6 +69,9 @@ repositories {
     }
     maven("https://redirector.kotlinlang.org/maven/compose-dev")
     maven("https://nexus.prsm.wtf/repository/maven-public/maven-repo/releases/")
+    maven("https://repo.hypixel.net/repository/Hypixel/") {
+        content { includeGroup("net.hypixel") }
+    }
     google()
 }
 
