@@ -457,6 +457,9 @@ object PlayerPreviewRenderer {
                 try {
                     pass.setPipeline(RenderPipelines.GUI_TEXTURED)
                     RenderSystem.bindDefaultUniforms(pass)
+                    //? if >= 26.2 {
+                    /*pass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(Matrix4f()))
+                    *///?}
                     //? if >= 1.21.11 {
                     val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
                     pass.bindTexture("Sampler0", srcView, sampler)
