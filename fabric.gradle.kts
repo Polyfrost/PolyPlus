@@ -103,7 +103,7 @@ dependencies {
     catalogLib("fabric-loader")?.let { implementation(it) { isTransitive = true } }
 
     implementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
-    for (module in listOf("commands", "compose-bundle", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
+    for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
