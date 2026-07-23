@@ -73,6 +73,7 @@ object PolyPlusClient {
         PolyPlusConfig.preload()
         DefaultSettings.initialize()
         OnboardingFeatures.initialize()
+        org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize()
 
         val earlyHooks: List<EarlyInitializable> = buildList {
             //? if >= 1.21.1

@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.FramerateLimitTracker;
 //?}
 import net.minecraft.client.Minecraft;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,16 +18,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /*@Mixin(Minecraft.class)
 *///?}
 public class Mixin_MainMenuFpsLimit {
+    private static final int UNCAPPED = 260;
+
     @Inject(method = "getFramerateLimit", at = @At("HEAD"), cancellable = true)
     private void polyplus$mainMenuFpsLimit(CallbackInfoReturnable<Integer> cir) {
+        if (AdaptiveBlurDefaults.isSampling()) {
+            cir.setReturnValue(UNCAPPED);
+            return;
+        }
         //? if >= 26.2 {
-        /*if (Minecraft.getInstance().gui.screen() instanceof PolyPlusMainMenuScreen) {
-            cir.setReturnValue(PolyPlusConfig.activeMainMenuFpsLimit());
-        }
+        /*Object screen = Minecraft.getInstance().gui.screen();
         *///?} else {
-        if (Minecraft.getInstance().screen instanceof PolyPlusMainMenuScreen) {
+        Object screen = Minecraft.getInstance().screen;
+        //?}
+        if (screen instanceof PolyPlusMainMenuScreen) {
             cir.setReturnValue(PolyPlusConfig.activeMainMenuFpsLimit());
         }
-        //?}
     }
 }

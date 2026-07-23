@@ -41,6 +41,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var onboardingPolyBlurApplied = false
 
     @JvmStatic @Include
+    var adaptiveBlurApplied = false
+
+    @JvmStatic @Include
     var onboardingLightTheme = false
 
     @JvmStatic @Include

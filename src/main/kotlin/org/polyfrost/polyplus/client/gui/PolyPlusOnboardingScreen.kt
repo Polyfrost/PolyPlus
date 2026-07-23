@@ -1,7 +1,12 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,7 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -68,6 +75,7 @@ import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.UnityMotionBlur
 import kotlin.math.roundToInt
@@ -127,6 +135,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
         var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(0, MOTION_BLUR_MAX)) }
+        var performanceMode by remember { mutableStateOf(PolyPlusConfig.onboardingMotionBlur <= 0) }
+        LaunchedEffect(AdaptiveBlurDefaults.sampled) {
+            if (AdaptiveBlurDefaults.sampled) performanceMode = AdaptiveBlurDefaults.recommendsPerformance
+        }
         val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
         var guiScale by remember {
             mutableIntStateOf(
@@ -140,7 +152,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             PolyPlusConfig.onboardingLightTheme = lightTheme
             PolyPlusConfig.onboardingUiStyle = uiStyle
             PolyPlusConfig.onboardingToggleSprint = toggleSprint
-            PolyPlusConfig.onboardingMotionBlur = motionBlur
+            PolyPlusConfig.onboardingMotionBlur = if (performanceMode) 0 else motionBlur
             PolyPlusConfig.onboardingGuiScale = guiScale
             PolyPlusConfig.onboardingCompleted = true
             PolyPlusConfig.save()
@@ -152,6 +164,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             mc.setScreen(PolyPlusMainMenuScreen())
             //?}
         }
+
+        val waitingForOptimization =
+            pages[page] == OnboardingPage.MODS && OnboardingFeatures.polyBlurAvailable && !AdaptiveBlurDefaults.sampled
 
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -190,12 +205,22 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                         uiStyle, { uiStyle = it },
                                         guiScale, maxGuiScale, { guiScale = it },
                                     )
-                                OnboardingPage.MODS -> ModsPage(
-                                    toggleSprint,
-                                    { toggleSprint = it },
-                                    motionBlur,
-                                    { motionBlur = it },
-                                )
+                                OnboardingPage.MODS ->
+                                    if (waitingForOptimization) {
+                                        OptimizingPage()
+                                    } else {
+                                        ModsPage(
+                                            toggleSprint,
+                                            { toggleSprint = it },
+                                            motionBlur,
+                                            { motionBlur = it },
+                                            performanceMode,
+                                            { enablePerformance ->
+                                                performanceMode = enablePerformance
+                                                if (!enablePerformance && motionBlur < 1) motionBlur = DEFAULT_QUALITY_BLUR
+                                            },
+                                        )
+                                    }
                                 OnboardingPage.COSMETICS -> CosmeticsPage(
                                     onClaim = { PolyPlusClient.refreshCosmetics() },
                                     onStore = {
@@ -211,6 +236,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 onSkip = finish,
                                 onBack = { page-- },
                                 onNext = { if (page == pages.size - 1) finish() else page++ },
+                                nextEnabled = !waitingForOptimization,
                             )
                         }
                     }
@@ -327,6 +353,8 @@ private fun ModsPage(
     onToggleSprint: (Boolean) -> Unit,
     motionBlur: Int,
     onMotionBlur: (Int) -> Unit,
+    performanceMode: Boolean,
+    onPerformanceMode: (Boolean) -> Unit,
 ) {
     Header("Continuing with", "Mods")
     val sprint = OnboardingFeatures.polySprintAvailable
@@ -341,7 +369,36 @@ private fun ModsPage(
         SprintSection(y, toggleSprint, onToggleSprint)
         y += SPRINT_SECTION_HEIGHT + SECTION_GAP
     }
-    if (blur) MotionBlurSection(y, motionBlur, onMotionBlur)
+    if (blur) MotionBlurSection(y, motionBlur, onMotionBlur, performanceMode, onPerformanceMode)
+}
+
+@Composable
+private fun OptimizingPage() {
+    Header("Continuing with", "Mods")
+    Column(
+        Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        val transition = rememberInfiniteTransition(label = "optimizing")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+            label = "spin",
+        )
+        OnboardingIcon(MAIN_MENU_ASSETS + "loading-02.svg", Accent, Modifier.size(40.dp).rotate(angle))
+        Spacer(Modifier.height(18.dp))
+        OnboardingText("Waiting to optimize game…", 16, Modifier.width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Medium)
+        Spacer(Modifier.height(6.dp))
+        OnboardingText(
+            "Measuring your frame rate to pick the best motion blur settings.",
+            13,
+            Modifier.width(460.dp),
+            TextSecondary,
+            FontWeight.Light,
+        )
+    }
 }
 
 @Composable
@@ -354,13 +411,31 @@ private fun SprintSection(y: Float, toggleSprint: Boolean, onToggleSprint: (Bool
 }
 
 @Composable
-private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> Unit) {
+private fun MotionBlurSection(
+    y: Float,
+    motionBlur: Int,
+    onMotionBlur: (Int) -> Unit,
+    performanceMode: Boolean,
+    onPerformanceMode: (Boolean) -> Unit,
+) {
     SectionLabel("Motion Blur", y)
-    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ChoiceButton("Performance", ONBOARDING_ASSETS + "flash-off.svg", performanceMode, 198f) { onPerformanceMode(true) }
+        ChoiceButton("Quality", "assets/polyplus/ico/stars.svg", !performanceMode, 198f) { onPerformanceMode(false) }
+    }
+
+    val displayStrength = if (performanceMode) 0 else motionBlur
+    Row(
+        Modifier.offset(232.dp, (y + BLUR_SLIDER_OFFSET).dp).alpha(if (performanceMode) 0.4f else 1f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         val thumbSize = 13.dp
         var trackWidthPx by remember { mutableStateOf(0f) }
         val progress by animateFloatAsState(
-            (motionBlur.toFloat() / MOTION_BLUR_MAX).coerceIn(0f, 1f),
+            (displayStrength.toFloat() / MOTION_BLUR_MAX).coerceIn(0f, 1f),
             animationSpec = spring(),
         )
         Box(
@@ -368,25 +443,28 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
                 .width(332.dp)
                 .height(13.dp)
                 .onSizeChanged { trackWidthPx = it.width.toFloat() }
-                .pointerInput(MOTION_BLUR_MAX) {
-                    val thumbPx = thumbSize.toPx()
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        fun update(x: Float) {
-                            val usableWidth = (trackWidthPx - thumbPx).coerceAtLeast(1f)
-                            val progress = ((x - thumbPx / 2f) / usableWidth).coerceIn(0f, 1f)
-                            onMotionBlur((progress * MOTION_BLUR_MAX).roundToInt())
+                .then(
+                    if (performanceMode) Modifier
+                    else Modifier.pointerInput(MOTION_BLUR_MAX) {
+                        val thumbPx = thumbSize.toPx()
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            fun update(x: Float) {
+                                val usableWidth = (trackWidthPx - thumbPx).coerceAtLeast(1f)
+                                val progress = ((x - thumbPx / 2f) / usableWidth).coerceIn(0f, 1f)
+                                onMotionBlur((progress * MOTION_BLUR_MAX).roundToInt())
+                            }
+                            update(down.position.x)
+                            down.consume()
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                update(change.position.x)
+                                change.consume()
+                            } while (change.pressed)
                         }
-                        update(down.position.x)
-                        down.consume()
-                        do {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            update(change.position.x)
-                            change.consume()
-                        } while (change.pressed)
-                    }
-                },
+                    },
+                ),
         ) {
             Box(
                 Modifier
@@ -413,9 +491,13 @@ private fun MotionBlurSection(y: Float, motionBlur: Int, onMotionBlur: (Int) -> 
             Modifier.width(64.dp).height(26.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
                 .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
             contentAlignment = Alignment.CenterStart,
-        ) { OnboardingText(motionBlur.toString(), 12, Modifier.padding(start = 8.dp)) }
+        ) { OnboardingText(displayStrength.toString(), 12, Modifier.padding(start = 8.dp)) }
     }
-    MotionBlurPreview(motionBlur, Modifier.offset(233.5.dp, (y + BLUR_PREVIEW_OFFSET).dp).size(413.dp, BLUR_PREVIEW_HEIGHT.dp))
+    MotionBlurPreview(
+        displayStrength,
+        Modifier.offset(233.5.dp, (y + BLUR_PREVIEW_OFFSET).dp).size(413.dp, BLUR_PREVIEW_HEIGHT.dp)
+            .alpha(if (performanceMode) 0.4f else 1f),
+    )
 }
 
 @Composable
@@ -469,6 +551,7 @@ private fun ChoiceButton(
     width: Float,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val contentColor = if (primary) Color.White else TextPrimary
@@ -476,6 +559,7 @@ private fun ChoiceButton(
         modifier
             .width(width.dp)
             .height(32.dp)
+            .alpha(if (enabled) 1f else 0.4f)
             .clip(ButtonShape)
             .background(
                 when {
@@ -485,7 +569,7 @@ private fun ChoiceButton(
                 },
             )
             .border(BorderWidth, if (selected || primary) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
-            .clickableWithSound(onClick),
+            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -557,13 +641,13 @@ private fun Checkerboard(modifier: Modifier) {
 }
 
 @Composable
-private fun BottomNavigation(page: Int, pageCount: Int, onSkip: () -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+private fun BottomNavigation(page: Int, pageCount: Int, onSkip: () -> Unit, onBack: () -> Unit, onNext: () -> Unit, nextEnabled: Boolean = true) {
     if (page == 0) {
         ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onSkip)
     } else {
         ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onBack)
     }
-    ChoiceButton(if (page == pageCount - 1) "Finish" else "Next", "assets/polyplus/ico/right-arrow.svg", false, 100f, Modifier.offset(754.dp, 604.dp), primary = true, onClick = onNext)
+    ChoiceButton(if (page == pageCount - 1) "Finish" else "Next", "assets/polyplus/ico/right-arrow.svg", false, 100f, Modifier.offset(754.dp, 604.dp), primary = true, enabled = nextEnabled, onClick = onNext)
     Row(Modifier.offset(((PANEL_WIDTH - (pageCount * 17f - 5f)) / 2f).dp, 614.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(pageCount) { index ->
             Box(
@@ -648,13 +732,15 @@ private const val PANEL_Y = 210f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MAX = 10
+private const val DEFAULT_QUALITY_BLUR = 3
 
 private const val CONTENT_TOP = 140f
 private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
 private const val LABEL_HEIGHT = 32f
 private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
-private const val BLUR_PREVIEW_OFFSET = 75f
+private const val BLUR_SLIDER_OFFSET = LABEL_HEIGHT + 32f + 16f // label, radio row, gap
+private const val BLUR_PREVIEW_OFFSET = BLUR_SLIDER_OFFSET + 26f + 17f // + slider row + gap
 private const val BLUR_PREVIEW_HEIGHT = 115f
 private const val BLUR_SECTION_HEIGHT = BLUR_PREVIEW_OFFSET + BLUR_PREVIEW_HEIGHT
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
