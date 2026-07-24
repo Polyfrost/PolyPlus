@@ -17,6 +17,9 @@ out
 build
 .gradle
 
+# stonecutter version nodes (run/test logs)
+versions/*/logs/
+
 # other
 eclipse
 run
