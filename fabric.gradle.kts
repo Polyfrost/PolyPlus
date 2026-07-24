@@ -111,6 +111,9 @@ dependencies {
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
+
+    testImplementation(libs.junit.jupiter)
+    catalogLib("fabric-loader-junit")?.let { testImplementation(it) }
 }
 
 run {
@@ -140,6 +143,10 @@ loomExt.runs.named("client") {
     // Dev: force the PolyPlus user badge onto every player's nametag + tab entry
     // so the render path can be tested solo without live backend presence.
     vmArg("-Dpolyplus.badge.debug=true")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<ProcessResources>().configureEach {

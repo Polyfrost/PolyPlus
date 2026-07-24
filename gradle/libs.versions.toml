@@ -8,6 +8,7 @@ mixin-extras = "0.5.0"
 mixin-squared = "0.3.7-beta.1"
 polymixin = "0.8.4+build.7"
 devauth = "1.2.2"
+junit = "6.1.2"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -25,6 +26,8 @@ mixin-squared = { module = "com.github.bawnorton.mixinsquared:mixinsquared-commo
 polymixin = { module = "org.polyfrost:polymixin", version.ref = "polymixin" }
 
 devauth-fabric = { module = "me.djtheredstoner:DevAuth-fabric", version.ref = "devauth" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 
 [bundles]
 ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation"]

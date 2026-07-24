@@ -116,6 +116,9 @@ dependencies {
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
+
+    testImplementation(libs.junit.jupiter)
+    catalogLib("fabric-loader-junit")?.let { testImplementation(it) }
 }
 
 run {
@@ -142,6 +145,10 @@ loomExt.runs.named("client") {
     ideConfigGenerated(true)
     client()
     runDir("../../run")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<ProcessResources>().configureEach {
