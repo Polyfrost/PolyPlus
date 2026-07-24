@@ -145,11 +145,6 @@ public abstract class ChatScreenEmojiMixin {
             graphics.drawString(font, EmojiRegistry.suggestionRow(polyplus$suggestions.get(i)), x + 3, rowY + 2, color);
         }
     }
-
-    @Inject(method = "keyPressed(III)Z", at = @At("HEAD"), cancellable = true)
-    private void polyplus$keyPressed(int key, int scan, int mods, CallbackInfoReturnable<Boolean> cir) {
-        if (polyplus$handleKey(key)) cir.setReturnValue(true);
-    }
     *///?} else {
     @Inject(method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V", at = @At("TAIL"))
     private void polyplus$renderEmoji(net.minecraft.client.gui.GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
@@ -170,7 +165,14 @@ public abstract class ChatScreenEmojiMixin {
             graphics.text(font, EmojiRegistry.suggestionRow(polyplus$suggestions.get(i)), x + 3, rowY + 2, color);
         }
     }
+    //?}
 
+    //? if < 1.21.10 {
+    /*@Inject(method = "keyPressed(III)Z", at = @At("HEAD"), cancellable = true)
+    private void polyplus$keyPressed(int key, int scan, int mods, CallbackInfoReturnable<Boolean> cir) {
+        if (polyplus$handleKey(key)) cir.setReturnValue(true);
+    }
+    *///?} else {
     @Inject(method = "keyPressed(Lnet/minecraft/client/input/KeyEvent;)Z", at = @At("HEAD"), cancellable = true)
     private void polyplus$keyPressed(net.minecraft.client.input.KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
         if (polyplus$handleKey(event.key())) cir.setReturnValue(true);

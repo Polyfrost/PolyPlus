@@ -15,7 +15,7 @@ public class Mixin_PanoramaBlurRadius {
     @ModifyExpressionValue(
         //? if >= 26.1 {
         method = "extractOptions",
-        //?} elif >= 1.21.11 {
+        //?} elif >= 1.21.8 {
         /*method = "render",
         *///?} else {
         /*method = "processBlurEffect",
