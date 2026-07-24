@@ -113,12 +113,16 @@ import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.host.E4mcSupport
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
+import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -425,6 +429,7 @@ private class MenuActions(
 )
 
 private const val ASSETS = "assets/polyplus/mainmenu/"
+private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 private val PageBackground = Color(0xFF11171C)
 private val PreviewGradient = Color(0xFF0F1C33)
@@ -1031,13 +1036,30 @@ private fun worldVersionLine(entry: HostWorldManager.HostWorldEntry): String =
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        IconButton(ASSETS + "moon-star.svg", assetsReady = assetsReady)
+        ThemeToggleButton(assetsReady)
         NotificationBell(assetsReady = assetsReady)
         if (!ClientPlatform.isMac) {
-            IconButton(ASSETS + "maximize-02.svg", assetsReady = assetsReady, onClick = actions.fullscreen)
+            IconButton(ASSETS + "maximize-02.svg", assetsReady = assetsReady, tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
         }
-        IconButton(ASSETS + "x-close.svg", background = CloseBackground, assetsReady = assetsReady, onClick = actions.quit)
+        IconButton(ASSETS + "x-close.svg", background = CloseBackground, assetsReady = assetsReady, tooltip = "Quit game", onClick = actions.quit)
     }
+}
+
+@Composable
+private fun ThemeToggleButton(assetsReady: Boolean) {
+    val themeName = LocalTheme.current.name
+    val light = themeName == PolyGlassLight.name || themeName == MinecraftLight.name
+    val minecraftStyle = themeName == MinecraftDark.name || themeName == MinecraftLight.name
+    IconButton(
+        icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
+        assetsReady = assetsReady,
+        tooltip = if (light) "Switch to dark theme" else "Switch to light theme",
+        onClick = {
+            PolyPlusConfig.onboardingLightTheme = !light
+            OnboardingFeatures.applyTheme(!light, if (minecraftStyle) 1 else 0)
+            PolyPlusConfig.save()
+        },
+    )
 }
 
 @Composable
@@ -1906,18 +1928,47 @@ private fun IconButton(
     background: Color = PanelBackground,
     assetsReady: Boolean,
     modifier: Modifier = Modifier,
+    tooltip: String? = null,
     onClick: () -> Unit = {},
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
     Box(
         modifier = modifier
             .size(45.dp)
+            .onSizeChanged { buttonSize = it }
             .clip(PanelShape)
             .background(background)
             .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .hoverable(interaction)
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
         MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
+        if (tooltip != null && hovered) {
+            Popup(
+                alignment = Alignment.TopEnd,
+                offset = IntOffset(0, buttonSize.height + 8),
+                properties = PopupProperties(focusable = false),
+            ) {
+                TooltipBubble(tooltip)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TooltipBubble(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(PanelShape)
+            .background(LocalTheme.current.popupBackground)
+            .border(BorderWidth, LocalTheme.current.borderColor, PanelShape)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        MenuText(text, fontSize = 13.sp, maxLines = 1)
     }
 }
 
@@ -1930,6 +1981,7 @@ private fun NotificationBell(assetsReady: Boolean) {
             ASSETS + "bell-01.svg",
             assetsReady = assetsReady,
             modifier = Modifier.onSizeChanged { bellSize = it },
+            tooltip = if (expanded) null else "Notifications",
             onClick = { expanded = !expanded },
         )
         if (expanded) {
