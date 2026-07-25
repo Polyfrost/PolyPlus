@@ -15,19 +15,23 @@ object OneLauncherAccounts {
     )
 
     fun list(): List<Account> {
+        SessionAccounts.capture()
         val store = LauncherAccountStore.load()
-        val defaultId = store.defaultUser?.let { LauncherAccountStore.parseUuid(it) }
+        val session = SessionAccounts.transientAccount(store)
+        val activeId = SessionAccounts.activeId?.let { LauncherAccountStore.parseUuid(it) }
+            ?: store.defaultUser?.let { LauncherAccountStore.parseUuid(it) }
             ?: store.users.keys.firstNotNullOfOrNull { LauncherAccountStore.parseUuid(it) }
 
-        return store.users.values.mapNotNull { stored ->
+        return (store.users.values + listOfNotNull(session)).mapNotNull { stored ->
             val id = LauncherAccountStore.parseUuid(stored.id) ?: return@mapNotNull null
             val microsoft = stored.kind.equals("microsoft", ignoreCase = true)
             Account(
                 id = id,
                 username = stored.username,
                 microsoft = microsoft,
-                active = id == defaultId,
-                expired = microsoft && isExpired(stored.expires),
+                active = id == activeId,
+                // The launch account has no refresh token, so it can never be refreshed.
+                expired = microsoft && stored !== session && isExpired(stored.expires),
             )
         }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })
     }
@@ -38,21 +42,29 @@ object OneLauncherAccounts {
     }
 
     fun switchTo(id: UUID): Boolean {
+        SessionAccounts.capture()
         val store = LauncherAccountStore.load()
         val stored = store.users[id.toString()]
             ?: store.users.values.firstOrNull { LauncherAccountStore.parseUuid(it.id) == id }
+            ?: SessionAccounts.find(id)?.let { session ->
+                if (!AccountSwitch.apply(session)) return false
+                SessionAccounts.markActive(session.id)
+                return true
+            }
             ?: run {
                 LOGGER.warn("Cannot switch: account {} not in store", id)
                 return false
             }
         if (!AccountSwitch.apply(stored)) return false
+        SessionAccounts.markActive(stored.id)
         LauncherAccountStore.save(store.copy(defaultUser = stored.id))
         return true
     }
 
     fun remove(id: UUID): Boolean {
         val store = LauncherAccountStore.load()
-        val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id } ?: return false
+        val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id }
+            ?: return SessionAccounts.dismiss(id)
         val users = store.users.toMutableMap().apply { remove(key) }
         val default = if (store.defaultUser == key) users.keys.firstOrNull() else store.defaultUser
         LauncherAccountStore.save(store.copy(users = users, defaultUser = default))
@@ -84,7 +96,8 @@ object OneLauncherAccounts {
         val users = current.users.toMutableMap().apply { put(key, refreshed) }
         LauncherAccountStore.save(current.copy(users = users))
 
-        val isDefault = current.defaultUser == key
+        val isDefault = SessionAccounts.activeId?.let { LauncherAccountStore.parseUuid(it) == id }
+            ?: (current.defaultUser == key)
         if (isDefault) AccountSwitch.apply(refreshed)
         return refreshed.toAccount(active = isDefault)
     }
@@ -92,15 +105,19 @@ object OneLauncherAccounts {
     fun addOffline(rawUsername: String): Account {
         val username = rawUsername.trim()
         val store = LauncherAccountStore.load()
+        val session = SessionAccounts.transientAccount(store)
 
-        require(LauncherAccountStore.hasMicrosoftAccount(store)) {
+        require(
+            LauncherAccountStore.hasMicrosoftAccount(store) ||
+                session?.kind.equals("microsoft", ignoreCase = true)
+        ) {
             "Add a Microsoft account before creating offline accounts"
         }
         require(username.length in 3..16) { "Username must be 3-16 characters" }
         require(username.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }) {
             "Username may only contain letters, digits, and underscores"
         }
-        require(store.users.values.none { it.username.equals(username, ignoreCase = true) }) {
+        require((store.users.values + listOfNotNull(session)).none { it.username.equals(username, ignoreCase = true) }) {
             "An account named $username already exists"
         }
 

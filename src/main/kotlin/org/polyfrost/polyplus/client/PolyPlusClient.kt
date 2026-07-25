@@ -26,6 +26,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
@@ -93,6 +94,8 @@ object PolyPlusClient {
                 }
             }
         }
+
+        SessionAccounts.capture()
 
         refreshCosmetics()
         PolyPlusCommands.register()
