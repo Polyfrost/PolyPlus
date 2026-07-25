@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
@@ -1841,7 +1842,6 @@ private fun OrDivider() {
 
 @Composable
 private fun LoadingSpinner(modifier: Modifier) {
-    // OneClient's Loading02 spoke icon (static, like OneClient).
     MenuIcon(ASSETS + "loading-02.svg", Accent, modifier, assetsReady = true)
 }
 
@@ -1934,10 +1934,12 @@ private fun IconButton(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var buttonSize by remember { mutableStateOf(IntSize.Zero) }
+    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
     Box(
         modifier = modifier
             .size(45.dp)
             .onSizeChanged { buttonSize = it }
+            .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
             .clip(PanelShape)
             .background(background)
             .border(BorderWidth, PanelBorderBrush, PanelShape)
@@ -1946,13 +1948,31 @@ private fun IconButton(
         contentAlignment = Alignment.Center,
     ) {
         MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
-        if (tooltip != null && hovered) {
+        if (tooltip != null && hovered && buttonSize.width > 0) {
+            val totalScale = buttonBounds.width / buttonSize.width
+            val positionProvider = remember(buttonBounds, totalScale) {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val gap = (8f * totalScale).roundToInt()
+                        return IntOffset(
+                            (buttonBounds.right - popupContentSize.width).roundToInt(),
+                            (buttonBounds.bottom + gap).roundToInt(),
+                        )
+                    }
+                }
+            }
             Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, buttonSize.height + 8),
-                properties = PopupProperties(focusable = false),
+                popupPositionProvider = positionProvider,
+                properties = PopupProperties(focusable = false, clippingEnabled = false),
             ) {
-                TooltipBubble(tooltip)
+                Box(Modifier.guiScaled(totalScale, TransformOrigin(1f, 0f))) {
+                    TooltipBubble(tooltip)
+                }
             }
         }
     }
