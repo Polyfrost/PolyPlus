@@ -28,6 +28,9 @@ import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
+import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
+import org.polyfrost.polyplus.client.privacy.PrivacyGate
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -67,12 +70,15 @@ object PolyPlusClient {
         install(WebSockets) {
             pingIntervalMillis = 15_000
         }
+
+        install(PrivacyGate)
     }
 
     fun initialize() {
         PolyPlusSentry.initialize()
         SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() }
         PolyPlusConfig.preload()
+        PrivacyEnforcement.syncConfig()
         DefaultSettings.initialize()
         OnboardingFeatures.initialize()
         org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize()
@@ -105,6 +111,7 @@ object PolyPlusClient {
 
     /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */
     fun refresh() {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         LOGGER.info("Refreshing PolyPlus Client...")
 
         SCOPE.launch {
@@ -121,6 +128,7 @@ object PolyPlusClient {
 
     /** Fetches catalog + player cosmetics and applies active loadout (no auth/cache wipe). */
     fun refreshCosmetics() {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
             return
         }
@@ -136,6 +144,7 @@ object PolyPlusClient {
 
     /** Loads cosmetics when the locker is empty but the player is in a world (e.g. command before join refresh finishes). */
     fun refreshCosmeticsIfNeeded() {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         if (CosmeticCatalog.ownedIds().isNotEmpty() || CosmeticCatalog.allDefinitions().isNotEmpty()) {
             return
         }

@@ -13,6 +13,8 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
+import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -29,6 +31,10 @@ object PolyAuthorization {
     private var currentJob: Deferred<AuthResponse>? = null
 
     suspend fun current(): String {
+        if (!PrivacyConsent.allowsOnlineServices()) {
+            throw OnlineServicesDisabledException("${PolyPlusConfig.apiUrl}/account/login")
+        }
+
         val token = LOCK.withLock {
             cachedResponse?.token?.takeIf { System.currentTimeMillis() < cachedExpiresAtMs }
         }

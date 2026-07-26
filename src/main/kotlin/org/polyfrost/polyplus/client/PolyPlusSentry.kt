@@ -11,6 +11,7 @@ import io.sentry.Sentry
 import io.sentry.protocol.SentryId
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,6 +25,7 @@ object PolyPlusSentry {
     private val seen: MutableSet<Throwable> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
 
     fun initialize() {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         if (!started.compareAndSet(false, true)) return
 
         val dev = FabricLoader.getInstance().isDevelopmentEnvironment
@@ -49,6 +51,11 @@ object PolyPlusSentry {
         }
 
         installRuntimeContext(minecraftVersion)
+    }
+
+    fun shutdown() {
+        if (!started.compareAndSet(true, false)) return
+        runCatching { Sentry.close() }
     }
 
     private fun installRuntimeContext(minecraftVersion: String) {
@@ -96,6 +103,7 @@ object PolyPlusSentry {
 
     @JvmStatic
     fun capture(throwable: Throwable) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         if (isTransientNetworkFailure(throwable)) return
         if (!seen.add(throwable)) return
@@ -232,12 +240,14 @@ object PolyPlusSentry {
 
     @JvmStatic
     fun captureMessage(message: String) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         Sentry.captureMessage(message, io.sentry.SentryLevel.ERROR)
     }
 
     @JvmStatic
     fun captureFatal(throwable: Throwable) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         if (!Sentry.isEnabled()) return
         if (!seen.add(throwable)) return

@@ -112,6 +112,7 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -272,6 +273,10 @@ private data class CosmeticUiItem(
 
 @Composable
 private fun PolyPlusCosmeticsScreen() {
+    if (!PrivacyConsent.allowsOnlineServices()) {
+        OnlineFeaturesDisabled()
+        return
+    }
     var tab by remember { mutableStateOf(PolyPlusTab.Wardrobe) }
     var showCart by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
@@ -2403,6 +2408,31 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
             CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
         }
         PlayerPreviewSource.Override(equipment)
+    }
+}
+
+@Composable
+private fun OnlineFeaturesDisabled() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+    ) {
+        GuiText(
+            "Cosmetics are unavailable",
+            LocalTheme.current.textColor,
+            16.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+        GuiText(
+            "The Terms of Service and Privacy Policy were declined, so PolyPlus does not contact its " +
+                "servers. Accept them under Privacy in the PolyPlus settings to use cosmetics.",
+            LocalTheme.current.textColorSecondary,
+            13.sp,
+            modifier = Modifier.width(420.dp),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

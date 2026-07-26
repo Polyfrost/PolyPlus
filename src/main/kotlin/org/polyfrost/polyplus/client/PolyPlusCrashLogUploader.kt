@@ -7,6 +7,7 @@ import io.sentry.SentryEvent
 import io.sentry.SentryLevel
 import io.sentry.protocol.Message
 import net.fabricmc.loader.api.FabricLoader
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -43,6 +44,7 @@ object PolyPlusCrashLogUploader {
     }
 
     fun uploadPending() {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         if (!ran.compareAndSet(false, true)) return
         runCatching { scanAndUpload() }
     }

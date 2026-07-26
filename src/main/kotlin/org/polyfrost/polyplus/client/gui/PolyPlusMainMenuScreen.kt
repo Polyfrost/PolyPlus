@@ -128,6 +128,7 @@ import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -690,7 +691,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         // if (!PolyPlusConfig.hideMainMenuSocial) {
         //     PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
         // }
-        if (!PolyPlusConfig.hideMainMenuCosmetics) {
+        if (!PolyPlusConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
             PillButton(
                 "Cosmetics",
                 ASSETS + "diamond-01.svg",

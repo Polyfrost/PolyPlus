@@ -179,12 +179,24 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     )
     var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
 
+    @JvmStatic
+    @Switch(
+        title = "Accept Terms of Service & Privacy Policy",
+        description = "Required for crash reporting and online features (cosmetics, client indicator, etc.). ",
+        category = "Privacy",
+    )
+    var acceptedLegalTerms = true
+
     @Dropdown(title = "API URL", description = "The URL used for the PolyPlus API. Only change if you know what you're doing.")
     var apiUrl: BackendUrl = BackendUrl.PRODUCTION
 
     init {
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
+        }
+
+        addCallback("acceptedLegalTerms") {
+            org.polyfrost.polyplus.client.privacy.PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
         }
 
         addCallback("apiUrl") {

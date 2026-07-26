@@ -20,6 +20,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.events.WebSocketMessage
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
@@ -47,6 +48,14 @@ object PolyConnection {
         start() // Just cold start and set up
     }
 
+    fun applyConsent() {
+        if (PrivacyConsent.allowsOnlineServices()) {
+            if (job == null) start()
+        } else {
+            close()
+        }
+    }
+
     /**
      * Reconnects the WebSocket connection. Best for when the connection is lost, or we'd like to switch servers.
      */
@@ -63,6 +72,10 @@ object PolyConnection {
     }
 
     fun sendMessage(message: String): Result<Unit> {
+        if (!PrivacyConsent.allowsOnlineServices()) {
+            return Result.failure(IllegalStateException("PolyPlus online features are disabled"))
+        }
+
         if (session == null) {
             return Result.failure(IllegalStateException("WebSocket is not connected"))
         }
@@ -84,6 +97,11 @@ object PolyConnection {
     }
 
     private fun start() {
+        if (!PrivacyConsent.allowsOnlineServices()) {
+            LOGGER.info("PolyPlus WebSocket disabled: the Terms of Service and Privacy Policy were not accepted.")
+            return
+        }
+
         closing = false
         job = PolyPlusClient.SCOPE.launch {
             var attempt = 0

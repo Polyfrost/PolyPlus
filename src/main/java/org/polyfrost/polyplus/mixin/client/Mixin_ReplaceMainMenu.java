@@ -5,7 +5,9 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen;
+import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -22,13 +24,18 @@ public class Mixin_ReplaceMainMenu {
         /*if (mc.gui.screen() instanceof PolyPlusMainMenuScreen || mc.gui.screen() instanceof PolyPlusOnboardingScreen) {
             return;
         }
-        mc.gui.setScreen(PolyPlusConfig.getOnboardingCompleted() ? new PolyPlusMainMenuScreen() : new PolyPlusOnboardingScreen());
+        mc.gui.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
         *///?} else {
         if (mc.screen instanceof PolyPlusMainMenuScreen || mc.screen instanceof PolyPlusOnboardingScreen) {
             return;
         }
-        mc.setScreen(PolyPlusConfig.getOnboardingCompleted() ? new PolyPlusMainMenuScreen() : new PolyPlusOnboardingScreen());
+        mc.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
         //?}
         ci.cancel();
+    }
+
+    @Unique
+    private static boolean polyplus$needsOnboarding() {
+        return !PolyPlusConfig.getOnboardingCompleted() || PrivacyConsent.needsPrompt();
     }
 }
