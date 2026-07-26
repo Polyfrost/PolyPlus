@@ -68,6 +68,9 @@ repositories {
     maven("https://maven.parchmentmc.org") {
         content { includeGroupAndSubgroups("org.parchmentmc") }
     }
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
+    }
     maven("https://redirector.kotlinlang.org/maven/compose-dev")
     maven("https://nexus.prsm.wtf/repository/maven-public/maven-repo/releases/")
     maven("https://repo.hypixel.net/repository/Hypixel/") {
@@ -107,6 +110,8 @@ dependencies {
 
     catalogBundle("fabric-api")?.let { modImplementation(it) { isTransitive = true } }
     catalogLib("fabric-loader")?.let { modImplementation(it) { isTransitive = true } }
+
+    catalogLib("sodium")?.let { modCompileOnly(it) { isTransitive = false } }
 
     modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {

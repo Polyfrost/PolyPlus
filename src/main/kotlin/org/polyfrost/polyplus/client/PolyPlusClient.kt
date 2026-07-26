@@ -70,6 +70,7 @@ object PolyPlusClient {
 
     fun initialize() {
         PolyPlusSentry.initialize()
+        SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() }
         PolyPlusConfig.preload()
         DefaultSettings.initialize()
         OnboardingFeatures.initialize()

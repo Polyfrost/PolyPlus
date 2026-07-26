@@ -9,6 +9,9 @@
     ],
     "environment": "client",
     "entrypoints": {
+        "preLaunch": [
+            "org.polyfrost.polyplus.PolyPlusPreLaunch"
+        ],
         "client": [
             "org.polyfrost.polyplus.PolyPlusEntrypoint"
         ]

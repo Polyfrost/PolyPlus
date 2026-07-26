@@ -65,6 +65,9 @@ repositories {
     maven("https://maven.bawnorton.com/releases") {
         content { includeGroup("com.github.bawnorton.mixinsquared") }
     }
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
+    }
     maven("https://redirector.kotlinlang.org/maven/compose-dev")
     maven("https://nexus.prsm.wtf/repository/maven-public/maven-repo/releases/")
     maven("https://central.sonatype.com/repository/maven-snapshots") {
@@ -102,6 +105,8 @@ dependencies {
 
     catalogBundle("fabric-api")?.let { implementation(it) { isTransitive = true } }
     catalogLib("fabric-loader")?.let { implementation(it) { isTransitive = true } }
+
+    catalogLib("sodium")?.let { compileOnly(it) { isTransitive = false } }
 
     implementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {

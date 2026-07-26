@@ -80,6 +80,10 @@
   ,
     "client.Mixin_HostWorldButtonLabel"
     //?}
+    //? if >= 1.21.11 {
+  ,
+    "client.sodium.Mixin_SodiumViewBobbing"
+    //?}
   ],
   "verbose": true
 }

@@ -6,7 +6,9 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
+import io.sentry.Attachment
 import io.sentry.Sentry
+import io.sentry.protocol.SentryId
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import java.util.Collections
@@ -38,9 +40,56 @@ object PolyPlusSentry {
             options.setTag("minecraft", minecraftVersion)
             // Verbose SDK logging only in dev.
             options.isDebug = dev
+            options.isEnableUncaughtExceptionHandler = true
+            options.isAttachStacktrace = true
             options.setBeforeSend { event, _ ->
                 val t = event.throwable
                 if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t))) null else event
+            }
+        }
+
+        installRuntimeContext(minecraftVersion)
+    }
+
+    private fun installRuntimeContext(minecraftVersion: String) {
+        runCatching {
+            val loader = FabricLoader.getInstance()
+            val mods = loader.allMods
+                .map { "${it.metadata.id}@${it.metadata.version.friendlyString}" }
+                .sorted()
+
+            val loaderVersion = loader.getModContainer("fabricloader")
+                .map { it.metadata.version.friendlyString }
+                .orElse("unknown")
+
+            val runtime = Runtime.getRuntime()
+
+            Sentry.configureScope { scope ->
+                scope.setTag("loader", loaderVersion)
+                scope.setTag("java", System.getProperty("java.version") ?: "unknown")
+                scope.setTag("os", System.getProperty("os.name") ?: "unknown")
+                scope.setContexts(
+                    "polyplus_runtime",
+                    mapOf(
+                        "minecraft" to minecraftVersion,
+                        "polyplus" to PolyPlusConstants.VERSION,
+                        "fabric_loader" to loaderVersion,
+                        "mod_count" to mods.size,
+                        "java_version" to (System.getProperty("java.version") ?: "unknown"),
+                        "java_vendor" to (System.getProperty("java.vendor") ?: "unknown"),
+                        "os_name" to (System.getProperty("os.name") ?: "unknown"),
+                        "os_version" to (System.getProperty("os.version") ?: "unknown"),
+                        "os_arch" to (System.getProperty("os.arch") ?: "unknown"),
+                        "max_memory_mb" to runtime.maxMemory() / (1024L * 1024L),
+                    ),
+                )
+                scope.addAttachment(
+                    Attachment(
+                        mods.joinToString("\n").toByteArray(Charsets.UTF_8),
+                        "modlist.txt",
+                        "text/plain",
+                    ),
+                )
             }
         }
     }
@@ -192,7 +241,8 @@ object PolyPlusSentry {
         initialize()
         if (!Sentry.isEnabled()) return
         if (!seen.add(throwable)) return
-        Sentry.captureException(throwable)
+        val id = Sentry.captureException(throwable) { scope -> scope.setTag("mechanism", "crash_report") }
+        if (id != SentryId.EMPTY_ID) PolyPlusCrashLogUploader.recordLiveCapture(throwable)
         Sentry.flush(5_000)
     }
 }

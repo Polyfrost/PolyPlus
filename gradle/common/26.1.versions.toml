@@ -1,2 +1,6 @@
 [versions]
 minecraft = "26.1"
+sodium = "mc26.1.2-0.9.1-fabric"
+
+[libraries]
+sodium = { module = "maven.modrinth:sodium", version.ref = "sodium" }

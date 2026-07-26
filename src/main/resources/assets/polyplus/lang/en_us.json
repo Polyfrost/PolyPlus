@@ -1,3 +1,4 @@
 {
-  "polyplus.hostWorld": "Host World"
+  "polyplus.hostWorld": "Host World",
+  "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this."
 }
