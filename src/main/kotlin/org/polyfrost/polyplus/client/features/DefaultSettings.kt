@@ -49,7 +49,7 @@ object DefaultSettings {
             AnimatiumOption("itemPositions", value = true),
             AnimatiumOption("itemPositionsInThirdPerson", value = true),
             AnimatiumOption("itemUsageSwinging", value = true),
-            AnimatiumOption("disableSwingOnUse", value = true),
+            AnimatiumOption("disableSwingOnUse", value = false),
             AnimatiumOption("itemPickupPosition", value = true),
             AnimatiumOption("fishingRodVersion", value = "V1_7"),
         ),
@@ -58,6 +58,13 @@ object DefaultSettings {
             AnimatiumOption("damageTintArmor", "entityArmorHurtTint", value = true),
         ),
     )
+
+    private val ANIMATIUM_FIXUPS = mapOf(
+        "items" to listOf(
+            AnimatiumOption("disableSwingOnUse", value = false),
+        ),
+    )
+
     private const val BETTER_SCREENS_CONFIG = "dev.microcontrollers.betterscreens.config.BetterScreensConfig"
     private const val CONFIRM_DISCONNECT_CONFIG = "dev.microcontrollers.confirmdisconnect.config.ConfirmDisconnectConfig"
     private const val CONTROLIFY_MOD = "dev.isxander.controlify.Controlify"
@@ -67,6 +74,7 @@ object DefaultSettings {
         val label: String,
         val isPresent: () -> Boolean,
         val apply: () -> Unit,
+        val coveredByLegacyFlag: Boolean = true,
     )
 
     private val INIT_TASKS = listOf(
@@ -118,6 +126,15 @@ object DefaultSettings {
         )
         add(
             Task(
+                id = "animatium-swing-on-use",
+                label = "Animatium",
+                isPresent = { findClass(ANIMATIUM_CONFIG) != null },
+                apply = ::applyAnimatiumFixups,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
                 id = "animatium-packs",
                 label = "Animatium resource packs",
                 isPresent = { findClass(ANIMATIUM_CONFIG) != null },
@@ -153,7 +170,7 @@ object DefaultSettings {
     private fun migrateLegacyFlag() {
         if (!PolyPlusConfig.defaultSettingsApplied) return
         (INIT_TASKS + TICK_TASKS).forEach { task ->
-            if (isPresent(task)) applied += task.id
+            if (task.coveredByLegacyFlag && isPresent(task)) applied += task.id
         }
         PolyPlusConfig.defaultSettingsApplied = false
         persist()
@@ -280,19 +297,32 @@ object DefaultSettings {
         val configClass = findClass(ANIMATIUM_CONFIG) ?: error("$ANIMATIUM_CONFIG is missing")
         val instance = configClass.getMethod("instance").invoke(null)
         applyAnimatiumPreset(configClass, instance)
+        applyAnimatiumOverrides(instance, ANIMATIUM_OVERRIDES)
 
-        ANIMATIUM_OVERRIDES.forEach { (name, overrides) ->
+        configClass.getMethod("save").invoke(null)
+        reloadAnimatium()
+        logger.info("Applied the Animatium {} preset with PolyPlus overrides", ANIMATIUM_PRESET)
+    }
+
+    private fun applyAnimatiumFixups() {
+        val configClass = findClass(ANIMATIUM_CONFIG) ?: error("$ANIMATIUM_CONFIG is missing")
+        val instance = configClass.getMethod("instance").invoke(null)
+        applyAnimatiumOverrides(instance, ANIMATIUM_FIXUPS)
+
+        configClass.getMethod("save").invoke(null)
+        reloadAnimatium()
+        logger.info("Corrected outdated Animatium PolyPlus overrides")
+    }
+
+    private fun applyAnimatiumOverrides(instance: Any, overrides: Map<String, List<AnimatiumOption>>) {
+        overrides.forEach { (name, options) ->
             val category = runCatching { instance.javaClass.getField(name).get(instance) }.getOrNull()
             if (category == null) {
                 logger.warn("Animatium has no config category '{}', skipping", name)
                 return@forEach
             }
-            overrides.forEach { option -> setAnimatiumField(category, option) }
+            options.forEach { option -> setAnimatiumField(category, option) }
         }
-
-        configClass.getMethod("save").invoke(null)
-        reloadAnimatium()
-        logger.info("Applied the Animatium {} preset with PolyPlus overrides", ANIMATIUM_PRESET)
     }
 
     private fun applyAnimatiumPreset(configClass: Class<*>, config: Any) {
