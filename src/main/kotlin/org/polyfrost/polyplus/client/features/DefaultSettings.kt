@@ -9,6 +9,10 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readLines
+import kotlin.io.path.writeText
 
 object DefaultSettings {
     private val logger = LogManager.getLogger("PolyPlus/DefaultSettings")
@@ -50,6 +54,13 @@ object DefaultSettings {
     private const val BETTER_SCREENS_ID = "betterscreens"
     private const val CONFIRM_DISCONNECT_ID = "confirmdisconnect"
     private const val CONTROLIFY_ID = "controlify"
+    private const val BOBBY_ID = "bobby"
+
+    private const val BOBBY_CONFIG_FILE = "bobby.conf"
+    private const val BOBBY_DYNAMIC_MULTI_WORLD = "dynamic-multi-world"
+
+    private val BOBBY_DYNAMIC_MULTI_WORLD_LINE =
+        Regex("""^(\s*)"?$BOBBY_DYNAMIC_MULTI_WORLD"?\s*([=:])\s*.*$""")
 
     private class AnimatiumOption(vararg val names: String, val value: Any)
 
@@ -144,6 +155,16 @@ object DefaultSettings {
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumFixups,
                 coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
+                id = "bobby-dynamic-multi-world",
+                label = "Bobby",
+                isPresent = { modLoaded(BOBBY_ID) && bobbyConfigPath().exists() },
+                apply = ::applyBobbyConfig,
+                coveredByLegacyFlag = false,
+                retryable = true,
             ),
         )
         add(
@@ -313,6 +334,23 @@ object DefaultSettings {
         globalSettings.javaClass.getField("alwaysKeyboardMovement").setBoolean(globalSettings, true)
         config.javaClass.getMethod("save").invoke(config)
         logger.info("Enabled Controlify keyboard-like movement")
+    }
+
+    private fun bobbyConfigPath(): Path =
+        FabricLoader.getInstance().configDir.resolve(BOBBY_CONFIG_FILE)
+
+    private fun applyBobbyConfig() {
+        val path = bobbyConfigPath()
+        var found = false
+        val lines = path.readLines().map { line ->
+            val match = BOBBY_DYNAMIC_MULTI_WORLD_LINE.matchEntire(line) ?: return@map line
+            found = true
+            "${match.groupValues[1]}$BOBBY_DYNAMIC_MULTI_WORLD${match.groupValues[2]}true"
+        }
+        val updated = if (found) lines else lines + "$BOBBY_DYNAMIC_MULTI_WORLD=true"
+
+        path.writeText(updated.joinToString("\n", postfix = "\n"))
+        logger.info("Enabled Bobby dynamic multi-world")
     }
 
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
