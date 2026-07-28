@@ -278,6 +278,7 @@ private fun PolyPlusCosmeticsScreen() {
         return
     }
     var tab by remember { mutableStateOf(PolyPlusTab.Wardrobe) }
+    var tabResolved by remember { mutableStateOf(false) }
     var showCart by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -292,6 +293,14 @@ private fun PolyPlusCosmeticsScreen() {
     var auraColor by remember { mutableStateOf(CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())) }
     LaunchedEffect(refreshKey) {
         auraColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
+    }
+
+    LaunchedEffect(allItems, tabResolved) {
+        if (tabResolved || allItems.isEmpty()) return@LaunchedEffect
+        if (allItems.none { it.owned }) {
+            tab = PolyPlusTab.Store
+        }
+        tabResolved = true
     }
 
     LaunchedEffect(Unit) {
@@ -326,24 +335,29 @@ private fun PolyPlusCosmeticsScreen() {
             cartSize = cart.size,
             onWardrobe = {
                 tab = PolyPlusTab.Wardrobe
+                tabResolved = true
                 status = null
             },
             onStore = {
                 tab = PolyPlusTab.Store
+                tabResolved = true
                 showCart = false
                 status = null
             },
             onBundles = {
                 tab = PolyPlusTab.Bundles
+                tabResolved = true
                 showCart = false
                 status = null
             },
             onHistory = {
                 tab = PolyPlusTab.History
+                tabResolved = true
                 status = null
             },
             onCart = {
                 tab = PolyPlusTab.Store
+                tabResolved = true
                 showCart = true
             },
             onRefresh = {
