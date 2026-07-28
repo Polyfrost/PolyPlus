@@ -13,6 +13,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,13 +30,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +67,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.skia.Matrix33
@@ -143,6 +147,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
         var page by remember { mutableIntStateOf(0) }
         var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
+        var termsAccepted by remember { mutableStateOf(false) }
         var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
@@ -205,7 +210,20 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
                 val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
                     guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
-                CompositionLocalProvider(LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f))) {
+                val compact = pages[page] == OnboardingPage.TERMS
+                val panelWidth by animateFloatAsState(
+                    if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
+                    animationSpec = spring(),
+                )
+                val panelHeight by animateFloatAsState(
+                    if (compact) TERMS_PANEL_HEIGHT else PANEL_HEIGHT,
+                    animationSpec = spring(),
+                )
+                CompositionLocalProvider(
+                    LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
+                    LocalPanelWidth provides panelWidth,
+                    LocalPanelHeight provides panelHeight,
+                ) {
                     Box(
                         Modifier
                             .align(Alignment.Center)
@@ -218,8 +236,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     ) {
                         Box(
                             Modifier
-                                .offset(PANEL_X.dp, PANEL_Y.dp)
-                                .size(PANEL_WIDTH.dp, PANEL_HEIGHT.dp)
+                                .offset(((DESIGN_WIDTH - panelWidth) / 2f).dp, ((DESIGN_HEIGHT - panelHeight) / 2f).dp)
+                                .size(panelWidth.dp, panelHeight.dp)
                                 .shadow(
                                     elevation = 29.dp,
                                     shape = PANEL_SHAPE,
@@ -232,7 +250,12 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         ) {
                             when (pages[page]) {
                                 OnboardingPage.TERMS ->
-                                    TermsPage(legalDocument) { legalDocument = it }
+                                    TermsPage(
+                                        legalDocument,
+                                        termsAccepted,
+                                        { termsAccepted = it },
+                                        { legalDocument = it },
+                                    )
                                 OnboardingPage.LOOK_AND_FEEL ->
                                     LookAndFeelPage(
                                         lightTheme, { lightTheme = it },
@@ -271,10 +294,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 onSkip = finish,
                                 onBack = { page-- },
                                 onNext = if (terms) ({ answerTerms(true) }) else advance,
-                                nextEnabled = !waitingForOptimization,
+                                nextEnabled = !waitingForOptimization && (!terms || termsAccepted),
                                 allowSkip = !terms,
                                 nextLabel = if (terms) "Agree" else null,
-                                secondaryLabel = if (terms) "Disagree, continue without features" else null,
+                                secondaryLabel = if (terms) "Decline" else null,
                                 onSecondary = { answerTerms(false) },
                             )
                         }
@@ -573,8 +596,9 @@ private fun DonePage() {
 
 @Composable
 private fun Header(kicker: String, title: String) {
-    OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Normal)
-    OnboardingText(title, 32, Modifier.offset(0.dp, 66.dp).width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Normal)
+    val width = LocalPanelWidth.current
+    OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(width.dp), TextPrimary, FontWeight.Normal)
+    OnboardingText(title, 32, Modifier.offset(0.dp, 66.dp).width(width.dp), TextPrimary, FontWeight.Normal)
 }
 
 @Composable
@@ -692,33 +716,50 @@ private fun BottomNavigation(
     secondaryLabel: String? = null,
     onSecondary: () -> Unit = {},
 ) {
+    val panelWidth = LocalPanelWidth.current
+    val buttonY = LocalPanelHeight.current - NAV_BOTTOM_INSET
+    val nextX = panelWidth - 26f - 100f
     if (page == 0) {
         if (allowSkip) {
-            ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onSkip)
+            ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, buttonY.dp), onClick = onSkip)
         }
     } else {
-        ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, 604.dp), onClick = onBack)
+        ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, buttonY.dp), onClick = onBack)
     }
     if (secondaryLabel != null) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val hovered by interactionSource.collectIsHoveredAsState()
         Box(
             Modifier
-                .offset((754f - SECONDARY_ACTION_WIDTH - 14f).dp, 604.dp)
-                .size(SECONDARY_ACTION_WIDTH.dp, 32.dp)
-                .clickableWithSound(onSecondary),
+                .offset((nextX - SECONDARY_ACTION_WIDTH - 14f).dp, buttonY.dp)
+                .size(SECONDARY_ACTION_WIDTH.dp, 32.dp),
             contentAlignment = Alignment.CenterEnd,
-        ) { OnboardingText(secondaryLabel, 13, color = TextSecondary, weight = FontWeight.Light, align = TextAlign.End) }
+        ) {
+            OnboardingText(
+                secondaryLabel,
+                13,
+                Modifier.hoverable(interactionSource).clickableTextWithSound(onSecondary),
+                color = if (hovered) TextPrimary else TextSecondary,
+                weight = FontWeight.Light,
+                align = TextAlign.End,
+            )
+        }
     }
     ChoiceButton(
         nextLabel ?: if (page == pageCount - 1) "Finish" else "Next",
         "assets/polyplus/ico/right-arrow.svg",
         false,
         100f,
-        Modifier.offset(754.dp, 604.dp),
+        Modifier.offset(nextX.dp, buttonY.dp),
         primary = true,
         enabled = nextEnabled,
         onClick = onNext,
     )
-    Row(Modifier.offset(((PANEL_WIDTH - (pageCount * 17f - 5f)) / 2f).dp, 614.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.offset(((panelWidth - (pageCount * 17f - 5f)) / 2f).dp, (buttonY + 10f).dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         repeat(pageCount) { index ->
             Box(
                 Modifier.size(if (index == page) 12.dp else 10.dp)
@@ -795,191 +836,103 @@ private fun loadOnboardingImage(path: String): SkiaImage? = runCatching {
 @Composable
 private fun TermsPage(
     document: LegalDocument?,
+    accepted: Boolean,
+    onAccepted: (Boolean) -> Unit,
     onDocument: (LegalDocument) -> Unit,
 ) {
-    var loading by remember { mutableStateOf(document == null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var attempt by remember { mutableIntStateOf(0) }
-    var privacyTab by remember { mutableStateOf(false) }
-
-    LaunchedEffect(attempt) {
-        if (document != null) {
-            loading = false
-            return@LaunchedEffect
-        }
-        loading = true
-        LegalDocuments.load()
-            .onSuccess { onDocument(it); error = null }
-            .onFailure { error = it.message?.takeIf { message -> message.isNotBlank() } ?: it.javaClass.simpleName }
-        loading = false
+    LaunchedEffect(Unit) {
+        if (document == null) LegalDocuments.load().onSuccess(onDocument)
     }
 
-    Header("Before we begin", "Terms & Privacy")
-    OnboardingText(
-        "Please read and accept these before continuing.",
-        14,
-        Modifier.offset(0.dp, 106.dp).width(PANEL_WIDTH.dp),
-        TextSecondary,
-        FontWeight.Light,
-    )
-
-    val privacyBody = document?.privacyBody
-    val hasTabs = privacyBody != null
-    if (hasTabs) {
-        Row(
-            Modifier.offset(((PANEL_WIDTH - TERMS_TABS_WIDTH) / 2f).dp, TERMS_TABS_Y.dp),
-            horizontalArrangement = Arrangement.spacedBy(TERMS_TAB_GAP.dp),
-        ) {
-            TermsTab("Terms", !privacyTab) { privacyTab = false }
-            TermsTab("Privacy", privacyTab) { privacyTab = true }
-        }
-    }
-
-    val bodyTop = if (hasTabs) TERMS_BODY_Y else TERMS_TABS_Y
-    val shape = ppShape(10.dp)
+    val panelWidth = LocalPanelWidth.current
     Box(
         Modifier
-            .offset(TERMS_CONTENT_X.dp, bodyTop.dp)
-            .size(TERMS_CONTENT_WIDTH.dp, (TERMS_BODY_BOTTOM - bodyTop).dp)
-            .clip(shape)
-            .background(ChoiceBackground)
-            .border(BorderWidth, PanelBorderBrush, shape),
+            .offset(0.dp, TERMS_CONTENT_TOP.dp)
+            .size(panelWidth.dp, (LocalPanelHeight.current - NAV_BOTTOM_INSET - 14f - TERMS_CONTENT_TOP).dp),
+        contentAlignment = Alignment.Center,
     ) {
-        when {
-            loading -> OnboardingText(
-                "Loading the Terms of Service and Privacy Policy…",
-                13,
-                Modifier.align(Alignment.Center).fillMaxWidth(),
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Row(
+                Modifier.clickableTextWithSound { onAccepted(!accepted) },
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CheckBox(accepted)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OnboardingText("I agree to the", 15, weight = FontWeight.Normal)
+                    TermsLink("Terms of Service") {
+                        ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL)
+                    }
+                    OnboardingText("and", 15, weight = FontWeight.Normal)
+                    TermsLink("Privacy Policy") {
+                        ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL)
+                    }
+                }
+            }
+            OnboardingText(
+                "Declining disables crash reporting and all online features.",
+                12,
+                Modifier.width(panelWidth.dp),
                 TextSecondary,
                 FontWeight.Light,
             )
-            document != null -> MarkdownBody(
-                if (privacyTab) privacyBody.orEmpty() else document.terms,
-                Modifier.fillMaxSize().padding(16.dp),
-            )
-            else -> TermsUnavailable(error) { attempt++ }
         }
-    }
-
-    Row(
-        Modifier.offset(((PANEL_WIDTH - TERMS_LINKS_WIDTH) / 2f).dp, TERMS_LINKS_Y.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        ChoiceButton("Terms of Service", MAIN_MENU_ASSETS + "link-external-01.svg", false, 200f) {
-            ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL)
-        }
-        ChoiceButton("Privacy Policy", MAIN_MENU_ASSETS + "link-external-01.svg", false, 200f) {
-            ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL)
-        }
-    }
-
-    OnboardingText(
-        "Declining disables crash reporting and all online features.",
-        11,
-        Modifier.offset(0.dp, TERMS_NOTICE_Y.dp).width(PANEL_WIDTH.dp),
-        TextSecondary,
-        FontWeight.Light,
-    )
-}
-
-@Composable
-private fun TermsUnavailable(error: String?, onRetry: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-    ) {
-        OnboardingText(
-            "Couldn’t load the Terms of Service or Privacy Policy.",
-            14,
-            Modifier.fillMaxWidth(),
-            TextPrimary,
-            FontWeight.Medium,
-        )
-        OnboardingText(
-            "Open them in your browser using the links below, or try again once you’re back online.",
-            12,
-            Modifier.fillMaxWidth(),
-            TextSecondary,
-            FontWeight.Light,
-        )
-        if (error != null) {
-            OnboardingText(error, 11, Modifier.fillMaxWidth(), TextSecondary.copy(alpha = 0.7f), FontWeight.Light)
-        }
-        ChoiceButton("Retry", MAIN_MENU_ASSETS + "refresh-cw-01.svg", false, 120f, onClick = onRetry)
     }
 }
 
+/** Mirrors OneConfig's `CheckboxIndicator` so the onboarding checkbox matches the rest of the UI. */
 @Composable
-private fun TermsTab(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun CheckBox(checked: Boolean) {
+    val theme = LocalTheme.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
     Box(
         Modifier
-            .size(TERMS_TAB_WIDTH.dp, 30.dp)
-            .clip(ppShape(8.dp))
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ppShape(8.dp))
-            .clickableWithSound(onClick),
+            .size(24.dp)
+            .hoverable(interactionSource)
+            .clip(theme.checkBoxShape)
+            .background(if (checked) Accent else theme.componentBackground)
+            .border(
+                1.5.dp,
+                when {
+                    checked -> Accent
+                    hovered -> theme.textColorSecondary
+                    else -> theme.borderColor
+                },
+                theme.checkBoxShape,
+            ),
         contentAlignment = Alignment.Center,
-    ) { OnboardingText(label, 13, color = TextPrimary, weight = FontWeight.Medium) }
+    ) {
+        if (checked) OnboardingIcon("tick", theme.textColor, Modifier.size(26.dp))
+    }
 }
 
 @Composable
-private fun MarkdownBody(markdown: String, modifier: Modifier) {
-    val blocks = remember(markdown) { parseMarkdown(markdown) }
-    LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        items(blocks.size) { index ->
-            when (val block = blocks[index]) {
-                is MarkdownBlock.Gap -> Spacer(Modifier.height(block.height.dp))
-                is MarkdownBlock.Line -> OnboardingText(
-                    block.text,
-                    block.size,
-                    Modifier.fillMaxWidth(),
-                    if (block.muted) TextSecondary else TextPrimary,
-                    block.weight,
-                    TextAlign.Start,
-                )
-            }
-        }
-    }
+private fun TermsLink(label: String, onClick: () -> Unit) {
+    BasicText(
+        label,
+        Modifier.clickableTextWithSound(onClick),
+        TextStyle(
+            color = Accent,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = LocalTheme.current.typography.family,
+            textDecoration = TextDecoration.Underline,
+        ),
+    )
 }
-
-private sealed interface MarkdownBlock {
-    data class Gap(val height: Float) : MarkdownBlock
-    data class Line(val text: String, val size: Int, val weight: FontWeight, val muted: Boolean = false) : MarkdownBlock
-}
-
-private fun parseMarkdown(markdown: String): List<MarkdownBlock> = markdown.lines().map { raw ->
-    val line = raw.trim()
-    when {
-        line.isEmpty() -> MarkdownBlock.Gap(4f)
-        line.length > 2 && line.all { it == '-' || it == '*' || it == '_' } -> MarkdownBlock.Gap(6f)
-        line.startsWith("#### ") -> heading(line.removePrefix("#### "), 13)
-        line.startsWith("### ") -> heading(line.removePrefix("### "), 14)
-        line.startsWith("## ") -> heading(line.removePrefix("## "), 16)
-        line.startsWith("# ") -> heading(line.removePrefix("# "), 18)
-        line.startsWith("- ") || line.startsWith("* ") -> body("•  ${stripMarkdown(line.drop(2))}")
-        line.startsWith("> ") -> body(stripMarkdown(line.removePrefix("> ")), muted = true)
-        else -> body(stripMarkdown(line))
-    }
-}
-
-private fun heading(text: String, size: Int) = MarkdownBlock.Line(stripMarkdown(text), size, FontWeight.Medium)
-
-private fun body(text: String, muted: Boolean = false) = MarkdownBlock.Line(text, 13, FontWeight.Light, muted)
-
-private val MARKDOWN_LINK = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
-private val MARKDOWN_EMPHASIS = Regex("(\\*\\*|__|\\*|`)")
-
-private fun stripMarkdown(text: String): String =
-    MARKDOWN_EMPHASIS.replace(MARKDOWN_LINK.replace(text) { it.groupValues[1] }, "")
 
 private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, COSMETICS, DONE }
 
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
 private const val UI_SCALE = DESIGN_WIDTH / 1240f
-private const val PANEL_X = 520f
-private const val PANEL_Y = 210f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MAX = 10
@@ -994,18 +947,14 @@ private const val BLUR_SLIDER_OFFSET = LABEL_HEIGHT + 32f + 16f // label, radio 
 private const val BLUR_PREVIEW_OFFSET = BLUR_SLIDER_OFFSET + 26f + 17f // + slider row + gap
 private const val BLUR_PREVIEW_HEIGHT = 115f
 private const val BLUR_SECTION_HEIGHT = BLUR_PREVIEW_OFFSET + BLUR_PREVIEW_HEIGHT
-private const val TERMS_CONTENT_X = 100f
-private const val TERMS_CONTENT_WIDTH = 680f
-private const val TERMS_TAB_WIDTH = 120f
-private const val TERMS_TAB_GAP = 8f
-private const val TERMS_TABS_WIDTH = TERMS_TAB_WIDTH * 2 + TERMS_TAB_GAP
-private const val TERMS_TABS_Y = 140f
-private const val TERMS_BODY_Y = TERMS_TABS_Y + 30f + 12f // + tab row + gap
-private const val TERMS_BODY_BOTTOM = 494f
-private const val TERMS_LINKS_Y = TERMS_BODY_BOTTOM + 14f
-private const val TERMS_LINKS_WIDTH = 200f * 2 + 18f
-private const val TERMS_NOTICE_Y = TERMS_LINKS_Y + 32f + 10f
-private const val SECONDARY_ACTION_WIDTH = 250f
+private const val TERMS_PANEL_WIDTH = 620f
+private const val TERMS_PANEL_HEIGHT = 170f
+private const val TERMS_CONTENT_TOP = 30f
+private const val NAV_BOTTOM_INSET = 56f
+private const val SECONDARY_ACTION_WIDTH = 120f
+
+private val LocalPanelWidth = compositionLocalOf { PANEL_WIDTH }
+private val LocalPanelHeight = compositionLocalOf { PANEL_HEIGHT }
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
 
