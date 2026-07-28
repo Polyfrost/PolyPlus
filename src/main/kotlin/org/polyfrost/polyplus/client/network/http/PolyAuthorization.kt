@@ -42,18 +42,25 @@ object PolyAuthorization {
     }
 
     suspend fun refresh(): String {
+        if (!PrivacyConsent.allowsOnlineServices()) {
+            throw OnlineServicesDisabledException("${PolyPlusConfig.apiUrl}/account/login")
+        }
+
         currentJob?.let { return it.await().token }
 
         val lockedJob = LOCK.withLock {
             currentJob?.let { return it.await().token }
 
             val job = PolyPlusClient.SCOPE.async(start = CoroutineStart.LAZY) {
-                authorize().also {
-                    LOCK.withLock {
-                        cachedResponse = it
-                        cachedExpiresAtMs = System.currentTimeMillis() + TOKEN_TTL_MS - REFRESH_MARGIN_MS
-                        currentJob = null
+                try {
+                    authorize().also {
+                        LOCK.withLock {
+                            cachedResponse = it
+                            cachedExpiresAtMs = System.currentTimeMillis() + TOKEN_TTL_MS - REFRESH_MARGIN_MS
+                        }
                     }
+                } finally {
+                    LOCK.withLock { currentJob = null }
                 }
             }
 

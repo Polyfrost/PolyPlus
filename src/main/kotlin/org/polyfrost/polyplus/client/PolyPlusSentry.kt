@@ -104,6 +104,7 @@ object PolyPlusSentry {
     @JvmStatic
     fun capture(throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
+        if (throwable is kotlinx.coroutines.CancellationException) return
         initialize()
         if (isTransientNetworkFailure(throwable)) return
         if (!seen.add(throwable)) return

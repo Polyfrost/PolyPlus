@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.privacy
 
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -12,6 +13,8 @@ object PrivacyEnforcement {
 
     private val syncing = AtomicBoolean(false)
 
+    private val bootstrapped = AtomicBoolean(false)
+
     fun apply() {
         val allowed = PrivacyConsent.allowsOnlineServices()
         LOGGER.info(
@@ -22,6 +25,15 @@ object PrivacyEnforcement {
         )
         if (allowed) PolyPlusSentry.initialize() else PolyPlusSentry.shutdown()
         PolyConnection.applyConsent()
+
+        if (allowed) {
+            if (bootstrapped.compareAndSet(false, true)) {
+                LOGGER.info("Consent granted; bootstrapping PolyPlus online services.")
+                PolyPlusClient.refreshCosmetics()
+            }
+        } else {
+            bootstrapped.set(false)
+        }
     }
 
     fun syncConfig() {

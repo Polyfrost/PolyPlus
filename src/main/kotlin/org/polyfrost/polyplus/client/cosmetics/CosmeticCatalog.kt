@@ -103,7 +103,11 @@ object CosmeticCatalog {
                 expectSuccess = true
             }.body<CosmeticList>()
         }.onFailure { LOGGER.error("Failed to fetch cosmetic catalog", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
-            .getOrNull() ?: return
+            .getOrElse {
+                CosmeticLoadProgress.fail(it.message ?: it::class.java.simpleName)
+                return
+            }
+        CosmeticLoadProgress.onCatalogFetched()
 
         // Drop groups whose type this client version doesn't recognize
         val knownGroups = cosmetics.contents.filter { it.type != CosmeticType.Unknown }
@@ -138,12 +142,6 @@ object CosmeticCatalog {
             flattenedEmotes.size,
         )
 
-        //? if >= 1.21.1 {
-        PolyPlusClient.SCOPE.launch {
-            runCatching { CosmeticAssetCache.preloadDefinitions(flattened + flattenedEmotes) }
-                .onFailure { LOGGER.error("Failed to preload cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
-        }
-        //?}
     }
 
     suspend fun refreshPlayer() {
@@ -184,10 +182,21 @@ object CosmeticCatalog {
         }
 
         //? if >= 1.21.1 {
+        val owned = ownedDefs + player.emotes.map { it.asCosmeticDefinition() }
+        val equippedIds = equippedKnown.values.toSet()
+        val (equipped, rest) = owned.partition { it.id in equippedIds }
+        val assetsToken = CosmeticLoadProgress.beginAssets(
+            equipped.size * CosmeticAssetCache.PRELOAD_STEPS_PER_DEFINITION,
+        )
         PolyPlusClient.SCOPE.launch {
-            runCatching {
-                CosmeticAssetCache.preloadDefinitions(ownedDefs + player.emotes.map { it.asCosmeticDefinition() })
-            }.onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            try {
+                runCatching { CosmeticAssetCache.preloadDefinitions(equipped, trackProgress = true) }
+                    .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            } finally {
+                CosmeticLoadProgress.onAssetsComplete(assetsToken)
+            }
+            runCatching { CosmeticAssetCache.preloadDefinitions(rest) }
+                .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
         }
         //?}
     }

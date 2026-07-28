@@ -6,10 +6,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class HashManager(val file: File) {
-    private var hashes: HashMap<String, String>? = null
+    @Volatile
+    private var hashes: ConcurrentHashMap<String, String>? = null
+
+    @Volatile
     private var isUpToDate: Boolean = false
+
+    @Volatile
     private var hashJob: Deferred<Unit> = CompletableDeferred()
 
     init {
@@ -20,9 +26,11 @@ class HashManager(val file: File) {
             }
 
             val json = file.readText()
-            hashes = if (json.isNotBlank()) {
-                PolyPlusClient.JSON.decodeFromString<HashMap<String, String>>(json)
-            } else HashMap()
+            hashes = ConcurrentHashMap<String, String>().apply {
+                if (json.isNotBlank()) {
+                    putAll(PolyPlusClient.JSON.decodeFromString<HashMap<String, String>>(json))
+                }
+            }
         }
     }
 
@@ -54,13 +62,14 @@ class HashManager(val file: File) {
             return
         }
 
+        val snapshot = HashMap(hashes ?: return)
         hashJob = PolyPlusClient.SCOPE.async(Dispatchers.IO)  {
             if (!file.exists()) {
                 file.parentFile?.mkdirs()
                 file.createNewFile()
             }
 
-            val json = PolyPlusClient.JSON.encodeToString(hashes)
+            val json = PolyPlusClient.JSON.encodeToString(snapshot)
             file.writeText(json)
         }
     }

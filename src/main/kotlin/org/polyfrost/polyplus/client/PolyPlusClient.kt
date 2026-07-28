@@ -18,6 +18,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
@@ -146,6 +147,7 @@ object PolyPlusClient {
     fun refreshCosmeticsIfNeeded() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (CosmeticCatalog.ownedIds().isNotEmpty() || CosmeticCatalog.allDefinitions().isNotEmpty()) {
+            CosmeticLoadProgress.markLoaded()
             return
         }
         refreshCosmetics()
@@ -153,17 +155,22 @@ object PolyPlusClient {
 
     private suspend fun refreshCosmeticsInternal() {
         LOGGER.info("Refreshing cosmetics catalog and player data...")
+        CosmeticLoadProgress.beginRefresh()
 
-        runCatching { CosmeticCatalog.refreshCatalog() }
-            .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it); PolyPlusSentry.capture(it) }
-        runCatching { CosmeticCatalog.refreshPlayer() }
-            .onFailure { LOGGER.error("Player cosmetics refresh failed", it); PolyPlusSentry.capture(it) }
-        //? if >= 1.21.1 {
-        runCatching { CosmeticService.syncLocalActive() }
-            .onFailure { LOGGER.error("Local active cosmetics sync failed", it); PolyPlusSentry.capture(it) }
-        //?} else {
-        /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
-            .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/
-        //?}
+        try {
+            runCatching { CosmeticCatalog.refreshCatalog() }
+                .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it); PolyPlusSentry.capture(it) }
+            runCatching { CosmeticCatalog.refreshPlayer() }
+                .onFailure { LOGGER.error("Player cosmetics refresh failed", it); PolyPlusSentry.capture(it) }
+            //? if >= 1.21.1 {
+            runCatching { CosmeticService.syncLocalActive() }
+                .onFailure { LOGGER.error("Local active cosmetics sync failed", it); PolyPlusSentry.capture(it) }
+            //?} else {
+            /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
+                .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/
+            //?}
+        } finally {
+            CosmeticLoadProgress.onMetadataComplete()
+        }
     }
 }

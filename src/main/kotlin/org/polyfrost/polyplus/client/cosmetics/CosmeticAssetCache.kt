@@ -5,8 +5,12 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
@@ -27,11 +31,14 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.utils.HashManager
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 
 object CosmeticAssetCache {
     private val LOGGER = LogManager.getLogger()
-    private val loadLock = Mutex()
+    private val downloadLocks = ConcurrentHashMap<String, Mutex>()
+
+    private val parseLock = Mutex()
 
     @JvmField
     val baseDir: File = File("${PolyPlusConstants.NAME}/cosmetics")
@@ -73,36 +80,58 @@ object CosmeticAssetCache {
         //?}
     }
 
-    suspend fun preloadDefinitions(definitions: Collection<CosmeticDefinition>) {
+    const val PRELOAD_STEPS_PER_DEFINITION = 2
+
+    private const val MAX_PARALLEL_DOWNLOADS = 8
+
+    suspend fun preloadDefinitions(
+        definitions: Collection<CosmeticDefinition>,
+        trackProgress: Boolean = false,
+    ) {
         withContext(Dispatchers.IO) {
-            loadLock.withLock {
-                hashManager.awaitHashes()
-                if (!baseDir.exists() && !baseDir.mkdirs()) {
-                    LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
-                    org.polyfrost.polyplus.client.PolyPlusSentry.captureMessage("Failed to create cosmetics directory at ${baseDir.absolutePath}")
-                    return@withLock
-                }
+            hashManager.awaitHashes()
+            if (!ensureBaseDir()) return@withContext
 
-                try {
-                    for (definition in definitions) {
-                        runCatching { materializeCosmeticLocked(definition) }
-                            .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            try {
+                val gate = Semaphore(MAX_PARALLEL_DOWNLOADS)
+                definitions.map { definition ->
+                    async {
+                        gate.withPermit {
+                            downloadLockFor(definition).withLock {
+                                runCatching { materializeCosmeticLocked(definition) }
+                                    .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                            }
+                        }
+                        if (trackProgress) CosmeticLoadProgress.stepAssets()
                     }
+                }.awaitAll()
 
-                    //? if >= 1.21.1 {
-                    BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
-                    //?}
+                //? if >= 1.21.1 {
+                parseLock.withLock { BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir) }
+                //?}
 
-                    for (definition in definitions) {
+                for (definition in definitions) {
+                    parseLock.withLock {
                         runCatching { loadCosmeticAssetsLocked(definition) }
                             .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
                     }
-                } finally {
-                    hashManager.saveHashes()
+                    if (trackProgress) CosmeticLoadProgress.stepAssets()
                 }
+            } finally {
+                hashManager.saveHashes()
             }
         }
     }
+
+    private fun ensureBaseDir(): Boolean {
+        if (baseDir.exists() || baseDir.mkdirs()) return true
+        LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
+        org.polyfrost.polyplus.client.PolyPlusSentry.captureMessage("Failed to create cosmetics directory at ${baseDir.absolutePath}")
+        return false
+    }
+
+    private fun downloadLockFor(definition: CosmeticDefinition): Mutex =
+        downloadLocks.computeIfAbsent(definition.cacheKey()) { Mutex() }
 
     suspend fun ensureLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getDefinition(id) ?: return false
@@ -123,24 +152,18 @@ object CosmeticAssetCache {
 
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
         return withContext(Dispatchers.IO) {
-            loadLock.withLock {
-                runCatching {
-                    hashManager.awaitHashes()
-                    ensureLoadedLocked(definition)
-                    hashManager.saveHashes()
-                    true
-                }.getOrElse {
-                    LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
-                    org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
-                    false
-                }
+            runCatching {
+                hashManager.awaitHashes()
+                downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
+                parseLock.withLock { loadCosmeticAssetsLocked(definition) }
+                hashManager.saveHashes()
+                true
+            }.getOrElse {
+                LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
+                org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
+                false
             }
         }
-    }
-
-    private suspend fun ensureLoadedLocked(definition: CosmeticDefinition) {
-        materializeCosmeticLocked(definition)
-        loadCosmeticAssetsLocked(definition)
     }
 
     private suspend fun materializeCosmeticLocked(definition: CosmeticDefinition) {

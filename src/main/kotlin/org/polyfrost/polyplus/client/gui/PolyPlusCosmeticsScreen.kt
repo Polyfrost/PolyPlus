@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -37,7 +38,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -100,6 +106,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
+import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
@@ -275,6 +282,25 @@ private data class CosmeticUiItem(
 private fun PolyPlusCosmeticsScreen() {
     if (!PrivacyConsent.allowsOnlineServices()) {
         OnlineFeaturesDisabled()
+        return
+    }
+    var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }
+    LaunchedEffect(Unit) {
+        PolyPlusClient.refreshCosmeticsIfNeeded()
+        while (true) {
+            loadState = CosmeticLoadProgress.snapshot()
+            if (loadState.ready) break
+            delay(100L)
+        }
+    }
+    if (!loadState.ready) {
+        CosmeticsLoadingScreen(
+            state = loadState,
+            onRetry = {
+                PolyPlusClient.refreshCosmetics()
+                loadState = CosmeticLoadProgress.snapshot()
+            },
+        )
         return
     }
     var tab by remember { mutableStateOf(PolyPlusTab.Wardrobe) }
@@ -1831,7 +1857,8 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
 
     return remember(previewId, loadTick, isCape) {
         if (isCape) {
-            PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = CosmeticAssetCache.getCapeResource(previewId))
+            val cape = CosmeticAssetCache.getCapeResource(previewId) ?: return@remember null
+            PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = cape)
         } else {
             val attached = CosmeticAssetCache.getAttachedCosmetic(previewId) ?: return@remember null
             val equipment = CosmeticEquipment()
@@ -2422,6 +2449,92 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
             CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
         }
         PlayerPreviewSource.Override(equipment)
+    }
+}
+
+@Composable
+private fun CosmeticsLoadingScreen(
+    state: CosmeticLoadProgress.Snapshot,
+    onRetry: () -> Unit,
+) {
+    val failed = state.failure != null
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+    ) {
+        GuiText(
+            if (failed) "Couldn't load cosmetics" else "Loading cosmetics",
+            LocalTheme.current.textColor,
+            16.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+        GuiText(
+            if (failed) {
+                "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
+            } else {
+                state.label
+            },
+            LocalTheme.current.textColorSecondary,
+            13.sp,
+            modifier = Modifier.width(360.dp),
+            textAlign = TextAlign.Center,
+        )
+        if (failed) {
+            Spacer(Modifier.height(2.dp))
+            SmallButton("Retry", iconPath = "refresh", primary = true, onClick = onRetry)
+        } else {
+            ProgressBar(state.fraction, Modifier.width(360.dp))
+        }
+    }
+}
+
+private const val SWEEP_WIDTH_FRACTION = 0.35f
+
+@Composable
+private fun ProgressBar(fraction: Float?, modifier: Modifier) {
+    val track = LocalTheme.current.chipBackground
+    val shape = ppShape(4.dp)
+    Box(
+        modifier
+            .height(8.dp)
+            .clip(shape)
+            .background(track)
+            .border(1.dp, LocalTheme.current.borderColor, shape),
+    ) {
+        if (fraction != null) {
+            val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), animationSpec = tween(220))
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(animated)
+                    .clip(shape)
+                    .background(Accent),
+            )
+        } else {
+            val transition = rememberInfiniteTransition(label = "cosmeticsLoadingSweep")
+            val head by transition.animateFloat(
+                initialValue = -SWEEP_WIDTH_FRACTION,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1_100, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "cosmeticsLoadingSweepHead",
+            )
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val width = maxWidth
+                Box(
+                    Modifier
+                        .offset(x = width * head)
+                        .fillMaxHeight()
+                        .width(width * SWEEP_WIDTH_FRACTION)
+                        .clip(shape)
+                        .background(Accent),
+                )
+            }
+        }
     }
 }
 
