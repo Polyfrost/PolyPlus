@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
@@ -13,6 +14,9 @@ object DefaultSettings {
     private val logger = LogManager.getLogger("PolyPlus/DefaultSettings")
 
     private const val UNLIMITED_FRAMERATE = 260
+
+    private const val TICK_SCAN_INTERVAL = 20
+    private const val RETRY_SCAN_LIMIT = 100
 
     private val UNBIND_ALL_NAMESPACES = listOf(
         "presencefootsteps",
@@ -41,6 +45,11 @@ object DefaultSettings {
     )
 
     private const val ANIMATIUM_PRESET = "MODERN"
+
+    private const val ANIMATIUM_ID = "animatium"
+    private const val BETTER_SCREENS_ID = "betterscreens"
+    private const val CONFIRM_DISCONNECT_ID = "confirmdisconnect"
+    private const val CONTROLIFY_ID = "controlify"
 
     private class AnimatiumOption(vararg val names: String, val value: Any)
 
@@ -75,13 +84,16 @@ object DefaultSettings {
         val isPresent: () -> Boolean,
         val apply: () -> Unit,
         val coveredByLegacyFlag: Boolean = true,
-    )
+        val retryable: Boolean = false,
+    ) {
+        var attempts = 0
+    }
 
     private val INIT_TASKS = listOf(
         Task(
             id = "animatium-onboarding",
             label = "Animatium onboarding",
-            isPresent = { findFirstClass(ANIMATIUM_STATE) != null },
+            isPresent = { modLoaded(ANIMATIUM_ID) && findFirstClass(ANIMATIUM_STATE) != null },
             apply = ::markAnimatiumOnboardingSeen,
         ),
     )
@@ -96,7 +108,7 @@ object DefaultSettings {
             Task(
                 id = "better-screens",
                 label = "Better Screens",
-                isPresent = { findClass(BETTER_SCREENS_CONFIG) != null },
+                isPresent = { modLoaded(BETTER_SCREENS_ID) && findClass(BETTER_SCREENS_CONFIG) != null },
                 apply = ::applyBetterScreens,
             ),
         )
@@ -104,7 +116,7 @@ object DefaultSettings {
             Task(
                 id = "confirm-disconnect",
                 label = "Confirm Disconnect",
-                isPresent = { findClass(CONFIRM_DISCONNECT_CONFIG) != null },
+                isPresent = { modLoaded(CONFIRM_DISCONNECT_ID) && findClass(CONFIRM_DISCONNECT_CONFIG) != null },
                 apply = ::applyConfirmDisconnect,
             ),
         )
@@ -112,15 +124,16 @@ object DefaultSettings {
             Task(
                 id = "controlify-keyboard-movement",
                 label = "Controlify keyboard-like movement",
-                isPresent = { controlifyGlobalSettings() != null },
+                isPresent = { modLoaded(CONTROLIFY_ID) && controlifyGlobalSettings() != null },
                 apply = ::applyControlifyKeyboardMovement,
+                retryable = true,
             ),
         )
         add(
             Task(
                 id = "animatium-config",
                 label = "Animatium",
-                isPresent = { findClass(ANIMATIUM_CONFIG) != null },
+                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumConfig,
             ),
         )
@@ -128,7 +141,7 @@ object DefaultSettings {
             Task(
                 id = "animatium-swing-on-use",
                 label = "Animatium",
-                isPresent = { findClass(ANIMATIUM_CONFIG) != null },
+                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumFixups,
                 coveredByLegacyFlag = false,
             ),
@@ -137,7 +150,7 @@ object DefaultSettings {
             Task(
                 id = "animatium-packs",
                 label = "Animatium resource packs",
-                isPresent = { findClass(ANIMATIUM_CONFIG) != null },
+                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::disableAnimatiumResourcePacks,
             ),
         )
@@ -150,40 +163,66 @@ object DefaultSettings {
         apply = { unbindMatching(matches) },
     )
 
+    private val LEGACY_TASKS = (INIT_TASKS + TICK_TASKS).filter(Task::coveredByLegacyFlag)
+
+    private val pending = TICK_TASKS.toMutableList()
+
     private val applied = linkedSetOf<String>()
 
     private val failures = linkedSetOf<String>()
     private var reported = false
 
+    private val classCache = HashMap<String, Class<*>?>()
+    private var ticks = 0
+    private var done = false
+
     fun initialize() {
         applied += PolyPlusConfig.appliedDefaults.split(',').filter(String::isNotEmpty)
 
-        if (!PolyPlusConfig.defaultSettingsApplied) runTasks(INIT_TASKS)
+        if (!PolyPlusConfig.defaultSettingsApplied) runTasks(INIT_TASKS.toMutableList())
 
         eventHandler { _: TickEvent.End ->
-            migrateLegacyFlag()
-            runTasks(TICK_TASKS)
-            reportFailures()
+            if (!done && ticks++ % TICK_SCAN_INTERVAL == 0) scan()
         }
+    }
+
+    private fun scan() {
+        migrateLegacyFlag()
+        runTasks(pending)
+        reportFailures()
+        done = pending.isEmpty() && !PolyPlusConfig.defaultSettingsApplied && (reported || failures.isEmpty())
     }
 
     private fun migrateLegacyFlag() {
         if (!PolyPlusConfig.defaultSettingsApplied) return
-        (INIT_TASKS + TICK_TASKS).forEach { task ->
-            if (task.coveredByLegacyFlag && isPresent(task)) applied += task.id
+        var settled = true
+        LEGACY_TASKS.forEach { task ->
+            if (task.id in applied) return@forEach
+            if (isPresent(task)) applied += task.id
+            else if (task in pending) settled = false
         }
+        if (!settled) return
+
         PolyPlusConfig.defaultSettingsApplied = false
         persist()
         logger.info("Migrated legacy default settings flag to {}", applied)
     }
 
-    private fun runTasks(tasks: List<Task>) {
+    private fun runTasks(tasks: MutableList<Task>) {
         var changed = false
-        tasks.forEach { task ->
-            if (task.id in applied || !isPresent(task)) return@forEach
-            attempt(task.label, task.apply)
-            applied += task.id
-            changed = true
+        val iterator = tasks.iterator()
+        while (iterator.hasNext()) {
+            val task = iterator.next()
+            when {
+                task.id in applied -> iterator.remove()
+                isPresent(task) -> {
+                    attempt(task.label, task.apply)
+                    applied += task.id
+                    changed = true
+                    iterator.remove()
+                }
+                !task.retryable || ++task.attempts > RETRY_SCAN_LIMIT -> iterator.remove()
+            }
         }
         if (changed) persist()
     }
@@ -387,8 +426,14 @@ object DefaultSettings {
     private fun isAnimatiumPack(id: String): Boolean =
         id.substringBefore(':').equals("animatium", ignoreCase = true)
 
-    private fun findClass(name: String): Class<*>? =
-        runCatching { Class.forName(name, true, javaClass.classLoader) }.getOrNull()
+    private fun modLoaded(id: String): Boolean = FabricLoader.getInstance().isModLoaded(id)
+
+    private fun findClass(name: String): Class<*>? {
+        if (name in classCache) return classCache[name]
+        val type = runCatching { Class.forName(name, true, javaClass.classLoader) }.getOrNull()
+        classCache[name] = type
+        return type
+    }
 
     private fun findFirstClass(names: List<String>): Class<*>? = names.firstNotNullOfOrNull(::findClass)
 }
