@@ -32,6 +32,8 @@ object PlayerPreviewOverlay {
         @Volatile @JvmField var fw: Float = 0f
         @Volatile @JvmField var fh: Float = 0f
         @Volatile @JvmField var visible: Boolean = false
+
+        @Volatile @JvmField var owner: java.lang.ref.WeakReference<Any>? = null
     }
 
     private val entries = ConcurrentHashMap<Long, Entry>()
@@ -49,6 +51,22 @@ object PlayerPreviewOverlay {
 
     fun reportBounds(entry: Entry, fx: Float, fy: Float, fw: Float, fh: Float, visible: Boolean) {
         entry.fx = fx; entry.fy = fy; entry.fw = fw; entry.fh = fh; entry.visible = visible
+        entry.owner = if (visible) currentScreen()?.let { java.lang.ref.WeakReference(it) } else null
+    }
+
+    private fun currentScreen(): Any? {
+        val mc = net.minecraft.client.Minecraft.getInstance() ?: return null
+        //? if >= 26.2 {
+        /*return mc.gui?.screen()
+        *///?} else {
+        return mc.screen
+        //?}
+    }
+
+    /** Drops every entry; called when leaving a screen that owned live previews. */
+    @JvmStatic
+    fun clear() {
+        if (entries.isNotEmpty()) entries.clear()
     }
 
     private const val SPIN_DEG_PER_SEC = 37.5f
@@ -63,8 +81,13 @@ object PlayerPreviewOverlay {
         val screen = mc?.screen
         //?}
         if (screen !is org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen) {
-            if (entries.isNotEmpty()) entries.clear()
+            clear()
             return
+        }
+        if (entries.isEmpty()) return
+        entries.values.removeIf { e ->
+            val owner = e.owner?.get()
+            owner != null && owner !== screen
         }
         if (entries.isEmpty()) return
         val fbW = target.width
