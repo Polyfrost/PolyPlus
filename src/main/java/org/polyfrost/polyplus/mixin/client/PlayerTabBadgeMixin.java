@@ -15,7 +15,7 @@ import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-@Mixin(PlayerTabOverlay.class)
+@Mixin(value = PlayerTabOverlay.class, priority = 1500)
 public class PlayerTabBadgeMixin {
     @WrapOperation(
         method = "render",

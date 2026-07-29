@@ -83,7 +83,9 @@
     //?}
     //? if >= 1.21.11 {
   ,
-    "client.sodium.Mixin_SodiumViewBobbing"
+    "client.sodium.Mixin_SodiumViewBobbing",
+    "client.Mixin_CustomPanoramaCubeMap",
+    "client.Mixin_CustomPanoramaOverlay"
     //?}
   ],
   "verbose": true
