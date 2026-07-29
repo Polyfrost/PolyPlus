@@ -201,6 +201,8 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
+            //? if >= 1.21.11
+            org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
             val serverLoad = async(Dispatchers.IO) {
                 org.polyfrost.polyplus.client.PolyPlusRecentServers.displayServers()
             }

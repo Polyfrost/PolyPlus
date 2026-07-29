@@ -108,6 +108,8 @@ object PolyPlusClient {
         refreshCosmetics()
         PolyPlusCommands.register()
         org.polyfrost.polyplus.client.host.HostWorldManager.registerLanPublishHook()
+        //? if >= 1.21.11
+        org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
     }
 
     /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */
