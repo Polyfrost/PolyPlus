@@ -117,7 +117,7 @@ object EmojiRegistry {
 
         if (expandedSelf == null && !siblingsChanged) return component
 
-        val root: MutableComponent = expandedSelf ?: component.plainCopy()
+        val root: MutableComponent = expandedSelf ?: component.plainCopy().setStyle(component.style)
         for (sibling in newSiblings) root.append(sibling)
         return root
     }
@@ -156,7 +156,7 @@ object EmojiRegistry {
         var last = 0
         while (matcher.find()) {
             val glyph = glyphFor(matcher.group()) ?: continue
-            if (root == null) root = Component.empty()
+            if (root == null) root = Component.empty().setStyle(style)
             if (matcher.start() > last) {
                 root.append(Component.literal(text.substring(last, matcher.start())).setStyle(style))
             }
