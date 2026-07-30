@@ -26,6 +26,9 @@
     "client.Mixin_MainMenuFpsLimit",
     "client.Mixin_PanoramaBlurRadius",
     "client.Mixin_HideBobbyUpgradeMessage",
+    "client.essential.Mixin_EssentialPartnerConfig",
+    "client.essential.Mixin_EssentialPartnerButton",
+    "client.essential.Mixin_EssentialPartnerModal",
     "client.access.MinecraftAccessor",
     "client.access.UserAccessor"
     //? if >= 1.21.8 && < 26.1 {
