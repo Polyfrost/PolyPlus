@@ -1,4 +1,5 @@
 [versions]
+object-builder-v1 = "21.1.2+b8d6ba7049"
 api-base = "0.4.62+73a52b4b49"
 lifecycle-events-v1 = "2.6.0+230071a049"
 rendering-v1 = "11.2.0+acfc689549"
@@ -18,5 +19,7 @@ command-api-v2 = { module = "net.fabricmc.fabric-api:fabric-command-api-v2", ver
 key-binding-api-v1 = { module = "net.fabricmc.fabric-api:fabric-key-binding-api-v1", version.ref = "key-binding-api-v1" }
 resource-loader-v0 = { module = "net.fabricmc.fabric-api:fabric-resource-loader-v0", version.ref = "resource-loader-v0" }
 
+object-builder-v1 = { module = "net.fabricmc.fabric-api:fabric-object-builder-api-v1", version.ref = "object-builder-v1" }
+
 [bundles]
-fabric-api = ["api-base", "lifecycle-events-v1", "rendering-v1", "screen-api-v1", "transitive-access-wideners-v1", "command-api-v2", "key-binding-api-v1", "resource-loader-v0"]
+fabric-api = ["api-base", "lifecycle-events-v1", "rendering-v1", "screen-api-v1", "transitive-access-wideners-v1", "command-api-v2", "key-binding-api-v1", "resource-loader-v0", "object-builder-v1"]

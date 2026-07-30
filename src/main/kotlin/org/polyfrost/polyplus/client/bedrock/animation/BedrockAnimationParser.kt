@@ -6,6 +6,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.JsonPrimitive
+import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
 import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
@@ -48,6 +49,9 @@ object BedrockAnimationParser {
         for ((name, element) in animationsObject.entrySet()) {
             runCatching {
                 result[name] = parseAnimation(name, element.asJsonObject, parents, pivots)
+            }.onFailure { ex ->
+                LogManager.getLogger("BedrockAnimationParser")
+                    .warn("Failed to parse animation {}", name, ex)
             }
         }
 

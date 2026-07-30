@@ -13,6 +13,8 @@ import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+//? if >= 1.21.1
+import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
@@ -60,8 +62,10 @@ object CosmeticSync : EarlyInitializable {
         eventHandler<WorldEvent.Unload> {
             unsubscribeAllPlayers()
             CosmeticCatalog.reset()
-            //? if >= 1.21.1
+            //? if >= 1.21.1 {
             CosmeticAssetCache.reset()
+            PetManager.despawnAll()
+            //?}
         }.register()
 
         eventHandler<WebSocketMessage> { event ->
@@ -99,8 +103,10 @@ object CosmeticSync : EarlyInitializable {
                 if (!uuid.isRealPlayer()) continue
                 CosmeticCatalog.removeRemote(uuid)
                 removed.add(uuid.toString())
-                //? if >= 1.21.1
+                //? if >= 1.21.1 {
                 handleEmoteStop(uuid.toString())
+                PetManager.despawn(uuid)
+                //?}
             }
             unsubscribePlayers(removed)
             Unit
@@ -214,6 +220,7 @@ object CosmeticSync : EarlyInitializable {
 
         //? if >= 1.21.1 {
         reconcileAttachedCosmetics(player, uuid)
+        reconcilePet(uuid)
         //?}
 
         for (id in cosmeticIds) {
@@ -229,7 +236,8 @@ object CosmeticSync : EarlyInitializable {
                 CosmeticType.Hat,
                 CosmeticType.Aura,
                 CosmeticType.Boots,
-                CosmeticType.Shoulder -> Unit
+                CosmeticType.Shoulder,
+                CosmeticType.Pet -> Unit
                 CosmeticType.Unknown -> Unit
                 //? if >= 1.21.1 {
                 CosmeticType.Emote -> applyEmote(player, id)
@@ -249,6 +257,7 @@ object CosmeticSync : EarlyInitializable {
         BodySlot.Aura,
         BodySlot.Boots,
         BodySlot.Shoulder,
+        BodySlot.Pet,
     )
 
     private fun reconcileVisiblePlayers() {
@@ -258,6 +267,7 @@ object CosmeticSync : EarlyInitializable {
             if (!uuid.isRealPlayer()) continue
             if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
             reconcileAttachedCosmetics(player, uuid)
+            reconcilePet(uuid)
         }
     }
 
@@ -272,18 +282,44 @@ object CosmeticSync : EarlyInitializable {
                 continue
             }
 
-            if (current != null && current.cosmetic.id == CosmeticAssetCache.attachedCosmeticId(desiredId)) {
-                continue
-            }
-
             PolyPlusClient.SCOPE.launch {
                 if (!CosmeticAssetCache.ensureCosmeticLoaded(desiredId)) return@launch
                 val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId) ?: return@launch
+                if (current != null &&
+                    current.cosmetic.id == CosmeticAssetCache.attachedCosmeticId(desiredId) &&
+                    current.cosmetic == attached
+                ) {
+                    return@launch
+                }
                 ClientPlatform.runOnMain {
                     if (CosmeticCatalog.getActiveId(uuid, slot) != desiredId) return@runOnMain
                     CosmeticApi.unequipSlot(player, slot)
                     CosmeticApi.equipLocal(player, attached.copy(slot = slot))
                 }
+            }
+        }
+    }
+
+    private fun reconcilePet(uuid: UUID) {
+        val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
+        val desiredId = equipped[BodySlot.Pet]
+
+        if (desiredId == null) {
+            PetManager.despawn(uuid)
+            return
+        }
+
+        if (PetManager.currentPetCosmeticId(uuid) == desiredId) return
+
+        LOGGER.info("reconcilePet: {} wants pet cosmetic {}, loading assets", uuid, desiredId)
+        PolyPlusClient.SCOPE.launch {
+            if (!CosmeticAssetCache.ensurePetLoaded(desiredId)) {
+                LOGGER.warn("reconcilePet: failed to load pet cosmetic {} for {}", desiredId, uuid)
+                return@launch
+            }
+            ClientPlatform.runOnMain {
+                if (CosmeticCatalog.getRemoteEquipped(uuid)?.get(BodySlot.Pet) != desiredId) return@runOnMain
+                PetManager.ensurePet(uuid, desiredId)
             }
         }
     }

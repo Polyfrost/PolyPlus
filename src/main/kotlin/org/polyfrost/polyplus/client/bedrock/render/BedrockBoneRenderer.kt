@@ -72,13 +72,15 @@ class BedrockBoneRenderer internal constructor(
         lightCoords: Int,
         overlayCoords: Int,
         color: Int = -1,
+        vScale: Float = 1f,
+        vOffset: Float = 0f,
     ) {
         poseStack.pushPose()
         translateAndRotate(poseStack)
-        mesh.render(poseStack.last(), buffer, lightCoords, overlayCoords, color)
+        mesh.render(poseStack.last(), buffer, lightCoords, overlayCoords, color, vScale, vOffset)
 
         for (child in children) {
-            child.render(poseStack, buffer, lightCoords, overlayCoords, color)
+            child.render(poseStack, buffer, lightCoords, overlayCoords, color, vScale, vOffset)
         }
 
         poseStack.popPose()

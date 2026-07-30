@@ -7,6 +7,7 @@ import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometryParser
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 internal object BedrockPlayerGeometryCache {
@@ -69,7 +70,7 @@ internal object BedrockPlayerGeometryCache {
         } ?: throw IllegalStateException("Player geometry has not been downloaded yet")
     }
 
-    fun tryCaptureFrom(root: java.nio.file.Path) {
+    fun tryCaptureFrom(root: Path) {
         val asset = DiskAssetReader.findFirst(root) {
             it.endsWith("player.geo.json") || it == "models/player.geo.json"
         } ?: return

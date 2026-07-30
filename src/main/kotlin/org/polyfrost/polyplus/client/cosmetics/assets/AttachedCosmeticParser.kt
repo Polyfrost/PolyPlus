@@ -28,6 +28,8 @@ internal object AttachedCosmeticParser {
         root: Path,
         slot: BodySlot,
         playerGeometry: BedrockGeometry,
+        scale: Float = 1f,
+        anchor: PlayerModelBone? = null,
     ): AttachedCosmetic? {
         val geometryAsset = DiskAssetReader.findFirst(root) { path ->
             path.endsWith(".geo.json") && !path.endsWith("player.geo.json")
@@ -54,7 +56,7 @@ internal object AttachedCosmeticParser {
                 // hat -> head, ...) so uploads just work without hand-editing.
                 val geometry = applyAutoMirror(
                     reconcileTextureSize(
-                        ensureAttached(parsed, slot),
+                        ensureAttached(parsed, slot, anchor),
                         textureFile,
                         cosmeticId,
                     ),
@@ -71,6 +73,7 @@ internal object AttachedCosmeticParser {
                     texture = RemoteTextures.register(textureId, textureFile),
                     model = BedrockEffectModel.build(geometry, playerGeometry),
                     animation = findAnimation(root, cosmeticId),
+                    scale = scale,
                 )
             }
         } catch (ex: Exception) {
@@ -146,10 +149,11 @@ internal object AttachedCosmeticParser {
         BodySlot.Aura -> PlayerModelBone.BODY
         BodySlot.Boots -> PlayerModelBone.BODY
         BodySlot.Shoulder -> PlayerModelBone.BODY
+        BodySlot.Pet -> PlayerModelBone.BODY
         BodySlot.Cape, BodySlot.Unknown -> null
     }
 
-    private fun ensureAttached(geometry: BedrockGeometry, slot: BodySlot): BedrockGeometry {
+    private fun ensureAttached(geometry: BedrockGeometry, slot: BodySlot, anchor: PlayerModelBone? = null): BedrockGeometry {
         if (geometry.bones.values.any { PlayerModelBone.fromBedrockNameOrNull(it.parent) != null }) {
             return geometry
         }
@@ -161,7 +165,7 @@ internal object AttachedCosmeticParser {
             if (name !in renderable || !isAttachmentRoot(prepared, bone)) {
                 return@mapValues bone
             }
-            val target = attachTargetFor(prepared, slot, bone) ?: return@mapValues bone
+            val target = anchor ?: attachTargetFor(prepared, slot, bone) ?: return@mapValues bone
             bone.copy(parent = target.serializedName)
         }
         return prepared.copy(bones = rewritten)
@@ -252,7 +256,9 @@ internal object AttachedCosmeticParser {
         val asset = DiskAssetReader.findFirst(root) { path ->
             path.endsWith(".json") &&
                 !path.endsWith(".geo.json") &&
-                !path.endsWith(".emote.json")
+                !path.endsWith(".emote.json") &&
+                path != "pet.json" &&
+                !path.endsWith(".animation_controllers.json")
         } ?: return null
 
         return try {

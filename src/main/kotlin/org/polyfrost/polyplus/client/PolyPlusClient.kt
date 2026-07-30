@@ -42,6 +42,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.pets.PetEntities
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.utils.EarlyInitializable
 
@@ -125,6 +126,9 @@ object PolyPlusClient {
         earlyHooks.forEach { hook ->
             step("early init ${hook.javaClass.simpleName}") { hook.earlyInitialize() }
         }
+
+        //? if >= 1.21.1
+        step("pet entities") { PetEntities.register() }
 
         step("websocket") {
             PolyConnection.initialize {
