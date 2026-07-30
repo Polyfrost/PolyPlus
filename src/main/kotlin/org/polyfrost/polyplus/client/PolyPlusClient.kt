@@ -13,7 +13,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.request
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
-import io.ktor.http.isSuccess
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -86,7 +85,8 @@ object PolyPlusClient {
         HttpResponseValidator {
             validateResponse { response ->
                 val status = response.status
-                if (status.isSuccess()) return@validateResponse
+                // Only 4xx/5xx are failures; 1xx (such as the 101 WebSocket upgrade) and 3xx are not.
+                if (status.value < HttpStatusCode.BadRequest.value) return@validateResponse
                 if (status == HttpStatusCode.Unauthorized) return@validateResponse
                 if (response.request.url.host != apiHost()) return@validateResponse
 
