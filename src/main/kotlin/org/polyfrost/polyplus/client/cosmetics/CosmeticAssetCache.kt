@@ -19,9 +19,11 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 //? if >= 1.21.1 {
+import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
 import org.polyfrost.polyplus.client.cosmetics.assets.BedrockPlayerGeometryCache
 import org.polyfrost.polyplus.client.cosmetics.assets.EmoteAssetParser
+import org.polyfrost.polyplus.client.cosmetics.assets.PetAssetParser
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.emotes.Emote
 //?}
@@ -30,6 +32,7 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.utils.HashManager
 import java.io.File
+import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
@@ -49,6 +52,7 @@ object CosmeticAssetCache {
     private val emotesByCosmeticId = HashMap<Int, List<Emote>>()
     private val emotesById = HashMap<Int, Emote>()
     private val attachedById = HashMap<Int, AttachedCosmetic>()
+    private val petsById = HashMap<Int, PetDefinition>()
     //?}
 
     @JvmStatic
@@ -67,6 +71,8 @@ object CosmeticAssetCache {
     fun getAttachedCosmetic(id: Int): AttachedCosmetic? = attachedById[id]
 
     fun attachedCosmeticId(id: Int): Identifier = AttachedCosmeticParser.attachedCosmeticId(id)
+
+    fun getPetDefinition(id: Int): PetDefinition? = petsById[id]
     //?}
 
     fun reset() {
@@ -75,6 +81,7 @@ object CosmeticAssetCache {
         emotesByCosmeticId.clear()
         emotesById.clear()
         attachedById.clear()
+        petsById.clear()
         RemoteTextures.releaseAll()
         BedrockPlayerGeometryCache.reset()
         //?}
@@ -148,6 +155,11 @@ object CosmeticAssetCache {
         val definition = CosmeticCatalog.getEmoteDefinition(id) ?: return false
         return ensureLoaded(definition)
     }
+
+    suspend fun ensurePetLoaded(id: Int): Boolean {
+        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return false
+        return ensureLoaded(definition)
+    }
     //?}
 
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
@@ -213,13 +225,15 @@ object CosmeticAssetCache {
             CosmeticType.Unknown -> LOGGER.warn("Ignoring cosmetic {} with unknown type/slot", definition.id)
             //? if >= 1.21.1 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
+            CosmeticType.Pet -> loadPet(definition.id, cosmeticDir)
             //?} else {
             /*CosmeticType.Emote -> LOGGER.warn("Emotes require Minecraft 1.21.1+")*/
+            /*CosmeticType.Pet -> LOGGER.warn("Pets require Minecraft 1.21.1+")*/
             //?}
         }
     }
 
-    private fun loadCape(id: Int, dir: java.nio.file.Path) {
+    private fun loadCape(id: Int, dir: Path) {
         val png = dir.toFile().walkTopDown()
             .firstOrNull { it.isFile && it.extension.equals("png", ignoreCase = true) }
             ?: dir.resolve("asset.bin").toFile().takeIf { it.exists() }
@@ -237,7 +251,7 @@ object CosmeticAssetCache {
     }
 
     //? if >= 1.21.1 {
-    private fun loadAttachedCosmetic(id: Int, dir: java.nio.file.Path, slot: BodySlot) {
+    private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null) {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()
         if (!BedrockPlayerGeometryCache.isReady()) {
@@ -248,14 +262,14 @@ object CosmeticAssetCache {
             return
         }
         val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
-        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry) ?: return
+        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return
 
         ClientPlatform.runOnMain {
             attachedById[id] = attached
         }
     }
 
-    private fun loadEmote(id: Int, dir: java.nio.file.Path) {
+    private fun loadEmote(id: Int, dir: Path) {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()
         if (!BedrockPlayerGeometryCache.isReady()) {
@@ -275,6 +289,22 @@ object CosmeticAssetCache {
         ClientPlatform.runOnMain {
             emotesByCosmeticId[id] = parsed
             emotesById[id] = parsed.first()
+        }
+    }
+
+    private fun loadPet(id: Int, dir: Path) {
+        when (PetAssetParser.peekArchetype(dir)) {
+            PetArchetype.Shoulder -> loadAttachedCosmetic(id, dir, BodySlot.Pet, PetAssetParser.peekScale(dir), PetAssetParser.peekAnchor(dir))
+            PetArchetype.Flying, PetArchetype.Walking -> {
+                val parsed = PetAssetParser.parse(id, dir) ?: run {
+                    LOGGER.warn("Failed to parse pet cosmetic {}", id)
+                    return
+                }
+                ClientPlatform.runOnMain {
+                    petsById[id] = parsed
+                }
+            }
+            null -> LOGGER.warn("Pet cosmetic {} has no valid manifest", id)
         }
     }
     //?}

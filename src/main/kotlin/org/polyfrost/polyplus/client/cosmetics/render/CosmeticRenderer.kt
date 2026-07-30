@@ -98,6 +98,7 @@ object CosmeticRenderer {
                 color = color,
                 translucent = translucent,
                 backOffset = backOffset,
+                scale = entry.cosmetic.scale,
             )
         }
 }

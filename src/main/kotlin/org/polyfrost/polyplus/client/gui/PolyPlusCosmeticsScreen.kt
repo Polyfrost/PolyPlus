@@ -1837,6 +1837,7 @@ private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): PlayerPreviewSo
 @Composable
 private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): PlayerPreviewSource? {
     val isCape = type == CosmeticType.Cape
+    val isPet = type == CosmeticType.Pet
 
     var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
     var loadTick by remember(cosmeticId) { mutableIntStateOf(0) }
@@ -1844,10 +1845,10 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
         val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
         val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
         previewId = id
-        val loaded = if (isCape) {
-            CosmeticAssetCache.getCapeResource(id) != null
-        } else {
-            CosmeticAssetCache.getAttachedCosmetic(id) != null
+        val loaded = when {
+            isCape -> CosmeticAssetCache.getCapeResource(id) != null
+            isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+            else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
         }
         if (!loaded) {
             CosmeticAssetCache.ensureCosmeticLoaded(id)
@@ -1855,15 +1856,29 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
         }
     }
 
-    return remember(previewId, loadTick, isCape) {
-        if (isCape) {
-            val cape = CosmeticAssetCache.getCapeResource(previewId) ?: return@remember null
-            PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = cape)
-        } else {
-            val attached = CosmeticAssetCache.getAttachedCosmetic(previewId) ?: return@remember null
-            val equipment = CosmeticEquipment()
-            equipment.equip(attached)
-            PlayerPreviewSource.Override(equipment)
+    return remember(previewId, loadTick, isCape, isPet) {
+        when {
+            isCape -> {
+                val cape = CosmeticAssetCache.getCapeResource(previewId) ?: return@remember null
+                PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = cape)
+            }
+            isPet -> {
+                val attached = CosmeticAssetCache.getAttachedCosmetic(previewId)
+                if (attached != null) {
+                    val equipment = CosmeticEquipment()
+                    equipment.equip(attached)
+                    PlayerPreviewSource.Override(equipment)
+                } else {
+                    val pet = CosmeticAssetCache.getPetDefinition(previewId) ?: return@remember null
+                    PlayerPreviewSource.Override(CosmeticEquipment(), pet = pet)
+                }
+            }
+            else -> {
+                val attached = CosmeticAssetCache.getAttachedCosmetic(previewId) ?: return@remember null
+                val equipment = CosmeticEquipment()
+                equipment.equip(attached)
+                PlayerPreviewSource.Override(equipment)
+            }
         }
     }
 }
@@ -2432,7 +2447,7 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
     LaunchedEffect(bundleCosmeticIds) {
         var changed = false
         for (id in bundleCosmeticIds) {
-            if (CosmeticAssetCache.getAttachedCosmetic(id) == null) {
+            if (CosmeticAssetCache.getAttachedCosmetic(id) == null && CosmeticAssetCache.getPetDefinition(id) == null) {
                 CosmeticAssetCache.ensureCosmeticLoaded(id)
                 changed = true
             }
@@ -2448,7 +2463,8 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
         for (id in CosmeticCatalog.localEquipped().ids()) {
             CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
         }
-        PlayerPreviewSource.Override(equipment)
+        val pet = bundleCosmeticIds.firstNotNullOfOrNull { CosmeticAssetCache.getPetDefinition(it) }
+        PlayerPreviewSource.Override(equipment, pet = pet)
     }
 }
 

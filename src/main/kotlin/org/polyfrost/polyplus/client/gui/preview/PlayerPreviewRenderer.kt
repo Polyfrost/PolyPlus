@@ -535,10 +535,12 @@ object PlayerPreviewRenderer {
         /*val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
         *///?} else {
         val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
         //?}
@@ -591,10 +593,12 @@ object PlayerPreviewRenderer {
         /*val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
         *///?} else {
         val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
         //?}
@@ -604,12 +608,111 @@ object PlayerPreviewRenderer {
         mc.entityRenderDispatcher.setRenderShadow(false)
         try {
             mc.entityRenderDispatcher.render(state, 0.0, 0.0, 0.0, pose, bufferSource, 0xF000F0)
+            renderPreviewPetLegacy(previewPet(source), pose, bufferSource, yawDeg)
             bufferSource.endBatch()
         } finally {
             mc.entityRenderDispatcher.setRenderShadow(true)
         }
         *///?}
     }
+
+    private fun previewPet(source: PlayerPreviewSource): org.polyfrost.polyplus.client.cosmetics.PetDefinition? = when (source) {
+        is PlayerPreviewSource.Override -> source.pet
+        PlayerPreviewSource.LocalLive ->
+            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
+                ?.let { org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getPetDefinition(it) }
+    }
+
+    private val previewPetModelCache =
+        java.util.concurrent.ConcurrentHashMap<Int, org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel>()
+
+    private fun idlePetPose(definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition): Map<String, org.polyfrost.polyplus.client.bedrock.playback.BoneTransform> {
+        val animationName = definition.stateMap["idle"] ?: definition.stateMap.values.firstOrNull()
+        val animation = animationName?.let { definition.animations[it] } ?: return emptyMap()
+        val timeTicks = org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback.resolveTimeTicks(
+            animation,
+            (System.nanoTime() / 50_000_000L).toFloat(),
+        )
+        return org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
+    }
+
+    private const val PREVIEW_PET_SIDE_OFFSET = -0.65
+
+    /** Must match [org.polyfrost.polyplus.client.pets.PetEntityRenderer]'s per-frame hold time. */
+    private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
+
+    private fun previewTextureFrame(definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition): Pair<Float, Float> {
+        val frameCount = definition.textureFrameCount
+        if (frameCount <= 1) return 1f to 0f
+        val ticks = System.nanoTime() / 50_000_000L
+        val frame = (ticks / PREVIEW_TICKS_PER_TEXTURE_FRAME) % frameCount
+        return (1f / frameCount) to (frame.toFloat() / frameCount)
+    }
+
+    //? if >= 1.21.10 {
+    private fun submitPreviewPet(
+        definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition,
+        poseStack: PoseStack,
+        submitNodeCollector: net.minecraft.client.renderer.SubmitNodeCollector,
+        lightCoords: Int,
+        yawDeg: Float,
+    ) {
+        val model = previewPetModelCache.getOrPut(definition.id) {
+            org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel.build(definition.geometry)
+        }
+        val pose = idlePetPose(definition)
+        model.resetPose()
+        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
+
+        //? if >= 26.1 {
+        val renderType = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(definition.texture)
+        //?} elif >= 1.21.11 {
+        /*val renderType = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull(definition.texture)
+        *///?} else {
+        /*val renderType = net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture)
+        *///?}
+
+        poseStack.pushPose()
+        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
+        poseStack.scale(-definition.scale, -definition.scale, definition.scale)
+        poseStack.mulPose(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
+        val (vScale, vOffset) = previewTextureFrame(definition)
+        submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
+            val localStack = PoseStack()
+            localStack.last().set(basePose)
+            for (root in model.roots) {
+                root.render(localStack, buffer, lightCoords, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
+            }
+        }
+        poseStack.popPose()
+    }
+    //?} else {
+    /*private fun renderPreviewPetLegacy(
+        definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition?,
+        poseStack: PoseStack,
+        bufferSource: net.minecraft.client.renderer.MultiBufferSource,
+        yawDeg: Float,
+    ) {
+        if (definition == null) return
+        val model = previewPetModelCache.getOrPut(definition.id) {
+            org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel.build(definition.geometry)
+        }
+        val pose = idlePetPose(definition)
+        model.resetPose()
+        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
+
+        val buffer = bufferSource.getBuffer(net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture))
+        poseStack.pushPose()
+        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
+        poseStack.scale(-definition.scale, -definition.scale, definition.scale)
+        poseStack.mulPose(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
+        val (vScale, vOffset) = previewTextureFrame(definition)
+        for (root in model.roots) {
+            root.render(poseStack, buffer, 0xF000F0, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
+        }
+        poseStack.popPose()
+    }
+    *///?}
 
     private val loadAttempted = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Int, Boolean>())
 

@@ -19,6 +19,7 @@ enum class CosmeticType {
     Aura,
     Boots,
     Shoulder,
+    Pet,
     Emote,
     Unknown;
 
@@ -33,6 +34,7 @@ enum class CosmeticType {
             Aura -> "aura"
             Boots -> "boots"
             Shoulder -> "shoulder"
+            Pet -> "pet"
             Emote -> "emote"
             Unknown -> "unknown"
         }
@@ -48,6 +50,7 @@ enum class CosmeticType {
             Aura -> "Aura"
             Boots -> "Boots"
             Shoulder -> "Shoulder"
+            Pet -> "Pet"
             Emote -> "Emote"
             Unknown -> "Unknown"
         }
@@ -62,6 +65,7 @@ enum class CosmeticType {
         Aura -> BodySlot.Aura
         Boots -> BodySlot.Boots
         Shoulder -> BodySlot.Shoulder
+        Pet -> BodySlot.Pet
         Emote, Unknown -> null
     }
 

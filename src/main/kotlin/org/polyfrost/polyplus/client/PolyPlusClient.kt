@@ -34,6 +34,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.pets.PetEntities
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.utils.EarlyInitializable
 
@@ -89,6 +90,9 @@ object PolyPlusClient {
             add(CosmeticsInitializer)
         }
         earlyHooks.forEach(EarlyInitializable::earlyInitialize)
+
+        //? if >= 1.21.1
+        PetEntities.register()
 
         PolyConnection.initialize {
             LOGGER.info("Connected to PolyPlus WebSocket server.")

@@ -32,6 +32,8 @@ data class BedrockQuad(
         overlayCoords: Int,
         color: Int,
         scratch: Vector3f,
+        vScale: Float = 1f,
+        vOffset: Float = 0f,
     ) {
         val matrix = pose.pose()
         val normal = pose.transformNormal(nx, ny, nz, scratch)
@@ -41,10 +43,10 @@ data class BedrockQuad(
 
         val light = if (lightLevel < 0) lightCoords else emissive(lightCoords, lightLevel)
 
-        emitVertex(v0, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch)
-        emitVertex(v1, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch)
-        emitVertex(v2, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch)
-        emitVertex(v3, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch)
+        emitVertex(v0, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch, vScale, vOffset)
+        emitVertex(v1, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch, vScale, vOffset)
+        emitVertex(v2, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch, vScale, vOffset)
+        emitVertex(v3, matrix, buffer, color, overlayCoords, light, nxOut, nyOut, nzOut, scratch, vScale, vOffset)
     }
 
     private fun emitVertex(
@@ -58,6 +60,8 @@ data class BedrockQuad(
         ny: Float,
         nz: Float,
         scratch: Vector3f,
+        vScale: Float,
+        vOffset: Float,
     ) {
         val pos = matrix.transformPosition(
             vertex.x / PIXEL_SCALE,
@@ -66,7 +70,8 @@ data class BedrockQuad(
             scratch,
         )
 
-        buffer.addVertex(pos.x(), pos.y(), pos.z(), color, vertex.u, vertex.v, overlayCoords, lightCoords, nx, ny, nz)
+        val v = vertex.v * vScale + vOffset
+        buffer.addVertex(pos.x(), pos.y(), pos.z(), color, vertex.u, v, overlayCoords, lightCoords, nx, ny, nz)
     }
 
     companion object {

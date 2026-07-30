@@ -26,13 +26,15 @@ class BedrockMesh private constructor(
         lightCoords: Int,
         overlayCoords: Int,
         color: Int = -1,
+        vScale: Float = 1f,
+        vOffset: Float = 0f,
     ) {
         if (quads.isEmpty())
             return
 
         val scratch = Vector3f()
         for (quad in quads) {
-            quad.emit(pose, buffer, lightCoords, overlayCoords, color, scratch)
+            quad.emit(pose, buffer, lightCoords, overlayCoords, color, scratch, vScale, vOffset)
         }
     }
 

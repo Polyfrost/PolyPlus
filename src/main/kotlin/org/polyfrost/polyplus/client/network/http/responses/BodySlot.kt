@@ -20,6 +20,7 @@ enum class BodySlot {
     Aura,
     Boots,
     Shoulder,
+    Pet,
     Unknown;
 
     val serializedName: String
@@ -34,6 +35,7 @@ enum class BodySlot {
             Aura -> "aura"
             Boots -> "boots"
             Shoulder -> "shoulder"
+            Pet -> "pet"
             Unknown -> "unknown"
         }
 
@@ -49,6 +51,7 @@ enum class BodySlot {
             Aura -> "Aura"
             Boots -> "Boots"
             Shoulder -> "Shoulder"
+            Pet -> "Pet"
             Unknown -> "Unknown"
         }
 
@@ -62,12 +65,13 @@ enum class BodySlot {
         Aura -> CosmeticType.Aura
         Boots -> CosmeticType.Boots
         Shoulder -> CosmeticType.Shoulder
+        Pet -> CosmeticType.Pet
         Unknown -> CosmeticType.Unknown
     }
 
     companion object {
         val equippableSlots: List<BodySlot> =
-            listOf(Cape, Backpack, Glasses, Wings, LeftHand, RightHand, Hat, Aura, Boots, Shoulder)
+            listOf(Cape, Backpack, Glasses, Wings, LeftHand, RightHand, Hat, Aura, Boots, Shoulder, Pet)
 
         fun fromSerializedName(name: String): BodySlot? =
             entries.firstOrNull { it != Unknown && it.serializedName == name }

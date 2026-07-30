@@ -14,5 +14,6 @@ data class AttachedCosmetic(
     val texture: Identifier,
     val model: BedrockEffectModel,
     val animation: BedrockAnimation? = null,
+    val scale: Float = 1f,
 )
 //?}
