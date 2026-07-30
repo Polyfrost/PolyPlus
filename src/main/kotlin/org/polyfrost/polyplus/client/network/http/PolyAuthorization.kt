@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.network.http
 
-import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.post
 import kotlinx.coroutines.CoroutineStart
@@ -88,7 +87,7 @@ object PolyAuthorization {
             .post("${PolyPlusConfig.apiUrl}/account/login?server_id=$serverId&username=$playerName") {
                 expectSuccess = true
             }
-            .body<AuthResponse>()
+            .bodyOrThrow<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
         return response
     }

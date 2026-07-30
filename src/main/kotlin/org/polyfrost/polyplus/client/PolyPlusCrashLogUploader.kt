@@ -5,7 +5,11 @@ import io.sentry.Hint
 import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryLevel
+import io.sentry.protocol.Mechanism
 import io.sentry.protocol.Message
+import io.sentry.protocol.SentryException
+import io.sentry.protocol.SentryStackFrame
+import io.sentry.protocol.SentryStackTrace
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
@@ -137,6 +141,7 @@ object PolyPlusCrashLogUploader {
             level = SentryLevel.FATAL
             message = Message().apply { formatted = summarize(body, isJvmFatal) }
             fingerprints = fingerprint
+            exceptions = listOf(syntheticException(body, isJvmFatal))
             setTag("mechanism", if (isJvmFatal) "jvm_fatal_log" else "crash_report_file")
             setTag("source", "postmortem")
             setExtra("crash_file", file.name)
@@ -200,6 +205,71 @@ object PolyPlusCrashLogUploader {
 
     private val THROWABLE_LINE = Regex("(?m)^[\\w.$]+(?:Exception|Error|Throwable)(?::.*)?$")
     private val TOP_FRAME = Regex("(?m)^\\s+at (\\S+)")
+
+    private const val MAX_FRAMES = 250
+
+    private fun syntheticException(body: String, isJvmFatal: Boolean): SentryException {
+        if (isJvmFatal) {
+            return SentryException().apply {
+                setType("JvmFatalError")
+                setValue(summarize(body, true))
+                setMechanism(crashMechanism("jvm_fatal_log"))
+            }
+        }
+
+        val header = THROWABLE_LINE.find(body)?.value?.trim()
+        val qualified = header?.substringBefore(':')?.trim().orEmpty()
+        return SentryException().apply {
+            setType(qualified.substringAfterLast('.').ifEmpty { "MinecraftCrash" })
+            setModule(qualified.substringBeforeLast('.', "").takeIf { it.isNotEmpty() })
+            setValue(
+                header?.substringAfter(':', "")?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: valueAfter(body, "Description:"),
+            )
+            setMechanism(crashMechanism("crash_report_file"))
+            parseFrames(body).takeIf { it.isNotEmpty() }?.let {
+                setStacktrace(SentryStackTrace(it).apply { setSnapshot(false) })
+            }
+        }
+    }
+
+    private fun crashMechanism(type: String): Mechanism = Mechanism().apply {
+        setType(type)
+        setHandled(false)
+        setSynthetic(true)
+    }
+
+    private fun parseFrames(body: String): List<SentryStackFrame> {
+        val lines = body.lines()
+        val start = lines.indexOfFirst { THROWABLE_LINE.matches(it) }
+        if (start < 0) return emptyList()
+
+        val frames = ArrayList<SentryStackFrame>()
+        for (index in start + 1 until lines.size) {
+            val line = lines[index].trim()
+            when {
+                line.startsWith("at ") -> frames += stackFrame(line.removePrefix("at ").trim())
+                line.startsWith("...") -> Unit
+                line.isEmpty() && frames.isEmpty() -> Unit
+                else -> break
+            }
+            if (frames.size >= MAX_FRAMES) break
+        }
+        return frames.reversed()
+    }
+
+    private fun stackFrame(raw: String): SentryStackFrame {
+        val signature = raw.substringAfter("//") // drop the Fabric class-loader prefix
+        val qualified = signature.substringBefore('(')
+        val locator = signature.substringAfter('(', "").substringBefore(')')
+        return SentryStackFrame().apply {
+            setModule(qualified.substringBeforeLast('.', "").takeIf { it.isNotEmpty() })
+            setFunction(qualified.substringAfterLast('.').takeIf { it.isNotEmpty() })
+            setFilename(locator.substringBefore(':').takeIf { it.isNotEmpty() })
+            setLineno(locator.substringAfter(':', "").toIntOrNull())
+            setInApp(qualified.startsWith("org.polyfrost."))
+        }
+    }
 
     private fun valueAfter(text: String, prefix: String): String? = text.lineSequence()
         .firstOrNull { it.startsWith(prefix) }

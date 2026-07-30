@@ -24,13 +24,14 @@ import org.polyfrost.polyplus.utils.Batcher
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 object CosmeticSync : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
     private val BATCHER = Batcher(Duration.ofMillis(200), HashSet<String>()) { players ->
         subscribePlayers(players.toList())
     }
-    private val subscribedPlayers = HashSet<String>()
+    private val subscribedPlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private const val MAX_PLAYERS_PER_REQUEST = 64
 

@@ -2,6 +2,7 @@
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,8 +11,14 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.outputStream
 
+internal class OutOfDiskSpaceException(cause: IOException) :
+    IOException("Out of disk space while writing cosmetic assets", cause)
+
 internal object AssetArchive {
-    fun materialize(bytes: ByteArray, targetDir: Path): Path {
+    private val OUT_OF_SPACE_MARKERS =
+        listOf("no space left", "not enough space", "disk full", "insufficient disk space")
+
+    fun materialize(bytes: ByteArray, targetDir: Path): Path = mappingDiskFull {
         targetDir.createDirectories()
         if (isZip(bytes)) {
             extractZip(bytes, targetDir)
@@ -19,7 +26,20 @@ internal object AssetArchive {
             val single = targetDir.resolve("asset.bin")
             Files.write(single, bytes)
         }
-        return targetDir
+        targetDir
+    }
+
+    private inline fun <T> mappingDiskFull(block: () -> T): T = try {
+        block()
+    } catch (e: IOException) {
+        throw if (isOutOfSpace(e)) OutOfDiskSpaceException(e) else e
+    }
+
+    private fun isOutOfSpace(error: IOException): Boolean {
+        val messages = generateSequence<Throwable>(error) { current ->
+            current.cause?.takeIf { it !== current }
+        }.mapNotNull { it.message }.joinToString(" ")
+        return OUT_OF_SPACE_MARKERS.any { messages.contains(it, ignoreCase = true) }
     }
 
     private fun isZip(bytes: ByteArray): Boolean =
