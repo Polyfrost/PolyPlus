@@ -8,7 +8,12 @@ import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
 import io.sentry.Attachment
 import io.sentry.Sentry
+import io.sentry.SentryEvent
+import io.sentry.exception.ExceptionMechanismException
+import io.sentry.protocol.Mechanism
+import io.sentry.protocol.Message
 import io.sentry.protocol.SentryId
+import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -19,8 +24,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 object PolyPlusSentry {
+
     private const val DSN =
-        "https://8aad59841c698c55f86ec3992b853628@o4511714343124992.ingest.us.sentry.io/4511714567979008"
+        "https://e48ba6e979b72c09075eff3ec145a5e4@o4511714343124992.ingest.us.sentry.io/4511826505891840"
 
     private const val MAX_EVENTS_PER_SIGNATURE = 5
 
@@ -223,7 +229,7 @@ object PolyPlusSentry {
     @JvmStatic
     fun capture(throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
-        if (throwable is kotlinx.coroutines.CancellationException) return
+        if (throwable is CancellationException) return
         initialize()
         if (isTransientNetworkFailure(throwable)) return
         if (isExpectedAccountState(throwable)) return
@@ -231,7 +237,7 @@ object PolyPlusSentry {
         if (isReporterArtifact(throwable)) return
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
-        Sentry.captureException(throwable)
+        send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
     }
 
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
@@ -296,13 +302,18 @@ object PolyPlusSentry {
      * foreign/vanilla/other-mod crash is intentionally kept.
      */
     private fun isReporterArtifact(throwable: Throwable): Boolean {
+        if (isDeliberateCrash(throwable)) return true
+
         var cause: Throwable? = throwable
         while (cause != null) {
-            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog
-            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")"),
+            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog)
+            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")") — not a fault.
             if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
 
             if (cause is RuntimeException && cause.message == "Crash requested by CrashPatch") return true
+
+            // KeyboardHandler's F3+C debug crash: the player asked for it.
+            if (cause.message == DEBUG_CRASH) return true
 
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
@@ -381,6 +392,44 @@ object PolyPlusSentry {
         return false
     }
 
+    private const val DEBUG_CRASH = "Manually triggered debug crash"
+
+    /** SkyHanni's opt-in "crash on <event>" features, which live under this class name prefix. */
+    private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
+
+    private val SHUTDOWN_WATCHDOG = Regex("""Client shutdown.*java\.lang\.Error: Watchdog""")
+
+    /**
+     * Crash reports that are never worth reporting, matched on a description of the form
+     * `<crash report title>: <throwable>` so both live and postmortem reports are covered.
+     *
+     * - Shutdown watchdogs fire because some mod left a long-running thread non-daemon. Commonplace
+     *   from Minecraft 26.2 onwards and harmless beyond delaying the exit.
+     * - Debug crashes are what the player asked for by holding F3+C.
+     */
+    internal fun isIgnoredCrashReport(description: String?): Boolean {
+        if (description == null) return false
+        return SHUTDOWN_WATCHDOG.containsMatchIn(description) || description.contains(DEBUG_CRASH)
+    }
+
+    /**
+     * A crash a mod threw on purpose because the player switched it on. Matched by class, since the
+     * messages are jokes that get reworded.
+     */
+    internal fun isDeliberateCrash(crashReport: String): Boolean =
+        crashReport.contains(DELIBERATE_CRASH_CLASS)
+
+    private fun isDeliberateCrash(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            if (cause.stackTrace.any { it.className.startsWith(DELIBERATE_CRASH_CLASS) }) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
     private fun isMemoryExhaustion(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
@@ -396,34 +445,80 @@ object PolyPlusSentry {
     fun captureMessage(message: String) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
-        Sentry.captureMessage(message, io.sentry.SentryLevel.ERROR)
+        val kind = CrashKind.RUNTIME_ERROR
+        val event = SentryEvent()
+        event.message = Message().apply { formatted = "[${kind.label}] $message" }
+        event.markCrashKind(kind)
+        Sentry.captureEvent(event)
     }
 
+    /**
+     * Reports a crash report the game built. Severity depends on what happened next, which
+     * [CrashOutcomeTracker] resolves a few moments later, so the send is deferred until then.
+     */
     @JvmStatic
-    fun captureFatal(throwable: Throwable) {
+    fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         if (!Sentry.isEnabled()) return
+
+        val description = if (title.isNullOrBlank()) throwable.toString() else "$title: $throwable"
+        if (isIgnoredCrashReport(description) || isDeliberateCrash(throwable)) {
+            PolyPlusCrashLogUploader.recordIgnoredCrash()
+            return
+        }
+        // Recovering from an ignored crash leaves the client half torn down (NotEnoughCrashes nulls
+        // the player and level), so whatever crashes next is fallout from it rather than a fault.
+        if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
+            PolyPlusCrashLogUploader.recordIgnoredCrash()
+            return
+        }
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
-        val root = runCatching { mostInformativeCause(throwable) }.getOrNull()
-        val id = Sentry.captureException(throwable) { scope ->
-            scope.setTag("mechanism", "crash_report")
+
+        val thread = Thread.currentThread()
+        CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, thread) }
+    }
+
+    private fun deliver(throwable: Throwable, kind: CrashKind, description: String?, thread: Thread) {
+        val root = runCatching { mostInformativeCause(throwable) }.getOrNull() ?: throwable
+        val id = send(throwable, kind, description, thread) { event ->
+            event.setTag("mechanism", "crash_report")
             runCatching {
-                val target = root ?: throwable
-                if (target !== throwable) {
+                if (root !== throwable) {
                     // Keeps entrypoint failures distinguishable from mixin failures at a glance.
-                    scope.setTag("wrapped_by", throwable.javaClass.simpleName)
-                    entrypointModId(throwable)?.let { scope.setTag("entrypoint_mod", it) }
+                    event.setTag("wrapped_by", throwable.javaClass.simpleName)
+                    entrypointModId(throwable)?.let { event.setTag("entrypoint_mod", it) }
                 }
-                val top = target.stackTrace.firstOrNull()
-                scope.fingerprint = explicitFingerprint(throwable, target) ?: listOfNotNull(
-                    target.javaClass.name,
+                val top = root.stackTrace.firstOrNull()
+                val explicit = explicitFingerprint(throwable, root) ?: listOfNotNull(
+                    root.javaClass.name,
                     top?.let { "${it.className}.${normalizeMethodName(it.methodName)}" },
                 )
+                event.fingerprints = explicit + kind.tag
             }
         }
         if (id != SentryId.EMPTY_ID) PolyPlusCrashLogUploader.recordLiveCapture(throwable)
         Sentry.flush(5_000)
+    }
+
+    private fun send(
+        throwable: Throwable,
+        kind: CrashKind,
+        description: String?,
+        thread: Thread,
+        customise: (SentryEvent) -> Unit = {},
+    ): SentryId {
+        val mechanism = Mechanism()
+        mechanism.type = kind.tag
+        mechanism.description = description
+        mechanism.isHandled = kind.handled
+
+        val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
+        // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
+        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.markCrashKind(kind)
+        customise(event)
+        return Sentry.captureEvent(event)
     }
 }

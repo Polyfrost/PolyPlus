@@ -4,7 +4,6 @@ import io.sentry.Attachment
 import io.sentry.Hint
 import io.sentry.Sentry
 import io.sentry.SentryEvent
-import io.sentry.SentryLevel
 import io.sentry.protocol.Mechanism
 import io.sentry.protocol.Message
 import io.sentry.protocol.SentryException
@@ -14,6 +13,7 @@ import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 object PolyPlusCrashLogUploader {
     private const val MAX_ATTACHMENT_BYTES = 512 * 1024
@@ -21,16 +21,22 @@ object PolyPlusCrashLogUploader {
     private const val MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
     private const val UPLOADED_HISTORY = 200
     private const val LIVE_HISTORY = 20
+    private const val IGNORED_HISTORY = 20
 
     private const val LIVE_MATCH_WINDOW_MS = 900_000L
 
+    /** How long after an ignored crash further crashes count as fallout from its recovery. */
+    private const val SIDE_EFFECT_WINDOW_MS = 10_000L
+
     private val ran = AtomicBoolean(false)
     private val stateLock = Any()
+    private val lastIgnoredCrash = AtomicLong(0)
 
     private val gameDir: File get() = FabricLoader.getInstance().gameDir.toFile()
     private val stateDir: File get() = File(gameDir, "polyplus/sentry")
     private val uploadedFile: File get() = File(stateDir, "uploaded.txt")
     private val liveCaptureFile: File get() = File(stateDir, "live-captures.txt")
+    private val ignoredCrashFile: File get() = File(stateDir, "ignored-crashes.txt")
 
     private data class LiveCapture(val at: Long, val throwableClass: String, val topFrame: String)
 
@@ -46,6 +52,29 @@ object PolyPlusCrashLogUploader {
             }
         }
     }
+
+    /**
+     * Records that a crash report was deliberately not sent, so the crash file it leaves behind and
+     * anything that crashes while the game recovers from it are skipped too.
+     */
+    fun recordIgnoredCrash() {
+        val at = System.currentTimeMillis()
+        lastIgnoredCrash.set(at)
+        runCatching {
+            synchronized(stateLock) {
+                stateDir.mkdirs()
+                val stamps = readLines(ignoredCrashFile) + at.toString()
+                ignoredCrashFile.writeText(stamps.takeLast(IGNORED_HISTORY).joinToString("\n"))
+            }
+        }
+    }
+
+    /** Whether [at] falls in the window after a crash this session chose to ignore. */
+    fun isSideEffectOfIgnoredCrash(at: Long): Boolean =
+        isSideEffectOfIgnoredCrash(listOf(lastIgnoredCrash.get()), at)
+
+    private fun isSideEffectOfIgnoredCrash(ignored: List<Long>, at: Long): Boolean =
+        ignored.any { it > 0 && at - it in 0..SIDE_EFFECT_WINDOW_MS }
 
     fun uploadPending() {
         if (!PrivacyConsent.allowsOnlineServices()) return
@@ -71,6 +100,7 @@ object PolyPlusCrashLogUploader {
             }
 
             val liveCaptures = readLines(liveCaptureFile).mapNotNull(::parseLiveCapture)
+            val ignoredCrashes = readLines(ignoredCrashFile).mapNotNull { it.trim().toLongOrNull() }
             val now = System.currentTimeMillis()
             var sent = 0
 
@@ -84,10 +114,15 @@ object PolyPlusCrashLogUploader {
 
                 val isJvmFatal = file.name.startsWith("hs_err_pid")
                 val body = prepare(file, isJvmFatal) ?: continue
+                val summary = summarize(body, isJvmFatal)
+                if (!isJvmFatal && PolyPlusSentry.isIgnoredCrashReport(summary)) continue
+                if (!isJvmFatal && PolyPlusSentry.isDeliberateCrash(body)) continue
+                if (!isJvmFatal && isSideEffectOfIgnoredCrash(ignoredCrashes, file.lastModified())) continue
+
                 val fingerprint = fingerprint(body, isJvmFatal)
                 if (!isJvmFatal && alreadyReportedLive(liveCaptures, fingerprint, file.lastModified())) continue
 
-                if (send(file, body, fingerprint, isJvmFatal)) sent++
+                if (send(file, body, summary, fingerprint, isJvmFatal)) sent++
             }
 
             writeUploaded(uploaded)
@@ -136,12 +171,21 @@ object PolyPlusCrashLogUploader {
         scrub(if (isJvmFatal) trimJvmFatalLog(raw) else raw).take(MAX_ATTACHMENT_BYTES)
     }.getOrNull()
 
-    private fun send(file: File, body: String, fingerprint: List<String>, isJvmFatal: Boolean): Boolean = runCatching {
+    private fun send(
+        file: File,
+        body: String,
+        summary: String,
+        fingerprint: List<String>,
+        isJvmFatal: Boolean,
+    ): Boolean = runCatching {
+        // Anything reaching here went unreported while the game was alive, so it took the game down.
+        val kind = CrashKind.HARD_CRASH
+
         val event = SentryEvent().apply {
-            level = SentryLevel.FATAL
-            message = Message().apply { formatted = summarize(body, isJvmFatal) }
+            message = Message().apply { formatted = "[${kind.label}] $summary" }
             fingerprints = fingerprint
             exceptions = listOf(syntheticException(body, isJvmFatal))
+            markCrashKind(kind)
             setTag("mechanism", if (isJvmFatal) "jvm_fatal_log" else "crash_report_file")
             setTag("source", "postmortem")
             setExtra("crash_file", file.name)

@@ -112,6 +112,7 @@ object PolyPlusClient {
 
     fun initialize() {
         step("sentry") { PolyPlusSentry.initialize() }
+        step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
         step("config preload") { PolyPlusConfig.preload() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
