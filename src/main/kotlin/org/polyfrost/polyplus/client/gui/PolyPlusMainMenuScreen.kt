@@ -1094,7 +1094,7 @@ private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
             FooterBrandText(platformLabel(), assetsReady)
         }
         MenuText(
-            "Copyright Mojang AB, Do Not distribute!",
+            "Copyright Mojang AB. Do not distribute!",
             fontSize = 13.sp,
             color = TextSecondary,
             modifier = Modifier
