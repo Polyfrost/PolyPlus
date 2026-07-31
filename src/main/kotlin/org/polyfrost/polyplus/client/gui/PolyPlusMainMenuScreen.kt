@@ -576,6 +576,16 @@ private fun MainMenu(
                     actions,
                     assetsReady,
                 )
+                if (!PolyPlusConfig.hideMainMenuModButtons) {
+                    ModIntegrationBar(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 18.dp)
+                            .guiScaled(scale, TransformOrigin(0.5f, 1f)),
+                        assetsReady,
+                        screen,
+                    )
+                }
                 Footer(Modifier.fillMaxSize(), scale, assetsReady)
             }
         }
@@ -1058,6 +1068,27 @@ private fun worldSubtitle(entry: HostWorldManager.HostWorldEntry): String {
 
 private fun worldVersionLine(entry: HostWorldManager.HostWorldEntry): String =
     "${entry.versionName} · ${gameModeLabel(entry.gameMode)}"
+
+@Composable
+private fun ModIntegrationBar(
+    modifier: Modifier,
+    assetsReady: Boolean,
+    screen: net.minecraft.client.gui.screens.Screen,
+) {
+    val buttons = ModIntegrationButtons.available()
+    if (buttons.isEmpty()) return
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        buttons.forEach { button ->
+            IconButton(
+                icon = button.icon,
+                assetsReady = assetsReady,
+                tooltip = button.tooltip,
+                tooltipPlacement = TooltipPlacement.ABOVE_CENTER,
+                onClick = { button.onClick(screen) },
+            )
+        }
+    }
+}
 
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
@@ -1947,6 +1978,8 @@ private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onCl
     }
 }
 
+private enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
+
 @Composable
 private fun IconButton(
     icon: String,
@@ -1954,6 +1987,7 @@ private fun IconButton(
     assetsReady: Boolean,
     modifier: Modifier = Modifier,
     tooltip: String? = null,
+    tooltipPlacement: TooltipPlacement = TooltipPlacement.BELOW_END,
     onClick: () -> Unit = {},
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -1975,7 +2009,7 @@ private fun IconButton(
         MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
         if (tooltip != null && hovered && buttonSize.width > 0) {
             val totalScale = buttonBounds.width / buttonSize.width
-            val positionProvider = remember(buttonBounds, totalScale) {
+            val positionProvider = remember(buttonBounds, totalScale, tooltipPlacement) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect,
@@ -1983,19 +2017,29 @@ private fun IconButton(
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
                     ): IntOffset {
-                        val gap = (8f * totalScale).roundToInt()
-                        return IntOffset(
-                            (buttonBounds.right - popupContentSize.width).roundToInt(),
-                            (buttonBounds.bottom + gap).roundToInt(),
-                        )
+                        val gap = 8f * totalScale
+                        return when (tooltipPlacement) {
+                            TooltipPlacement.BELOW_END -> IntOffset(
+                                (buttonBounds.right - popupContentSize.width).roundToInt(),
+                                (buttonBounds.bottom + gap).roundToInt(),
+                            )
+                            TooltipPlacement.ABOVE_CENTER -> IntOffset(
+                                (buttonBounds.center.x - popupContentSize.width * totalScale / 2f).roundToInt(),
+                                (buttonBounds.top - gap - popupContentSize.height * totalScale).roundToInt(),
+                            )
+                        }
                     }
                 }
+            }
+            val origin = when (tooltipPlacement) {
+                TooltipPlacement.BELOW_END -> TransformOrigin(1f, 0f)
+                TooltipPlacement.ABOVE_CENTER -> TransformOrigin(0f, 0f)
             }
             Popup(
                 popupPositionProvider = positionProvider,
                 properties = PopupProperties(focusable = false, clippingEnabled = false),
             ) {
-                Box(Modifier.guiScaled(totalScale, TransformOrigin(1f, 0f))) {
+                Box(Modifier.guiScaled(totalScale, origin)) {
                     TooltipBubble(tooltip)
                 }
             }

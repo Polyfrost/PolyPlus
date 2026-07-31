@@ -131,6 +131,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic
     @Switch(
+        title = "Hide Mod Buttons",
+        description = "Hide the row of buttons for supported mods at the bottom of the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuModButtons = false
+
+    @JvmStatic
+    @Switch(
         title = "PolyPlus User Indicators",
         description = "Show a badge on the nametag and tab list of players who are using PolyPlus.",
     )
