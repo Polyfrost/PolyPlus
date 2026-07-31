@@ -50,7 +50,20 @@ object PolyPlusSentry {
 
     private const val FINGERPRINT_FRAMES = 8
 
+    /** Mechanism type Sentry's own uncaught-exception handler stamps on the events it raises. */
+    private const val UNCAUGHT_MECHANISM = "UncaughtExceptionHandler"
+
+    /** Package holding Essential's authentication exceptions, all of which are account state. */
+    private const val ESSENTIAL_AUTH_EXCEPTIONS = "gg.essential.minecraftauth.exception."
+
     private val started = AtomicBoolean(false)
+
+    /**
+     * The thread the client runs on, taken at pre-launch before Minecraft renames it to
+     * "Render thread". An uncaught exception only takes the game down when it happened here.
+     */
+    @Volatile
+    private var gameThread: Thread? = null
 
     private val seen: MutableSet<Throwable> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
 
@@ -148,6 +161,12 @@ object PolyPlusSentry {
         null
     }.getOrNull()
 
+    /** Called from the pre-launch entrypoint, which still runs on the thread the client will use. */
+    @JvmStatic
+    fun markGameThread() {
+        gameThread = Thread.currentThread()
+    }
+
     fun initialize() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!started.compareAndSet(false, true)) return
@@ -170,7 +189,12 @@ object PolyPlusSentry {
             options.isAttachStacktrace = true
             options.setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t) || isExpectedAccountState(t))) null else event
+                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t) || isExpectedAccountState(t))) {
+                    null
+                } else {
+                    rateUncaughtException(event)
+                    event
+                }
             }
         }
 
@@ -238,6 +262,23 @@ object PolyPlusSentry {
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
         send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
+    }
+
+    /**
+     * Rates the events Sentry's own uncaught-exception handler raises, which arrive levelled `FATAL`
+     * no matter where they came from. Only the game thread dying takes the client with it; anywhere
+     * else the exception kills one worker and the session carries on, which is the same outcome as
+     * something PolyPlus caught itself.
+     */
+    private fun rateUncaughtException(event: SentryEvent) {
+        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return
+        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return
+
+        val onGameThread = gameThread?.let { it === wrapper.thread } == true
+        val kind = if (onGameThread) CrashKind.HARD_CRASH else CrashKind.RUNTIME_ERROR
+        event.markCrashKind(kind)
+        // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
+        event.fingerprints = listOf("{{ default }}", kind.tag)
     }
 
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
@@ -375,6 +416,8 @@ object PolyPlusSentry {
             val name = cause.javaClass.name
             if (name.contains("UserBannedException")) return true
             if (name.contains("AuthenticationUnavailable")) return true
+            // Essential's session tokens expiring, rate-limiting the refresh, or rejecting it.
+            if (name.startsWith(ESSENTIAL_AUTH_EXCEPTIONS)) return true
             if (cause is ClientRequestException) {
                 when (cause.response.status) {
                     HttpStatusCode.Forbidden, HttpStatusCode.Conflict -> return true

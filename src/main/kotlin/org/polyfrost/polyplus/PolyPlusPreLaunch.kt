@@ -16,6 +16,7 @@ class PolyPlusPreLaunch
     override
     //?}
     fun onPreLaunch() {
+        PolyPlusSentry.markGameThread()
         PolyPlusSentry.initialize()
     }
 
