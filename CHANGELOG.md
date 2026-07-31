@@ -1,2 +1,5 @@
-## 1.1.9
-- Improved error and crash reporting to let us prioritize actual critical issues better
+## 1.1.10
+- Added flashback button to main menu
+- Added realms to main menu
+- Now shows e4mc hint as hover tooltip
+- Corrected punctuation in Mojang copyright
