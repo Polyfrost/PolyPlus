@@ -91,12 +91,9 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             EmoteWheelContent(
                 logger = logger,
                 onRelease = { emoteId ->
-                    logger.info("Wheel released, hovered emote id = {}", emoteId)
                     if (emoteId != null) {
                         PolyPlusClient.SCOPE.launch {
-                            logger.info("Calling CosmeticService.playEmote({})...", emoteId)
                             CosmeticService.playEmote(emoteId)
-                                .onSuccess { logger.info("playEmote({}) succeeded", emoteId) }
                                 .onFailure {
                                     logger.error("Failed to play emote {}", emoteId, it)
                                     PolyPlusSentry.capture(it)
