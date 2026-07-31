@@ -722,10 +722,18 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
 private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
     val enabled = E4mcSupport.isPresent
     var showPopup by remember { mutableStateOf(false) }
-    var showHint by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     var buttonSize by remember { mutableStateOf(IntSize.Zero) }
+    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
 
-    Box(modifier = Modifier.fillMaxWidth().onSizeChanged { buttonSize = it }) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { buttonSize = it }
+            .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
+            .hoverable(interaction),
+    ) {
         PillButton(
             label = "Host World",
             icon = ASSETS + "log-in-04.svg",
@@ -734,8 +742,6 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
             onClick = {
                 if (enabled) {
                     showPopup = true
-                } else {
-                    showHint = !showHint
                 }
             },
         )
@@ -763,30 +769,33 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
                 }
             }
         }
-        if (showHint && !enabled) {
+        if (hovered && !enabled && buttonSize.width > 0) {
+            val totalScale = buttonBounds.width / buttonSize.width
+            val positionProvider = remember(buttonBounds, totalScale) {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val gap = 8f * totalScale
+                        return IntOffset(
+                            (buttonBounds.center.x - popupContentSize.width * totalScale / 2f).roundToInt(),
+                            (buttonBounds.bottom + gap).roundToInt(),
+                        )
+                    }
+                }
+            }
             Popup(
-                alignment = Alignment.TopCenter,
-                offset = IntOffset(0, buttonSize.height + 8),
-                onDismissRequest = { showHint = false },
+                popupPositionProvider = positionProvider,
+                properties = PopupProperties(focusable = false, clippingEnabled = false),
             ) {
-                HintBubble("Install the e4mc mod to host worlds")
+                Box(Modifier.guiScaled(totalScale, TransformOrigin(0f, 0f))) {
+                    TooltipBubble("Install the e4mc mod to host worlds")
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun HintBubble(text: String) {
-    Box(
-        modifier = Modifier
-            .width(280.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        MenuText(text, fontSize = 13.sp, color = TextSecondary)
     }
 }
 
