@@ -23,6 +23,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.DefaultSettings
@@ -93,6 +94,8 @@ object PolyPlusClient {
 
         //? if >= 1.21.1
         PetEntities.register()
+        //? if >= 1.21.1
+        EmoteWheelKeybind.register()
 
         PolyConnection.initialize {
             LOGGER.info("Connected to PolyPlus WebSocket server.")
