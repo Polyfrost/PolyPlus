@@ -17,13 +17,23 @@ internal class ModIntegrationButton(
 internal object ModIntegrationButtons {
     private const val ASSETS = "assets/polyplus/mainmenu/"
 
+    private val flashback = ParentScreenFactory("com.moulberry.flashback.screen.select_replay.SelectReplayScreen")
+    private val modMenu = ParentScreenFactory("com.terraformersmc.modmenu.gui.ModsScreen")
+
     val all: List<ModIntegrationButton> = listOf(
         ModIntegrationButton(
             id = "flashback",
             icon = ASSETS + "video-recorder.svg",
             tooltip = "Flashback replays",
-            isPresent = { modLoaded("flashback") && FlashbackSupport.isUsable },
-            onClick = { parent -> FlashbackSupport.openReplaySelection(parent) },
+            isPresent = { modLoaded("flashback") && flashback.isUsable },
+            onClick = { parent -> flashback.open(parent) },
+        ),
+        ModIntegrationButton(
+            id = "modmenu",
+            icon = ASSETS + "package-01.svg",
+            tooltip = "Fabric Mod Menu",
+            isPresent = { modLoaded("modmenu") && modMenu.isUsable },
+            onClick = { parent -> modMenu.open(parent) },
         ),
     )
 
@@ -38,19 +48,18 @@ internal object ModIntegrationButtons {
     }
 }
 
-private object FlashbackSupport {
-    private const val SELECT_REPLAY_SCREEN = "com.moulberry.flashback.screen.select_replay.SelectReplayScreen"
-
+/** Opens a screen from another mod, reflectively, so the class need not be present at compile time. */
+private class ParentScreenFactory(private val className: String) {
     private val constructor by lazy {
         runCatching {
-            Class.forName(SELECT_REPLAY_SCREEN, false, javaClass.classLoader)
+            Class.forName(className, false, javaClass.classLoader)
                 .getConstructor(Screen::class.java)
         }.getOrNull()
     }
 
     val isUsable: Boolean get() = constructor != null
 
-    fun openReplaySelection(parent: Screen) {
+    fun open(parent: Screen) {
         val screen = runCatching { constructor?.newInstance(parent) as? Screen }.getOrNull() ?: return
         val mc = net.minecraft.client.Minecraft.getInstance()
         //? if >= 26.2 {
