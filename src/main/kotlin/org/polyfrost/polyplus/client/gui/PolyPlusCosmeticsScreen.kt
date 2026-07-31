@@ -262,6 +262,13 @@ private fun selectedStoreVariant(
         ?: variants.first()
 }
 
+private fun checkoutFailureMessage(error: Throwable): String =
+    if (error is BillingService.AlreadyOwnedException) {
+        error.message ?: "You already own this item."
+    } else {
+        "Checkout failed: ${error.message}"
+    }
+
 private data class CosmeticUiItem(
     val groupId: Int,
     val type: CosmeticType,
@@ -349,7 +356,7 @@ private fun PolyPlusCosmeticsScreen() {
             ClientPlatform.runOnMain {
                 status = result.fold(
                     onSuccess = { "Checkout opened in your browser." },
-                    onFailure = { "Checkout failed: ${it.message}" },
+                    onFailure = ::checkoutFailureMessage,
                 )
             }
         }
@@ -497,7 +504,7 @@ private fun PolyPlusCosmeticsScreen() {
                             ClientPlatform.runOnMain {
                                 status = result.fold(
                                     onSuccess = { "Checkout opened in your browser." },
-                                    onFailure = { "Checkout failed: ${it.message}" },
+                                    onFailure = ::checkoutFailureMessage,
                                 )
                             }
                         }

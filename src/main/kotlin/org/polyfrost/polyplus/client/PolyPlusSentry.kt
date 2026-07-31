@@ -8,21 +8,145 @@ import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
 import io.sentry.Attachment
 import io.sentry.Sentry
+import io.sentry.SentryEvent
+import io.sentry.exception.ExceptionMechanismException
+import io.sentry.protocol.Mechanism
+import io.sentry.protocol.Message
 import io.sentry.protocol.SentryId
+import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 object PolyPlusSentry {
+
     private const val DSN =
-        "https://8aad59841c698c55f86ec3992b853628@o4511714343124992.ingest.us.sentry.io/4511714567979008"
+        "https://e48ba6e979b72c09075eff3ec145a5e4@o4511714343124992.ingest.us.sentry.io/4511826505891840"
+
+    private const val MAX_EVENTS_PER_SIGNATURE = 5
+
+    private const val MAX_TRACKED_SIGNATURES = 500
+
+    private const val SIGNATURE_FRAMES = 3
+
+    private const val MAX_UNWRAP_DEPTH = 20
+
+    private val ENTRYPOINT_MOD_ID = Regex("provided by '([^']+)'")
+
+    private val FJP_WORKER_INDEX = Regex("worker-\\d+")
+
+    private val MIXIN_TRANSFORM_TARGET = Regex("Mixin transformation of ([\\w.$]+) failed")
+
+    private val MIXIN_HASH_SEGMENT = Regex("\\$[a-z]{3}\\d{3}\\$")
+
+    private val DIGIT_RUN = Regex("\\d+")
+
+    private const val MIXIN_HASH_PLACEHOLDER = "\$hash\$"
+
+    private const val FINGERPRINT_FRAMES = 8
 
     private val started = AtomicBoolean(false)
 
     private val seen: MutableSet<Throwable> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
+
+    private val signatureCounts = ConcurrentHashMap<String, AtomicInteger>()
+
+    private fun signatureOf(throwable: Throwable): String {
+        val frames = throwable.stackTrace.take(SIGNATURE_FRAMES)
+            .joinToString("|") { "${it.className}.${it.methodName}:${it.lineNumber}" }
+        return "${throwable.javaClass.name}@$frames"
+    }
+
+    private fun allowBySignature(throwable: Throwable): Boolean {
+        val signature = runCatching { signatureOf(throwable) }.getOrNull() ?: return true
+        var counter = signatureCounts[signature]
+        if (counter == null) {
+            if (signatureCounts.size >= MAX_TRACKED_SIGNATURES) return false
+            val fresh = AtomicInteger(0)
+            counter = signatureCounts.putIfAbsent(signature, fresh) ?: fresh
+        }
+        return counter.incrementAndGet() <= MAX_EVENTS_PER_SIGNATURE
+    }
+
+    private fun mostInformativeCause(throwable: Throwable): Throwable {
+        var cause: Throwable = throwable
+        var hops = 0
+        while (hops++ < MAX_UNWRAP_DEPTH) {
+            val next = cause.cause ?: break
+            if (next === cause) break // self-referencing chain
+            val isWrapper = when (cause) {
+                is java.lang.reflect.InvocationTargetException,
+                is java.util.concurrent.ExecutionException,
+                is java.util.concurrent.CompletionException,
+                is ExceptionInInitializerError,
+                is BootstrapMethodError,
+                -> true
+                is RuntimeException -> cause.message?.let { m ->
+                    m.startsWith("Could not execute entrypoint stage") ||
+                        m.startsWith("Mixin transformation of")
+                } == true
+                else -> false
+            }
+            if (!isWrapper) break
+            cause = next
+        }
+        return cause
+    }
+
+    private fun entrypointModId(throwable: Throwable): String? = runCatching {
+        var cause: Throwable? = throwable
+        var hops = 0
+        while (cause != null && hops++ < MAX_UNWRAP_DEPTH) {
+            val message = cause.message
+            if (message != null && message.startsWith("Could not execute entrypoint stage")) {
+                return@runCatching ENTRYPOINT_MOD_ID.find(message)?.groupValues?.getOrNull(1)
+            }
+            val next = cause.cause
+            if (next === cause) break // self-referencing chain
+            cause = next
+        }
+        null
+    }.getOrNull()
+
+    private fun normalizeMessage(message: String): String =
+        DIGIT_RUN.replace(FJP_WORKER_INDEX.replace(message, "worker-N"), "N")
+
+    private fun normalizeMethodName(methodName: String): String =
+        MIXIN_HASH_SEGMENT.replace(methodName, MIXIN_HASH_PLACEHOLDER)
+
+    private fun explicitFingerprint(throwable: Throwable, root: Throwable): List<String>? = runCatching {
+        val messages = listOfNotNull(throwable.message, root.message.takeIf { it !== throwable.message })
+
+        messages.firstOrNull { it.contains("ThreadLocalRandom accessed from a different thread") }?.let {
+            return@runCatching listOf("c2me-threadlocalrandom", normalizeMessage(it))
+        }
+
+        entrypointModId(throwable)?.let {
+            return@runCatching listOf("entrypoint-failure", it)
+        }
+
+        for (message in messages) {
+            MIXIN_TRANSFORM_TARGET.find(message)?.groupValues?.getOrNull(1)?.let {
+                return@runCatching listOf("mixin-transform-failure", it)
+            }
+        }
+
+        root.stackTrace.take(FINGERPRINT_FRAMES).firstOrNull {
+            MIXIN_HASH_SEGMENT.containsMatchIn(it.methodName)
+        }?.let { frame ->
+            return@runCatching listOf(
+                root.javaClass.name,
+                "${frame.className}.${normalizeMethodName(frame.methodName)}",
+            )
+        }
+
+        null
+    }.getOrNull()
 
     fun initialize() {
         if (!PrivacyConsent.allowsOnlineServices()) return
@@ -46,7 +170,7 @@ object PolyPlusSentry {
             options.isAttachStacktrace = true
             options.setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t))) null else event
+                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t) || isExpectedAccountState(t))) null else event
             }
         }
 
@@ -55,6 +179,7 @@ object PolyPlusSentry {
 
     fun shutdown() {
         if (!started.compareAndSet(true, false)) return
+        signatureCounts.clear()
         runCatching { Sentry.close() }
     }
 
@@ -104,17 +229,23 @@ object PolyPlusSentry {
     @JvmStatic
     fun capture(throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
-        if (throwable is kotlinx.coroutines.CancellationException) return
+        if (throwable is CancellationException) return
         initialize()
         if (isTransientNetworkFailure(throwable)) return
+        if (isExpectedAccountState(throwable)) return
+        if (isBenignCancellation(throwable)) return
+        if (isReporterArtifact(throwable)) return
         if (!seen.add(throwable)) return
-        Sentry.captureException(throwable)
+        if (!allowBySignature(throwable)) return
+        send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
     }
 
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
             if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return true
+            // io.ktor.websocket ping timeout: an idle/slow socket the client just reconnects.
+            if (cause.message?.contains("Ping timeout", ignoreCase = true) == true) return true
             when (cause) {
                 is ServerResponseException,
                 is HttpRequestTimeoutException,
@@ -155,6 +286,9 @@ object PolyPlusSentry {
         var cause: Throwable? = throwable
         while (cause != null) {
             if (cause is java.util.concurrent.CancellationException) return true
+            if (cause.message?.contains("The coroutine scope left the composition", ignoreCase = true) == true) {
+                return true
+            }
             val next = cause.cause
             if (next === cause) break
             cause = next
@@ -168,11 +302,18 @@ object PolyPlusSentry {
      * foreign/vanilla/other-mod crash is intentionally kept.
      */
     private fun isReporterArtifact(throwable: Throwable): Boolean {
+        if (isDeliberateCrash(throwable)) return true
+
         var cause: Throwable? = throwable
         while (cause != null) {
-            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog
-            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")"),
+            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog)
+            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")") — not a fault.
             if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
+
+            if (cause is RuntimeException && cause.message == "Crash requested by CrashPatch") return true
+
+            // KeyboardHandler's F3+C debug crash: the player asked for it.
+            if (cause.message == DEBUG_CRASH) return true
 
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
@@ -228,6 +369,67 @@ object PolyPlusSentry {
         return false
     }
 
+    private fun isExpectedAccountState(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            val name = cause.javaClass.name
+            if (name.contains("UserBannedException")) return true
+            if (name.contains("AuthenticationUnavailable")) return true
+            if (cause is ClientRequestException) {
+                when (cause.response.status) {
+                    HttpStatusCode.Forbidden, HttpStatusCode.Conflict -> return true
+                    else -> {}
+                }
+            }
+            cause.message?.let { m ->
+                if (m.contains("bad crack, try again.", ignoreCase = true)) return true
+                if (m.contains("expected status code 101 but was 401", ignoreCase = true)) return true
+            }
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    private const val DEBUG_CRASH = "Manually triggered debug crash"
+
+    /** SkyHanni's opt-in "crash on <event>" features, which live under this class name prefix. */
+    private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
+
+    private val SHUTDOWN_WATCHDOG = Regex("""Client shutdown.*java\.lang\.Error: Watchdog""")
+
+    /**
+     * Crash reports that are never worth reporting, matched on a description of the form
+     * `<crash report title>: <throwable>` so both live and postmortem reports are covered.
+     *
+     * - Shutdown watchdogs fire because some mod left a long-running thread non-daemon. Commonplace
+     *   from Minecraft 26.2 onwards and harmless beyond delaying the exit.
+     * - Debug crashes are what the player asked for by holding F3+C.
+     */
+    internal fun isIgnoredCrashReport(description: String?): Boolean {
+        if (description == null) return false
+        return SHUTDOWN_WATCHDOG.containsMatchIn(description) || description.contains(DEBUG_CRASH)
+    }
+
+    /**
+     * A crash a mod threw on purpose because the player switched it on. Matched by class, since the
+     * messages are jokes that get reworded.
+     */
+    internal fun isDeliberateCrash(crashReport: String): Boolean =
+        crashReport.contains(DELIBERATE_CRASH_CLASS)
+
+    private fun isDeliberateCrash(throwable: Throwable): Boolean {
+        var cause: Throwable? = throwable
+        while (cause != null) {
+            if (cause.stackTrace.any { it.className.startsWith(DELIBERATE_CRASH_CLASS) }) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
     private fun isMemoryExhaustion(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
@@ -243,17 +445,80 @@ object PolyPlusSentry {
     fun captureMessage(message: String) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
-        Sentry.captureMessage(message, io.sentry.SentryLevel.ERROR)
+        val kind = CrashKind.RUNTIME_ERROR
+        val event = SentryEvent()
+        event.message = Message().apply { formatted = "[${kind.label}] $message" }
+        event.markCrashKind(kind)
+        Sentry.captureEvent(event)
     }
 
+    /**
+     * Reports a crash report the game built. Severity depends on what happened next, which
+     * [CrashOutcomeTracker] resolves a few moments later, so the send is deferred until then.
+     */
     @JvmStatic
-    fun captureFatal(throwable: Throwable) {
+    fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         if (!Sentry.isEnabled()) return
+
+        val description = if (title.isNullOrBlank()) throwable.toString() else "$title: $throwable"
+        if (isIgnoredCrashReport(description) || isDeliberateCrash(throwable)) {
+            PolyPlusCrashLogUploader.recordIgnoredCrash()
+            return
+        }
+        // Recovering from an ignored crash leaves the client half torn down (NotEnoughCrashes nulls
+        // the player and level), so whatever crashes next is fallout from it rather than a fault.
+        if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
+            PolyPlusCrashLogUploader.recordIgnoredCrash()
+            return
+        }
         if (!seen.add(throwable)) return
-        val id = Sentry.captureException(throwable) { scope -> scope.setTag("mechanism", "crash_report") }
+        if (!allowBySignature(throwable)) return
+
+        val thread = Thread.currentThread()
+        CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, thread) }
+    }
+
+    private fun deliver(throwable: Throwable, kind: CrashKind, description: String?, thread: Thread) {
+        val root = runCatching { mostInformativeCause(throwable) }.getOrNull() ?: throwable
+        val id = send(throwable, kind, description, thread) { event ->
+            event.setTag("mechanism", "crash_report")
+            runCatching {
+                if (root !== throwable) {
+                    // Keeps entrypoint failures distinguishable from mixin failures at a glance.
+                    event.setTag("wrapped_by", throwable.javaClass.simpleName)
+                    entrypointModId(throwable)?.let { event.setTag("entrypoint_mod", it) }
+                }
+                val top = root.stackTrace.firstOrNull()
+                val explicit = explicitFingerprint(throwable, root) ?: listOfNotNull(
+                    root.javaClass.name,
+                    top?.let { "${it.className}.${normalizeMethodName(it.methodName)}" },
+                )
+                event.fingerprints = explicit + kind.tag
+            }
+        }
         if (id != SentryId.EMPTY_ID) PolyPlusCrashLogUploader.recordLiveCapture(throwable)
         Sentry.flush(5_000)
+    }
+
+    private fun send(
+        throwable: Throwable,
+        kind: CrashKind,
+        description: String?,
+        thread: Thread,
+        customise: (SentryEvent) -> Unit = {},
+    ): SentryId {
+        val mechanism = Mechanism()
+        mechanism.type = kind.tag
+        mechanism.description = description
+        mechanism.isHandled = kind.handled
+
+        val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
+        // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
+        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.markCrashKind(kind)
+        customise(event)
+        return Sentry.captureEvent(event)
     }
 }

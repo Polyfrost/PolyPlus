@@ -17,6 +17,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
+import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
@@ -35,6 +36,7 @@ import java.io.File
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.imageio.ImageIO
 
 object CosmeticAssetCache {
@@ -101,17 +103,35 @@ object CosmeticAssetCache {
 
             try {
                 val gate = Semaphore(MAX_PARALLEL_DOWNLOADS)
+                val outOfSpace = AtomicBoolean(false)
                 definitions.map { definition ->
                     async {
-                        gate.withPermit {
-                            downloadLockFor(definition).withLock {
-                                runCatching { materializeCosmeticLocked(definition) }
-                                    .onFailure { LOGGER.error("Failed to download cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                        if (!outOfSpace.get()) {
+                            gate.withPermit {
+                                downloadLockFor(definition).withLock {
+                                    runCatching { materializeCosmeticLocked(definition) }
+                                        .onFailure { error ->
+                                            if (error is OutOfDiskSpaceException) {
+                                                if (outOfSpace.compareAndSet(false, true)) {
+                                                    LOGGER.error("Out of disk space caching cosmetics; aborting the batch", error)
+                                                    org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
+                                                }
+                                            } else {
+                                                LOGGER.error("Failed to download cosmetic {}", definition.id, error)
+                                                org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
+                                            }
+                                        }
+                                }
                             }
                         }
                         if (trackProgress) CosmeticLoadProgress.stepAssets()
                     }
                 }.awaitAll()
+
+                if (outOfSpace.get()) {
+                    CosmeticLoadProgress.fail("Out of disk space while downloading cosmetics")
+                    return@withContext
+                }
 
                 //? if >= 1.21.1 {
                 parseLock.withLock { BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir) }

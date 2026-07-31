@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
 import io.ktor.client.request.setBody
@@ -12,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.bodyOrThrow
 import org.polyfrost.polyplus.client.network.http.getBodyAuthorized
 import org.polyfrost.polyplus.client.network.http.putAuthorized
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
@@ -101,7 +101,7 @@ object CosmeticCatalog {
         val cosmetics = runCatching {
             PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics") {
                 expectSuccess = true
-            }.body<CosmeticList>()
+            }.bodyOrThrow<CosmeticList>()
         }.onFailure { LOGGER.error("Failed to fetch cosmetic catalog", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
             .getOrElse {
                 CosmeticLoadProgress.fail(it.message ?: it::class.java.simpleName)

@@ -15,7 +15,7 @@ public class Mixin_SentryCrashReport {
     )
     private void polyplus$reportToSentry(String title, Throwable cause, CallbackInfo ci) {
         if (cause != null) {
-            PolyPlusSentry.captureFatal(cause);
+            PolyPlusSentry.captureCrashReport(title, cause);
         }
     }
 }

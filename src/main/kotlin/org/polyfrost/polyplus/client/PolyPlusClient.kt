@@ -2,10 +2,17 @@ package org.polyfrost.polyplus.client
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.request
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -75,48 +82,81 @@ object PolyPlusClient {
         }
 
         install(PrivacyGate)
+
+        HttpResponseValidator {
+            validateResponse { response ->
+                val status = response.status
+                // Only 4xx/5xx are failures; 1xx (such as the 101 WebSocket upgrade) and 3xx are not.
+                if (status.value < HttpStatusCode.BadRequest.value) return@validateResponse
+                if (status == HttpStatusCode.Unauthorized) return@validateResponse
+                if (response.request.url.host != apiHost()) return@validateResponse
+
+                val text = runCatching { response.bodyAsText() }.getOrDefault("")
+                throw if (status.value >= 500) {
+                    ServerResponseException(response, text)
+                } else {
+                    ClientRequestException(response, text)
+                }
+            }
+        }
+    }
+
+    private fun apiHost(): String? =
+        runCatching { Url(PolyPlusConfig.apiUrl.url).host }.getOrNull()
+
+    private inline fun step(name: String, block: () -> Unit) {
+        runCatching(block).onFailure { error ->
+            LOGGER.error("PolyPlus init step '{}' failed; continuing without it", name, error)
+            runCatching { PolyPlusSentry.capture(error) }
+        }
     }
 
     fun initialize() {
-        PolyPlusSentry.initialize()
-        SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() }
-        PolyPlusConfig.preload()
-        PrivacyEnforcement.syncConfig()
-        DefaultSettings.initialize()
-        OnboardingFeatures.initialize()
-        org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize()
+        step("sentry") { PolyPlusSentry.initialize() }
+        step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
+        step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
+        step("config preload") { PolyPlusConfig.preload() }
+        step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
+        step("default settings") { DefaultSettings.initialize() }
+        step("onboarding") { OnboardingFeatures.initialize() }
+        step("adaptive blur") { org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize() }
 
         val earlyHooks: List<EarlyInitializable> = buildList {
             //? if >= 1.21.1
             add(CosmeticsInitializer)
         }
-        earlyHooks.forEach(EarlyInitializable::earlyInitialize)
+        earlyHooks.forEach { hook ->
+            step("early init ${hook.javaClass.simpleName}") { hook.earlyInitialize() }
+        }
 
         //? if >= 1.21.1
+        step("pet entities") { PetEntities.register() }
         PetEntities.register()
         //? if >= 1.21.1
         EmoteWheelKeybind.register()
 
-        PolyConnection.initialize {
-            LOGGER.info("Connected to PolyPlus WebSocket server.")
+        step("websocket") {
+            PolyConnection.initialize {
+                LOGGER.info("Connected to PolyPlus WebSocket server.")
 
-            SCOPE.launch {
-                PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
-                //? if >= 1.21.1
-                CosmeticSync.resubscribeVisiblePlayers()
-                if (net.minecraft.client.Minecraft.getInstance().player != null) {
-                    refreshCosmetics()
+                SCOPE.launch {
+                    PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
+                    //? if >= 1.21.1
+                    CosmeticSync.resubscribeVisiblePlayers()
+                    if (net.minecraft.client.Minecraft.getInstance().player != null) {
+                        refreshCosmetics()
+                    }
                 }
             }
         }
 
-        SessionAccounts.capture()
+        step("session accounts") { SessionAccounts.capture() }
 
-        refreshCosmetics()
-        PolyPlusCommands.register()
-        org.polyfrost.polyplus.client.host.HostWorldManager.registerLanPublishHook()
+        step("cosmetics prefetch") { refreshCosmetics() }
+        step("commands") { PolyPlusCommands.register() }
+        step("host world") { org.polyfrost.polyplus.client.host.HostWorldManager.registerLanPublishHook() }
         //? if >= 1.21.11
-        org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
+        step("panorama") { org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize() }
     }
 
     /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */
@@ -131,6 +171,8 @@ object PolyPlusClient {
                 CosmeticCatalog.reset()
                 CosmeticAssetCache.reset()
             }
+
+            runCatching { PolyConnection.reconnect() }
 
             refreshCosmeticsInternal()
         }

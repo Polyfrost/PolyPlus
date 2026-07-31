@@ -28,6 +28,8 @@ object PolyConnection {
     private const val INITIAL_RECONNECT_DELAY_MS = 1_000L
     private const val MAX_RECONNECT_DELAY_MS = 60_000L
 
+    private const val MAX_RECONNECT_ATTEMPTS = 12
+
     private var connectionCallback: (() -> Unit)? = null
     private var job: Job? = null
     @Volatile
@@ -39,6 +41,9 @@ object PolyConnection {
 
     @Volatile
     private var disconnectNotified = false
+
+    @Volatile
+    private var handshakeSucceeded = false
 
     val isConnected: Boolean
         get() = session != null
@@ -105,7 +110,9 @@ object PolyConnection {
         closing = false
         job = PolyPlusClient.SCOPE.launch {
             var attempt = 0
+            var tokenRefreshed = false
             while (isActive) {
+                handshakeSucceeded = false
                 try {
                     connectOnce()
                     // The session ended without throwing: the server closed the
@@ -119,8 +126,13 @@ object PolyConnection {
                 } catch (e: Exception) {
                     if (closing || !isActive) break
                     if (isAuthFailure(e)) {
-                        LOGGER.warn("PolyPlus WebSocket authentication failed (401); refreshing token before retry.")
-                        runCatching { PolyAuthorization.reset() }
+                        if (tokenRefreshed) {
+                            LOGGER.warn("PolyPlus WebSocket still rejected (401) after a token refresh.")
+                        } else {
+                            LOGGER.warn("PolyPlus WebSocket authentication failed (401); refreshing token before retry.")
+                            tokenRefreshed = true
+                            runCatching { PolyAuthorization.reset() }
+                        }
                         notifyDisconnected(null)
                     } else {
                         LOGGER.error("PolyPlus WebSocket connection failed", e)
@@ -131,7 +143,18 @@ object PolyConnection {
                     session = null
                 }
 
+                if (handshakeSucceeded) {
+                    attempt = 0
+                    tokenRefreshed = false
+                }
+
                 attempt++
+                if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+                    LOGGER.error("Giving up on the PolyPlus WebSocket after {} failed attempts.", attempt)
+                    notifyGaveUp()
+                    break
+                }
+
                 val backoff = reconnectDelay(attempt)
                 LOGGER.info("Reconnecting to PolyPlus WebSocket in {} ms (attempt {}).", backoff, attempt)
                 delay(backoff)
@@ -148,6 +171,7 @@ object PolyConnection {
             bearerAuth(token)
         }) {
             session = this
+            handshakeSucceeded = true
             notifyReconnected()
 
             val sender = launch {
@@ -191,6 +215,16 @@ object PolyConnection {
         runCatching {
             Notifications.error("PolyPlus", "Lost connection to PolyPlus$reason Reconnecting...")
         }.onFailure { LOGGER.error("Failed to show disconnect notification", it) }
+    }
+
+    private fun notifyGaveUp() {
+        disconnectNotified = true
+        runCatching {
+            Notifications.error(
+                "PolyPlus",
+                "Could not reconnect to PolyPlus. Run /polyplus refresh or restart the game to retry.",
+            )
+        }.onFailure { LOGGER.error("Failed to show reconnect-failed notification", it) }
     }
 
     private fun notifyReconnected() {
