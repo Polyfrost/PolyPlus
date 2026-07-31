@@ -113,6 +113,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic
     @Switch(
+        title = "Hide Realms Button",
+        description = "Hide the Realms button on the PolyPlus main menu.",
+        category = "Main Menu",
+        subcategory = "Elements",
+    )
+    var hideMainMenuRealms = false
+
+    @JvmStatic
+    @Switch(
         title = "Hide Host World Button",
         description = "Hide the Host World button (opens a world to LAN via e4mc) on the PolyPlus main menu.",
         category = "Main Menu",
@@ -195,6 +204,10 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
         }
 
+        addDependency("hideMainMenuRealms", "Realms is unavailable") {
+            if (realmsSupported()) Display.SHOWN else Display.HIDDEN
+        }
+
         addCallback("acceptedLegalTerms") {
             org.polyfrost.polyplus.client.privacy.PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
         }
@@ -205,6 +218,10 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
             PolyPlusClient.refresh() // Refresh API tokens, cosmetic data, etc.
         }
     }
+
+    @JvmStatic
+    fun realmsSupported(): Boolean =
+        runCatching { Minecraft.getInstance().allowsRealms() }.getOrDefault(false)
 
     @JvmStatic
     fun defaultMainMenuFpsLimit(): Int {

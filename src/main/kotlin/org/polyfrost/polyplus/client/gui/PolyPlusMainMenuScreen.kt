@@ -245,6 +245,15 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         mc.setScreen(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this))
                         //?}
                     },
+                    realms = if (PolyPlusConfig.realmsSupported() && !PolyPlusConfig.hideMainMenuRealms) {
+                        {
+                            //? if >= 26.2 {
+                            /*mc.gui.setScreen(com.mojang.realmsclient.RealmsMainScreen(this))
+                            *///?} else {
+                            mc.setScreen(com.mojang.realmsclient.RealmsMainScreen(this))
+                            //?}
+                        }
+                    } else null,
                     settings = {
                         //? if >= 26.1 {
                         //? if >= 26.2 {
@@ -425,6 +434,7 @@ private fun buildFace(skin: java.awt.image.BufferedImage): ImageBitmap {
 private class MenuActions(
     val singleplayer: () -> Unit,
     val multiplayer: () -> Unit,
+    val realms: (() -> Unit)?,
     val settings: () -> Unit,
     val mods: () -> Unit,
     val fullscreen: () -> Unit,
@@ -588,6 +598,9 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions, assetsReady: 
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             PillButton("Singleplayer", ASSETS + "user-01.svg", Modifier.fillMaxWidth(), assetsReady, actions.singleplayer)
             PillButton("Multiplayer", ASSETS + "users-01.svg", Modifier.fillMaxWidth(), assetsReady, actions.multiplayer)
+            actions.realms?.let { realms ->
+                PillButton("Realms", ASSETS + "globe-01.svg", Modifier.fillMaxWidth(), assetsReady, realms)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
                 PillButton("Settings", ASSETS + "settings-02.svg", Modifier.weight(1f), assetsReady, actions.settings)
                 PillButton("Mods", ASSETS + "settings-04.svg", Modifier.weight(1f), assetsReady, actions.mods)
