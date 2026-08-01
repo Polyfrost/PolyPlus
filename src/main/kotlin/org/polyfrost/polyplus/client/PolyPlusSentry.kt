@@ -307,6 +307,7 @@ object PolyPlusSentry {
                 is java.net.UnknownHostException,
                 is java.net.SocketException,
                 is java.nio.channels.UnresolvedAddressException, // DNS resolution failed
+                is java.nio.channels.ClosedChannelException,      // write raced the connection closing
                 is java.io.EOFException,                          // premature close / not enough data
                 is java.nio.file.FileSystemException,             // disk/fs error materializing assets
                 -> return true
