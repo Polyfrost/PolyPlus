@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus
 
 import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.compat.RrlsConfigCompat
 
 //? if fabric {
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint
@@ -18,6 +19,7 @@ class PolyPlusPreLaunch
     fun onPreLaunch() {
         PolyPlusSentry.markGameThread()
         PolyPlusSentry.initialize()
+        RrlsConfigCompat.apply()
     }
 
 }
