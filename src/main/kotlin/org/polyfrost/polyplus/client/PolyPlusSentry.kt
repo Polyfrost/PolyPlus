@@ -53,6 +53,15 @@ object PolyPlusSentry {
     /** Mechanism type Sentry's own uncaught-exception handler stamps on the events it raises. */
     private const val UNCAUGHT_MECHANISM = "UncaughtExceptionHandler"
 
+    /** Tag naming the thread the reported throwable was raised on. */
+    private const val TAG_THREAD = "thread"
+
+    /** Netty's event-loop body, a frame every stack that ran on a network thread goes through. */
+    private const val NETTY_EVENT_LOOP_CLASS = "io.netty.util.concurrent.SingleThreadEventExecutor"
+
+    /** Minecraft names its Netty event loops "Netty Client IO #0", "Netty Local Client IO #0"… */
+    private const val NETTY_THREAD_PREFIX = "Netty "
+
     /** Package holding Essential's authentication exceptions, all of which are account state. */
     private const val ESSENTIAL_AUTH_EXCEPTIONS = "gg.essential.minecraftauth.exception."
 
@@ -276,6 +285,7 @@ object PolyPlusSentry {
 
         val onGameThread = gameThread?.let { it === wrapper.thread } == true
         val kind = if (onGameThread) CrashKind.HARD_CRASH else CrashKind.RUNTIME_ERROR
+        wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
         // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
         event.fingerprints = listOf("{{ default }}", kind.tag)
@@ -491,6 +501,7 @@ object PolyPlusSentry {
         val kind = CrashKind.RUNTIME_ERROR
         val event = SentryEvent()
         event.message = Message().apply { formatted = "[${kind.label}] $message" }
+        event.setTag(TAG_THREAD, Thread.currentThread().name)
         event.markCrashKind(kind)
         Sentry.captureEvent(event)
     }
@@ -523,9 +534,31 @@ object PolyPlusSentry {
         CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, thread) }
     }
 
+    /**
+     * Whether the throwable was raised on a Netty event loop, either because the crash report was
+     * built there or because the stack still bottoms out in the event loop's own run body.
+     *
+     * `Connection` catches everything the pipeline throws and disconnects, so the client outlives it
+     * whatever [CrashOutcomeTracker] made of the moments that followed — a player leaving as the
+     * connection dies is indistinguishable from one whose client stopped ticking because it crashed.
+     */
+    private fun isNetworkThreadFailure(throwable: Throwable, thread: Thread): Boolean {
+        if (thread.name.startsWith(NETTY_THREAD_PREFIX)) return true
+        return runCatching {
+            throwable.stackTrace.any {
+                it.className.startsWith(NETTY_EVENT_LOOP_CLASS) && it.methodName == "run"
+            }
+        }.getOrDefault(false)
+    }
+
     private fun deliver(throwable: Throwable, kind: CrashKind, description: String?, thread: Thread) {
+        val rated = if (kind == CrashKind.HARD_CRASH && isNetworkThreadFailure(throwable, thread)) {
+            CrashKind.CAUGHT_CRASH
+        } else {
+            kind
+        }
         val root = runCatching { mostInformativeCause(throwable) }.getOrNull() ?: throwable
-        val id = send(throwable, kind, description, thread) { event ->
+        val id = send(throwable, rated, description, thread) { event ->
             event.setTag("mechanism", "crash_report")
             runCatching {
                 if (root !== throwable) {
@@ -538,7 +571,7 @@ object PolyPlusSentry {
                     root.javaClass.name,
                     top?.let { "${it.className}.${normalizeMethodName(it.methodName)}" },
                 )
-                event.fingerprints = explicit + kind.tag
+                event.fingerprints = explicit + rated.tag
             }
         }
         if (id != SentryId.EMPTY_ID) PolyPlusCrashLogUploader.recordLiveCapture(throwable)
@@ -560,6 +593,7 @@ object PolyPlusSentry {
         val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
         // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
         event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)
         customise(event)
         return Sentry.captureEvent(event)
