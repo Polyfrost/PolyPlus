@@ -12,7 +12,6 @@ import io.sentry.SentryEvent
 import io.sentry.exception.ExceptionMechanismException
 import io.sentry.protocol.Mechanism
 import io.sentry.protocol.Message
-import io.sentry.protocol.SentryId
 import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -198,7 +197,7 @@ object PolyPlusSentry {
             options.isAttachStacktrace = true
             options.setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && (isTransientNetworkFailure(t) || isReporterArtifact(t) || isBenignCancellation(t) || isForeignPacketNoise(t) || isMemoryExhaustion(t) || isExpectedAccountState(t))) {
+                if (t != null && isNeverReported(t)) {
                     null
                 } else {
                     rateUncaughtException(event)
@@ -264,10 +263,7 @@ object PolyPlusSentry {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (throwable is CancellationException) return
         initialize()
-        if (isTransientNetworkFailure(throwable)) return
-        if (isExpectedAccountState(throwable)) return
-        if (isBenignCancellation(throwable)) return
-        if (isReporterArtifact(throwable)) return
+        if (isNeverReported(throwable)) return
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
         send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
@@ -290,6 +286,20 @@ object PolyPlusSentry {
         // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
         event.fingerprints = listOf("{{ default }}", kind.tag)
     }
+
+    /**
+     * Every reason a throwable is dropped rather than reported, in one place so the crash-report
+     * path reaches the same verdict up front as [initialize]'s `beforeSend` would reach later on.
+     * A crash decided here is recorded as ignored, which is what keeps the crash report file it
+     * leaves behind from being uploaded postmortem on the next launch.
+     */
+    private fun isNeverReported(throwable: Throwable): Boolean =
+        isTransientNetworkFailure(throwable) ||
+            isReporterArtifact(throwable) ||
+            isBenignCancellation(throwable) ||
+            isForeignPacketNoise(throwable) ||
+            isMemoryExhaustion(throwable) ||
+            isExpectedAccountState(throwable)
 
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
@@ -362,10 +372,8 @@ object PolyPlusSentry {
             // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")") — not a fault.
             if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
 
-            if (cause is RuntimeException && cause.message == "Crash requested by CrashPatch") return true
-
-            // KeyboardHandler's F3+C debug crash: the player asked for it.
-            if (cause.message == DEBUG_CRASH) return true
+            // Debug crashes: the player asked for them.
+            if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
 
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
@@ -446,32 +454,42 @@ object PolyPlusSentry {
         return false
     }
 
+    /** KeyboardHandler's F3+C debug crash. */
     private const val DEBUG_CRASH = "Manually triggered debug crash"
+
+    /** CrashPatch's own debug crash keybind, its equivalent of F3+C. */
+    private const val CRASHPATCH_CRASH = "Crash requested by CrashPatch"
 
     /** SkyHanni's opt-in "crash on <event>" features, which live under this class name prefix. */
     private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
-    private val SHUTDOWN_WATCHDOG = Regex("""Client shutdown.*java\.lang\.Error: Watchdog""")
+    /** `createWatchdogCrashReport` builds a synthetic `Error("Watchdog (" + message + ")")`. */
+    private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog \(""")
+
+    /** An `OutOfMemoryError` at the head of a printed throwable, its own or a cause's. */
+    private val OUT_OF_MEMORY = Regex("""(?m)^(?:Caused by: )?java\.lang\.OutOfMemoryError""")
 
     /**
-     * Crash reports that are never worth reporting, matched on a description of the form
-     * `<crash report title>: <throwable>` so both live and postmortem reports are covered.
+     * Crash reports that are never worth reporting, matched on text so that reports read back off
+     * disk are covered as well as live ones. [description] is of the form `<crash report title>:
+     * <throwable>`; [body] is the whole report where there is one, and carries the causes and stack
+     * frames the description leaves out.
      *
-     * - Shutdown watchdogs fire because some mod left a long-running thread non-daemon. Commonplace
-     *   from Minecraft 26.2 onwards and harmless beyond delaying the exit.
-     * - Debug crashes are what the player asked for by holding F3+C.
+     * - Watchdogs fire because some thread stalled or a mod left one non-daemon, commonplace from
+     *   Minecraft 26.2 onwards and harmless beyond delaying the exit.
+     * - Debug crashes are what the player asked for, by holding F3+C or through CrashPatch.
+     * - Deliberate crashes are a mod feature the player switched on, matched by class since the
+     *   messages are jokes that get reworded.
+     * - Running out of heap is the player's memory allocation rather than a fault to fix.
      */
-    internal fun isIgnoredCrashReport(description: String?): Boolean {
-        if (description == null) return false
-        return SHUTDOWN_WATCHDOG.containsMatchIn(description) || description.contains(DEBUG_CRASH)
+    internal fun isIgnoredCrashReport(description: String?, body: String? = null): Boolean {
+        for (text in listOfNotNull(description, body)) {
+            if (WATCHDOG_ERROR.containsMatchIn(text)) return true
+            if (text.contains(DEBUG_CRASH) || text.contains(CRASHPATCH_CRASH)) return true
+        }
+        if (body == null) return false
+        return body.contains(DELIBERATE_CRASH_CLASS) || OUT_OF_MEMORY.containsMatchIn(body)
     }
-
-    /**
-     * A crash a mod threw on purpose because the player switched it on. Matched by class, since the
-     * messages are jokes that get reworded.
-     */
-    internal fun isDeliberateCrash(crashReport: String): Boolean =
-        crashReport.contains(DELIBERATE_CRASH_CLASS)
 
     private fun isDeliberateCrash(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
@@ -518,14 +536,14 @@ object PolyPlusSentry {
         if (!Sentry.isEnabled()) return
 
         val description = if (title.isNullOrBlank()) throwable.toString() else "$title: $throwable"
-        if (isIgnoredCrashReport(description) || isDeliberateCrash(throwable)) {
-            PolyPlusCrashLogUploader.recordIgnoredCrash()
+        if (isIgnoredCrashReport(description) || isNeverReported(throwable)) {
+            PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
         }
         // Recovering from an ignored crash leaves the client half torn down (NotEnoughCrashes nulls
         // the player and level), so whatever crashes next is fallout from it rather than a fault.
         if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
-            PolyPlusCrashLogUploader.recordIgnoredCrash()
+            PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
         }
         if (!seen.add(throwable)) return
@@ -559,7 +577,7 @@ object PolyPlusSentry {
             kind
         }
         val root = runCatching { mostInformativeCause(throwable) }.getOrNull() ?: throwable
-        val id = send(throwable, rated, description, thread) { event ->
+        send(throwable, rated, description, thread) { event ->
             event.setTag("mechanism", "crash_report")
             runCatching {
                 if (root !== throwable) {
@@ -575,7 +593,7 @@ object PolyPlusSentry {
                 event.fingerprints = explicit + rated.tag
             }
         }
-        if (id != SentryId.EMPTY_ID) PolyPlusCrashLogUploader.recordLiveCapture(throwable)
+        PolyPlusCrashLogUploader.recordHandledCrash(throwable)
         Sentry.flush(5_000)
     }
 
@@ -585,7 +603,7 @@ object PolyPlusSentry {
         description: String?,
         thread: Thread,
         customise: (SentryEvent) -> Unit = {},
-    ): SentryId {
+    ) {
         val mechanism = Mechanism()
         mechanism.type = kind.tag
         mechanism.description = description
@@ -597,6 +615,6 @@ object PolyPlusSentry {
         event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)
         customise(event)
-        return Sentry.captureEvent(event)
+        Sentry.captureEvent(event)
     }
 }

@@ -35,20 +35,24 @@ object PolyPlusCrashLogUploader {
     private val gameDir: File get() = FabricLoader.getInstance().gameDir.toFile()
     private val stateDir: File get() = File(gameDir, "polyplus/sentry")
     private val uploadedFile: File get() = File(stateDir, "uploaded.txt")
-    private val liveCaptureFile: File get() = File(stateDir, "live-captures.txt")
+    private val handledCrashFile: File get() = File(stateDir, "live-captures.txt")
     private val ignoredCrashFile: File get() = File(stateDir, "ignored-crashes.txt")
 
-    private data class LiveCapture(val at: Long, val throwableClass: String, val topFrame: String)
+    private data class HandledCrash(val at: Long, val throwableClass: String, val topFrame: String)
 
-    fun recordLiveCapture(throwable: Throwable) {
+    /**
+     * Records that the live path settled a crash — reported it, or decided it is one of the kinds
+     * that never are — so the crash file it leaves behind is not picked up again on the next launch.
+     */
+    fun recordHandledCrash(throwable: Throwable) {
         runCatching {
             val top = throwable.stackTrace.firstOrNull()
             val frame = if (top != null) "${top.className}.${top.methodName}" else ""
             val line = "${System.currentTimeMillis()}\t${throwable.javaClass.name}\t$frame"
             synchronized(stateLock) {
                 stateDir.mkdirs()
-                val stamps = readLines(liveCaptureFile) + line
-                liveCaptureFile.writeText(stamps.takeLast(LIVE_HISTORY).joinToString("\n"))
+                val stamps = readLines(handledCrashFile) + line
+                handledCrashFile.writeText(stamps.takeLast(LIVE_HISTORY).joinToString("\n"))
             }
         }
     }
@@ -57,7 +61,8 @@ object PolyPlusCrashLogUploader {
      * Records that a crash report was deliberately not sent, so the crash file it leaves behind and
      * anything that crashes while the game recovers from it are skipped too.
      */
-    fun recordIgnoredCrash() {
+    fun recordIgnoredCrash(throwable: Throwable) {
+        recordHandledCrash(throwable)
         val at = System.currentTimeMillis()
         lastIgnoredCrash.set(at)
         runCatching {
@@ -99,7 +104,7 @@ object PolyPlusCrashLogUploader {
                 return
             }
 
-            val liveCaptures = readLines(liveCaptureFile).mapNotNull(::parseLiveCapture)
+            val handled = readLines(handledCrashFile).mapNotNull(::parseHandledCrash)
             val ignoredCrashes = readLines(ignoredCrashFile).mapNotNull { it.trim().toLongOrNull() }
             val now = System.currentTimeMillis()
             var sent = 0
@@ -115,12 +120,15 @@ object PolyPlusCrashLogUploader {
                 val isJvmFatal = file.name.startsWith("hs_err_pid")
                 val body = prepare(file, isJvmFatal) ?: continue
                 val summary = summarize(body, isJvmFatal)
-                if (!isJvmFatal && PolyPlusSentry.isIgnoredCrashReport(summary)) continue
-                if (!isJvmFatal && PolyPlusSentry.isDeliberateCrash(body)) continue
-                if (!isJvmFatal && isSideEffectOfIgnoredCrash(ignoredCrashes, file.lastModified())) continue
+                if (isJvmFatal) {
+                    if (NATIVE_OUT_OF_MEMORY.containsMatchIn(body)) continue
+                } else {
+                    if (PolyPlusSentry.isIgnoredCrashReport(summary, body)) continue
+                    if (isSideEffectOfIgnoredCrash(ignoredCrashes, file.lastModified())) continue
+                }
 
                 val fingerprint = fingerprint(body, isJvmFatal)
-                if (!isJvmFatal && alreadyReportedLive(liveCaptures, fingerprint, file.lastModified())) continue
+                if (!isJvmFatal && alreadyHandledLive(handled, fingerprint, file.lastModified())) continue
 
                 if (send(file, body, summary, fingerprint, isJvmFatal)) sent++
             }
@@ -145,21 +153,21 @@ object PolyPlusCrashLogUploader {
         return crashReports + jvmFatal
     }
 
-    private fun parseLiveCapture(line: String): LiveCapture? {
+    private fun parseHandledCrash(line: String): HandledCrash? {
         val parts = line.split('\t')
         val at = parts.getOrNull(0)?.trim()?.toLongOrNull() ?: return null
-        return LiveCapture(at, parts.getOrNull(1).orEmpty().trim(), parts.getOrNull(2).orEmpty().trim())
+        return HandledCrash(at, parts.getOrNull(1).orEmpty().trim(), parts.getOrNull(2).orEmpty().trim())
     }
 
-    private fun alreadyReportedLive(
-        liveCaptures: List<LiveCapture>,
+    private fun alreadyHandledLive(
+        handled: List<HandledCrash>,
         fingerprint: List<String>,
         fileTime: Long,
     ): Boolean {
         val throwableClass = fingerprint.getOrNull(1).orEmpty()
         val topFrame = fingerprint.getOrNull(2).orEmpty()
         if (throwableClass.isEmpty() || topFrame.isEmpty()) return false
-        return liveCaptures.any {
+        return handled.any {
             it.throwableClass == throwableClass &&
                 it.topFrame == topFrame &&
                 kotlin.math.abs(it.at - fileTime) <= LIVE_MATCH_WINDOW_MS
@@ -199,6 +207,12 @@ object PolyPlusCrashLogUploader {
         Sentry.captureEvent(event, hint)
         true
     }.getOrDefault(false)
+
+    /**
+     * The JVM asked the OS for memory and was refused. Like the `OutOfMemoryError` the live path
+     * drops, it is the machine the game was given rather than a fault to fix.
+     */
+    private val NATIVE_OUT_OF_MEMORY = Regex("(?m)^#.*(?:Out of Memory Error|insufficient memory)")
 
     private fun trimJvmFatalLog(text: String): String {
         val cut = text.indexOf("---------------  P R O C E S S")
