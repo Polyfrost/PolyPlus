@@ -1,2 +1,3 @@
-## 1.1.11
-- Fixed exceptions from background threads being sent to Sentry as fatal errors
+## 1.1.12
+- Fixed some connection errors being sent to Sentry as fatal errors
+- Added thread information to error reports to aid debugging
