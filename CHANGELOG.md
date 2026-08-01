@@ -1,2 +1,2 @@
-## 1.1.13
-- Added a workaround for Remove Reloading Screen crashing the game when switching from a newer Minecraft version to an older one
+## 1.1.14
+- Fixed some excluded crash types still getting sent as postmortems
