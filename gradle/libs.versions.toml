@@ -9,6 +9,7 @@ mixin-squared = "0.3.7-beta.1"
 polymixin = "0.8.4+build.7"
 devauth = "1.2.2"
 junit = "6.1.2"
+shadow = "9.6.1"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -38,3 +39,4 @@ ktor-serialization = ["ktor-serialization-kotlinx-json"]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinx-serialization" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "atomicfu" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

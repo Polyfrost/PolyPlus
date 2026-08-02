@@ -1,15 +1,15 @@
 package org.polyfrost.polyplus.client
 
-import io.sentry.Attachment
-import io.sentry.Hint
-import io.sentry.Sentry
-import io.sentry.SentryEvent
-import io.sentry.protocol.Mechanism
-import io.sentry.protocol.Message
-import io.sentry.protocol.SentryException
-import io.sentry.protocol.SentryStackFrame
-import io.sentry.protocol.SentryStackTrace
 import net.fabricmc.loader.api.FabricLoader
+import org.polyfrost.polyplus.libs.sentry.Attachment
+import org.polyfrost.polyplus.libs.sentry.Hint
+import org.polyfrost.polyplus.libs.sentry.IHub
+import org.polyfrost.polyplus.libs.sentry.SentryEvent
+import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
+import org.polyfrost.polyplus.libs.sentry.protocol.Message
+import org.polyfrost.polyplus.libs.sentry.protocol.SentryException
+import org.polyfrost.polyplus.libs.sentry.protocol.SentryStackFrame
+import org.polyfrost.polyplus.libs.sentry.protocol.SentryStackTrace
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,7 +25,6 @@ object PolyPlusCrashLogUploader {
 
     private const val LIVE_MATCH_WINDOW_MS = 900_000L
 
-    /** How long after an ignored crash further crashes count as fallout from its recovery. */
     private const val SIDE_EFFECT_WINDOW_MS = 10_000L
 
     private val ran = AtomicBoolean(false)
@@ -40,10 +39,6 @@ object PolyPlusCrashLogUploader {
 
     private data class HandledCrash(val at: Long, val throwableClass: String, val topFrame: String)
 
-    /**
-     * Records that the live path settled a crash — reported it, or decided it is one of the kinds
-     * that never are — so the crash file it leaves behind is not picked up again on the next launch.
-     */
     fun recordHandledCrash(throwable: Throwable) {
         runCatching {
             val top = throwable.stackTrace.firstOrNull()
@@ -57,10 +52,6 @@ object PolyPlusCrashLogUploader {
         }
     }
 
-    /**
-     * Records that a crash report was deliberately not sent, so the crash file it leaves behind and
-     * anything that crashes while the game recovers from it are skipped too.
-     */
     fun recordIgnoredCrash(throwable: Throwable) {
         recordHandledCrash(throwable)
         val at = System.currentTimeMillis()
@@ -74,7 +65,6 @@ object PolyPlusCrashLogUploader {
         }
     }
 
-    /** Whether [at] falls in the window after a crash this session chose to ignore. */
     fun isSideEffectOfIgnoredCrash(at: Long): Boolean =
         isSideEffectOfIgnoredCrash(listOf(lastIgnoredCrash.get()), at)
 
@@ -89,7 +79,7 @@ object PolyPlusCrashLogUploader {
 
     private fun scanAndUpload() {
         PolyPlusSentry.initialize()
-        if (!Sentry.isEnabled()) return
+        val hub = PolyPlusSentry.activeHub() ?: return
 
         val candidates = collectCandidates()
         if (candidates.isEmpty()) return
@@ -130,13 +120,13 @@ object PolyPlusCrashLogUploader {
                 val fingerprint = fingerprint(body, isJvmFatal)
                 if (!isJvmFatal && alreadyHandledLive(handled, fingerprint, file.lastModified())) continue
 
-                if (send(file, body, summary, fingerprint, isJvmFatal)) sent++
+                if (send(hub, file, body, summary, fingerprint, isJvmFatal)) sent++
             }
 
             writeUploaded(uploaded)
         }
 
-        Sentry.flush(10_000)
+        hub.flush(10_000)
     }
 
     private fun collectCandidates(): List<File> {
@@ -180,13 +170,14 @@ object PolyPlusCrashLogUploader {
     }.getOrNull()
 
     private fun send(
+        hub: IHub,
         file: File,
         body: String,
         summary: String,
         fingerprint: List<String>,
         isJvmFatal: Boolean,
     ): Boolean = runCatching {
-        // Anything reaching here went unreported while the game was alive, so it took the game down.
+        // Anything that reaches this was not reported while the game was alive, which means it was a hard crash.
         val kind = CrashKind.HARD_CRASH
 
         val event = SentryEvent().apply {
@@ -204,14 +195,10 @@ object PolyPlusCrashLogUploader {
             addAttachment(Attachment(body.toByteArray(Charsets.UTF_8), file.name, "text/plain"))
         }
 
-        Sentry.captureEvent(event, hint)
+        hub.captureEvent(event, hint)
         true
     }.getOrDefault(false)
 
-    /**
-     * The JVM asked the OS for memory and was refused. Like the `OutOfMemoryError` the live path
-     * drops, it is the machine the game was given rather than a fault to fix.
-     */
     private val NATIVE_OUT_OF_MEMORY = Regex("(?m)^#.*(?:Out of Memory Error|insufficient memory)")
 
     private fun trimJvmFatalLog(text: String): String {
@@ -317,7 +304,7 @@ object PolyPlusCrashLogUploader {
     }
 
     private fun stackFrame(raw: String): SentryStackFrame {
-        val signature = raw.substringAfter("//") // drop the Fabric class-loader prefix
+        val signature = raw.substringAfter("//") // strip Fabric classloader prefix
         val qualified = signature.substringBefore('(')
         val locator = signature.substringAfter('(', "").substringBefore(')')
         return SentryStackFrame().apply {

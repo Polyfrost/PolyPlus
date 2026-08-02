@@ -1,5 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
@@ -12,8 +13,13 @@ plugins {
     kotlin("plugin.compose")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.atomicfu)
+    alias(libs.plugins.shadow)
     id("net.fabricmc.fabric-loom-remap")
     id("me.modmuss50.mod-publish-plugin")
+}
+
+shadow {
+    addShadowJarToAssembleLifecycle = false
 }
 
 val stonecutter = extensions.getByName("stonecutter") as StonecutterBuildExtension
@@ -86,6 +92,45 @@ configure<KotlinJvmExtension> {
 
 val loomExt = extensions.getByName<LoomGradleExtensionAPI>("loom")
 
+val sentryRelocatedPackage = "org.polyfrost.polyplus.libs.sentry"
+
+val sentryShade: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false // io.sentry:sentry:7.18.0 has zero runtime dependencies
+}
+
+val relocateSentry = tasks.register<ShadowJar>("relocateSentry") {
+    group = "build"
+    description = "Relocates io.sentry into $sentryRelocatedPackage"
+
+    configurations = listOf(sentryShade)
+    relocate("io.sentry", sentryRelocatedPackage)
+
+    exclude(
+        "META-INF/native-image/**",
+        "META-INF/INDEX.LIST",
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "module-info.class",
+    )
+
+    archiveBaseName = "sentry-relocated"
+    archiveVersion = ""
+    archiveClassifier = ""
+    destinationDirectory = layout.buildDirectory.dir("relocated")
+
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+tasks.jar {
+    from(zipTree(relocateSentry.flatMap { it.archiveFile })) {
+        exclude("META-INF/MANIFEST.MF")
+    }
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:${versionCatalog("common$catalogVersion").findVersion("minecraft").get()}")
 
@@ -113,7 +158,8 @@ dependencies {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
-    implementation(libs.sentry)
+    sentryShade(libs.sentry)
+    implementation(files(relocateSentry.flatMap { it.archiveFile }))
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
@@ -125,8 +171,7 @@ dependencies {
 run {
     val bundledRoots = libs.bundles.ktor.client.get() +
         libs.bundles.ktor.server.get() +
-        libs.bundles.ktor.serialization.get() +
-        libs.sentry.get()
+        libs.bundles.ktor.serialization.get()
     val closure = configurations.detachedConfiguration(
         *bundledRoots.map { dependencies.create(it) }.toTypedArray()
     )

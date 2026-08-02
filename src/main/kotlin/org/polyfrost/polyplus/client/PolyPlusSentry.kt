@@ -6,15 +6,18 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
-import io.sentry.Attachment
-import io.sentry.Sentry
-import io.sentry.SentryEvent
-import io.sentry.exception.ExceptionMechanismException
-import io.sentry.protocol.Mechanism
-import io.sentry.protocol.Message
 import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.libs.sentry.Attachment
+import org.polyfrost.polyplus.libs.sentry.Hub
+import org.polyfrost.polyplus.libs.sentry.IHub
+import org.polyfrost.polyplus.libs.sentry.SentryEvent
+import org.polyfrost.polyplus.libs.sentry.SentryOptions
+import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
+import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
+import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
+import org.polyfrost.polyplus.libs.sentry.protocol.Message
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.IdentityHashMap
@@ -49,27 +52,23 @@ object PolyPlusSentry {
 
     private const val FINGERPRINT_FRAMES = 8
 
-    /** Mechanism type Sentry's own uncaught-exception handler stamps on the events it raises. */
     private const val UNCAUGHT_MECHANISM = "UncaughtExceptionHandler"
 
-    /** Tag naming the thread the reported throwable was raised on. */
     private const val TAG_THREAD = "thread"
 
-    /** Netty's event-loop body, a frame every stack that ran on a network thread goes through. */
     private const val NETTY_EVENT_LOOP_CLASS = "io.netty.util.concurrent.SingleThreadEventExecutor"
 
-    /** Minecraft names its Netty event loops "Netty Client IO #0", "Netty Local Client IO #0"… */
     private const val NETTY_THREAD_PREFIX = "Netty "
 
-    /** Package holding Essential's authentication exceptions, all of which are account state. */
     private const val ESSENTIAL_AUTH_EXCEPTIONS = "gg.essential.minecraftauth.exception."
 
     private val started = AtomicBoolean(false)
 
-    /**
-     * The thread the client runs on, taken at pre-launch before Minecraft renames it to
-     * "Render thread". An uncaught exception only takes the game down when it happened here.
-     */
+    // We intentionally create our own hub in addition to relocating Sentry
+    // to avoid clashes with other mods using Sentry.
+    @Volatile
+    private var hub: IHub? = null
+
     @Volatile
     private var gameThread: Thread? = null
 
@@ -169,7 +168,6 @@ object PolyPlusSentry {
         null
     }.getOrNull()
 
-    /** Called from the pre-launch entrypoint, which still runs on the thread the client will use. */
     @JvmStatic
     fun markGameThread() {
         gameThread = Thread.currentThread()
@@ -186,16 +184,16 @@ object PolyPlusSentry {
             .map { it.metadata.version.friendlyString }
             .orElse("unknown")
 
-        Sentry.init { options ->
-            options.dsn = DSN
-            options.release = "${PolyPlusConstants.ID}@${PolyPlusConstants.VERSION}"
-            options.environment = if (dev) "development" else "production"
-            options.setTag("minecraft", minecraftVersion)
-            // Verbose SDK logging only in dev.
-            options.isDebug = dev
-            options.isEnableUncaughtExceptionHandler = true
-            options.isAttachStacktrace = true
-            options.setBeforeSend { event, _ ->
+        val options = SentryOptions().apply {
+            dsn = DSN
+            release = "${PolyPlusConstants.ID}@${PolyPlusConstants.VERSION}"
+            environment = if (dev) "development" else "production"
+            setTag("minecraft", minecraftVersion)
+            isDebug = dev
+            if (dev) setLogger(SystemOutLogger())
+            isEnableUncaughtExceptionHandler = true
+            isAttachStacktrace = true
+            setBeforeSend { event, _ ->
                 val t = event.throwable
                 if (t != null && isNeverReported(t)) {
                     null
@@ -206,16 +204,26 @@ object PolyPlusSentry {
             }
         }
 
-        installRuntimeContext(minecraftVersion)
+        val ourHub = Hub(options)
+        options.integrations.forEach { integration ->
+            runCatching { integration.register(ourHub, options) }
+        }
+        hub = ourHub
+
+        installRuntimeContext(ourHub, minecraftVersion)
     }
 
     fun shutdown() {
         if (!started.compareAndSet(true, false)) return
         signatureCounts.clear()
-        runCatching { Sentry.close() }
+        val ourHub = hub ?: return
+        hub = null
+        runCatching { ourHub.close() }
     }
 
-    private fun installRuntimeContext(minecraftVersion: String) {
+    internal fun activeHub(): IHub? = hub?.takeIf { it.isEnabled }
+
+    private fun installRuntimeContext(hub: IHub, minecraftVersion: String) {
         runCatching {
             val loader = FabricLoader.getInstance()
             val mods = loader.allMods
@@ -228,7 +236,7 @@ object PolyPlusSentry {
 
             val runtime = Runtime.getRuntime()
 
-            Sentry.configureScope { scope ->
+            hub.configureScope { scope ->
                 scope.setTag("loader", loaderVersion)
                 scope.setTag("java", System.getProperty("java.version") ?: "unknown")
                 scope.setTag("os", System.getProperty("os.name") ?: "unknown")
@@ -269,12 +277,6 @@ object PolyPlusSentry {
         send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
     }
 
-    /**
-     * Rates the events Sentry's own uncaught-exception handler raises, which arrive levelled `FATAL`
-     * no matter where they came from. Only the game thread dying takes the client with it; anywhere
-     * else the exception kills one worker and the session carries on, which is the same outcome as
-     * something PolyPlus caught itself.
-     */
     private fun rateUncaughtException(event: SentryEvent) {
         val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return
         if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return
@@ -283,16 +285,10 @@ object PolyPlusSentry {
         val kind = if (onGameThread) CrashKind.HARD_CRASH else CrashKind.RUNTIME_ERROR
         wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
-        // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
+        // Make sure we don't merge reports of different severity
         event.fingerprints = listOf("{{ default }}", kind.tag)
     }
 
-    /**
-     * Every reason a throwable is dropped rather than reported, in one place so the crash-report
-     * path reaches the same verdict up front as [initialize]'s `beforeSend` would reach later on.
-     * A crash decided here is recorded as ignored, which is what keeps the crash report file it
-     * leaves behind from being uploaded postmortem on the next launch.
-     */
     private fun isNeverReported(throwable: Throwable): Boolean =
         isTransientNetworkFailure(throwable) ||
             isReporterArtifact(throwable) ||
@@ -312,7 +308,6 @@ object PolyPlusSentry {
         var cause: Throwable? = throwable
         while (cause != null) {
             if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return true
-            // io.ktor.websocket ping timeout: an idle/slow socket the client just reconnects.
             if (cause.message?.contains("Ping timeout", ignoreCase = true) == true) return true
             if (cause.message?.let { isTransientHandshakeStatus(it) } == true) return true
             when (cause) {
@@ -324,18 +319,17 @@ object PolyPlusSentry {
                 is java.net.ConnectException,
                 is java.net.UnknownHostException,
                 is java.net.SocketException,
-                is java.nio.channels.UnresolvedAddressException, // DNS resolution failed
-                is java.nio.channels.ClosedChannelException,      // write raced the connection closing
-                is java.io.EOFException,                          // premature close / not enough data
-                is java.nio.file.FileSystemException,             // disk/fs error materializing assets
+                is java.nio.channels.UnresolvedAddressException,
+                is java.nio.channels.ClosedChannelException,
+                is java.io.EOFException,
+                is java.nio.file.FileSystemException,
                 -> return true
                 is ClientRequestException ->
                     if (cause.response.status == HttpStatusCode.Unauthorized) return true
                 is IllegalStateException ->
-                    // Truncated HTTP body (e.g. "Content-Length ... doesn't match").
+                    // Truncated HTTP body
                     if (cause.message?.contains("Content-Length", ignoreCase = true) == true) return true
                 is java.io.IOException ->
-                    // Disk-full / out-of-space IOException while writing cosmetic assets.
                     cause.message?.let { m ->
                         if (m.contains("No space left", ignoreCase = true) ||
                             m.contains("not enough space", ignoreCase = true) ||
@@ -366,36 +360,24 @@ object PolyPlusSentry {
         return false
     }
 
-    /**
-     * "Reporter artifacts": crash-report events uploaded by the CrashReport mixin that carry no
-     * diagnostic value. Only very specific self-noise signatures are matched here; every other
-     * foreign/vanilla/other-mod crash is intentionally kept.
-     */
     private fun isReporterArtifact(throwable: Throwable): Boolean {
         if (isDeliberateCrash(throwable)) return true
 
         var cause: Throwable? = throwable
         while (cause != null) {
-            // Watchdog hang-on-exit dump (ServerWatchdog/ClientShutdownWatchdog)
-            // createWatchdogCrashReport builds a synthetic Error("Watchdog (" + message + ")") — not a fault.
             if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
 
-            // Debug crashes: the player asked for them.
             if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
 
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
                 val cn = top.className
                 val mn = top.methodName
-                // CrashReport.preload() startup warmup ("Don't panic!"): a synthetic throwable
-                // whose only frame is the preload call itself — no usable application/mod frame.
                 if ((cn == "net.minecraft.CrashReport" || cn == "net.minecraft.class_128") &&
                     (mn == "preload" || mn == "method_24305")
                 ) {
                     return true
                 }
-                // Reporter self-crash while formatting someone else's crash: NPE thrown inside
-                // CrashReportCategory.validateStackTrace (StackTraceElement.getFileName() == null).
                 if (cause is NullPointerException &&
                     (cn == "net.minecraft.CrashReportCategory" || cn == "net.minecraft.class_129") &&
                     (mn == "validateStackTrace" || mn == "method_584")
@@ -443,7 +425,6 @@ object PolyPlusSentry {
             val name = cause.javaClass.name
             if (name.contains("UserBannedException")) return true
             if (name.contains("AuthenticationUnavailable")) return true
-            // Essential's session tokens expiring, rate-limiting the refresh, or rejecting it.
             if (name.startsWith(ESSENTIAL_AUTH_EXCEPTIONS)) return true
             if (cause is ClientRequestException) {
                 when (cause.response.status) {
@@ -462,34 +443,17 @@ object PolyPlusSentry {
         return false
     }
 
-    /** KeyboardHandler's F3+C debug crash. */
     private const val DEBUG_CRASH = "Manually triggered debug crash"
 
-    /** CrashPatch's own debug crash keybind, its equivalent of F3+C. */
     private const val CRASHPATCH_CRASH = "Crash requested by CrashPatch"
 
-    /** SkyHanni's opt-in "crash on <event>" features, which live under this class name prefix. */
+    // SkyHanni joke crash features (requires opt-in from player)
     private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
-    /** `createWatchdogCrashReport` builds a synthetic `Error("Watchdog (" + message + ")")`. */
     private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog \(""")
 
-    /** An `OutOfMemoryError` at the head of a printed throwable, its own or a cause's. */
     private val OUT_OF_MEMORY = Regex("""(?m)^(?:Caused by: )?java\.lang\.OutOfMemoryError""")
 
-    /**
-     * Crash reports that are never worth reporting, matched on text so that reports read back off
-     * disk are covered as well as live ones. [description] is of the form `<crash report title>:
-     * <throwable>`; [body] is the whole report where there is one, and carries the causes and stack
-     * frames the description leaves out.
-     *
-     * - Watchdogs fire because some thread stalled or a mod left one non-daemon, commonplace from
-     *   Minecraft 26.2 onwards and harmless beyond delaying the exit.
-     * - Debug crashes are what the player asked for, by holding F3+C or through CrashPatch.
-     * - Deliberate crashes are a mod feature the player switched on, matched by class since the
-     *   messages are jokes that get reworded.
-     * - Running out of heap is the player's memory allocation rather than a fault to fix.
-     */
     internal fun isIgnoredCrashReport(description: String?, body: String? = null): Boolean {
         for (text in listOfNotNull(description, body)) {
             if (WATCHDOG_ERROR.containsMatchIn(text)) return true
@@ -530,26 +494,22 @@ object PolyPlusSentry {
         event.message = Message().apply { formatted = "[${kind.label}] $message" }
         event.setTag(TAG_THREAD, Thread.currentThread().name)
         event.markCrashKind(kind)
-        Sentry.captureEvent(event)
+        activeHub()?.captureEvent(event)
     }
 
-    /**
-     * Reports a crash report the game built. Severity depends on what happened next, which
-     * [CrashOutcomeTracker] resolves a few moments later, so the send is deferred until then.
-     */
     @JvmStatic
     fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
-        if (!Sentry.isEnabled()) return
+        val hub = activeHub() ?: return
 
         val description = if (title.isNullOrBlank()) throwable.toString() else "$title: $throwable"
         if (isIgnoredCrashReport(description) || isNeverReported(throwable)) {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
         }
-        // Recovering from an ignored crash leaves the client half torn down (NotEnoughCrashes nulls
-        // the player and level), so whatever crashes next is fallout from it rather than a fault.
+        // NotEnoughCrashes preventing a crash may leave the game in a broken
+        // state and cause additional noise
         if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
@@ -561,14 +521,6 @@ object PolyPlusSentry {
         CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, thread) }
     }
 
-    /**
-     * Whether the throwable was raised on a Netty event loop, either because the crash report was
-     * built there or because the stack still bottoms out in the event loop's own run body.
-     *
-     * `Connection` catches everything the pipeline throws and disconnects, so the client outlives it
-     * whatever [CrashOutcomeTracker] made of the moments that followed — a player leaving as the
-     * connection dies is indistinguishable from one whose client stopped ticking because it crashed.
-     */
     private fun isNetworkThreadFailure(throwable: Throwable, thread: Thread): Boolean {
         if (thread.name.startsWith(NETTY_THREAD_PREFIX)) return true
         return runCatching {
@@ -602,7 +554,7 @@ object PolyPlusSentry {
             }
         }
         PolyPlusCrashLogUploader.recordHandledCrash(throwable)
-        Sentry.flush(5_000)
+        activeHub()?.flush(5_000)
     }
 
     private fun send(
@@ -618,11 +570,11 @@ object PolyPlusSentry {
         mechanism.isHandled = kind.handled
 
         val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
-        // Keep Sentry's stack-trace grouping but never merge outcomes of different severity.
+        // Make sure we don't merge reports of different severity
         event.fingerprints = listOf("{{ default }}", kind.tag)
         event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)
         customise(event)
-        Sentry.captureEvent(event)
+        activeHub()?.captureEvent(event)
     }
 }
