@@ -1,2 +1,2 @@
-## 1.1.14
-- Fixed some excluded crash types still getting sent as postmortems
+## 1.1.15
+- Added compatibility with OneConfig 1.0.14
