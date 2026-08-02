@@ -52,18 +52,16 @@ base.archivesName = property("mod.id") as String
 val oneconfigVersion = property("oneconfig_version") as String
 
 repositories {
+    mavenLocal()
     mavenCentral()
-    maven("https://maven.fabricmc.net/")
+    google()
     maven("https://repo.polyfrost.org/releases")
     maven("https://repo.polyfrost.org/snapshots")
-    maven("https://jitpack.io") {
-        content { includeGroupAndSubgroups("com.github") }
+    maven("https://maven.fabricmc.net/") {
+        content { includeGroupAndSubgroups("net.fabricmc") }
     }
-    maven("https://maven.terraformersmc.com/") {
+    maven("https://maven.terraformersmc.com/releases/") {
         content { includeGroup("com.terraformersmc") }
-    }
-    maven("https://maven.bawnorton.com/releases") {
-        content { includeGroup("com.github.bawnorton.mixinsquared") }
     }
     maven("https://maven.parchmentmc.org") {
         content { includeGroupAndSubgroups("org.parchmentmc") }
@@ -71,12 +69,9 @@ repositories {
     maven("https://api.modrinth.com/maven") {
         content { includeGroup("maven.modrinth") }
     }
-    maven("https://redirector.kotlinlang.org/maven/compose-dev")
-    maven("https://nexus.prsm.wtf/repository/maven-public/maven-repo/releases/")
-    maven("https://repo.hypixel.net/repository/Hypixel/") {
-        content { includeGroup("net.hypixel") }
+    maven("https://central.sonatype.com/repository/maven-snapshots") {
+        content { includeGroup("net.kyori") }
     }
-    google()
 }
 
 java {
