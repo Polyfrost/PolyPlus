@@ -14,7 +14,6 @@
     "client.Mixin_ReplaceCapeTexture",
     "client.Mixin_OneConfigNavigationGraph",
     "client.Mixin_OneConfigNavigationGroups",
-    "client.Mixin_OneConfigUIScreenRoute",
     "client.Mixin_ThemeRegistryBranding",
     "client.NameTagBadgeMixin",
     "client.ChatEmojiMixin",

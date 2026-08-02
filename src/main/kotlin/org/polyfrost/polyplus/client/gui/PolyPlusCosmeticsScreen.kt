@@ -92,6 +92,7 @@ import androidx.navigation.compose.composable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
@@ -156,16 +157,6 @@ object PolyPlusOneConfigIntegration {
         builder.polyPlusCosmeticsGraph()
     }
 
-    @Volatile
-    private var pendingOpeningRoute: Any? = null
-
-    @JvmStatic
-    fun consumePendingOpeningRoute(): Any? {
-        val route = pendingOpeningRoute
-        pendingOpeningRoute = null
-        return route
-    }
-
     @JvmStatic
     fun openCosmetics() = openOneConfig(PolyPlusCosmeticsRoute)
 
@@ -173,13 +164,7 @@ object PolyPlusOneConfigIntegration {
     fun openMods() = openOneConfig(ModsGraph)
 
     private fun openOneConfig(route: Any) {
-        pendingOpeningRoute = route
-        val mc = net.minecraft.client.Minecraft.getInstance()
-        //? if >= 26.2 {
-        /*mc.gui.setScreen(OneConfigUIScreen())
-        *///?} else {
-        mc.setScreen(OneConfigUIScreen())
-        //?}
+        OneConfigUI.open(route)
     }
 }
 
