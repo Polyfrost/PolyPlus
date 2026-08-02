@@ -23,6 +23,6 @@
         "minecraft": "${minor_mc_version}",
         "fabricloader": ">=0.16.0",
         "java": ">=21",
-        "oneconfigv1": ">=1.0.7"
+        "oneconfigv1": ">=1.0.14"
     }
 }
