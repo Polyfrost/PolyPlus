@@ -1,2 +1,2 @@
-## 1.1.15
-- Added compatibility with OneConfig 1.0.14
+## 1.1.16
+- Fix aura cosmetics being visually stuck
