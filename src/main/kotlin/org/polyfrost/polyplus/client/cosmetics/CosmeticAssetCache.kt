@@ -57,6 +57,8 @@ object CosmeticAssetCache {
     private val petsById = HashMap<Int, PetDefinition>()
     //?}
 
+    private val parsedHashes = ConcurrentHashMap<Int, String>()
+
     @JvmStatic
     fun getCapeTexture(uuid: UUID): Identifier? {
         val id = CosmeticCatalog.getActiveId(uuid, BodySlot.Cape) ?: return null
@@ -79,6 +81,7 @@ object CosmeticAssetCache {
 
     fun reset() {
         capes.clear()
+        parsedHashes.clear()
         //? if >= 1.21.1 {
         emotesByCosmeticId.clear()
         emotesById.clear()
@@ -182,10 +185,27 @@ object CosmeticAssetCache {
     }
     //?}
 
+    private fun isLoaded(definition: CosmeticDefinition): Boolean {
+        if (definition.type == CosmeticType.Cape) return capes.containsKey(definition.id)
+        //? if >= 1.21.1 {
+        return when (definition.type) {
+            CosmeticType.Emote -> emotesById.containsKey(definition.id)
+            CosmeticType.Pet -> petsById.containsKey(definition.id) || attachedById.containsKey(definition.id)
+            CosmeticType.Unknown -> false
+            else -> attachedById.containsKey(definition.id)
+        }
+        //?} else {
+        /*return false
+        *///?}
+    }
+
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
         return withContext(Dispatchers.IO) {
             runCatching {
                 hashManager.awaitHashes()
+                if (isLoaded(definition) && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
+                    return@runCatching true
+                }
                 downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
                 parseLock.withLock { loadCosmeticAssetsLocked(definition) }
                 hashManager.saveHashes()
@@ -226,7 +246,9 @@ object CosmeticAssetCache {
     private fun loadCosmeticAssetsLocked(definition: CosmeticDefinition) {
         val cosmeticDir = baseDir.resolve(definition.cacheKey()).toPath()
         if (!cosmeticDir.toFile().exists()) return
+        if (isLoaded(definition) && parsedHashes[definition.id] == definition.hash) return
 
+        parsedHashes[definition.id] = definition.hash
         when (definition.type) {
             CosmeticType.Cape -> loadCape(definition.id, cosmeticDir)
             CosmeticType.Backpack,
