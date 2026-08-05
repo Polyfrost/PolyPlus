@@ -23,6 +23,7 @@
         "minecraft": "${minor_mc_version}",
         "fabricloader": ">=0.16.0",
         "java": ">=21",
+        "fabric-language-kotlin": ">=1.13.8",
         "oneconfigv1": ">=1.1.2"
     }
 }
