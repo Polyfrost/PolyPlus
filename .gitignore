@@ -19,6 +19,18 @@ build
 
 # stonecutter version nodes (run/test logs)
 versions/*/logs/
+versions/*/config/
+versions/*/oneconfig/
+versions/*/mods/
+versions/*/.fabric/
+versions/*/.gradle/
+versions/*/saves/
+versions/*/screenshots/
+versions/*/crash-reports/
+versions/*/options.txt
+versions/*/servers.dat*
+versions/*/usercache.json
+versions/*/usernamecache.json
 
 # other
 eclipse
