@@ -31,7 +31,7 @@ object AdaptiveBlurDefaults {
     var sampled by mutableStateOf(false)
         private set
 
-    var recommendsPerformance by mutableStateOf(false)
+    var recommendedMode by mutableStateOf(OnboardingFeatures.MOTION_BLUR_QUALITY)
         private set
 
     private var windowStartNanos = 0L
@@ -98,8 +98,14 @@ object AdaptiveBlurDefaults {
     private fun onSample(averageFps: Float) {
         if (sampled) return
         val refreshRate = refreshRate()
-        recommendsPerformance = averageFps < refreshRate - LOW_FPS_MARGIN
-        if (!PolyPlusConfig.adaptiveBlurApplied) apply(averageFps, refreshRate)
+        recommendedMode = when {
+            averageFps < refreshRate - LOW_FPS_MARGIN -> OnboardingFeatures.MOTION_BLUR_DISABLED
+            averageFps < refreshRate + HEADROOM_MARGIN -> OnboardingFeatures.MOTION_BLUR_PERFORMANCE
+            else -> OnboardingFeatures.MOTION_BLUR_QUALITY
+        }
+        if (!PolyPlusConfig.adaptiveBlurApplied && !OnboardingFeatures.needsMotionBlurChoice()) {
+            apply(averageFps, refreshRate)
+        }
         sampled = true
     }
 

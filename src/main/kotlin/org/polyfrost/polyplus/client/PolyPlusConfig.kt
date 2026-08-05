@@ -53,6 +53,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var onboardingToggleSprint = true
 
     @JvmStatic @Include
+    var onboardingMotionBlurMode = -1
+
+    @JvmStatic @Include
     var onboardingMotionBlur = 3
 
     @JvmStatic @Include

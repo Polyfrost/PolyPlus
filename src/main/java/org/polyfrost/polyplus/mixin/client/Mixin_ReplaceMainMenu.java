@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.mixin.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.features.OnboardingFeatures;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
@@ -36,6 +37,8 @@ public class Mixin_ReplaceMainMenu {
 
     @Unique
     private static boolean polyplus$needsOnboarding() {
-        return !PolyPlusConfig.getOnboardingCompleted() || PrivacyConsent.needsPrompt();
+        return !PolyPlusConfig.getOnboardingCompleted()
+                || PrivacyConsent.needsPrompt()
+                || OnboardingFeatures.needsMotionBlurChoice();
     }
 }
