@@ -21,6 +21,8 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.io.IOException
+import java.nio.channels.UnresolvedAddressException
 import kotlin.random.Random
 
 object PolyConnection {
@@ -223,6 +225,7 @@ object PolyConnection {
                 ?.groupValues?.getOrNull(1)
                 ?.toIntOrNull()
             if (status != null && status >= 500) return true
+            if (cause is IOException || cause is UnresolvedAddressException) return true
             val next = cause.cause
             if (next === cause) break
             cause = next

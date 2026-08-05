@@ -4,6 +4,11 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
+import java.io.EOFException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.nio.channels.UnresolvedAddressException
 
 class WebSocketBackoffTest {
     private companion object {
@@ -22,6 +27,24 @@ class WebSocketBackoffTest {
         assertTrue(
             PolyConnection.isTransientHandshakeFailure(
                 IllegalStateException("websocket failed", handshakeFailure(500)),
+            ),
+        )
+    }
+
+    @Test
+    fun `socket-level failures are transient`() {
+        assertTrue(
+            PolyConnection.isTransientHandshakeFailure(
+                EOFException("Failed to parse HTTP response: the server prematurely closed the connection"),
+            ),
+        )
+        assertTrue(PolyConnection.isTransientHandshakeFailure(ConnectException("Connection refused")))
+        assertTrue(PolyConnection.isTransientHandshakeFailure(SocketTimeoutException("timeout")))
+        assertTrue(PolyConnection.isTransientHandshakeFailure(UnknownHostException("api.polyfrost.org")))
+        assertTrue(PolyConnection.isTransientHandshakeFailure(UnresolvedAddressException()))
+        assertTrue(
+            PolyConnection.isTransientHandshakeFailure(
+                IllegalStateException("websocket failed", EOFException()),
             ),
         )
     }
