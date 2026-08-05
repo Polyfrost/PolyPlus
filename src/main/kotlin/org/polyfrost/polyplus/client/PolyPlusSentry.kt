@@ -301,12 +301,20 @@ object PolyPlusSentry {
             isMemoryExhaustion(throwable) ||
             isExpectedAccountState(throwable)
 
+    private val HANDSHAKE_STATUS = Regex("expected status code 101 but was (\\d{3})")
+
+    private fun isTransientHandshakeStatus(message: String): Boolean {
+        val status = HANDSHAKE_STATUS.find(message)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: return false
+        return status >= 500
+    }
+
     private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
             if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return true
             // io.ktor.websocket ping timeout: an idle/slow socket the client just reconnects.
             if (cause.message?.contains("Ping timeout", ignoreCase = true) == true) return true
+            if (cause.message?.let { isTransientHandshakeStatus(it) } == true) return true
             when (cause) {
                 is ServerResponseException,
                 is HttpRequestTimeoutException,

@@ -21,6 +21,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import kotlin.random.Random
 
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
@@ -29,6 +30,10 @@ object PolyConnection {
     private const val MAX_RECONNECT_DELAY_MS = 60_000L
 
     private const val MAX_RECONNECT_ATTEMPTS = 12
+
+    private const val TRANSIENT_FAILURES_BEFORE_NOTIFYING = 3
+
+    private val HANDSHAKE_STATUS = Regex("expected status code 101 but was (\\d{3})")
 
     private var connectionCallback: (() -> Unit)? = null
     private var job: Job? = null
@@ -111,6 +116,7 @@ object PolyConnection {
         job = PolyPlusClient.SCOPE.launch {
             var attempt = 0
             var tokenRefreshed = false
+            var transientFailures = 0
             while (isActive) {
                 handshakeSucceeded = false
                 try {
@@ -134,6 +140,12 @@ object PolyConnection {
                             runCatching { PolyAuthorization.reset() }
                         }
                         notifyDisconnected(null)
+                    } else if (isTransientHandshakeFailure(e)) {
+                        transientFailures++
+                        LOGGER.debug("PolyPlus WebSocket handshake failed ({}); retrying.", e.message)
+                        if (transientFailures >= TRANSIENT_FAILURES_BEFORE_NOTIFYING) {
+                            notifyDisconnected(null)
+                        }
                     } else {
                         LOGGER.error("PolyPlus WebSocket connection failed", e)
                         org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
@@ -146,6 +158,7 @@ object PolyConnection {
                 if (handshakeSucceeded) {
                     attempt = 0
                     tokenRefreshed = false
+                    transientFailures = 0
                 }
 
                 attempt++
@@ -202,10 +215,27 @@ object PolyConnection {
         }
     }
 
-    private fun reconnectDelay(attempt: Int): Long {
+    internal fun isTransientHandshakeFailure(error: Throwable): Boolean {
+        var cause: Throwable? = error
+        while (cause != null) {
+            val status = cause.message
+                ?.let { HANDSHAKE_STATUS.find(it) }
+                ?.groupValues?.getOrNull(1)
+                ?.toIntOrNull()
+            if (status != null && status >= 500) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    internal fun reconnectDelay(attempt: Int): Long {
         val shift = (attempt - 1).coerceIn(0, 30)
         val delayMs = INITIAL_RECONNECT_DELAY_MS shl shift
-        return if (delayMs <= 0L) MAX_RECONNECT_DELAY_MS else delayMs.coerceAtMost(MAX_RECONNECT_DELAY_MS)
+        val capped = if (delayMs <= 0L) MAX_RECONNECT_DELAY_MS else delayMs.coerceAtMost(MAX_RECONNECT_DELAY_MS)
+        val half = capped / 2
+        return half + Random.nextLong(half + 1)
     }
 
     private fun notifyDisconnected(error: Exception?) {

@@ -102,7 +102,7 @@ object CosmeticCatalog {
             PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics") {
                 expectSuccess = true
             }.bodyOrThrow<CosmeticList>()
-        }.onFailure { LOGGER.error("Failed to fetch cosmetic catalog", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+        }.onFailure { reportCatalogFailure(it) }
             .getOrElse {
                 CosmeticLoadProgress.fail(it.message ?: it::class.java.simpleName)
                 return
@@ -142,6 +142,30 @@ object CosmeticCatalog {
             flattenedEmotes.size,
         )
 
+    }
+
+    internal fun isRuntimeMismatch(error: Throwable): Boolean {
+        var cause: Throwable? = error
+        while (cause != null) {
+            if (cause is LinkageError) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    private fun reportCatalogFailure(error: Throwable) {
+        if (isRuntimeMismatch(error)) {
+            LOGGER.error(
+                "Failed to decode the cosmetic catalog: the kotlinx-serialization runtime on the " +
+                    "classpath is older than PolyPlus needs. Update fabric-language-kotlin.",
+                error,
+            )
+            return
+        }
+        LOGGER.error("Failed to fetch cosmetic catalog", error)
+        org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
     }
 
     suspend fun refreshPlayer() {
