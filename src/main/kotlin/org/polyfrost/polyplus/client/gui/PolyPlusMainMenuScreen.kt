@@ -183,13 +183,9 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     //? if <26.1 {
     /*override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        if (mainMenuPanoramaEnabled()) return
-        super.renderBackground(ctx, mouseX, mouseY, tickDelta)
     }
     *///?} else {
     override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        if (mainMenuPanoramaEnabled()) return
-        super.extractBackground(ctx, mouseX, mouseY, tickDelta)
     }
     //?}
 
@@ -713,9 +709,6 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         if (!PolyPlusConfig.hideMainMenuHostWorld) {
             HostWorldButton(assetsReady, screen)
         }
-        // if (!PolyPlusConfig.hideMainMenuSocial) {
-        //     PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
-        // }
         if (!PolyPlusConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
             PillButton(
                 "Cosmetics",

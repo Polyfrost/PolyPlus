@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import net.minecraft.client.Minecraft
+import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 
 object MenuBackgroundPass {
@@ -22,6 +23,34 @@ object MenuBackgroundPass {
         if (!SkiaCtx.isReady) return
         SkiaCtx.queueDraw { render(panorama) }
     }
+
+    //? if >= 26.1 {
+    @JvmStatic
+    fun renderInline(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, panorama: Boolean, screen: Any): Boolean {
+        if (!SkiaCtx.isReady) return false
+        if (screen is ComposeScreen) {
+            SkiaCtx.queueHudDraw { render(panorama) }
+            SkiaCtx.drawNow()
+            SkiaCtx.blitHud(ctx)
+        } else {
+            SkiaCtx.drawComposeBlit(ctx) { render(panorama) }
+        }
+        return true
+    }
+    //?} else {
+    /*@JvmStatic
+    fun renderInline(ctx: net.minecraft.client.gui.GuiGraphics, panorama: Boolean, screen: Any): Boolean {
+        if (!SkiaCtx.isReady) return false
+        if (screen is ComposeScreen) {
+            SkiaCtx.queueHudDraw { render(panorama) }
+            SkiaCtx.drawNow()
+            SkiaCtx.blitHud(ctx)
+        } else {
+            SkiaCtx.drawComposeBlit(ctx) { render(panorama) }
+        }
+        return true
+    }
+    *///?}
 
     private fun render(panorama: Boolean) {
         val mc = Minecraft.getInstance()

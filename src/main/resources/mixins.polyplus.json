@@ -24,6 +24,9 @@
     "client.Mixin_TrackRecentServers",
     "client.Mixin_MainMenuFpsLimit",
     "client.Mixin_PanoramaBlurRadius",
+    "client.Mixin_MenuPanoramaFrame",
+    "client.Mixin_MenuPanoramaBackground",
+    "client.Mixin_MenuPanoramaListBackground",
     "client.Mixin_HideBobbyUpgradeMessage",
     "client.essential.Mixin_EssentialPartnerConfig",
     "client.essential.Mixin_EssentialPartnerButton",
@@ -50,6 +53,10 @@
     /*,
     "client.MinecraftMainRenderTargetAccessor"
     *///?}
+    //? if >= 26.1 {
+  ,
+    "client.Mixin_MenuPanoramaFrameGuard"
+    //?}
     //? if >= 26.1 && < 26.2 {
   ,
     "client.Mixin_PreviewPresent"
@@ -79,9 +86,14 @@
     /*,
     "client.cosmetics.EntityRenderDispatcherPlayerAccessor"
     *///?}
+    //? if < 1.21.4 {
+    /*,
+    "client.Mixin_UnfreezeRegistry"
+    *///?}
     //? if < 26.2 {
   ,
-    "client.Mixin_HostWorldButtonLabel"
+    "client.Mixin_HostWorldButtonLabel",
+    "client.Mixin_MenuPanoramaTabButton"
     //?}
     //? if >= 1.21.11 {
   ,

@@ -261,8 +261,8 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
     }
 }
 *///?} else {
-/*
-class PetEntityRenderer(context: EntityRendererProvider.Context) :
+
+/*class PetEntityRenderer(context: EntityRendererProvider.Context) :
     net.minecraft.client.renderer.entity.EntityRenderer<PetEntity>(context) {
     private val modelCache = ConcurrentHashMap<Int, BedrockStandaloneModel>()
     private val molangVariables = mutableMapOf<String, Float>()

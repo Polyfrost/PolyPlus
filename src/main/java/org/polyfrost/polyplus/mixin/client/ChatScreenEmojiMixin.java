@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Style;
@@ -24,8 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenEmojiMixin {
     @Shadow protected EditBox input;
+    @Shadow CommandSuggestions commandSuggestions;
 
-    @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile(":([a-z0-9_+\\-]{2,})$");
+    @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile("(?<![A-Za-z0-9_:/.+\\-]):([a-z0-9_+\\-]{2,})$");
     @Unique private static final int POLYPLUS_MAX = 10;
     @Unique private static final int POLYPLUS_LINE_H = 12;
 
@@ -58,6 +60,10 @@ public abstract class ChatScreenEmojiMixin {
         polyplus$suggestions = Collections.emptyList();
         polyplus$tokenStart = -1;
         if (input == null || !EmojiRegistry.enabled()) {
+            polyplus$token = null;
+            return;
+        }
+        if (commandSuggestions != null && commandSuggestions.isVisible()) {
             polyplus$token = null;
             return;
         }

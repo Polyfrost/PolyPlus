@@ -22,7 +22,28 @@ object PetEntities {
     private val PET_ENTITY_TYPE_KEY: ResourceKey<EntityType<*>> =
         ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "pet"))
 
-    val PET_ENTITY_TYPE: EntityType<PetEntity> = Registry.register(
+    //? if < 1.21.4 {
+    /*@Suppress("UNCHECKED_CAST")
+    private inline fun <R> withUnfrozenEntityTypes(block: () -> R): R {
+        val registry = BuiltInRegistries.ENTITY_TYPE as net.minecraft.core.MappedRegistry<EntityType<*>>
+        val accessor =
+            registry as org.polyfrost.polyplus.mixin.client.Mixin_UnfreezeRegistry<EntityType<*>>
+        val previous = accessor.`polyplus$getIntrusiveHolders`()
+        accessor.`polyplus$setFrozen`(false)
+        if (previous == null) accessor.`polyplus$setIntrusiveHolders`(java.util.IdentityHashMap())
+        try {
+            return block()
+        } finally {
+            registry.freeze()
+        }
+    }
+    *///?}
+
+    val PET_ENTITY_TYPE: EntityType<PetEntity> =
+        //? if < 1.21.4 {
+        /*withUnfrozenEntityTypes {
+        *///?}
+        Registry.register(
         BuiltInRegistries.ENTITY_TYPE,
         PET_ENTITY_TYPE_KEY,
         //? if >= 26.2 {
@@ -47,7 +68,10 @@ object PetEntities {
             .trackRangeChunks(8)
             .build(),
         *///?}
-    )
+        )
+        //? if < 1.21.4 {
+        /*}
+        *///?}
 
     fun register() {
         FabricDefaultAttributeRegistry.register(PET_ENTITY_TYPE, PetEntity.createAttributes())

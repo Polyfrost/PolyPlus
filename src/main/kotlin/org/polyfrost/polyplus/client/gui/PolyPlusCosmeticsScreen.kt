@@ -197,7 +197,9 @@ private data class CartEntry(
     val stripePriceId: String?,
     val coverAssetId: Int? = null,
 ) {
-    val discounted: Boolean get() = (discountRate ?: 0) > 0
+    val free: Boolean get() = (finalPrice ?: 0f) <= 0f
+
+    val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 }
 
 private fun BundleInfo.toCartEntry(): CartEntry =
@@ -261,9 +263,7 @@ private data class CosmeticUiItem(
     val collection: String,
     val owned: Boolean,
     val equipped: Boolean,
-    /** User-facing variants (slim/wide model axis collapsed away). >= 1 entry. */
     val variants: List<CosmeticVariantUi>,
-    /** Which variant id is currently equipped for this group, if any. */
     val equippedVariantId: Int?,
 ) {
     val id: Int get() = groupId
@@ -305,8 +305,6 @@ private fun PolyPlusCosmeticsScreen() {
     val ownedIds = remember(refreshKey) { CosmeticCatalog.ownedIds() }
     var selectedId by remember { mutableStateOf<Int?>(null) }
     val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
-    // User's chosen variant per group (groupId -> variantId). Falls back to the
-    // equipped/first variant via selectedVariantId().
     val variantPicks = remember { mutableStateMapOf<Int, Int>() }
     var auraColor by remember { mutableStateOf(CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())) }
     LaunchedEffect(refreshKey) {
@@ -532,8 +530,6 @@ private fun Toolbar(
         Spacer(Modifier.width(8.dp))
         TabButton("Store", activeTab == PolyPlusTab.Store, onStore)
         Spacer(Modifier.width(8.dp))
-        // TabButton("Bundles", activeTab == PolyPlusTab.Bundles, onBundles)
-        // Spacer(Modifier.width(8.dp))
         TabButton("History", activeTab == PolyPlusTab.History, onHistory)
         Spacer(Modifier.weight(1f))
         SmallButton("Refresh", iconPath = "refresh", primary = false, onClick = onRefresh)
@@ -986,6 +982,7 @@ private fun BundleCard(
 private fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
     when {
         finalPrice == null -> GuiText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
+        finalPrice <= 0f -> GuiText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         discounted && basePrice != null -> {
             GuiText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
             Spacer(Modifier.width(4.dp))
@@ -1318,11 +1315,6 @@ private fun AuraDot(
     }
 }
 
-/**
- * Chips for selecting which variant of a grouped cosmetic to equip. The chosen
- * variant is what the Equip button acts on (the client then auto-resolves the
- * slim/wide model to the player's skin).
- */
 @Composable
 private fun VariantPicker(
     variants: List<CosmeticVariantUi>,
@@ -1726,7 +1718,7 @@ private fun CartPanel(
         if (discount > 0f) {
             RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
         }
-        RowTotals("Total", money(total), Color.White, large = true)
+        RowTotals("Total", if (total <= 0f) "FREE" else money(total), Color.White, large = true)
         if (status != null) {
             GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
@@ -2137,7 +2129,6 @@ private fun StoreCard(
 
     Box(
         modifier = Modifier.size(180.dp, 258.dp)
-            // Owned listings stay legible but read as already-handled.
             .alpha(if (owned) 0.6f else 1f)
             .clip(ppShape(12.dp))
             .background(cardBrush())

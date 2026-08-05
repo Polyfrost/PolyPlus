@@ -199,6 +199,22 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic
     @Switch(
+        title = "Custom Panorama",
+        description = "Use the PolyPlus panorama instead of the vanilla Minecraft one.",
+        category = "Main Menu",
+    )
+    var customPanorama = true
+
+    @JvmStatic
+    @Switch(
+        title = "Panorama In All Menus",
+        description = "Keep the panorama behind every menu (settings, multiplayer, singleplayer, etc.) instead of the dirt background.",
+        category = "Main Menu",
+    )
+    var panoramaInAllMenus = false
+
+    @JvmStatic
+    @Switch(
         title = "Accept Terms of Service & Privacy Policy",
         description = "Required for crash reporting and online features (cosmetics, client indicator, etc.). ",
         category = "Privacy",
@@ -211,6 +227,17 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     init {
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
+        }
+
+        addDependency("customPanorama", "Menu Backdrop") {
+            if (!customPanoramaSupported()) Display.HIDDEN
+            else if (mainMenuBackground == MainMenuBackground.PANORAMA) Display.SHOWN
+            else Display.DISABLED
+        }
+
+        addCallback("customPanorama") {
+            //? if >= 1.21.11
+            if (customPanorama) org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
         }
 
         addDependency("hideMainMenuRealms", "Realms is unavailable") {
@@ -227,6 +254,14 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
             PolyPlusClient.refresh() // Refresh API tokens, cosmetic data, etc.
         }
     }
+
+    @JvmStatic
+    fun customPanoramaSupported(): Boolean =
+        //? if >= 1.21.11 {
+        org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.isAvailable()
+        //?} else {
+        /*false
+        *///?}
 
     @JvmStatic
     fun realmsSupported(): Boolean =
