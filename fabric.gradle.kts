@@ -164,7 +164,7 @@ tasks.withType<ProcessResources>().configureEach {
                 "mod_id" to modId,
                 "mod_name" to modName,
                 "mod_version" to modVersion,
-                "mod_description" to "PolyPlus cosmetics for OneConfig",
+                "mod_description" to "Various expansions for the OneClient 'modpack'",
                 "minor_mc_version" to minecraftPredicate,
             ),
         )
