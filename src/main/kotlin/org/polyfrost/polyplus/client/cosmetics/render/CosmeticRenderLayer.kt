@@ -18,7 +18,7 @@ import net.minecraft.client.renderer.entity.state.PlayerRenderState
 import net.minecraft.client.renderer.entity.RenderLayerParent
 import net.minecraft.client.renderer.entity.layers.RenderLayer
 import net.minecraft.world.entity.EquipmentSlot
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -129,10 +129,10 @@ private fun resolveHiddenSlots(player: AbstractClientPlayer): Set<BodySlot> = hi
 
 private fun hiddenSlotsFor(player: AbstractClientPlayer): Set<BodySlot> {
     val hidden = mutableSetOf<BodySlot>()
-    if (PolyPlusConfig.hideHeadCosmeticsWithHelmet && !player.getItemBySlot(EquipmentSlot.HEAD).isEmpty) {
+    if (PolyPlusCosmeticsConfig.hideHeadCosmeticsWithHelmet && !player.getItemBySlot(EquipmentSlot.HEAD).isEmpty) {
         hidden += BodySlot.Hat
     }
-    if (PolyPlusConfig.hideFeetCosmeticsWithBoots && !player.getItemBySlot(EquipmentSlot.FEET).isEmpty) {
+    if (PolyPlusCosmeticsConfig.hideFeetCosmeticsWithBoots && !player.getItemBySlot(EquipmentSlot.FEET).isEmpty) {
         hidden += BodySlot.Boots
     }
     return hidden

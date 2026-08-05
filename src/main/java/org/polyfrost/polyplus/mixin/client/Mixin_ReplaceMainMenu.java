@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.mixin.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
 import org.polyfrost.polyplus.client.features.OnboardingFeatures;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen;
@@ -17,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class Mixin_ReplaceMainMenu {
     @Inject(method = "init", at = @At("HEAD"), cancellable = true)
     private void polyplus$replaceMainMenu(CallbackInfo ci) {
-        if (PolyPlusConfig.getUseVanillaMainMenu()) {
+        if (PolyPlusMainMenuConfig.getUseVanillaMainMenu()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();

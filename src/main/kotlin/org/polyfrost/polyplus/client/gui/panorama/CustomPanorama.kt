@@ -18,7 +18,7 @@ import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.MenuPanorama
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen
@@ -90,7 +90,7 @@ object CustomPanorama {
     @JvmStatic
     fun initialize() {
         val pack = PACK ?: return
-        if (!PolyPlusConfig.customPanorama) return
+        if (!PolyPlusMainMenuConfig.customPanorama) return
         if (cubeMapReady) return
         if (!started.compareAndSet(false, true)) return
 
@@ -113,7 +113,7 @@ object CustomPanorama {
         if (overlayReady && shouldApply()) OVERLAY_ID else original
 
     private fun shouldApply(): Boolean {
-        if (!PolyPlusConfig.customPanorama) return false
+        if (!PolyPlusMainMenuConfig.customPanorama) return false
         val screen =
             //? if >= 26.2 {
             /*Minecraft.getInstance().gui.screen()

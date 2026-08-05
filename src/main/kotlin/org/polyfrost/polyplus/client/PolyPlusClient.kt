@@ -116,6 +116,8 @@ object PolyPlusClient {
         step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
         step("config preload") { PolyPlusConfig.preload() }
+        step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
+        step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("default settings") { DefaultSettings.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }

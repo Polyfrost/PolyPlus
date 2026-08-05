@@ -1,0 +1,23 @@
+{
+	"mainMenuFpsLimit": 260,
+	"hideMainMenuQuickplay": false,
+	"mainMenuBackground": {
+		"class": "org.polyfrost.polyplus.client.gui.MainMenuBackground",
+		"value": "PANORAMA"
+	},
+	"useVanillaMainMenu": false,
+	"hideMainMenuModButtons": false,
+	"migratedFromLegacyConfig": false,
+	"hideMainMenuHostWorld": false,
+	"hideMainMenuRealms": false,
+	"hideMainMenuPlayerPreview": false,
+	"hideMainMenuSocial": false,
+	"hideMainMenuCosmetics": false,
+	"hideMainMenuAltManager": false,
+	"customPanorama": true,
+	"mainMenuFpsLimitMode": {
+		"class": "org.polyfrost.polyplus.client.MainMenuFpsLimitMode",
+		"value": "SMART"
+	},
+	"panoramaInAllMenus": true
+}

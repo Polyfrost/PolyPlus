@@ -3,7 +3,7 @@ package org.polyfrost.polyplus.client.gui
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 
 object MenuPanorama {
     @JvmField
@@ -19,7 +19,7 @@ object MenuPanorama {
     fun menusActive(): Boolean = menusActive(currentScreen())
 
     private fun menusActive(screen: Any?): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
         if (Minecraft.getInstance().level == null) return true
         return isLoadingScreen(screen)
     }
@@ -37,7 +37,7 @@ object MenuPanorama {
     fun active(screen: Screen): Boolean = menusActive(screen) && screen !is ComposeScreen
 
     private fun backdropWanted(screen: Screen, onPanoramaPass: Boolean): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
         if (!onPanoramaPass && !menusActive(screen)) return false
         return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
     }
@@ -59,7 +59,7 @@ object MenuPanorama {
 
     @JvmStatic
     fun suppressPanorama(): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus || panoramaBackdrop()) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus || panoramaBackdrop()) return false
         val screen = currentScreen() ?: return false
         return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
     }
