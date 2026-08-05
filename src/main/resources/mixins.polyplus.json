@@ -29,7 +29,9 @@
     "client.essential.Mixin_EssentialPartnerButton",
     "client.essential.Mixin_EssentialPartnerModal",
     "client.access.MinecraftAccessor",
-    "client.access.UserAccessor"
+    "client.access.UserAccessor",
+    "client.network.Mixin_ConnectionP2P",
+    "client.network.Mixin_ServerConnectionListenerP2P"
     //? if >= 1.21.8 && < 26.1 {
     /*,
     "client.PlayerTabBadgeMixin"

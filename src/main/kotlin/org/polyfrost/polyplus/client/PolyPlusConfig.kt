@@ -2,16 +2,18 @@ package org.polyfrost.polyplus.client
 
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import org.lwjgl.glfw.GLFW
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.Property.Display
-import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
-import org.polyfrost.oneconfig.api.config.v1.annotations.Include
-import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
-import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
+import org.polyfrost.oneconfig.api.config.v1.annotations.*
+import org.polyfrost.oneconfig.api.ui.v1.keybind.KeyModifiers
+import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.MainMenuBackground
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
+import org.polyfrost.polyplus.client.social.SocialOverlay
+
 
 private const val MAIN_MENU_FPS_HEADROOM = 60
 private const val FALLBACK_MONITOR_REFRESH_RATE = 60
@@ -204,6 +206,18 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
         category = "Privacy",
     )
     var acceptedLegalTerms = true
+
+    @Keybind(
+        title = "Socials Menu",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus Socials menu",
+    )
+    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(GLFW.GLFW_KEY_P), null, KeyModifiers.SHIFT, 0L) { state ->
+        if (state) {
+            SocialOverlay.toggle()
+        }
+        true
+    }
 
     @Dropdown(title = "API URL", description = "The URL used for the PolyPlus API. Only change if you know what you're doing.")
     var apiUrl: BackendUrl = BackendUrl.PRODUCTION

@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.host
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
@@ -12,6 +13,9 @@ import java.nio.file.Path
 
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+
 //?}
 
 object HostWorldManager {
@@ -100,6 +104,67 @@ object HostWorldManager {
             *///?} else {
             mc.setScreen(returnScreen)
             //?}
+        }
+    }
+
+    fun hostViaP2P(
+        returnScreen: Screen,
+        entry: HostWorldEntry,
+        gameMode: GameType,
+        allowCheats: Boolean,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+
+        org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+            val result = org.polyfrost.polyplus.client.network.p2p.P2PSessionManager.beginHostingSession()
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats)
+                mc.createWorldOpenFlows().openWorld(entry.id) {
+                    pending = null
+                    //? if >= 26.2 {
+                    /*mc.gui.setScreen(returnScreen)
+                    *///?} else {
+                    mc.setScreen(returnScreen)
+                    //?}
+                }
+                LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
+                onHosted(session.id)
+            }
+        }
+    }
+
+    fun hostCurrentWorldViaP2P(
+        gameMode: GameType,
+        allowCheats: Boolean,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) {
+            onFailure(IllegalStateException("Not currently in a singleplayer world"))
+            return
+        }
+
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession()
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats)
+                onHosted(session.id)
+            }
         }
     }
 

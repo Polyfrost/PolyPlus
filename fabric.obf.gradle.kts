@@ -56,6 +56,7 @@ repositories {
     mavenCentral()
     google()
     maven("https://repo.polyfrost.org/releases")
+    maven("https://maven.cloverclient.com/releases")
     maven("https://repo.polyfrost.org/snapshots")
     maven("https://maven.fabricmc.net/") {
         content { includeGroupAndSubgroups("net.fabricmc") }
@@ -117,6 +118,8 @@ dependencies {
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
+
+    implementation(include("gg.sona:eos:2.0.2")!!)
 
     testImplementation(libs.junit.jupiter)
     catalogLib("fabric-loader-junit")?.let { testImplementation(it) }

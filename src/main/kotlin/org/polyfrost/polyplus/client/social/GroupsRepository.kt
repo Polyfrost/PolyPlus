@@ -1,0 +1,145 @@
+package org.polyfrost.polyplus.client.social
+
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.http.GroupsApi
+import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
+import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
+import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
+import org.polyfrost.polyplus.events.WebSocketMessage
+import org.polyfrost.polyplus.utils.EarlyInitializable
+
+object GroupsRepository : EarlyInitializable {
+    private val LOGGER = LogManager.getLogger()
+
+    private val _groups = MutableStateFlow<List<GroupSummary>>(emptyList())
+    val groups = _groups.asStateFlow()
+
+    private val messagesByGroup = ConcurrentHashMap<Int, MutableStateFlow<List<GroupMessage>>>()
+
+    override fun earlyInitialize() {
+        eventHandler<WebSocketMessage> { event ->
+            when (val packet = event.packet) {
+                is ClientboundPacket.GroupMessageReceived -> onMessageReceived(packet)
+                is ClientboundPacket.GroupMessageEdited -> onMessageEdited(packet)
+                is ClientboundPacket.GroupMessageDeleted -> onMessageDeleted(packet)
+                else -> Unit
+            }
+        }.register()
+    }
+
+    /** Flow of loaded messages for a group. Empty until [loadMessages] has been called at least once. */
+    fun messagesFlow(groupId: Int): StateFlow<List<GroupMessage>> =
+        messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }.asStateFlow()
+
+    fun refreshGroups() = PolyPlusClient.SCOPE.launch {
+        GroupsApi.list()
+            .onSuccess { _groups.value = it }
+            .onFailure { LOGGER.error("Failed to refresh groups", it) }
+    }
+
+    fun openDirectMessage(player: String, onResult: (Result<GroupSummary>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
+        val result = GroupsApi.openDirectMessage(player)
+        result.onSuccess { summary -> upsertGroup(summary) }
+            .onFailure { LOGGER.error("Failed to open DM with $player", it) }
+        onResult(result)
+    }
+
+    fun createGroup(name: String, members: List<String>, onResult: (Result<GroupSummary>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
+        val result = GroupsApi.createGroup(name, members)
+        result.onSuccess { summary -> upsertGroup(summary) }
+            .onFailure { LOGGER.error("Failed to create group $name", it) }
+        onResult(result)
+    }
+
+    fun addMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.addMember(groupId, player).onSuccess { refreshGroups() }
+            .onFailure { LOGGER.error("Failed to add $player to group $groupId", it) }
+    }
+
+    fun removeMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.removeMember(groupId, player).onSuccess { refreshGroups() }
+            .onFailure { LOGGER.error("Failed to remove $player from group $groupId", it) }
+    }
+
+    fun loadMessages(groupId: Int, before: Long? = null, limit: Long? = null) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.messages(groupId, before, limit)
+            .onSuccess { page ->
+                val flow = messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
+                flow.value = if (before == null) {
+                    page.sortedBy { it.id }
+                } else {
+                    (page + flow.value).distinctBy { it.id }.sortedBy { it.id }
+                }
+            }
+            .onFailure { LOGGER.error("Failed to load messages for group $groupId", it) }
+    }
+
+    fun sendMessage(groupId: Int, content: String, idempotencyKey: String? = null) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.sendMessage(groupId, content, idempotencyKey)
+            .onSuccess { message -> appendOrReplace(groupId, message) }
+            .onFailure { LOGGER.error("Failed to send message to group $groupId", it) }
+    }
+
+    fun editMessage(groupId: Int, messageId: Long, content: String) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.editMessage(groupId, messageId, content)
+            .onSuccess { message -> appendOrReplace(groupId, message) }
+            .onFailure { LOGGER.error("Failed to edit message $messageId in group $groupId", it) }
+    }
+
+    fun deleteMessage(groupId: Int, messageId: Long) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.deleteMessage(groupId, messageId)
+            .onSuccess { removeMessage(groupId, messageId) }
+            .onFailure { LOGGER.error("Failed to delete message $messageId in group $groupId", it) }
+    }
+
+    fun markRead(groupId: Int, messageId: Long) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.markRead(groupId, messageId)
+            .onSuccess { refreshGroups() }
+            .onFailure { LOGGER.error("Failed to mark group $groupId read up to $messageId", it) }
+    }
+
+    private fun upsertGroup(summary: GroupSummary) {
+        _groups.value = _groups.value.filterNot { it.id == summary.id } + summary
+    }
+
+    private fun appendOrReplace(groupId: Int, message: GroupMessage) {
+        val flow = messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
+        flow.value = (flow.value.filterNot { it.id == message.id } + message).sortedBy { it.id }
+        refreshGroups()
+    }
+
+    private fun removeMessage(groupId: Int, messageId: Long) {
+        messagesByGroup[groupId]?.let { flow ->
+            flow.value = flow.value.filterNot { it.id == messageId }
+        }
+    }
+
+    private fun onMessageReceived(packet: ClientboundPacket.GroupMessageReceived) {
+        appendOrReplace(
+            packet.groupId,
+            GroupMessage(
+                id = packet.messageId,
+                sender = packet.sender,
+                content = packet.content,
+                sentAt = java.time.Instant.now().toString(),
+                editedAt = null,
+            ),
+        )
+    }
+
+    private fun onMessageEdited(packet: ClientboundPacket.GroupMessageEdited) {
+        val flow = messagesByGroup[packet.groupId] ?: return
+        flow.value = flow.value.map { if (it.id == packet.messageId) it.copy(content = packet.content) else it }
+    }
+
+    private fun onMessageDeleted(packet: ClientboundPacket.GroupMessageDeleted) {
+        removeMessage(packet.groupId, packet.messageId)
+    }
+}

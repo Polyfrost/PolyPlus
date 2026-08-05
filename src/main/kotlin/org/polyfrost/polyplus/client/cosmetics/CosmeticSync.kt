@@ -124,10 +124,10 @@ object CosmeticSync : EarlyInitializable {
         val level = mc.level
             ?: return Result.failure(IllegalStateException("No world is loaded"))
 
-        val known = HashSet<String>()
-        mc.connection?.onlinePlayerIds?.forEach { known.add(it.toString()) }
-        level.players().forEach { known.add(it.uuid.toString()) }
-        val visible = known
+
+
+        val visible = level.players()
+            .map { it.uuid.toString() }
             .mapNotNull(::normalizePlayerUuid)
             .toSet()
 

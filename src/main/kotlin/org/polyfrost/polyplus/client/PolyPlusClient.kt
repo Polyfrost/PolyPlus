@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
@@ -31,18 +32,26 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.pets.PetEntities
+import org.polyfrost.polyplus.client.social.FriendsRepository
+import org.polyfrost.polyplus.client.social.GlobalChatRepository
+import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.utils.EarlyInitializable
 
@@ -61,6 +70,7 @@ object PolyPlusClient {
         prettyPrint = true
         isLenient = true
         ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
     @JvmField val HTTP = HttpClient(CIO) {
@@ -119,11 +129,16 @@ object PolyPlusClient {
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("default settings") { DefaultSettings.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
-        step("adaptive blur") { org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize() }
+        step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
 
         val earlyHooks: List<EarlyInitializable> = buildList {
             //? if >= 1.21.1
             add(CosmeticsInitializer)
+            add(FriendsRepository)
+            add(GroupsRepository)
+            add(GlobalChatRepository)
+            add(SessionsRepository)
+            add(P2PSessionManager)
         }
         earlyHooks.forEach { hook ->
             step("early init ${hook.javaClass.simpleName}") { hook.earlyInitialize() }
@@ -134,6 +149,7 @@ object PolyPlusClient {
         PetEntities.register()
         //? if >= 1.21.1
         EmoteWheelKeybind.register()
+        step("social overlay keybind") { SocialOverlay.registerKeybind() }
 
         step("websocket") {
             PolyConnection.initialize {
@@ -143,9 +159,14 @@ object PolyPlusClient {
                     PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
                     //? if >= 1.21.1
                     CosmeticSync.resubscribeVisiblePlayers()
-                    if (net.minecraft.client.Minecraft.getInstance().player != null) {
+                    if (Minecraft.getInstance().player != null) {
                         refreshCosmetics()
                     }
+
+                    FriendsRepository.refreshAll()
+                    GroupsRepository.refreshGroups()
+                    GlobalChatRepository.refreshHistory()
+                    SessionsRepository.refreshIncoming()
                 }
             }
         }
@@ -154,7 +175,7 @@ object PolyPlusClient {
 
         step("cosmetics prefetch") { refreshCosmetics() }
         step("commands") { PolyPlusCommands.register() }
-        step("host world") { org.polyfrost.polyplus.client.host.HostWorldManager.registerLanPublishHook() }
+        step("host world") { HostWorldManager.registerLanPublishHook() }
         //? if >= 1.21.11
         step("panorama") { org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize() }
     }

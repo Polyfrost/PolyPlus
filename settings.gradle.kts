@@ -38,6 +38,7 @@ fun usesFabricObfLoom(mc: String): Boolean {
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         mavenCentral()
         maven("https://maven.fabricmc.net/")
         maven("https://repo.polyfrost.org/releases")

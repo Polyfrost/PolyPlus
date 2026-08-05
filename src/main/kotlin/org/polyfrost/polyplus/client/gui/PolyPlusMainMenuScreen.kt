@@ -49,6 +49,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -115,7 +116,6 @@ import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.host.E4mcSupport
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -127,6 +127,9 @@ import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.network.p2p.EosStatus
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
@@ -713,9 +716,15 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         if (!PolyPlusConfig.hideMainMenuHostWorld) {
             HostWorldButton(assetsReady, screen)
         }
-        // if (!PolyPlusConfig.hideMainMenuSocial) {
-        //     PillButton("Social", ASSETS + "message-chat-circle.svg", Modifier.fillMaxWidth(), assetsReady)
-        // }
+        if (!PolyPlusConfig.hideMainMenuSocial) {
+            PillButton(
+                "Social",
+                ASSETS + "message-chat-circle.svg",
+                Modifier.fillMaxWidth(),
+                assetsReady,
+                onClick = { SocialOverlay.open(screen) },
+            )
+        }
         if (!PolyPlusConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
             PillButton(
                 "Cosmetics",
@@ -730,32 +739,17 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
 
 @Composable
 private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
-    val enabled = E4mcSupport.isPresent
     var showPopup by remember { mutableStateOf(false) }
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
-    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onSizeChanged { buttonSize = it }
-            .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
-            .hoverable(interaction),
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         PillButton(
             label = "Host World",
             icon = ASSETS + "log-in-04.svg",
-            modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f),
+            modifier = Modifier.fillMaxWidth(),
             assetsReady = assetsReady,
-            onClick = {
-                if (enabled) {
-                    showPopup = true
-                }
-            },
+            onClick = { showPopup = true },
         )
-        if (showPopup && enabled) {
+        if (showPopup) {
             Popup(
                 alignment = Alignment.Center,
                 onDismissRequest = { showPopup = false },
@@ -779,33 +773,6 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
                 }
             }
         }
-        if (hovered && !enabled && buttonSize.width > 0) {
-            val totalScale = buttonBounds.width / buttonSize.width
-            val positionProvider = remember(buttonBounds, totalScale) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        val gap = 8f * totalScale
-                        return IntOffset(
-                            (buttonBounds.center.x - popupContentSize.width * totalScale / 2f).roundToInt(),
-                            (buttonBounds.bottom + gap).roundToInt(),
-                        )
-                    }
-                }
-            }
-            Popup(
-                popupPositionProvider = positionProvider,
-                properties = PopupProperties(focusable = false, clippingEnabled = false),
-            ) {
-                Box(Modifier.guiScaled(totalScale, TransformOrigin(0f, 0f))) {
-                    TooltipBubble("Install the e4mc mod to host worlds")
-                }
-            }
-        }
     }
 }
 
@@ -819,6 +786,8 @@ private fun HostWorldPopup(
     var selected by remember { mutableStateOf<HostWorldManager.HostWorldEntry?>(null) }
     var gameMode by remember { mutableStateOf(net.minecraft.world.level.GameType.SURVIVAL) }
     var allowCheats by remember { mutableStateOf(false) }
+    var hostError by remember { mutableStateOf<String?>(null) }
+    val eosStatus by P2PSessionManager.status.collectAsState()
 
     DisposableEffect(Unit) {
         org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
@@ -884,7 +853,17 @@ private fun HostWorldPopup(
             Box(Modifier.weight(1f)) { CheatsToggle(allowCheats) { allowCheats = !allowCheats } }
         }
 
+        when (val status = eosStatus) {
+            EosStatus.Connecting ->
+                MenuText("Connecting to Poly+ multiplayer services…", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Light)
+            is EosStatus.Failed ->
+                MenuText(status.reason + " — you can still host on LAN below.", fontSize = 12.sp, color = WarnColor, fontWeight = FontWeight.Light)
+            EosStatus.Ready -> {}
+        }
+        hostError?.let { MenuText(it, fontSize = 12.sp, color = DangerColor, fontWeight = FontWeight.Light) }
+
         val chosen = selected
+        val hostReady = chosen != null && eosStatus == EosStatus.Ready
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             PillButton(
                 label = "Cancel",
@@ -894,15 +873,39 @@ private fun HostWorldPopup(
                 onClick = onDismiss,
             )
             PillButton(
-                label = "Host",
+                label = if (eosStatus is EosStatus.Failed) "Host on LAN" else "Host",
                 icon = ASSETS + "log-in-04.svg",
                 modifier = Modifier.weight(1f).alpha(if (chosen != null) 1f else 0.5f),
                 assetsReady = assetsReady,
                 onClick = {
-                    if (chosen != null) {
+                    if (chosen == null) return@PillButton
+                    if (eosStatus is EosStatus.Failed) {
                         onDismiss()
                         HostWorldManager.host(screen, chosen, gameMode, allowCheats)
+                    } else if (hostReady) {
+                        hostError = null
+                        onDismiss()
+                        HostWorldManager.hostViaP2P(
+                            screen,
+                            chosen,
+                            gameMode,
+                            allowCheats,
+                            onFailure = { hostError = "Unable to start hosting: ${it.message}" },
+                        )
                     }
+                },
+            )
+        }
+        if (eosStatus == EosStatus.Ready) {
+            MenuText(
+                "Host on LAN instead",
+                fontSize = 11.sp,
+                color = TextSecondary,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    val chosenNow = selected ?: return@clickable
+                    onDismiss()
+                    HostWorldManager.host(screen, chosenNow, gameMode, allowCheats)
                 },
             )
         }
