@@ -1,28 +1,9 @@
 [versions]
-object-builder-v1 = "23.1.0+abb459f14c"
-rendering-v1 = "23.0.4+c7e428fd4c"
-api-base = "2.0.3+ece063234c"
-lifecycle-events-v1 = "4.1.0+6d50a0854c"
-transitive-access-wideners-v1 = "8.1.1+7f80f93d4c"
-command-api-v2 = "3.0.5+e2bdee784c"
-key-mapping-api-v1 = "2.0.4+e2bdee784c"
-resource-loader-v1 = "2.0.10+7c44c7324c"
+fabric-api = "0.155.2+26.1.2"
 
 cinnabar = "26.1-snapshot-9-0.0.7-beta-85-gd3508cc"
 
-
 [libraries]
-api-base = { module = "net.fabricmc.fabric-api:fabric-api-base", version.ref = "api-base" }
-lifecycle-events-v1 = { module = "net.fabricmc.fabric-api:fabric-lifecycle-events-v1", version.ref = "lifecycle-events-v1" }
-transitive-access-wideners-v1 = { module = "net.fabricmc.fabric-api:fabric-transitive-access-wideners-v1", version.ref = "transitive-access-wideners-v1" }
-command-api-v2 = { module = "net.fabricmc.fabric-api:fabric-command-api-v2", version.ref = "command-api-v2" }
-key-mapping-api-v1 = { module = "net.fabricmc.fabric-api:fabric-key-mapping-api-v1", version.ref = "key-mapping-api-v1" }
-resource-loader-v1 = { module = "net.fabricmc.fabric-api:fabric-resource-loader-v1", version.ref = "resource-loader-v1" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
 
 cinnabar = { module = "graphics.cinnabar:cinnabar-fabric", version.ref = "cinnabar" }
-
-object-builder-v1 = { module = "net.fabricmc.fabric-api:fabric-object-builder-api-v1", version.ref = "object-builder-v1" }
-rendering-v1 = { module = "net.fabricmc.fabric-api:fabric-rendering-v1", version.ref = "rendering-v1" }
-
-[bundles]
-fabric-api = ["api-base", "lifecycle-events-v1", "transitive-access-wideners-v1", "command-api-v2", "key-mapping-api-v1", "resource-loader-v1", "object-builder-v1", "rendering-v1"]

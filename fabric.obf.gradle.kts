@@ -49,9 +49,6 @@ val versionedCatalogs = run {
 fun catalogLib(name: String) =
     versionedCatalogs.firstNotNullOfOrNull { cat -> cat.findLibrary(name).orElse(null) }
 
-fun catalogBundle(name: String) =
-    versionedCatalogs.firstNotNullOfOrNull { cat -> cat.findBundle(name).orElse(null) }
-
 group = property("mod.group") as String
 version = "${property("mod.version")}+${stonecutter.current.version}"
 base.archivesName = property("mod.id") as String
@@ -148,7 +145,7 @@ dependencies {
 
     modLocalRuntime(libs.devauth.fabric)
 
-    catalogBundle("fabric-api")?.let { modImplementation(it) { isTransitive = true } }
+    catalogLib("fabric-api")?.let { modImplementation(it) { isTransitive = true } }
     catalogLib("fabric-loader")?.let { modImplementation(it) { isTransitive = true } }
 
     catalogLib("sodium")?.let { modCompileOnly(it) { isTransitive = false } }
