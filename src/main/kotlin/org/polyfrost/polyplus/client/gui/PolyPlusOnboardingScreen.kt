@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -65,7 +66,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -466,16 +469,7 @@ private fun MotionBlurPage(
     motionBlur: Int,
     onMotionBlur: (Int) -> Unit,
 ) {
-    val panelWidth = LocalPanelWidth.current
     Header("One choice left:", "Motion Blur")
-    OnboardingText(
-        "Motion blur when configured right makes your game feel much smoother, but will decrease FPS " +
-            "significantly, especially on lower-end devices",
-        13,
-        Modifier.offset(0.dp, BLUR_INTRO_Y.dp).width(panelWidth.dp).padding(horizontal = 90.dp),
-        TextSecondary,
-        FontWeight.Light,
-    )
 
     val recommended = if (AdaptiveBlurDefaults.sampled) AdaptiveBlurDefaults.recommendedMode else OnboardingFeatures.MOTION_BLUR_UNSET
     Row(
@@ -486,8 +480,8 @@ private fun MotionBlurPage(
             "Disabled",
             MAIN_MENU_ASSETS + "x-close.svg",
             "No motion blur at all. You get the most performance with this option.",
-            "Best FPS",
             ImpactGood,
+            300,
             blurMode == OnboardingFeatures.MOTION_BLUR_DISABLED,
             recommended == OnboardingFeatures.MOTION_BLUR_DISABLED,
         ) { onBlurMode(OnboardingFeatures.MOTION_BLUR_DISABLED) }
@@ -495,8 +489,8 @@ private fun MotionBlurPage(
             "Performance",
             ONBOARDING_ASSETS + "zap.svg",
             "Motion blur with no hand blur option and less samples per frame for the motion blur.",
-            "Small FPS cost",
             ImpactWarn,
+            225,
             blurMode == OnboardingFeatures.MOTION_BLUR_PERFORMANCE,
             recommended == OnboardingFeatures.MOTION_BLUR_PERFORMANCE,
         ) { onBlurMode(OnboardingFeatures.MOTION_BLUR_PERFORMANCE) }
@@ -504,23 +498,12 @@ private fun MotionBlurPage(
             "Quality",
             "assets/polyplus/ico/stars.svg",
             "The full blur experience. Only run if you get 200FPS+ in-game.",
-            "Fewer FPS",
             ImpactHeavy,
+            200,
             blurMode == OnboardingFeatures.MOTION_BLUR_QUALITY,
             recommended == OnboardingFeatures.MOTION_BLUR_QUALITY,
         ) { onBlurMode(OnboardingFeatures.MOTION_BLUR_QUALITY) }
     }
-
-    val (note, noteColor) = when (blurMode) {
-        OnboardingFeatures.MOTION_BLUR_DISABLED ->
-            "No blur is drawn, so your frame rate stays exactly where it is." to ImpactGood
-        OnboardingFeatures.MOTION_BLUR_PERFORMANCE ->
-            FPS_WARNING to ImpactWarn
-        OnboardingFeatures.MOTION_BLUR_QUALITY ->
-            FPS_WARNING to ImpactHeavy
-        else -> "Pick one to continue. You can change this later in PolyBlur's settings." to TextSecondary
-    }
-    OnboardingText(note, 13, Modifier.offset(0.dp, BLUR_NOTE_Y.dp).width(panelWidth.dp), noteColor, FontWeight.Medium)
 
     val blurOff = blurMode != OnboardingFeatures.MOTION_BLUR_PERFORMANCE &&
         blurMode != OnboardingFeatures.MOTION_BLUR_QUALITY
@@ -608,8 +591,8 @@ private fun MotionBlurModeCard(
     title: String,
     icon: String,
     description: String,
-    impact: String,
     impactColor: Color,
+    exampleFps: Int,
     selected: Boolean,
     recommended: Boolean,
     onClick: () -> Unit,
@@ -622,7 +605,9 @@ private fun MotionBlurModeCard(
             .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(
+            Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = MODE_CARD_FOOTER.dp),
+        ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -634,31 +619,42 @@ private fun MotionBlurModeCard(
             OnboardingText(
                 description,
                 12,
-                Modifier.width((MODE_CARD_WIDTH - 32f).dp),
+                Modifier.width((MODE_CARD_WIDTH - 32f).dp).heightIn(min = MODE_CARD_DESC_HEIGHT.dp),
                 TextSecondary,
                 FontWeight.Light,
                 TextAlign.Start,
             )
+            Spacer(Modifier.weight(1f))
+            FpsHud(exampleFps, impactColor, Modifier.align(Alignment.CenterHorizontally))
+            Spacer(Modifier.weight(1f))
         }
-        Row(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Pill(impact, impactColor)
-            if (recommended) OnboardingText("Recommended", 11, color = Accent, weight = FontWeight.Medium)
+        if (recommended) {
+            OnboardingText(
+                "Recommended",
+                11,
+                Modifier.align(Alignment.BottomCenter).padding(14.dp),
+                Accent,
+                FontWeight.Medium,
+            )
         }
     }
 }
 
 @Composable
-private fun Pill(label: String, color: Color) {
-    Box(
-        Modifier.height(20.dp).clip(ppShape(10.dp)).background(color.copy(alpha = 0.16f))
-            .padding(horizontal = 9.dp),
-        contentAlignment = Alignment.Center,
-    ) { OnboardingText(label, 11, color = color, weight = FontWeight.Medium) }
+private fun FpsHud(fps: Int, color: Color, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(ppShape(HUD_RADIUS.dp))
+            .background(HudBackground)
+            .padding(HUD_PADDING.dp),
+    ) {
+        val style = TextStyle(fontSize = HUD_TEXT_SIZE.sp, fontFamily = MinecraftFontFamily)
+        BasicText("FPS: ", style = style.copy(color = TextPrimary))
+        BasicText(fps.toString(), style = style.copy(color = color))
+    }
 }
+
+private val MinecraftFontFamily = FontFamily(Font("assets/oneconfig/fonts/minecraft/Minecraft-Regular.otf"))
 
 @Composable
 private fun CosmeticsPage(onClaim: () -> Unit, onStore: () -> Unit) {
@@ -1043,17 +1039,16 @@ private const val LABEL_HEIGHT = 32f
 private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
 
 private const val MODE_CARD_WIDTH = 240f
-private const val MODE_CARD_HEIGHT = 158f
-private const val FPS_WARNING =
-    "YOU ARE TRADING YOUR FPS FOR MOTION BLUR, DO NOT COME COMPLAINING TO US IF YOUR FPS IS WORSE!"
-private const val BLUR_INTRO_Y = 112f
+private const val MODE_CARD_HEIGHT = 212f
+private const val MODE_CARD_FOOTER = 38f
+// Three lines of the 12sp description font, whose line height is 1.5em.
+private const val MODE_CARD_DESC_HEIGHT = 3f * 12f * 1.5f
 private const val BLUR_CARDS_X = (PANEL_WIDTH - (MODE_CARD_WIDTH * 3f + 36f)) / 2f
-private const val BLUR_CARDS_Y = 158f
-private const val BLUR_NOTE_Y = BLUR_CARDS_Y + MODE_CARD_HEIGHT + 12f
-private const val BLUR_STRENGTH_LABEL_Y = BLUR_NOTE_Y + 30f
+private const val BLUR_CARDS_Y = 130f
+private const val BLUR_STRENGTH_LABEL_Y = BLUR_CARDS_Y + MODE_CARD_HEIGHT + 26f
 private const val BLUR_SLIDER_Y = BLUR_STRENGTH_LABEL_Y + LABEL_HEIGHT
 private const val BLUR_PREVIEW_Y = BLUR_SLIDER_Y + 26f + 16f
-private const val BLUR_PREVIEW_HEIGHT = 115f
+private const val BLUR_PREVIEW_HEIGHT = CONTENT_BOTTOM - BLUR_PREVIEW_Y
 private const val TERMS_PANEL_WIDTH = 620f
 private const val TERMS_PANEL_HEIGHT = 170f
 private const val TERMS_CONTENT_TOP = 30f
@@ -1088,6 +1083,10 @@ private val TextSecondary: Color
     @Composable get() = LocalTheme.current.textColorSecondary
 private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
 
+private const val HUD_TEXT_SIZE = 21f
+private const val HUD_PADDING = HUD_TEXT_SIZE * (4f / 9f)
+private const val HUD_RADIUS = HUD_TEXT_SIZE * (4f / 9f)
+private val HudBackground = Color(0x80000000)
 private val ImpactGood = Color(0xFF6FD08C)
 private val ImpactWarn = Color(0xFFE7B85C)
 private val ImpactHeavy = Color(0xFFE8836B)
