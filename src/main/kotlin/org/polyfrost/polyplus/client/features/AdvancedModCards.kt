@@ -13,7 +13,7 @@ object AdvancedModCards {
         id = "polyplus:advanced",
         title = "Advanced",
         icon = "settings",
-        priority = 200,
+        priority = 50,
         collapsedByDefault = true,
     )
 
