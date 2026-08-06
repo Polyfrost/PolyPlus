@@ -24,6 +24,9 @@ internal class DiskCubeMapTexture(id: Identifier, private val dir: Path) : CubeM
                     if (slot == 0) {
                         width = image.width
                         height = image.height
+                        if (width != height) {
+                            throw IOException("Panorama face $face is ${width}x$height, expected a square texture")
+                        }
                         stacked = NativeImage(width, height * FACE_ORDER.size, false)
                     } else if (image.width != width || image.height != height) {
                         throw IOException(
