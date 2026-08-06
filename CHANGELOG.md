@@ -1,3 +1,4 @@
-## 1.1.19
-- Isolated our Sentry crash reporting implementation to prevent interference from other mods
-- Fixed Fabric API not being declared as a dependency
+## 1.1.20
+- Fix minor misc. bugs
+- Improve PolyBlur onboarding even further
+- Put certain mods in the advanced mod card type
