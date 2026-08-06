@@ -47,7 +47,7 @@ object DefaultModOrder {
         return result
     }
 
-    private fun bundledOrder(): List<String> =
+    internal fun bundledOrder(): List<String> =
         runCatching {
             javaClass.getResourceAsStream(RESOURCE)
                 ?.bufferedReader(StandardCharsets.UTF_8)

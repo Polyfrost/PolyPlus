@@ -33,6 +33,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
+import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
@@ -122,6 +123,7 @@ object PolyPlusClient {
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("default settings") { DefaultSettings.initialize() }
         step("default mod order") { DefaultModOrder.initialize() }
+        step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
         step("adaptive blur") { org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults.initialize() }
 
