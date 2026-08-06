@@ -170,19 +170,38 @@ object CustomPanorama {
     }
 
     private fun register(dir: Path) {
-        ClientPlatform.runOnMainSync {
-            val textureManager = Minecraft.getInstance().textureManager
-            textureManager.registerAndLoad(CUBE_MAP_ID, DiskCubeMapTexture(CUBE_MAP_ID, dir))
-            cubeMapReady = true
+        val loaded = ClientPlatform.runOnMainSync {
+            runCatching {
+                val textureManager = Minecraft.getInstance().textureManager
+                textureManager.registerAndLoad(CUBE_MAP_ID, DiskCubeMapTexture(CUBE_MAP_ID, dir))
+                cubeMapReady = true
 
-            val overlay = dir.resolve(OVERLAY_FILE)
-            if (Files.isRegularFile(overlay)) {
-                val image = Files.newInputStream(overlay).use(NativeImage::read)
-                textureManager.register(OVERLAY_ID, DynamicTexture({ OVERLAY_ID.toString() }, image))
-                overlayReady = true
-            }
+                val overlay = dir.resolve(OVERLAY_FILE)
+                if (Files.isRegularFile(overlay)) {
+                    val image = Files.newInputStream(overlay).use(NativeImage::read)
+                    textureManager.register(OVERLAY_ID, DynamicTexture({ OVERLAY_ID.toString() }, image))
+                    overlayReady = true
+                }
+            }.onFailure {
+                LOGGER.warn("Discarding unusable main menu panorama pack at {}", dir, it)
+            }.isSuccess
+        }
+
+        if (!loaded) {
+            cubeMapReady = false
+            overlayReady = false
+            purge(dir)
+            started.set(false)
+            return
         }
         LOGGER.info("Custom main menu panorama loaded from {}", dir)
+    }
+
+    private fun purge(dir: Path) {
+        runCatching {
+            for (face in 0 until FACES) Files.deleteIfExists(dir.resolve(faceName(face)))
+            Files.deleteIfExists(dir.resolve(OVERLAY_FILE))
+        }
     }
 
     private fun sha1Hex(bytes: ByteArray): String =
