@@ -135,7 +135,6 @@ object PolyPlusClient {
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
-        PetEntities.register()
         //? if >= 1.21.1
         EmoteWheelKeybind.register()
 
