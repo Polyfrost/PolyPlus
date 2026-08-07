@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object PolyPlusSentry {
 
     private const val DSN =
-        "https://e48ba6e979b72c09075eff3ec145a5e4@o4511714343124992.ingest.us.sentry.io/4511826505891840"
+        "https://c480e4c64ce55c006da8e1213e4d1eb5@o4511714343124992.ingest.us.sentry.io/4511869855399936"
 
     private const val MAX_EVENTS_PER_SIGNATURE = 5
 
