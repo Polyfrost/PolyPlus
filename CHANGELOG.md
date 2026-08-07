@@ -1,4 +1,3 @@
-## 1.1.20
-- Fix minor misc. bugs
-- Improve PolyBlur onboarding even further
-- Put certain mods in the advanced mod card type
+## 1.1.21
+- Non-crash events are no longer sent to Sentry at all
+- The same crash from the same user will only be sent to Sentry at most once per hour
