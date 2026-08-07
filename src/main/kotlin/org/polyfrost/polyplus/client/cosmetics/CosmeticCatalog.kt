@@ -165,13 +165,12 @@ object CosmeticCatalog {
             return
         }
         LOGGER.error("Failed to fetch cosmetic catalog", error)
-        org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
     }
 
     suspend fun refreshPlayer() {
         val player = PolyPlusClient.HTTP
             .getBodyAuthorized<PlayerCosmetics>("${PolyPlusConfig.apiUrl}/cosmetics/player")
-            .onFailure { LOGGER.error("Failed to fetch player cosmetics", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            .onFailure { LOGGER.error("Failed to fetch player cosmetics", it) }
             .getOrNull() ?: return
 
         val ownedGroups = player.owned.filter { it.type != CosmeticType.Unknown }
@@ -215,12 +214,12 @@ object CosmeticCatalog {
         PolyPlusClient.SCOPE.launch {
             try {
                 runCatching { CosmeticAssetCache.preloadDefinitions(equipped, trackProgress = true) }
-                    .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                    .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it) }
             } finally {
                 CosmeticLoadProgress.onAssetsComplete(assetsToken)
             }
             runCatching { CosmeticAssetCache.preloadDefinitions(rest) }
-                .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it) }
         }
         //?}
     }
@@ -233,7 +232,6 @@ object CosmeticCatalog {
         Unit
     }.onFailure {
         LOGGER.error("Failed to set equipped cosmetics", it)
-        org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
     }
 
     fun applyRemoteActive(uuid: UUID, cosmeticIds: List<Int>) {

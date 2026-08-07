@@ -54,7 +54,6 @@ object PolyPlusClient {
 
     private val EXCEPTION_HANDLER = CoroutineExceptionHandler { _, throwable ->
         LOGGER.error("Uncaught exception in PolyPlus coroutine", throwable)
-        PolyPlusSentry.capture(throwable)
     }
 
     @JvmField val SCOPE = CoroutineScope(SupervisorJob() + Dispatchers.Default + EXCEPTION_HANDLER)
@@ -109,7 +108,6 @@ object PolyPlusClient {
     private inline fun step(name: String, block: () -> Unit) {
         runCatching(block).onFailure { error ->
             LOGGER.error("PolyPlus init step '{}' failed; continuing without it", name, error)
-            runCatching { PolyPlusSentry.capture(error) }
         }
     }
 
@@ -215,12 +213,12 @@ object PolyPlusClient {
 
         try {
             runCatching { CosmeticCatalog.refreshCatalog() }
-                .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
             runCatching { CosmeticCatalog.refreshPlayer() }
-                .onFailure { LOGGER.error("Player cosmetics refresh failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
             //? if >= 1.21.1 {
             runCatching { CosmeticService.syncLocalActive() }
-                .onFailure { LOGGER.error("Local active cosmetics sync failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
             /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
                 .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/

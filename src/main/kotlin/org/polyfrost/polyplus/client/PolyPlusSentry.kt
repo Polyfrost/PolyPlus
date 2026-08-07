@@ -6,7 +6,6 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.libs.sentry.Attachment
@@ -17,7 +16,6 @@ import org.polyfrost.polyplus.libs.sentry.SentryOptions
 import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
 import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
 import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
-import org.polyfrost.polyplus.libs.sentry.protocol.Message
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.IdentityHashMap
@@ -198,8 +196,7 @@ object PolyPlusSentry {
                 if (t != null && isNeverReported(t)) {
                     null
                 } else {
-                    rateUncaughtException(event)
-                    event
+                    event.takeIf { acceptUncaughtException(it) }
                 }
             }
         }
@@ -266,27 +263,24 @@ object PolyPlusSentry {
         }
     }
 
-    @JvmStatic
-    fun capture(throwable: Throwable) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        if (throwable is CancellationException) return
-        initialize()
-        if (isNeverReported(throwable)) return
-        if (!seen.add(throwable)) return
-        if (!allowBySignature(throwable)) return
-        send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
-    }
-
-    private fun rateUncaughtException(event: SentryEvent) {
-        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return
-        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return
+    /**
+     * Determines whether an uncaught exception should be reported. Exceptions
+     * outside the game's render thread generally do not crash the game, so
+     * they are not reported here.
+     */
+    private fun acceptUncaughtException(event: SentryEvent): Boolean {
+        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return true
+        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return true
 
         val onGameThread = gameThread?.let { it === wrapper.thread } == true
-        val kind = if (onGameThread) CrashKind.HARD_CRASH else CrashKind.RUNTIME_ERROR
+        if (!onGameThread) return false
+
+        val kind = CrashKind.HARD_CRASH
         wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
         // Make sure we don't merge reports of different severity
         event.fingerprints = listOf("{{ default }}", kind.tag)
+        return true
     }
 
     private fun isNeverReported(throwable: Throwable): Boolean =
@@ -486,18 +480,6 @@ object PolyPlusSentry {
     }
 
     @JvmStatic
-    fun captureMessage(message: String) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        initialize()
-        val kind = CrashKind.RUNTIME_ERROR
-        val event = SentryEvent()
-        event.message = Message().apply { formatted = "[${kind.label}] $message" }
-        event.setTag(TAG_THREAD, Thread.currentThread().name)
-        event.markCrashKind(kind)
-        activeHub()?.captureEvent(event)
-    }
-
-    @JvmStatic
     fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
@@ -562,7 +544,7 @@ object PolyPlusSentry {
         kind: CrashKind,
         description: String?,
         thread: Thread,
-        customise: (SentryEvent) -> Unit = {},
+        customise: (SentryEvent) -> Unit,
     ) {
         val mechanism = Mechanism()
         mechanism.type = kind.tag
