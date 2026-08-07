@@ -463,6 +463,12 @@ object PolyPlusSentry {
         return body.contains(DELIBERATE_CRASH_CLASS) || OUT_OF_MEMORY.containsMatchIn(body)
     }
 
+    private const val POLYPLUS_PACKAGE = "org.polyfrost.polyplus"
+    private val POLYPLUS_MIXIN_FRAME = Regex("\\$[a-z]{3}\\d+[$]polyplus[$]")
+
+    internal fun involvesPolyPlus(body: String): Boolean =
+        body.contains(POLYPLUS_PACKAGE) || POLYPLUS_MIXIN_FRAME.containsMatchIn(body)
+
     private fun isDeliberateCrash(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {

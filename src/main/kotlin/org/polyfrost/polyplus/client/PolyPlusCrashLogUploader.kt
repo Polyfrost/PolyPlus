@@ -110,6 +110,7 @@ object PolyPlusCrashLogUploader {
                 val isJvmFatal = file.name.startsWith("hs_err_pid")
                 val body = prepare(file, isJvmFatal) ?: continue
                 val summary = summarize(body, isJvmFatal)
+                if (!PolyPlusSentry.involvesPolyPlus(body)) continue
                 if (isJvmFatal) {
                     if (NATIVE_OUT_OF_MEMORY.containsMatchIn(body)) continue
                 } else {
