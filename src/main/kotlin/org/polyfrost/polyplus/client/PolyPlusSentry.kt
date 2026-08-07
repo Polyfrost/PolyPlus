@@ -381,7 +381,7 @@ object PolyPlusSentry {
 
         var cause: Throwable? = throwable
         while (cause != null) {
-            if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
+            if (cause is Error && cause.message?.startsWith("Watchdog") == true) return true
 
             if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
 
@@ -466,7 +466,7 @@ object PolyPlusSentry {
     // SkyHanni joke crash features (requires opt-in from player)
     private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
-    private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog \(""")
+    private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog\b""")
 
     private val OUT_OF_MEMORY = Regex("""(?m)^(?:Caused by: )?java\.lang\.OutOfMemoryError""")
 
