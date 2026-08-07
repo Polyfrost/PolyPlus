@@ -17,6 +17,7 @@ import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
 import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
 import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.io.File
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
@@ -50,6 +51,8 @@ object PolyPlusSentry {
 
     private const val FINGERPRINT_FRAMES = 8
 
+    private const val DEFAULT_FINGERPRINT = "{{ default }}"
+
     private const val UNCAUGHT_MECHANISM = "UncaughtExceptionHandler"
 
     private const val TAG_THREAD = "thread"
@@ -74,6 +77,10 @@ object PolyPlusSentry {
 
     private val signatureCounts = ConcurrentHashMap<String, AtomicInteger>()
 
+    private val rateLimiter by lazy {
+        SentryEventRateLimiter(File(PolyPlusCrashLogUploader.stateDir, "recent-events.txt"))
+    }
+
     private fun signatureOf(throwable: Throwable): String {
         val frames = throwable.stackTrace.take(SIGNATURE_FRAMES)
             .joinToString("|") { "${it.className}.${it.methodName}:${it.lineNumber}" }
@@ -90,6 +97,20 @@ object PolyPlusSentry {
         }
         return counter.incrementAndGet() <= MAX_EVENTS_PER_SIGNATURE
     }
+
+    internal fun rateLimitKey(event: SentryEvent): String {
+        val throwable = event.throwable
+        val explicit = event.fingerprints.orEmpty().filter { it != DEFAULT_FINGERPRINT }
+        val body = when {
+            throwable != null -> signatureOf(throwable)
+            explicit.isNotEmpty() -> explicit.joinToString("|")
+            else -> event.message?.formatted.orEmpty()
+        }
+        return "${event.level?.name ?: "unknown"}\n$body"
+    }
+
+    private fun allowByRecentReports(event: SentryEvent): Boolean =
+        runCatching { rateLimiter.allow(rateLimitKey(event)) }.getOrDefault(true)
 
     private fun mostInformativeCause(throwable: Throwable): Throwable {
         var cause: Throwable = throwable
@@ -193,10 +214,11 @@ object PolyPlusSentry {
             isAttachStacktrace = true
             setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && isNeverReported(t)) {
-                    null
-                } else {
-                    event.takeIf { acceptUncaughtException(it) }
+                when {
+                    t != null && isNeverReported(t) -> null
+                    !acceptUncaughtException(event) -> null
+                    !allowByRecentReports(event) -> null
+                    else -> event
                 }
             }
         }
@@ -279,7 +301,7 @@ object PolyPlusSentry {
         wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
         // Make sure we don't merge reports of different severity
-        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
         return true
     }
 
@@ -553,7 +575,7 @@ object PolyPlusSentry {
 
         val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
         // Make sure we don't merge reports of different severity
-        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
         event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)
         customise(event)
