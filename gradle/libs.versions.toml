@@ -1,6 +1,7 @@
 [versions]
 kotlin = "2.3.0"
 kotlinx-serialization = "2.3.0"
+kotlinx-serialization-runtime = "1.9.0"
 atomicfu = "0.27.0"
 ktor = "3.3.1"
 sentry = "7.18.0"
@@ -22,6 +23,12 @@ ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-conte
 ktor-server-websockets = { group = "io.ktor", name = "ktor-server-websockets", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
+kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core-jvm", version.ref = "kotlinx-serialization-runtime" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json-jvm", version.ref = "kotlinx-serialization-runtime" }
+kotlinx-serialization-json-io = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json-io-jvm", version.ref = "kotlinx-serialization-runtime" }
+ktor-serialization-kotlinx = { group = "io.ktor", name = "ktor-serialization-kotlinx-jvm", version.ref = "ktor" }
+ktor-serialization-kotlinx-json-jvm = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
+
 mixin-extras = { module = "io.github.llamalad7:mixinextras-common", version.ref = "mixin-extras" }
 mixin-squared = { module = "com.github.bawnorton.mixinsquared:mixinsquared-common", version.ref = "mixin-squared" }
 polymixin = { module = "org.polyfrost:polymixin", version.ref = "polymixin" }
@@ -34,6 +41,13 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation"]
 ktor-server = ["ktor-server-websockets"]
 ktor-serialization = ["ktor-serialization-kotlinx-json"]
+serialization-shade = [
+    "kotlinx-serialization-core",
+    "kotlinx-serialization-json",
+    "kotlinx-serialization-json-io",
+    "ktor-serialization-kotlinx",
+    "ktor-serialization-kotlinx-json-jvm",
+]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

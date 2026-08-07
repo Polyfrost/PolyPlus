@@ -37,6 +37,7 @@ object CosmeticStore {
         types: List<String> = emptyList(),
         tags: List<String> = emptyList(),
         collection: Int? = null,
+        reportFailures: Boolean = true,
     ): Result<CosmeticSearchResponse> = runCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics/search") {
             parameter("page", page.coerceAtLeast(1))
@@ -47,7 +48,7 @@ object CosmeticStore {
             if (tags.isNotEmpty()) parameter("tags", tags.joinToString(","))
             if (collection != null) parameter("collection", collection)
         }.body<CosmeticSearchResponse>()
-    }.onFailure { reportFailure("Failed to search cosmetics", it) }
+    }.onFailure { if (reportFailures) reportFailure("Failed to search cosmetics", it) }
 
     private var cachedStockedTypes: List<CosmeticType>? = null
 
@@ -58,14 +59,18 @@ object CosmeticStore {
         val stocked = coroutineScope {
             types.map { type ->
                 async {
-                    val result = search(page = 1, perPage = 1, types = listOf(type.serializedName))
-                    if (result.isSuccess) anySucceeded = true
-                    val count = result.getOrNull()?.pagination?.totalItems
-                    type.takeIf { count == null || count > 0 }
+                    val response = search(
+                        page = 1,
+                        perPage = 1,
+                        types = listOf(type.serializedName),
+                        reportFailures = false,
+                    ).getOrNull() ?: return@async null
+                    anySucceeded = true
+                    type.takeIf { response.pagination.totalItems > 0 }
                 }
             }.awaitAll()
         }.filterNotNull()
-        if (!anySucceeded) return stocked
+        if (!anySucceeded) return types
         return stocked.also { cachedStockedTypes = it }
     }
 

@@ -15,10 +15,13 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.EmoteWheelScreen
+import java.util.concurrent.atomic.AtomicBoolean
 
 object EmoteWheelKeybind {
     private val logger = LogManager.getLogger("polyplus/emote-wheel")
     private lateinit var keyMapping: KeyMapping
+
+    private val registered = AtomicBoolean(false)
 
     fun isHeld(): Boolean {
         val key = InputConstants.getKey(keyMapping.saveString())
@@ -35,6 +38,8 @@ object EmoteWheelKeybind {
     }
 
     fun register() {
+        if (!registered.compareAndSet(false, true)) return
+
         val mapping = KeyMapping(
             "key.polyplus.emote_wheel",
             InputConstants.Type.KEYSYM,

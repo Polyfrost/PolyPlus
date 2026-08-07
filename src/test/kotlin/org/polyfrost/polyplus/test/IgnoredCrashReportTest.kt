@@ -103,6 +103,13 @@ class IgnoredCrashReportTest {
         return "$description: $throwable"
     }
 
+    private fun throwableWith(vararg frames: Pair<String, String>): Throwable =
+        RuntimeException("boom").apply {
+            stackTrace = frames
+                .map { (className, methodName) -> StackTraceElement(className, methodName, null, -1) }
+                .toTypedArray()
+        }
+
     @Test
     fun `ignores crashes the player asked for`() {
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(CRASHPATCH_REPORT), CRASHPATCH_REPORT))
@@ -182,6 +189,44 @@ class IgnoredCrashReportTest {
 
         assertTrue(PolyPlusSentry.involvesPolyPlus(ourCode))
         assertTrue(PolyPlusSentry.involvesPolyPlus(ourMixin))
+    }
+
+    @Test
+    fun `reaches the same verdict from a live throwable`() {
+        val foreign = throwableWith(
+            "tomeko.legacyskyblock.neu.PetFetcher" to "getIcon",
+            "java.util.concurrent.ThreadPoolExecutor" to "runWorker",
+        )
+        val ourCode = throwableWith(
+            "org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderer" to "render",
+            "net.minecraft.client.renderer.entity.LivingEntityRenderer" to "render",
+        )
+        val ourMixin = throwableWith(
+            "net.minecraft.client.gui.screens.ChatScreen" to "handler\$zzk000\$polyplus\$onKeyPressed",
+            "net.minecraft.client.gui.screens.ChatScreen" to "keyPressed",
+        )
+
+        assertFalse(PolyPlusSentry.involvesPolyPlus(foreign))
+        assertTrue(PolyPlusSentry.involvesPolyPlus(ourCode))
+        assertTrue(PolyPlusSentry.involvesPolyPlus(ourMixin))
+    }
+
+    @Test
+    fun `finds us further down the cause chain`() {
+        val ours = throwableWith("org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog" to "refreshCatalog")
+        val wrapped = throwableWith("java.util.concurrent.CompletableFuture" to "wrapInCompletionException")
+            .initCause(ours)
+
+        assertTrue(PolyPlusSentry.involvesPolyPlus(wrapped))
+    }
+
+    @Test
+    fun `terminates on a self-referencing cause chain`() {
+        val foreign = throwableWith("com.ishland.c2me.common.CheckedThreadLocalRandom" to "handleNotOwner")
+        val outer = throwableWith("net.minecraft.client.Minecraft" to "runTick").initCause(foreign)
+        foreign.initCause(outer)
+
+        assertFalse(PolyPlusSentry.involvesPolyPlus(outer))
     }
 
     @Test
