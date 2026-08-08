@@ -507,7 +507,9 @@ object PolyPlusSentry {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
         }
-        // A crash NotEnoughCrashes prevented leaves the game broken and noisy afterwards
+        // If NotEnoughCrashes prevents a crash, it may leave the game in a half-broken state
+        // and result in things crashing because of that, so we ignore crashes that happen
+        // shortly after recovering from one.
         if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
