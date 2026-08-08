@@ -84,8 +84,8 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
         addCallback("apiUrl") {
             LOGGER.info("API URL changed to $apiUrl, refreshing API data...")
-            PolyConnection.reconnect() // Reconnect WebSocket under new URL
-            PolyPlusClient.refresh() // Refresh API tokens, cosmetic data, etc.
+            PolyConnection.reconnect()
+            PolyPlusClient.refresh()
         }
     }
 }

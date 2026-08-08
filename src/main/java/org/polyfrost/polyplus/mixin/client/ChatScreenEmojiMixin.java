@@ -81,7 +81,7 @@ public abstract class ChatScreenEmojiMixin {
             return;
         }
         if (!prefix.equals(polyplus$token)) {
-            polyplus$selected = 0; // reset selection when the prefix changes
+            polyplus$selected = 0;
             polyplus$token = prefix;
         }
         polyplus$suggestions = found;
@@ -117,7 +117,7 @@ public abstract class ChatScreenEmojiMixin {
             case 264: // GLFW_KEY_DOWN
                 polyplus$selected = (polyplus$selected + 1) % n;
                 return true;
-            case 258: // TAB - complete highlighted emoji
+            case 258: // TAB
             case 257: // ENTER
             case 335: // KP_ENTER
                 return polyplus$accept();

@@ -63,10 +63,6 @@ object ClientPlatform {
 
     fun localPlayerName(): String = Minecraft.getInstance().user.name
 
-    /**
-     * Whether the local player's skin uses the slim ("Alex") arm model. Used to
-     * auto-pick the matching slim/wide variant of a cosmetic at equip time.
-     */
     fun localSkinSlim(): Boolean =
         //? if >= 1.21.10 {
         Minecraft.getInstance().player?.skin?.model() == PlayerModelType.SLIM

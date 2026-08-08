@@ -118,7 +118,7 @@ object OnboardingFeatures {
                 setFloat(instance, "setStrength", strength.coerceIn(1, 10).toFloat())
                 setInt(instance, "setBlurType", if (performance) UNITY_BLUR_TYPE else HYBRID_BLUR_TYPE)
                 setFloat(instance, "setMotionBlurSamples", if (performance) PERFORMANCE_SAMPLES else QUALITY_SAMPLES)
-                setBoolean(instance, "setBlurHand", !performance) // >= 1.21.5 only; skipped if absent
+                setBoolean(instance, "setBlurHand", !performance) // >= 1.21.5 only skipped if absent
             }
             config.getMethod("save").invoke(instance)
             true
@@ -151,7 +151,7 @@ object OnboardingFeatures {
     const val MOTION_BLUR_PERFORMANCE = 1
     const val MOTION_BLUR_QUALITY = 2
 
-    private const val UNITY_BLUR_TYPE = 1  // blurType dropdown: 0=Phosphor, 1=Unity, 2=Hybrid
+    private const val UNITY_BLUR_TYPE = 1  // blurType dropdown 0 Phosphor 1 Unity 2 Hybrid
     private const val HYBRID_BLUR_TYPE = 2
     private const val PERFORMANCE_SAMPLES = 8f // motionBlurSamples slider range 4..32
     private const val QUALITY_SAMPLES = 16f

@@ -258,8 +258,8 @@ object CosmeticSync : EarlyInitializable {
             val definition = CosmeticCatalog.getDefinition(id) ?: continue
             when (definition.type) {
                 CosmeticType.Cape -> Unit
-                // Backpack/Glasses/Wings/Glove are reconciled from the catalog
-                // above so unequips are handled even when no id is passed here.
+                // Backpack Glasses Wings and Glove are reconciled from the catalog above so
+                // unequips are handled even when no id is passed here
                 CosmeticType.Backpack,
                 CosmeticType.Glasses,
                 CosmeticType.Wings,

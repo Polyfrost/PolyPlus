@@ -30,7 +30,7 @@ object OneLauncherAccounts {
                 username = stored.username,
                 microsoft = microsoft,
                 active = id == activeId,
-                // The launch account has no refresh token, so it can never be refreshed.
+                // The launch account has no refresh token so it can never be refreshed
                 expired = microsoft && stored !== session && isExpired(stored.expires),
             )
         }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })

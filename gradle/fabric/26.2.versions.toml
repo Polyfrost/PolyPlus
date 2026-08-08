@@ -1,5 +1,0 @@
-[versions]
-fabric-api = "0.156.0+26.2"
-
-[libraries]
-fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }

@@ -144,7 +144,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 if (needsSettings) {
                     add(OnboardingPage.LOOK_AND_FEEL)
                     if (OnboardingFeatures.modsPageAvailable) add(OnboardingPage.MODS)
-                    // add(OnboardingPage.COSMETICS)
                 }
                 if (needsBlurChoice) add(OnboardingPage.MOTION_BLUR)
                 if (needsSettings) add(OnboardingPage.DONE)
@@ -980,7 +979,7 @@ private fun TermsPage(
     }
 }
 
-/** Mirrors OneConfig's `CheckboxIndicator` so the onboarding checkbox matches the rest of the UI. */
+// Mirrors OneConfig's CheckboxIndicator so the onboarding checkbox matches the rest of the UI
 @Composable
 private fun CheckBox(checked: Boolean) {
     val theme = LocalTheme.current
@@ -1041,7 +1040,7 @@ private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
 private const val MODE_CARD_WIDTH = 240f
 private const val MODE_CARD_HEIGHT = 212f
 private const val MODE_CARD_FOOTER = 38f
-// Three lines of the 12sp description font, whose line height is 1.5em.
+// Three lines of the 12sp description font whose line height is 1.5em
 private const val MODE_CARD_DESC_HEIGHT = 3f * 12f * 1.5f
 private const val BLUR_CARDS_X = (PANEL_WIDTH - (MODE_CARD_WIDTH * 3f + 36f)) / 2f
 private const val BLUR_CARDS_Y = 130f

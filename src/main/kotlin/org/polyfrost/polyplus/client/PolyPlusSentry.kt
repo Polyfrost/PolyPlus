@@ -65,8 +65,7 @@ object PolyPlusSentry {
 
     private val started = AtomicBoolean(false)
 
-    // We intentionally create our own hub in addition to relocating Sentry
-    // to avoid clashes with other mods using Sentry.
+    // Our own hub on top of relocation avoids clashing with other mods using Sentry
     @Volatile
     private var hub: IHub? = null
 
@@ -285,11 +284,7 @@ object PolyPlusSentry {
         }
     }
 
-    /**
-     * Determines whether an uncaught exception should be reported. Exceptions
-     * outside the game's render thread generally do not crash the game, so
-     * they are not reported here.
-     */
+    // Uncaught exceptions off the game thread generally do not crash the game
     private fun acceptUncaughtException(event: SentryEvent): Boolean {
         val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return true
         if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return true
@@ -300,7 +295,7 @@ object PolyPlusSentry {
         val kind = CrashKind.HARD_CRASH
         wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
-        // Make sure we don't merge reports of different severity
+        // Keep reports of different severity from merging
         event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
         return true
     }
@@ -463,7 +458,7 @@ object PolyPlusSentry {
 
     private const val CRASHPATCH_CRASH = "Crash requested by CrashPatch"
 
-    // SkyHanni joke crash features (requires opt-in from player)
+    // SkyHanni joke crash feature requiring player opt-in
     private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
     private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog\b""")
@@ -512,8 +507,7 @@ object PolyPlusSentry {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
         }
-        // NotEnoughCrashes preventing a crash may leave the game in a broken
-        // state and cause additional noise
+        // A crash NotEnoughCrashes prevented leaves the game broken and noisy afterwards
         if (PolyPlusCrashLogUploader.isSideEffectOfIgnoredCrash(System.currentTimeMillis())) {
             PolyPlusCrashLogUploader.recordIgnoredCrash(throwable)
             return
@@ -545,7 +539,7 @@ object PolyPlusSentry {
             event.setTag("mechanism", "crash_report")
             runCatching {
                 if (root !== throwable) {
-                    // Keeps entrypoint failures distinguishable from mixin failures at a glance.
+                    // Keeps entrypoint failures distinguishable from mixin failures
                     event.setTag("wrapped_by", throwable.javaClass.simpleName)
                     entrypointModId(throwable)?.let { event.setTag("entrypoint_mod", it) }
                 }
@@ -574,7 +568,7 @@ object PolyPlusSentry {
         mechanism.isHandled = kind.handled
 
         val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
-        // Make sure we don't merge reports of different severity
+        // Keep reports of different severity from merging
         event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
         event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)

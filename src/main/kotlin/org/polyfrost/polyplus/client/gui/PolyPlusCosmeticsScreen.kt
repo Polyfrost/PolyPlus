@@ -1356,18 +1356,18 @@ private val VARIANT_WHEEL_STEP = 48.dp
 private val VARIANT_ARROW_STEP = 96.dp
 
 private val AURA_COLORS: List<Int> = listOf(
-    0xFFFF4444.toInt(), // red
-    0xFFFF9E3D.toInt(), // orange
-    0xFFF4D03F.toInt(), // yellow
-    0xFF2ECC71.toInt(), // green
-    0xFF1ABC9C.toInt(), // teal
-    0xFF3DA5FF.toInt(), // blue
-    0xFF6C5CE7.toInt(), // indigo
-    0xFFB05CFF.toInt(), // purple
-    0xFFFF6FD8.toInt(), // pink
-    0xFFFFFFFF.toInt(), // white
-    0xFF3A3F43.toInt(), // dark
-    0xFF9BA2A6.toInt(), // gray
+    0xFFFF4444.toInt(),
+    0xFFFF9E3D.toInt(),
+    0xFFF4D03F.toInt(),
+    0xFF2ECC71.toInt(),
+    0xFF1ABC9C.toInt(),
+    0xFF3DA5FF.toInt(),
+    0xFF6C5CE7.toInt(),
+    0xFFB05CFF.toInt(),
+    0xFFFF6FD8.toInt(),
+    0xFFFFFFFF.toInt(),
+    0xFF3A3F43.toInt(),
+    0xFF9BA2A6.toInt(),
 )
 
 private const val DEFAULT_AURA_ARGB: Int = -1

@@ -22,7 +22,7 @@ data class BedrockQuad(
     val nx: Float,
     val ny: Float,
     val nz: Float,
-    /** Fake-glow light level 0..15, or -1 to render at the incoming ambient light. */
+    // Fake glow 0..15 or -1 for incoming ambient light
     val lightLevel: Int = -1,
 ) {
     fun emit(

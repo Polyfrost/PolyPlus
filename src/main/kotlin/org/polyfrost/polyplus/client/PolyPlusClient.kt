@@ -87,7 +87,7 @@ object PolyPlusClient {
         HttpResponseValidator {
             validateResponse { response ->
                 val status = response.status
-                // Only 4xx/5xx are failures; 1xx (such as the 101 WebSocket upgrade) and 3xx are not.
+                // Only 4xx and 5xx are failures 1xx like the 101 WebSocket upgrade and 3xx are not
                 if (status.value < HttpStatusCode.BadRequest.value) return@validateResponse
                 if (status == HttpStatusCode.Unauthorized) return@validateResponse
                 if (response.request.url.host != apiHost()) return@validateResponse
@@ -162,7 +162,7 @@ object PolyPlusClient {
         step("panorama") { org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize() }
     }
 
-    /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */
+    // Full reset of auth caches and API data
     fun refresh() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         LOGGER.info("Refreshing PolyPlus Client...")
@@ -181,7 +181,7 @@ object PolyPlusClient {
         }
     }
 
-    /** Fetches catalog + player cosmetics and applies active loadout (no auth/cache wipe). */
+    // Refetches cosmetics without wiping auth or caches
     fun refreshCosmetics() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
@@ -197,7 +197,7 @@ object PolyPlusClient {
         }
     }
 
-    /** Loads cosmetics when the locker is empty but the player is in a world (e.g. command before join refresh finishes). */
+    // Covers a command running before the join refresh finishes
     fun refreshCosmeticsIfNeeded() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (CosmeticCatalog.ownedIds().isNotEmpty() || CosmeticCatalog.allDefinitions().isNotEmpty()) {

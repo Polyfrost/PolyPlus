@@ -7,10 +7,7 @@ import kotlinx.serialization.Serializable
 data class CosmeticVariant(
     val id: Int,
     val name: String = "Variant",
-    /**
-     * "slim"/"wide" when the client must pick a model to match the player's
-     * skin; null otherwise.
-     */
+    // "slim"/"wide" when the client must match the player's skin model null otherwise
     val model: String? = null,
     @SerialName("allowed_slots") val allowedSlots: List<BodySlot> = emptyList(),
     val url: String? = null,

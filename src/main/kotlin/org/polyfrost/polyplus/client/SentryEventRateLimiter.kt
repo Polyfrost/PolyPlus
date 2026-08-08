@@ -3,9 +3,6 @@ package org.polyfrost.polyplus.client
 import java.io.File
 import java.security.MessageDigest
 
-/**
- * Suppresses an error that was already reported within [windowMs].
- */
 internal class SentryEventRateLimiter(
     private val stateFile: File,
     private val windowMs: Long = DEFAULT_WINDOW_MS,

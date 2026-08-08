@@ -48,7 +48,7 @@ internal object ModIntegrationButtons {
     }
 }
 
-/** Opens a screen from another mod, reflectively, so the class need not be present at compile time. */
+// Reflective so the other mod's class need not be present at compile time
 private class ParentScreenFactory(private val className: String) {
     private val constructor by lazy {
         runCatching {

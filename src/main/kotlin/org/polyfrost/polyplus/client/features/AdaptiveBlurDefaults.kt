@@ -19,13 +19,13 @@ object AdaptiveBlurDefaults {
     private const val POLYPLUS_PACKAGE = "org.polyfrost.polyplus."
     private const val FALLBACK_REFRESH_RATE = 60
     private const val WINDOW_MILLIS = 5_000L
-    private const val WARMUP_MILLIS = 1_000L // discard while the lifted cap takes effect
+    private const val WARMUP_MILLIS = 1_000L
 
-    private const val LOW_FPS_MARGIN = 10    // refresh - 10: below this, no blur
-    private const val HEADROOM_MARGIN = 30   // refresh + 30: below this, cheap Unity blur
-    private const val HEADROOM_MARGIN_HI = 75 // refresh + 75: below this, just fewer samples
-    private const val UNITY_BLUR_TYPE = 1    // blurType dropdown: 0=Phosphor, 1=Unity, 2=Hybrid
-    private const val REDUCED_SAMPLES = 8f   // motionBlurSamples slider range 4..32
+    private const val LOW_FPS_MARGIN = 10
+    private const val HEADROOM_MARGIN = 30
+    private const val HEADROOM_MARGIN_HI = 75
+    private const val UNITY_BLUR_TYPE = 1
+    private const val REDUCED_SAMPLES = 8f
     private const val MEDIUM_SAMPLES = 12f
 
     var sampled by mutableStateOf(false)
@@ -58,12 +58,12 @@ object AdaptiveBlurDefaults {
         val mc = Minecraft.getInstance()
         val screen = currentScreen(mc)
         val onMenu = mc.player == null && screen != null && screen.javaClass.name.startsWith(POLYPLUS_PACKAGE)
-        if (!onMenu) { // loading/other screen, or in a world: abandon the window and restore the cap
+        if (!onMenu) {
             abortWindow()
             return
         }
 
-        if (!sampling) { // start of a fresh window
+        if (!sampling) {
             sampling = true
             windowStartNanos = System.nanoTime()
             fpsSum = 0L
@@ -110,7 +110,7 @@ object AdaptiveBlurDefaults {
     }
 
     private fun apply(averageFps: Float, refreshRate: Int) {
-        val instance = polyBlurInstance() ?: return // PolyBlur absent; retry on a later launch
+        val instance = polyBlurInstance() ?: return
 
         runCatching {
             when {
@@ -125,7 +125,7 @@ object AdaptiveBlurDefaults {
                     setBoolean(instance, "setEnabled", true)
                     setInt(instance, "setBlurType", UNITY_BLUR_TYPE)
                     setFloat(instance, "setMotionBlurSamples", REDUCED_SAMPLES)
-                    setBoolean(instance, "setBlurHand", false) // >= 1.21.5 only; skipped if absent
+                    setBoolean(instance, "setBlurHand", false)
                     logger.info(
                         "Avg main-menu FPS {} below refresh {} + {}; Unity blur, hand blur off, {} samples",
                         averageFps, refreshRate, HEADROOM_MARGIN, REDUCED_SAMPLES.toInt(),

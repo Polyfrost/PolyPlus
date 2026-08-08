@@ -63,7 +63,6 @@ object PlayerPreviewOverlay {
         //?}
     }
 
-    /** Drops every entry; called when leaving a screen that owned live previews. */
     @JvmStatic
     fun clear() {
         if (entries.isNotEmpty()) entries.clear()

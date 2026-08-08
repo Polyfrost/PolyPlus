@@ -208,7 +208,7 @@ object PlayerPreviewRenderer {
         val cols = FloatArray(w)
         val fadePx = w * EDGE_FADE_FRACTION
         for (x in 0 until w) {
-            val d = minOf(x + 0.5f, w - 0.5f - x) // distance from nearest edge (pixel center)
+            val d = minOf(x + 0.5f, w - 0.5f - x) // distance from nearest edge at pixel center
             val t = if (fadePx <= 0f) 1f else (d / fadePx).coerceIn(0f, 1f)
             cols[x] = t * t * t * (t * (t * 6f - 15f) + 10f)
         }
@@ -219,7 +219,7 @@ object PlayerPreviewRenderer {
         val rows = FloatArray(h)
         val fadePx = h * EDGE_FADE_FRACTION
         for (r in 0 until h) {
-            val d = r + 0.5f // distance from top edge (pixel center)
+            val d = r + 0.5f // distance from top edge at pixel center
             val t = if (fadePx <= 0f) 1f else (d / fadePx).coerceIn(0f, 1f)
             rows[r] = t * t * t * (t * (t * 6f - 15f) + 10f)
         }
@@ -562,7 +562,7 @@ object PlayerPreviewRenderer {
         //? if >= 1.21.10 {
         state.bodyRot = yawDeg
         //?} else {
-        /*state.bodyRot = yawDeg + 180f // no CameraRenderState flip on render(state); turn body to camera
+        /*state.bodyRot = yawDeg + 180f // no CameraRenderState flip here so turn the body to the camera
         *///?}
         state.boundingBoxWidth = PLAYER_BB_WIDTH
         state.boundingBoxHeight = PLAYER_BB_HEIGHT
@@ -604,7 +604,7 @@ object PlayerPreviewRenderer {
         //?}
         //?} else {
         /*val bufferSource = mc.renderBuffers().bufferSource()
-        // render(state,…) draws a ground shadow that dereferences mc.level → NPE off-world.
+        // render draws a ground shadow that dereferences mc.level and NPEs off-world
         mc.entityRenderDispatcher.setRenderShadow(false)
         try {
             mc.entityRenderDispatcher.render(state, 0.0, 0.0, 0.0, pose, bufferSource, 0xF000F0)
@@ -638,7 +638,7 @@ object PlayerPreviewRenderer {
 
     private const val PREVIEW_PET_SIDE_OFFSET = -0.65
 
-    /** Must match [org.polyfrost.polyplus.client.pets.PetEntityRenderer]'s per-frame hold time. */
+    // Must match PetEntityRenderer's per-frame hold time
     private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
 
     private fun previewTextureFrame(definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition): Pair<Float, Float> {
@@ -764,7 +764,7 @@ object PlayerPreviewRenderer {
     private fun texturedProfile(mc: Minecraft): com.mojang.authlib.GameProfile? {
         val id = mc.user.profileId
         val startup = mc.gameProfile
-        if (startup.id == id) return startup // no switch: startup profile already carries textures
+        if (startup.id == id) return startup // startup profile already carries textures
         resolvedProfile?.let { if (it.id == id) return it }
         synchronized(this) {
             if (resolvingProfileId != id) {
@@ -850,8 +850,7 @@ object PlayerPreviewRenderer {
     private const val PLAYER_BB_HEIGHT = 1.8f
 
     private fun dummy(mc: Minecraft, level: ClientLevel): AbstractClientPlayer? {
-        // Skip the frame while the textured profile resolves; a bare-profile dummy would cache the
-        // default skin and never refresh (same uuid), whereas retrying picks up textures once ready.
+        // A bare-profile dummy would cache the default skin and never refresh under the same uuid
         val profile = texturedProfile(mc) ?: return null
         dummy?.let { if (dummyProfileId == profile.id && it.level() === level) return it }
         return runCatching { RemotePlayer(level, profile) }.getOrNull()?.also {
@@ -1094,8 +1093,7 @@ object PlayerPreviewRenderer {
     private fun bindLegacyEquipment(player: AbstractClientPlayer, source: PlayerPreviewSource) {
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
-            // Off-world (main menu) mc.player is null, so fall back to the catalog's locally
-            // equipped set — otherwise cosmetics wouldn't render on the preview there.
+            // Off-world mc.player is null so fall back to the catalog's locally equipped set
             PlayerPreviewSource.LocalLive ->
                 (Minecraft.getInstance().player as? PlayerCosmeticsAccess)?.`polyplus$cosmeticEquipment`()
                     ?: legacyLocalEquipment()

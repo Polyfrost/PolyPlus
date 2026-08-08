@@ -177,7 +177,7 @@ object PolyPlusCrashLogUploader {
         fingerprint: List<String>,
         isJvmFatal: Boolean,
     ): Boolean = runCatching {
-        // Anything that reaches this was not reported while the game was alive, which means it was a hard crash.
+        // Anything reaching here went unreported while the game was alive so it was a hard crash
         val kind = CrashKind.HARD_CRASH
 
         val event = SentryEvent().apply {

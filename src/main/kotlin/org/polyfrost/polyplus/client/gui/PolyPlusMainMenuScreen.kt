@@ -421,7 +421,7 @@ private fun buildFace(skin: java.awt.image.BufferedImage): ImageBitmap {
             out[i] = argb.toByte()               // B
             out[i + 1] = (argb ushr 8).toByte()  // G
             out[i + 2] = (argb ushr 16).toByte() // R
-            out[i + 3] = 0xFF.toByte()           // A (face is opaque)
+            out[i + 3] = 0xFF.toByte()           // A
         }
     }
     return SkiaImage.makeRaster(org.jetbrains.skia.ImageInfo.makeN32Premul(size, size), out, size * 4)

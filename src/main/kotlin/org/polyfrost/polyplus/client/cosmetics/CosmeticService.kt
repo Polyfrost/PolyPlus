@@ -43,8 +43,7 @@ object CosmeticService {
         if (requested.type == CosmeticType.Emote) {
             return equipEmote(cosmeticId)
         }
-        // slim/wide is auto-picked by the local player's skin model, not chosen
-        // by the user
+        // slim/wide comes from the local player's skin model not from the user
         val resolvedId = if (requested.model != null) {
             val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
             CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)

@@ -27,11 +27,3 @@ fun Modifier.clickableTextWithSound(onClick: () -> Unit): Modifier = clickable(
     playButtonClickSound()
     onClick()
 }
-
-// import org.polyfrost.oneconfig.internal.ui.sound.UiSoundEvent
-// import org.polyfrost.oneconfig.internal.ui.sound.UiSounds
-//
-// fun Modifier.clickableWithSound(onClick: () -> Unit): Modifier = clickable {
-//     UiSounds.play(UiSoundEvent.CLICK)
-//     onClick()
-// }

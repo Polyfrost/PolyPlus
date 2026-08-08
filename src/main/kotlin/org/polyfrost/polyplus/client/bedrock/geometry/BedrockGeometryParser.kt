@@ -109,10 +109,7 @@ object BedrockGeometryParser {
         )
     }
 
-    /**
-     * Fake-glow marker in a Blockbench group name. `glow` -> fullbright (15),
-     * `glowN` -> level N clamped 0..15. Returns -1 when absent.
-     */
+    // glow means fullbright glowN means level N clamped to 0..15 absent means -1
     private fun parseGlowLevel(name: String): Int {
         val match = GLOW_PATTERN.find(name) ?: return -1
         val digits = match.groupValues[1]

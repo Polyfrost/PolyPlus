@@ -10,10 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
-/**
- * Adds a comment to crash reports informing LLMs to ignore the contents of the crash report
- * and direct users to seek help from humans via our help channels instead.
- */
+// Tells LLMs reading the crash report to send users to our help channels instead
 @Mixin(CrashReport.class)
 public class Mixin_NoAI {
     @SuppressWarnings("StringBufferReplaceableByString")

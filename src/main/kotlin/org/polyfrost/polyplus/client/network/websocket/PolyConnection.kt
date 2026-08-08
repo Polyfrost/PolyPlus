@@ -57,7 +57,7 @@ object PolyConnection {
 
     fun initialize(callback: (() -> Unit)? = null) {
         this.connectionCallback = callback
-        start() // Just cold start and set up
+        start()
     }
 
     fun applyConsent() {
@@ -68,9 +68,6 @@ object PolyConnection {
         }
     }
 
-    /**
-     * Reconnects the WebSocket connection. Best for when the connection is lost, or we'd like to switch servers.
-     */
     fun reconnect() {
         close()
         start()
@@ -122,9 +119,8 @@ object PolyConnection {
                 handshakeSucceeded = false
                 try {
                     connectOnce()
-                    // The session ended without throwing: the server closed the
-                    // socket cleanly. Treat it as a drop and reconnect unless we
-                    // asked to close.
+                    // No throw means the server closed cleanly so treat it as a drop and
+                    // reconnect unless we asked to close
                     if (closing || !isActive) break
                     LOGGER.warn("PolyPlus WebSocket closed by server.")
                     notifyDisconnected(null)
