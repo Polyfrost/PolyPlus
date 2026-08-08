@@ -501,6 +501,18 @@ object PolyPlusSentry {
         return false
     }
 
+    private val locallyHandled = ThreadLocal.withInitial { 0 }
+
+    fun <T> handlingLocally(block: () -> T): T {
+        val depth = locallyHandled.get()
+        locallyHandled.set(depth + 1)
+        return try {
+            block()
+        } finally {
+            locallyHandled.set(depth)
+        }
+    }
+
     @JvmStatic
     fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
