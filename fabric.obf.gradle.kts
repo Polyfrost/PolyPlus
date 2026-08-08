@@ -128,48 +128,11 @@ tasks.jar {
     }
 }
 
-val serializationRelocatedPackage = "org.polyfrost.polyplus.libs.serialization"
-
-val serializationShade: Configuration by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    isTransitive = false
-}
-
-val shadedArchiveBaseName = property("mod.id") as String
-val shadedArchiveVersion = version.toString()
-
-val relocateSerialization = tasks.register<ShadowJar>("relocateSerialization") {
-    group = "build"
-    description = "Rewrites kotlinx.serialization to $serializationRelocatedPackage across the mod"
-
-    from(tasks.jar.map { zipTree(it.archiveFile) })
-    configurations = listOf(serializationShade)
-    relocate("kotlinx.serialization", serializationRelocatedPackage)
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    mergeServiceFiles()
-
-    exclude(
-        "META-INF/MANIFEST.MF",
-        "META-INF/*.SF",
-        "META-INF/*.DSA",
-        "META-INF/*.RSA",
-        "META-INF/versions/**/module-info.class",
-        "module-info.class",
-    )
-
-    archiveBaseName = shadedArchiveBaseName
-    archiveVersion = shadedArchiveVersion
-    archiveClassifier = "shaded"
-    destinationDirectory = layout.buildDirectory.dir("libs")
-
-    isPreserveFileTimestamps = false
-    isReproducibleFileOrder = true
-}
-
-tasks.named<net.fabricmc.loom.task.RemapJarTask>("remapJar") {
-    inputFile = relocateSerialization.flatMap { it.archiveFile }
-}
+val serializationProvidedByFlk = setOf(
+    "org.jetbrains.kotlinx:kotlinx-serialization-core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json",
+    "org.jetbrains.kotlinx:kotlinx-serialization-cbor",
+)
 
 dependencies {
     minecraft("com.mojang:minecraft:${versionCatalog("common$catalogVersion").findVersion("minecraft").get()}")
@@ -190,6 +153,7 @@ dependencies {
 
     catalogLib("fabric-api")?.let { modImplementation(it) { isTransitive = true } }
     catalogLib("fabric-loader")?.let { modImplementation(it) { isTransitive = true } }
+    catalogLib("fabric-language-kotlin")?.let { modImplementation(it) { isTransitive = false } }
 
     catalogLib("sodium")?.let { modCompileOnly(it) { isTransitive = false } }
 
@@ -200,7 +164,7 @@ dependencies {
 
     sentryShade(libs.sentry)
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
-    serializationShade(libs.bundles.serialization.shade)
+    implementation(libs.bundles.serialization)
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
@@ -212,18 +176,18 @@ dependencies {
 run {
     val bundledRoots = libs.bundles.ktor.client.get() +
         libs.bundles.ktor.server.get() +
-        libs.bundles.ktor.serialization.get()
+        libs.bundles.ktor.serialization.get() +
+        libs.bundles.serialization.get()
     val closure = configurations.detachedConfiguration(
         *bundledRoots.map { dependencies.create(it) }.toTypedArray()
     )
 
     fun key(group: String?, name: String) = "$group:${name.removeSuffix("-jvm")}"
-    val relocated = serializationShade.dependencies.map { key(it.group, it.name) }.toSet()
 
     closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
         val id = art.moduleVersion.id
         if (id.group == "org.jetbrains.kotlin") return@forEach
-        if (key(id.group, id.name) in relocated) return@forEach
+        if (key(id.group, id.name) in serializationProvidedByFlk) return@forEach
         dependencies.include("${id.group}:${id.name}:${id.version}")
     }
 }
