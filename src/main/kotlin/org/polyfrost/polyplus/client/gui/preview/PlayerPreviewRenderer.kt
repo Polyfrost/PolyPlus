@@ -368,9 +368,11 @@ object PlayerPreviewRenderer {
             previewCape = capeOverride(source)?.let { ClientAsset.ResourceTexture(it).texturePath() }
             renderingPreview = true
             try {
-                val level = mc.level
-                if (level != null && mc.cameraEntity != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
-                else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+                org.polyfrost.polyplus.client.PolyPlusSentry.handlingLocally {
+                    val level = mc.level
+                    if (level != null && mc.cameraEntity != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
+                    else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+                }
             } catch (t: Throwable) {
                 LOG.error("[preview] entity submit failed; skipping frame", t)
             } finally {

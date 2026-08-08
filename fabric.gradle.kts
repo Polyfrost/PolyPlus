@@ -127,6 +127,12 @@ tasks.jar {
     }
 }
 
+val serializationProvidedByFlk = setOf(
+    "org.jetbrains.kotlinx:kotlinx-serialization-core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json",
+    "org.jetbrains.kotlinx:kotlinx-serialization-cbor",
+)
+
 dependencies {
     minecraft("com.mojang:minecraft:${versionCatalog("common$catalogVersion").findVersion("minecraft").get()}")
 
@@ -139,6 +145,7 @@ dependencies {
 
     catalogLib("fabric-api")?.let { implementation(it) { isTransitive = true } }
     catalogLib("fabric-loader")?.let { implementation(it) { isTransitive = true } }
+    catalogLib("fabric-language-kotlin")?.let { implementation(it) { isTransitive = false } }
 
     catalogLib("sodium")?.let { compileOnly(it) { isTransitive = false } }
 
@@ -149,6 +156,7 @@ dependencies {
 
     sentryShade(libs.sentry)
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
+    implementation(libs.bundles.serialization)
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.serialization)
@@ -160,15 +168,19 @@ dependencies {
 run {
     val bundledRoots = libs.bundles.ktor.client.get() +
         libs.bundles.ktor.server.get() +
-        libs.bundles.ktor.serialization.get()
+        libs.bundles.ktor.serialization.get() +
+        libs.bundles.serialization.get()
     val closure = configurations.detachedConfiguration(
         *bundledRoots.map { dependencies.create(it) }.toTypedArray()
     )
+
+    fun key(group: String?, name: String) = "$group:${name.removeSuffix("-jvm")}"
+
     closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
         val id = art.moduleVersion.id
-        if (id.group != "org.jetbrains.kotlin") {
-            dependencies.include("${id.group}:${id.name}:${id.version}")
-        }
+        if (id.group == "org.jetbrains.kotlin") return@forEach
+        if (key(id.group, id.name) in serializationProvidedByFlk) return@forEach
+        dependencies.include("${id.group}:${id.name}:${id.version}")
     }
 }
 

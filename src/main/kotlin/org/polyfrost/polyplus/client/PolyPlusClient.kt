@@ -136,7 +136,7 @@ object PolyPlusClient {
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
         //? if >= 1.21.1
-        EmoteWheelKeybind.register()
+        step("emote wheel keybind") { EmoteWheelKeybind.register() }
 
         step("websocket") {
             PolyConnection.initialize {
