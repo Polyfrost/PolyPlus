@@ -14,7 +14,10 @@ sealed interface ServerboundPacket {
 
     @Serializable
     @SerialName("SubscribePlayers")
-    data class SubscribePlayers(val players: List<String>) : ServerboundPacket {
+    data class SubscribePlayers(
+        val players: List<String>,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket {
         constructor(vararg players: String) : this(players.toList())
     }
 

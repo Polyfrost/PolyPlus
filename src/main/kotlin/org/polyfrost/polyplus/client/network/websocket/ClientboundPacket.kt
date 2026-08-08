@@ -8,7 +8,11 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 sealed interface ClientboundPacket {
     @Serializable
     @SerialName("Error")
-    data class Error(@SerialName("error_code") val code: String, val message: String) : ClientboundPacket
+    data class Error(
+        @SerialName("error_code") val code: String,
+        val message: String,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ClientboundPacket
 
     @Serializable
     @SerialName("CosmeticsInfo")
@@ -21,6 +25,8 @@ sealed interface ClientboundPacket {
         @SerialName("active_emotes") val activeEmotes: Map<String, Int>,
         @SerialName("particle_colors") val particleColors: Map<String, Int> = emptyMap(),
         val users: List<String> = emptyList(),
+        val rejected: List<String> = emptyList(),
+        @SerialName("request_id") val requestId: Long? = null,
     ) : ClientboundPacket
 
     @Serializable
