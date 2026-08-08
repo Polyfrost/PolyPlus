@@ -59,6 +59,16 @@ class IgnoredCrashReportTest {
             	at net.minecraft.server.dedicated.ServerWatchdog.run(ServerWatchdog.java:63)
         """.trimIndent()
 
+        val BARE_WATCHDOG_REPORT = """
+            ---- Minecraft Crash Report ----
+
+            Time: 2026-08-01 23:53:16
+            Description: Client shutdown
+
+            java.lang.Error: Watchdog
+            	at java.base/java.lang.Object.wait0(Native Method)
+        """.trimIndent()
+
         val OUT_OF_MEMORY_REPORT = """
             ---- Minecraft Crash Report ----
 
@@ -114,6 +124,7 @@ class IgnoredCrashReportTest {
     fun `ignores watchdogs and memory exhaustion`() {
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(SHUTDOWN_WATCHDOG_REPORT), SHUTDOWN_WATCHDOG_REPORT))
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(SERVER_WATCHDOG_REPORT), SERVER_WATCHDOG_REPORT))
+        assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(BARE_WATCHDOG_REPORT), BARE_WATCHDOG_REPORT))
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(OUT_OF_MEMORY_REPORT), OUT_OF_MEMORY_REPORT))
     }
 
@@ -126,6 +137,7 @@ class IgnoredCrashReportTest {
     fun `matches the description alone, as the live path has it`() {
         assertTrue(PolyPlusSentry.isIgnoredCrashReport("Unexpected error: java.lang.RuntimeException: Crash requested by CrashPatch"))
         assertTrue(PolyPlusSentry.isIgnoredCrashReport("Client shutdown: java.lang.Error: Watchdog (took too long)"))
+        assertTrue(PolyPlusSentry.isIgnoredCrashReport("[HARD CRASH] Client shutdown: java.lang.Error: Watchdog"))
         assertFalse(PolyPlusSentry.isIgnoredCrashReport(summary(GENUINE_REPORT)))
         assertFalse(PolyPlusSentry.isIgnoredCrashReport(null))
     }

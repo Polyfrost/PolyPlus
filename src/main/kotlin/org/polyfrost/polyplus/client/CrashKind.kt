@@ -16,7 +16,6 @@ enum class CrashKind(
 ) {
     HARD_CRASH("hard_crash", "HARD CRASH", "high", SentryLevel.FATAL, false),
     CAUGHT_CRASH("caught_crash", "CAUGHT CRASH", "medium", SentryLevel.WARNING, true),
-    RUNTIME_ERROR("runtime_error", "RUNTIME ERROR", "low", SentryLevel.INFO, true),
 }
 
 fun SentryEvent.markCrashKind(kind: CrashKind) {

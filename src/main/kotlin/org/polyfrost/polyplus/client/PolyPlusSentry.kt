@@ -6,7 +6,6 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.CancellationException
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.libs.sentry.Attachment
@@ -17,8 +16,8 @@ import org.polyfrost.polyplus.libs.sentry.SentryOptions
 import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
 import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
 import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
-import org.polyfrost.polyplus.libs.sentry.protocol.Message
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.io.File
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
@@ -28,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object PolyPlusSentry {
 
     private const val DSN =
-        "https://e48ba6e979b72c09075eff3ec145a5e4@o4511714343124992.ingest.us.sentry.io/4511826505891840"
+        "https://c480e4c64ce55c006da8e1213e4d1eb5@o4511714343124992.ingest.us.sentry.io/4511869855399936"
 
     private const val MAX_EVENTS_PER_SIGNATURE = 5
 
@@ -51,6 +50,8 @@ object PolyPlusSentry {
     private const val MIXIN_HASH_PLACEHOLDER = "\$hash\$"
 
     private const val FINGERPRINT_FRAMES = 8
+
+    private const val DEFAULT_FINGERPRINT = "{{ default }}"
 
     private const val UNCAUGHT_MECHANISM = "UncaughtExceptionHandler"
 
@@ -76,6 +77,10 @@ object PolyPlusSentry {
 
     private val signatureCounts = ConcurrentHashMap<String, AtomicInteger>()
 
+    private val rateLimiter by lazy {
+        SentryEventRateLimiter(File(PolyPlusCrashLogUploader.stateDir, "recent-events.txt"))
+    }
+
     private fun signatureOf(throwable: Throwable): String {
         val frames = throwable.stackTrace.take(SIGNATURE_FRAMES)
             .joinToString("|") { "${it.className}.${it.methodName}:${it.lineNumber}" }
@@ -92,6 +97,20 @@ object PolyPlusSentry {
         }
         return counter.incrementAndGet() <= MAX_EVENTS_PER_SIGNATURE
     }
+
+    internal fun rateLimitKey(event: SentryEvent): String {
+        val throwable = event.throwable
+        val explicit = event.fingerprints.orEmpty().filter { it != DEFAULT_FINGERPRINT }
+        val body = when {
+            throwable != null -> signatureOf(throwable)
+            explicit.isNotEmpty() -> explicit.joinToString("|")
+            else -> event.message?.formatted.orEmpty()
+        }
+        return "${event.level?.name ?: "unknown"}\n$body"
+    }
+
+    private fun allowByRecentReports(event: SentryEvent): Boolean =
+        runCatching { rateLimiter.allow(rateLimitKey(event)) }.getOrDefault(true)
 
     private fun mostInformativeCause(throwable: Throwable): Throwable {
         var cause: Throwable = throwable
@@ -195,11 +214,11 @@ object PolyPlusSentry {
             isAttachStacktrace = true
             setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && isNeverReported(t)) {
-                    null
-                } else {
-                    rateUncaughtException(event)
-                    event
+                when {
+                    t != null && isNeverReported(t) -> null
+                    !acceptUncaughtException(event) -> null
+                    !allowByRecentReports(event) -> null
+                    else -> event
                 }
             }
         }
@@ -266,27 +285,24 @@ object PolyPlusSentry {
         }
     }
 
-    @JvmStatic
-    fun capture(throwable: Throwable) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        if (throwable is CancellationException) return
-        initialize()
-        if (isNeverReported(throwable)) return
-        if (!seen.add(throwable)) return
-        if (!allowBySignature(throwable)) return
-        send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
-    }
-
-    private fun rateUncaughtException(event: SentryEvent) {
-        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return
-        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return
+    /**
+     * Determines whether an uncaught exception should be reported. Exceptions
+     * outside the game's render thread generally do not crash the game, so
+     * they are not reported here.
+     */
+    private fun acceptUncaughtException(event: SentryEvent): Boolean {
+        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return true
+        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return true
 
         val onGameThread = gameThread?.let { it === wrapper.thread } == true
-        val kind = if (onGameThread) CrashKind.HARD_CRASH else CrashKind.RUNTIME_ERROR
+        if (!onGameThread) return false
+
+        val kind = CrashKind.HARD_CRASH
         wrapper.thread?.name?.let { event.setTag(TAG_THREAD, it) }
         event.markCrashKind(kind)
         // Make sure we don't merge reports of different severity
-        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
+        return true
     }
 
     private fun isNeverReported(throwable: Throwable): Boolean =
@@ -365,7 +381,7 @@ object PolyPlusSentry {
 
         var cause: Throwable? = throwable
         while (cause != null) {
-            if (cause is Error && cause.message?.startsWith("Watchdog (") == true) return true
+            if (cause is Error && cause.message?.startsWith("Watchdog") == true) return true
 
             if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
 
@@ -450,7 +466,7 @@ object PolyPlusSentry {
     // SkyHanni joke crash features (requires opt-in from player)
     private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
-    private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog \(""")
+    private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog\b""")
 
     private val OUT_OF_MEMORY = Regex("""(?m)^(?:Caused by: )?java\.lang\.OutOfMemoryError""")
 
@@ -483,30 +499,6 @@ object PolyPlusSentry {
             cause = next
         }
         return false
-    }
-
-    @JvmStatic
-    fun captureMessage(message: String) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        initialize()
-        val kind = CrashKind.RUNTIME_ERROR
-        val event = SentryEvent()
-        event.message = Message().apply { formatted = "[${kind.label}] $message" }
-        event.setTag(TAG_THREAD, Thread.currentThread().name)
-        event.markCrashKind(kind)
-        activeHub()?.captureEvent(event)
-    }
-
-    private val locallyHandled = ThreadLocal.withInitial { 0 }
-
-    fun <T> handlingLocally(block: () -> T): T {
-        val depth = locallyHandled.get()
-        locallyHandled.set(depth + 1)
-        return try {
-            block()
-        } finally {
-            locallyHandled.set(depth)
-        }
     }
 
     @JvmStatic
@@ -576,7 +568,7 @@ object PolyPlusSentry {
         kind: CrashKind,
         description: String?,
         thread: Thread,
-        customise: (SentryEvent) -> Unit = {},
+        customise: (SentryEvent) -> Unit,
     ) {
         val mechanism = Mechanism()
         mechanism.type = kind.tag
@@ -585,7 +577,7 @@ object PolyPlusSentry {
 
         val event = SentryEvent(ExceptionMechanismException(mechanism, throwable, thread))
         // Make sure we don't merge reports of different severity
-        event.fingerprints = listOf("{{ default }}", kind.tag)
+        event.fingerprints = listOf(DEFAULT_FINGERPRINT, kind.tag)
         event.setTag(TAG_THREAD, thread.name)
         event.markCrashKind(kind)
         customise(event)

@@ -48,7 +48,6 @@ import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import kotlin.math.atan2
@@ -96,7 +95,6 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                             CosmeticService.playEmote(emoteId)
                                 .onFailure {
                                     logger.error("Failed to play emote {}", emoteId, it)
-                                    PolyPlusSentry.capture(it)
                                 }
                         }
                     }

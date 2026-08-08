@@ -32,7 +32,7 @@ object PolyPlusCrashLogUploader {
     private val lastIgnoredCrash = AtomicLong(0)
 
     private val gameDir: File get() = FabricLoader.getInstance().gameDir.toFile()
-    private val stateDir: File get() = File(gameDir, "polyplus/sentry")
+    internal val stateDir: File get() = File(gameDir, "polyplus/sentry")
     private val uploadedFile: File get() = File(stateDir, "uploaded.txt")
     private val handledCrashFile: File get() = File(stateDir, "live-captures.txt")
     private val ignoredCrashFile: File get() = File(stateDir, "ignored-crashes.txt")
