@@ -195,7 +195,7 @@ object PolyPlusSentry {
             isAttachStacktrace = true
             setBeforeSend { event, _ ->
                 val t = event.throwable
-                if (t != null && (isNeverReported(t) || isForeignUncaughtException(event, t))) {
+                if (t != null && isNeverReported(t)) {
                     null
                 } else {
                     rateUncaughtException(event)
@@ -275,12 +275,6 @@ object PolyPlusSentry {
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
         send(throwable, CrashKind.RUNTIME_ERROR, null, Thread.currentThread())
-    }
-
-    private fun isForeignUncaughtException(event: SentryEvent, throwable: Throwable): Boolean {
-        val wrapper = event.throwableMechanism as? ExceptionMechanismException ?: return false
-        if (wrapper.exceptionMechanism?.type != UNCAUGHT_MECHANISM) return false
-        return !involvesPolyPlus(throwable)
     }
 
     private fun rateUncaughtException(event: SentryEvent) {
@@ -469,27 +463,6 @@ object PolyPlusSentry {
         return body.contains(DELIBERATE_CRASH_CLASS) || OUT_OF_MEMORY.containsMatchIn(body)
     }
 
-    private const val POLYPLUS_PACKAGE = "org.polyfrost.polyplus"
-    private val POLYPLUS_MIXIN_FRAME = Regex("\\$[a-z]{3}\\d+[$]polyplus[$]")
-
-    internal fun involvesPolyPlus(body: String): Boolean =
-        body.contains(POLYPLUS_PACKAGE) || POLYPLUS_MIXIN_FRAME.containsMatchIn(body)
-
-    private fun isPolyPlusFrame(frame: StackTraceElement): Boolean =
-        frame.className.startsWith(POLYPLUS_PACKAGE) || POLYPLUS_MIXIN_FRAME.containsMatchIn(frame.methodName)
-
-    internal fun involvesPolyPlus(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        var hops = 0
-        while (cause != null && hops++ < MAX_UNWRAP_DEPTH) {
-            if (cause.stackTrace.any(::isPolyPlusFrame)) return true
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
-        }
-        return false
-    }
-
     private fun isDeliberateCrash(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
@@ -543,8 +516,6 @@ object PolyPlusSentry {
         val hub = activeHub() ?: return
 
         if (locallyHandled.get() > 0) return
-
-        if (!involvesPolyPlus(throwable)) return
 
         val description = if (title.isNullOrBlank()) throwable.toString() else "$title: $throwable"
         if (isIgnoredCrashReport(description) || isNeverReported(throwable)) {
