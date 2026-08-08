@@ -10,7 +10,6 @@ import kotlinx.coroutines.coroutineScope
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticSearchResponse
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -85,6 +84,5 @@ object CosmeticStore {
             return
         }
         LOGGER.error(message, error)
-        PolyPlusSentry.capture(error)
     }
 }

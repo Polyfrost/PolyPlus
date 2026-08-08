@@ -78,7 +78,6 @@ internal object AttachedCosmeticParser {
             }
         } catch (ex: Exception) {
             logger.error("Failed to load attached cosmetic {}", cosmeticId, ex)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(ex)
             null
         }
     }

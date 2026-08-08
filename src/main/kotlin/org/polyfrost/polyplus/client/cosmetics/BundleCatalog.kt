@@ -24,9 +24,9 @@ object BundleCatalog {
             parameter("nb", perPage.coerceIn(1, MAX_PAGE_SIZE))
             if (!text.isNullOrBlank()) parameter("text", text)
         }.body<BundleSearchResponse>()
-    }.onFailure { LOGGER.error("Failed to search bundles", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+    }.onFailure { LOGGER.error("Failed to search bundles", it) }
 
     suspend fun view(id: Int): Result<BundleViewResponse> = runCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/bundles/view/$id").body<BundleViewResponse>()
-    }.onFailure { LOGGER.error("Failed to view bundle {}", id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+    }.onFailure { LOGGER.error("Failed to view bundle {}", id, it) }
 }

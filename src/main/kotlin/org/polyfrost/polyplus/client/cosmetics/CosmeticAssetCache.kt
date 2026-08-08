@@ -117,11 +117,9 @@ object CosmeticAssetCache {
                                             if (error is OutOfDiskSpaceException) {
                                                 if (outOfSpace.compareAndSet(false, true)) {
                                                     LOGGER.error("Out of disk space caching cosmetics; aborting the batch", error)
-                                                    org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
                                                 }
                                             } else {
                                                 LOGGER.error("Failed to download cosmetic {}", definition.id, error)
-                                                org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
                                             }
                                         }
                                 }
@@ -143,7 +141,7 @@ object CosmeticAssetCache {
                 for (definition in definitions) {
                     parseLock.withLock {
                         runCatching { loadCosmeticAssetsLocked(definition) }
-                            .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                            .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
                     }
                     if (trackProgress) CosmeticLoadProgress.stepAssets()
                 }
@@ -156,7 +154,6 @@ object CosmeticAssetCache {
     private fun ensureBaseDir(): Boolean {
         if (baseDir.exists() || baseDir.mkdirs()) return true
         LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
-        org.polyfrost.polyplus.client.PolyPlusSentry.captureMessage("Failed to create cosmetics directory at ${baseDir.absolutePath}")
         return false
     }
 
@@ -212,7 +209,6 @@ object CosmeticAssetCache {
                 true
             }.getOrElse {
                 LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
-                org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
                 false
             }
         }

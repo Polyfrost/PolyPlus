@@ -97,7 +97,6 @@ object PolyConnection {
             val error = result.exceptionOrNull()
             if (error != null) {
                 LOGGER.error("Failed to enqueue WebSocket message", error)
-                org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
             }
             return Result.failure(error ?: IllegalStateException("WebSocket outgoing queue rejected message"))
         }
@@ -150,7 +149,6 @@ object PolyConnection {
                         }
                     } else {
                         LOGGER.error("PolyPlus WebSocket connection failed", e)
-                        org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
                         notifyDisconnected(e)
                     }
                 } finally {
@@ -195,7 +193,6 @@ object PolyConnection {
                         send(Frame.Text(message))
                     } catch (e: Exception) {
                         LOGGER.error("Failed to send WebSocket message", e)
-                        org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
                     }
                 }
             }

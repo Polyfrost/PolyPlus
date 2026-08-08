@@ -40,7 +40,6 @@ object BillingService {
             return Result.failure(AlreadyOwnedException(message))
         }
         LOGGER.error("Failed to create Stripe checkout", error)
-        org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
         return result
     }
 
@@ -62,5 +61,5 @@ object BillingService {
         PolyPlusClient.HTTP
             .getBodyAuthorized<TransactionsResponse>("${PolyPlusConfig.apiUrl}/transactions/player")
             .map { it.transactions.sortedByDescending { tx -> tx.id } }
-            .onFailure { LOGGER.error("Failed to fetch transactions", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            .onFailure { LOGGER.error("Failed to fetch transactions", it) }
 }

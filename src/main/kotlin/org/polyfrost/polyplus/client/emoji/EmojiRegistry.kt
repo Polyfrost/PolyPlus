@@ -63,7 +63,7 @@ object EmojiRegistry {
         }
         return runCatching {
             stream.bufferedReader().use { JSON.decodeFromString<Map<String, String>>(it.readText()) }
-        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }.getOrDefault(emptyMap())
+        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it) }.getOrDefault(emptyMap())
     }
 
     @JvmStatic
