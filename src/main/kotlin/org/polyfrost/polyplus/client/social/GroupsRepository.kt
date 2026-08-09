@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.social
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,11 @@ object GroupsRepository : EarlyInitializable {
     val groups = _groups.asStateFlow()
 
     private val messagesByGroup = ConcurrentHashMap<Int, MutableStateFlow<List<GroupMessage>>>()
+
+    private const val PENDING_ID_BASE = Long.MAX_VALUE - 1_000_000L
+    private val pendingIdCounter = AtomicLong(0)
+
+    fun isPending(messageId: Long): Boolean = messageId >= PENDING_ID_BASE
 
     override fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
@@ -47,25 +53,37 @@ object GroupsRepository : EarlyInitializable {
     fun openDirectMessage(player: String, onResult: (Result<GroupSummary>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         val result = GroupsApi.openDirectMessage(player)
         result.onSuccess { summary -> upsertGroup(summary) }
-            .onFailure { LOGGER.error("Failed to open DM with $player", it) }
+            .onFailure {
+                LOGGER.error("Failed to open DM with $player", it)
+                SocialErrors.emit("Couldn't open that conversation", it)
+            }
         onResult(result)
     }
 
     fun createGroup(name: String, members: List<String>, onResult: (Result<GroupSummary>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         val result = GroupsApi.createGroup(name, members)
         result.onSuccess { summary -> upsertGroup(summary) }
-            .onFailure { LOGGER.error("Failed to create group $name", it) }
+            .onFailure {
+                LOGGER.error("Failed to create group $name", it)
+                SocialErrors.emit("Couldn't create group", it)
+            }
         onResult(result)
     }
 
     fun addMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
         GroupsApi.addMember(groupId, player).onSuccess { refreshGroups() }
-            .onFailure { LOGGER.error("Failed to add $player to group $groupId", it) }
+            .onFailure {
+                LOGGER.error("Failed to add $player to group $groupId", it)
+                SocialErrors.emit("Couldn't add member", it)
+            }
     }
 
     fun removeMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
         GroupsApi.removeMember(groupId, player).onSuccess { refreshGroups() }
-            .onFailure { LOGGER.error("Failed to remove $player from group $groupId", it) }
+            .onFailure {
+                LOGGER.error("Failed to remove $player from group $groupId", it)
+                SocialErrors.emit("Couldn't remove member", it)
+            }
     }
 
     fun loadMessages(groupId: Int, before: Long? = null, limit: Long? = null) = PolyPlusClient.SCOPE.launch {
@@ -82,9 +100,23 @@ object GroupsRepository : EarlyInitializable {
     }
 
     fun sendMessage(groupId: Int, content: String, idempotencyKey: String? = null) = PolyPlusClient.SCOPE.launch {
+        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val tempId = PENDING_ID_BASE + pendingIdCounter.getAndIncrement()
+        appendOrReplace(
+            groupId,
+            GroupMessage(id = tempId, sender = selfId, content = content, sentAt = java.time.Instant.now().toString(), editedAt = null),
+        )
+
         GroupsApi.sendMessage(groupId, content, idempotencyKey)
-            .onSuccess { message -> appendOrReplace(groupId, message) }
-            .onFailure { LOGGER.error("Failed to send message to group $groupId", it) }
+            .onSuccess { message ->
+                removeMessage(groupId, tempId)
+                appendOrReplace(groupId, message)
+            }
+            .onFailure {
+                LOGGER.error("Failed to send message to group $groupId", it)
+                SocialErrors.emit("Couldn't send message", it)
+                removeMessage(groupId, tempId)
+            }
     }
 
     fun editMessage(groupId: Int, messageId: Long, content: String) = PolyPlusClient.SCOPE.launch {

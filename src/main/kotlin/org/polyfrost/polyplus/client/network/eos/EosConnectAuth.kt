@@ -32,6 +32,12 @@ object EosConnectAuth {
         }
     }
 
+    suspend fun forceLogin(bridge: EosSdkBridge): Result<EosProductUserId> = LOCK.withLock {
+        val result = login(bridge)
+        loginResult = result
+        result
+    }
+
     private suspend fun login(bridge: EosSdkBridge): Result<EosProductUserId> {
         val verifier = generateCodeVerifier()
         val challenge = codeChallenge(verifier)

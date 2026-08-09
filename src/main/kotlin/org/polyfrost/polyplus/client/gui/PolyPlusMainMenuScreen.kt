@@ -335,7 +335,7 @@ private object MainMenuRasterAssets {
         }.getOrNull()?.also { cache[path] = it }
 }
 
-private object MenuHeadCache {
+internal object MenuHeadCache {
     private val heads = ConcurrentHashMap<java.util.UUID, ImageBitmap>()
     private val requested: MutableSet<java.util.UUID> = Collections.newSetFromMap(ConcurrentHashMap())
     var version by mutableStateOf(0)

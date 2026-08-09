@@ -37,8 +37,9 @@ object P2PSessionManager : EarlyInitializable {
 
     @Volatile private var bridge: EosSdkBridge? = null
 
-    @Volatile var currentSessionId: String? = null
-        private set
+    private val _currentSessionId = MutableStateFlow<String?>(null)
+    val currentSessionIdFlow = _currentSessionId.asStateFlow()
+    val currentSessionId: String? get() = _currentSessionId.value
 
     private val _status = MutableStateFlow<EosStatus>(EosStatus.Connecting)
     val status = _status.asStateFlow()
@@ -73,25 +74,34 @@ object P2PSessionManager : EarlyInitializable {
             }
         }
 
-        PolyPlusClient.SCOPE.launch {
-            val user = EosConnectAuth.ensureLoggedIn(bridge)
-                .onFailure {
-                    LOGGER.error("EOS Connect login failed; P2P hosting/joining is unavailable", it)
-                    _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services")
-                }
-                .getOrNull()
+        PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
+    }
 
-            if (user != null) {
-                org.polyfrost.polyplus.client.network.http.AccountApi.linkPuid(user.raw)
-                    .onSuccess { _status.value = EosStatus.Ready }
-                    .onFailure {
-                        LOGGER.error("Failed to link EOS ProductUserId with the backend", it)
-                        _status.value = EosStatus.Failed("Unable to link your account for multiplayer sessions")
-                    }
+    fun reconnect() {
+        val bridge = this.bridge ?: return
+        stopHosting()
+        _status.value = EosStatus.Connecting
+        PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = true) }
+    }
+
+    private suspend fun authenticate(bridge: EosSdkBridge, forceRelogin: Boolean) {
+        val user = (if (forceRelogin) EosConnectAuth.forceLogin(bridge) else EosConnectAuth.ensureLoggedIn(bridge))
+            .onFailure {
+                LOGGER.error("EOS Connect login failed; P2P hosting/joining is unavailable", it)
+                _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services")
             }
+            .getOrNull()
 
-            bridge.queryNatType().onSuccess { LOGGER.info("EOS P2P NAT type: {}", it) }
+        if (user != null) {
+            org.polyfrost.polyplus.client.network.http.AccountApi.linkPuid(user.raw)
+                .onSuccess { _status.value = EosStatus.Ready }
+                .onFailure {
+                    LOGGER.error("Failed to link EOS ProductUserId with the backend", it)
+                    _status.value = EosStatus.Failed("Unable to link your account for multiplayer sessions")
+                }
         }
+
+        bridge.queryNatType().onSuccess { LOGGER.info("EOS P2P NAT type: {}", it) }
     }
 
     fun connectBootstrap(target: JoinTarget): Bootstrap =
@@ -114,14 +124,14 @@ object P2PSessionManager : EarlyInitializable {
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
 
         return SessionsApi.create().onSuccess { session ->
-            currentSessionId = session.id
+            _currentSessionId.value = session.id
             P2PListenContext.setPendingListen(socketFor(session.id), localUser)
         }
     }
 
     fun stopHosting() {
         val sessionId = currentSessionId ?: return
-        currentSessionId = null
+        _currentSessionId.value = null
         SessionsRepository.close(sessionId)
     }
 

@@ -78,38 +78,59 @@ object FriendsRepository : EarlyInitializable {
     fun sendRequest(player: String) = PolyPlusClient.SCOPE.launch {
         SocialApi.sendRequest(player)
             .onSuccess { refreshRequests(); if (it == null) refreshFriends() }
-            .onFailure { LOGGER.error("Failed to send friend request to $player", it) }
+            .onFailure {
+                LOGGER.error("Failed to send friend request to $player", it)
+                SocialErrors.emit("Couldn't send friend request", it)
+            }
     }
 
     fun acceptRequest(id: Int) = PolyPlusClient.SCOPE.launch {
         SocialApi.acceptRequest(id)
             .onSuccess { refreshRequests(); refreshFriends() }
-            .onFailure { LOGGER.error("Failed to accept friend request $id", it) }
+            .onFailure {
+                LOGGER.error("Failed to accept friend request $id", it)
+                SocialErrors.emit("Couldn't accept friend request", it)
+            }
     }
 
     fun declineRequest(id: Int) = PolyPlusClient.SCOPE.launch {
         SocialApi.declineRequest(id).onSuccess { refreshRequests() }
-            .onFailure { LOGGER.error("Failed to decline friend request $id", it) }
+            .onFailure {
+                LOGGER.error("Failed to decline friend request $id", it)
+                SocialErrors.emit("Couldn't decline friend request", it)
+            }
     }
 
     fun cancelRequest(id: Int) = PolyPlusClient.SCOPE.launch {
         SocialApi.cancelRequest(id).onSuccess { refreshRequests() }
-            .onFailure { LOGGER.error("Failed to cancel friend request $id", it) }
+            .onFailure {
+                LOGGER.error("Failed to cancel friend request $id", it)
+                SocialErrors.emit("Couldn't cancel friend request", it)
+            }
     }
 
     fun removeFriend(player: String) = PolyPlusClient.SCOPE.launch {
         SocialApi.removeFriend(player).onSuccess { refreshFriends() }
-            .onFailure { LOGGER.error("Failed to remove friend $player", it) }
+            .onFailure {
+                LOGGER.error("Failed to remove friend $player", it)
+                SocialErrors.emit("Couldn't remove friend", it)
+            }
     }
 
     fun block(player: String) = PolyPlusClient.SCOPE.launch {
         SocialApi.block(player)
             .onSuccess { refreshBlocked(); refreshFriends(); refreshRequests() }
-            .onFailure { LOGGER.error("Failed to block $player", it) }
+            .onFailure {
+                LOGGER.error("Failed to block $player", it)
+                SocialErrors.emit("Couldn't block player", it)
+            }
     }
 
     fun unblock(player: String) = PolyPlusClient.SCOPE.launch {
         SocialApi.unblock(player).onSuccess { refreshBlocked() }
-            .onFailure { LOGGER.error("Failed to unblock $player", it) }
+            .onFailure {
+                LOGGER.error("Failed to unblock $player", it)
+                SocialErrors.emit("Couldn't unblock player", it)
+            }
     }
 }

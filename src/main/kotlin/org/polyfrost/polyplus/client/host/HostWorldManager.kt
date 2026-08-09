@@ -168,6 +168,12 @@ object HostWorldManager {
         }
     }
 
+    fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) return
+        pending = PendingHost(gameMode, allowCheats)
+    }
+
     fun registerLanPublishHook() {
         //? if fabric {
         ClientTickEvents.END_CLIENT_TICK.register(ClientTickEvents.EndTick { mc -> tick(mc) })

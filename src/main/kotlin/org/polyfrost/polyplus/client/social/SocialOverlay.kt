@@ -83,5 +83,6 @@ internal object SocialRefresh {
         GroupsRepository.refreshGroups()
         GlobalChatRepository.refreshHistory()
         SessionsRepository.refreshIncoming()
+        SpecialChatRepository.refreshTargets()
     }
 }

@@ -43,7 +43,10 @@ object GlobalChatRepository : EarlyInitializable {
     fun send(content: String) = PolyPlusClient.SCOPE.launch {
         GlobalChatApi.send(content)
             .onSuccess { append(it) }
-            .onFailure { LOGGER.error("Failed to send Global Chat message", it) }
+            .onFailure {
+                LOGGER.error("Failed to send Global Chat message", it)
+                SocialErrors.emit("Couldn't send message", it)
+            }
     }
 
     private fun append(message: GlobalChatMessage) {

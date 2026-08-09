@@ -47,7 +47,10 @@ object SessionsRepository : EarlyInitializable {
 
     fun host(eosSessionId: String? = null, onResult: (Result<SessionResponse>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         val result = SessionsApi.create(eosSessionId)
-        result.onFailure { LOGGER.error("Failed to host a session", it) }
+        result.onFailure {
+            LOGGER.error("Failed to host a session", it)
+            SocialErrors.emit("Couldn't start hosting", it)
+        }
         onResult(result)
     }
 
@@ -56,7 +59,10 @@ object SessionsRepository : EarlyInitializable {
     }
 
     fun invite(sessionId: String, player: String) = PolyPlusClient.SCOPE.launch {
-        SessionsApi.invite(sessionId, player).onFailure { LOGGER.error("Failed to invite $player to session $sessionId", it) }
+        SessionsApi.invite(sessionId, player).onFailure {
+            LOGGER.error("Failed to invite $player to session $sessionId", it)
+            SocialErrors.emit("Couldn't send session invite", it)
+        }
     }
 
     fun accept(invite: SessionInvite) = PolyPlusClient.SCOPE.launch {
@@ -65,11 +71,17 @@ object SessionsRepository : EarlyInitializable {
                 refreshIncoming()
                 _acceptedInvites.emit(invite)
             }
-            .onFailure { LOGGER.error("Failed to accept session invite ${invite.id}", it) }
+            .onFailure {
+                LOGGER.error("Failed to accept session invite ${invite.id}", it)
+                SocialErrors.emit("Couldn't accept session invite", it)
+            }
     }
 
     fun decline(invite: SessionInvite) = PolyPlusClient.SCOPE.launch {
         SessionsApi.declineInvite(invite.id).onSuccess { refreshIncoming() }
-            .onFailure { LOGGER.error("Failed to decline session invite ${invite.id}", it) }
+            .onFailure {
+                LOGGER.error("Failed to decline session invite ${invite.id}", it)
+                SocialErrors.emit("Couldn't decline session invite", it)
+            }
     }
 }

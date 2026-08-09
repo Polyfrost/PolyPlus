@@ -194,6 +194,7 @@ object PolyPlusClient {
             }
 
             runCatching { PolyConnection.reconnect() }
+            runCatching { P2PSessionManager.reconnect() }
 
             refreshCosmeticsInternal()
         }
