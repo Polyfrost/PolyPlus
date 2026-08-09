@@ -28,6 +28,7 @@
     "client.Mixin_MenuPanoramaBackground",
     "client.Mixin_MenuPanoramaListBackground",
     "client.Mixin_HideBobbyUpgradeMessage",
+    "client.euphoria.Mixin_HideEuphoriaPatcherMessages",
     "client.essential.Mixin_EssentialPartnerConfig",
     "client.essential.Mixin_EssentialPartnerButton",
     "client.essential.Mixin_EssentialPartnerModal",
