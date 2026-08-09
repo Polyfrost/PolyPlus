@@ -19,6 +19,18 @@ build
 
 # stonecutter version nodes (run/test logs)
 versions/*/logs/
+versions/*/config/
+versions/*/oneconfig/
+versions/*/mods/
+versions/*/.fabric/
+versions/*/.gradle/
+versions/*/saves/
+versions/*/screenshots/
+versions/*/crash-reports/
+versions/*/options.txt
+versions/*/servers.dat*
+versions/*/usercache.json
+versions/*/usernamecache.json
 
 # other
 eclipse
@@ -26,8 +38,8 @@ run
 build - Copy.gradle
 .vscode
 .devauth
-.DS_STORE
-
+.DS_Store
+.kotlin
 
 # Created by https://www.toptal.com/developers/gitignore/api/java,gradle,forgegradle,kotlin,macos,intellij,intellij+all,eclipse,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,gradle,forgegradle,kotlin,macos,intellij,intellij+all,eclipse,visualstudiocode

@@ -236,8 +236,7 @@ class BedrockMesh private constructor(
             val height = abs(cube.size.y)
             val depth = abs(cube.size.z)
 
-            // Blockbench floors box-UV dimensions - if we dont, then it results
-            // in fucked up UV
+            // Blockbench floors box-UV dimensions and skipping that mangles the UV
             val uvWidth = floor(width)
             val uvHeight = floor(height)
             val uvDepth = floor(depth)
@@ -336,8 +335,7 @@ class BedrockMesh private constructor(
             flipU: Boolean,
             facing: Direction,
         ): BedrockQuad? {
-            // flipU swaps the U span so the texture mirrors horizontally (Bedrock
-            // `"mirror"`), without touching geometry winding.
+            // flipU mirrors the texture horizontally without touching geometry winding
             val u0 = if (flipU) u1In else u0In
             val u1 = if (flipU) u0In else u1In
             if (abs(u1 - u0) < BILLBOARD_EPSILON || abs(v1 - v0) < BILLBOARD_EPSILON) {

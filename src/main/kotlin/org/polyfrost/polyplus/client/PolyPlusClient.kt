@@ -35,6 +35,8 @@ import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
+import org.polyfrost.polyplus.client.features.AdvancedModCards
+import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -61,7 +63,6 @@ object PolyPlusClient {
 
     private val EXCEPTION_HANDLER = CoroutineExceptionHandler { _, throwable ->
         LOGGER.error("Uncaught exception in PolyPlus coroutine", throwable)
-        PolyPlusSentry.capture(throwable)
     }
 
     @JvmField val SCOPE = CoroutineScope(SupervisorJob() + Dispatchers.Default + EXCEPTION_HANDLER)
@@ -96,7 +97,7 @@ object PolyPlusClient {
         HttpResponseValidator {
             validateResponse { response ->
                 val status = response.status
-                // Only 4xx/5xx are failures; 1xx (such as the 101 WebSocket upgrade) and 3xx are not.
+                // Only 4xx and 5xx are failures 1xx like the 101 WebSocket upgrade and 3xx are not
                 if (status.value < HttpStatusCode.BadRequest.value) return@validateResponse
                 if (status == HttpStatusCode.Unauthorized) return@validateResponse
                 if (response.request.url.host != apiHost()) return@validateResponse
@@ -117,7 +118,6 @@ object PolyPlusClient {
     private inline fun step(name: String, block: () -> Unit) {
         runCatching(block).onFailure { error ->
             LOGGER.error("PolyPlus init step '{}' failed; continuing without it", name, error)
-            runCatching { PolyPlusSentry.capture(error) }
         }
     }
 
@@ -126,8 +126,12 @@ object PolyPlusClient {
         step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
         step("config preload") { PolyPlusConfig.preload() }
+        step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
+        step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("default settings") { DefaultSettings.initialize() }
+        step("default mod order") { DefaultModOrder.initialize() }
+        step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
 
@@ -146,7 +150,6 @@ object PolyPlusClient {
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
-        PetEntities.register()
         //? if >= 1.21.1
         EmoteWheelKeybind.register()
         step("social overlay keybind") { SocialOverlay.registerKeybind() }
@@ -180,7 +183,7 @@ object PolyPlusClient {
         step("panorama") { org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize() }
     }
 
-    /** Full reset (auth, caches, API data). Used when the API URL changes or via `/polyplus refresh`. */
+    // Full reset of auth caches and API data
     fun refresh() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         LOGGER.info("Refreshing PolyPlus Client...")
@@ -200,7 +203,7 @@ object PolyPlusClient {
         }
     }
 
-    /** Fetches catalog + player cosmetics and applies active loadout (no auth/cache wipe). */
+    // Refetches cosmetics without wiping auth or caches
     fun refreshCosmetics() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
@@ -216,7 +219,7 @@ object PolyPlusClient {
         }
     }
 
-    /** Loads cosmetics when the locker is empty but the player is in a world (e.g. command before join refresh finishes). */
+    // Covers a command running before the join refresh finishes
     fun refreshCosmeticsIfNeeded() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (CosmeticCatalog.ownedIds().isNotEmpty() || CosmeticCatalog.allDefinitions().isNotEmpty()) {
@@ -232,12 +235,12 @@ object PolyPlusClient {
 
         try {
             runCatching { CosmeticCatalog.refreshCatalog() }
-                .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
             runCatching { CosmeticCatalog.refreshPlayer() }
-                .onFailure { LOGGER.error("Player cosmetics refresh failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
             //? if >= 1.21.1 {
             runCatching { CosmeticService.syncLocalActive() }
-                .onFailure { LOGGER.error("Local active cosmetics sync failed", it); PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
             /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
                 .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/

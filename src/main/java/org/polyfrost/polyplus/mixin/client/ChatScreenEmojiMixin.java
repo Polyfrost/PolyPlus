@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Style;
@@ -24,8 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenEmojiMixin {
     @Shadow protected EditBox input;
+    @Shadow CommandSuggestions commandSuggestions;
 
-    @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile(":([a-z0-9_+\\-]{2,})$");
+    @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile("(?<![A-Za-z0-9_:/.+\\-]):([a-z0-9_+\\-]{2,})$");
     @Unique private static final int POLYPLUS_MAX = 10;
     @Unique private static final int POLYPLUS_LINE_H = 12;
 
@@ -61,6 +63,10 @@ public abstract class ChatScreenEmojiMixin {
             polyplus$token = null;
             return;
         }
+        if (commandSuggestions != null && commandSuggestions.isVisible()) {
+            polyplus$token = null;
+            return;
+        }
         String value = input.getValue();
         int cursor = Math.min(input.getCursorPosition(), value.length());
         Matcher m = POLYPLUS_TOKEN.matcher(value.substring(0, cursor));
@@ -75,7 +81,7 @@ public abstract class ChatScreenEmojiMixin {
             return;
         }
         if (!prefix.equals(polyplus$token)) {
-            polyplus$selected = 0; // reset selection when the prefix changes
+            polyplus$selected = 0;
             polyplus$token = prefix;
         }
         polyplus$suggestions = found;
@@ -111,7 +117,7 @@ public abstract class ChatScreenEmojiMixin {
             case 264: // GLFW_KEY_DOWN
                 polyplus$selected = (polyplus$selected + 1) % n;
                 return true;
-            case 258: // TAB - complete highlighted emoji
+            case 258: // TAB
             case 257: // ENTER
             case 335: // KP_ENTER
                 return polyplus$accept();

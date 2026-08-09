@@ -16,7 +16,9 @@ data class BundleInfo(
 ) {
     val purchasable: Boolean get() = !stripePriceId.isNullOrBlank()
 
-    val discounted: Boolean get() = (discountRate ?: 0) > 0
+    val free: Boolean get() = (finalPrice ?: 0f) <= 0f
+
+    val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 
     val finalPrice: Float?
         get() = basePrice?.let { base ->

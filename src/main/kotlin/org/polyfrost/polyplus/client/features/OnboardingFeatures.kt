@@ -18,7 +18,11 @@ object OnboardingFeatures {
     val polyBlurAvailable: Boolean by lazy { classExists(POLYBLUR_CONFIG) }
 
     val modsPageAvailable: Boolean
-        get() = polySprintAvailable || polyBlurAvailable
+        get() = polySprintAvailable
+
+    @JvmStatic
+    fun needsMotionBlurChoice(): Boolean =
+        polyBlurAvailable && PolyPlusConfig.onboardingMotionBlurMode == MOTION_BLUR_UNSET
 
     fun initialize() {
         eventHandler { _: TickEvent.End ->
@@ -34,7 +38,7 @@ object OnboardingFeatures {
                 changed = true
             }
             if (polyBlurAvailable && !PolyPlusConfig.onboardingPolyBlurApplied) {
-                if (applyPolyBlur(PolyPlusConfig.onboardingMotionBlur)) {
+                if (applyMotionBlur(PolyPlusConfig.onboardingMotionBlurMode, PolyPlusConfig.onboardingMotionBlur)) {
                     PolyPlusConfig.onboardingPolyBlurApplied = true
                     changed = true
                 }
@@ -49,10 +53,17 @@ object OnboardingFeatures {
             applyToggleSprint(PolyPlusConfig.onboardingToggleSprint)
             PolyPlusConfig.onboardingSprintApplied = true
         }
-        if (applyPolyBlur(PolyPlusConfig.onboardingMotionBlur)) {
+        if (applyMotionBlur(PolyPlusConfig.onboardingMotionBlurMode, PolyPlusConfig.onboardingMotionBlur)) {
             PolyPlusConfig.onboardingPolyBlurApplied = true
         }
         PolyPlusConfig.save()
+    }
+
+    fun applySavedMotionBlur() {
+        if (applyMotionBlur(PolyPlusConfig.onboardingMotionBlurMode, PolyPlusConfig.onboardingMotionBlur)) {
+            PolyPlusConfig.onboardingPolyBlurApplied = true
+            PolyPlusConfig.save()
+        }
     }
 
     private fun applyCoreSettings() {
@@ -96,14 +107,18 @@ object OnboardingFeatures {
         }.onFailure { logger.warn("Could not apply toggle sprint preference", it) }
     }
 
-    private fun applyPolyBlur(value: Int): Boolean {
-        val strength = value.coerceIn(0, 10)
+    fun applyMotionBlur(mode: Int, strength: Int): Boolean {
+        if (mode == MOTION_BLUR_UNSET) return false
         return runCatching {
             val config = Class.forName(POLYBLUR_CONFIG)
             val instance = config.getField("INSTANCE").get(null)
-            config.getMethod("setEnabled", Boolean::class.javaPrimitiveType).invoke(instance, strength > 0)
-            if (strength > 0) {
-                config.getMethod("setStrength", Float::class.javaPrimitiveType).invoke(instance, strength.toFloat())
+            val performance = mode == MOTION_BLUR_PERFORMANCE
+            setBoolean(instance, "setEnabled", mode != MOTION_BLUR_DISABLED)
+            if (mode != MOTION_BLUR_DISABLED) {
+                setFloat(instance, "setStrength", strength.coerceIn(1, 10).toFloat())
+                setInt(instance, "setBlurType", if (performance) UNITY_BLUR_TYPE else HYBRID_BLUR_TYPE)
+                setFloat(instance, "setMotionBlurSamples", if (performance) PERFORMANCE_SAMPLES else QUALITY_SAMPLES)
+                setBoolean(instance, "setBlurHand", !performance) // >= 1.21.5 only skipped if absent
             }
             config.getMethod("save").invoke(instance)
             true
@@ -112,8 +127,34 @@ object OnboardingFeatures {
         }.getOrDefault(false)
     }
 
+    private fun setBoolean(instance: Any, method: String, value: Boolean) {
+        val fn = runCatching { instance.javaClass.getMethod(method, Boolean::class.javaPrimitiveType) }.getOrNull()
+        if (fn == null) {
+            logger.debug("PolyBlur has no {}, skipping", method)
+            return
+        }
+        fn.invoke(instance, value)
+    }
+
+    private fun setInt(instance: Any, method: String, value: Int) {
+        instance.javaClass.getMethod(method, Int::class.javaPrimitiveType).invoke(instance, value)
+    }
+
+    private fun setFloat(instance: Any, method: String, value: Float) {
+        instance.javaClass.getMethod(method, Float::class.javaPrimitiveType).invoke(instance, value)
+    }
+
     private fun classExists(name: String) = runCatching { Class.forName(name, false, javaClass.classLoader) }.isSuccess
 
+    const val MOTION_BLUR_UNSET = -1
+    const val MOTION_BLUR_DISABLED = 0
+    const val MOTION_BLUR_PERFORMANCE = 1
+    const val MOTION_BLUR_QUALITY = 2
+
+    private const val UNITY_BLUR_TYPE = 1  // blurType dropdown 0 Phosphor 1 Unity 2 Hybrid
+    private const val HYBRID_BLUR_TYPE = 2
+    private const val PERFORMANCE_SAMPLES = 8f // motionBlurSamples slider range 4..32
+    private const val QUALITY_SAMPLES = 16f
     private const val POLYSPRINT_CONFIG = "org.polyfrost.polysprint.client.PolySprintConfig"
     private const val POLYBLUR_CONFIG = "org.polyfrost.polyblur.client.PolyBlurConfig"
 }

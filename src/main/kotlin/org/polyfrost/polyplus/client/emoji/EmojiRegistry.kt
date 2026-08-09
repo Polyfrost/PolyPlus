@@ -63,7 +63,7 @@ object EmojiRegistry {
         }
         return runCatching {
             stream.bufferedReader().use { JSON.decodeFromString<Map<String, String>>(it.readText()) }
-        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }.getOrDefault(emptyMap())
+        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it) }.getOrDefault(emptyMap())
     }
 
     @JvmStatic
@@ -95,8 +95,8 @@ object EmojiRegistry {
     fun enabled(): Boolean = PolyPlusConfig.showChatEmoji
 
     @JvmStatic
-    fun transformForViewer(component: Component): Component =
-        if (!enabled()) component else transform(component)
+    fun transformForViewer(component: Component?): Component? =
+        if (component == null || !enabled()) component else transform(component)
 
     fun transform(component: Component): Component {
         val contents = component.contents
@@ -126,7 +126,7 @@ object EmojiRegistry {
         contents: TranslatableContents,
         style: Style,
     ): MutableComponent? {
-        val args = contents.args
+        val args: Array<out Any?> = contents.args
         var changed = false
         val newArgs = arrayOfNulls<Any>(args.size)
         for (i in args.indices) {

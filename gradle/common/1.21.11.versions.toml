@@ -1,8 +1,0 @@
-[versions]
-minecraft = "1.21.11"
-parchment = "2025.12.20"
-sodium = "mc1.21.11-0.8.13-fabric"
-
-[libraries]
-parchment = { module = "org.parchmentmc.data:parchment-1.21.11", version.ref = "parchment" }
-sodium = { module = "maven.modrinth:sodium", version.ref = "sodium" }

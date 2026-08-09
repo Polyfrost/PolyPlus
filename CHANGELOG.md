@@ -1,2 +1,2 @@
-## 1.1.16
-- Fix aura cosmetics being visually stuck
+## 1.1.22
+- Filtered out more useless watchdog crash reports

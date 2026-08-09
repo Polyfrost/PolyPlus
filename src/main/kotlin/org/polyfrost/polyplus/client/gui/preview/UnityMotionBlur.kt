@@ -20,7 +20,6 @@ object UnityMotionBlur {
 
     private const val SAMPLE_LIMIT = 32
 
-    /** A still camera: no smear, PolyBlur's resting sample count. */
     val NONE = Motion(Offset.Zero, MIN_SAMPLES)
 
     private val effect: RuntimeEffect? by lazy {

@@ -21,8 +21,10 @@
     ],
     "depends": {
         "minecraft": "${minor_mc_version}",
+        "fabric-api": "*",
         "fabricloader": ">=0.16.0",
         "java": ">=21",
-        "oneconfigv1": ">=1.0.14"
+        "fabric-language-kotlin": ">=1.13.8",
+        "oneconfigv1": ">=1.1.2"
     }
 }

@@ -4,7 +4,7 @@ package org.polyfrost.polyplus.mixin.client;
 import com.mojang.blaze3d.platform.FramerateLimitTracker;
 //?}
 import net.minecraft.client.Minecraft;
-import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,7 +32,7 @@ public class Mixin_MainMenuFpsLimit {
         Object screen = Minecraft.getInstance().screen;
         //?}
         if (screen instanceof PolyPlusMainMenuScreen) {
-            cir.setReturnValue(PolyPlusConfig.activeMainMenuFpsLimit());
+            cir.setReturnValue(PolyPlusMainMenuConfig.activeMainMenuFpsLimit());
         }
     }
 }

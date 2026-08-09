@@ -18,6 +18,8 @@ import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.gui.MenuPanorama
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen
 import org.polyfrost.polyplus.client.gui.mainMenuPanoramaEnabled
@@ -83,8 +85,12 @@ object CustomPanorama {
     private var overlayReady = false
 
     @JvmStatic
+    fun isAvailable(): Boolean = PACK != null
+
+    @JvmStatic
     fun initialize() {
         val pack = PACK ?: return
+        if (!PolyPlusMainMenuConfig.customPanorama) return
         if (cubeMapReady) return
         if (!started.compareAndSet(false, true)) return
 
@@ -107,6 +113,7 @@ object CustomPanorama {
         if (overlayReady && shouldApply()) OVERLAY_ID else original
 
     private fun shouldApply(): Boolean {
+        if (!PolyPlusMainMenuConfig.customPanorama) return false
         val screen =
             //? if >= 26.2 {
             /*Minecraft.getInstance().gui.screen()
@@ -116,7 +123,7 @@ object CustomPanorama {
         return when (screen) {
             is PolyPlusMainMenuScreen -> mainMenuPanoramaEnabled()
             is PolyPlusOnboardingScreen -> true
-            else -> false
+            else -> MenuPanorama.menusActive() && mainMenuPanoramaEnabled()
         }
     }
 
@@ -163,19 +170,38 @@ object CustomPanorama {
     }
 
     private fun register(dir: Path) {
-        ClientPlatform.runOnMainSync {
-            val textureManager = Minecraft.getInstance().textureManager
-            textureManager.registerAndLoad(CUBE_MAP_ID, DiskCubeMapTexture(CUBE_MAP_ID, dir))
-            cubeMapReady = true
+        val loaded = ClientPlatform.runOnMainSync {
+            runCatching {
+                val textureManager = Minecraft.getInstance().textureManager
+                textureManager.registerAndLoad(CUBE_MAP_ID, DiskCubeMapTexture(CUBE_MAP_ID, dir))
+                cubeMapReady = true
 
-            val overlay = dir.resolve(OVERLAY_FILE)
-            if (Files.isRegularFile(overlay)) {
-                val image = Files.newInputStream(overlay).use(NativeImage::read)
-                textureManager.register(OVERLAY_ID, DynamicTexture({ OVERLAY_ID.toString() }, image))
-                overlayReady = true
-            }
+                val overlay = dir.resolve(OVERLAY_FILE)
+                if (Files.isRegularFile(overlay)) {
+                    val image = Files.newInputStream(overlay).use(NativeImage::read)
+                    textureManager.register(OVERLAY_ID, DynamicTexture({ OVERLAY_ID.toString() }, image))
+                    overlayReady = true
+                }
+            }.onFailure {
+                LOGGER.warn("Discarding unusable main menu panorama pack at {}", dir, it)
+            }.isSuccess
+        }
+
+        if (!loaded) {
+            cubeMapReady = false
+            overlayReady = false
+            purge(dir)
+            started.set(false)
+            return
         }
         LOGGER.info("Custom main menu panorama loaded from {}", dir)
+    }
+
+    private fun purge(dir: Path) {
+        runCatching {
+            for (face in 0 until FACES) Files.deleteIfExists(dir.resolve(faceName(face)))
+            Files.deleteIfExists(dir.resolve(OVERLAY_FILE))
+        }
     }
 
     private fun sha1Hex(bytes: ByteArray): String =

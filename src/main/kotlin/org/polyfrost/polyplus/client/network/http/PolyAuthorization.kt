@@ -113,7 +113,6 @@ object PolyAuthorization {
             )
         } catch (e: Exception) {
             LOGGER.error("Failed to authenticate with Mojang", e)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(e)
         }
     }
 }

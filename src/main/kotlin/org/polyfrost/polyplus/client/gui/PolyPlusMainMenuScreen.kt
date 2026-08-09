@@ -115,6 +115,7 @@ import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -183,13 +184,9 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     //? if <26.1 {
     /*override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        if (mainMenuPanoramaEnabled()) return
-        super.renderBackground(ctx, mouseX, mouseY, tickDelta)
     }
     *///?} else {
     override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        if (mainMenuPanoramaEnabled()) return
-        super.extractBackground(ctx, mouseX, mouseY, tickDelta)
     }
     //?}
 
@@ -245,7 +242,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         mc.setScreen(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this))
                         //?}
                     },
-                    realms = if (PolyPlusConfig.realmsSupported() && !PolyPlusConfig.hideMainMenuRealms) {
+                    realms = if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
                         {
                             //? if >= 26.2 {
                             /*mc.gui.setScreen(com.mojang.realmsclient.RealmsMainScreen(this))
@@ -424,7 +421,7 @@ private fun buildFace(skin: java.awt.image.BufferedImage): ImageBitmap {
             out[i] = argb.toByte()               // B
             out[i + 1] = (argb ushr 8).toByte()  // G
             out[i + 2] = (argb ushr 16).toByte() // R
-            out[i + 3] = 0xFF.toByte()           // A (face is opaque)
+            out[i + 3] = 0xFF.toByte()           // A
         }
     }
     return SkiaImage.makeRaster(org.jetbrains.skia.ImageInfo.makeN32Premul(size, size), out, size * 4)
@@ -497,7 +494,7 @@ private val Outfit: FontFamily by lazy {
 }
 
 internal fun mainMenuPanoramaEnabled(): Boolean {
-    return PolyPlusConfig.mainMenuBackground == MainMenuBackground.PANORAMA
+    return PolyPlusMainMenuConfig.mainMenuBackground == MainMenuBackground.PANORAMA
 }
 
 internal const val REFERENCE_GUI_SCALE = 2f
@@ -550,7 +547,7 @@ private fun MainMenu(
                         assetsReady,
                     )
                 }
-                if (!PolyPlusConfig.hideMainMenuQuickplay) {
+                if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
                     LeftColumn(
                         Modifier
                             .align(Alignment.CenterStart)
@@ -576,7 +573,7 @@ private fun MainMenu(
                     actions,
                     assetsReady,
                 )
-                if (!PolyPlusConfig.hideMainMenuModButtons) {
+                if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
                     ModIntegrationBar(
                         Modifier
                             .align(Alignment.BottomCenter)
@@ -682,7 +679,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (!PolyPlusConfig.hideMainMenuPlayerPreview) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuPlayerPreview) {
         val hasHeadCosmetic = org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
             .localEquipped().equipped
             .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
@@ -707,13 +704,13 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
             }
         }
         }
-        if (!PolyPlusConfig.hideMainMenuAltManager) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
             AccountPill(name = playerName(), assetsReady = assetsReady)
         }
-        if (!PolyPlusConfig.hideMainMenuHostWorld) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld) {
             HostWorldButton(assetsReady, screen)
         }
-        if (!PolyPlusConfig.hideMainMenuSocial) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuSocial) {
             PillButton(
                 "Social",
                 ASSETS + "message-chat-circle.svg",
@@ -722,7 +719,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
                 onClick = { SocialOverlay.open(screen) },
             )
         }
-        if (!PolyPlusConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
             PillButton(
                 "Cosmetics",
                 ASSETS + "diamond-01.svg",

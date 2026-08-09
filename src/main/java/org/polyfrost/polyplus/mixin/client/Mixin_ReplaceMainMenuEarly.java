@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
+import org.polyfrost.polyplus.client.features.OnboardingFeatures;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
@@ -21,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class Mixin_ReplaceMainMenuEarly {
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void polyplus$replaceMainMenuEarly(Screen screen, CallbackInfo ci) {
-        if (PolyPlusConfig.getUseVanillaMainMenu()) {
+        if (PolyPlusMainMenuConfig.getUseVanillaMainMenu()) {
             return;
         }
         //? if >= 26.2 {
@@ -48,6 +50,8 @@ public class Mixin_ReplaceMainMenuEarly {
 
     @Unique
     private static boolean polyplus$needsOnboarding() {
-        return !PolyPlusConfig.getOnboardingCompleted() || PrivacyConsent.needsPrompt();
+        return !PolyPlusConfig.getOnboardingCompleted()
+                || PrivacyConsent.needsPrompt()
+                || OnboardingFeatures.needsMotionBlurChoice();
     }
 }

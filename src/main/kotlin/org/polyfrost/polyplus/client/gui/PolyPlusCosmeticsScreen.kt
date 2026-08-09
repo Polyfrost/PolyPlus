@@ -9,6 +9,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -76,16 +80,22 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -197,7 +207,9 @@ private data class CartEntry(
     val stripePriceId: String?,
     val coverAssetId: Int? = null,
 ) {
-    val discounted: Boolean get() = (discountRate ?: 0) > 0
+    val free: Boolean get() = (finalPrice ?: 0f) <= 0f
+
+    val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 }
 
 private fun BundleInfo.toCartEntry(): CartEntry =
@@ -261,9 +273,7 @@ private data class CosmeticUiItem(
     val collection: String,
     val owned: Boolean,
     val equipped: Boolean,
-    /** User-facing variants (slim/wide model axis collapsed away). >= 1 entry. */
     val variants: List<CosmeticVariantUi>,
-    /** Which variant id is currently equipped for this group, if any. */
     val equippedVariantId: Int?,
 ) {
     val id: Int get() = groupId
@@ -305,8 +315,6 @@ private fun PolyPlusCosmeticsScreen() {
     val ownedIds = remember(refreshKey) { CosmeticCatalog.ownedIds() }
     var selectedId by remember { mutableStateOf<Int?>(null) }
     val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
-    // User's chosen variant per group (groupId -> variantId). Falls back to the
-    // equipped/first variant via selectedVariantId().
     val variantPicks = remember { mutableStateMapOf<Int, Int>() }
     var auraColor by remember { mutableStateOf(CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())) }
     LaunchedEffect(refreshKey) {
@@ -532,8 +540,6 @@ private fun Toolbar(
         Spacer(Modifier.width(8.dp))
         TabButton("Store", activeTab == PolyPlusTab.Store, onStore)
         Spacer(Modifier.width(8.dp))
-        // TabButton("Bundles", activeTab == PolyPlusTab.Bundles, onBundles)
-        // Spacer(Modifier.width(8.dp))
         TabButton("History", activeTab == PolyPlusTab.History, onHistory)
         Spacer(Modifier.weight(1f))
         SmallButton("Refresh", iconPath = "refresh", primary = false, onClick = onRefresh)
@@ -882,8 +888,8 @@ private fun CosmeticCard(
             .clickable(onClick = activate),
     ) {
         CosmeticThumbnail(item, Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        GuiText(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
+        CardLabel(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
 
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
@@ -950,7 +956,7 @@ private fun BundleCard(
             .clickable(onClick = onSelect),
     ) {
         CheckerThumbnail(Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(bundle.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(bundle.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically) {
             PriceLabel(bundle)
         }
@@ -986,6 +992,7 @@ private fun BundleCard(
 private fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
     when {
         finalPrice == null -> GuiText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
+        finalPrice <= 0f -> GuiText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         discounted && basePrice != null -> {
             GuiText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
             Spacer(Modifier.width(4.dp))
@@ -1318,11 +1325,6 @@ private fun AuraDot(
     }
 }
 
-/**
- * Chips for selecting which variant of a grouped cosmetic to equip. The chosen
- * variant is what the Equip button acts on (the client then auto-resolves the
- * slim/wide model to the player's skin).
- */
 @Composable
 private fun VariantPicker(
     variants: List<CosmeticVariantUi>,
@@ -1364,18 +1366,18 @@ private val VARIANT_WHEEL_STEP = 48.dp
 private val VARIANT_ARROW_STEP = 96.dp
 
 private val AURA_COLORS: List<Int> = listOf(
-    0xFFFF4444.toInt(), // red
-    0xFFFF9E3D.toInt(), // orange
-    0xFFF4D03F.toInt(), // yellow
-    0xFF2ECC71.toInt(), // green
-    0xFF1ABC9C.toInt(), // teal
-    0xFF3DA5FF.toInt(), // blue
-    0xFF6C5CE7.toInt(), // indigo
-    0xFFB05CFF.toInt(), // purple
-    0xFFFF6FD8.toInt(), // pink
-    0xFFFFFFFF.toInt(), // white
-    0xFF3A3F43.toInt(), // dark
-    0xFF9BA2A6.toInt(), // gray
+    0xFFFF4444.toInt(),
+    0xFFFF9E3D.toInt(),
+    0xFFF4D03F.toInt(),
+    0xFF2ECC71.toInt(),
+    0xFF1ABC9C.toInt(),
+    0xFF3DA5FF.toInt(),
+    0xFF6C5CE7.toInt(),
+    0xFFB05CFF.toInt(),
+    0xFFFF6FD8.toInt(),
+    0xFFFFFFFF.toInt(),
+    0xFF3A3F43.toInt(),
+    0xFF9BA2A6.toInt(),
 )
 
 private const val DEFAULT_AURA_ARGB: Int = -1
@@ -1726,7 +1728,7 @@ private fun CartPanel(
         if (discount > 0f) {
             RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
         }
-        RowTotals("Total", money(total), Color.White, large = true)
+        RowTotals("Total", if (total <= 0f) "FREE" else money(total), Color.White, large = true)
         if (status != null) {
             GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
@@ -2137,7 +2139,6 @@ private fun StoreCard(
 
     Box(
         modifier = Modifier.size(180.dp, 258.dp)
-            // Owned listings stay legible but read as already-handled.
             .alpha(if (owned) 0.6f else 1f)
             .clip(ppShape(12.dp))
             .background(cardBrush())
@@ -2145,7 +2146,7 @@ private fun StoreCard(
             .clickable(onClick = onSelect),
     ) {
         StoreThumbnail(info, variant.id, Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PriceLabel(info)
             if (variantCount > 1) {
@@ -2580,6 +2581,9 @@ private fun GuiText(
     fontWeight: FontWeight = FontWeight.Normal,
     textAlign: TextAlign = TextAlign.Start,
     textDecoration: TextDecoration? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     BasicText(
         text = text,
@@ -2592,7 +2596,72 @@ private fun GuiText(
             textAlign = textAlign,
             textDecoration = textDecoration,
         ),
+        maxLines = maxLines,
+        overflow = overflow,
+        onTextLayout = onTextLayout,
     )
+}
+
+@Composable
+private fun CardLabel(
+    text: String,
+    color: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    fontWeight: FontWeight = FontWeight.Normal,
+) {
+    var truncated by remember(text) { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+
+    Box(modifier.hoverable(interaction)) {
+        GuiText(
+            text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { truncated = it.hasVisualOverflow },
+        )
+        if (truncated && hovered) {
+            TooltipPopup(text)
+        }
+    }
+}
+
+@Composable
+private fun TooltipPopup(text: String) {
+    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
+    val positionProvider = remember(gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                val above = anchorBounds.top - gap - popupContentSize.height
+                val y = if (above >= 0) above else anchorBounds.bottom + gap
+                return IntOffset(x, y)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        Box(
+            modifier = Modifier.widthIn(max = 240.dp)
+                .clip(ppShape(6.dp))
+                .background(LocalTheme.current.popupBackground)
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            GuiText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
+        }
+    }
 }
 
 @Composable

@@ -4,7 +4,6 @@ plugins {
 
 stonecutter active "26.1-fabric"
 
-// Used to preprocess mixin json file
 stonecutter handlers {
     inherit("json5", "json")
 }

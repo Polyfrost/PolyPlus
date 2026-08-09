@@ -50,10 +50,8 @@ internal object AttachedCosmeticParser {
                     return null
                 }
 
-                // A model exported straight from Blockbench usually doesn't parent
-                // its bones to a player bone, so it would have nothing to attach to.
-                // Auto-attach it to the slot's natural body part (wings -> body,
-                // hat -> head, ...) so uploads just work without hand-editing.
+                // Blockbench exports rarely parent bones to a player bone so fall back to the
+                // slot's natural body part and let uploads work unedited
                 val geometry = applyAutoMirror(
                     reconcileTextureSize(
                         ensureAttached(parsed, slot, anchor),
@@ -78,7 +76,6 @@ internal object AttachedCosmeticParser {
             }
         } catch (ex: Exception) {
             logger.error("Failed to load attached cosmetic {}", cosmeticId, ex)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(ex)
             null
         }
     }

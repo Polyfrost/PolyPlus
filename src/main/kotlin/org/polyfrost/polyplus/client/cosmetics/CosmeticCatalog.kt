@@ -102,14 +102,14 @@ object CosmeticCatalog {
             PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics") {
                 expectSuccess = true
             }.bodyOrThrow<CosmeticList>()
-        }.onFailure { LOGGER.error("Failed to fetch cosmetic catalog", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+        }.onFailure { reportCatalogFailure(it) }
             .getOrElse {
                 CosmeticLoadProgress.fail(it.message ?: it::class.java.simpleName)
                 return
             }
         CosmeticLoadProgress.onCatalogFetched()
 
-        // Drop groups whose type this client version doesn't recognize
+        // Drop groups whose type this client version does not recognize
         val knownGroups = cosmetics.contents.filter { it.type != CosmeticType.Unknown }
         val skipped = cosmetics.contents.size - knownGroups.size
         if (skipped > 0) {
@@ -144,10 +144,33 @@ object CosmeticCatalog {
 
     }
 
+    internal fun isRuntimeMismatch(error: Throwable): Boolean {
+        var cause: Throwable? = error
+        while (cause != null) {
+            if (cause is LinkageError) return true
+            val next = cause.cause
+            if (next === cause) break
+            cause = next
+        }
+        return false
+    }
+
+    private fun reportCatalogFailure(error: Throwable) {
+        if (isRuntimeMismatch(error)) {
+            LOGGER.error(
+                "Failed to decode the cosmetic catalog: the kotlinx-serialization runtime on the " +
+                    "classpath is older than PolyPlus needs. Update fabric-language-kotlin.",
+                error,
+            )
+            return
+        }
+        LOGGER.error("Failed to fetch cosmetic catalog", error)
+    }
+
     suspend fun refreshPlayer() {
         val player = PolyPlusClient.HTTP
             .getBodyAuthorized<PlayerCosmetics>("${PolyPlusConfig.apiUrl}/cosmetics/player")
-            .onFailure { LOGGER.error("Failed to fetch player cosmetics", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+            .onFailure { LOGGER.error("Failed to fetch player cosmetics", it) }
             .getOrNull() ?: return
 
         val ownedGroups = player.owned.filter { it.type != CosmeticType.Unknown }
@@ -191,12 +214,12 @@ object CosmeticCatalog {
         PolyPlusClient.SCOPE.launch {
             try {
                 runCatching { CosmeticAssetCache.preloadDefinitions(equipped, trackProgress = true) }
-                    .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                    .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it) }
             } finally {
                 CosmeticLoadProgress.onAssetsComplete(assetsToken)
             }
             runCatching { CosmeticAssetCache.preloadDefinitions(rest) }
-                .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it) }
         }
         //?}
     }
@@ -209,7 +232,6 @@ object CosmeticCatalog {
         Unit
     }.onFailure {
         LOGGER.error("Failed to set equipped cosmetics", it)
-        org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
     }
 
     fun applyRemoteActive(uuid: UUID, cosmeticIds: List<Int>) {
@@ -248,10 +270,7 @@ object CosmeticCatalog {
         polyPlusUsers.remove(uuid)
     }
 
-    /**
-     * Cosmetic groups for the picker UI: one entry per buyable cosmetic
-     * Emotes are excluded (they have their own list)
-     */
+    // One entry per buyable cosmetic emotes are excluded and have their own list
     fun cosmeticGroupViews(): List<CosmeticGroupView> =
         groupMeta.values.mapNotNull { meta ->
             val variants = meta.variantIds.mapNotNull { cosmeticDefinitions[it] }
@@ -267,10 +286,7 @@ object CosmeticCatalog {
             group.groupId == id || group.variants.any { it.id == id }
         }
 
-    /**
-     * The user-facing variants of a group (label -> representative variant id),
-     * in backend order, with the slim/wide model axis collapsed away.
-     */
+    // Label to representative variant id in backend order with the slim/wide axis collapsed away
     fun userFacingVariants(group: CosmeticGroupView): List<Pair<String, Int>> {
         val byLabel = LinkedHashMap<String, Int>()
         for (variant in group.variants) {
@@ -284,9 +300,6 @@ object CosmeticCatalog {
             .filter { group -> group.variants.any { it.id in ownedCosmeticIds } }
             .map { it.groupId }
 
-    /**
-     * Resolves the variant id to actually equip for a user-facing choice
-     */
     fun resolveVariantForSkin(variantId: Int, slim: Boolean): Int {
         val definition = cosmeticDefinitions[variantId] ?: return variantId
         if (definition.model == null) return variantId
