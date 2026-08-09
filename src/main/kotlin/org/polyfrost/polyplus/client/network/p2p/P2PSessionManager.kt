@@ -63,7 +63,7 @@ object P2PSessionManager : EarlyInitializable {
         this.bridge = bridge
         EosP2PChannel.Holder.bridge = bridge
 
-        bridge.setRelayControl(allowRelays = true)
+        bridge.setRelayControl(forceRelays = true)
         bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
@@ -118,14 +118,23 @@ object P2PSessionManager : EarlyInitializable {
 
     fun socketFor(sessionId: String): EosP2PSocketId = EosP2PSocketId(sessionId.replace("-", "").take(32))
 
-    suspend fun beginHostingSession(): Result<SessionResponse> {
+    fun setPrivateRelay(enabled: Boolean) {
+        bridge?.setRelayControl(forceRelays = enabled)
+    }
+
+    suspend fun beginHostingSession(privateRelay: Boolean = true): Result<SessionResponse> {
         val bridge = this.bridge ?: return Result.failure(IllegalStateException("P2P transport is not installed"))
         val localUser = bridge.localUser
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
 
+        setPrivateRelay(privateRelay)
+
         return SessionsApi.create().onSuccess { session ->
             _currentSessionId.value = session.id
-            P2PListenContext.setPendingListen(socketFor(session.id), localUser)
+            val socket = socketFor(session.id)
+            P2PListenContext.setPendingListen(socket, localUser)
+            SessionsApi.updateEosSessionId(session.id, socket.name)
+                .onFailure { LOGGER.error("Failed to record EOS session id for session {}", session.id, it) }
         }
     }
 

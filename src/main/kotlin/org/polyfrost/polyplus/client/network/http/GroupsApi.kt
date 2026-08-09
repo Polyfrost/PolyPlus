@@ -62,4 +62,7 @@ object GroupsApi {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/read/$messageId")
         Unit
     }
+
+    suspend fun claim(groupId: Int): Result<GroupSummary> =
+        PolyPlusClient.HTTP.postBodyAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/claim")
 }

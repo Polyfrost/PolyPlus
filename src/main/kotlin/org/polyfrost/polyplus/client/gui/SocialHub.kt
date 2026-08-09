@@ -51,6 +51,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.client.social.SocialOverlay
 
 @Composable
 fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
@@ -79,6 +80,13 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     val visibleGroups = remember(groups, searchQuery, names) {
         if (searchQuery.isBlank()) groups
         else groups.filter { rawConversationTitle(it, selfId, names).contains(searchQuery, ignoreCase = true) }
+    }
+
+    LaunchedEffect(Unit) {
+        if (SocialOverlay.consumeAutoHostCurrentWorld()) {
+            hostingCurrentWorld = true
+            hostFlow = HostFlowStep.SelectWorld
+        }
     }
 
     fun openConversation(groupId: Int) {
@@ -402,8 +410,8 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
                                 SocialText(PlayerNamesRepository.displayName(invite.sender), fontSize = 13.sp, modifier = Modifier.weight(1f))
                                 SocialIconButton(SOCIAL_ASSETS + "x-close.svg", tooltip = "Decline", onClick = { SessionsRepository.decline(invite) })
                                 SocialIconButton(
-                                    SOCIAL_ASSETS + "check-circle.svg",
-                                    tint = SocialSuccessColor,
+                                    SOCIAL_ASSETS + "check.svg",
+                                    tint = Color.White,
                                     tooltip = "Join",
                                     onClick = { open = false; SessionsRepository.accept(invite) },
                                 )

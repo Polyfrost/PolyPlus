@@ -64,6 +64,14 @@ internal fun ConversationView(
 ) {
     val title = renameOverrides[group.id] ?: conversationDisplayTitle(group, selfId)
     val relevantInvites = incomingInvites.filter { it.sender in group.members }
+    val specialStatus by SpecialChatRepository.status.collectAsState()
+    val isSpecialGroup = specialStatus?.groupId == group.id
+    val canConvertToNormal = isSpecialGroup && specialStatus?.isSpecialChatTarget == true
+
+    val latestMessageId = messages.lastOrNull()?.id
+    LaunchedEffect(group.id, latestMessageId) {
+        if (latestMessageId != null) GroupsRepository.markRead(group.id, latestMessageId)
+    }
 
     Column(Modifier.fillMaxSize()) {
         ConversationHeader(
@@ -71,6 +79,7 @@ internal fun ConversationView(
             title = title,
             selfId = selfId,
             muted = group.id in mutedGroups,
+            canConvertToNormal = canConvertToNormal,
             onToggleMute = { onToggleMute(group.id) },
             onRename = { onRename(group.id, it) },
             onInvite = onInviteToGroup,
@@ -85,13 +94,12 @@ internal fun ConversationView(
                     SocialErrors.emit("Invited the group to your session")
                 }
             },
+            onConvertToNormal = { GroupsRepository.claimSpecialChatGroup(group.id) },
         )
         Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
         relevantInvites.forEach { invite -> WorldInviteBanner(invite) }
         MessageTimeline(Modifier.weight(1f), messages, selfId, group.id)
 
-        val specialStatus by SpecialChatRepository.status.collectAsState()
-        val isSpecialGroup = specialStatus?.groupId == group.id
         val cooldownRemaining = (if (isSpecialGroup) specialStatus?.cooldownUntil else null)
             ?.let { rememberCooldownRemaining(it) } ?: 0L
         MessageComposer(
@@ -160,11 +168,13 @@ private fun ConversationHeader(
     title: String,
     selfId: String,
     muted: Boolean,
+    canConvertToNormal: Boolean,
     onToggleMute: () -> Unit,
     onRename: (String) -> Unit,
     onInvite: () -> Unit,
     onLeave: () -> Unit,
     onInviteToSession: () -> Unit,
+    onConvertToNormal: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
@@ -214,7 +224,9 @@ private fun ConversationHeader(
                             onRename = { menuOpen = false; renameValue = title; renaming = true },
                             onMute = { menuOpen = false; onToggleMute() },
                             onLeave = { menuOpen = false; onLeave() },
+                            onConvertToNormal = { menuOpen = false; onConvertToNormal() },
                             muted = muted,
+                            canConvertToNormal = canConvertToNormal,
                         )
                     }
                 }
@@ -230,7 +242,9 @@ private fun GroupOverflowMenu(
     onRename: () -> Unit,
     onMute: () -> Unit,
     onLeave: () -> Unit,
+    onConvertToNormal: () -> Unit,
     muted: Boolean,
+    canConvertToNormal: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -245,6 +259,9 @@ private fun GroupOverflowMenu(
         OverflowMenuItem(SOCIAL_ASSETS + "log-in-04.svg", "Invite Group to Session", onClick = onInviteToSession)
         OverflowMenuItem(SOCIAL_ASSETS + "edit-02.svg", "Rename Group", onClick = onRename)
         OverflowMenuItem(SOCIAL_ASSETS + "volume-x.svg", if (muted) "Unmute Group" else "Mute Group", onClick = onMute)
+        if (canConvertToNormal) {
+            OverflowMenuItem(SOCIAL_ASSETS + "check.svg", "Convert to Normal Chat", onClick = onConvertToNormal)
+        }
         OverflowMenuItem(SOCIAL_ASSETS + "x-close.svg", "Leave Group", color = SocialDangerColor, onClick = onLeave)
     }
 }

@@ -83,7 +83,8 @@
     *///?}
     //? if < 26.2 {
   ,
-    "client.Mixin_HostWorldButtonLabel"
+    "client.Mixin_HostWorldButtonLabel",
+    "client.Mixin_ReplaceOpenToLan"
     //?}
     //? if >= 1.21.11 {
   ,

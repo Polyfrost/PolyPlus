@@ -133,6 +133,14 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic
     @Switch(
+        title = "Replace Pause Menu LAN Button",
+        description = "Replace the vanilla 'Open to LAN' pause menu button with the PolyPlus Host World flow, for hosting your current world over EOS P2P.",
+        category = "Multiplayer",
+    )
+    var replacePauseLanButton = true
+
+    @JvmStatic
+    @Switch(
         title = "Hide Mod Buttons",
         description = "Hide the row of buttons for supported mods at the bottom of the PolyPlus main menu.",
         category = "Main Menu",
@@ -216,6 +224,16 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
         if (state) {
             SocialOverlay.toggle()
         }
+        true
+    }
+
+    @Keybind(
+        title = "Emote Wheel",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus Emote Wheel",
+    )
+    var emoteWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind.onKeybindState(state)
         true
     }
 

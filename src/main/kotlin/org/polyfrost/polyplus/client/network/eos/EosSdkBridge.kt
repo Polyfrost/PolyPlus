@@ -9,7 +9,7 @@ interface EosSdkBridge {
 
     suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId>
 
-    fun setRelayControl(allowRelays: Boolean)
+    fun setRelayControl(forceRelays: Boolean)
 
     suspend fun queryNatType(): Result<NatType>
 

@@ -125,7 +125,6 @@ class EosSdkBridgeImpl : EosSdkBridge {
         if (!hooksInstalled.compareAndSet(false, true)) return
         val p2p = requireNotNull(platform).p2p
 
-        p2p.setRelayControl(EosRelayControl.AllowRelays)
         p2p.setPacketQueueSize(DEFAULT_QUEUE_BYTES, DEFAULT_QUEUE_BYTES)
 
         p2p.addNotifyPeerConnectionRequest(local, null) { info ->
@@ -319,8 +318,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
         resolved
     }
 
-    override fun setRelayControl(allowRelays: Boolean) = post {
-        platform?.p2p?.setRelayControl(if (allowRelays) EosRelayControl.AllowRelays else EosRelayControl.NoRelays)
+    override fun setRelayControl(forceRelays: Boolean) = post {
+        platform?.p2p?.setRelayControl(if (forceRelays) EosRelayControl.ForceRelays else EosRelayControl.AllowRelays)
     }
 
     override suspend fun queryNatType(): Result<EosSdkBridge.NatType> = runCatching {

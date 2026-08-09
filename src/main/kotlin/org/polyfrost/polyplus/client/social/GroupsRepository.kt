@@ -137,6 +137,18 @@ object GroupsRepository : EarlyInitializable {
             .onFailure { LOGGER.error("Failed to mark group $groupId read up to $messageId", it) }
     }
 
+    fun claimSpecialChatGroup(groupId: Int) = PolyPlusClient.SCOPE.launch {
+        GroupsApi.claim(groupId)
+            .onSuccess { summary ->
+                upsertGroup(summary)
+                SpecialChatRepository.refreshTargets()
+            }
+            .onFailure {
+                LOGGER.error("Failed to convert group $groupId into a normal chat", it)
+                SocialErrors.emit("Couldn't convert this chat", it)
+            }
+    }
+
     private fun upsertGroup(summary: GroupSummary) {
         _groups.value = _groups.value.filterNot { it.id == summary.id } + summary
     }

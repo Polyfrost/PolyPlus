@@ -24,7 +24,21 @@ object SocialOverlay {
     private val logger = LogManager.getLogger("polyplus/social-overlay")
     private var previousScreen: Screen? = null
 
+    @Volatile
+    private var pendingAutoHostCurrentWorld = false
+
     fun registerKeybind() {
+    }
+
+    fun openHostCurrentWorld(from: Screen? = currentScreen()) {
+        pendingAutoHostCurrentWorld = true
+        open(from)
+    }
+
+    fun consumeAutoHostCurrentWorld(): Boolean {
+        val was = pendingAutoHostCurrentWorld
+        pendingAutoHostCurrentWorld = false
+        return was
     }
 
     fun toggle() {

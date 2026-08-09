@@ -49,7 +49,11 @@ object HostWorldManager {
         val compat: Compat,
     )
 
-    private data class PendingHost(val gameMode: GameType, val allowCheats: Boolean)
+    private data class PendingHost(
+        val gameMode: GameType,
+        val allowCheats: Boolean,
+        val onPublished: () -> Unit = {},
+    )
 
     @Volatile
     private var pending: PendingHost? = null
@@ -112,13 +116,14 @@ object HostWorldManager {
         entry: HostWorldEntry,
         gameMode: GameType,
         allowCheats: Boolean,
+        privateRelay: Boolean = true,
         onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
     ) {
         val mc = Minecraft.getInstance()
 
-        org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
-            val result = org.polyfrost.polyplus.client.network.p2p.P2PSessionManager.beginHostingSession()
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession(privateRelay)
             result.onFailure {
                 LOGGER.error("Failed to create a P2P hosting session", it)
                 onFailure(it)
@@ -126,9 +131,8 @@ object HostWorldManager {
             val session = result.getOrNull() ?: return@launch
 
             mc.execute {
-                pending = PendingHost(gameMode, allowCheats)
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
                 mc.createWorldOpenFlows().openWorld(entry.id) {
-                    pending = null
                     //? if >= 26.2 {
                     /*mc.gui.setScreen(returnScreen)
                     *///?} else {
@@ -136,7 +140,6 @@ object HostWorldManager {
                     //?}
                 }
                 LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
-                onHosted(session.id)
             }
         }
     }
@@ -144,6 +147,7 @@ object HostWorldManager {
     fun hostCurrentWorldViaP2P(
         gameMode: GameType,
         allowCheats: Boolean,
+        privateRelay: Boolean = true,
         onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
     ) {
@@ -154,7 +158,7 @@ object HostWorldManager {
         }
 
         PolyPlusClient.SCOPE.launch {
-            val result = P2PSessionManager.beginHostingSession()
+            val result = P2PSessionManager.beginHostingSession(privateRelay)
             result.onFailure {
                 LOGGER.error("Failed to create a P2P hosting session", it)
                 onFailure(it)
@@ -162,8 +166,7 @@ object HostWorldManager {
             val session = result.getOrNull() ?: return@launch
 
             mc.execute {
-                pending = PendingHost(gameMode, allowCheats)
-                onHosted(session.id)
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
             }
         }
     }
@@ -187,6 +190,7 @@ object HostWorldManager {
         if (mc.connection == null) return
         if (server.isPublished) {
             pending = null
+            request.onPublished()
             return
         }
 
@@ -201,6 +205,7 @@ object HostWorldManager {
 
         if (published) {
             LOGGER.info("Opened world to LAN on port {} (e4mc will relay if installed)", port)
+            request.onPublished()
         } else {
             LOGGER.warn("publishServer returned false — world was not opened to LAN")
         }

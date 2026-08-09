@@ -309,8 +309,8 @@ internal fun InviteToGroupDialog(friends: List<Friend>, onInvite: (String) -> Un
                                 SocialAvatar(friend.player, 30.dp)
                                 SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 SocialIconButton(
-                                    icon = if (done) SOCIAL_ASSETS + "check-circle.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-                                    tint = if (done) SocialSuccessColor else SocialTextPrimary,
+                                    icon = if (done) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
+                                    tint = if (done) Color.White else SocialTextPrimary,
                                     onClick = {
                                         if (!done) {
                                             onInvite(friend.player)
@@ -347,7 +347,7 @@ private fun RequestCard(request: FriendRequest, incoming: Boolean, onAccept: (()
             SocialText(if (incoming) "Incoming request" else "Outgoing request", fontSize = 12.sp, color = SocialTextSecondary)
         }
         if (incoming && onAccept != null) {
-            SocialIconButton(SOCIAL_ASSETS + "check-circle.svg", tint = SocialSuccessColor, tooltip = "Accept", onClick = onAccept)
+            SocialIconButton(SOCIAL_ASSETS + "check.svg", tint = Color.White, tooltip = "Accept", onClick = onAccept)
         }
         SocialIconButton(
             SOCIAL_ASSETS + "x-close.svg",

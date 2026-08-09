@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,7 @@ import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.client.social.SpecialChatRepository
 
 internal sealed class HostFlowStep {
     object SelectWorld : HostFlowStep()
@@ -67,7 +69,7 @@ private class HostFlowState(val hostingCurrent: Boolean) {
     var gameMode by mutableStateOf(GameType.SURVIVAL)
     var difficulty by mutableStateOf(Difficulty.NORMAL)
     var allowCheats by mutableStateOf(false)
-    var shareIp by mutableStateOf(true)
+    var privateRelay by mutableStateOf(true)
     var invitees by mutableStateOf<Set<String>>(emptySet())
     var hostError by mutableStateOf<String?>(null)
     var hosting by mutableStateOf(false)
@@ -279,9 +281,9 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
                 SocialToggle("Allow Cheats", state.allowCheats) { state.allowCheats = !state.allowCheats }
             }
         }
-        FormRow("Share IP") {
+        FormRow("Private Relay") {
             Box(Modifier.width(220.dp)) {
-                SocialToggle("Share IP with friends", state.shareIp) { state.shareIp = !state.shareIp }
+                SocialToggle("Private Relay", state.privateRelay) { state.privateRelay = !state.privateRelay }
             }
         }
 
@@ -317,7 +319,8 @@ private fun InviteFriendsModal(
     val filtered = friends.filter { PlayerNamesRepository.displayName(it.player).contains(query, ignoreCase = true) }
     val online = filtered.filter { it.online }
     val offline = filtered.filter { !it.online }
-    val inviteableGroups = groups.filter { it.kind == GroupKind.Group && it.members.size > 1 }
+    val specialChatGroupId = SpecialChatRepository.status.collectAsState().value?.groupId
+    val inviteableGroups = groups.filter { it.kind == GroupKind.Group && it.members.size > 1 && it.id != specialChatGroupId }
 
     ModalPanel(width = 560.dp, height = 620.dp) {
         SocialText("Invite friends to world", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -372,6 +375,7 @@ private fun InviteFriendsModal(
                             HostWorldManager.hostCurrentWorldViaP2P(
                                 state.gameMode,
                                 state.allowCheats,
+                                state.privateRelay,
                                 onFailure = {
                                     state.hosting = false
                                     state.hostError = "Unable to start hosting: ${it.message}"
@@ -394,6 +398,7 @@ private fun InviteFriendsModal(
                             entry,
                             state.gameMode,
                             state.allowCheats,
+                            state.privateRelay,
                             onFailure = {
                                 state.hosting = false
                                 state.hostError = "Unable to start hosting: ${it.message}"
@@ -404,6 +409,22 @@ private fun InviteFriendsModal(
                         )
                         onHosted()
                     }
+                },
+            )
+        }
+        if (eosStatus == EosStatus.Ready && !state.hosting) {
+            SocialText(
+                "Host on LAN instead",
+                fontSize = 11.sp,
+                color = SocialTextSecondary,
+                modifier = Modifier.clickableWithSound {
+                    if (state.hostingCurrent) {
+                        HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats)
+                    } else {
+                        val entry = state.selected ?: return@clickableWithSound
+                        HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats)
+                    }
+                    onHosted()
                 },
             )
         }
@@ -433,8 +454,8 @@ private fun GroupInviteRow(group: GroupSummary, selfId: String, invitees: Set<St
             SocialText("${members.size} members", fontSize = 11.sp, color = SocialTextSecondary)
         }
         SocialIconButton(
-            icon = if (allInvited) SOCIAL_ASSETS + "check-circle.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-            tint = if (allInvited) SocialSuccessColor else SocialTextPrimary,
+            icon = if (allInvited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
+            tint = if (allInvited) Color.White else SocialTextPrimary,
             background = if (allInvited) Accent.asSocialSelected else null,
             tooltip = if (allInvited) "Everyone invited" else "Invite everyone in this group",
             onClick = { if (!allInvited) onInviteAll(members) },
@@ -452,8 +473,8 @@ private fun FriendInviteRow(friend: Friend, invited: Boolean, onToggle: (Boolean
         SocialAvatar(friend.player, 32.dp)
         SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 14.sp, modifier = Modifier.weight(1f))
         SocialIconButton(
-            icon = if (invited) SOCIAL_ASSETS + "check-circle.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-            tint = if (invited) SocialSuccessColor else SocialTextPrimary,
+            icon = if (invited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
+            tint = if (invited) Color.White else SocialTextPrimary,
             background = if (invited) Accent.asSocialSelected else null,
             tooltip = if (invited) "Invited" else "Invite",
             onClick = { onToggle(!invited) },

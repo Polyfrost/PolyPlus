@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -38,9 +39,16 @@ object PlayerNamesRepository {
 
     @Composable
     fun displayName(uuid: String): String {
-        val names by names.collectAsState()
-        LaunchedEffect(uuid) { resolve(listOf(uuid)) }
-        return names[uuid] ?: shortId(uuid)
+        val resolvedNames by names.collectAsState()
+        LaunchedEffect(uuid) {
+            repeat(5) { attempt ->
+                if (uuid in _names.value) return@LaunchedEffect
+                resolve(listOf(uuid)).join()
+                if (uuid in _names.value) return@LaunchedEffect
+                if (attempt < 4) delay(1500)
+            }
+        }
+        return resolvedNames[uuid] ?: shortId(uuid)
     }
 }
 

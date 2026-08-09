@@ -9,6 +9,11 @@ data class CreateSessionRequest(
 )
 
 @Serializable
+data class UpdateSessionRequest(
+    @SerialName("eos_session_id") val eosSessionId: String,
+)
+
+@Serializable
 data class SessionResponse(
     val id: String,
     @SerialName("eos_session_id") val eosSessionId: String? = null,

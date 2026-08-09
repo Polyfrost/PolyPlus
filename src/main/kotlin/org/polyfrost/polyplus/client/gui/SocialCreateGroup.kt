@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,8 +100,8 @@ internal fun CreateGroupDialog(friends: List<Friend>, onCreate: (name: String, m
                                 SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 13.sp, modifier = Modifier.weight(1f))
                                 if (checked) {
                                     Icon(
-                                        SOCIAL_ASSETS + "check-circle.svg",
-                                        SocialSuccessColor,
+                                        SOCIAL_ASSETS + "check.svg",
+                                        Color.White,
                                         Modifier.height(16.dp).width(16.dp),
                                     )
                                 }
