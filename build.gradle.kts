@@ -206,7 +206,6 @@ loomExt.decompilerOptions.named("vineflower") {
 loomExt.runs.configureEach {
     ideConfigGenerated(true)
     runDir("../../run") // Shares the run directory between versions
-    vmArg("-Dmixin.debug.export=true") // Exports transformed classes for debugging
     vmArg("-Dpolyplus.badge.debug=true")
 }
 loomExt.runs.named("client") {
