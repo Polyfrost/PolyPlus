@@ -34,7 +34,7 @@ public class PlayerTabBadgeMixin {
         Operation<Void> original,
         @Local PlayerInfo info
     ) {
-        if (info != null && PolyPlusBadge.shouldBadge(PolyPlusBadge.tabUuid(info.getProfile()))) {
+        if (info != null && PolyPlusBadge.shouldBadgeTab(info)) {
             PolyPlusBadge.blitTab(graphics, x, y);
             original.call(graphics, font, name, x + PolyPlusBadge.BADGE_ADVANCE, y, color);
         } else {
@@ -57,7 +57,7 @@ public class PlayerTabBadgeMixin {
         @Local PlayerInfo info
     ) {
         int width = original.call(font, text);
-        if (info != null && PolyPlusBadge.shouldBadge(PolyPlusBadge.tabUuid(info.getProfile()))) {
+        if (info != null && PolyPlusBadge.shouldBadgeTab(info)) {
             return width + PolyPlusBadge.BADGE_ADVANCE;
         }
         return width;

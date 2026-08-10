@@ -11,6 +11,8 @@ import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import kotlinx.coroutines.launch
+//? if >= 1.21.1
+import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 //? if >= 1.21.1
@@ -79,6 +81,7 @@ object CosmeticSync : EarlyInitializable {
             unsubscribeAllPlayers()
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
+            PolyPlusBadge.clearTabCache()
             CosmeticAssetCache.reset()
             PetManager.despawnAll()
             //?}

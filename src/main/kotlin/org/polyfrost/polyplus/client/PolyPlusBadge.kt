@@ -8,6 +8,8 @@ import net.minecraft.network.chat.FontDescription
 //?}
 //? if >= 1.21.1 {
 import com.mojang.authlib.GameProfile
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.PlayerInfo
 //?}
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -55,6 +57,49 @@ object PolyPlusBadge {
     }
 
     //? if >= 1.21.1 {
+    // Some servers (e.g. Hypixel SkyBlock) use placeholder profiles with fake
+    // UUIDs in the visible part of the tab list, so we match against the name
+    // as a fallback
+    private val NAME_TOKEN = Regex("[A-Za-z0-9_]{3,16}")
+
+    private val proxiedTabUuids = HashMap<UUID, ProxiedTabEntry>()
+
+    private class ProxiedTabEntry(val displayName: String, val resolved: UUID?)
+
+    @JvmStatic
+    fun shouldBadgeTab(info: PlayerInfo): Boolean {
+        if (!PolyPlusConfig.showPolyPlusIndicator) return false
+        if (DEBUG_FORCE) return true
+        if (CosmeticCatalog.isPolyPlusUser(tabUuid(info.profile))) return true
+        val proxied = resolveProxiedTabUuid(info) ?: return false
+        return CosmeticCatalog.isPolyPlusUser(proxied)
+    }
+
+    fun clearTabCache() {
+        proxiedTabUuids.clear()
+    }
+
+    private fun resolveProxiedTabUuid(info: PlayerInfo): UUID? {
+        val displayName = info.tabListDisplayName?.string ?: return null
+        val id = tabUuid(info.profile)
+        val cached = proxiedTabUuids[id]
+        if (cached != null && cached.displayName == displayName) return cached.resolved
+
+        val resolved = lookUpPlayerListEntry(displayName)
+        proxiedTabUuids[id] = ProxiedTabEntry(displayName, resolved)
+        return resolved
+    }
+
+    private fun lookUpPlayerListEntry(displayName: String): UUID? {
+        val connection = Minecraft.getInstance().connection ?: return null
+        for (token in NAME_TOKEN.findAll(displayName)) {
+            val entry = connection.getPlayerInfo(token.value) ?: continue
+            val id = tabUuid(entry.profile)
+            if (id.version() == 4) return id
+        }
+        return null
+    }
+
     private val BADGE_TEXTURE: Identifier = Identifier.fromNamespaceAndPath("polyplus", "textures/badge.png")
 
     private const val TEX_W = 48
