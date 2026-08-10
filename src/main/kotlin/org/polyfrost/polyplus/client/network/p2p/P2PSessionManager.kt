@@ -40,6 +40,10 @@ object P2PSessionManager : EarlyInitializable {
     private const val INBOUND_QUEUE_BYTES = 16L * 1024 * 1024
     private const val OUTBOUND_QUEUE_BYTES = 16L * 1024 * 1024
 
+    // this is a placeholder IP we hand to MC
+    // it leads to literally nothing
+    const val P2P_PLACEHOLDER_IP = "127.6.6.6"
+
     @Volatile private var bridge: EosSdkBridge? = null
 
     private val _currentSessionId = MutableStateFlow<String?>(null)
@@ -247,10 +251,10 @@ object P2PSessionManager : EarlyInitializable {
         P2PConnectionContext.setPendingJoin(target)
 
         val minecraft = Minecraft.getInstance()
-        val address = ServerAddress.parseString("127.6.6.6:2")
+        val address = ServerAddress.parseString("$P2P_PLACEHOLDER_IP:2")
         val serverData = ServerData(
             "PolyPlus P2P session",
-            "127.6.6.6",
+            P2P_PLACEHOLDER_IP,
             ServerData.Type.OTHER,
         )
 
