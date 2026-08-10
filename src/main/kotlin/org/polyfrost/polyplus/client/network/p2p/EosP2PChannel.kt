@@ -75,6 +75,8 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                 localSocket = (localAddress as? EosP2PAddress)?.socket ?: remoteAddress.socket
                 remoteUser = remoteAddress.user
                 activate()
+                // Explicitly request the connection now
+                bridge.acceptConnection(remoteAddress.socket, remoteAddress.user)
                 promise.setSuccess()
                 pipeline().fireChannelActive()
             } catch (e: Throwable) {

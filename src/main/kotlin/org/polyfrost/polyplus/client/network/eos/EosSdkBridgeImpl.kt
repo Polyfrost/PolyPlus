@@ -100,6 +100,9 @@ class EosSdkBridgeImpl : EosSdkBridge {
         EosLogging.setCallback { msg -> onLog(msg.category, msg.level, msg.message) }
         EosLogging.setLogLevel(EosLogCategory.AllCategories, EosLogLevel.Info)
 
+        EosLogging.setLogLevel(EosLogCategory.P2P, EosLogLevel.VeryVerbose)
+        EosLogging.setLogLevel(EosLogCategory.Messaging, EosLogLevel.VeryVerbose)
+
         val options = EosPlatformOptions.create(
             productId = EosConstants.PRODUCT_ID,
             sandboxId = EosConstants.SANDBOX_ID,
@@ -350,7 +353,16 @@ class EosSdkBridgeImpl : EosSdkBridge {
         data.get(bytes)
 
         post {
-            val local = localUser ?: return@post
+            val local = localUser
+            if (local == null) {
+                logger.warn(
+                    "Dropping outbound packet to {} on '{}': not logged into EOS Connect yet " +
+                        "(this packet is lost, nothing will retry it)",
+                    remote,
+                    socket,
+                )
+                return@post
+            }
             val result = requireNotNull(platform).p2p.sendPacket(
                 localUserId = SdkProductUserId.fromString(local.raw),
                 remoteUserId = SdkProductUserId.fromString(remote.raw),
@@ -378,7 +390,11 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     override fun acceptConnection(socket: EosP2PSocketId, remote: EosProductUserId) = post {
-        val local = localUser ?: return@post
+        val local = localUser
+        if (local == null) {
+            logger.warn("Cannot accept connection from {} on '{}': not logged into EOS Connect yet", remote, socket)
+            return@post
+        }
         platform?.p2p?.acceptConnection(
             SdkProductUserId.fromString(local.raw),
             SdkProductUserId.fromString(remote.raw),
@@ -387,7 +403,11 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     override fun closeConnection(socket: EosP2PSocketId, remote: EosProductUserId?) = post {
-        val local = localUser ?: return@post
+        val local = localUser
+        if (local == null) {
+            logger.warn("Cannot close connection on '{}': not logged into EOS Connect yet", socket)
+            return@post
+        }
         val sdkSocket = SdkSocketId(socket.name)
         val sdkLocal = SdkProductUserId.fromString(local.raw)
         if (remote != null) {

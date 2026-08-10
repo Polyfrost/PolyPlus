@@ -2,13 +2,18 @@ package org.polyfrost.polyplus.client.network.p2p
 
 import io.netty.bootstrap.Bootstrap
 import io.netty.bootstrap.ServerBootstrap
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.TitleScreen
@@ -47,13 +52,17 @@ object P2PSessionManager : EarlyInitializable {
     private val _joinFailures = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val joinFailures = _joinFailures.asSharedFlow()
 
+    private const val AUTH_READY_TIMEOUT_MS = 15_000L
+    private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
+    private const val MAX_JOIN_ATTEMPTS = 3
+
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
 
     override fun earlyInitialize() {
         install(EosSdkBridgeImpl().also { it.initialize() })
 
         SessionsRepository.acceptedInvites
-            .onEach { invite -> handleAcceptedInvite(invite) }
+            .onEach { invite -> PolyPlusClient.SCOPE.launch { handleAcceptedInvite(invite) } }
             .launchIn(PolyPlusClient.SCOPE)
 
         eventHandler<WorldEvent.Unload> { stopHosting() }.register()
@@ -63,7 +72,7 @@ object P2PSessionManager : EarlyInitializable {
         this.bridge = bridge
         EosP2PChannel.Holder.bridge = bridge
 
-        bridge.setRelayControl(forceRelays = true)
+        bridge.setRelayControl(forceRelays = false)
         bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
@@ -122,7 +131,7 @@ object P2PSessionManager : EarlyInitializable {
         bridge?.setRelayControl(forceRelays = enabled)
     }
 
-    suspend fun beginHostingSession(privateRelay: Boolean = true): Result<SessionResponse> {
+    suspend fun beginHostingSession(privateRelay: Boolean = false): Result<SessionResponse> {
         val bridge = this.bridge ?: return Result.failure(IllegalStateException("P2P transport is not installed"))
         val localUser = bridge.localUser
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
@@ -144,11 +153,24 @@ object P2PSessionManager : EarlyInitializable {
         SessionsRepository.close(sessionId)
     }
 
-    private fun handleAcceptedInvite(invite: SessionInvite) {
-        if (this.bridge == null) {
+    private suspend fun handleAcceptedInvite(invite: SessionInvite) {
+        val bridge = this.bridge
+        if (bridge == null) {
             LOGGER.error("Accepted session invite {} but the P2P transport isn't installed", invite.id)
             _joinFailures.tryEmit("Multiplayer services aren't ready yet - try again shortly")
             return
+        }
+
+        if (_status.value != EosStatus.Ready) {
+            LOGGER.info("Waiting for EOS Connect to be ready before joining session {}", invite.sessionId)
+            val ready = withTimeoutOrNull(AUTH_READY_TIMEOUT_MS) {
+                status.filter { it == EosStatus.Ready || it is EosStatus.Failed }.first()
+            }
+            if (ready != EosStatus.Ready) {
+                LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join session {}", invite.sessionId)
+                _joinFailures.tryEmit("Multiplayer services aren't ready yet - try again shortly")
+                return
+            }
         }
 
         val hostPuid = invite.eosProductUserId
@@ -165,7 +187,52 @@ object P2PSessionManager : EarlyInitializable {
         val socket = socketFor(invite.eosSessionId ?: invite.sessionId)
         val target = JoinTarget(EosProductUserId(hostPuid), socket)
         LOGGER.info("Resolved join target for session {}: host={} socket={}", invite.sessionId, hostPuid, socket)
+        attemptJoin(bridge, target, attempt = 1)
+    }
+
+    private suspend fun attemptJoin(bridge: EosSdkBridge, target: JoinTarget, attempt: Int) {
+        bridge.setRelayControl(forceRelays = attempt % 2 == 0)
+
+        val established = AtomicBoolean(false)
+        val handle = bridge.addConnectionStateHandler(target.socket) { event ->
+            if (event.remote != target.host) return@addConnectionStateHandler
+            if (event is EosSdkBridge.ConnectionStateEvent.Established) established.set(true)
+        }
+
+        LOGGER.info(
+            "Join attempt {}/{} for session socket {} (relay={})",
+            attempt,
+            MAX_JOIN_ATTEMPTS,
+            target.socket,
+            if (attempt % 2 == 0) "forced" else "allowed",
+        )
         onJoinTargetResolved(target)
+
+        delay(JOIN_HANDSHAKE_TIMEOUT_MS)
+        bridge.removeNotificationHandler(handle)
+
+        if (established.get()) return
+
+        bridge.closeConnection(target.socket, target.host)
+
+        if (attempt < MAX_JOIN_ATTEMPTS) {
+            LOGGER.warn(
+                "Join attempt {}/{} for session socket {} timed out after {}ms, retrying",
+                attempt,
+                MAX_JOIN_ATTEMPTS,
+                target.socket,
+                JOIN_HANDSHAKE_TIMEOUT_MS,
+            )
+            attemptJoin(bridge, target, attempt + 1)
+        } else {
+            LOGGER.error(
+                "Join attempt {}/{} for session socket {} timed out; giving up",
+                attempt,
+                MAX_JOIN_ATTEMPTS,
+                target.socket,
+            )
+            _joinFailures.tryEmit("Couldn't establish a P2P connection with the host - check your network/firewall and try again")
+        }
     }
 
     var onJoinTargetResolved: (JoinTarget) -> Unit = { target ->
