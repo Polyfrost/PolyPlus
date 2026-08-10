@@ -96,10 +96,10 @@ object HostWorldManager {
         mc.createWorldOpenFlows().openWorld(entry.id) {
             pending = null
             //? if >= 26.2 {
-            /*mc.gui.setScreen(returnScreen)
-            *///?} else {
-            mc.setScreen(returnScreen)
-            //?}
+            mc.gui.setScreen(returnScreen)
+            //?} else {
+            /*mc.setScreen(returnScreen)
+            *///?}
         }
     }
 
@@ -122,10 +122,10 @@ object HostWorldManager {
         val port = HttpUtil.getAvailablePort()
         val published =
             //? if >= 26.2 {
-            /*server.publishServer(net.minecraft.server.MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
-            *///?} else {
-            server.publishServer(request.gameMode, request.allowCheats, port)
-            //?}
+            server.publishServer(net.minecraft.server.MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
+            //?} else {
+            /*server.publishServer(request.gameMode, request.allowCheats, port)
+            *///?}
         pending = null
 
         if (published) {

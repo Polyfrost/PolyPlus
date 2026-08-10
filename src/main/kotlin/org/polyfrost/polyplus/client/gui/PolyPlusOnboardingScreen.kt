@@ -120,12 +120,12 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         MenuBackgroundPass.enqueue(true)
         net.minecraft.client.Minecraft.getInstance().gameRenderer
             //? if >= 26.2 {
-            /*.panorama()
+            .panorama()
             .extractRenderState(ctx, width, height)
-            *///?} else {
-            .getPanorama()
+            //?} else {
+            /*.getPanorama()
             .extractRenderState(ctx, width, height, true)
-            //?}
+            *///?}
         ctx.blurBeforeThisStratum()
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
@@ -187,10 +187,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             }
             val mc = net.minecraft.client.Minecraft.getInstance()
             //? if >= 26.2 {
-            /*mc.gui.setScreen(PolyPlusMainMenuScreen())
-            *///?} else {
-            mc.setScreen(PolyPlusMainMenuScreen())
-            //?}
+            mc.gui.setScreen(PolyPlusMainMenuScreen())
+            //?} else {
+            /*mc.setScreen(PolyPlusMainMenuScreen())
+            *///?}
         }
 
         val waitingForOptimization =

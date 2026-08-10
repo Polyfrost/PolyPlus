@@ -25,10 +25,10 @@ public class Mixin_PanoramaBlurRadius {
     private int polyplus$forcePanoramaBlurRadius(int original) {
         Minecraft mc = Minecraft.getInstance();
         //? if >= 26.2 {
-        /*if (mc.gui.screen() instanceof PolyPlusMainMenuScreen && PolyPlusMainMenuScreenKt.mainMenuPanoramaEnabled()) {
-        *///?} else {
-        if (mc.screen instanceof PolyPlusMainMenuScreen && PolyPlusMainMenuScreenKt.mainMenuPanoramaEnabled()) {
-        //?}
+        if (mc.gui.screen() instanceof PolyPlusMainMenuScreen && PolyPlusMainMenuScreenKt.mainMenuPanoramaEnabled()) {
+        //?} else {
+        /*if (mc.screen instanceof PolyPlusMainMenuScreen && PolyPlusMainMenuScreenKt.mainMenuPanoramaEnabled()) {
+        *///?}
             return POLYPLUS_PANORAMA_BLUR_RADIUS;
         }
         return original;

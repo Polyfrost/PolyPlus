@@ -1,11 +1,11 @@
 //? if < 26.2 {
-package org.polyfrost.polyplus.mixin.client;
+/*package org.polyfrost.polyplus.mixin.client;
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?} else {
-/*import net.minecraft.client.gui.GuiGraphics;
-*///?}
+/^import net.minecraft.client.gui.GuiGraphics;
+^///?}
 
 import net.minecraft.client.gui.components.TabButton;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
@@ -24,12 +24,12 @@ public class Mixin_MenuPanoramaTabButton {
         ci.cancel();
     }
     //?} else {
-    /*@Inject(method = "renderMenuBackground", at = @At("HEAD"), cancellable = true)
+    /^@Inject(method = "renderMenuBackground", at = @At("HEAD"), cancellable = true)
     private void polyplus$keepPanoramaTabBackground(GuiGraphics graphics, int x, int y, int right, int bottom, CallbackInfo ci) {
         if (!MenuPanorama.backdropDrawn()) return;
         graphics.fill(x, y, right, bottom, MenuPanorama.LIST_TINT);
         ci.cancel();
     }
-    *///?}
+    ^///?}
 }
-//?}
+*///?}

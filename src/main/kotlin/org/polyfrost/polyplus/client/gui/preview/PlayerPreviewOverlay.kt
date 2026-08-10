@@ -57,10 +57,10 @@ object PlayerPreviewOverlay {
     private fun currentScreen(): Any? {
         val mc = net.minecraft.client.Minecraft.getInstance() ?: return null
         //? if >= 26.2 {
-        /*return mc.gui?.screen()
-        *///?} else {
-        return mc.screen
-        //?}
+        return mc.gui?.screen()
+        //?} else {
+        /*return mc.screen
+        *///?}
     }
 
     @JvmStatic
@@ -75,10 +75,10 @@ object PlayerPreviewOverlay {
         if (java.lang.Boolean.getBoolean("pp.overlay.off")) return
         val mc = net.minecraft.client.Minecraft.getInstance()
         //? if >= 26.2 {
-        /*val screen = mc?.gui?.screen()
-        *///?} else {
-        val screen = mc?.screen
-        //?}
+        val screen = mc?.gui?.screen()
+        //?} else {
+        /*val screen = mc?.screen
+        *///?}
         if (screen !is org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen) {
             clear()
             return

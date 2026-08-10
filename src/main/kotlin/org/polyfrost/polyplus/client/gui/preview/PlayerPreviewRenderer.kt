@@ -20,8 +20,8 @@ import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
 //? if < 26.2 {
-import com.mojang.blaze3d.vertex.Tesselator
-//?}
+/*import com.mojang.blaze3d.vertex.Tesselator
+*///?}
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines
@@ -298,19 +298,19 @@ object PlayerPreviewRenderer {
         Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f)
     //?}
     //? if >= 26.2 {
-    /*private fun orthoProjection(w: Int, h: Int): net.minecraft.client.renderer.Projection =
+    private fun orthoProjection(w: Int, h: Int): net.minecraft.client.renderer.Projection =
         net.minecraft.client.renderer.Projection().apply { setupOrtho(-1000f, 1000f, w.toFloat(), h.toFloat(), true) }
-    *///?}
+    //?}
 
     private fun ensureTarget(w: Int, h: Int): TextureTarget {
         val existing = target
         if (existing != null && existing.width == w && existing.height == h) return existing
         existing?.destroyBuffers()
         //? if >= 26.2 {
-        /*return TextureTarget("polyplus_player_preview", w, h, true, com.mojang.blaze3d.GpuFormat.RGBA8_UNORM).also { target = it }
-        *///?} else {
-        return TextureTarget("polyplus_player_preview", w, h, true).also { target = it }
-        //?}
+        return TextureTarget("polyplus_player_preview", w, h, true, com.mojang.blaze3d.GpuFormat.RGBA8_UNORM).also { target = it }
+        //?} else {
+        /*return TextureTarget("polyplus_player_preview", w, h, true).also { target = it }
+        *///?}
     }
 
     private fun renderAndReadback(source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
@@ -331,23 +331,23 @@ object PlayerPreviewRenderer {
         val savedFog = RenderSystem.getShaderFog()
 
         //? if >= 26.2 {
-        /*RenderSystem.getDevice().createCommandEncoder()
-            .clearColorAndDepthTextures(colorTex, org.joml.Vector4f(0f, 0f, 0f, 0f), depthTex, 0.0)
-        *///?} else {
         RenderSystem.getDevice().createCommandEncoder()
+            .clearColorAndDepthTextures(colorTex, org.joml.Vector4f(0f, 0f, 0f, 0f), depthTex, 0.0)
+        //?} else {
+        /*RenderSystem.getDevice().createCommandEncoder()
             .clearColorAndDepthTextures(colorTex, 0x00000000, depthTex, 1.0)
-        //?}
+        *///?}
         RenderSystem.backupProjectionMatrix()
         //? if < 26.1 {
         /*RenderSystem.setProjectionMatrix(projection.getBuffer(w.toFloat(), h.toFloat()), ProjectionType.ORTHOGRAPHIC)
         *///?}
         //? if >= 26.2 {
-        /*RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(w, h)), ProjectionType.ORTHOGRAPHIC)
-        *///?} else {
-        //? if >= 26.1 {
+        RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(w, h)), ProjectionType.ORTHOGRAPHIC)
+        //?} else {
+        /*//? if >= 26.1 {
         RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(w, h)), ProjectionType.ORTHOGRAPHIC)
         //?}
-        //?}
+        *///?}
         RenderSystem.outputColorTextureOverride = colorView
         RenderSystem.outputDepthTextureOverride = depthView
         //? if >= 26.1 {
@@ -359,10 +359,10 @@ object PlayerPreviewRenderer {
         /*RenderSystem.disableScissorForRenderTypeDraws()
         *///?}
         //? if >= 26.2 {
-        /*val modelViewStack = RenderSystem.getModelViewStack()
+        val modelViewStack = RenderSystem.getModelViewStack()
         modelViewStack.pushMatrix()
         modelViewStack.identity()
-        *///?}
+        //?}
         try {
             //? if >= 1.21.10 {
             previewCape = capeOverride(source)?.let { ClientAsset.ResourceTexture(it).texturePath() }
@@ -382,8 +382,8 @@ object PlayerPreviewRenderer {
             *///?}
         } finally {
             //? if >= 26.2 {
-            /*RenderSystem.getModelViewStack().popMatrix()
-            *///?}
+            RenderSystem.getModelViewStack().popMatrix()
+            //?}
             RenderSystem.outputColorTextureOverride = null
             RenderSystem.outputDepthTextureOverride = null
             RenderSystem.restoreProjectionMatrix()
@@ -415,17 +415,17 @@ object PlayerPreviewRenderer {
 
         val fmt = DefaultVertexFormat.POSITION_TEX_COLOR
         //? if >= 26.2 {
-        /*val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(1024)
+        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(1024)
         val bb: com.mojang.blaze3d.vertex.VertexConsumer = com.mojang.blaze3d.vertex.BufferBuilder(byteBuilder, com.mojang.blaze3d.PrimitiveTopology.QUADS, fmt)
-        *///?} else {
-        val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
-        //?}
+        //?} else {
+        /*val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
+        *///?}
         buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade, opacity)
         //? if >= 26.2 {
-        /*val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: run { byteBuilder.close(); return }
-        *///?} else {
-        val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: return
-        //?}
+        val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: run { byteBuilder.close(); return }
+        //?} else {
+        /*val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: return
+        *///?}
         val indexCount = GRID_X * GRID_Y * 6
 
         try {
@@ -433,33 +433,33 @@ object PlayerPreviewRenderer {
             val vbuf = device.createBuffer({ "polyplus_preview_quad" }, GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer())
             try {
                 //? if >= 26.2 {
-                /*val seq = RenderSystem.getSequentialBuffer(com.mojang.blaze3d.PrimitiveTopology.QUADS)
-                *///?} else {
-                val seq = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)
-                //?}
+                val seq = RenderSystem.getSequentialBuffer(com.mojang.blaze3d.PrimitiveTopology.QUADS)
+                //?} else {
+                /*val seq = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)
+                *///?}
                 val ibuf = seq.getBuffer(indexCount)
                 val itype = seq.type()
 
                 RenderSystem.backupProjectionMatrix()
                 //? if >= 26.2 {
-                /*RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
-                *///?} elif >= 26.1 {
-                RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
-                //?} else {
+                RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
+                //?} elif >= 26.1 {
+                /*RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(fbW, fbH)), ProjectionType.ORTHOGRAPHIC)
+                *///?} else {
                 /*RenderSystem.setProjectionMatrix(projection.getBuffer(fbW.toFloat(), fbH.toFloat()), ProjectionType.ORTHOGRAPHIC)
                 *///?}
                 val encoder = device.createCommandEncoder()
                 //? if >= 26.2 {
-                /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.Optional.empty())
-                *///?} else {
-                val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.OptionalInt.empty())
-                //?}
+                val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.Optional.empty())
+                //?} else {
+                /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.OptionalInt.empty())
+                *///?}
                 try {
                     pass.setPipeline(RenderPipelines.GUI_TEXTURED)
                     RenderSystem.bindDefaultUniforms(pass)
                     //? if >= 26.2 {
-                    /*pass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(Matrix4f()))
-                    *///?}
+                    pass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(Matrix4f()))
+                    //?}
                     //? if >= 1.21.11 {
                     val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
                     pass.bindTexture("Sampler0", srcView, sampler)
@@ -467,16 +467,16 @@ object PlayerPreviewRenderer {
                     /*pass.bindSampler("Sampler0", srcView)
                     *///?}
                     //? if >= 26.2 {
-                    /*pass.setVertexBuffer(0, vbuf.slice())
-                    *///?} else {
-                    pass.setVertexBuffer(0, vbuf)
-                    //?}
+                    pass.setVertexBuffer(0, vbuf.slice())
+                    //?} else {
+                    /*pass.setVertexBuffer(0, vbuf)
+                    *///?}
                     pass.setIndexBuffer(ibuf, itype)
                     //? if >= 26.2 {
-                    /*pass.drawIndexed(indexCount, 1, 0, 0, 0)
-                    *///?} else {
-                    pass.drawIndexed(0, 0, indexCount, 1)
-                    //?}
+                    pass.drawIndexed(indexCount, 1, 0, 0, 0)
+                    //?} else {
+                    /*pass.drawIndexed(0, 0, indexCount, 1)
+                    *///?}
                 } finally {
                     pass.close()
                     RenderSystem.restoreProjectionMatrix()
@@ -487,8 +487,8 @@ object PlayerPreviewRenderer {
         } finally {
             mesh.close()
             //? if >= 26.2 {
-            /*byteBuilder.close()
-            *///?}
+            byteBuilder.close()
+            //?}
         }
     }
 
@@ -520,10 +520,10 @@ object PlayerPreviewRenderer {
         pose.mulPose(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         //? if >= 26.2 {
-        /*mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
-        *///?} else {
-        mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
-        //?}
+        mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
+        //?} else {
+        /*mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
+        *///?}
         val camera = CameraRenderState().apply {
             orientation = Quaternionf().rotateY(Math.PI.toFloat())
             pos = net.minecraft.world.phys.Vec3.ZERO
@@ -532,18 +532,18 @@ object PlayerPreviewRenderer {
             *///?}
         }
         //? if >= 26.2 {
-        /*val features = mc.gameRenderer.featureRenderDispatcher()
+        val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
-        *///?} else {
-        val features = mc.gameRenderer.featureRenderDispatcher
+        //?} else {
+        /*val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
-        //?}
+        *///?}
     }
     //?}
 
@@ -577,10 +577,10 @@ object PlayerPreviewRenderer {
         pose.mulPose(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         //? if >= 26.2 {
-        /*mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
-        *///?} else {
-        mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
-        //?}
+        mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
+        //?} else {
+        /*mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
+        *///?}
         //? if >= 1.21.10 {
         val camera = CameraRenderState().apply {
             orientation = Quaternionf().rotateY(Math.PI.toFloat())
@@ -590,18 +590,18 @@ object PlayerPreviewRenderer {
             *///?}
         }
         //? if >= 26.2 {
-        /*val features = mc.gameRenderer.featureRenderDispatcher()
+        val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
-        *///?} else {
-        val features = mc.gameRenderer.featureRenderDispatcher
+        //?} else {
+        /*val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
-        //?}
+        *///?}
         //?} else {
         /*val bufferSource = mc.renderBuffers().bufferSource()
         // render draws a ground shadow that dereferences mc.level and NPEs off-world
@@ -872,10 +872,10 @@ object PlayerPreviewRenderer {
     private fun readback(colorTex: com.mojang.blaze3d.textures.GpuTexture, w: Int, h: Int, key: Any) {
         val device = RenderSystem.getDevice()
         //? if >= 26.2 {
-        /*val pixelSize = colorTex.format.blockSize()
-        *///?} else {
-        val pixelSize = colorTex.format.pixelSize()
-        //?}
+        val pixelSize = colorTex.format.blockSize()
+        //?} else {
+        /*val pixelSize = colorTex.format.pixelSize()
+        *///?}
         //? if >= 1.21.11 {
         val size = w.toLong() * h.toLong() * pixelSize
         val offset = 0L
@@ -887,10 +887,10 @@ object PlayerPreviewRenderer {
         device.createCommandEncoder().copyTextureToBuffer(colorTex, buffer, offset, Runnable {
             runCatching {
                 //? if >= 26.2 {
-                /*val mapped = buffer.map(true, false)
-                *///?} else {
-                val mapped = RenderSystem.getDevice().createCommandEncoder().mapBuffer(buffer, true, false)
-                //?}
+                val mapped = buffer.map(true, false)
+                //?} else {
+                /*val mapped = RenderSystem.getDevice().createCommandEncoder().mapBuffer(buffer, true, false)
+                *///?}
                 try {
                     latestByKey[key] = toImageBitmap(mapped.data(), w, h, pixelSize)
                 } finally {

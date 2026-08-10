@@ -269,9 +269,9 @@ object DefaultSettings {
         if (reported || failures.isEmpty()) return
         val minecraft = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
-        *///?} else
-        if (minecraft.overlay != null || minecraft.screen == null) return
+        if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
+        //?} else
+        //if (minecraft.overlay != null || minecraft.screen == null) return
 
         reported = true
         runCatching {

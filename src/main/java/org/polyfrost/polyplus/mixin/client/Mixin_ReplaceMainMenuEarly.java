@@ -16,10 +16,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 //? if >= 26.2 {
-/*@Mixin(net.minecraft.client.gui.Gui.class)
-*///?} else {
-@Mixin(Minecraft.class)
-//?}
+@Mixin(net.minecraft.client.gui.Gui.class)
+//?} else {
+/*@Mixin(Minecraft.class)
+*///?}
 public class Mixin_ReplaceMainMenuEarly {
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void polyplus$replaceMainMenuEarly(Screen screen, CallbackInfo ci) {
@@ -27,24 +27,24 @@ public class Mixin_ReplaceMainMenuEarly {
             return;
         }
         //? if >= 26.2 {
-        /*Minecraft mc = Minecraft.getInstance();
-        *///?} else {
-        Minecraft mc = (Minecraft) (Object) this;
-        //?}
+        Minecraft mc = Minecraft.getInstance();
+        //?} else {
+        /*Minecraft mc = (Minecraft) (Object) this;
+        *///?}
         boolean opensTitleScreen = screen instanceof TitleScreen || (screen == null && mc.player == null);
         if (!opensTitleScreen) {
             return;
         }
 
         //? if >= 26.2 {
-        /*if (!(mc.gui.screen() instanceof PolyPlusMainMenuScreen) && !(mc.gui.screen() instanceof PolyPlusOnboardingScreen)) {
+        if (!(mc.gui.screen() instanceof PolyPlusMainMenuScreen) && !(mc.gui.screen() instanceof PolyPlusOnboardingScreen)) {
             mc.gui.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
         }
-        *///?} else {
-        if (!(mc.screen instanceof PolyPlusMainMenuScreen) && !(mc.screen instanceof PolyPlusOnboardingScreen)) {
+        //?} else {
+        /*if (!(mc.screen instanceof PolyPlusMainMenuScreen) && !(mc.screen instanceof PolyPlusOnboardingScreen)) {
             mc.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
         }
-        //?}
+        *///?}
         ci.cancel();
     }
 

@@ -59,13 +59,13 @@
     "client.Mixin_MenuPanoramaFrameGuard"
     //?}
     //? if >= 26.1 && < 26.2 {
-  ,
+  /*,
     "client.Mixin_PreviewPresent"
-    //?}
-    //? if >= 26.2 {
-    /*,
-    "client.Mixin_PreviewPresent26_2"
     *///?}
+    //? if >= 26.2 {
+    ,
+    "client.Mixin_PreviewPresent26_2"
+    //?}
     //? if >= 1.21.1 {
   ,
     "client.cosmetics.AbstractClientPlayerMixin",
@@ -92,10 +92,10 @@
     "client.Mixin_UnfreezeRegistry"
     *///?}
     //? if < 26.2 {
-  ,
+  /*,
     "client.Mixin_HostWorldButtonLabel",
     "client.Mixin_MenuPanoramaTabButton"
-    //?}
+    *///?}
     //? if >= 1.21.11 {
   ,
     "client.sodium.Mixin_SodiumViewBobbing",

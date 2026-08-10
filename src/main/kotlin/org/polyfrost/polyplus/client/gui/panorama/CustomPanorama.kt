@@ -51,14 +51,14 @@ object CustomPanorama {
 
     private val PACK: PanoramaPack? =
         //? if >= 26.2 {
-        /*PanoramaPack(
+        PanoramaPack(
             cacheKey = "alt-chaos-cubed-1.1.2",
             url = "https://cdn.modrinth.com/data/abtyNK6x/versions/VNOEJAJZ/Alt%20Chaos%20Cubed%20Panorama%201.1%20Shader.zip",
             sha1 = "ea2d2987f2bae1d70f3bab797655508e5eebe419",
         )
-        *///?} elif >= 26.1 {
-        null
-        //?} else {
+        //?} elif >= 26.1 {
+        /*null
+        *///?} else {
         /*PanoramaPack(
             cacheKey = "mounts-of-mayhem-1.21.11",
             url = "https://cdn.modrinth.com/data/zm2Mso0b/versions/11MWbQX8/Shader%20Panorama%20of%201.21.11%EF%BC%9AMounts%20of%20Mayhem.zip",
@@ -116,10 +116,10 @@ object CustomPanorama {
         if (!PolyPlusMainMenuConfig.customPanorama) return false
         val screen =
             //? if >= 26.2 {
-            /*Minecraft.getInstance().gui.screen()
-            *///?} else {
-            Minecraft.getInstance().screen
-            //?}
+            Minecraft.getInstance().gui.screen()
+            //?} else {
+            /*Minecraft.getInstance().screen
+            *///?}
         return when (screen) {
             is PolyPlusMainMenuScreen -> mainMenuPanoramaEnabled()
             is PolyPlusOnboardingScreen -> true

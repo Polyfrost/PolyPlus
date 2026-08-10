@@ -94,8 +94,8 @@ object MenuPanorama {
 
     private fun currentScreen() =
         //? if >= 26.2 {
-        /*Minecraft.getInstance().gui.screen()
-        *///?} else {
-        Minecraft.getInstance().screen
-        //?}
+        Minecraft.getInstance().gui.screen()
+        //?} else {
+        /*Minecraft.getInstance().screen
+        *///?}
 }

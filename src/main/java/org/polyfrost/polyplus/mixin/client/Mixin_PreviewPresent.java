@@ -1,5 +1,5 @@
 //? if >= 26.1 && < 26.2 {
-package org.polyfrost.polyplus.mixin.client;
+/*package org.polyfrost.polyplus.mixin.client;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Minecraft;
@@ -19,5 +19,5 @@ public class Mixin_PreviewPresent {
         PlayerPreviewOverlay.renderAll(self);
     }
 }
-//?}
+*///?}
 

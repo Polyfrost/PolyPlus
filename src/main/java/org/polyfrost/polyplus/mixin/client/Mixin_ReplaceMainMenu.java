@@ -23,16 +23,16 @@ public class Mixin_ReplaceMainMenu {
         }
         Minecraft mc = Minecraft.getInstance();
         //? if >= 26.2 {
-        /*if (mc.gui.screen() instanceof PolyPlusMainMenuScreen || mc.gui.screen() instanceof PolyPlusOnboardingScreen) {
+        if (mc.gui.screen() instanceof PolyPlusMainMenuScreen || mc.gui.screen() instanceof PolyPlusOnboardingScreen) {
             return;
         }
         mc.gui.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
-        *///?} else {
-        if (mc.screen instanceof PolyPlusMainMenuScreen || mc.screen instanceof PolyPlusOnboardingScreen) {
+        //?} else {
+        /*if (mc.screen instanceof PolyPlusMainMenuScreen || mc.screen instanceof PolyPlusOnboardingScreen) {
             return;
         }
         mc.setScreen(polyplus$needsOnboarding() ? new PolyPlusOnboardingScreen() : new PolyPlusMainMenuScreen());
-        //?}
+        *///?}
         ci.cancel();
     }
 

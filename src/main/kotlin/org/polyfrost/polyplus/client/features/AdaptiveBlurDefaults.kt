@@ -91,9 +91,9 @@ object AdaptiveBlurDefaults {
 
     private fun currentScreen(mc: Minecraft): Screen? =
         //? if >= 26.2 {
-        /*mc.gui.screen()
-        *///?} else
-        mc.screen
+        mc.gui.screen()
+        //?} else
+        //mc.screen
 
     private fun onSample(averageFps: Float) {
         if (sampled) return

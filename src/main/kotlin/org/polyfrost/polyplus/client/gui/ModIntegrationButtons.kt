@@ -63,9 +63,9 @@ private class ParentScreenFactory(private val className: String) {
         val screen = runCatching { constructor?.newInstance(parent) as? Screen }.getOrNull() ?: return
         val mc = net.minecraft.client.Minecraft.getInstance()
         //? if >= 26.2 {
-        /*mc.gui.setScreen(screen)
-        *///?} else {
-        mc.setScreen(screen)
-        //?}
+        mc.gui.setScreen(screen)
+        //?} else {
+        /*mc.setScreen(screen)
+        *///?}
     }
 }

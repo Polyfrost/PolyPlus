@@ -18,19 +18,19 @@ public class Mixin_MenuPanoramaFrameGuard {
 
         GameRenderer self = (GameRenderer) (Object) this;
         //? if >= 26.2 {
-        /*GuiRenderState state = self.gameRenderState().guiRenderState;
-        *///?} else {
-        GuiRenderState state = self.getGameRenderState().guiRenderState;
-        //?}
+        GuiRenderState state = self.gameRenderState().guiRenderState;
+        //?} else {
+        /*GuiRenderState state = self.getGameRenderState().guiRenderState;
+        *///?}
         if (state.panoramaRenderState == null) return;
         state.panoramaRenderState = null;
 
         if (MenuPanorama.backdropFilled()) return;
         //? if >= 26.2 {
-        /*net.minecraft.util.ARGB.setVector4fFromARGB32(state.clearColorOverride, MenuPanorama.BASE_COLOR);
-        *///?} else {
-        state.clearColorOverride = MenuPanorama.BASE_COLOR;
-        //?}
+        net.minecraft.util.ARGB.setVector4fFromARGB32(state.clearColorOverride, MenuPanorama.BASE_COLOR);
+        //?} else {
+        /*state.clearColorOverride = MenuPanorama.BASE_COLOR;
+        *///?}
     }
 }
 //?}

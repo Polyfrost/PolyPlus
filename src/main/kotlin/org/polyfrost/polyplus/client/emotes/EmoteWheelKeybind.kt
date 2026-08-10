@@ -58,16 +58,16 @@ object EmoteWheelKeybind {
             while (keyMapping.consumeClick()) {
                 logger.info("consumeClick() fired")
                 //? if >= 26.2 {
-                /*val currentScreen = mc.gui.screen()
-                *///?} else {
-                val currentScreen = mc.screen
-                //?}
+                val currentScreen = mc.gui.screen()
+                //?} else {
+                /*val currentScreen = mc.screen
+                *///?}
                 if (currentScreen == null) {
                     //? if >= 26.2 {
-                    /*mc.gui.setScreen(EmoteWheelScreen())
-                    *///?} else {
-                    mc.setScreen(EmoteWheelScreen())
-                    //?}
+                    mc.gui.setScreen(EmoteWheelScreen())
+                    //?} else {
+                    /*mc.setScreen(EmoteWheelScreen())
+                    *///?}
                 }
             }
         }

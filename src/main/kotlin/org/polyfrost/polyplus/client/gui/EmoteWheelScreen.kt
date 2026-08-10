@@ -108,10 +108,10 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         Minecraft.getInstance().execute {
             val mc = Minecraft.getInstance()
             //? if >= 26.2 {
-            /*if (mc.gui.screen() === this) mc.gui.setScreen(null)
-            *///?} else {
-            if (mc.screen === this) mc.setScreen(null)
-            //?}
+            if (mc.gui.screen() === this) mc.gui.setScreen(null)
+            //?} else {
+            /*if (mc.screen === this) mc.setScreen(null)
+            *///?}
         }
     }
 }

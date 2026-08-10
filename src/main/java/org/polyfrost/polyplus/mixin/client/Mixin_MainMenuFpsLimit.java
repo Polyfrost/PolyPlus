@@ -27,10 +27,10 @@ public class Mixin_MainMenuFpsLimit {
             return;
         }
         //? if >= 26.2 {
-        /*Object screen = Minecraft.getInstance().gui.screen();
-        *///?} else {
-        Object screen = Minecraft.getInstance().screen;
-        //?}
+        Object screen = Minecraft.getInstance().gui.screen();
+        //?} else {
+        /*Object screen = Minecraft.getInstance().screen;
+        *///?}
         if (screen instanceof PolyPlusMainMenuScreen) {
             cir.setReturnValue(PolyPlusMainMenuConfig.activeMainMenuFpsLimit());
         }

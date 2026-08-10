@@ -4,10 +4,10 @@ package org.polyfrost.polyplus.client.pets
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry
 import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricDefaultAttributeRegistry
 //? if >= 26.2 {
-/*import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricEntityType
-*///?} else {
-import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricEntityTypeBuilder
-//?}
+import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricEntityType
+//?} else {
+/*import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricEntityTypeBuilder
+*///?}
 import net.minecraft.core.Registry
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
@@ -47,20 +47,20 @@ object PetEntities {
         BuiltInRegistries.ENTITY_TYPE,
         PET_ENTITY_TYPE_KEY,
         //? if >= 26.2 {
-        /*FabricEntityType.Builder.createMob(::PetEntity, MobCategory.MISC) { it }
+        FabricEntityType.Builder.createMob(::PetEntity, MobCategory.MISC) { it }
             .sized(0.8f, 0.8f)
             .noSummon()
             .noSave()
             .clientTrackingRange(8)
             .build(PET_ENTITY_TYPE_KEY),
-        *///?} elif >= 1.21.4 {
-        FabricEntityTypeBuilder.create(MobCategory.MISC, ::PetEntity)
+        //?} elif >= 1.21.4 {
+        /*FabricEntityTypeBuilder.create(MobCategory.MISC, ::PetEntity)
             .dimensions(EntityDimensions.scalable(0.8f, 0.8f))
             .disableSummon()
             .disableSaving()
             .trackRangeChunks(8)
             .build(PET_ENTITY_TYPE_KEY),
-        //?} else {
+        *///?} else {
         /*FabricEntityTypeBuilder.create(MobCategory.MISC, ::PetEntity)
             .dimensions(EntityDimensions.scalable(0.8f, 0.8f))
             .disableSummon()
