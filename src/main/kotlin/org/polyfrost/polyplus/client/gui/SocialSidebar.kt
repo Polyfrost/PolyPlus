@@ -56,7 +56,8 @@ internal fun SocialSidebar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SidebarTabButton("Chat", tab == SocialTab.Chat, Modifier.weight(1f)) { onTabChange(SocialTab.Chat) }
-            SidebarTabButton("Global", tab == SocialTab.Global, Modifier.weight(1f)) { onTabChange(SocialTab.Global) }
+            // Global chat is disabled for now.
+            // SidebarTabButton("Global", tab == SocialTab.Global, Modifier.weight(1f)) { onTabChange(SocialTab.Global) }
             SidebarTabButton("Friends", tab == SocialTab.Friends, Modifier.weight(1f)) { onTabChange(SocialTab.Friends) }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))

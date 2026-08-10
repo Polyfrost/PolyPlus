@@ -20,4 +20,6 @@ internal object P2PChannelRegistry {
     fun get(socket: EosP2PSocketId, remote: EosProductUserId): EosP2PChannel? = channels[Key(socket, remote)]
 
     fun allChannels(): Collection<EosP2PChannel> = channels.values
+
+    fun connectedPeers(): List<EosProductUserId> = channels.values.mapNotNull { it.currentRemote() }.distinct()
 }

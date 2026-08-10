@@ -8,9 +8,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.GroupsApi
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
+import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
@@ -174,13 +176,38 @@ object GroupsRepository : EarlyInitializable {
                 content = packet.content,
                 sentAt = java.time.Instant.now().toString(),
                 editedAt = null,
+                sessionInvite = packet.sessionInviteId?.let {
+                    GroupMessageSessionInvite(id = it, sessionId = "", status = packet.sessionInviteStatus ?: "pending")
+                },
             ),
         )
+        if (packet.sessionInviteId == null) notifyMessageReceived(packet.sender, packet.content)
+    }
+
+    private fun notifyMessageReceived(sender: String, content: String) {
+        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        if (sender == selfId) return
+
+        PlayerNamesRepository.resolve(listOf(sender))
+        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        val preview = if (content.length > 80) content.take(77) + "..." else content
+        Notifications.success(name, preview)
     }
 
     private fun onMessageEdited(packet: ClientboundPacket.GroupMessageEdited) {
         val flow = messagesByGroup[packet.groupId] ?: return
-        flow.value = flow.value.map { if (it.id == packet.messageId) it.copy(content = packet.content) else it }
+        flow.value = flow.value.map { message ->
+            if (message.id != packet.messageId) return@map message
+            val invite = message.sessionInvite
+            message.copy(
+                content = packet.content,
+                sessionInvite = if (invite != null && packet.sessionInviteStatus != null) {
+                    invite.copy(status = packet.sessionInviteStatus)
+                } else {
+                    invite
+                },
+            )
+        }
     }
 
     private fun onMessageDeleted(packet: ClientboundPacket.GroupMessageDeleted) {

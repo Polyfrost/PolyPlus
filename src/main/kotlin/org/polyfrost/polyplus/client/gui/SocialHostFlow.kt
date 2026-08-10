@@ -70,6 +70,7 @@ private class HostFlowState(val hostingCurrent: Boolean) {
     var difficulty by mutableStateOf(Difficulty.NORMAL)
     var allowCheats by mutableStateOf(false)
     var privateRelay by mutableStateOf(true)
+    var autoShareResourcePack by mutableStateOf(false)
     var invitees by mutableStateOf<Set<String>>(emptySet())
     var hostError by mutableStateOf<String?>(null)
     var hosting by mutableStateOf(false)
@@ -286,6 +287,11 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
                 SocialToggle("Private Relay", state.privateRelay) { state.privateRelay = !state.privateRelay }
             }
         }
+        FormRow("Resource Pack") {
+            Box(Modifier.width(220.dp)) {
+                SocialToggle("Auto-share with members", state.autoShareResourcePack) { state.autoShareResourcePack = !state.autoShareResourcePack }
+            }
+        }
 
         Box(Modifier.weight(1f))
 
@@ -332,13 +338,13 @@ private fun InviteFriendsModal(
         )
 
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (inviteableGroups.isNotEmpty() && query.isBlank()) {
-                SectionLabel("Groups")
-                inviteableGroups.forEach { group -> GroupInviteRow(group, selfId, state.invitees) { members -> state.invitees = state.invitees + members } }
-            }
             if (online.isNotEmpty()) {
                 SectionLabel("Online")
                 online.forEach { friend -> FriendInviteRow(friend, friend.player in state.invitees) { toggled -> state.invitees = if (toggled) state.invitees + friend.player else state.invitees - friend.player } }
+            }
+            if (inviteableGroups.isNotEmpty() && query.isBlank()) {
+                SectionLabel("Groups")
+                inviteableGroups.forEach { group -> GroupInviteRow(group, selfId, state.invitees) { members -> state.invitees = state.invitees + members } }
             }
             if (offline.isNotEmpty()) {
                 SectionLabel("Offline")
@@ -376,6 +382,7 @@ private fun InviteFriendsModal(
                                 state.gameMode,
                                 state.allowCheats,
                                 state.privateRelay,
+                                state.autoShareResourcePack,
                                 onFailure = {
                                     state.hosting = false
                                     state.hostError = "Unable to start hosting: ${it.message}"
@@ -399,6 +406,7 @@ private fun InviteFriendsModal(
                             state.gameMode,
                             state.allowCheats,
                             state.privateRelay,
+                            state.autoShareResourcePack,
                             onFailure = {
                                 state.hosting = false
                                 state.hostError = "Unable to start hosting: ${it.message}"

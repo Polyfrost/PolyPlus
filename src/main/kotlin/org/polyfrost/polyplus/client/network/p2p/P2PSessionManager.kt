@@ -75,6 +75,8 @@ object P2PSessionManager : EarlyInitializable {
         bridge.setRelayControl(forceRelays = false)
         bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
+            if (ResourcePackShare.handlePacket(received)) return@setInboundPacketHandler
+
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
             if (channel == null) {
                 LOGGER.warn("Dropping EOS P2P packet on socket {} from unregistered peer {}", received.socket, received.remote)
@@ -82,6 +84,7 @@ object P2PSessionManager : EarlyInitializable {
                 channel.deliverInbound(received.remote, received.data)
             }
         }
+        ResourcePackShare.install(bridge)
 
         PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
     }
@@ -131,12 +134,16 @@ object P2PSessionManager : EarlyInitializable {
         bridge?.setRelayControl(forceRelays = enabled)
     }
 
-    suspend fun beginHostingSession(privateRelay: Boolean = false): Result<SessionResponse> {
+    @Volatile var autoShareResourcePack: Boolean = false
+        private set
+
+    suspend fun beginHostingSession(privateRelay: Boolean = false, autoShareResourcePack: Boolean = false): Result<SessionResponse> {
         val bridge = this.bridge ?: return Result.failure(IllegalStateException("P2P transport is not installed"))
         val localUser = bridge.localUser
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
 
         setPrivateRelay(privateRelay)
+        this.autoShareResourcePack = autoShareResourcePack
 
         return SessionsApi.create().onSuccess { session ->
             _currentSessionId.value = session.id
@@ -150,6 +157,7 @@ object P2PSessionManager : EarlyInitializable {
     fun stopHosting() {
         val sessionId = currentSessionId ?: return
         _currentSessionId.value = null
+        autoShareResourcePack = false
         SessionsRepository.close(sessionId)
     }
 

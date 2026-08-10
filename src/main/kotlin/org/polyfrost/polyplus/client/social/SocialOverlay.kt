@@ -95,7 +95,7 @@ internal object SocialRefresh {
     fun refreshAll() {
         FriendsRepository.refreshAll()
         GroupsRepository.refreshGroups()
-        GlobalChatRepository.refreshHistory()
+        // GlobalChatRepository.refreshHistory() // Global chat is disabled for now.
         SessionsRepository.refreshIncoming()
         SpecialChatRepository.refreshTargets()
     }

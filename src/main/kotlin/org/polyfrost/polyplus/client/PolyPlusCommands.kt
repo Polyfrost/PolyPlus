@@ -45,6 +45,22 @@ object PolyPlusCommands {
                 )
                 Command.SINGLE_SUCCESS
             })
+            .then(commands.literal("sharepack").executes { ctx ->
+                val peers = org.polyfrost.polyplus.client.network.p2p.ResourcePackShare.connectedPeers()
+                if (peers.isEmpty()) {
+                    ctx.source.sendFeedback(
+                        Component.literal("You're not currently P2P-connected to anyone to share a pack with.")
+                            .withStyle(ChatFormatting.RED),
+                    )
+                } else {
+                    peers.forEach { peer -> org.polyfrost.polyplus.client.network.p2p.ResourcePackShare.shareEquippedPackWith(peer) }
+                    ctx.source.sendFeedback(
+                        Component.literal("Sharing your equipped resource pack with ${peers.size} peer(s)...")
+                            .withStyle(ChatFormatting.GREEN),
+                    )
+                }
+                Command.SINGLE_SUCCESS
+            })
             .then(commands.literal("mainmenu").executes { _ ->
                 val client = net.minecraft.client.Minecraft.getInstance()
                 if (client.isSameThread) {

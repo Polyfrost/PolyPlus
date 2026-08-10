@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
@@ -27,10 +28,12 @@ object SessionsRepository : EarlyInitializable {
 
     override fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
-            when (event.packet) {
-                is ClientboundPacket.SessionInviteReceived,
-                is ClientboundPacket.SessionInviteUpdated,
-                -> {
+            when (val packet = event.packet) {
+                is ClientboundPacket.SessionInviteReceived -> {
+                    refreshIncoming()
+                    notifyInviteReceived(packet.sender)
+                }
+                is ClientboundPacket.SessionInviteUpdated -> {
                     refreshIncoming()
                 }
                 else -> {}
@@ -83,5 +86,11 @@ object SessionsRepository : EarlyInitializable {
                 LOGGER.error("Failed to decline session invite ${invite.id}", it)
                 SocialErrors.emit("Couldn't decline session invite", it)
             }
+    }
+
+    private fun notifyInviteReceived(sender: String) {
+        PlayerNamesRepository.resolve(listOf(sender))
+        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        Notifications.success("PolyPlus", "$name invited you to their world")
     }
 }

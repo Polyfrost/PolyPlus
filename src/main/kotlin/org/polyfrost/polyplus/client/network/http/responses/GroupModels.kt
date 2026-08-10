@@ -58,12 +58,20 @@ data class GroupSummary(
 )
 
 @Serializable
+data class GroupMessageSessionInvite(
+    val id: Int,
+    @SerialName("session_id") val sessionId: String,
+    val status: String,
+)
+
+@Serializable
 data class GroupMessage(
     val id: Long,
     val sender: String,
     val content: String,
     @SerialName("sent_at") val sentAt: String,
     @SerialName("edited_at") val editedAt: String? = null,
+    @SerialName("session_invite") val sessionInvite: GroupMessageSessionInvite? = null,
 )
 
 @Serializable

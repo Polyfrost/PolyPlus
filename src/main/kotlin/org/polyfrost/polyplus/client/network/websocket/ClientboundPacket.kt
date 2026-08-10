@@ -109,6 +109,8 @@ sealed interface ClientboundPacket {
         @SerialName("message_id") val messageId: Long,
         val sender: String,
         val content: String,
+        @SerialName("session_invite_id") val sessionInviteId: Int? = null,
+        @SerialName("session_invite_status") val sessionInviteStatus: String? = null,
     ) : ClientboundPacket
 
     @Serializable
@@ -117,6 +119,7 @@ sealed interface ClientboundPacket {
         @SerialName("group_id") val groupId: Int,
         @SerialName("message_id") val messageId: Long,
         val content: String,
+        @SerialName("session_invite_status") val sessionInviteStatus: String? = null,
     ) : ClientboundPacket
 
     @Serializable

@@ -36,6 +36,7 @@ import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
+import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
@@ -63,12 +64,13 @@ internal fun ConversationView(
     onLeaveGroup: () -> Unit,
 ) {
     val title = renameOverrides[group.id] ?: conversationDisplayTitle(group, selfId)
-    val relevantInvites = incomingInvites.filter { it.sender in group.members }
+    val invitesShownInline = messages.mapNotNull { it.sessionInvite?.id }.toSet()
+    val relevantInvites = incomingInvites.filter { it.sender in group.members && it.id !in invitesShownInline }
     val specialStatus by SpecialChatRepository.status.collectAsState()
     val isSpecialGroup = specialStatus?.groupId == group.id
     val canConvertToNormal = isSpecialGroup && specialStatus?.isSpecialChatTarget == true
 
-    val latestMessageId = messages.lastOrNull()?.id
+    val latestMessageId = messages.lastOrNull { !GroupsRepository.isPending(it.id) }?.id
     LaunchedEffect(group.id, latestMessageId) {
         if (latestMessageId != null) GroupsRepository.markRead(group.id, latestMessageId)
     }
@@ -98,7 +100,7 @@ internal fun ConversationView(
         )
         Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
         relevantInvites.forEach { invite -> WorldInviteBanner(invite) }
-        MessageTimeline(Modifier.weight(1f), messages, selfId, group.id)
+        MessageTimeline(Modifier.weight(1f), messages, selfId, group.id, incomingInvites)
 
         val cooldownRemaining = (if (isSpecialGroup) specialStatus?.cooldownUntil else null)
             ?.let { rememberCooldownRemaining(it) } ?: 0L
@@ -288,7 +290,13 @@ private fun OverflowMenuItem(icon: String, label: String, color: androidx.compos
 }
 
 @Composable
-private fun MessageTimeline(modifier: Modifier, messages: List<GroupMessage>, selfId: String, conversationId: Int) {
+private fun MessageTimeline(
+    modifier: Modifier,
+    messages: List<GroupMessage>,
+    selfId: String,
+    conversationId: Int,
+    incomingInvites: List<SessionInvite>,
+) {
     if (messages.isEmpty()) {
         Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             SocialText("No messages yet. Say hello!", fontSize = 13.sp, color = SocialTextSecondary)
@@ -315,7 +323,7 @@ private fun MessageTimeline(modifier: Modifier, messages: List<GroupMessage>, se
                 DateSeparator(date)
                 lastDate = date
             }
-            MessageBubble(message, outgoing = message.sender == selfId)
+            MessageBubble(message, outgoing = message.sender == selfId, incomingInvites)
         }
         Spacer(Modifier.height(4.dp))
     }
@@ -335,7 +343,13 @@ private fun DateSeparator(date: String) {
 }
 
 @Composable
-private fun MessageBubble(message: GroupMessage, outgoing: Boolean) {
+private fun MessageBubble(message: GroupMessage, outgoing: Boolean, incomingInvites: List<SessionInvite>) {
+    val invite = message.sessionInvite
+    if (invite != null) {
+        InviteMessageCard(message, invite, outgoing, incomingInvites)
+        return
+    }
+
     val pending = GroupsRepository.isPending(message.id)
     Row(
         modifier = Modifier.fillMaxWidth().alpha(if (pending) 0.55f else 1f),
@@ -359,6 +373,50 @@ private fun MessageBubble(message: GroupMessage, outgoing: Boolean) {
             ) {
                 SocialText(message.content, fontSize = 14.sp, color = if (outgoing) androidx.compose.ui.graphics.Color.White else SocialTextPrimary)
             }
+        }
+    }
+}
+
+@Composable
+private fun InviteMessageCard(
+    message: GroupMessage,
+    invite: GroupMessageSessionInvite,
+    outgoing: Boolean,
+    incomingInvites: List<SessionInvite>,
+) {
+    val live = incomingInvites.firstOrNull { it.id == invite.id }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(SocialPanelShape)
+            .background(SocialWarnColor.copy(alpha = 0.12f))
+            .border(SocialBorderWidth, SocialWarnColor, SocialPanelShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        SocialAvatar(message.sender, 32.dp)
+        Column(Modifier.weight(1f)) {
+            SocialText(
+                if (outgoing) "You invited them to your world" else "${PlayerNamesRepository.displayName(message.sender)} invited you to their world",
+                fontSize = 13.sp,
+            )
+            SocialText(
+                when (invite.status) {
+                    "accepted" -> "Accepted"
+                    "declined" -> "Declined"
+                    "expired" -> "Expired"
+                    else -> "Session invite"
+                },
+                fontSize = 11.sp,
+                color = SocialTextSecondary,
+            )
+        }
+        if (!outgoing && live != null && invite.status == "pending") {
+            SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(live) })
+            SocialButton("Join", icon = SOCIAL_ASSETS + "log-in-04.svg", filled = true, modifier = Modifier.height(34.dp), onClick = { SessionsRepository.accept(live) })
         }
     }
 }

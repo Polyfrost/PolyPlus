@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.SocialApi
 import org.polyfrost.polyplus.client.network.http.responses.BlockedPlayer
@@ -31,10 +32,12 @@ object FriendsRepository : EarlyInitializable {
 
     override fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
-            when (event.packet) {
-                is ClientboundPacket.FriendRequestReceived,
-                is ClientboundPacket.FriendRequestUpdated,
-                -> {
+            when (val packet = event.packet) {
+                is ClientboundPacket.FriendRequestReceived -> {
+                    PolyPlusClient.SCOPE.launch { refreshRequests() }
+                    notifyFriendRequest(packet.sender)
+                }
+                is ClientboundPacket.FriendRequestUpdated -> {
                     PolyPlusClient.SCOPE.launch { refreshRequests() }
                 }
                 is ClientboundPacket.FriendRemoved -> {
@@ -132,5 +135,11 @@ object FriendsRepository : EarlyInitializable {
                 LOGGER.error("Failed to unblock $player", it)
                 SocialErrors.emit("Couldn't unblock player", it)
             }
+    }
+
+    private fun notifyFriendRequest(sender: String) {
+        PlayerNamesRepository.resolve(listOf(sender))
+        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        Notifications.success("PolyPlus", "$name sent you a friend request")
     }
 }

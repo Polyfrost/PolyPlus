@@ -34,6 +34,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     @Volatile private var remoteUser: EosProductUserId? = null
     @Volatile private var open = true
     @Volatile private var active = false
+    @Volatile private var accepted = false
 
     private var connectionStateHandle: EosNotificationHandle? = null
 
@@ -47,6 +48,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     internal fun setupAccepted(socket: EosP2PSocketId, remote: EosProductUserId) {
         localSocket = socket
         remoteUser = remote
+        accepted = true
         activate()
     }
 
@@ -100,11 +102,16 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
         connectionStateHandle = bridge.addConnectionStateHandler(socket) { event ->
             if (event.remote != remoteUser) return@addConnectionStateHandler
             when (event) {
-                is EosSdkBridge.ConnectionStateEvent.Established -> LOGGER.info(
-                    "EOS P2P connection established on socket {} ({})",
-                    socket,
-                    if (event.direct) "direct" else "relayed",
-                )
+                is EosSdkBridge.ConnectionStateEvent.Established -> {
+                    LOGGER.info(
+                        "EOS P2P connection established on socket {} ({})",
+                        socket,
+                        if (event.direct) "direct" else "relayed",
+                    )
+                    if (accepted && P2PSessionManager.autoShareResourcePack) {
+                        ResourcePackShare.shareEquippedPackWith(remote)
+                    }
+                }
                 is EosSdkBridge.ConnectionStateEvent.Interrupted -> {
                     LOGGER.warn("EOS P2P connection on socket {} interrupted, attempting to recover", socket)
                 }
@@ -190,4 +197,6 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     }
 
     internal fun currentSocket(): EosP2PSocketId? = localSocket
+
+    internal fun currentRemote(): EosProductUserId? = remoteUser
 }

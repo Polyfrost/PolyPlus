@@ -117,13 +117,14 @@ object HostWorldManager {
         gameMode: GameType,
         allowCheats: Boolean,
         privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
         onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
     ) {
         val mc = Minecraft.getInstance()
 
         PolyPlusClient.SCOPE.launch {
-            val result = P2PSessionManager.beginHostingSession(privateRelay)
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
             result.onFailure {
                 LOGGER.error("Failed to create a P2P hosting session", it)
                 onFailure(it)
@@ -148,6 +149,7 @@ object HostWorldManager {
         gameMode: GameType,
         allowCheats: Boolean,
         privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
         onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
     ) {
@@ -158,7 +160,7 @@ object HostWorldManager {
         }
 
         PolyPlusClient.SCOPE.launch {
-            val result = P2PSessionManager.beginHostingSession(privateRelay)
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
             result.onFailure {
                 LOGGER.error("Failed to create a P2P hosting session", it)
                 onFailure(it)

@@ -140,7 +140,8 @@ object PolyPlusClient {
             add(CosmeticsInitializer)
             add(FriendsRepository)
             add(GroupsRepository)
-            add(GlobalChatRepository)
+            // Global chat is disabled for now.
+            // add(GlobalChatRepository)
             add(SessionsRepository)
             add(P2PSessionManager)
         }
@@ -168,7 +169,7 @@ object PolyPlusClient {
 
                     FriendsRepository.refreshAll()
                     GroupsRepository.refreshGroups()
-                    GlobalChatRepository.refreshHistory()
+                    // GlobalChatRepository.refreshHistory() // Global chat is disabled for now.
                     SessionsRepository.refreshIncoming()
                 }
             }
