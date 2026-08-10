@@ -132,6 +132,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
 
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -1120,6 +1121,10 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                     }
                 }
             }
+            DisposableEffect(Unit) {
+                PlayerPreviewDim.push()
+                onDispose { PlayerPreviewDim.pop() }
+            }
             Popup(
                 popupPositionProvider = positionProvider,
                 onDismissRequest = { if (busy == null) open = false },
@@ -1452,8 +1457,8 @@ private fun MicrosoftLoginPopup(
     onCancel: () -> Unit,
 ) {
     DisposableEffect(Unit) {
-        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
-        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+        PlayerPreviewDim.push()
+        onDispose { PlayerPreviewDim.pop() }
     }
     Popup(
         alignment = Alignment.Center,
@@ -1770,6 +1775,10 @@ private fun NotificationBell(assetsReady: Boolean) {
             onClick = { expanded = !expanded },
         )
         if (expanded) {
+            DisposableEffect(Unit) {
+                PlayerPreviewDim.push()
+                onDispose { PlayerPreviewDim.pop() }
+            }
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, bellSize.height + 12),

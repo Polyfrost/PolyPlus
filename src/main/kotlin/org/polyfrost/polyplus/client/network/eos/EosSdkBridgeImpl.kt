@@ -170,7 +170,9 @@ class EosSdkBridgeImpl : EosSdkBridge {
                 runCatching { checkCongestion() }.onFailure { logger.warn("EOS congestion check failed", it) }
             }
 
-            val hadWork = drainInboundPackets()
+            val hadWork = runCatching { drainInboundPackets() }
+                .onFailure { logger.error("Draining inbound EOS packets failed", it) }
+                .getOrDefault(false)
             idleTicks = if (hadWork) 0 else idleTicks + 1
 
             park(idleTicks)
@@ -208,13 +210,15 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
             lastLoggedReceiveFailure = null
             delivered = true
-            handler(
-                EosSdkBridge.Received(
-                    socket = EosP2PSocketId(packet.socketId.name),
-                    remote = EosProductUserId(packet.remoteUserId.toStringValue()),
-                    data = ByteBuffer.wrap(packet.data),
-                ),
-            )
+            runCatching {
+                handler(
+                    EosSdkBridge.Received(
+                        socket = EosP2PSocketId(packet.socketId.name),
+                        remote = EosProductUserId(packet.remoteUserId.toStringValue()),
+                        data = ByteBuffer.wrap(packet.data),
+                    ),
+                )
+            }.onFailure { logger.error("Inbound EOS packet handler failed on socket '{}'", packet.socketId.name, it) }
         }
         return delivered
     }

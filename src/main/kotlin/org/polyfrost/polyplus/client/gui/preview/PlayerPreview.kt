@@ -31,14 +31,14 @@ import kotlinx.coroutines.delay
 val LocalPlayerPreviewOpacity = androidx.compose.runtime.compositionLocalOf { 1f }
 
 object PlayerPreviewDim {
-    private const val DIMMED = 0.18f
+    private const val HIDDEN = 0f
     var factor by mutableStateOf(1f)
         private set
     private var depth = 0
 
     fun push() {
         depth++
-        factor = DIMMED
+        factor = HIDDEN
     }
 
     fun pop() {

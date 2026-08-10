@@ -288,7 +288,7 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
             }
         }
         FormRow("Resource Pack") {
-            Box(Modifier.width(220.dp)) {
+            Box(Modifier.width(260.dp)) {
                 SocialToggle("Auto-share with members", state.autoShareResourcePack) { state.autoShareResourcePack = !state.autoShareResourcePack }
             }
         }

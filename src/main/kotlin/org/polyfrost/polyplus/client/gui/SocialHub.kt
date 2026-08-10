@@ -311,7 +311,9 @@ private fun SocialHeaderToolbar(
         SocialIconButton(SOCIAL_ASSETS + "x-close.svg", tooltip = "Close", onClick = onBack)
         SocialIconButton(SOCIAL_ASSETS + "user-plus-01.svg", tooltip = "Add Friend", onClick = onAddFriend)
         SocialIconButton(SOCIAL_ASSETS + "plus.svg", tooltip = "New Group", onClick = onNewGroup)
-        SocialIconButton(SOCIAL_ASSETS + "log-in-04.svg", tooltip = "Host World", onClick = onHostWorld)
+        if (hostedSessionId == null) {
+            SocialIconButton(SOCIAL_ASSETS + "log-in-04.svg", tooltip = "Host World", onClick = onHostWorld)
+        }
         if (hostedSessionId != null) {
             SocialIconButton(
                 SOCIAL_ASSETS + "user-plus-01.svg",

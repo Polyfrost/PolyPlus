@@ -23,6 +23,7 @@ object ResourcePackShare {
 
     private const val CHUNK_SIZE = 1024
     private const val MAX_PACK_BYTES = 50L * 1024 * 1024
+    private const val MAX_NAME_BYTES = 512
     private const val QUEUE_PACING_THRESHOLD_BYTES = 2L * 1024 * 1024
 
     private const val TYPE_OFFER: Byte = 0
@@ -35,11 +36,13 @@ object ResourcePackShare {
         val totalBytes: Int,
         val sha256: ByteArray,
         val data: ByteArray,
-        var receivedChunks: Int = 0,
         var receivedBytes: Int = 0,
     )
 
     private val incoming = ConcurrentHashMap<EosProductUserId, IncomingTransfer>()
+
+    private val sendingTo = ConcurrentHashMap.newKeySet<EosProductUserId>()
+    private val lastSentHash = ConcurrentHashMap<EosProductUserId, String>()
 
     @Volatile private var bridge: EosSdkBridge? = null
 
@@ -48,6 +51,7 @@ object ResourcePackShare {
         bridge.addConnectionRequestHandler(SOCKET_ID) { remote -> bridge.acceptConnection(SOCKET_ID, remote) }
     }
 
+    /** Players we currently have an active P2P game connection with - the natural "share with" targets. */
     fun connectedPeers(): List<EosProductUserId> = P2PChannelRegistry.connectedPeers()
 
     fun shareEquippedPackWith(remote: EosProductUserId) {
@@ -56,36 +60,66 @@ object ResourcePackShare {
             return
         }
 
-        PolyPlusClient.SCOPE.launch {
-            val pack = runCatching { readEquippedPack() }.getOrNull()
-            if (pack == null) {
-                LOGGER.warn("No equipped resource pack found to share, or it couldn't be read")
-                SocialErrors.emit("You don't have a resource pack equipped to share")
-                return@launch
-            }
-            if (pack.second.size > MAX_PACK_BYTES) {
-                SocialErrors.emit("That resource pack is too large to share (max 50 MB)")
-                return@launch
-            }
+        if (!sendingTo.add(remote)) {
+            LOGGER.info("Already sending a resource pack to {}, skipping duplicate request", remote)
+            return
+        }
 
-            bridge.acceptConnection(SOCKET_ID, remote)
-            sendPack(bridge, remote, pack.first, pack.second)
+        PolyPlusClient.SCOPE.launch {
+            try {
+                val pack = runCatching { readEquippedPack() }
+                    .onFailure { LOGGER.error("Failed to read the equipped resource pack", it) }
+                    .getOrNull()
+                if (pack == null) {
+                    SocialErrors.emit("Couldn't find your equipped resource pack's file - try re-selecting it in Options > Resource Packs")
+                    return@launch
+                }
+                if (pack.second.isEmpty()) {
+                    SocialErrors.emit("Your equipped resource pack is empty, nothing to share")
+                    return@launch
+                }
+                if (pack.second.size > MAX_PACK_BYTES) {
+                    SocialErrors.emit("That resource pack is too large to share (max 50 MB)")
+                    return@launch
+                }
+
+                val hash = MessageDigest.getInstance("SHA-256").digest(pack.second).toHex()
+                if (lastSentHash[remote] == hash) {
+                    LOGGER.info("{} already has this resource pack, skipping resend", remote)
+                    return@launch
+                }
+
+                bridge.acceptConnection(SOCKET_ID, remote)
+                runCatching { sendPack(bridge, remote, pack.first, pack.second, hash) }
+                    .onFailure {
+                        LOGGER.error("Failed to send resource pack '{}' to {}", pack.first, remote, it)
+                        SocialErrors.emit("Failed to send your resource pack", it)
+                    }
+            } finally {
+                sendingTo.remove(remote)
+            }
         }
     }
 
     private fun readEquippedPack(): Pair<String, ByteArray>? {
         val minecraft = Minecraft.getInstance()
-        val selected = minecraft.resourcePackRepository.selectedIds
+        val selected = minecraft.resourcePackRepository?.selectedIds ?: return null
         val id = selected.lastOrNull() ?: return null
 
+        val fileName = id.removePrefix("file/")
+        if (fileName.isBlank() || fileName == id && id in BUILTIN_PACK_IDS) return null
+
         val packsDir = File(minecraft.gameDirectory, "resourcepacks")
-        val entry = File(packsDir, id)
-        if (!entry.exists()) return null
+        val entry = File(packsDir, fileName)
+        if (!entry.exists()) {
+            LOGGER.warn("Equipped resource pack id '{}' (resolved to '{}') has no matching file under resourcepacks/", id, fileName)
+            return null
+        }
 
         return if (entry.isFile) {
-            id to entry.readBytes()
+            fileName to entry.readBytes()
         } else {
-            id to zipDirectory(entry)
+            fileName to zipDirectory(entry)
         }
     }
 
@@ -102,10 +136,12 @@ object ResourcePackShare {
         return bytes.toByteArray()
     }
 
-    private suspend fun sendPack(bridge: EosSdkBridge, remote: EosProductUserId, fileName: String, data: ByteArray) {
+    private suspend fun sendPack(bridge: EosSdkBridge, remote: EosProductUserId, fileName: String, data: ByteArray, hashHex: String) {
         val sha256 = MessageDigest.getInstance("SHA-256").digest(data)
         val totalChunks = (data.size + CHUNK_SIZE - 1) / CHUNK_SIZE
-        val nameBytes = fileName.toByteArray(StandardCharsets.UTF_8)
+        val nameBytes = fileName.toByteArray(StandardCharsets.UTF_8).let {
+            if (it.size > MAX_NAME_BYTES) it.copyOf(MAX_NAME_BYTES) else it
+        }
 
         val offer = ByteBuffer.allocate(1 + 4 + nameBytes.size + 4 + 4 + sha256.size).apply {
             put(TYPE_OFFER)
@@ -119,8 +155,12 @@ object ResourcePackShare {
         bridge.sendPacket(SOCKET_ID, remote, offer)
 
         for (index in 0 until totalChunks) {
+            var waited = 0
             while (bridge.outboundQueueBytes(SOCKET_ID) >= QUEUE_PACING_THRESHOLD_BYTES) {
                 delay(50)
+                if (++waited > 1200) { // 60s stuck with a full queue, the connection is dead, so just give up
+                    error("Outbound queue stayed full for too long, aborting transfer to $remote")
+                }
             }
 
             val start = index * CHUNK_SIZE
@@ -137,43 +177,59 @@ object ResourcePackShare {
         val complete = ByteBuffer.allocate(1).apply { put(TYPE_COMPLETE); flip() }
         bridge.sendPacket(SOCKET_ID, remote, complete)
 
+        lastSentHash[remote] = hashHex
         LOGGER.info("Sent resource pack '{}' ({} bytes, {} chunks) to {}", fileName, data.size, totalChunks, remote)
-        SocialErrors.emit("Sent your resource pack to ${PlayerNamesRepository.names.value[remote.raw] ?: remote.raw.take(8)}")
+        SocialErrors.emit("Sent your resource pack to ${displayName(remote)}")
     }
 
     fun handlePacket(received: EosSdkBridge.Received): Boolean {
         if (received.socket != SOCKET_ID) return false
 
-        val buf = received.data
-        if (!buf.hasRemaining()) return true
-        val type = buf.get()
-
-        when (type) {
-            TYPE_OFFER -> handleOffer(received.remote, buf)
-            TYPE_CHUNK -> handleChunk(received.remote, buf)
-            TYPE_COMPLETE -> handleComplete(received.remote)
-            TYPE_REJECT -> {
-                incoming.remove(received.remote)
-                LOGGER.info("{} rejected the resource pack transfer", received.remote)
+        runCatching {
+            val buf = received.data
+            if (!buf.hasRemaining()) return@runCatching
+            when (val type = buf.get()) {
+                TYPE_OFFER -> handleOffer(received.remote, buf)
+                TYPE_CHUNK -> handleChunk(received.remote, buf)
+                TYPE_COMPLETE -> handleComplete(received.remote)
+                TYPE_REJECT -> {
+                    incoming.remove(received.remote)
+                    LOGGER.info("{} rejected the resource pack transfer", received.remote)
+                }
+                else -> LOGGER.warn("Unknown resource-pack-share frame type {} from {}", type, received.remote)
             }
-            else -> LOGGER.warn("Unknown resource-pack-share frame type {} from {}", type, received.remote)
+        }.onFailure {
+            LOGGER.warn("Discarding malformed resource-pack-share frame from {}", received.remote, it)
+            incoming.remove(received.remote)
         }
         return true
     }
 
     private fun handleOffer(remote: EosProductUserId, buf: ByteBuffer) {
         val nameLen = buf.int
+        if (nameLen < 0 || nameLen > MAX_NAME_BYTES || nameLen > buf.remaining()) {
+            LOGGER.warn("Rejecting resource pack offer from {} with invalid name length {}", remote, nameLen)
+            return
+        }
         val nameBytes = ByteArray(nameLen)
         buf.get(nameBytes)
         val fileName = String(nameBytes, StandardCharsets.UTF_8)
+        if (buf.remaining() < 4 + 4 + 32) {
+            LOGGER.warn("Rejecting truncated resource pack offer from {}", remote)
+            return
+        }
         val totalBytes = buf.int
         val totalChunks = buf.int
         val sha256 = ByteArray(32)
         buf.get(sha256)
 
-        if (totalBytes < 0 || totalBytes > MAX_PACK_BYTES) {
-            LOGGER.warn("Rejecting oversized resource pack offer from {} ({} bytes)", remote, totalBytes)
+        if (totalBytes <= 0 || totalBytes > MAX_PACK_BYTES || totalChunks < 0) {
+            LOGGER.warn("Rejecting invalid resource pack offer from {} ({} bytes, {} chunks)", remote, totalBytes, totalChunks)
             return
+        }
+
+        if (incoming.containsKey(remote)) {
+            LOGGER.warn("New resource pack offer from {} while a previous transfer was still in progress; abandoning the old one", remote)
         }
 
         incoming[remote] = IncomingTransfer(fileName, totalBytes, sha256, ByteArray(totalBytes))
@@ -182,20 +238,35 @@ object ResourcePackShare {
 
     private fun handleChunk(remote: EosProductUserId, buf: ByteBuffer) {
         val transfer = incoming[remote] ?: return
+        if (buf.remaining() < 4) {
+            LOGGER.warn("Discarding truncated resource pack chunk header from {}", remote)
+            return
+        }
         val index = buf.int
         val remaining = buf.remaining()
-        val start = index * CHUNK_SIZE
-        if (start < 0 || start + remaining > transfer.data.size) {
+        if (remaining <= 0) return
+        val start = index.toLong() * CHUNK_SIZE
+        if (index < 0 || start < 0 || start + remaining > transfer.data.size) {
             LOGGER.warn("Discarding out-of-range resource pack chunk {} from {}", index, remote)
             return
         }
-        buf.get(transfer.data, start, remaining)
-        transfer.receivedChunks++
+        buf.get(transfer.data, start.toInt(), remaining)
         transfer.receivedBytes += remaining
     }
 
     private fun handleComplete(remote: EosProductUserId) {
         val transfer = incoming.remove(remote) ?: return
+
+        if (transfer.receivedBytes != transfer.totalBytes) {
+            LOGGER.error(
+                "Resource pack transfer from {} finished incomplete ({}/{} bytes received), discarding",
+                remote,
+                transfer.receivedBytes,
+                transfer.totalBytes,
+            )
+            SocialErrors.emit("Resource pack transfer from ${displayName(remote)} was incomplete")
+            return
+        }
 
         val digest = MessageDigest.getInstance("SHA-256").digest(transfer.data)
         if (!digest.contentEquals(transfer.sha256)) {
@@ -208,7 +279,7 @@ object ResourcePackShare {
             runCatching { installPack(transfer.fileName, transfer.data) }
                 .onSuccess {
                     LOGGER.info("Installed resource pack '{}' from {}", transfer.fileName, remote)
-                    SocialErrors.emit("Received a resource pack from ${PlayerNamesRepository.names.value[remote.raw] ?: remote.raw.take(8)} - check Options > Resource Packs")
+                    SocialErrors.emit("Received a resource pack from ${displayName(remote)} - check Options > Resource Packs")
                 }
                 .onFailure {
                     LOGGER.error("Failed to install resource pack '{}' from {}", transfer.fileName, remote, it)
@@ -222,7 +293,9 @@ object ResourcePackShare {
         val packsDir = File(minecraft.gameDirectory, "resourcepacks")
         packsDir.mkdirs()
 
-        val safeName = fileName.substringAfterLast('/').substringAfterLast('\\').ifBlank { "shared-pack" }
+        val safeName = fileName.substringAfterLast('/').substringAfterLast('\\')
+            .filter { it !in FORBIDDEN_FILENAME_CHARS }
+            .ifBlank { "shared-pack" }
         var target = File(packsDir, safeName)
         var suffix = 1
         while (target.exists()) {
@@ -232,11 +305,17 @@ object ResourcePackShare {
             target = File(packsDir, "$stem-received-$suffix$ext")
             suffix++
         }
+        check(target.canonicalFile.parentFile == packsDir.canonicalFile) { "Resulting pack path escaped resourcepacks/" }
 
-        target.writeBytes(data)
+        val tmp = File(packsDir, "${target.name}.tmp")
+        tmp.writeBytes(data)
+        if (!tmp.renameTo(target)) {
+            tmp.delete()
+            error("Couldn't finalize the downloaded resource pack file")
+        }
 
         val repository = minecraft.resourcePackRepository
-        val rescanned = listOf("reload", "scanPacks", "reloadPacks").any { name ->
+        val rescanned = repository != null && listOf("reload", "scanPacks", "reloadPacks").any { name ->
             runCatching {
                 repository.javaClass.getMethod(name).invoke(repository)
                 true
@@ -251,4 +330,12 @@ object ResourcePackShare {
             )
         }
     }
+
+    private fun displayName(remote: EosProductUserId): String =
+        PlayerNamesRepository.names.value[remote.raw] ?: remote.raw.take(8)
+
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+    private val FORBIDDEN_FILENAME_CHARS = charArrayOf('/', '\\', ':', '*', '?', '"', '<', '>', '|', ' ')
+    private val BUILTIN_PACK_IDS = setOf("vanilla", "programer_art", "fabric", "minecraft")
 }
