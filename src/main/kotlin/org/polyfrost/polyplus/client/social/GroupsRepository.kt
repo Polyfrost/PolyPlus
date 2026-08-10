@@ -181,17 +181,18 @@ object GroupsRepository : EarlyInitializable {
                 },
             ),
         )
-        if (packet.sessionInviteId == null) notifyMessageReceived(packet.sender, packet.content)
+        if (packet.sessionInviteId == null) notifyMessageReceived(packet.messageId, packet.sender, packet.content)
     }
 
-    private fun notifyMessageReceived(sender: String, content: String) {
+    private fun notifyMessageReceived(messageId: Long, sender: String, content: String) {
         val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
         if (sender == selfId) return
+        if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
 
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
         val preview = if (content.length > 80) content.take(77) + "..." else content
-        Notifications.success(name, preview)
+        Notifications.info(name, preview)
     }
 
     private fun onMessageEdited(packet: ClientboundPacket.GroupMessageEdited) {

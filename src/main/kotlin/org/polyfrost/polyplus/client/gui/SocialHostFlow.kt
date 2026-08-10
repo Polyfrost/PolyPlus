@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -86,6 +87,11 @@ internal fun HostWorldFlow(
     onDismiss: () -> Unit,
 ) {
     val state = remember { HostFlowState(hostingCurrent) }
+
+    DisposableEffect(Unit) {
+        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
+        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+    }
 
     LaunchedEffect(Unit) {
         if (state.hostingCurrent) return@LaunchedEffect

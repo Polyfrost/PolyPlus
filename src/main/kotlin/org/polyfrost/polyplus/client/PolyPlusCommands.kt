@@ -53,7 +53,7 @@ object PolyPlusCommands {
                             .withStyle(ChatFormatting.RED),
                     )
                 } else {
-                    peers.forEach { peer -> org.polyfrost.polyplus.client.network.p2p.ResourcePackShare.shareEquippedPackWith(peer) }
+                    peers.forEach { peer -> org.polyfrost.polyplus.client.network.p2p.ResourcePackShare.shareEquippedPackWith(peer, force = true) }
                     ctx.source.sendFeedback(
                         Component.literal("Sharing your equipped resource pack with ${peers.size} peer(s)...")
                             .withStyle(ChatFormatting.GREEN),

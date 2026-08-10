@@ -35,7 +35,7 @@ object FriendsRepository : EarlyInitializable {
             when (val packet = event.packet) {
                 is ClientboundPacket.FriendRequestReceived -> {
                     PolyPlusClient.SCOPE.launch { refreshRequests() }
-                    notifyFriendRequest(packet.sender)
+                    notifyFriendRequest(packet.requestId, packet.sender)
                 }
                 is ClientboundPacket.FriendRequestUpdated -> {
                     PolyPlusClient.SCOPE.launch { refreshRequests() }
@@ -137,9 +137,10 @@ object FriendsRepository : EarlyInitializable {
             }
     }
 
-    private fun notifyFriendRequest(sender: String) {
+    private fun notifyFriendRequest(requestId: Int, sender: String) {
+        if (!NotificationDedup.shouldNotify("friend_request:$requestId")) return
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
-        Notifications.success("PolyPlus", "$name sent you a friend request")
+        Notifications.info("PolyPlus", "$name sent you a friend request")
     }
 }

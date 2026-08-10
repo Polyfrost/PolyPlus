@@ -31,7 +31,7 @@ object SessionsRepository : EarlyInitializable {
             when (val packet = event.packet) {
                 is ClientboundPacket.SessionInviteReceived -> {
                     refreshIncoming()
-                    notifyInviteReceived(packet.sender)
+                    notifyInviteReceived(packet.inviteId, packet.sender)
                 }
                 is ClientboundPacket.SessionInviteUpdated -> {
                     refreshIncoming()
@@ -88,9 +88,10 @@ object SessionsRepository : EarlyInitializable {
             }
     }
 
-    private fun notifyInviteReceived(sender: String) {
+    private fun notifyInviteReceived(inviteId: Int, sender: String) {
+        if (!NotificationDedup.shouldNotify("session_invite:$inviteId")) return
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
-        Notifications.success("PolyPlus", "$name invited you to their world")
+        Notifications.info("PolyPlus", "$name invited you to their world")
     }
 }
