@@ -20,4 +20,10 @@ public interface UserAccessor {
     @Mutable
     @Accessor("accessToken")
     void setAccessToken(String accessToken);
+
+    //? if < 1.21.10 {
+    /*@Mutable
+    @Accessor("type")
+    void setType(User.Type type);
+    *///?}
 }
