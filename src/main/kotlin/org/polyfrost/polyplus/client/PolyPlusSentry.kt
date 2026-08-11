@@ -378,8 +378,6 @@ object PolyPlusSentry {
         while (cause != null) {
             if (cause is Error && cause.message?.startsWith("Watchdog") == true) return true
 
-            if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
-
             val top = cause.stackTrace.firstOrNull()
             if (top != null) {
                 val cn = top.className
@@ -454,14 +452,26 @@ object PolyPlusSentry {
         return false
     }
 
+    // Vanilla's F3 + C crash
     private const val DEBUG_CRASH = "Manually triggered debug crash"
+
+    private val DEBUG_CRASH_CLASSES = setOf(
+        "net.minecraft.client.KeyboardHandler", // mojmap
+        "net.minecraft.class_309",             // intermediary
+    )
 
     private const val CRASHPATCH_CRASH = "Crash requested by CrashPatch"
 
+    private const val CRASHPATCH_TRIGGER = "\$crashpatch\$debug"
+
     // SkyHanni joke crash feature requiring player opt-in
-    private const val DELIBERATE_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
+    private const val SKYHANNI_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
     private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog\b""")
+
+    private val DEBUG_CRASH_TRACE = Regex(
+        """(?m)^(?:Caused by: )?java\.lang\.Throwable\b.*\R\s*at net\.minecraft\.(?:client\.KeyboardHandler|class_309)\.""",
+    )
 
     private val OUT_OF_MEMORY = Regex("""(?m)^(?:Caused by: )?java\.lang\.OutOfMemoryError""")
 
@@ -471,13 +481,27 @@ object PolyPlusSentry {
             if (text.contains(DEBUG_CRASH) || text.contains(CRASHPATCH_CRASH)) return true
         }
         if (body == null) return false
-        return body.contains(DELIBERATE_CRASH_CLASS) || OUT_OF_MEMORY.containsMatchIn(body)
+        return body.contains(SKYHANNI_CRASH_CLASS) ||
+            body.contains(CRASHPATCH_TRIGGER) ||
+            DEBUG_CRASH_TRACE.containsMatchIn(body) ||
+            OUT_OF_MEMORY.containsMatchIn(body)
     }
 
-    private fun isDeliberateCrash(throwable: Throwable): Boolean {
+    internal fun isDeliberateCrash(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
-            if (cause.stackTrace.any { it.className.startsWith(DELIBERATE_CRASH_CLASS) }) return true
+            if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
+            if (cause.stackTrace.any {
+                    it.className.startsWith(SKYHANNI_CRASH_CLASS) || it.methodName.contains(CRASHPATCH_TRIGGER)
+                }
+            ) {
+                return true
+            }
+            if (cause.javaClass == Throwable::class.java &&
+                cause.stackTrace.firstOrNull()?.className in DEBUG_CRASH_CLASSES
+            ) {
+                return true
+            }
             val next = cause.cause
             if (next === cause) break
             cause = next
