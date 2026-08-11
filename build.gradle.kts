@@ -82,6 +82,7 @@ repositories {
     maven("https://central.sonatype.com/repository/maven-snapshots") {
         content { includeGroup("net.kyori") }
     }
+    strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.terraformersmc.com/releases/", "TerraformersMC", "com.terraformersmc")
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
