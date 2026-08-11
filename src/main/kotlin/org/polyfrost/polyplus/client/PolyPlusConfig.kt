@@ -68,6 +68,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic
     @Switch(
+        title = "Automatically Refresh Session",
+        description = "Automatically refresh your Microsoft account session when it expires.",
+    )
+    var autoRefreshSession = true
+
+    @JvmStatic
+    @Switch(
         title = "Accept Terms of Service & Privacy Policy",
         description = "Required for crash reporting and online features (cosmetics, client indicator, etc.). ",
         category = "Privacy",

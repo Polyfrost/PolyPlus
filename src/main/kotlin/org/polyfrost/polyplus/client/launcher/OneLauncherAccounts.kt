@@ -24,21 +24,16 @@ object OneLauncherAccounts {
 
         return (store.users.values + listOfNotNull(session)).mapNotNull { stored ->
             val id = LauncherAccountStore.parseUuid(stored.id) ?: return@mapNotNull null
-            val microsoft = stored.kind.equals("microsoft", ignoreCase = true)
+            val microsoft = LauncherAccountStore.isMicrosoft(stored)
             Account(
                 id = id,
                 username = stored.username,
                 microsoft = microsoft,
                 active = id == activeId,
                 // The launch account has no refresh token so it can never be refreshed
-                expired = microsoft && stored !== session && isExpired(stored.expires),
+                expired = microsoft && stored !== session && LauncherAccountStore.isExpired(stored.expires),
             )
         }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })
-    }
-
-    private fun isExpired(expires: String): Boolean {
-        val at = runCatching { java.time.Instant.parse(expires) }.getOrNull() ?: return true
-        return at.isBefore(java.time.Instant.now().plusSeconds(60))
     }
 
     fun switchTo(id: UUID): Boolean {
@@ -58,6 +53,7 @@ object OneLauncherAccounts {
         if (!AccountSwitch.apply(stored)) return false
         SessionAccounts.markActive(stored.id)
         LauncherAccountStore.save(store.copy(defaultUser = stored.id))
+        SessionRefresh.refreshAfterSwitch(stored)
         return true
     }
 
@@ -86,7 +82,7 @@ object OneLauncherAccounts {
         val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id }
             ?: error("Account not found")
         val stored = store.users[key] ?: error("Account not found")
-        require(stored.kind.equals("microsoft", ignoreCase = true)) {
+        require(LauncherAccountStore.isMicrosoft(stored)) {
             "Only Microsoft accounts can be refreshed"
         }
 
@@ -139,8 +135,8 @@ object OneLauncherAccounts {
     private fun LauncherAccountStore.StoredAccount.toAccount(active: Boolean) = Account(
         id = LauncherAccountStore.parseUuid(id) ?: UUID(0L, 0L),
         username = username,
-        microsoft = kind.equals("microsoft", ignoreCase = true),
+        microsoft = LauncherAccountStore.isMicrosoft(this),
         active = active,
-        expired = kind.equals("microsoft", ignoreCase = true) && isExpired(expires),
+        expired = LauncherAccountStore.isMicrosoft(this) && LauncherAccountStore.isExpired(expires),
     )
 }

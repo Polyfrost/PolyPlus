@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.utils
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.utils.v1.Multithreading
 //? if >= 1.21.10 {
@@ -53,6 +54,15 @@ object ClientPlatform {
         error.get()?.let { throw it }
         @Suppress("UNCHECKED_CAST")
         return result.get() as T
+    }
+
+    fun currentScreen(): Screen? {
+        val mc = Minecraft.getInstance()
+        //? if >= 26.2 {
+        return mc.gui.screen()
+        //?} else {
+        /*return mc.screen
+        *///?}
     }
 
     fun openUri(uri: String) {

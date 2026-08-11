@@ -1,5 +1,9 @@
 {
   "polyplus.hostWorld": "Host World",
+  "polyplus.session.refresh": "Refresh Session",
+  "polyplus.session.refreshing": "Refreshing session...",
+  "polyplus.session.reconnecting": "Reconnecting...",
+  "polyplus.session.refreshFailed": "Refresh failed - click to retry",
   "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this.",
   "key.polyplus.category": "PolyPlus",
   "key.polyplus.emote_wheel": "Open Emote Wheel"

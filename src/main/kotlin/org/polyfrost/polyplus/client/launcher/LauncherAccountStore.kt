@@ -10,12 +10,15 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.Instant
 import java.util.UUID
 
 object LauncherAccountStore {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
     private const val AUTH_FILE = "auth.json"
     private const val MAX_WALK_UP = 5
+
+    private const val EXPIRY_GRACE_SECONDS = 60L
 
     private val WRITE_JSON = Json {
         prettyPrint = true
@@ -64,6 +67,15 @@ object LauncherAccountStore {
             }
         }.onFailure { LOGGER.warn("Failed to write launcher auth file at {}", file, it) }
     }
+
+    fun isMicrosoft(account: StoredAccount): Boolean = account.kind.equals("microsoft", ignoreCase = true)
+
+    fun isExpired(expires: String): Boolean {
+        val at = runCatching { Instant.parse(expires) }.getOrNull() ?: return true
+        return at.isBefore(Instant.now().plusSeconds(EXPIRY_GRACE_SECONDS))
+    }
+
+    fun isRefreshable(account: StoredAccount): Boolean = isMicrosoft(account) && account.refreshToken.isNotBlank()
 
     fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
 
