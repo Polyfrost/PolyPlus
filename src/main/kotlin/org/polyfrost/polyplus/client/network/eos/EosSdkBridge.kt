@@ -17,7 +17,12 @@ interface EosSdkBridge {
 
     fun outboundQueueBytes(socket: EosP2PSocketId): Long
 
-    fun sendPacket(socket: EosP2PSocketId, remote: EosProductUserId, data: ByteBuffer)
+    fun sendPacket(
+        socket: EosP2PSocketId,
+        remote: EosProductUserId,
+        data: ByteBuffer,
+        reliability: PacketReliability = PacketReliability.ReliableOrdered,
+    )
 
     fun setInboundPacketHandler(handler: (Received) -> Unit)
 
@@ -42,4 +47,6 @@ interface EosSdkBridge {
     }
 
     enum class NatType { Open, Moderate, Strict, Unknown }
+
+    enum class PacketReliability { UnreliableUnordered, ReliableUnordered, ReliableOrdered }
 }

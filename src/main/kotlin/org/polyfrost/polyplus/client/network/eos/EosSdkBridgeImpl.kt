@@ -352,9 +352,19 @@ class EosSdkBridgeImpl : EosSdkBridge {
         }.getOrDefault(0L)
     }
 
-    override fun sendPacket(socket: EosP2PSocketId, remote: EosProductUserId, data: ByteBuffer) {
+    override fun sendPacket(
+        socket: EosP2PSocketId,
+        remote: EosProductUserId,
+        data: ByteBuffer,
+        reliability: EosSdkBridge.PacketReliability,
+    ) {
         val bytes = ByteArray(data.remaining())
         data.get(bytes)
+        val sdkReliability = when (reliability) {
+            EosSdkBridge.PacketReliability.UnreliableUnordered -> EosPacketReliability.UnreliableUnordered
+            EosSdkBridge.PacketReliability.ReliableUnordered -> EosPacketReliability.ReliableUnordered
+            EosSdkBridge.PacketReliability.ReliableOrdered -> EosPacketReliability.ReliableOrdered
+        }
 
         post {
             val local = localUser
@@ -373,7 +383,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
                 socketId = SdkSocketId(socket.name),
                 channel = 0,
                 data = bytes,
-                reliability = EosPacketReliability.ReliableOrdered,
+                reliability = sdkReliability,
             )
             if (result != EosResult.Success) {
                 logger.warn("sendPacket to {} on '{}' -> {}", remote, socket, result)

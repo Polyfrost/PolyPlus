@@ -16,7 +16,7 @@ import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SocialErrors
 
-object ResourcePackShare {
+object P2PResourcePackShare {
     private val LOGGER = LogManager.getLogger()
 
     val SOCKET_ID: EosP2PSocketId = EosP2PSocketId("polyplus-resourcepack-share")

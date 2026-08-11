@@ -109,7 +109,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                         if (event.direct) "direct" else "relayed",
                     )
                     if (accepted && P2PSessionManager.autoShareResourcePack) {
-                        ResourcePackShare.shareEquippedPackWith(remote)
+                        P2PResourcePackShare.shareEquippedPackWith(remote)
                     }
                 }
                 is EosSdkBridge.ConnectionStateEvent.Interrupted -> {

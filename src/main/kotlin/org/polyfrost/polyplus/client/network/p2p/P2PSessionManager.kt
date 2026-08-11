@@ -1,14 +1,10 @@
 package org.polyfrost.polyplus.client.network.p2p
 
-import io.netty.bootstrap.Bootstrap
-import io.netty.bootstrap.ServerBootstrap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -33,6 +29,7 @@ import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.utils.EarlyInitializable
+import kotlin.time.Duration.Companion.milliseconds
 
 object P2PSessionManager : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -54,7 +51,6 @@ object P2PSessionManager : EarlyInitializable {
     val status = _status.asStateFlow()
 
     private val _joinFailures = MutableSharedFlow<String>(extraBufferCapacity = 8)
-    val joinFailures = _joinFailures.asSharedFlow()
 
     private const val AUTH_READY_TIMEOUT_MS = 15_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
@@ -79,7 +75,8 @@ object P2PSessionManager : EarlyInitializable {
         bridge.setRelayControl(forceRelays = false)
         bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
-            if (ResourcePackShare.handlePacket(received)) return@setInboundPacketHandler
+            if (P2PResourcePackShare.handlePacket(received)) return@setInboundPacketHandler
+            if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
 
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
             if (channel == null) {
@@ -88,7 +85,8 @@ object P2PSessionManager : EarlyInitializable {
                 channel.deliverInbound(received.remote, received.data)
             }
         }
-        ResourcePackShare.install(bridge)
+        P2PResourcePackShare.install(bridge)
+        EosVoicechatBridge.install(bridge)
 
         PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
     }
@@ -118,18 +116,6 @@ object P2PSessionManager : EarlyInitializable {
         }
 
         bridge.queryNatType().onSuccess { LOGGER.info("EOS P2P NAT type: {}", it) }
-    }
-
-    fun connectBootstrap(target: JoinTarget): Bootstrap =
-        Bootstrap()
-            .channel(EosP2PChannel::class.java)
-            .remoteAddress(EosP2PAddress(target.host, target.socket))
-
-    fun listenBootstrap(socket: EosP2PSocketId): ServerBootstrap {
-        val localUser = requireNotNull(bridge?.localUser) { "Cannot host a P2P session before EOS Connect login completes" }
-        return ServerBootstrap()
-            .channel(EosP2PServerChannel::class.java)
-            .localAddress(EosP2PAddress(localUser, socket))
     }
 
     fun socketFor(sessionId: String): EosP2PSocketId = EosP2PSocketId(sessionId.replace("-", "").take(32))
@@ -175,8 +161,8 @@ object P2PSessionManager : EarlyInitializable {
 
         if (_status.value != EosStatus.Ready) {
             LOGGER.info("Waiting for EOS Connect to be ready before joining session {}", invite.sessionId)
-            val ready = withTimeoutOrNull(AUTH_READY_TIMEOUT_MS) {
-                status.filter { it == EosStatus.Ready || it is EosStatus.Failed }.first()
+            val ready = withTimeoutOrNull(AUTH_READY_TIMEOUT_MS.milliseconds) {
+                status.first { it == EosStatus.Ready || it is EosStatus.Failed }
             }
             if (ready != EosStatus.Ready) {
                 LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join session {}", invite.sessionId)
@@ -220,7 +206,7 @@ object P2PSessionManager : EarlyInitializable {
         )
         onJoinTargetResolved(target)
 
-        delay(JOIN_HANDSHAKE_TIMEOUT_MS)
+        delay(JOIN_HANDSHAKE_TIMEOUT_MS.milliseconds)
         bridge.removeNotificationHandler(handle)
 
         if (established.get()) return

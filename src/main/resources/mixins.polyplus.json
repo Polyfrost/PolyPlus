@@ -34,7 +34,8 @@
     "client.access.MinecraftAccessor",
     "client.access.UserAccessor",
     "client.network.Mixin_ConnectionP2P",
-    "client.network.Mixin_ServerConnectionListenerP2P"
+    "client.network.Mixin_ServerConnectionListenerP2P",
+    "client.network.Mixin_VoicechatResolveP2PAddress"
     //? if >= 1.21.8 && < 26.1 {
     /*,
     "client.PlayerTabBadgeMixin"

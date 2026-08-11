@@ -77,6 +77,7 @@ repositories {
     strictMaven("https://maven.terraformersmc.com/releases/", "TerraformersMC", "com.terraformersmc")
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
+    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
 }
 
 val javaVersion = when {
@@ -167,6 +168,8 @@ dependencies {
     optionalProperty("deps.sodium")?.let {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }
     }
+
+    modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
 
     modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
