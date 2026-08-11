@@ -13,9 +13,9 @@ plugins {
     java
     kotlin("jvm")
     kotlin("plugin.compose")
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.atomicfu)
-    alias(libs.plugins.shadow)
+    kotlin("plugin.serialization")
+    id("org.jetbrains.kotlinx.atomicfu")
+    id("com.gradleup.shadow")
     id("dev.kikugie.loom-back-compat")
     id("me.modmuss50.mod-publish-plugin")
 }
@@ -40,6 +40,21 @@ fun optionalProperty(name: String): String? =
     findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
+val kotlinVersion = property("deps.kotlin") as String
+val ktorVersion = property("deps.ktor") as String
+val sentryVersion = property("deps.sentry") as String
+val mixinExtrasVersion = property("deps.mixin_extras") as String
+val mixinSquaredVersion = property("deps.mixin_squared") as String
+val devauthVersion = property("deps.devauth") as String
+val junitVersion = property("deps.junit") as String
+
+val ktorModules = listOf(
+    "io.ktor:ktor-client-core",
+    "io.ktor:ktor-client-cio",
+    "io.ktor:ktor-client-content-negotiation",
+    "io.ktor:ktor-server-websockets",
+    "io.ktor:ktor-serialization-kotlinx-json"
+).map { "$it:$ktorVersion" }
 
 group = property("mod.group") as String
 version = "${property("mod.version")}+${stonecutter.current.version}"
@@ -63,9 +78,6 @@ repositories {
     maven("https://repo.polyfrost.org/snapshots")
     maven("https://maven.fabricmc.net/") {
         content { includeGroupAndSubgroups("net.fabricmc") }
-    }
-    maven("https://maven.parchmentmc.org") {
-        content { includeGroupAndSubgroups("org.parchmentmc") }
     }
     maven("https://central.sonatype.com/repository/maven-snapshots") {
         content { includeGroup("net.kyori") }
@@ -102,7 +114,7 @@ val sentryRelocatedPackage = "org.polyfrost.polyplus.libs.sentry"
 val sentryShade: Configuration by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
-    isTransitive = false // io.sentry:sentry:7.18.0 has zero runtime dependencies
+    isTransitive = false // io.sentry:sentry has zero runtime dependencies
 }
 
 val relocateSentry = tasks.register<ShadowJar>("relocateSentry") {
@@ -139,22 +151,15 @@ tasks.jar {
 dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
 
-    // Layered mappings are rejected outside an obfuscated environment, and Parchment is only
-    // published for versions that have one, so its presence selects the mapping strategy.
     // `applyMojangMappings` is a no-op on 26+.
-    optionalProperty("deps.parchment")?.also { parchmentDep ->
-        mappings(loomExt.layered {
-            officialMojangMappings()
-            parchment("$parchmentDep@zip")
-        })
-    } ?: dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
+    dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
 
-    implementation(libs.kotlin.stdlib)
-    implementation(libs.kotlin.reflect)
-    annotationProcessor(libs.mixin.extras)
-    annotationProcessor(libs.mixin.squared)
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+    annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
+    annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:$mixinSquaredVersion")
 
-    modLocalRuntime(libs.devauth.fabric)
+    modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
 
     // Use `mod{dependency type}` even on 26+ - loom-back-compat aliases them.
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
@@ -169,22 +174,17 @@ dependencies {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
-    sentryShade(libs.sentry)
+    sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
-    implementation(libs.bundles.ktor.client)
-    implementation(libs.bundles.ktor.server)
-    implementation(libs.bundles.ktor.serialization)
+    for (module in ktorModules) implementation(module)
 
-    testImplementation(libs.junit.jupiter)
+    testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
 }
 
 run {
-    val bundledRoots = libs.bundles.ktor.client.get() +
-        libs.bundles.ktor.server.get() +
-        libs.bundles.ktor.serialization.get()
     val closure = configurations.detachedConfiguration(
-        *bundledRoots.map { dependencies.create(it) }.toTypedArray()
+        *ktorModules.map { dependencies.create(it) }.toTypedArray()
     )
     closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
         val id = art.moduleVersion.id

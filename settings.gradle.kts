@@ -9,11 +9,12 @@ pluginManagement {
     }
 
     plugins {
-        kotlin("jvm") version "2.3.0"
-        kotlin("plugin.serialization") version "2.3.0"
-        kotlin("plugin.compose") version "2.3.0"
-        id("org.jetbrains.kotlinx.atomicfu") version "0.27.0"
-        id("me.modmuss50.mod-publish-plugin") version "1.1.0"
+        kotlin("jvm") version "2.4.10"
+        kotlin("plugin.serialization") version "2.4.10"
+        kotlin("plugin.compose") version "2.4.10"
+        id("org.jetbrains.kotlinx.atomicfu") version "0.33.0"
+        id("com.gradleup.shadow") version "9.6.1"
+        id("me.modmuss50.mod-publish-plugin") version "2.2.0"
     }
 }
 
@@ -33,7 +34,6 @@ dependencyResolutionManagement {
         maven("https://repo.polyfrost.org/snapshots")
         maven("https://jitpack.io")
         maven("https://maven.bawnorton.com/releases")
-        maven("https://maven.parchmentmc.org")
         maven("https://redirector.kotlinlang.org/maven/compose-dev")
         google()
     }
