@@ -26,5 +26,8 @@
         "java": ">=21",
         "fabric-language-kotlin": ">=1.13.8",
         "oneconfigv1": ">=1.1.2"
+    },
+    "breaks": {
+        "auto-reauth": "*"
     }
 }
