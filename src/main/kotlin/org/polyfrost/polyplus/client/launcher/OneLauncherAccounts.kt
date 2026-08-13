@@ -107,12 +107,6 @@ object OneLauncherAccounts {
         val store = LauncherAccountStore.load()
         val session = SessionAccounts.transientAccount(store)
 
-        require(
-            LauncherAccountStore.hasMicrosoftAccount(store) ||
-                session?.kind.equals("microsoft", ignoreCase = true)
-        ) {
-            "Add a Microsoft account before creating offline accounts"
-        }
         require(username.length in 3..16) { "Username must be 3-16 characters" }
         require(username.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }) {
             "Username may only contain letters, digits, and underscores"

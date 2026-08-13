@@ -1,4 +1,2 @@
-## 1.1.23
-- fix(PolyPlusBadge): show the badge on tab lists built from placeholder profiles
-- fix(sentry): recognise deliberate crashes with translated messages
-- fix(onboarding): fix compat with animatium 4.2
+## 1.1.25
+- feat(accounts): allow adding offline accounts without a Microsoft account signed in

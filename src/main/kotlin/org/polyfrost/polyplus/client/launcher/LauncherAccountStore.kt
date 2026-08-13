@@ -65,9 +65,6 @@ object LauncherAccountStore {
         }.onFailure { LOGGER.warn("Failed to write launcher auth file at {}", file, it) }
     }
 
-    fun hasMicrosoftAccount(store: CredentialsStore): Boolean =
-        store.users.values.any { it.kind.equals("microsoft", ignoreCase = true) }
-
     fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
 
     private fun authFile(): File? {
