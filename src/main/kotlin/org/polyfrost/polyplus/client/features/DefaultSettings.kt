@@ -142,7 +142,7 @@ object DefaultSettings {
         )
         add(
             Task(
-                id = "animatium-config",
+                id = "animatium-config-2",
                 label = "Animatium",
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumConfig,
@@ -237,9 +237,10 @@ object DefaultSettings {
             when {
                 task.id in applied -> iterator.remove()
                 isPresent(task) -> {
-                    attempt(task.label, task.apply)
-                    applied += task.id
-                    changed = true
+                    if (attempt(task.label, task.apply)) {
+                        applied += task.id
+                        changed = true
+                    }
                     iterator.remove()
                 }
                 !task.retryable || ++task.attempts > RETRY_SCAN_LIMIT -> iterator.remove()
@@ -258,12 +259,11 @@ object DefaultSettings {
         PolyPlusConfig.save()
     }
 
-    private inline fun attempt(what: String, block: () -> Unit) {
+    private inline fun attempt(what: String, block: () -> Unit): Boolean =
         runCatching(block).onFailure {
             logger.warn("Could not apply default settings for {}", what, it)
             failures += what
-        }
-    }
+        }.isSuccess
 
     private fun reportFailures() {
         if (reported || failures.isEmpty()) return
