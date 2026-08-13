@@ -48,7 +48,7 @@ object DefaultSettings {
         "org.visuals.legacy.animatium.util.config.Version",
     )
 
-    private const val ANIMATIUM_PRESET = "MODERN"
+    private val ANIMATIUM_PRESET = listOf("VANILLA", "MODERN")
 
     private const val ANIMATIUM_ID = "animatium"
     private const val BETTER_SCREENS_ID = "betterscreens"
@@ -378,7 +378,7 @@ object DefaultSettings {
 
         configClass.getMethod("save").invoke(null)
         reloadAnimatium()
-        logger.info("Applied the Animatium {} preset with PolyPlus overrides", ANIMATIUM_PRESET)
+        logger.info("Applied the Animatium modern-animations preset with PolyPlus overrides")
     }
 
     private fun applyAnimatiumFixups() {
@@ -405,7 +405,9 @@ object DefaultSettings {
     private fun applyAnimatiumPreset(configClass: Class<*>, config: Any) {
         val versionClass = findFirstClass(ANIMATIUM_VERSION)
             ?: error("Animatium has none of $ANIMATIUM_VERSION")
-        val preset = enumConstant(versionClass, ANIMATIUM_PRESET)
+        val preset = ANIMATIUM_PRESET.firstNotNullOfOrNull { name ->
+            runCatching { enumConstant(versionClass, name) }.getOrNull()
+        } ?: error("Animatium has none of the $ANIMATIUM_PRESET presets")
 
         val legacyApply = runCatching { versionClass.getMethod("apply", configClass) }.getOrNull()
         if (legacyApply != null) legacyApply.invoke(preset, config)
@@ -462,7 +464,7 @@ object DefaultSettings {
     }
 
     private fun isAnimatiumPack(id: String): Boolean =
-        id.substringBefore(':').equals("animatium", ignoreCase = true)
+        id.substringBefore(':').substringBefore('/').equals(ANIMATIUM_ID, ignoreCase = true)
 
     private fun modLoaded(id: String): Boolean = FabricLoader.getInstance().isModLoaded(id)
 
