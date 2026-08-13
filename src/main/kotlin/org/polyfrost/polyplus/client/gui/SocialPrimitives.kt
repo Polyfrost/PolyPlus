@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -376,11 +377,13 @@ internal fun <T> SocialDropdown(
         },
     )
     val triggerBackground by animateColorAsState(if (expanded) Accent.asSocialSelected else SocialControlBackground)
+    var triggerSize by remember { mutableStateOf(IntSize.Zero) }
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(38.dp)
+                .onSizeChanged { triggerSize = it }
                 .clip(SocialFieldShape)
                 .background(triggerBackground)
                 .border(SocialBorderWidth, triggerBorder, SocialFieldShape)
@@ -395,13 +398,32 @@ internal fun <T> SocialDropdown(
             Icon(SOCIAL_ASSETS + "chevron-up.svg", SocialTextPrimary, Modifier.align(Alignment.CenterEnd).size(14.dp).rotate(chevronAngle))
         }
         if (expanded) {
+            val gap = with(LocalDensity.current) { 4.dp.roundToPx() }
+            val positionProvider = remember(gap) {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val below = anchorBounds.bottom + gap
+                        val y = if (below + popupContentSize.height <= windowSize.height) {
+                            below
+                        } else {
+                            (anchorBounds.top - gap - popupContentSize.height).coerceAtLeast(0)
+                        }
+                        val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                        return IntOffset(x, y)
+                    }
+                }
+            }
             Popup(
-                alignment = Alignment.TopStart,
-                offset = IntOffset(0, 148),
+                popupPositionProvider = positionProvider,
                 onDismissRequest = { expanded = false },
                 properties = PopupProperties(focusable = true),
             ) {
-                SocialFieldWidthColumn {
+                SocialDropdownList(triggerSize.width) {
                     options.forEach { option ->
                         SocialDropdownOption(labelFor(option), option == selected) { onSelect(option); expanded = false }
                     }
@@ -437,10 +459,11 @@ private fun SocialDropdownOption(label: String, selected: Boolean, onClick: () -
 }
 
 @Composable
-private fun SocialFieldWidthColumn(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun SocialDropdownList(triggerWidthPx: Int, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val width = with(LocalDensity.current) { triggerWidthPx.toDp() }
     androidx.compose.foundation.layout.Column(
         modifier = Modifier
-            .width(220.dp)
+            .width(if (triggerWidthPx > 0) width else 220.dp)
             .clip(SocialPanelShape)
             .background(SocialPopupBackground)
             .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)

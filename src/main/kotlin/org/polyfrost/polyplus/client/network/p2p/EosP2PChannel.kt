@@ -9,8 +9,10 @@ import io.netty.channel.ChannelMetadata
 import io.netty.channel.ChannelOutboundBuffer
 import io.netty.channel.ChannelPromise
 import io.netty.channel.EventLoop
+import io.netty.handler.timeout.ReadTimeoutHandler
 import java.net.SocketAddress
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
@@ -34,7 +36,6 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     @Volatile private var remoteUser: EosProductUserId? = null
     @Volatile private var open = true
     @Volatile private var active = false
-    @Volatile private var accepted = false
 
     private var connectionStateHandle: EosNotificationHandle? = null
 
@@ -43,12 +44,18 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
 
         // EOS' MTU is ~1170 bytes/packet
         const val MAX_PAYLOAD_BYTES = 1169
+
+        private const val TIMEOUT_HANDLER = "timeout"
+
+        private const val READ_TIMEOUT_SECONDS = 60
+
+        private const val TIMEOUT_INSTALL_ATTEMPTS = 5
+        private const val TIMEOUT_INSTALL_RETRY_MS = 100L
     }
 
     internal fun setupAccepted(socket: EosP2PSocketId, remote: EosProductUserId) {
         localSocket = socket
         remoteUser = remote
-        accepted = true
         activate()
     }
 
@@ -108,9 +115,6 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                         socket,
                         if (event.direct) "direct" else "relayed",
                     )
-                    if (accepted && P2PSessionManager.autoShareResourcePack) {
-                        P2PResourcePackShare.shareEquippedPackWith(remote)
-                    }
                 }
                 is EosSdkBridge.ConnectionStateEvent.Interrupted -> {
                     LOGGER.warn("EOS P2P connection on socket {} interrupted, attempting to recover", socket)
@@ -123,6 +127,26 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
         }
 
         active = true
+    }
+
+    override fun doRegister() {
+        super.doRegister()
+        eventLoop().execute { relaxReadTimeout(attempt = 1) }
+    }
+
+    private fun relaxReadTimeout(attempt: Int) {
+        if (pipeline().get(TIMEOUT_HANDLER) == null) {
+            if (attempt < TIMEOUT_INSTALL_ATTEMPTS) {
+                eventLoop().schedule({ relaxReadTimeout(attempt + 1) }, TIMEOUT_INSTALL_RETRY_MS, TimeUnit.MILLISECONDS)
+            } else {
+                LOGGER.warn("No read timeout handler on the P2P pipeline; leaving whatever this version uses in place")
+            }
+            return
+        }
+
+        runCatching { pipeline().replace(TIMEOUT_HANDLER, TIMEOUT_HANDLER, ReadTimeoutHandler(READ_TIMEOUT_SECONDS)) }
+            .onSuccess { LOGGER.info("Relaxed the P2P read timeout to {}s", READ_TIMEOUT_SECONDS) }
+            .onFailure { LOGGER.warn("Couldn't relax the P2P read timeout; sticking with vanilla's", it) }
     }
 
     override fun doDisconnect() = doClose()

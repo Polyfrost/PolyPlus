@@ -27,6 +27,9 @@ import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
+import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
+import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
+import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import kotlin.time.Duration.Companion.milliseconds
@@ -65,7 +68,12 @@ object P2PSessionManager : EarlyInitializable {
             .onEach { invite -> PolyPlusClient.SCOPE.launch { handleAcceptedInvite(invite) } }
             .launchIn(PolyPlusClient.SCOPE)
 
-        eventHandler<WorldEvent.Unload> { stopHosting() }.register()
+        HostSharedPack.registerConfigurationHook()
+
+        eventHandler<WorldEvent.Unload> {
+            stopHosting()
+            PackHttpBridge.setPackSource(null)
+        }.register()
     }
 
     private fun install(bridge: EosSdkBridge) {
@@ -75,7 +83,7 @@ object P2PSessionManager : EarlyInitializable {
         bridge.setRelayControl(forceRelays = false)
         bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
-            if (P2PResourcePackShare.handlePacket(received)) return@setInboundPacketHandler
+            if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
             if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
 
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
@@ -85,7 +93,7 @@ object P2PSessionManager : EarlyInitializable {
                 channel.deliverInbound(received.remote, received.data)
             }
         }
-        P2PResourcePackShare.install(bridge)
+        P2PPackTransport.install(bridge)
         EosVoicechatBridge.install(bridge)
 
         PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
@@ -124,16 +132,13 @@ object P2PSessionManager : EarlyInitializable {
         bridge?.setRelayControl(forceRelays = enabled)
     }
 
-    @Volatile var autoShareResourcePack: Boolean = false
-        private set
-
     suspend fun beginHostingSession(privateRelay: Boolean = false, autoShareResourcePack: Boolean = false): Result<SessionResponse> {
         val bridge = this.bridge ?: return Result.failure(IllegalStateException("P2P transport is not installed"))
         val localUser = bridge.localUser
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
 
         setPrivateRelay(privateRelay)
-        this.autoShareResourcePack = autoShareResourcePack
+        if (autoShareResourcePack) HostSharedPack.enable() else HostSharedPack.disable()
 
         return SessionsApi.create().onSuccess { session ->
             _currentSessionId.value = session.id
@@ -145,9 +150,9 @@ object P2PSessionManager : EarlyInitializable {
     }
 
     fun stopHosting() {
+        HostSharedPack.disable()
         val sessionId = currentSessionId ?: return
         _currentSessionId.value = null
-        autoShareResourcePack = false
         SessionsRepository.close(sessionId)
     }
 
@@ -235,6 +240,7 @@ object P2PSessionManager : EarlyInitializable {
 
     var onJoinTargetResolved: (JoinTarget) -> Unit = { target ->
         P2PConnectionContext.setPendingJoin(target)
+        PackHttpBridge.setPackSource(target.host)
 
         val minecraft = Minecraft.getInstance()
         val address = ServerAddress.parseString("$P2P_PLACEHOLDER_IP:2")

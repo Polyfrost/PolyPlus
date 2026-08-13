@@ -46,16 +46,15 @@ object PolyPlusCommands {
                 Command.SINGLE_SUCCESS
             })
             .then(commands.literal("sharepack").executes { ctx ->
-                val peers = org.polyfrost.polyplus.client.network.p2p.P2PResourcePackShare.connectedPeers()
-                if (peers.isEmpty()) {
+                if (org.polyfrost.polyplus.client.network.p2p.P2PSessionManager.currentSessionId == null) {
                     ctx.source.sendFeedback(
-                        Component.literal("You're not currently P2P-connected to anyone to share a pack with.")
+                        Component.literal("You're not hosting a Poly+ world, so there's nobody to share a pack with.")
                             .withStyle(ChatFormatting.RED),
                     )
                 } else {
-                    peers.forEach { peer -> org.polyfrost.polyplus.client.network.p2p.P2PResourcePackShare.shareEquippedPackWith(peer, force = true) }
+                    org.polyfrost.polyplus.client.resourcepack.HostSharedPack.enable()
                     ctx.source.sendFeedback(
-                        Component.literal("Sharing your equipped resource pack with ${peers.size} peer(s)...")
+                        Component.literal("Your equipped resource pack will be offered to everyone who joins.")
                             .withStyle(ChatFormatting.GREEN),
                     )
                 }
