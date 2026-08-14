@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosmetics
@@ -8,6 +9,7 @@ import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object CosmeticService {
+    private val LOGGER = LogManager.getLogger("polyplus/cosmetics")
     suspend fun equipCape(cosmeticId: Int): Result<Unit> =
         equip(cosmeticId, BodySlot.Cape)
 
@@ -33,7 +35,7 @@ object CosmeticService {
 
     suspend fun clearEmote(): Result<Unit> = runCatching {
         CosmeticCatalog.setSelectedEmote(null)
-        CosmeticSync.refreshVisibleSubscriptions().getOrThrow()
+        refreshSubscriptionsBestEffort()
         PolyConnection.sendPacket(ServerboundPacket.StopEmote).getOrThrow()
     }
 
@@ -70,13 +72,19 @@ object CosmeticService {
     fun playEmote(emoteId: Int): Result<Unit> = runCatching {
         require(emoteId in CosmeticCatalog.ownedEmoteIds()) { "Emote #$emoteId is not in your locker" }
         CosmeticCatalog.setSelectedEmote(emoteId)
-        CosmeticSync.refreshVisibleSubscriptions().getOrThrow()
+        refreshSubscriptionsBestEffort()
         PolyConnection.sendPacket(ServerboundPacket.PlayEmote(emoteId)).getOrThrow()
     }
 
     fun stopEmote(): Result<Unit> = runCatching {
-        CosmeticSync.refreshVisibleSubscriptions().getOrThrow()
+        refreshSubscriptionsBestEffort()
         PolyConnection.sendPacket(ServerboundPacket.StopEmote).getOrThrow()
+    }
+
+    private fun refreshSubscriptionsBestEffort() {
+        CosmeticSync.refreshVisibleSubscriptions().onFailure {
+            LOGGER.warn("Failed to refresh visible player subscriptions", it)
+        }
     }
 
     suspend fun syncLocalActive(): Result<Unit> = runCatching {

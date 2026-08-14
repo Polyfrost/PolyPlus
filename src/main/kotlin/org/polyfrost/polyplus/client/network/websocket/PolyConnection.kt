@@ -110,6 +110,10 @@ object PolyConnection {
             return
         }
 
+        job?.let { existing ->
+            existing.cancel()
+        }
+
         closing = false
         job = PolyPlusClient.SCOPE.launch {
             var attempt = 0

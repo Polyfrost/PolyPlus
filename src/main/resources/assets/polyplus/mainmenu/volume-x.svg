@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="volume-x">
+<path id="Icon" d="M4.5 10.125H8.4375L13.5 5.625V21.375L8.4375 16.875H4.5V10.125Z" stroke="var(--stroke-0, white)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="X" d="M18 9L23.625 14.625M23.625 9L18 14.625" stroke="var(--stroke-0, white)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

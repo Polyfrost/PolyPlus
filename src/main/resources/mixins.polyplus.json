@@ -36,7 +36,13 @@
     "client.essential.Mixin_EssentialPartnerButton",
     "client.essential.Mixin_EssentialPartnerModal",
     "client.access.MinecraftAccessor",
-    "client.access.UserAccessor"
+    "client.access.UserAccessor",
+    "client.network.Mixin_ConnectionP2P",
+    "client.network.Mixin_ServerConnectionListenerP2P",
+    "client.network.Mixin_VoicechatResolveP2PAddress",
+    "client.network.ServerCommonPacketListenerAccessor",
+    "client.network.Mixin_P2PResourcePackUrl",
+    "client.network.Mixin_P2PPeerTimeoutAlert"
     //? if >= 1.21.8 && < 26.1 {
     /*,
     "client.PlayerTabBadgeMixin"
@@ -97,6 +103,7 @@
     //? if < 26.2 {
   /*,
     "client.Mixin_HostWorldButtonLabel",
+    "client.Mixin_ReplaceOpenToLan",
     "client.Mixin_MenuPanoramaTabButton"
     *///?}
     //? if >= 1.21.11 {

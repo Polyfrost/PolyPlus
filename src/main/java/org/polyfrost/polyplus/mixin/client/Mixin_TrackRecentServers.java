@@ -7,6 +7,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.TransferState;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.polyfrost.polyplus.client.PolyPlusRecentServers;
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,7 +25,7 @@ public class Mixin_TrackRecentServers {
         TransferState transferState,
         CallbackInfo ci
     ) {
-        if (serverData != null) {
+        if (serverData != null && !P2PSessionManager.P2P_PLACEHOLDER_IP.equals(serverData.ip)) {
             PolyPlusRecentServers.record(serverData.name, serverData.ip);
         }
     }

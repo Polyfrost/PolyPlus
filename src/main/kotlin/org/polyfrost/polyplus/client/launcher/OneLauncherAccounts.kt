@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.launcher
 
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
 import java.util.UUID
 
 object OneLauncherAccounts {
@@ -44,6 +45,7 @@ object OneLauncherAccounts {
             ?: SessionAccounts.find(id)?.let { session ->
                 if (!AccountSwitch.apply(session)) return false
                 SessionAccounts.markActive(session.id)
+                PolyPlusClient.refresh()
                 return true
             }
             ?: run {
@@ -54,6 +56,7 @@ object OneLauncherAccounts {
         SessionAccounts.markActive(stored.id)
         LauncherAccountStore.save(store.copy(defaultUser = stored.id))
         SessionRefresh.refreshAfterSwitch(stored)
+        PolyPlusClient.refresh()
         return true
     }
 
@@ -94,7 +97,10 @@ object OneLauncherAccounts {
 
         val isDefault = SessionAccounts.activeId?.let { LauncherAccountStore.parseUuid(it) == id }
             ?: (current.defaultUser == key)
-        if (isDefault) AccountSwitch.apply(refreshed)
+        if (isDefault) {
+            AccountSwitch.apply(refreshed)
+            PolyPlusClient.refresh()
+        }
         return refreshed.toAccount(active = isDefault)
     }
 

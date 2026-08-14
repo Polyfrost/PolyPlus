@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.host
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
@@ -12,6 +13,9 @@ import java.nio.file.Path
 
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+
 //?}
 
 object HostWorldManager {
@@ -45,7 +49,11 @@ object HostWorldManager {
         val compat: Compat,
     )
 
-    private data class PendingHost(val gameMode: GameType, val allowCheats: Boolean)
+    private data class PendingHost(
+        val gameMode: GameType,
+        val allowCheats: Boolean,
+        val onPublished: () -> Unit = {},
+    )
 
     @Volatile
     private var pending: PendingHost? = null
@@ -103,6 +111,74 @@ object HostWorldManager {
         }
     }
 
+    fun hostViaP2P(
+        returnScreen: Screen,
+        entry: HostWorldEntry,
+        gameMode: GameType,
+        allowCheats: Boolean,
+        privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+                mc.createWorldOpenFlows().openWorld(entry.id) {
+                    //? if >= 26.2 {
+                    /*mc.gui.setScreen(returnScreen)
+                    *///?} else {
+                    mc.setScreen(returnScreen)
+                    //?}
+                }
+                LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
+            }
+        }
+    }
+
+    fun hostCurrentWorldViaP2P(
+        gameMode: GameType,
+        allowCheats: Boolean,
+        privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) {
+            onFailure(IllegalStateException("Not currently in a singleplayer world"))
+            return
+        }
+
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+            }
+        }
+    }
+
+    fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) return
+        pending = PendingHost(gameMode, allowCheats)
+    }
+
     fun registerLanPublishHook() {
         //? if fabric {
         ClientTickEvents.END_CLIENT_TICK.register(ClientTickEvents.EndTick { mc -> tick(mc) })
@@ -116,6 +192,7 @@ object HostWorldManager {
         if (mc.connection == null) return
         if (server.isPublished) {
             pending = null
+            request.onPublished()
             return
         }
 
@@ -130,6 +207,7 @@ object HostWorldManager {
 
         if (published) {
             LOGGER.info("Opened world to LAN on port {} (e4mc will relay if installed)", port)
+            request.onPublished()
         } else {
             LOGGER.warn("publishServer returned false — world was not opened to LAN")
         }

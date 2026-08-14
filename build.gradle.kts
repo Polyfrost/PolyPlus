@@ -76,6 +76,10 @@ repositories {
     google()
     maven("https://repo.polyfrost.org/releases")
     maven("https://repo.polyfrost.org/snapshots")
+    maven("https://maven.cloverclient.com/releases")
+    maven("https://jitpack.io") {
+        content { includeGroupAndSubgroups("com.github") }
+    }
     maven("https://maven.fabricmc.net/") {
         content { includeGroupAndSubgroups("net.fabricmc") }
     }
@@ -86,6 +90,7 @@ repositories {
     strictMaven("https://maven.terraformersmc.com/releases/", "TerraformersMC", "com.terraformersmc")
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
+    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
 }
 
 val javaVersion = when {
@@ -170,6 +175,8 @@ dependencies {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }
     }
 
+    modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
+
     modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
@@ -178,6 +185,8 @@ dependencies {
     sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
     for (module in ktorModules) implementation(module)
+
+    implementation(include("gg.sona:eos:2.0.2")!!)
 
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")

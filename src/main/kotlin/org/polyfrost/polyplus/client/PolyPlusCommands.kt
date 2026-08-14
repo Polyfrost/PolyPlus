@@ -45,6 +45,21 @@ object PolyPlusCommands {
                 )
                 Command.SINGLE_SUCCESS
             })
+            .then(commands.literal("sharepack").executes { ctx ->
+                if (org.polyfrost.polyplus.client.network.p2p.P2PSessionManager.currentSessionId == null) {
+                    ctx.source.sendFeedback(
+                        Component.literal("You're not hosting a Poly+ world, so there's nobody to share a pack with.")
+                            .withStyle(ChatFormatting.RED),
+                    )
+                } else {
+                    org.polyfrost.polyplus.client.resourcepack.HostSharedPack.enable()
+                    ctx.source.sendFeedback(
+                        Component.literal("Your equipped resource pack will be offered to everyone who joins.")
+                            .withStyle(ChatFormatting.GREEN),
+                    )
+                }
+                Command.SINGLE_SUCCESS
+            })
             .then(commands.literal("mainmenu").executes { _ ->
                 val client = net.minecraft.client.Minecraft.getInstance()
                 if (client.isSameThread) {
