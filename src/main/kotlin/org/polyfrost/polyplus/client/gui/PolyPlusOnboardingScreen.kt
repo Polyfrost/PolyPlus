@@ -81,6 +81,7 @@ import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.oneconfig.internal.ui.themes.pixelGridScale
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
@@ -217,8 +218,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
-                val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
-                    guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
                 val compact = pages[page] == OnboardingPage.TERMS
                 val panelWidth by animateFloatAsState(
                     if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
@@ -227,6 +226,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 val panelHeight by animateFloatAsState(
                     if (compact) TERMS_PANEL_HEIGHT else PANEL_HEIGHT,
                     animationSpec = spring(),
+                )
+                val scale = pixelGridScale(
+                    minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
+                        guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM,
+                    max = minOf(maxWidth.value / panelWidth, maxHeight.value / panelHeight),
                 )
                 CompositionLocalProvider(
                     LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),

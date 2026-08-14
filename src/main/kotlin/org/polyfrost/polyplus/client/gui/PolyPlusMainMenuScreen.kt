@@ -126,6 +126,7 @@ import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
 import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.oneconfig.internal.ui.themes.pixelGridScale
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -524,7 +525,10 @@ private fun MainMenu(
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-            val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+            val scale = pixelGridScale(
+                minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit),
+                max = containFit,
+            )
             CompositionLocalProvider(
                 LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
             ) {
