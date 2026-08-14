@@ -262,12 +262,18 @@ object PolyConnection {
     }
 
     private fun process(scope: CoroutineScope, message: String) {
-        val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
-        if (packet is ClientboundPacket.Error) {
-            LOGGER.error("Error packet received: ${packet.message}")
-        }
+        try {
+            val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
+            if (packet is ClientboundPacket.Error) {
+                LOGGER.error("Error packet received: ${packet.message}")
+            }
 
-        EventManager.INSTANCE.post(WebSocketMessage(packet))
+            EventManager.INSTANCE.post(WebSocketMessage(packet))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LOGGER.error("Failed to process WebSocket message: $message", e)
+        }
     }
 
     private inline fun <reified T : ServerboundPacket> T.string(): String {
