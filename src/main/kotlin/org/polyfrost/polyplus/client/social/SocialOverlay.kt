@@ -44,10 +44,10 @@ object SocialOverlay {
     fun toggle() {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*val current = mc.gui.screen()
-        *///?} else {
-        val current = mc.screen
-        //?}
+        val current = mc.gui.screen()
+        //?} else {
+        /*val current = mc.screen
+        *///?}
 
         when (current) {
             is SocialOverlayScreen -> close()
@@ -61,10 +61,10 @@ object SocialOverlay {
         previousScreen = from
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*mc.gui.setScreen(SocialOverlayScreen())
-        *///?} else {
-        mc.setScreen(SocialOverlayScreen())
-        //?}
+        mc.gui.setScreen(SocialOverlayScreen())
+        //?} else {
+        /*mc.setScreen(SocialOverlayScreen())
+        *///?}
 
         SocialRefresh.refreshAll()
     }
@@ -73,20 +73,20 @@ object SocialOverlay {
         val mc = Minecraft.getInstance()
         mc.execute {
             //? if >= 26.2 {
-            /*if (mc.gui.screen() is SocialOverlayScreen) mc.gui.setScreen(previousScreen)
-            *///?} else {
-            if (mc.screen is SocialOverlayScreen) mc.setScreen(previousScreen)
-            //?}
+            if (mc.gui.screen() is SocialOverlayScreen) mc.gui.setScreen(previousScreen)
+            //?} else {
+            /*if (mc.screen is SocialOverlayScreen) mc.setScreen(previousScreen)
+            *///?}
         }
     }
 
     private fun currentScreen(): Screen? {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*return mc.gui.screen()
-        *///?} else {
-        return mc.screen
-        //?}
+        return mc.gui.screen()
+        //?} else {
+        /*return mc.screen
+        *///?}
     }
 }
 

@@ -500,10 +500,10 @@ private fun openSelectWorldScreen() {
     val mc = net.minecraft.client.Minecraft.getInstance()
     val target = net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(net.minecraft.client.gui.screens.TitleScreen())
     //? if >= 26.2 {
-    /*mc.gui.setScreen(target)
-    *///?} else {
-    mc.setScreen(target)
-    //?}
+    mc.gui.setScreen(target)
+    //?} else {
+    /*mc.setScreen(target)
+    *///?}
 }
 
 private fun socialGameModeLabel(mode: GameType): String = mode.getName().replaceFirstChar { it.uppercase() }

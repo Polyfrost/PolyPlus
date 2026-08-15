@@ -66,12 +66,12 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             MenuBackgroundPass.enqueue(true)
             net.minecraft.client.Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
-                /*.panorama()
+                .panorama()
                 .extractRenderState(ctx, width, height)
-                *///?} else {
-                .getPanorama()
+                //?} else {
+                /*.getPanorama()
                 .extractRenderState(ctx, width, height, true)
-                //?}
+                *///?}
             ctx.blurBeforeThisStratum()
         } else if (OneConfigConfig.enableBackgroundBlur) {
             if (SkiaCtx.isDeferredComposeBackend) {

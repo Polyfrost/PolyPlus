@@ -135,10 +135,10 @@ object HostWorldManager {
                 pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
                 mc.createWorldOpenFlows().openWorld(entry.id) {
                     //? if >= 26.2 {
-                    /*mc.gui.setScreen(returnScreen)
-                    *///?} else {
-                    mc.setScreen(returnScreen)
-                    //?}
+                    mc.gui.setScreen(returnScreen)
+                    //?} else {
+                    /*mc.setScreen(returnScreen)
+                    *///?}
                 }
                 LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
             }

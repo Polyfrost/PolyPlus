@@ -174,8 +174,8 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) : EntityRendere
     }
 }
 //?} elif >= 1.21.4 {
-/*
-class PetRenderState : net.minecraft.client.renderer.entity.state.EntityRenderState() {
+
+/*class PetRenderState : net.minecraft.client.renderer.entity.state.EntityRenderState() {
     var definition: PetDefinition? = null
     var pose: PetPose? = null
     var bodyYaw: Float = 0f
