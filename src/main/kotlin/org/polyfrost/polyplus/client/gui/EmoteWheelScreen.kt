@@ -86,7 +86,7 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     @Composable
     override fun compose() {
-        Theme(pixelGrid = true, designWidth = WHEEL_DIAMETER, designHeight = WHEEL_DIAMETER) {
+        Theme {
             EmoteWheelContent(
                 logger = logger,
                 onRelease = { emoteId ->
