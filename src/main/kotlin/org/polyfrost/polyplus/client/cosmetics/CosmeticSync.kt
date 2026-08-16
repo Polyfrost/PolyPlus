@@ -307,6 +307,7 @@ object CosmeticSync : EarlyInitializable {
 
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
+        reconcileCape(equipped[BodySlot.Cape])
         for (slot in ATTACHED_SLOTS) {
             val desiredId = equipped[slot]
             val current = CosmeticApi.equippedSlot(player, slot)
@@ -330,6 +331,15 @@ object CosmeticSync : EarlyInitializable {
                     CosmeticApi.unequipSlot(player, slot)
                     CosmeticApi.equipLocal(player, attached.copy(slot = slot))
                 }
+            }
+        }
+    }
+
+    private fun reconcileCape(cosmeticId: Int?) {
+        if (cosmeticId == null || CosmeticAssetCache.getCapeResource(cosmeticId) != null) return
+        PolyPlusClient.SCOPE.launch {
+            if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
+                LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)
             }
         }
     }
