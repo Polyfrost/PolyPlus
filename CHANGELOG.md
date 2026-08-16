@@ -1,2 +1,6 @@
-## 1.2.1
-- Production backend is now always used outside development environment to prevent users from accidentally changing it and breaking things
+## 1.2.2
+- Show player name and icon in group chat
+- Vanilla/OneClient switch main menu button
+- Add JVM arg for API URL
+- Fix text input focus in socials menu
+- Put special chats in separate category
