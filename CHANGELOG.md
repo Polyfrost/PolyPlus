@@ -1,2 +1,3 @@
-## 1.2.3
-- Add support for new login params
+## 1.2.4
+- Fix certain capes not loading for other players
+- Fix log spam from EOS
