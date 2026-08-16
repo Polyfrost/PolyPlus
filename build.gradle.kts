@@ -40,6 +40,7 @@ fun optionalProperty(name: String): String? =
     findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
+val fabricLanguageKotlinVersion = property("deps.fabric_language_kotlin") as String
 val kotlinVersion = property("deps.kotlin") as String
 val ktorVersion = property("deps.ktor") as String
 val sentryVersion = property("deps.sentry") as String
@@ -170,6 +171,7 @@ dependencies {
     // Use `mod{dependency type}` even on 26+ - loom-back-compat aliases them.
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
+    modRuntimeOnly("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion")
 
     optionalProperty("deps.sodium")?.let {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }

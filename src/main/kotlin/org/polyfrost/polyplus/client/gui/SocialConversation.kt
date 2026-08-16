@@ -100,7 +100,7 @@ internal fun ConversationView(
         )
         Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
         relevantInvites.forEach { invite -> WorldInviteBanner(invite) }
-        MessageTimeline(Modifier.weight(1f), messages, selfId, group.id, incomingInvites)
+        MessageTimeline(Modifier.weight(1f), messages, selfId, group.id, incomingInvites, isGroup = group.kind == GroupKind.Group)
 
         val cooldownRemaining = (if (isSpecialGroup) specialStatus?.cooldownUntil else null)
             ?.let { rememberCooldownRemaining(it) } ?: 0L
@@ -296,6 +296,7 @@ private fun MessageTimeline(
     selfId: String,
     conversationId: Int,
     incomingInvites: List<SessionInvite>,
+    isGroup: Boolean,
 ) {
     if (messages.isEmpty()) {
         Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -317,13 +318,22 @@ private fun MessageTimeline(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         var lastDate: String? = null
+        var lastSender: String? = null
         messages.forEach { message ->
             val date = dateSeparatorFor(message.sentAt)
             if (date != lastDate) {
                 DateSeparator(date)
                 lastDate = date
+                lastSender = null
             }
-            MessageBubble(message, outgoing = message.sender == selfId, incomingInvites)
+            MessageBubble(
+                message,
+                outgoing = message.sender == selfId,
+                incomingInvites = incomingInvites,
+                showSenderGutter = isGroup && message.sender != selfId,
+                showSender = message.sender != lastSender,
+            )
+            lastSender = message.sender
         }
         Spacer(Modifier.height(4.dp))
     }
@@ -343,7 +353,13 @@ private fun DateSeparator(date: String) {
 }
 
 @Composable
-private fun MessageBubble(message: GroupMessage, outgoing: Boolean, incomingInvites: List<SessionInvite>) {
+private fun MessageBubble(
+    message: GroupMessage,
+    outgoing: Boolean,
+    incomingInvites: List<SessionInvite>,
+    showSenderGutter: Boolean = false,
+    showSender: Boolean = true,
+) {
     val invite = message.sessionInvite
     if (invite != null) {
         InviteMessageCard(message, invite, outgoing, incomingInvites)
@@ -354,12 +370,29 @@ private fun MessageBubble(message: GroupMessage, outgoing: Boolean, incomingInvi
     Row(
         modifier = Modifier.fillMaxWidth().alpha(if (pending) 0.55f else 1f),
         horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Top,
     ) {
+        if (showSenderGutter) {
+            Box(Modifier.width(28.dp).padding(top = if (showSender) 14.dp else 0.dp)) {
+                if (showSender) SocialAvatar(message.sender, 28.dp)
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         Column(
             modifier = Modifier.widthIn(max = 340.dp),
             horizontalAlignment = if (outgoing) Alignment.End else Alignment.Start,
         ) {
-            SocialText(if (pending) "Sending..." else timeFor(message.sentAt), fontSize = 10.sp, color = SocialTextSecondary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (showSenderGutter && showSender) {
+                    SocialText(
+                        PlayerNamesRepository.displayName(message.sender),
+                        fontSize = 12.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+                SocialText(if (pending) "Sending..." else timeFor(message.sentAt), fontSize = 10.sp, color = SocialTextSecondary)
+            }
             Box(
                 modifier = Modifier
                     .clip(ppShapeOf(topStart = 14.dp, topEnd = 14.dp, bottomStart = if (outgoing) 14.dp else 3.dp, bottomEnd = if (outgoing) 3.dp else 14.dp))
