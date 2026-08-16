@@ -8,6 +8,7 @@ import gg.sona.eos.EosPlatformFlags
 import gg.sona.eos.EosPlatformOptions
 import gg.sona.eos.EosResult
 import gg.sona.eos.common.EosExternalCredentialType
+import gg.sona.eos.common.EosLoginStatus
 import gg.sona.eos.common.ProductUserId as SdkProductUserId
 import gg.sona.eos.logging.EosLogCategory
 import gg.sona.eos.logging.EosLogLevel
@@ -42,6 +43,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     private val isOnTickThread: Boolean get() = Thread.currentThread() === tickThread
 
     private var inboundHandler: ((EosSdkBridge.Received) -> Unit)? = null
+    @Volatile private var loginLostHandler: (() -> Unit)? = null
 
     private data class StateHandlerEntry(val handle: Long, val callback: (EosSdkBridge.ConnectionStateEvent) -> Unit)
 
@@ -100,9 +102,6 @@ class EosSdkBridgeImpl : EosSdkBridge {
         EosLogging.setCallback { msg -> onLog(msg.category, msg.level, msg.message) }
         EosLogging.setLogLevel(EosLogCategory.AllCategories, EosLogLevel.Info)
 
-        EosLogging.setLogLevel(EosLogCategory.P2P, EosLogLevel.VeryVerbose)
-        EosLogging.setLogLevel(EosLogCategory.Messaging, EosLogLevel.VeryVerbose)
-
         val options = EosPlatformOptions.create(
             productId = EosConstants.PRODUCT_ID,
             sandboxId = EosConstants.SANDBOX_ID,
@@ -122,10 +121,13 @@ class EosSdkBridgeImpl : EosSdkBridge {
         platform = created
     }
 
-    private val hooksInstalled = AtomicBoolean(false)
+    @Volatile private var hookedUser: EosProductUserId? = null
+    private val loginWatchInstalled = AtomicBoolean(false)
 
     private fun installP2PHooksOnce(local: SdkProductUserId) {
-        if (!hooksInstalled.compareAndSet(false, true)) return
+        val user = EosProductUserId(local.toStringValue())
+        if (hookedUser == user) return
+        hookedUser = user
         val p2p = requireNotNull(platform).p2p
 
         p2p.setPacketQueueSize(DEFAULT_QUEUE_BYTES, DEFAULT_QUEUE_BYTES)
@@ -145,6 +147,17 @@ class EosSdkBridgeImpl : EosSdkBridge {
             dispatchState(info.socketId.name, info.remoteUserId) {
                 EosSdkBridge.ConnectionStateEvent.Closed(it, info.reason.toString())
             }
+        }
+    }
+
+    private fun installLoginWatchOnce() {
+        if (!loginWatchInstalled.compareAndSet(false, true)) return
+        requireNotNull(platform).connect.addNotifyLoginStatusChanged { info ->
+            if (info.currentStatus == EosLoginStatus.LoggedIn) return@addNotifyLoginStatusChanged
+            logger.warn("EOS Connect login lost ({}), re-authenticating", info.currentStatus)
+            localUser = null
+            lastLoggedReceiveFailure = null
+            loginLostHandler?.let { handler -> runCatching(handler).onFailure { logger.error("EOS re-authentication hook failed", it) } }
         }
     }
 
@@ -244,6 +257,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
         val platform = this.platform ?: return
         this.platform = null
         localUser = null
+        hookedUser = null
+        loginWatchInstalled.set(false)
         lastLoggedReceiveFailure = null
         runCatching { platform.close() }.onFailure { logger.warn("Closing the EOS platform failed", it) }
         runCatching { Eos.shutdown() }.onFailure { logger.warn("Shutting the EOS SDK down failed", it) }
@@ -321,7 +336,10 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
         val resolved = EosProductUserId(userId.toStringValue())
         localUser = resolved
-        post { installP2PHooksOnce(userId) }
+        post {
+            installP2PHooksOnce(userId)
+            installLoginWatchOnce()
+        }
         resolved
     }
 
@@ -393,6 +411,10 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
     override fun setInboundPacketHandler(handler: (EosSdkBridge.Received) -> Unit) {
         inboundHandler = handler
+    }
+
+    override fun setLoginLostHandler(handler: () -> Unit) {
+        loginLostHandler = handler
     }
 
     override fun addConnectionRequestHandler(

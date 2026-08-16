@@ -26,6 +26,8 @@ interface EosSdkBridge {
 
     fun setInboundPacketHandler(handler: (Received) -> Unit)
 
+    fun setLoginLostHandler(handler: () -> Unit)
+
     fun addConnectionRequestHandler(socket: EosP2PSocketId, handler: (remote: EosProductUserId) -> Unit): EosNotificationHandle
 
     fun acceptConnection(socket: EosP2PSocketId, remote: EosProductUserId)

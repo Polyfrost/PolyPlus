@@ -93,6 +93,12 @@ object P2PSessionManager : EarlyInitializable {
                 channel.deliverInbound(received.remote, received.data)
             }
         }
+        bridge.setLoginLostHandler {
+            PolyPlusClient.SCOPE.launch {
+                _status.value = EosStatus.Connecting
+                authenticate(bridge, forceRelogin = true)
+            }
+        }
         P2PPackTransport.install(bridge)
         EosVoicechatBridge.install(bridge)
 
