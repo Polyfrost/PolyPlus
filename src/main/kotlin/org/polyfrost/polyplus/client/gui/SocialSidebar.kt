@@ -31,7 +31,7 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 
-internal enum class SocialTab { Chat, Global, Friends }
+internal enum class SocialTab { Chat, Global, Friends, Special }
 
 @Composable
 internal fun SocialSidebar(
@@ -39,6 +39,7 @@ internal fun SocialSidebar(
     tab: SocialTab,
     onTabChange: (SocialTab) -> Unit,
     groups: List<GroupSummary>,
+    showSpecialTab: Boolean,
     isSearching: Boolean,
     friends: List<Friend>,
     selfId: String,
@@ -47,6 +48,8 @@ internal fun SocialSidebar(
     onSelectFriend: (String) -> Unit,
     onAddFriend: () -> Unit,
 ) {
+    val specialGroups = if (showSpecialTab) groups.filter { it.special } else emptyList()
+    val chatGroups = if (showSpecialTab) groups.filterNot { it.special } else groups
     Column(
         modifier = modifier.background(SocialSidebarBackground),
     ) {
@@ -58,17 +61,35 @@ internal fun SocialSidebar(
             SidebarTabButton("Chat", tab == SocialTab.Chat, Modifier.weight(1f)) { onTabChange(SocialTab.Chat) }
             // Global chat is disabled for now.
             // SidebarTabButton("Global", tab == SocialTab.Global, Modifier.weight(1f)) { onTabChange(SocialTab.Global) }
+            if (showSpecialTab) {
+                SidebarTabButton(
+                    "Special",
+                    tab == SocialTab.Special,
+                    Modifier.weight(1f),
+                    badge = specialGroups.any { it.unread },
+                ) { onTabChange(SocialTab.Special) }
+            }
             SidebarTabButton("Friends", tab == SocialTab.Friends, Modifier.weight(1f)) { onTabChange(SocialTab.Friends) }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
         when (tab) {
             SocialTab.Chat -> ConversationList(
-                groups,
+                chatGroups,
                 isSearching,
                 selfId,
                 selectedGroupId,
                 onSelectGroup,
                 onAddFriend,
+            )
+            SocialTab.Special -> ConversationList(
+                specialGroups,
+                isSearching,
+                selfId,
+                selectedGroupId,
+                onSelectGroup,
+                onAddFriend,
+                emptyMessage = "No Special Chat messages yet",
+                emptyAction = null,
             )
             SocialTab.Global -> GlobalChatSidebarInfo()
             SocialTab.Friends -> FriendQuickList(friends, onSelectFriend, onAddFriend)
@@ -77,7 +98,13 @@ internal fun SocialSidebar(
 }
 
 @Composable
-private fun SidebarTabButton(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun SidebarTabButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier,
+    badge: Boolean = false,
+    onClick: () -> Unit,
+) {
     val (interaction, hovered) = rememberSocialHover()
     val background by androidx.compose.animation.animateColorAsState(if (selected) Accent.asSocialSelected else if (hovered) SocialHoverOverlay else Color.Transparent)
     val border by androidx.compose.animation.animateColorAsState(if (selected) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
@@ -92,7 +119,10 @@ private fun SidebarTabButton(label: String, selected: Boolean, modifier: Modifie
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        SocialText(label, fontSize = 13.sp, color = textColor)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            SocialText(label, fontSize = 13.sp, color = textColor)
+            if (badge) Box(Modifier.size(6.dp).clip(LocalTheme.current.circleShape).background(Accent))
+        }
     }
 }
 
@@ -104,6 +134,8 @@ private fun ConversationList(
     selectedGroupId: Int?,
     onSelectGroup: (Int) -> Unit,
     onAddFriend: () -> Unit,
+    emptyMessage: String = "No conversations yet",
+    emptyAction: String? = "Add a friend to get started",
 ) {
     if (groups.isEmpty()) {
         if (isSearching) {
@@ -112,8 +144,8 @@ private fun ConversationList(
             }
         } else {
             SidebarEmptyState(
-                message = "No conversations yet",
-                actionLabel = "Add a friend to get started",
+                message = emptyMessage,
+                actionLabel = emptyAction,
                 onAction = onAddFriend,
             )
         }
@@ -128,6 +160,8 @@ private fun ConversationList(
         }
     }
 }
+
+private const val SESSION_INVITE_CONTENT = "Invited you to their world"
 
 @Composable
 private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boolean, onClick: () -> Unit) {
@@ -167,8 +201,13 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
                     Box(Modifier.size(8.dp).clip(LocalTheme.current.circleShape).background(Accent))
                 }
             }
+            val last = group.lastMessage
             SocialText(
-                group.lastMessage?.content ?: "No messages yet",
+                when {
+                    last == null -> "No messages yet"
+                    last.sender == selfId && last.content == SESSION_INVITE_CONTENT -> "You invited them to your world"
+                    else -> last.content
+                },
                 fontSize = 12.sp,
                 color = SocialTextSecondary,
                 maxLines = 1,

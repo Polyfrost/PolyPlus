@@ -68,7 +68,7 @@ internal fun ConversationView(
     val relevantInvites = incomingInvites.filter { it.sender in group.members && it.id !in invitesShownInline }
     val specialStatus by SpecialChatRepository.status.collectAsState()
     val isSpecialGroup = specialStatus?.groupId == group.id
-    val canConvertToNormal = isSpecialGroup && specialStatus?.isSpecialChatTarget == true
+    val canConvertToNormal = group.special && specialStatus?.isSpecialChatTarget == true
 
     val latestMessageId = messages.lastOrNull { !GroupsRepository.isPending(it.id) }?.id
     LaunchedEffect(group.id, latestMessageId) {

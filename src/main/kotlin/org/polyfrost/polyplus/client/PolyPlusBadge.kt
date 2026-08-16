@@ -47,6 +47,9 @@ object PolyPlusBadge {
     @JvmField
     val badgeGlyph: Component = Component.literal(GLYPH).setStyle(BADGE_STYLE)
 
+    @JvmField
+    val badgeIcon: Component = Component.literal(GLYPH.substring(0, 1)).setStyle(BADGE_STYLE)
+
     @JvmStatic
     fun decorate(name: Component, uuid: UUID): Component {
         if (!shouldBadge(uuid)) return name

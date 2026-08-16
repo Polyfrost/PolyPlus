@@ -154,6 +154,7 @@ object PolyPlusClient {
         //? if >= 1.21.1
         EmoteWheelKeybind.register()
         step("social overlay keybind") { SocialOverlay.registerKeybind() }
+        step("vanilla menu button") { org.polyfrost.polyplus.client.gui.VanillaMenuButton.register() }
 
         step("websocket") {
             PolyConnection.initialize {

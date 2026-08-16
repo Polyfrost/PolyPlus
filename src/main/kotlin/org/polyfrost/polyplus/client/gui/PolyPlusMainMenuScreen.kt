@@ -790,6 +790,7 @@ private fun ModIntegrationBar(
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        VanillaMenuButton(assetsReady)
         ThemeToggleButton(assetsReady)
         NotificationBell(assetsReady = assetsReady)
         if (!ClientPlatform.isMac) {
@@ -797,6 +798,25 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady
         }
         IconButton(ASSETS + "x-close.svg", background = CloseBackground, assetsReady = assetsReady, tooltip = "Quit game", onClick = actions.quit)
     }
+}
+
+@Composable
+private fun VanillaMenuButton(assetsReady: Boolean) {
+    IconButton(
+        icon = ASSETS + "minecraft-block.svg",
+        assetsReady = assetsReady,
+        tooltip = "Switch to vanilla main menu",
+        onClick = {
+            PolyPlusMainMenuConfig.useVanillaMainMenu = true
+            PolyPlusMainMenuConfig.save()
+            val mc = net.minecraft.client.Minecraft.getInstance()
+            //? if >= 26.2 {
+            mc.gui.setScreen(net.minecraft.client.gui.screens.TitleScreen())
+            //?} else {
+            /*mc.setScreen(net.minecraft.client.gui.screens.TitleScreen())
+            *///?}
+        },
+    )
 }
 
 @Composable

@@ -1,5 +1,6 @@
 {
   "polyplus.hostWorld": "Host World",
+  "polyplus.mainmenu.switchToOneClient": "OneClient Menu",
   "polyplus.session.refresh": "Refresh Session",
   "polyplus.session.refreshing": "Refreshing session...",
   "polyplus.session.reconnecting": "Reconnecting...",

@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -271,12 +273,14 @@ internal fun SocialTextField(
     onSubmit: (() -> Unit)? = null,
 ) {
     val bodyFont = LocalTheme.current.typography.family
+    val focusRequester = remember { FocusRequester() }
     Row(
         modifier = modifier
             .height(38.dp)
             .clip(SocialFieldShape)
             .background(SocialControlBackground)
             .border(SocialBorderWidth, SocialBorderColor, SocialFieldShape)
+            .clickable(remember { MutableInteractionSource() }, indication = null) { focusRequester.requestFocus() }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -286,6 +290,7 @@ internal fun SocialTextField(
             BasicTextField(
                 value = value,
                 onValueChange = { if (it.length <= maxLength) onValueChange(it) },
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 singleLine = true,
                 textStyle = TextStyle(color = SocialTextPrimary, fontSize = 14.sp, fontFamily = bodyFont),
                 cursorBrush = SolidColor(Accent),

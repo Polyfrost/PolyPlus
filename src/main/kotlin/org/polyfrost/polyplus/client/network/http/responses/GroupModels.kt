@@ -55,6 +55,7 @@ data class GroupSummary(
     val members: List<String> = emptyList(),
     @SerialName("last_message") val lastMessage: GroupLastMessage? = null,
     val unread: Boolean = false,
+    val special: Boolean = false,
 )
 
 @Serializable

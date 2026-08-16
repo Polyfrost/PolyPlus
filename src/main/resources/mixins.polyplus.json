@@ -36,6 +36,7 @@
     "client.essential.Mixin_EssentialPartnerButton",
     "client.essential.Mixin_EssentialPartnerModal",
     "client.access.MinecraftAccessor",
+    "client.access.ScreenAccessor",
     "client.access.UserAccessor",
     "client.network.Mixin_ConnectionP2P",
     "client.network.Mixin_ServerConnectionListenerP2P",

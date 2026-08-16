@@ -52,6 +52,7 @@ import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.client.social.SpecialChatRepository
 
 @Composable
 fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
@@ -76,6 +77,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     val incomingInvites by SessionsRepository.incomingInvites.collectAsState()
     val names by PlayerNamesRepository.names.collectAsState()
     val hostedSessionId by P2PSessionManager.currentSessionIdFlow.collectAsState()
+    val isSpecialChatTarget = SpecialChatRepository.status.collectAsState().value?.isSpecialChatTarget == true
 
     val visibleGroups = remember(groups, searchQuery, names) {
         if (searchQuery.isBlank()) groups
@@ -91,7 +93,8 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
 
     fun openConversation(groupId: Int) {
         selectedGroupId = groupId
-        tab = SocialTab.Chat
+        val special = groups.firstOrNull { it.id == groupId }?.special == true
+        tab = if (isSpecialChatTarget && special) SocialTab.Special else SocialTab.Chat
         GroupsRepository.loadMessages(groupId)
     }
 
@@ -162,6 +165,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                     tab = tab,
                     onTabChange = { newTab -> tab = newTab },
                     groups = visibleGroups,
+                    showSpecialTab = isSpecialChatTarget,
                     isSearching = searchQuery.isNotBlank(),
                     friends = friends,
                     selfId = selfId,
@@ -175,8 +179,9 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                 Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     when (tab) {
-                        SocialTab.Chat -> {
+                        SocialTab.Chat, SocialTab.Special -> {
                             val group = groups.firstOrNull { it.id == selectedGroupId }
+                                ?.takeIf { tab != SocialTab.Chat || !isSpecialChatTarget || !it.special }
                             if (group != null) {
                                 val messages by GroupsRepository.messagesFlow(group.id).collectAsState()
                                 ConversationView(
