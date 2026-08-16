@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.network.http
 
 import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -11,8 +12,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -110,13 +113,31 @@ object PolyAuthorization {
         val serverId = generateServerId()
         authorizeSessionService(serverId, profileId, user.accessToken)
         val response = PolyPlusClient.HTTP
-            .post("${PolyPlusConfig.apiUrl}/account/login?server_id=$serverId&username=$playerName") {
+            .post("${PolyPlusConfig.apiUrl}/account/login") {
                 expectSuccess = true
+                parameter("server_id", serverId)
+                parameter("username", playerName)
+                parameter("client_version", PolyPlusConstants.VERSION)
+                parameter("minecraft_version", minecraftVersion())
+                parameter("loader", LOADER)
+                parameter("os", System.getProperty("os.name") ?: "unknown")
+                parameter("os_version", System.getProperty("os.version") ?: "unknown")
+                parameter("java_version", System.getProperty("java.version") ?: "unknown")
             }
             .bodyOrThrow<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
         return Authorized(profileId, response)
     }
+
+    private const val LOADER =
+        //? if fabric {
+        "fabric"
+    //?} else {
+    /*"neoforge"
+    *///?}
+
+    private fun minecraftVersion(): String =
+        runCatching { HostWorldManager.clientVersionName }.getOrDefault("unknown")
 
     private fun generateServerId(): String {
         val chars = ('a'..'z') + ('A'..'Z')
