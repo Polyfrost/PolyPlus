@@ -127,6 +127,8 @@ import net.minecraft.world.level.biome.MobSpawnSettings
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes
 import net.minecraft.world.level.dimension.DimensionType
 import net.minecraft.world.phys.Vec3
+import org.polyfrost.polyplus.mixin.client.access.CameraAccessor
+import org.polyfrost.polyplus.mixin.client.access.ClientPacketListenerAccessor
 *///?}
 
 object PlayerPreviewRenderer {
@@ -987,10 +989,8 @@ object PlayerPreviewRenderer {
 
         fun camera(): Camera {
             cachedCamera?.let { return it }
-            val unsafe = UNSAFE
-            val cam = unsafe.allocateInstance(Camera::class.java) as Camera
-            val field = Camera::class.java.getDeclaredField("position")
-            unsafe.putObject(cam, unsafe.objectFieldOffset(field), Vec3(0.0, 1.0E9, 0.0))
+            val cam = UNSAFE.allocateInstance(Camera::class.java) as Camera
+            (cam as CameraAccessor).`polyplus$setPosition`(Vec3(0.0, 1.0E9, 0.0))
             cachedCamera = cam
             return cam
         }
@@ -1050,10 +1050,8 @@ object PlayerPreviewRenderer {
         }
 
         private fun stubConnection(registries: RegistryAccess.Frozen): ClientPacketListener {
-            val unsafe = UNSAFE
-            val stub = unsafe.allocateInstance(ClientPacketListener::class.java) as ClientPacketListener
-            val field = ClientPacketListener::class.java.getDeclaredField("registryAccess")
-            unsafe.putObject(stub, unsafe.objectFieldOffset(field), registries)
+            val stub = UNSAFE.allocateInstance(ClientPacketListener::class.java) as ClientPacketListener
+            (stub as ClientPacketListenerAccessor).`polyplus$setRegistryAccess`(registries)
             return stub
         }
     }

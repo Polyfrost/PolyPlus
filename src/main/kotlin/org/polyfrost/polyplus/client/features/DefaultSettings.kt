@@ -55,6 +55,7 @@ object DefaultSettings {
     private const val CONFIRM_DISCONNECT_ID = "confirmdisconnect"
     private const val CONTROLIFY_ID = "controlify"
     private const val BOBBY_ID = "bobby"
+    private const val MODMENU_ID = "modmenu"
 
     private const val BOBBY_CONFIG_FILE = "bobby.conf"
     private const val BOBBY_DYNAMIC_MULTI_WORLD = "dynamic-multi-world"
@@ -84,6 +85,12 @@ object DefaultSettings {
             AnimatiumOption("disableSwingOnUse", value = false),
         ),
     )
+
+    private const val MODMENU_MAIN = "com.terraformersmc.modmenu.ModMenu"
+    private const val MODMENU_CONFIG = "com.terraformersmc.modmenu.config.ModMenuConfig"
+    private const val MODMENU_CONFIG_MANAGER = "com.terraformersmc.modmenu.config.ModMenuConfigManager"
+
+    private val MODMENU_COUNT_OPTIONS = listOf("COUNT_CHILDREN", "COUNT_LIBRARIES", "COUNT_HIDDEN_MODS")
 
     private const val BETTER_SCREENS_CONFIG = "dev.microcontrollers.betterscreens.config.BetterScreensConfig"
     private const val CONFIRM_DISCONNECT_CONFIG = "dev.microcontrollers.confirmdisconnect.config.ConfirmDisconnectConfig"
@@ -165,6 +172,15 @@ object DefaultSettings {
                 apply = ::applyBobbyConfig,
                 coveredByLegacyFlag = false,
                 retryable = true,
+            ),
+        )
+        add(
+            Task(
+                id = "modmenu-mod-count",
+                label = "Mod Menu mod count",
+                isPresent = { modLoaded(MODMENU_ID) && findClass(MODMENU_CONFIG) != null },
+                apply = ::applyModMenuModCount,
+                coveredByLegacyFlag = false,
             ),
         )
         add(
@@ -351,6 +367,17 @@ object DefaultSettings {
 
         path.writeText(updated.joinToString("\n", postfix = "\n"))
         logger.info("Enabled Bobby dynamic multi-world")
+    }
+
+    private fun applyModMenuModCount() {
+        val config = findClass(MODMENU_CONFIG) ?: error("$MODMENU_CONFIG is missing")
+        MODMENU_COUNT_OPTIONS.forEach { name ->
+            val option = config.getField(name).get(null)
+            option.javaClass.getMethod("setValue", Boolean::class.javaPrimitiveType).invoke(option, false)
+        }
+        findClass(MODMENU_CONFIG_MANAGER)?.getMethod("save")?.invoke(null)
+        findClass(MODMENU_MAIN)?.getMethod("clearModCountCache")?.invoke(null)
+        logger.info("Limited the Mod Menu mod count to non-library mods in the mods folder")
     }
 
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
