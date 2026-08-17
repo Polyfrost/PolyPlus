@@ -1,3 +1,4 @@
-## 1.2.4
-- Fix certain capes not loading for other players
-- Fix log spam from EOS
+## 1.2.5
+- Force disable bannable Debugify issues
+- Force kill Animatium toasts
+- Report actual mod count in mod menu
