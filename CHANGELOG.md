@@ -1,4 +1,2 @@
-## 1.2.5
-- Force disable bannable Debugify issues
-- Force kill Animatium toasts
-- Report actual mod count in mod menu
+## 1.2.6
+- fix player preview crash on 1.21.1
