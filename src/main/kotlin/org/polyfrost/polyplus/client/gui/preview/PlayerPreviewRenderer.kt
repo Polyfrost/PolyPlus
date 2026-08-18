@@ -127,6 +127,7 @@ import net.minecraft.world.level.biome.MobSpawnSettings
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes
 import net.minecraft.world.level.dimension.DimensionType
 import net.minecraft.world.phys.Vec3
+import net.minecraft.world.scores.Scoreboard
 import org.polyfrost.polyplus.mixin.client.access.CameraAccessor
 import org.polyfrost.polyplus.mixin.client.access.ClientPacketListenerAccessor
 *///?}
@@ -1052,6 +1053,7 @@ object PlayerPreviewRenderer {
         private fun stubConnection(registries: RegistryAccess.Frozen): ClientPacketListener {
             val stub = UNSAFE.allocateInstance(ClientPacketListener::class.java) as ClientPacketListener
             (stub as ClientPacketListenerAccessor).`polyplus$setRegistryAccess`(registries)
+            (stub as ClientPacketListenerAccessor).`polyplus$setScoreboard`(Scoreboard())
             return stub
         }
     }
@@ -1242,7 +1244,7 @@ object PlayerPreviewRenderer {
             /*// Always swap in the far-away stand-in camera (not only off-world): in a live
             dispatcher.camera = PreviewWorld.camera()
             dispatcher.overrideCameraOrientation(Quaternionf().rotateY(Math.PI.toFloat()))
-            dispatcher.render(player, 0.0, 0.0, 0.0, 0f, 1f, pose, bufferSource, 0xF000F0)
+            dispatcher.getRenderer(player)?.render(player, 0f, 1f, pose, bufferSource, 0xF000F0)
             *///?}
             fbo.bindWrite(true)
             bufferSource.endBatch()
