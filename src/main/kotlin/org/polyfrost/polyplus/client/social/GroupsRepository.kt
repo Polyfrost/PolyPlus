@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -181,18 +182,20 @@ object GroupsRepository : EarlyInitializable {
                 },
             ),
         )
-        if (packet.sessionInviteId == null) notifyMessageReceived(packet.messageId, packet.sender, packet.content)
+        if (packet.sessionInviteId == null) notifyMessageReceived(packet.groupId, packet.messageId, packet.sender, packet.content)
     }
 
-    private fun notifyMessageReceived(messageId: Long, sender: String, content: String) {
+    private fun notifyMessageReceived(groupId: Int, messageId: Long, sender: String, content: String) {
         val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
         if (sender == selfId) return
         if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
+        val groupName = groups.value.filter { it.id == groupId }.first().name
+
 
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
         val preview = if (content.length > 80) content.take(77) + "..." else content
-        Notifications.info(name, preview)
+        Notifications.info("[$groupName] $name", preview)
     }
 
     private fun onMessageEdited(packet: ClientboundPacket.GroupMessageEdited) {
