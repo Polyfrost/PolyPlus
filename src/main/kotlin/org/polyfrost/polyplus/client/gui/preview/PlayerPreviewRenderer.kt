@@ -503,6 +503,7 @@ object PlayerPreviewRenderer {
         player.yBodyRot = 0f; player.yBodyRotO = 0f
         player.yHeadRot = 0f; player.yHeadRotO = 0f
         player.setXRot(0f); player.xRotO = 0f
+        if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
         state.showCape = source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
@@ -560,6 +561,7 @@ object PlayerPreviewRenderer {
         equipmentByEntityId[PREVIEW_ENTITY_ID] = equipment
 
         val state = directState(skin)
+        if (mc.entityRenderDispatcher.getRenderer(state) == null) return
         state.id = PREVIEW_ENTITY_ID
         if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
         //? if >= 1.21.10 {
