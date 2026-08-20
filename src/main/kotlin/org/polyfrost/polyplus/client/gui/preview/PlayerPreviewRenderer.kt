@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
+import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 //? if >= 1.21.8 {
@@ -288,6 +289,15 @@ object PlayerPreviewRenderer {
     private val LOG = org.slf4j.LoggerFactory.getLogger("polyplus/preview")
     private const val MAX_DIM = 512
 
+    private val loggedSkips = HashSet<String>()
+
+    private fun logSkippedFrame(t: Throwable) {
+        val top = t.stackTrace.firstOrNull()
+        val signature = "${t.javaClass.name}@${top?.className}.${top?.methodName}:${top?.lineNumber}"
+        if (loggedSkips.add(signature)) LOG.error("[preview] entity submit failed; skipping frame", t)
+        else LOG.debug("[preview] entity submit failed again ({}); skipping frame", signature)
+    }
+
     private var target: TextureTarget? = null
     private var dummy: AbstractClientPlayer? = null
     private var dummyProfileId: java.util.UUID? = null
@@ -370,19 +380,25 @@ object PlayerPreviewRenderer {
             //? if >= 1.21.10 {
             previewCape = capeOverride(source)?.let { ClientAsset.ResourceTexture(it).texturePath() }
             renderingPreview = true
+            //?}
             try {
-                val level = mc.level
-                if (level != null && mc.cameraEntity != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
-                else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+                PolyPlusSentry.handlingLocally {
+                    //? if >= 1.21.10 {
+                    val level = mc.level
+                    if (level != null && mc.cameraEntity != null) renderEntity(mc, level, source, yawDeg, w, h, modelScale, verticalAnchor)
+                    else renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+                    //?} else {
+                    /*renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+                    *///?}
+                }
             } catch (t: Throwable) {
-                LOG.error("[preview] entity submit failed; skipping frame", t)
+                logSkippedFrame(t)
             } finally {
+                //? if >= 1.21.10 {
                 renderingPreview = false
                 previewCape = null
+                //?}
             }
-            //?} else {
-            /*renderDirect(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
-            *///?}
         } finally {
             //? if >= 26.2 {
             RenderSystem.getModelViewStack().popMatrix()
@@ -497,7 +513,10 @@ object PlayerPreviewRenderer {
 
     //? if >= 1.21.10 {
     private fun renderEntity(mc: Minecraft, level: ClientLevel, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
-        val player = dummy(mc, level) ?: return
+        val player = dummy(mc, level) ?: run {
+            LOG.debug("[preview] skipping frame: preview avatar not built yet")
+            return
+        }
         bindEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = 0f; player.yBodyRotO = 0f
