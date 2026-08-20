@@ -31,7 +31,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
-import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 //?}
 import java.util.concurrent.atomic.AtomicBoolean
@@ -151,8 +150,6 @@ object PolyPlusClient {
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
-        //? if >= 1.21.1
-        EmoteWheelKeybind.register()
         step("social overlay keybind") { SocialOverlay.registerKeybind() }
         step("vanilla menu button") { org.polyfrost.polyplus.client.gui.VanillaMenuButton.register() }
 

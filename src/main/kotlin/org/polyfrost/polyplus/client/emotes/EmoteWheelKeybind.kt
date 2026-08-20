@@ -10,9 +10,6 @@ object EmoteWheelKeybind {
 
     fun isHeld(): Boolean = held
 
-    fun register() {
-    }
-
     fun onKeybindState(pressed: Boolean) {
         held = pressed
         if (!pressed) return
