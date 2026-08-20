@@ -197,6 +197,7 @@ loomExt.runs.named("client") {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("polyplus.oneconfig.version", oneconfigVersion)
     testLogging {
         showStackTraces = true
         exceptionFormat = TestExceptionFormat.FULL
@@ -210,6 +211,7 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("modName", modName)
     inputs.property("modVersion", modVersion)
     inputs.property("minorMcVersion", minecraftPredicate)
+    inputs.property("oneconfigVersion", oneconfigVersion)
     filesMatching("fabric.mod.json") {
         expand(
             mapOf(
@@ -218,6 +220,7 @@ tasks.withType<ProcessResources>().configureEach {
                 "mod_version" to modVersion,
                 "mod_description" to "PolyPlus cosmetics for OneConfig",
                 "minor_mc_version" to minecraftPredicate,
+                "oneconfig_version" to oneconfigVersion,
             ),
         )
     }

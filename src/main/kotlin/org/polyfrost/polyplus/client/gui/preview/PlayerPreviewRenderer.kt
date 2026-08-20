@@ -496,7 +496,10 @@ object PlayerPreviewRenderer {
 
     //? if >= 1.21.10 {
     private fun renderEntity(mc: Minecraft, level: ClientLevel, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
-        val player = dummy(mc, level) ?: return
+        val player = dummy(mc, level) ?: run {
+            LOG.debug("[preview] skipping frame: preview avatar not built yet (textured profile still resolving)")
+            return
+        }
         bindEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = 0f; player.yBodyRotO = 0f
@@ -549,7 +552,21 @@ object PlayerPreviewRenderer {
     }
     //?}
 
+    private val capeLayerNeedsBackingAvatar: Boolean by lazy {
+        val loader = net.fabricmc.loader.api.FabricLoader.getInstance()
+        loader.isModLoaded("waveycapes") && loader.isModLoaded("ears")
+    }
+
+    private var loggedAvatarlessSkip = false
+
     private fun renderDirect(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
+        if (capeLayerNeedsBackingAvatar) {
+            if (!loggedAvatarlessSkip) {
+                loggedAvatarlessSkip = true
+                LOG.debug("[preview] skipping avatar-less preview frames: an installed cape layer needs the avatar the render state was extracted from")
+            }
+            return
+        }
         val baseSkin = localSkin(mc) ?: return
         val skin = capeOverride(source)?.let { withCape(baseSkin, it) } ?: baseSkin
         val equipment = when (source) {

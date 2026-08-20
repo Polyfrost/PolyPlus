@@ -129,6 +129,13 @@ object CustomPanorama {
 
     private suspend fun prepare(pack: PanoramaPack) {
         val dir = cacheDir(pack)
+        if (isUnpacked(dir) && !facesUsable(dir)) {
+            LOGGER.warn(
+                "Cached main menu panorama pack {} has unusable faces {}; discarding it and downloading again",
+                pack.cacheKey, faceSizes(dir),
+            )
+            purge(dir)
+        }
         if (!isUnpacked(dir)) {
             LOGGER.info("Downloading main menu panorama pack {}", pack.cacheKey)
             val bytes = http.get(pack.url) { timeout { requestTimeoutMillis = 300_000 } }.bodyAsBytes()
@@ -149,6 +156,11 @@ object CustomPanorama {
 
     private fun faceName(index: Int): String = "panorama_$index.png"
 
+    private fun faceSizes(dir: Path): List<Pair<Int, Int>?> =
+        (0 until FACES).map { PanoramaFaces.readPngSize(dir.resolve(faceName(it))) }
+
+    private fun facesUsable(dir: Path): Boolean = PanoramaFaces.facesUsable(faceSizes(dir))
+
     private fun unpack(bytes: ByteArray, dir: Path) {
         val wanted = buildSet {
             for (face in 0 until FACES) add(faceName(face))
@@ -167,6 +179,9 @@ object CustomPanorama {
             }
         }
         check(isUnpacked(dir)) { "Panorama pack is missing one or more panorama faces" }
+        check(facesUsable(dir)) {
+            "Panorama pack faces must all be square and the same size, got ${faceSizes(dir)}"
+        }
     }
 
     private fun register(dir: Path) {
