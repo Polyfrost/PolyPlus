@@ -29,6 +29,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 
@@ -78,6 +79,8 @@ object CustomPanorama {
 
     private val started = AtomicBoolean(false)
 
+    private val failedPacks = ConcurrentHashMap.newKeySet<String>()
+
     @Volatile
     private var cubeMapReady = false
 
@@ -92,11 +95,15 @@ object CustomPanorama {
         val pack = PACK ?: return
         if (!PolyPlusMainMenuConfig.customPanorama) return
         if (cubeMapReady) return
+        if (pack.cacheKey in failedPacks) return
         if (!started.compareAndSet(false, true)) return
 
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
             try {
-                prepare(pack)
+                if (!prepare(pack)) {
+                    failedPacks.add(pack.cacheKey)
+                    LOGGER.warn("Not retrying main menu panorama pack {} again this session", pack.cacheKey)
+                }
             } catch (t: Throwable) {
                 started.set(false)
                 LOGGER.warn("Failed to prepare the custom main menu panorama", t)
@@ -127,7 +134,7 @@ object CustomPanorama {
         }
     }
 
-    private suspend fun prepare(pack: PanoramaPack) {
+    private suspend fun prepare(pack: PanoramaPack): Boolean {
         val dir = cacheDir(pack)
         if (!isUnpacked(dir)) {
             LOGGER.info("Downloading main menu panorama pack {}", pack.cacheKey)
@@ -138,14 +145,17 @@ object CustomPanorama {
             }
             unpack(bytes, dir)
         }
-        register(dir)
+        return register(dir)
     }
 
     private fun cacheDir(pack: PanoramaPack): Path =
         File(PolyPlusConstants.NAME).resolve("panorama").resolve(pack.cacheKey).toPath()
 
+    private const val COMPLETE_MARKER = ".complete"
+
     private fun isUnpacked(dir: Path): Boolean =
-        (0 until FACES).all { Files.isRegularFile(dir.resolve(faceName(it))) }
+        Files.isRegularFile(dir.resolve(COMPLETE_MARKER)) &&
+            (0 until FACES).all { Files.isRegularFile(dir.resolve(faceName(it))) }
 
     private fun faceName(index: Int): String = "panorama_$index.png"
 
@@ -166,10 +176,13 @@ object CustomPanorama {
                 entry = zip.nextEntry
             }
         }
-        check(isUnpacked(dir)) { "Panorama pack is missing one or more panorama faces" }
+        check((0 until FACES).all { Files.isRegularFile(dir.resolve(faceName(it))) }) {
+            "Panorama pack is missing one or more panorama faces"
+        }
+        Files.write(dir.resolve(COMPLETE_MARKER), ByteArray(0))
     }
 
-    private fun register(dir: Path) {
+    private fun register(dir: Path): Boolean {
         val loaded = ClientPlatform.runOnMainSync {
             runCatching {
                 val textureManager = Minecraft.getInstance().textureManager
@@ -192,13 +205,15 @@ object CustomPanorama {
             overlayReady = false
             purge(dir)
             started.set(false)
-            return
+            return false
         }
         LOGGER.info("Custom main menu panorama loaded from {}", dir)
+        return true
     }
 
     private fun purge(dir: Path) {
         runCatching {
+            Files.deleteIfExists(dir.resolve(COMPLETE_MARKER))
             for (face in 0 until FACES) Files.deleteIfExists(dir.resolve(faceName(face)))
             Files.deleteIfExists(dir.resolve(OVERLAY_FILE))
         }
