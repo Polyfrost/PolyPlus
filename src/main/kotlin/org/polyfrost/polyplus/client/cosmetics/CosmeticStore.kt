@@ -36,6 +36,7 @@ object CosmeticStore {
         types: List<String> = emptyList(),
         tags: List<String> = emptyList(),
         collection: Int? = null,
+        reportFailures: Boolean = true,
     ): Result<CosmeticSearchResponse> = runCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics/search") {
             parameter("page", page.coerceAtLeast(1))
@@ -46,25 +47,34 @@ object CosmeticStore {
             if (tags.isNotEmpty()) parameter("tags", tags.joinToString(","))
             if (collection != null) parameter("collection", collection)
         }.body<CosmeticSearchResponse>()
-    }.onFailure { reportFailure("Failed to search cosmetics", it) }
+    }.onFailure { if (reportFailures) reportFailure("Failed to search cosmetics", it) }
 
     private var cachedStockedTypes: List<CosmeticType>? = null
 
     suspend fun stockedTypes(): List<CosmeticType> {
         cachedStockedTypes?.let { return it }
         val types = CosmeticType.entries.filter { it != CosmeticType.Unknown }
-        var anySucceeded = false
-        val stocked = coroutineScope {
+        val probes = coroutineScope {
             types.map { type ->
                 async {
-                    val result = search(page = 1, perPage = 1, types = listOf(type.serializedName))
-                    if (result.isSuccess) anySucceeded = true
-                    val count = result.getOrNull()?.pagination?.totalItems
-                    type.takeIf { count == null || count > 0 }
+                    type to search(
+                        page = 1,
+                        perPage = 1,
+                        types = listOf(type.serializedName),
+                        reportFailures = false,
+                    ).getOrNull()
                 }
             }.awaitAll()
-        }.filterNotNull()
-        if (!anySucceeded) return stocked
+        }
+        val stocked = probes.filter { (_, response) ->
+            response == null || response.pagination.totalItems > 0
+        }.map { it.first }
+
+        val failed = probes.count { it.second == null }
+        if (failed > 0) {
+            LOGGER.warn("{} of {} cosmetic type probes failed; not caching the stocked types", failed, types.size)
+            return stocked
+        }
         return stocked.also { cachedStockedTypes = it }
     }
 
