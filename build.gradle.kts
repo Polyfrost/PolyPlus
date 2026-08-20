@@ -57,6 +57,14 @@ val ktorModules = listOf(
     "io.ktor:ktor-serialization-kotlinx-json"
 ).map { "$it:$ktorVersion" }
 
+val flkProvidedModules = setOf(
+    "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+    "org.jetbrains.kotlinx:kotlinx-serialization-cbor-jvm",
+    "org.jetbrains.kotlinx:kotlinx-io-core-jvm",
+    "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm",
+)
+
 group = property("mod.group") as String
 version = "${property("mod.version")}+${stonecutter.current.version}"
 base.archivesName = property("mod.id") as String
@@ -92,6 +100,28 @@ repositories {
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
     strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
+}
+
+val flkProvidedVersions: Map<String, String> = run {
+    configurations.detachedConfiguration(
+        dependencies.create("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion"),
+    ).resolvedConfiguration.resolvedArtifacts
+        .map { it.moduleVersion.id }
+        .filter { "${it.group}:${it.name}" in flkProvidedModules }
+        .associate { "${it.group}:${it.name}" to it.version }
+        .also { resolved ->
+            val missing = flkProvidedModules - resolved.keys
+            check(missing.isEmpty()) {
+                "fabric-language-kotlin $fabricLanguageKotlinVersion no longer ships $missing; " +
+                    "drop them from flkProvidedModules so they get bundled again"
+            }
+        }
+}
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        flkProvidedVersions["${requested.group}:${requested.name}"]?.let { useVersion(it) }
+    }
 }
 
 val javaVersion = when {
@@ -202,9 +232,9 @@ run {
     )
     closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
         val id = art.moduleVersion.id
-        if (id.group != "org.jetbrains.kotlin") {
-            dependencies.include("${id.group}:${id.name}:${id.version}")
-        }
+        if (id.group == "org.jetbrains.kotlin") return@forEach
+        if ("${id.group}:${id.name}" in flkProvidedModules) return@forEach
+        dependencies.include("${id.group}:${id.name}:${id.version}")
     }
 }
 
