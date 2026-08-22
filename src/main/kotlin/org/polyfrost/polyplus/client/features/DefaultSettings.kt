@@ -9,6 +9,7 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import java.lang.reflect.Modifier
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -34,7 +35,12 @@ object DefaultSettings {
         "zoomify.key.zoom.secondary",
         "key.optigui.inspect",
         "key.blackbarconcealer.toggle",
+        "key.debug.noxesium",
+        "Open Mod Configuration",
+        "Reload Mod",
     )
+
+    private val POST_LEGACY_UNBINDS = setOf("key.debug.noxesium", "Open Mod Configuration", "Reload Mod")
 
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
@@ -69,6 +75,7 @@ object DefaultSettings {
         "items" to listOf(
             AnimatiumOption("itemPositions", value = true),
             AnimatiumOption("itemPositionsInThirdPerson", value = true),
+            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
             AnimatiumOption("itemUsageSwinging", value = true),
             AnimatiumOption("disableSwingOnUse", value = false),
             AnimatiumOption("itemPickupPosition", value = true),
@@ -83,6 +90,7 @@ object DefaultSettings {
     private val ANIMATIUM_FIXUPS = mapOf(
         "items" to listOf(
             AnimatiumOption("disableSwingOnUse", value = false),
+            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
         ),
     )
 
@@ -157,7 +165,7 @@ object DefaultSettings {
         )
         add(
             Task(
-                id = "animatium-swing-on-use",
+                id = "animatium-item-fixups",
                 label = "Animatium",
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumFixups,
@@ -198,6 +206,7 @@ object DefaultSettings {
         label = "keybinds",
         isPresent = { keyMappings().any { matches(it.name) } },
         apply = { unbindMatching(matches) },
+        coveredByLegacyFlag = id !in POST_LEGACY_UNBINDS,
     )
 
     private val LEGACY_TASKS = (INIT_TASKS + TICK_TASKS).filter(Task::coveredByLegacyFlag)
@@ -436,9 +445,16 @@ object DefaultSettings {
             runCatching { enumConstant(versionClass, name) }.getOrNull()
         } ?: error("Animatium has none of the $ANIMATIUM_PRESET presets")
 
-        val legacyApply = runCatching { versionClass.getMethod("apply", configClass) }.getOrNull()
-        if (legacyApply != null) legacyApply.invoke(preset, config)
-        else versionClass.getMethod("apply").invoke(preset)
+        val apply = versionClass.methods.firstOrNull { it.name == "apply" && !Modifier.isStatic(it.modifiers) }
+            ?: error("Animatium ${versionClass.simpleName} has no apply method")
+        val arguments = apply.parameterTypes.map { type ->
+            when {
+                type.isAssignableFrom(configClass) -> config
+                type == Boolean::class.javaPrimitiveType -> false
+                else -> error("Animatium ${versionClass.simpleName}#apply takes an unknown ${type.name}")
+            }
+        }
+        apply.invoke(preset, *arguments.toTypedArray())
     }
 
     private fun reloadAnimatium() {
