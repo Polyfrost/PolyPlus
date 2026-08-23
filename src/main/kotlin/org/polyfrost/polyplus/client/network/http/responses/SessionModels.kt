@@ -28,4 +28,5 @@ data class SessionInvite(
     @SerialName("eos_product_user_id") val eosProductUserId: String? = null,
     @SerialName("eos_session_id") val eosSessionId: String? = null,
     @SerialName("created_at") val createdAt: String,
+    val status: String = "pending",
 )

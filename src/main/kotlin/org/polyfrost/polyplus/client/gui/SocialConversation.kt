@@ -65,7 +65,9 @@ internal fun ConversationView(
 ) {
     val title = renameOverrides[group.id] ?: conversationDisplayTitle(group, selfId)
     val invitesShownInline = messages.mapNotNull { it.sessionInvite?.id }.toSet()
-    val relevantInvites = incomingInvites.filter { it.sender in group.members && it.id !in invitesShownInline }
+    val relevantInvites = incomingInvites.filter {
+        it.sender in group.members && it.id !in invitesShownInline && it.status == "pending"
+    }
     val specialStatus by SpecialChatRepository.status.collectAsState()
     val isSpecialGroup = specialStatus?.groupId == group.id
     val canConvertToNormal = group.special && specialStatus?.isSpecialChatTarget == true
@@ -447,9 +449,15 @@ private fun InviteMessageCard(
                 color = SocialTextSecondary,
             )
         }
-        if (!outgoing && live != null && invite.status == "pending") {
+        if (!outgoing && live != null) {
             SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(live) })
-            SocialButton("Join", icon = SOCIAL_ASSETS + "log-in-04.svg", filled = true, modifier = Modifier.height(34.dp), onClick = { SessionsRepository.accept(live) })
+            SocialButton(
+                if (live.status == "accepted") "Re-join" else "Join",
+                icon = SOCIAL_ASSETS + "log-in-04.svg",
+                filled = true,
+                modifier = Modifier.height(34.dp),
+                onClick = { SessionsRepository.accept(live) },
+            )
         }
     }
 }

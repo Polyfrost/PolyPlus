@@ -359,15 +359,16 @@ private fun SocialHeaderToolbar(
 @Composable
 private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val unanswered = invites.count { it.status == "pending" }
     Box {
         SocialIconButton(
             SOCIAL_ASSETS + "bell-01.svg",
             tooltip = "World invites",
-            background = if (invites.isNotEmpty()) SocialWarnColor.copy(alpha = 0.18f) else null,
-            tint = if (invites.isNotEmpty()) SocialWarnColor else SocialTextPrimary,
+            background = if (unanswered > 0) SocialWarnColor.copy(alpha = 0.18f) else null,
+            tint = if (unanswered > 0) SocialWarnColor else SocialTextPrimary,
             onClick = { open = !open },
         )
-        if (invites.isNotEmpty()) {
+        if (unanswered > 0) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
@@ -376,7 +377,7 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
                     .background(SocialWarnColor)
                     .padding(horizontal = 4.dp),
             ) {
-                SocialText(invites.size.toString(), fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                SocialText(unanswered.toString(), fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         if (open) {
@@ -397,7 +398,7 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
                 ) {
                     SocialText("World Invites", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     if (invites.isEmpty()) {
-                        SocialText("No pending invites", fontSize = 12.sp, color = SocialTextSecondary)
+                        SocialText("No world invites", fontSize = 12.sp, color = SocialTextSecondary)
                     } else {
                         invites.forEach { invite ->
                             val (interaction, hovered) = rememberSocialHover()
@@ -419,7 +420,7 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
                                 SocialIconButton(
                                     SOCIAL_ASSETS + "check.svg",
                                     tint = Color.White,
-                                    tooltip = "Join",
+                                    tooltip = if (invite.status == "accepted") "Re-join" else "Join",
                                     onClick = { open = false; SessionsRepository.accept(invite) },
                                 )
                             }
