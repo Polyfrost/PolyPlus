@@ -7,8 +7,8 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.FramebufferRenderEvent
 import org.polyfrost.oneconfig.api.event.v1.events.MainMenuFpsEvent
-import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.polyplus.client.PolyPlusConfig
 
@@ -48,7 +48,7 @@ object AdaptiveBlurDefaults {
         eventHandler { event: MainMenuFpsEvent ->
             onSample(event.averageFps)
         }
-        eventHandler { _: TickEvent.End ->
+        eventHandler { _: FramebufferRenderEvent ->
             tickSample()
         }
     }
