@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
@@ -77,7 +78,7 @@ object CosmeticSync : EarlyInitializable {
         }.register()
         //?}
 
-        eventHandler<WorldEvent.Unload> {
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             unsubscribeAllPlayers()
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
@@ -85,7 +86,7 @@ object CosmeticSync : EarlyInitializable {
             CosmeticAssetCache.reset()
             PetManager.despawnAll()
             //?}
-        }.register()
+        }
 
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {

@@ -78,7 +78,8 @@
     *///?}
     //? if >= 26.2 {
     ,
-    "client.Mixin_PreviewPresent26_2"
+    "client.Mixin_PreviewPresent26_2",
+    "client.Mixin_ChatAbilitiesOffThread"
     //?}
     //? if >= 1.21.1 {
   ,

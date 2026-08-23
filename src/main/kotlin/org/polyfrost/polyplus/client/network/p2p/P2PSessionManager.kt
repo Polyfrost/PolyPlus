@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.TitleScreen
@@ -18,7 +19,6 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
-import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
@@ -35,6 +35,7 @@ import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.utils.EarlyInitializable
+import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
 object P2PSessionManager : EarlyInitializable {
@@ -48,6 +49,7 @@ object P2PSessionManager : EarlyInitializable {
     const val P2P_PLACEHOLDER_IP = "127.6.6.6"
 
     @Volatile private var bridge: EosSdkBridge? = null
+    @Volatile private var sessionOwner: UUID? = null
 
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionIdFlow = _currentSessionId.asStateFlow()
@@ -72,10 +74,10 @@ object P2PSessionManager : EarlyInitializable {
 
         HostSharedPack.registerConfigurationHook()
 
-        eventHandler<WorldEvent.Unload> {
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             stopHosting()
             PackHttpBridge.setPackSource(null)
-        }.register()
+        }
 
         eventHandler<TickEvent.End> { checkForStalledEos() }.register()
     }
@@ -182,6 +184,7 @@ object P2PSessionManager : EarlyInitializable {
 
         return SessionsApi.create().onSuccess { session ->
             _currentSessionId.value = session.id
+            sessionOwner = localProfileId()
             val socket = socketFor(session.id)
             P2PListenContext.setPendingListen(socket, localUser)
             SessionsApi.updateEosSessionId(session.id, socket.name)
@@ -192,9 +195,14 @@ object P2PSessionManager : EarlyInitializable {
     fun stopHosting() {
         HostSharedPack.disable()
         val sessionId = currentSessionId ?: return
+        val owner = sessionOwner
         _currentSessionId.value = null
+        sessionOwner = null
+        if (owner != null && owner != localProfileId()) return
         SessionsRepository.close(sessionId)
     }
+
+    private fun localProfileId(): UUID? = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
 
     private suspend fun handleAcceptedInvite(invite: SessionInvite) {
         val bridge = this.bridge
