@@ -10,6 +10,10 @@ object P2PConnectionContext {
     @JvmStatic
     fun hasPendingJoin(): Boolean = pendingTarget != null
 
+    fun clearPendingJoin() {
+        pendingTarget = null
+    }
+
     @JvmStatic
     fun consumeAddressOverride(): EosP2PAddress? {
         val target = pendingTarget ?: return null

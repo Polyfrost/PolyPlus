@@ -533,6 +533,24 @@ object PolyPlusSentry {
     }
 
     @JvmStatic
+    fun captureStalledThread(thread: Thread, stack: Array<StackTraceElement>, description: String) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
+        initialize()
+        val hub = activeHub() ?: return
+
+        val stalled = StalledThreadException(description).apply { stackTrace = stack }
+        val event = SentryEvent(stalled)
+        event.setTag("mechanism", "thread_stall")
+        event.setTag(TAG_THREAD, thread.name)
+        event.fingerprints = listOfNotNull(
+            "thread_stall",
+            thread.name,
+            stack.firstOrNull()?.let { "${it.className}.${normalizeMethodName(it.methodName)}" },
+        )
+        hub.captureEvent(event)
+    }
+
+    @JvmStatic
     fun captureCrashReport(title: String?, throwable: Throwable) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (locallyHandled.get() > 0) return
@@ -615,3 +633,5 @@ object PolyPlusSentry {
         activeHub()?.captureEvent(event)
     }
 }
+
+class StalledThreadException internal constructor(message: String) : RuntimeException(message)

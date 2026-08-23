@@ -363,7 +363,7 @@ private fun InviteFriendsModal(
 
         when (val status = eosStatus) {
             EosStatus.Connecting -> SocialText("Connecting to Poly+ multiplayer services...", fontSize = 12.sp, color = SocialTextSecondary)
-            is EosStatus.Failed -> SocialText(status.reason + " — you can still host on LAN.", fontSize = 12.sp, color = SocialWarnColor)
+            is EosStatus.Failed -> SocialText(status.reason + " You can still host on LAN.", fontSize = 12.sp, color = SocialWarnColor)
             EosStatus.Ready -> {}
         }
         state.hostError?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }

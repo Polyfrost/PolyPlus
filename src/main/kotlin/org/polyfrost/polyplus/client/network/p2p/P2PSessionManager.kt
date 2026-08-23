@@ -17,13 +17,16 @@ import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
+import org.polyfrost.polyplus.client.network.eos.EosTickHealth
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
@@ -57,7 +60,6 @@ object P2PSessionManager : EarlyInitializable {
 
     private const val AUTH_READY_TIMEOUT_MS = 15_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
-    private const val MAX_JOIN_ATTEMPTS = 3
 
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
 
@@ -74,6 +76,8 @@ object P2PSessionManager : EarlyInitializable {
             stopHosting()
             PackHttpBridge.setPackSource(null)
         }.register()
+
+        eventHandler<TickEvent.End> { checkForStalledEos() }.register()
     }
 
     private fun install(bridge: EosSdkBridge) {
@@ -105,6 +109,36 @@ object P2PSessionManager : EarlyInitializable {
         PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
     }
 
+    private var stallReported = false
+
+    private fun checkForStalledEos() {
+        val bridge = this.bridge ?: return
+        if (!bridge.isStalled()) {
+            if (stallReported) {
+                stallReported = false
+                LOGGER.info("The EOS tick thread is responding again")
+                if (bridge.isLoggedIn) _status.value = EosStatus.Ready
+            }
+            return
+        }
+        if (stallReported) return
+
+        stallReported = true
+        val stuck = Thread.getAllStackTraces().entries.firstOrNull { it.key.name == EosTickHealth.THREAD_NAME }
+        val description = "${EosTickHealth.THREAD_NAME} hasn't ticked in over ${EosTickHealth.STALL_THRESHOLD_MS}ms"
+        LOGGER.error(
+            "{}; P2P hosting and joining are dead until the game restarts.\n{}",
+            description,
+            stuck?.value?.joinToString("\n\tat ", prefix = "Stuck ${EosTickHealth.THREAD_NAME} thread:\n\tat ")
+                ?: "The ${EosTickHealth.THREAD_NAME} thread is gone entirely.",
+        )
+        stuck?.let { (thread, stack) -> PolyPlusSentry.captureStalledThread(thread, stack, description) }
+        _status.value = EosStatus.Failed(
+            "Poly+ multiplayer stopped responding. Restart your game, and if you see this message, " +
+                "please report it at discord.gg/polyfrost or in Wyvest's OneClient DMs so we can fix this!",
+        )
+    }
+
     fun reconnect() {
         val bridge = this.bridge ?: return
         stopHosting()
@@ -116,7 +150,7 @@ object P2PSessionManager : EarlyInitializable {
         val user = (if (forceRelogin) EosConnectAuth.forceLogin(bridge) else EosConnectAuth.ensureLoggedIn(bridge))
             .onFailure {
                 LOGGER.error("EOS Connect login failed; P2P hosting/joining is unavailable", it)
-                _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services")
+                _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services.")
             }
             .getOrNull()
 
@@ -125,7 +159,7 @@ object P2PSessionManager : EarlyInitializable {
                 .onSuccess { _status.value = EosStatus.Ready }
                 .onFailure {
                     LOGGER.error("Failed to link EOS ProductUserId with the backend", it)
-                    _status.value = EosStatus.Failed("Unable to link your account for multiplayer sessions")
+                    _status.value = EosStatus.Failed("Unable to link your account for multiplayer sessions.")
                 }
         }
 
@@ -196,25 +230,17 @@ object P2PSessionManager : EarlyInitializable {
         val socket = socketFor(invite.eosSessionId ?: invite.sessionId)
         val target = JoinTarget(EosProductUserId(hostPuid), socket)
         LOGGER.info("Resolved join target for session {}: host={} socket={}", invite.sessionId, hostPuid, socket)
-        attemptJoin(bridge, target, attempt = 1)
+        attemptJoin(bridge, target)
     }
 
-    private suspend fun attemptJoin(bridge: EosSdkBridge, target: JoinTarget, attempt: Int) {
-        bridge.setRelayControl(forceRelays = attempt % 2 == 0)
-
+    private suspend fun attemptJoin(bridge: EosSdkBridge, target: JoinTarget) {
         val established = AtomicBoolean(false)
         val handle = bridge.addConnectionStateHandler(target.socket) { event ->
             if (event.remote != target.host) return@addConnectionStateHandler
             if (event is EosSdkBridge.ConnectionStateEvent.Established) established.set(true)
         }
 
-        LOGGER.info(
-            "Join attempt {}/{} for session socket {} (relay={})",
-            attempt,
-            MAX_JOIN_ATTEMPTS,
-            target.socket,
-            if (attempt % 2 == 0) "forced" else "allowed",
-        )
+        LOGGER.info("Joining session socket {}", target.socket)
         onJoinTargetResolved(target)
 
         delay(JOIN_HANDSHAKE_TIMEOUT_MS.milliseconds)
@@ -222,26 +248,10 @@ object P2PSessionManager : EarlyInitializable {
 
         if (established.get()) return
 
+        LOGGER.error("The host never accepted our P2P connection on socket {} within {}ms", target.socket, JOIN_HANDSHAKE_TIMEOUT_MS)
+        P2PConnectionContext.clearPendingJoin()
         bridge.closeConnection(target.socket, target.host)
-
-        if (attempt < MAX_JOIN_ATTEMPTS) {
-            LOGGER.warn(
-                "Join attempt {}/{} for session socket {} timed out after {}ms, retrying",
-                attempt,
-                MAX_JOIN_ATTEMPTS,
-                target.socket,
-                JOIN_HANDSHAKE_TIMEOUT_MS,
-            )
-            attemptJoin(bridge, target, attempt + 1)
-        } else {
-            LOGGER.error(
-                "Join attempt {}/{} for session socket {} timed out; giving up",
-                attempt,
-                MAX_JOIN_ATTEMPTS,
-                target.socket,
-            )
-            _joinFailures.tryEmit("Couldn't establish a P2P connection with the host - check your network/firewall and try again")
-        }
+        _joinFailures.tryEmit("Couldn't establish a P2P connection with the host - check your network/firewall and try again")
     }
 
     var onJoinTargetResolved: (JoinTarget) -> Unit = { target ->

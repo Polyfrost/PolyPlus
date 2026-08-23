@@ -14,6 +14,7 @@ import java.nio.file.Path
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 
 //?}
@@ -192,6 +193,7 @@ object HostWorldManager {
         if (mc.connection == null) return
         if (server.isPublished) {
             pending = null
+            bindPendingP2PListener(server)
             request.onPublished()
             return
         }
@@ -211,5 +213,12 @@ object HostWorldManager {
         } else {
             LOGGER.warn("publishServer returned false — world was not opened to LAN")
         }
+    }
+
+    private fun bindPendingP2PListener(server: net.minecraft.server.MinecraftServer) {
+        if (!P2PListenContext.hasPendingListen()) return
+        runCatching { server.connection.startTcpServerListener(null, HttpUtil.getAvailablePort()) }
+            .onSuccess { LOGGER.info("Bound an extra EOS P2P listener for the new session") }
+            .onFailure { LOGGER.error("Failed to bind the EOS P2P listener for the new session", it) }
     }
 }

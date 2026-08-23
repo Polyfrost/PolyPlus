@@ -7,6 +7,8 @@ interface EosSdkBridge {
 
     val localUser: EosProductUserId?
 
+    fun isStalled(): Boolean
+
     suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId>
 
     fun setRelayControl(forceRelays: Boolean)

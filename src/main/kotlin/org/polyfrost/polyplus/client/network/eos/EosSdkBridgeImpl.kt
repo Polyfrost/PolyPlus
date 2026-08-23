@@ -56,7 +56,12 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
     private var lastLoggedReceiveFailure: Pair<EosProductUserId, String>? = null
 
+    @Volatile private var lastTickMs = 0L
+
     override val isLoggedIn: Boolean get() = localUser != null
+
+    override fun isStalled(): Boolean =
+        EosTickHealth.isStalled(running && platform != null, lastTickMs, monotonicMs())
 
     companion object {
         private const val STARTUP_TIMEOUT_SECONDS = 10L
@@ -78,7 +83,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
             runCatching { start() }.onFailure { logger.error("Could not start EOS! P2P hosting/joining will be unavailable", it) }
             ready.countDown()
             if (platform != null) tickLoop()
-        }, "polyplus-eos").apply {
+        }, EosTickHealth.THREAD_NAME).apply {
             isDaemon = true
             priority = Thread.NORM_PRIORITY + 1
         }
@@ -176,6 +181,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         var tick = 0L
 
         while (running) {
+            lastTickMs = monotonicMs()
             runCatching { pump() }.onFailure { logger.error("An EOS tick failed", it) }
 
             tick++
@@ -252,6 +258,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
         val nanos = (MIN_TICK_SLEEP_NANOS shl steps).coerceAtMost(MAX_TICK_SLEEP_NANOS)
         java.util.concurrent.locks.LockSupport.parkNanos(nanos)
     }
+
+    private fun monotonicMs(): Long = System.nanoTime() / 1_000_000
 
     private fun teardown() {
         val platform = this.platform ?: return
