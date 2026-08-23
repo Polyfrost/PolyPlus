@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
+import net.minecraft.server.packs.resources.ResourceManager
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -49,6 +50,11 @@ object CustomPanorama {
 
     private val VANILLA_CUBE_MAP_ID: Identifier =
         Identifier.withDefaultNamespace("textures/gui/title/background/panorama")
+
+    private val VANILLA_FACE_ID: Identifier =
+        Identifier.withDefaultNamespace("textures/gui/title/background/panorama_0.png")
+
+    private const val VANILLA_PACK_ID = "vanilla"
 
     private val PACK: PanoramaPack? =
         //? if >= 26.2 {
@@ -87,6 +93,9 @@ object CustomPanorama {
     @Volatile
     private var overlayReady = false
 
+    @Volatile
+    private var packOverride: Boolean? = null
+
     @JvmStatic
     fun isAvailable(): Boolean = PACK != null
 
@@ -119,8 +128,26 @@ object CustomPanorama {
     fun overlayTexture(original: Identifier): Identifier =
         if (overlayReady && shouldApply()) OVERLAY_ID else original
 
+    internal fun refreshPackOverride(manager: ResourceManager) {
+        val overridden = runCatching {
+            val resource = manager.getResource(VANILLA_FACE_ID).orElse(null)
+            resource != null && resource.sourcePackId() != VANILLA_PACK_ID
+        }.getOrDefault(false)
+        if (overridden && packOverride != true) {
+            LOGGER.info("A resource pack supplies its own main menu panorama, leaving it alone")
+        }
+        packOverride = overridden
+    }
+
+    private fun resourcePackOverridesPanorama(): Boolean {
+        packOverride?.let { return it }
+        refreshPackOverride(Minecraft.getInstance().resourceManager)
+        return packOverride == true
+    }
+
     private fun shouldApply(): Boolean {
         if (!PolyPlusMainMenuConfig.customPanorama) return false
+        if (resourcePackOverridesPanorama()) return false
         val screen =
             //? if >= 26.2 {
             Minecraft.getInstance().gui.screen()

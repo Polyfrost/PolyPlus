@@ -14,6 +14,7 @@ import java.nio.file.Path
 
 internal class DiskCubeMapTexture(id: Identifier, private val dir: Path) : CubeMapTexture(id) {
     override fun loadContents(resourceManager: ResourceManager): TextureContents {
+        CustomPanorama.refreshPackOverride(resourceManager)
         var stacked: NativeImage? = null
         var width = 0
         var height = 0
