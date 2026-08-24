@@ -48,7 +48,7 @@ object AdaptiveBlurDefaults {
         eventHandler { event: MainMenuFpsEvent ->
             onSample(event.averageFps)
         }
-        eventHandler { _: FramebufferRenderEvent ->
+        eventHandler { _: FramebufferRenderEvent.End ->
             tickSample()
         }
     }
