@@ -1,2 +1,2 @@
-## 1.2.9
-- fix being stuck on blur optimizing
+## 1.2.10
+- Fix Sign Translation Vulnerability
