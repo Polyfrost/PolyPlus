@@ -17,51 +17,55 @@ object RichTextPrivacy {
 
     private val logger = LogManager.getLogger("PolyPlus/RichTextPrivacy")
 
-    private val ALLOWED_MODS = listOf("minecraft", "fabric-api", "modmenu", "placeholder-api", "sodium")
+    private val BLOCKED_MODS = listOf("debugify")
 
-    private val allowedKeys: Set<String> by lazy {
-        ExploitPreventerCompat.allow(ALLOWED_MODS)
-        collectAllowedKeys()
+    private val blockedKeys: Set<String> by lazy {
+        ExploitPreventerCompat.block(BLOCKED_MODS)
+        collectBlockedKeys()
     }
 
     fun warmUp() {
-        allowedKeys
+        blockedKeys
     }
 
     @JvmStatic
-    fun unresolved(component: Component): String = buildString { flatten(component, this) }
+    fun unresolved(component: Component): String = unresolved(component, blockedKeys)
 
-    private fun flatten(component: Component, out: StringBuilder) {
-        val contents = component.contents
-        val unresolvable = when (contents) {
-            is TranslatableContents -> contents.key.takeIf { contents.args.isNotEmpty() || it !in allowedKeys }
-            is KeybindContents -> contents.name.takeIf { it !in allowedKeys }
-            else -> null
+    internal fun unresolved(component: Component, blocked: Set<String>): String =
+        buildString { flatten(component, blocked, this) }
+
+    private fun flatten(component: Component, blocked: Set<String>, out: StringBuilder) {
+        when (val contents = component.contents) {
+            is TranslatableContents -> out.append(translate(contents, blocked))
+            is KeybindContents ->
+                if (contents.name in blocked) out.append(contents.name) else contents.visit(consumer(out))
+
+            else -> contents.visit(consumer(out))
         }
-        if (unresolvable != null) {
-            out.append(unresolvable)
-        } else {
-            contents.visit(FormattedText.ContentConsumer<Unit> { text ->
-                out.append(text)
-                Optional.empty()
-            })
-        }
-        component.siblings.forEach { flatten(it, out) }
+        component.siblings.forEach { flatten(it, blocked, out) }
     }
 
-    private fun collectAllowedKeys(): Set<String> {
+    private fun translate(contents: TranslatableContents, blocked: Set<String>): String {
+        if (contents.key in blocked) return contents.fallback ?: contents.key
+        val args = contents.args.map { if (it is Component) unresolved(it, blocked) else it }
+        return Component.translatableWithFallback(contents.key, contents.fallback, *args.toTypedArray()).string
+    }
+
+    private fun consumer(out: StringBuilder) = FormattedText.ContentConsumer<Unit> { text ->
+        out.append(text)
+        Optional.empty()
+    }
+
+    private fun collectBlockedKeys(): Set<String> {
         val keys = HashSet<String>()
-        val loader = FabricLoader.getInstance()
-        for (id in ALLOWED_MODS) {
-            loader.getModContainer(id).ifPresent { collect(it, keys) }
-        }
-        if ("gui.done" !in keys) {
-            runCatching {
-                checkNotNull(Language::class.java.getResourceAsStream(VANILLA_LANG)).use { read(it, keys) }
-            }.onFailure {
-                logger.error("Could not read vanilla translations - sign and anvil text will not resolve", it)
+        val found = mutableListOf<String>()
+        for (id in BLOCKED_MODS) {
+            FabricLoader.getInstance().getModContainer(id).ifPresent {
+                collect(it, keys)
+                found += id
             }
         }
+        logger.info("Blocking {} translation keys from {}", keys.size, found.joinToString().ifEmpty { "nothing" })
         return keys
     }
 
@@ -87,6 +91,4 @@ object RichTextPrivacy {
 
     private fun read(stream: InputStream, into: MutableSet<String>) =
         Language.loadFromJson(stream) { key, _ -> into.add(key) }
-
-    private const val VANILLA_LANG = "/assets/minecraft/lang/en_us.json"
 }

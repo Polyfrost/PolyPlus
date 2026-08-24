@@ -11,6 +11,8 @@ import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 class RichTextPrivacyTest {
 
     companion object {
+        private val DEBUGIFY = setOf("debugify.name")
+
         @JvmStatic
         @BeforeAll
         fun setupEnvironment() {
@@ -25,28 +27,48 @@ class RichTextPrivacyTest {
     }
 
     @Test
-    fun `mod translations do not resolve`() {
-        // getString() would give "RESOLVED" here - that is the leak.
-        val leaky = Component.translatableWithFallback("polyplus.hostWorld", "RESOLVED")
-        assertEquals("polyplus.hostWorld", RichTextPrivacy.unresolved(leaky))
+    fun `non-Debugify mod translations still resolve`() {
+        val probe = Component.translatableWithFallback("shulkerboxtooltip.config.title", "[NO_SHULKERBOXTOOLTIP_CONFIG]")
+        assertEquals("[NO_SHULKERBOXTOOLTIP_CONFIG]", RichTextPrivacy.unresolved(probe))
     }
 
     @Test
-    fun `args cannot smuggle a mod key through a vanilla key`() {
-        val smuggler = Component.translatableWithFallback("gui.done", "RESOLVED", Component.translatable("polyplus.hostWorld"))
-        assertEquals("gui.done", RichTextPrivacy.unresolved(smuggler))
+    fun `an allowed key with plain args still formats normally`() {
+        assertEquals("<bob> hello", RichTextPrivacy.unresolved(Component.translatable("chat.type.text", "bob", "hello")))
     }
 
     @Test
-    fun `keybinds do not resolve`() {
-        assertEquals("key.polyplus.test", RichTextPrivacy.unresolved(Component.keybind("key.polyplus.test")))
+    fun `a Debugify key answers with its fallback, exactly like a client without it`() {
+        val probe = Component.translatableWithFallback("debugify.name", "[NO_DEBUGIFY]")
+        assertEquals("[NO_DEBUGIFY]", RichTextPrivacy.unresolved(probe, DEBUGIFY))
+    }
+
+    @Test
+    fun `a Debugify key with no fallback answers with the key`() {
+        assertEquals("debugify.name", RichTextPrivacy.unresolved(Component.translatable("debugify.name"), DEBUGIFY))
+    }
+
+    @Test
+    fun `a Debugify keybind does not resolve`() {
+        assertEquals("debugify.name", RichTextPrivacy.unresolved(Component.keybind("debugify.name"), DEBUGIFY))
+    }
+
+    @Test
+    fun `args cannot smuggle a Debugify key through a vanilla key`() {
+        val smuggler = Component.translatable("chat.type.text", Component.translatable("debugify.name"), Component.literal("hi"))
+        assertEquals("<debugify.name> hi", RichTextPrivacy.unresolved(smuggler, DEBUGIFY))
+    }
+
+    @Test
+    fun `a vanilla key still resolves while Debugify is blocked`() {
+        assertEquals("Done", RichTextPrivacy.unresolved(Component.translatable("gui.done"), DEBUGIFY))
     }
 
     @Test
     fun `literal text and siblings survive`() {
         val component = Component.literal("hello ")
-            .append(Component.translatable("polyplus.hostWorld"))
+            .append(Component.translatable("gui.done"))
             .append(Component.literal("!"))
-        assertEquals("hello polyplus.hostWorld!", RichTextPrivacy.unresolved(component))
+        assertEquals("hello Done!", RichTextPrivacy.unresolved(component))
     }
 }
