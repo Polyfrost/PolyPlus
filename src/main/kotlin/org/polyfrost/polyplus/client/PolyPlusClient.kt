@@ -43,6 +43,7 @@ import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
+import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -128,6 +129,7 @@ object PolyPlusClient {
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
+        step("rich text privacy") { RichTextPrivacy.warmUp() }
         step("default settings") { DefaultSettings.initialize() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }

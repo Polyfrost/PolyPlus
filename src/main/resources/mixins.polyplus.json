@@ -32,6 +32,8 @@
     "client.Mixin_MenuPanoramaListBackground",
     "client.Mixin_HideBobbyUpgradeMessage",
     "client.Mixin_MinemenDebugifyNote",
+    "client.privacy.Mixin_SignEditTextPrivacy",
+    "client.privacy.Mixin_AnvilNamePrivacy",
     "client.animatium.Mixin_HideAnimatiumToasts",
     "client.euphoria.Mixin_HideEuphoriaPatcherMessages",
     "client.essential.Mixin_EssentialPartnerConfig",

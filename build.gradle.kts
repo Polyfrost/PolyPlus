@@ -211,6 +211,8 @@ dependencies {
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
 
+    compileOnly("com.nikoverflow:exploit-preventer-api:1.0.0")
+
     modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
