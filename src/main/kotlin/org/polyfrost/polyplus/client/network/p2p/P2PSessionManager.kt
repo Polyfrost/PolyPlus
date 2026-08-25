@@ -22,6 +22,7 @@ import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
+import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
@@ -66,7 +67,13 @@ object P2PSessionManager : EarlyInitializable {
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
 
     override fun earlyInitialize() {
-        install(EosSdkBridgeImpl().also { it.initialize() })
+        val unsupported = EosNativeSupport.unsupportedReason
+        if (unsupported == null) {
+            install(EosSdkBridgeImpl().also { it.initialize() })
+        } else {
+            LOGGER.warn("Not starting EOS on {}: {}", EosNativeSupport.platform, unsupported)
+            _status.value = EosStatus.Failed(unsupported)
+        }
 
         SessionsRepository.acceptedInvites
             .onEach { invite -> PolyPlusClient.SCOPE.launch { handleAcceptedInvite(invite) } }
@@ -79,7 +86,7 @@ object P2PSessionManager : EarlyInitializable {
             PackHttpBridge.setPackSource(null)
         }
 
-        eventHandler<TickEvent.End> { checkForStalledEos() }.register()
+        if (unsupported == null) eventHandler<TickEvent.End> { checkForStalledEos() }.register()
     }
 
     private fun install(bridge: EosSdkBridge) {
@@ -208,7 +215,9 @@ object P2PSessionManager : EarlyInitializable {
         val bridge = this.bridge
         if (bridge == null) {
             LOGGER.error("Accepted session invite {} but the P2P transport isn't installed", invite.id)
-            _joinFailures.tryEmit("Multiplayer services aren't ready yet - try again shortly")
+            _joinFailures.tryEmit(
+                EosNativeSupport.unsupportedReason ?: "Multiplayer services aren't ready yet - try again shortly",
+            )
             return
         }
 
