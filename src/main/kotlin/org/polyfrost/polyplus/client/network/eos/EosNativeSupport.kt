@@ -16,7 +16,7 @@ object EosNativeSupport {
         "macos-aarch64",
     )
 
-    private val REQUIRED_X86_FEATURES = setOf("sse3")
+    private val REQUIRED_X86_FEATURES = listOf("ssse3", "sse4.1", "sse4.2", "popcnt")
 
     private val FEATURE_ALIASES = mapOf(
         "pni" to "sse3",
@@ -51,16 +51,15 @@ object EosNativeSupport {
 
             !platform.endsWith("-x86_64") -> null
 
-            else -> missingX86Features()?.let { missing ->
-                "Poly+ multiplayer needs a processor with ${missing.joinToString(", ") { it.uppercase() }}, " +
-                    "and yours doesn't support it."
+            else -> missingX86Features()?.let {
+                "Poly+ multiplayer is disabled, your processor doesn't meet the minimum requirements."
             }
         }
     }
 
     val isSupported: Boolean = unsupportedReason == null
 
-    private fun missingX86Features(): Set<String>? {
+    private fun missingX86Features(): List<String>? {
         val features = readCpuFeatures()
         if (features == null) {
             LOGGER.warn("Couldn't read this CPU's extensions; letting EOS start and hoping for the best")
@@ -72,7 +71,10 @@ object EosNativeSupport {
             return null
         }
 
-        val missing = REQUIRED_X86_FEATURES - features
+        val missing = REQUIRED_X86_FEATURES.filterNot { it in features }
+        if (missing.isNotEmpty()) {
+            LOGGER.warn("This CPU is missing {} (has: {}); EOS would crash on it", missing, features)
+        }
         return missing.ifEmpty { null }
     }
 
