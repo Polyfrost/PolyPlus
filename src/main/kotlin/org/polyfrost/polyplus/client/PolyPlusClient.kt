@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
-import org.polyfrost.polyplus.client.features.FramebufferSizeGuard
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
@@ -137,7 +136,6 @@ object PolyPlusClient {
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
-        step("framebuffer size guard") { FramebufferSizeGuard.initialize() }
         step("login gate") { MinecraftLoginGate.register() }
 
         val earlyHooks: List<EarlyInitializable> = buildList {
