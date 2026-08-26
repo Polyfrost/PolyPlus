@@ -1,3 +1,2 @@
-## 1.2.11
-- Fix connection issues with multiplayer servers
-- Fix fullscreen not applying to Minecraft window sometimes
+## 1.2.12
+- Fix resizing issues
