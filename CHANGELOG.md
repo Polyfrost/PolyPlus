@@ -1,2 +1,3 @@
-## 1.2.10
-- Fix Sign Translation Vulnerability
+## 1.2.11
+- Fix connection issues with multiplayer servers
+- Fix fullscreen not applying to Minecraft window sometimes
