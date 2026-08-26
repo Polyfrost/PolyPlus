@@ -72,6 +72,15 @@ class WebSocketBackoffTest {
     }
 
     @Test
+    fun `short outages are not worth a notification`() {
+        val start = 1_000_000L
+        assertFalse(PolyConnection.outageIsWorthNotifying(start, start))
+        assertFalse(PolyConnection.outageIsWorthNotifying(start, start + 14_999L))
+        assertTrue(PolyConnection.outageIsWorthNotifying(start, start + 15_000L))
+        assertTrue(PolyConnection.outageIsWorthNotifying(start, start + 60_000L))
+    }
+
+    @Test
     fun `backoff is jittered rather than fixed`() {
         val seen = (1..SAMPLES).map { PolyConnection.reconnectDelay(10) }.toSet()
         assertTrue(seen.size > 1, "expected jitter, every attempt returned ${seen.first()}")

@@ -35,6 +35,8 @@ object PolyConnection {
 
     private const val TRANSIENT_FAILURES_BEFORE_NOTIFYING = 3
 
+    private const val NOTIFY_AFTER_OUTAGE_MS = 15_000L
+
     private val HANDSHAKE_STATUS = Regex("expected status code 101 but was (\\d{3})")
 
     private var connectionCallback: (() -> Unit)? = null
@@ -48,6 +50,9 @@ object PolyConnection {
 
     @Volatile
     private var disconnectNotified = false
+
+    @Volatile
+    private var disconnectedSinceMs = 0L
 
     @Volatile
     private var handshakeSucceeded = false
@@ -75,6 +80,8 @@ object PolyConnection {
 
     fun close() {
         closing = true
+        disconnectNotified = false
+        disconnectedSinceMs = 0L
         job?.cancel()
         job = null
         session = null
@@ -240,6 +247,9 @@ object PolyConnection {
 
     private fun notifyDisconnected(error: Exception?) {
         if (disconnectNotified) return
+        val now = System.currentTimeMillis()
+        if (disconnectedSinceMs == 0L) disconnectedSinceMs = now
+        if (!outageIsWorthNotifying(disconnectedSinceMs, now)) return
         disconnectNotified = true
         val reason = error?.message?.let { ": $it" } ?: "."
         runCatching {
@@ -247,8 +257,13 @@ object PolyConnection {
         }.onFailure { LOGGER.error("Failed to show disconnect notification", it) }
     }
 
+    internal fun outageIsWorthNotifying(since: Long, now: Long): Boolean {
+        return now - since >= NOTIFY_AFTER_OUTAGE_MS
+    }
+
     private fun notifyGaveUp() {
         disconnectNotified = true
+        disconnectedSinceMs = 0L
         runCatching {
             Notifications.error(
                 "PolyPlus",
@@ -258,6 +273,7 @@ object PolyConnection {
     }
 
     private fun notifyReconnected() {
+        disconnectedSinceMs = 0L
         if (!disconnectNotified) return
         disconnectNotified = false
         runCatching {

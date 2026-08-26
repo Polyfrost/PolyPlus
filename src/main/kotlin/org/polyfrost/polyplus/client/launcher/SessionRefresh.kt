@@ -151,7 +151,7 @@ object SessionRefresh {
         val id = LauncherAccountStore.parseUuid(account.id)
             ?: return Result.failure(IllegalStateException("The active account has a malformed ID"))
         return runCatching {
-            withTimeout(REFRESH_TIMEOUT_MS) { OneLauncherAccounts.refresh(id) }
+            withTimeout(REFRESH_TIMEOUT_MS) { OneLauncherAccounts.refresh(id, refreshClient = false) }
             LOGGER.info("Refreshed the session for {}", account.username)
         }.onFailure { LOGGER.warn("Could not refresh the session for {}", account.username, it) }
     }

@@ -80,7 +80,7 @@ object OneLauncherAccounts {
 
     fun cancelLogin(session: MicrosoftAuth.MicrosoftLoginSession) = MicrosoftAuth.cancelLogin(session)
 
-    suspend fun refresh(id: UUID): Account {
+    suspend fun refresh(id: UUID, refreshClient: Boolean = true): Account {
         val store = LauncherAccountStore.load()
         val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id }
             ?: error("Account not found")
@@ -99,7 +99,7 @@ object OneLauncherAccounts {
             ?: (current.defaultUser == key)
         if (isDefault) {
             AccountSwitch.apply(refreshed)
-            PolyPlusClient.refresh()
+            if (refreshClient) PolyPlusClient.refresh()
         }
         return refreshed.toAccount(active = isDefault)
     }

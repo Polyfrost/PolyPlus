@@ -29,6 +29,7 @@ object PolyAuthorization {
 
     private const val TOKEN_TTL_MS = 2 * 60 * 60 * 1000L
     private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L
+    private const val LOGIN_GATE_TIMEOUT_MS = 30 * 1000L
 
     private var cachedResponse: AuthResponse? = null
     private var cachedExpiresAtMs = 0L
@@ -106,7 +107,7 @@ object PolyAuthorization {
         return job
     }
 
-    private suspend fun authorize(): Authorized {
+    private suspend fun authorize(): Authorized = MinecraftLoginGate.whileNotLoggingIn(LOGIN_GATE_TIMEOUT_MS) {
         val user = Minecraft.getInstance().user
         val profileId = user.profileId
         val playerName = user.name
@@ -126,7 +127,7 @@ object PolyAuthorization {
             }
             .bodyOrThrow<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
-        return Authorized(profileId, response)
+        Authorized(profileId, response)
     }
 
     private const val LOADER =
