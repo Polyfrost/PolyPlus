@@ -61,7 +61,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     override val isLoggedIn: Boolean get() = localUser != null
 
     override fun isStalled(): Boolean =
-        EosTickHealth.isStalled(running && platform != null, lastTickMs, monotonicMs())
+        EosTickHealth.isStalled(running && platform != null, lastTickMs, EosTickHealth.monotonicMs())
 
     companion object {
         private const val STARTUP_TIMEOUT_SECONDS = 10L
@@ -181,7 +181,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         var tick = 0L
 
         while (running) {
-            lastTickMs = monotonicMs()
+            lastTickMs = EosTickHealth.monotonicMs()
             runCatching { pump() }.onFailure { logger.error("An EOS tick failed", it) }
 
             tick++
@@ -258,8 +258,6 @@ class EosSdkBridgeImpl : EosSdkBridge {
         val nanos = (MIN_TICK_SLEEP_NANOS shl steps).coerceAtMost(MAX_TICK_SLEEP_NANOS)
         java.util.concurrent.locks.LockSupport.parkNanos(nanos)
     }
-
-    private fun monotonicMs(): Long = System.nanoTime() / 1_000_000
 
     private fun teardown() {
         val platform = this.platform ?: return

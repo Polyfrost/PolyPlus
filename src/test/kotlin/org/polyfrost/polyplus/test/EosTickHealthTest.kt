@@ -33,4 +33,26 @@ class EosTickHealthTest {
         assertFalse(EosTickHealth.isStalled(ticking = true, lastTickMs = 0L, nowMs = NOW))
         assertFalse(EosTickHealth.isStalled(ticking = false, lastTickMs = NOW - OVER, nowMs = NOW))
     }
+
+    @Test
+    fun `a look taken after the watchdog was away itself proves nothing`() {
+        assertFalse(EosTickHealth.isObservationTrustworthy(lastCheckMs = 0L, nowMs = NOW))
+        assertFalse(
+            EosTickHealth.isObservationTrustworthy(
+                lastCheckMs = NOW - EosTickHealth.OBSERVER_GAP_TOLERANCE_MS - 1,
+                nowMs = NOW,
+            ),
+        )
+    }
+
+    @Test
+    fun `a look taken while the client keeps ticking is trustworthy`() {
+        assertTrue(EosTickHealth.isObservationTrustworthy(lastCheckMs = NOW - 50L, nowMs = NOW))
+        assertTrue(
+            EosTickHealth.isObservationTrustworthy(
+                lastCheckMs = NOW - EosTickHealth.OBSERVER_GAP_TOLERANCE_MS,
+                nowMs = NOW,
+            ),
+        )
+    }
 }
