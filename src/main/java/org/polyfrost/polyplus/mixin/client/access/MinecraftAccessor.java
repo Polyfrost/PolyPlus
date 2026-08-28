@@ -32,4 +32,10 @@ public interface MinecraftAccessor {
     @Mutable
     @Accessor("profileKeyPairManager")
     void setProfileKeyPairManager(ProfileKeyPairManager profileKeyPairManager);
+
+    //? if < 1.21.5 {
+    /*@Mutable
+    @Accessor("mainRenderTarget")
+    void polyplus$setMainRenderTarget(com.mojang.blaze3d.pipeline.RenderTarget target);
+    *///?}
 }

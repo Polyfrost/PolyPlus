@@ -27,7 +27,7 @@ object PetEntities {
     private inline fun <R> withUnfrozenEntityTypes(block: () -> R): R {
         val registry = BuiltInRegistries.ENTITY_TYPE as net.minecraft.core.MappedRegistry<EntityType<*>>
         val accessor =
-            registry as org.polyfrost.polyplus.mixin.client.Mixin_UnfreezeRegistry<EntityType<*>>
+            registry as org.polyfrost.polyplus.mixin.client.access.MappedRegistryAccessor<EntityType<*>>
         val previous = accessor.`polyplus$getIntrusiveHolders`()
         accessor.`polyplus$setFrozen`(false)
         if (previous == null) accessor.`polyplus$setIntrusiveHolders`(java.util.IdentityHashMap())
