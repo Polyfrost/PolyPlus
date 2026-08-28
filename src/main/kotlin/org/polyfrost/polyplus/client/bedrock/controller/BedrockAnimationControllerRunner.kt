@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.controller
 
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
@@ -114,4 +113,3 @@ class BedrockAnimationControllerRunner(
         from.z + (to.z - from.z) * weight,
     )
 }
-//?}

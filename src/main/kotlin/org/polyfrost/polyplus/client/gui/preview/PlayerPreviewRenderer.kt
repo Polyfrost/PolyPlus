@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.graphics.ImageBitmap
@@ -1371,4 +1370,3 @@ object PlayerPreviewRenderer {
     }
     *///?}
 }
-//?}

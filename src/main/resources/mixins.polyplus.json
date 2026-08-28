@@ -42,6 +42,7 @@
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",
     "client.cosmetics.MixinAvatarRenderer",
+    //? if >= 1.21.4
     "client.cosmetics.MixinAvatarRenderState",
     "client.cosmetics.MixinPlayerModel",
     "client.network.MixinClientCommonPacketListenerImpl",

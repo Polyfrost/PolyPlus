@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.playback
 
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
@@ -187,4 +186,3 @@ class EmoteController {
         ) : Phase()
     }
 }
-//?}

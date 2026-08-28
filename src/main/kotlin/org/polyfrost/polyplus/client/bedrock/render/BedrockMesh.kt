@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.render
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -377,4 +376,3 @@ class BedrockMesh private constructor(
         private const val BILLBOARD_HALF_THICKNESS = 0.01f
     }
 }
-//?}

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry
@@ -79,4 +78,3 @@ object PetEntities {
         org.apache.logging.log4j.LogManager.getLogger("PetEntities").info("Registered pet entity type + renderer")
     }
 }
-//?}

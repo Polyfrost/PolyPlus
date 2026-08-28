@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.controller
 
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
@@ -31,4 +30,3 @@ data class ControllerTransition(
     val targetState: String,
     val condition: MolangExpr,
 )
-//?}

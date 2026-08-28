@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.resources.Identifier
@@ -48,4 +47,3 @@ class CosmeticEquipment {
         val startTimeMs: Long,
     )
 }
-//?}

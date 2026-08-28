@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import com.google.gson.JsonObject
@@ -191,4 +190,3 @@ internal object PetAssetParser {
         return pixelHeight / declaredHeight
     }
 }
-//?}

@@ -1,10 +1,11 @@
-//? if >= 1.21.11 {
 package org.polyfrost.polyplus.mixin.client;
 
+//? if >= 1.21.11 {
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.resources.Identifier;
 import org.objectweb.asm.Opcodes;
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama;
+//?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -14,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 /*@Mixin(net.minecraft.client.renderer.PanoramaRenderer.class)
 *///?}
 public class MixinPanorama {
+    //? if >= 1.21.11 {
     @ModifyExpressionValue(
         //? if >= 26.1 {
         method = "extractRenderState",
@@ -33,5 +35,5 @@ public class MixinPanorama {
     private Identifier polyplus$swapPanoramaOverlay(Identifier original) {
         return CustomPanorama.overlayTexture(original);
     }
+    //?}
 }
-//?}

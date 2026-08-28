@@ -1,6 +1,6 @@
-//? if >= 1.21.4 {
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
+//? if >= 1.21.4 {
 import java.util.Collections;
 import java.util.Map;
 
@@ -9,19 +9,24 @@ import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+//?}
 
 //? if >= 1.21.10 {
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-//?} else {
+//?} elif >= 1.21.4 {
 /*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
 *///?}
 
 //? if >= 1.21.10 {
 @Mixin(AvatarRenderState.class)
-//?} else {
+//?} elif >= 1.21.4 {
 /*@Mixin(PlayerRenderState.class)
 *///?}
-public class MixinAvatarRenderState implements AvatarEmoteRenderAccess {
+public class MixinAvatarRenderState
+    //? if >= 1.21.4
+    implements AvatarEmoteRenderAccess
+{
+    //? if >= 1.21.4 {
     @Unique
     private EmoteController polyplus$boundEmoteController;
 
@@ -53,5 +58,5 @@ public class MixinAvatarRenderState implements AvatarEmoteRenderAccess {
     public void polyplus$setLastEmoteSample(Map<String, BoneTransform> sample) {
         polyplus$lastEmoteSample = sample == null ? Collections.emptyMap() : sample;
     }
+    //?}
 }
-//?}

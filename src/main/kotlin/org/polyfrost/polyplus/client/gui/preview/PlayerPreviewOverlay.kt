@@ -1,7 +1,8 @@
-//? if < 1.21.5 || >= 1.21.8 {
 package org.polyfrost.polyplus.client.gui.preview
 
+//? if < 1.21.5 || >= 1.21.8 {
 import com.mojang.blaze3d.pipeline.RenderTarget
+//?}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -68,6 +69,7 @@ object PlayerPreviewOverlay {
         if (entries.isNotEmpty()) entries.clear()
     }
 
+    //? if < 1.21.5 || >= 1.21.8 {
     private const val SPIN_DEG_PER_SEC = 37.5f
 
     @JvmStatic
@@ -117,6 +119,7 @@ object PlayerPreviewOverlay {
             .onFailure { LOG.error("[preview] re-present to back buffer failed", it) }
         *///?}
     }
+    //?}
 
     //? if >= 1.21.8 && < 26.1 {
     /*private fun mainFbo(target: RenderTarget): Int {
@@ -146,4 +149,3 @@ object PlayerPreviewOverlay {
     }
     *///?}
 }
-//?}

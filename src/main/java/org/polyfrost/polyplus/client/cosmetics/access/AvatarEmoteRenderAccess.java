@@ -1,4 +1,3 @@
-//? if >= 1.21.4 {
 package org.polyfrost.polyplus.client.cosmetics.access;
 
 import java.util.Collections;
@@ -17,4 +16,3 @@ public interface AvatarEmoteRenderAccess {
 
     void polyplus$setLastEmoteSample(Map<String, BoneTransform> sample);
 }
-//?}

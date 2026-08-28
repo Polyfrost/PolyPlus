@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.animation
 
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
@@ -147,4 +146,3 @@ class MolangKeyframeTrack private constructor(
         }
     }
 }
-//?}

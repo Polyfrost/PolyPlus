@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock
 
 object BedrockConstants {
@@ -6,4 +5,3 @@ object BedrockConstants {
     const val MS_PER_TICK = 50f
     const val PLAYER_MODEL_HEIGHT = 24f
 }
-//?}

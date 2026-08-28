@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -309,4 +308,3 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
     }
 }
 *///?}
-//?}

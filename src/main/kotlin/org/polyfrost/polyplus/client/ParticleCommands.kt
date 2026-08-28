@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client
 
 import com.mojang.brigadier.Command
@@ -92,4 +91,3 @@ object ParticleCommands {
         return Command.SINGLE_SUCCESS
     }
 }
-//?}
