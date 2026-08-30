@@ -22,6 +22,7 @@ import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
+import org.polyfrost.polyplus.client.network.eos.EosFailureDiagnosis
 import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
@@ -29,12 +30,14 @@ import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
 import org.polyfrost.polyplus.client.network.eos.EosTickHealth
 import org.polyfrost.polyplus.client.network.http.SessionsApi
+import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
 import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
@@ -61,6 +64,15 @@ object P2PSessionManager : EarlyInitializable {
 
     private val _joinFailures = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
+    @Volatile private var shutDownForConsent = false
+
+    @Volatile private var starting = false
+
+    private const val CONSENT_REQUIRED =
+        "Poly+ multiplayer is off until you accept the Terms of Service and Privacy Policy."
+    private const val RESTART_REQUIRED =
+        "Restart your game to turn Poly+ multiplayer back on."
+
     private const val AUTH_READY_TIMEOUT_MS = 15_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
 
@@ -69,7 +81,7 @@ object P2PSessionManager : EarlyInitializable {
     override fun earlyInitialize() {
         val unsupported = EosNativeSupport.unsupportedReason
         if (unsupported == null) {
-            install(EosSdkBridgeImpl().also { it.initialize() })
+            applyConsent()
         } else {
             LOGGER.warn("Not starting EOS on {}: {}", EosNativeSupport.platform, unsupported)
             _status.value = EosStatus.Failed(unsupported)
@@ -87,6 +99,49 @@ object P2PSessionManager : EarlyInitializable {
         }
 
         if (unsupported == null) eventHandler<TickEvent.End> { checkForStalledEos() }.register()
+    }
+
+    private val consentLock = Any()
+
+    fun applyConsent() {
+        if (EosNativeSupport.unsupportedReason != null) return
+
+        synchronized(consentLock) {
+            if (PrivacyConsent.allowsOnlineServices()) {
+                if (bridge != null || starting) return
+                if (shutDownForConsent) {
+                    _status.value = EosStatus.Failed(RESTART_REQUIRED)
+                    return
+                }
+                starting = true
+                _status.value = EosStatus.Connecting
+                PolyPlusClient.SCOPE.launch {
+                    val started = EosSdkBridgeImpl().also { it.initialize() }
+                    synchronized(consentLock) {
+                        starting = false
+                        if (!PrivacyConsent.allowsOnlineServices()) {
+                            LOGGER.info("Consent was withdrawn while EOS was starting; shutting it back down.")
+                            shutDownForConsent = true
+                            started.shutdown()
+                        } else {
+                            install(started)
+                        }
+                    }
+                }
+            } else {
+                _status.value = EosStatus.Failed(CONSENT_REQUIRED)
+                val running = bridge ?: run {
+                    if (starting) LOGGER.info("Consent withdrawn while EOS was starting; it will not be installed.")
+                    return
+                }
+                LOGGER.info("Consent withdrawn; shutting EOS down.")
+                stopHosting()
+                bridge = null
+                EosP2PChannel.Holder.bridge = null
+                shutDownForConsent = true
+                running.shutdown()
+            }
+        }
     }
 
     private fun install(bridge: EosSdkBridge) {
@@ -159,6 +214,9 @@ object P2PSessionManager : EarlyInitializable {
         val user = (if (forceRelogin) EosConnectAuth.forceLogin(bridge) else EosConnectAuth.ensureLoggedIn(bridge))
             .onFailure {
                 LOGGER.error("EOS Connect login failed; P2P hosting/joining is unavailable", it)
+                EosFailureDiagnosis
+                    .explain(EosFailureDiagnosis.openFileDescriptors(), PolyConnection.isConnected)
+                    ?.let(LOGGER::error)
                 _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services.")
             }
             .getOrNull()
@@ -216,7 +274,9 @@ object P2PSessionManager : EarlyInitializable {
         if (bridge == null) {
             LOGGER.error("Accepted session invite {} but the P2P transport isn't installed", invite.id)
             _joinFailures.tryEmit(
-                EosNativeSupport.unsupportedReason ?: "Multiplayer services aren't ready yet - try again shortly",
+                EosNativeSupport.unsupportedReason
+                    ?: CONSENT_REQUIRED.takeUnless { PrivacyConsent.allowsOnlineServices() }
+                    ?: "Multiplayer services aren't ready yet - try again shortly",
             )
             return
         }

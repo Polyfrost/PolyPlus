@@ -9,6 +9,8 @@ interface EosSdkBridge {
 
     fun isStalled(): Boolean
 
+    fun shutdown()
+
     suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId>
 
     fun setRelayControl(forceRelays: Boolean)

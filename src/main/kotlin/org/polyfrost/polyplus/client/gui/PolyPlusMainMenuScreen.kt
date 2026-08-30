@@ -332,32 +332,53 @@ private object MainMenuRasterAssets {
 
 internal object MenuHeadCache {
     private val heads = ConcurrentHashMap<java.util.UUID, ImageBitmap>()
+
+    private val fallbacks = ConcurrentHashMap<java.util.UUID, ImageBitmap>()
     private val requested: MutableSet<java.util.UUID> = Collections.newSetFromMap(ConcurrentHashMap())
+    private val retryAfter = ConcurrentHashMap<java.util.UUID, Long>()
     var version by mutableStateOf(0)
         private set
 
     fun get(id: java.util.UUID, name: String): ImageBitmap? {
         version
         heads[id]?.let { return it }
-        if (requested.add(id)) {
+        val now = System.currentTimeMillis()
+        if ((retryAfter[id] ?: 0L) <= now && requested.add(id)) {
             Thread({
-                val face = runCatching { loadFaceByUuid(id) }.getOrNull()
-                if (face != null) heads[id] = face else requested.remove(id)
+                val face = runCatching { loadFaceByUuid(id) }
+                    .onFailure { HEAD_LOG.debug("Failed to load head for {}", id, it) }
+                    .getOrNull()
+                if (face != null) {
+                    heads[id] = face
+                } else {
+                    if (!fallbacks.containsKey(id)) defaultSkinFace(id)?.let { fallbacks[id] = it }
+                    retryAfter[id] = System.currentTimeMillis() + HEAD_RETRY_DELAY_MS
+                    requested.remove(id)
+                    org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                        delay(HEAD_RETRY_DELAY_MS)
+                        version++
+                    }
+                }
                 version++ // snapshot state is writable off-thread
             }, "polyplus-account-head").apply {
                 isDaemon = true
                 start()
             }
         }
-        return heads[id]
+        return heads[id] ?: fallbacks[id]
     }
 }
 
 private const val MENU_HEAD_SIZE = 64
+private const val HEAD_RETRY_DELAY_MS = 30_000L
+private val HEAD_LOG = org.apache.logging.log4j.LogManager.getLogger("PolyPlus/Heads")
 
 private fun loadFaceByUuid(uuid: java.util.UUID): ImageBitmap? {
-    val url = mojangSkinUrl(uuid) ?: return defaultSkinFace(uuid)
-    val skin = javax.imageio.ImageIO.read(java.net.URI(url).toURL()) ?: return defaultSkinFace(uuid)
+    val url = mojangSkinUrl(uuid) ?: return null
+    val skin = javax.imageio.ImageIO.read(java.net.URI(url).toURL()) ?: run {
+        HEAD_LOG.debug("Skin texture at {} was not decodable for {}", url, uuid)
+        return null
+    }
     return buildFace(skin)
 }
 
@@ -377,7 +398,10 @@ private fun defaultSkinFace(uuid: java.util.UUID): ImageBitmap? = runCatching {
 private fun mojangSkinUrl(uuid: java.util.UUID): String? = runCatching {
     val id = uuid.toString().replace("-", "")
     val body = httpGetString("https://sessionserver.mojang.com/session/minecraft/profile/$id")
-        ?: return null
+        ?: run {
+            HEAD_LOG.debug("No Mojang profile for {} (offline, or not a premium account)", uuid)
+            return null
+        }
     val root = org.polyfrost.polyplus.client.PolyPlusClient.JSON.parseToJsonElement(body).jsonObject
     val props = root["properties"]?.jsonArray ?: return null
     val texturesValue = props.firstOrNull {
@@ -391,7 +415,7 @@ private fun mojangSkinUrl(uuid: java.util.UUID): String? = runCatching {
         .jsonObject["textures"]?.jsonObject
         ?.get("SKIN")?.jsonObject
         ?.get("url")?.jsonPrimitive?.content
-}.getOrNull()
+}.onFailure { HEAD_LOG.debug("Failed to read Mojang profile for {}", uuid, it) }.getOrNull()
 
 private fun httpGetString(url: String): String? {
     val conn = java.net.URI(url).toURL().openConnection() as java.net.HttpURLConnection
@@ -401,6 +425,7 @@ private fun httpGetString(url: String): String? {
         if (conn.responseCode == 200) {
             conn.inputStream.bufferedReader(java.nio.charset.StandardCharsets.UTF_8).use { it.readText() }
         } else {
+            HEAD_LOG.debug("GET {} returned {}", url, conn.responseCode)
             null
         }
     } finally {
@@ -712,12 +737,14 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
             HostWorldButton(assetsReady, screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuSocial) {
+            val groups by org.polyfrost.polyplus.client.social.GroupsRepository.groups.collectAsState()
             PillButton(
                 "Social",
                 ASSETS + "message-chat-circle.svg",
                 Modifier.fillMaxWidth(),
                 assetsReady,
                 onClick = { SocialOverlay.open(screen) },
+                badge = groups.any { it.unread },
             )
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
@@ -887,7 +914,7 @@ private fun FooterBrandText(platform: String, assetsReady: Boolean) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush) {
+private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush, badge: Boolean = false) {
     Row(
         modifier = modifier
             .height(45.dp)
@@ -901,6 +928,7 @@ private fun PillButton(label: String, icon: String, modifier: Modifier = Modifie
     ) {
         MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
         MenuText(label, fontSize = 16.sp)
+        if (badge) Box(Modifier.size(8.dp).clip(LocalTheme.current.circleShape).background(Accent))
     }
 }
 

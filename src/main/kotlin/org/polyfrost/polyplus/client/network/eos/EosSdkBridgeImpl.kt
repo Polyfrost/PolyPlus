@@ -56,6 +56,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
     private var lastLoggedReceiveFailure: Pair<EosProductUserId, String>? = null
 
+    private val logThrottle = EosLogThrottle()
+
     @Volatile private var lastTickMs = 0L
 
     override val isLoggedIn: Boolean get() = localUser != null
@@ -69,7 +71,6 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
         private const val MIN_TICK_SLEEP_NANOS = 1_000_000L
         private const val MAX_TICK_SLEEP_NANOS = 8_000_000L
-        private const val ACTIVITY_BACKOFF_AFTER_IDLE_TICKS = 4
 
         private const val MAX_PACKETS_PER_TICK = 4096
         private const val CONGESTION_CHECK_EVERY_TICKS = 64
@@ -85,7 +86,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
             if (platform != null) tickLoop()
         }, EosTickHealth.THREAD_NAME).apply {
             isDaemon = true
-            priority = Thread.NORM_PRIORITY + 1
+            priority = Thread.NORM_PRIORITY
         }
         tickThread = worker
         running = true
@@ -94,6 +95,10 @@ class EosSdkBridgeImpl : EosSdkBridge {
         if (!ready.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             logger.warn("EOS is still starting after {}s, continuing without it for now", STARTUP_TIMEOUT_SECONDS)
         }
+    }
+
+    override fun shutdown() {
+        running = false
     }
 
     private fun start() {
@@ -250,12 +255,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     private fun park(idleTicks: Int) {
-        if (idleTicks < ACTIVITY_BACKOFF_AFTER_IDLE_TICKS) {
-            Thread.onSpinWait()
-            return
-        }
-        val steps = (idleTicks - ACTIVITY_BACKOFF_AFTER_IDLE_TICKS).coerceAtMost(10)
-        val nanos = (MIN_TICK_SLEEP_NANOS shl steps).coerceAtMost(MAX_TICK_SLEEP_NANOS)
+        val nanos = (MIN_TICK_SLEEP_NANOS shl idleTicks.coerceAtMost(3)).coerceAtMost(MAX_TICK_SLEEP_NANOS)
         java.util.concurrent.locks.LockSupport.parkNanos(nanos)
     }
 
@@ -301,12 +301,15 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     private fun onLog(category: String, level: EosLogLevel, message: String) {
+        val suppressed = logThrottle.onMessage(message, monotonicMs()) ?: return
+        val text = if (suppressed == 0) message else "$message [+$suppressed identical messages suppressed]"
+
         val logName = category.removePrefix("LogEOS").ifBlank { "polyplus/eos" }.let { "polyplus/eos/$it" }
         val log = LogManager.getLogger(logName)
         when (level) {
-            EosLogLevel.Fatal, EosLogLevel.Error -> log.error(message)
-            EosLogLevel.Warning -> log.warn(message)
-            else -> log.info(message)
+            EosLogLevel.Fatal, EosLogLevel.Error -> log.error(text)
+            EosLogLevel.Warning -> log.warn(text)
+            else -> log.info(text)
         }
     }
 

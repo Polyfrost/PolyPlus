@@ -231,6 +231,7 @@ private fun ConversationHeader(
                             onConvertToNormal = { menuOpen = false; onConvertToNormal() },
                             muted = muted,
                             canConvertToNormal = canConvertToNormal,
+                            canLeave = !group.special,
                         )
                     }
                 }
@@ -249,6 +250,7 @@ private fun GroupOverflowMenu(
     onConvertToNormal: () -> Unit,
     muted: Boolean,
     canConvertToNormal: Boolean,
+    canLeave: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -266,7 +268,9 @@ private fun GroupOverflowMenu(
         if (canConvertToNormal) {
             OverflowMenuItem(SOCIAL_ASSETS + "check.svg", "Convert to Normal Chat", onClick = onConvertToNormal)
         }
-        OverflowMenuItem(SOCIAL_ASSETS + "x-close.svg", "Leave Group", color = SocialDangerColor, onClick = onLeave)
+        if (canLeave) {
+            OverflowMenuItem(SOCIAL_ASSETS + "x-close.svg", "Leave Group", color = SocialDangerColor, onClick = onLeave)
+        }
     }
 }
 
