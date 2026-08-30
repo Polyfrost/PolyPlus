@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import com.google.gson.JsonArray
@@ -158,4 +157,3 @@ object BedrockGeometryParser {
 
 
 }
-//?}

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.playback
 
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
@@ -10,4 +9,3 @@ data class EmotePlaybackSnapshot(
     val playerWeight: Float,
     val effectPoseWeight: Float = playerWeight,
 )
-//?}

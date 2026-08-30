@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import net.minecraft.resources.Identifier
@@ -155,4 +154,3 @@ internal object EmoteAssetParser {
     private fun cosmeticEmoteId(cosmeticId: Int, suffix: String): Identifier =
         Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "cosmetics/$cosmeticId/emote/$suffix")
 }
-//?}

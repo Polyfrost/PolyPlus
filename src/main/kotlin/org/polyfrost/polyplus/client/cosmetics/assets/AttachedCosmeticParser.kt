@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import net.minecraft.resources.Identifier
@@ -275,4 +274,3 @@ internal object AttachedCosmeticParser {
         return (preferred ?: pngs.first()).file
     }
 }
-//?}

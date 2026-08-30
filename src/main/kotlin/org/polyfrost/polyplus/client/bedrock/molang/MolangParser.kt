@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.molang
 
 object MolangParser {
@@ -358,4 +357,3 @@ object MolangParser {
         private fun isIdentifierPart(ch: Char): Boolean = ch.isLetterOrDigit() || ch == '_'
     }
 }
-//?}

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.model
 
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
@@ -48,4 +47,3 @@ internal class BedrockEffectBoneTreeBuilder(
         const val MAX_DEPTH = 256
     }
 }
-//?}

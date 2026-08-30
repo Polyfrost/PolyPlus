@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.ByteArrayInputStream
@@ -62,4 +61,3 @@ internal object AssetArchive {
 
     fun readBytes(path: Path): ByteArray = Files.readAllBytes(path)
 }
-//?}

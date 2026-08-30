@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.molang
 
 import kotlin.math.abs
@@ -129,4 +128,3 @@ object MolangEvaluator {
         else -> root.lowercase()
     }
 }
-//?}

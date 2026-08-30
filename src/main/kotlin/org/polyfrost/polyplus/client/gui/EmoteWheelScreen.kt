@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.Canvas
@@ -259,4 +258,3 @@ private fun WheelCanvas(
         }
     }
 }
-//?}

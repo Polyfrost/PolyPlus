@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry
@@ -27,7 +26,7 @@ object PetEntities {
     private inline fun <R> withUnfrozenEntityTypes(block: () -> R): R {
         val registry = BuiltInRegistries.ENTITY_TYPE as net.minecraft.core.MappedRegistry<EntityType<*>>
         val accessor =
-            registry as org.polyfrost.polyplus.mixin.client.Mixin_UnfreezeRegistry<EntityType<*>>
+            registry as org.polyfrost.polyplus.mixin.client.access.MappedRegistryAccessor<EntityType<*>>
         val previous = accessor.`polyplus$getIntrusiveHolders`()
         accessor.`polyplus$setFrozen`(false)
         if (previous == null) accessor.`polyplus$setIntrusiveHolders`(java.util.IdentityHashMap())
@@ -79,4 +78,3 @@ object PetEntities {
         org.apache.logging.log4j.LogManager.getLogger("PetEntities").info("Registered pet entity type + renderer")
     }
 }
-//?}

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.playback
 
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
@@ -136,4 +135,3 @@ object AnimationSampler {
             )
     }
 }
-//?}

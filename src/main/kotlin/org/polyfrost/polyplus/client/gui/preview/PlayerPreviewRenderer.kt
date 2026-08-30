@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.graphics.ImageBitmap
@@ -1159,7 +1158,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun legacyPlayerRenderer(mc: Minecraft, skin: PlayerSkin): PlayerRenderer? {
-        val map = (mc.entityRenderDispatcher as org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherPlayerAccessor)
+        val map = (mc.entityRenderDispatcher as org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor)
             .`polyplus$playerRenderers`()
         return (map[skin.model()] ?: map.values.firstOrNull()) as? PlayerRenderer
     }
@@ -1255,7 +1254,7 @@ object PlayerPreviewRenderer {
         /*val prevCamera = dispatcher.camera
         *///?}
         val realMainTarget = mc.mainRenderTarget
-        (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+        (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
             .`polyplus$setMainRenderTarget`(fbo)
         try {
             //? if >= 1.21.4 {
@@ -1270,7 +1269,7 @@ object PlayerPreviewRenderer {
             fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
-            (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+            (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
                 .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
             //? if < 1.21.4 {
@@ -1371,4 +1370,3 @@ object PlayerPreviewRenderer {
     }
     *///?}
 }
-//?}

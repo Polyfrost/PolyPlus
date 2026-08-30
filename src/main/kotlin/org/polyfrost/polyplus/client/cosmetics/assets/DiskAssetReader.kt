@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.InputStream
@@ -38,4 +37,3 @@ internal object DiskAssetReader {
 
     fun open(asset: Asset): InputStream = asset.open()
 }
-//?}

@@ -65,6 +65,15 @@ object ClientPlatform {
         *///?}
     }
 
+    fun setScreen(screen: Screen?) {
+        val mc = Minecraft.getInstance()
+        //? if >= 26.2 {
+        mc.gui.setScreen(screen)
+        //?} else {
+        /*mc.setScreen(screen)
+        *///?}
+    }
+
     fun openUri(uri: String) {
         Multithreading.submit { DesktopHelper.browse(URI(uri)) }
     }

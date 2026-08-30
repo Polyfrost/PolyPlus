@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import org.joml.Vector2f
@@ -63,4 +62,3 @@ enum class BedrockCubeFace {
     UP,
     DOWN,
 }
-//?}

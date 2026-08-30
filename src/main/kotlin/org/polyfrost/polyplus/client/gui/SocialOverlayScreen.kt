@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.Minecraft
@@ -101,4 +100,3 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
     }
 }
-//?}

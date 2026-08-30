@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.resources.Identifier
@@ -14,4 +13,3 @@ data class Emote(
     val effects: List<EmoteEffect> = emptyList(),
     val rules: EmoteRules = EmoteRules.DEFAULT,
 )
-//?}

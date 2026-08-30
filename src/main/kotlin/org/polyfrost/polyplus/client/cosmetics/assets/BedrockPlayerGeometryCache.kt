@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -90,4 +89,3 @@ internal object BedrockPlayerGeometryCache {
         playerGeometryFile = null
     }
 }
-//?}

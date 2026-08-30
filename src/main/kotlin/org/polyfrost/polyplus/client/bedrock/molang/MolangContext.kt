@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.molang
 
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
@@ -83,4 +82,3 @@ data class MolangVector3(
         }
     }
 }
-//?}

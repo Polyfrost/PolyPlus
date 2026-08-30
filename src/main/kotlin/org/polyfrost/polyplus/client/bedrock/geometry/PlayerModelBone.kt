@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -85,4 +84,3 @@ enum class PlayerModelBone(val serializedName: String) {
         }
     }
 }
-//?}

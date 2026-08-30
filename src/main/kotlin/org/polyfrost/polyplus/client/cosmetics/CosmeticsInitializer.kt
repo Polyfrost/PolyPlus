@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics
 
 import org.polyfrost.polyplus.utils.EarlyInitializable
@@ -9,4 +8,3 @@ object CosmeticsInitializer : EarlyInitializable {
         CosmeticSync.earlyInitialize()
     }
 }
-//?}
