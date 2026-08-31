@@ -66,6 +66,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     var showCreateGroup by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var unreadOnly by remember { mutableStateOf(false) }
     val mutedGroups = remember { mutableStateOf(setOf<Int>()) }
     val renameOverrides = remember { mutableStateOf(mapOf<Int, String>()) }
 
@@ -79,9 +80,11 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     val hostedSessionId by P2PSessionManager.currentSessionIdFlow.collectAsState()
     val isSpecialChatTarget = SpecialChatRepository.status.collectAsState().value?.isSpecialChatTarget == true
 
-    val visibleGroups = remember(groups, searchQuery, names) {
-        if (searchQuery.isBlank()) groups
-        else groups.filter { rawConversationTitle(it, selfId, names).contains(searchQuery, ignoreCase = true) }
+    val visibleGroups = remember(groups, searchQuery, unreadOnly, selectedGroupId, names) {
+        groups.filter { group ->
+            (!unreadOnly || group.unread || group.id == selectedGroupId) &&
+                (searchQuery.isBlank() || rawConversationTitle(group, selfId, names).contains(searchQuery, ignoreCase = true))
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -139,6 +142,8 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                 selfId = selfId,
                 searchOpen = searchOpen,
                 searchQuery = searchQuery,
+                unreadOnly = unreadOnly,
+                onToggleUnreadOnly = { unreadOnly = !unreadOnly },
                 onSearchQueryChange = { searchQuery = it },
                 onToggleSearch = {
                     searchOpen = !searchOpen
@@ -166,7 +171,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                     onTabChange = { newTab -> tab = newTab },
                     groups = visibleGroups,
                     showSpecialTab = isSpecialChatTarget,
-                    isSearching = searchQuery.isNotBlank(),
+                    isFiltered = searchQuery.isNotBlank() || unreadOnly,
                     friends = friends,
                     selfId = selfId,
                     selectedGroupId = selectedGroupId,
@@ -297,6 +302,8 @@ private fun SocialHeaderToolbar(
     selfId: String,
     searchOpen: Boolean,
     searchQuery: String,
+    unreadOnly: Boolean,
+    onToggleUnreadOnly: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onToggleSearch: () -> Unit,
     onBack: () -> Unit,
@@ -341,6 +348,14 @@ private fun SocialHeaderToolbar(
         } else {
             Spacer(Modifier.weight(1f))
         }
+
+        SocialIconButton(
+            SOCIAL_ASSETS + "message-chat-circle.svg",
+            tooltip = if (unreadOnly) "Show all conversations" else "Show unread only",
+            background = if (unreadOnly) Accent.asSocialSelected else null,
+            tint = if (unreadOnly) Accent else SocialTextPrimary,
+            onClick = onToggleUnreadOnly,
+        )
 
         SocialIconButton(
             SOCIAL_ASSETS + "search-lg.svg",

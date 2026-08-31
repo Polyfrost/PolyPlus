@@ -40,7 +40,7 @@ internal fun SocialSidebar(
     onTabChange: (SocialTab) -> Unit,
     groups: List<GroupSummary>,
     showSpecialTab: Boolean,
-    isSearching: Boolean,
+    isFiltered: Boolean,
     friends: List<Friend>,
     selfId: String,
     selectedGroupId: Int?,
@@ -75,7 +75,7 @@ internal fun SocialSidebar(
         when (tab) {
             SocialTab.Chat -> ConversationList(
                 chatGroups,
-                isSearching,
+                isFiltered,
                 selfId,
                 selectedGroupId,
                 onSelectGroup,
@@ -83,7 +83,7 @@ internal fun SocialSidebar(
             )
             SocialTab.Special -> ConversationList(
                 specialGroups,
-                isSearching,
+                isFiltered,
                 selfId,
                 selectedGroupId,
                 onSelectGroup,
@@ -129,7 +129,7 @@ private fun SidebarTabButton(
 @Composable
 private fun ConversationList(
     groups: List<GroupSummary>,
-    isSearching: Boolean,
+    isFiltered: Boolean,
     selfId: String,
     selectedGroupId: Int?,
     onSelectGroup: (Int) -> Unit,
@@ -138,9 +138,9 @@ private fun ConversationList(
     emptyAction: String? = "Add a friend to get started",
 ) {
     if (groups.isEmpty()) {
-        if (isSearching) {
+        if (isFiltered) {
             Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                SocialText("No conversations match your search", fontSize = 13.sp, color = SocialTextSecondary)
+                SocialText("No conversations match your filters", fontSize = 13.sp, color = SocialTextSecondary)
             }
         } else {
             SidebarEmptyState(
