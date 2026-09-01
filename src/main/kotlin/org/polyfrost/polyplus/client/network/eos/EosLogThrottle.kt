@@ -16,15 +16,31 @@ class EosLogThrottle(
         override fun removeEldestEntry(eldest: Map.Entry<String, State>) = size > MAX_KEYS
     }
 
+    private var lastMessage: String? = null
+    private var lastKey: String = ""
+
+    private fun keyFor(message: String): String {
+        if (message == lastMessage) return lastKey
+        lastKey = normalize(message)
+        lastMessage = message
+        return lastKey
+    }
+
     @Synchronized
     fun onMessage(message: String, nowMs: Long): Int? {
-        val state = states.getOrPut(normalize(message)) { State() }
+        val state = states.getOrPut(keyFor(message)) { State() }
+
+        if (state.emitted >= burst && nowMs - state.lastEmitMs > maxIntervalMs * QUIET_RESET_FACTOR) {
+            state.emitted = 0
+        }
 
         if (state.emitted < burst) {
+            val suppressed = state.suppressed
+            state.suppressed = 0
             state.emitted++
             state.lastEmitMs = nowMs
             state.intervalMs = firstIntervalMs
-            return 0
+            return suppressed
         }
 
         if (nowMs - state.lastEmitMs < state.intervalMs) {
@@ -45,6 +61,8 @@ class EosLogThrottle(
         const val FIRST_REPEAT_INTERVAL_MS = 30_000L
         const val MAX_REPEAT_INTERVAL_MS = 10L * 60 * 1000
         const val MAX_KEYS = 256
+
+        const val QUIET_RESET_FACTOR = 2
 
         private val VARYING = listOf(
             Regex("0x[0-9a-fA-F]+"),

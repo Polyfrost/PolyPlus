@@ -26,6 +26,8 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     private val bridge: EosSdkBridge
         get() = requireNotNull(Holder.bridge) { "EosP2PChannel used before P2PSessionManager.install() was called" }
 
+    private val bridgeOrNull: EosSdkBridge? get() = Holder.bridge
+
     internal object Holder {
         @Volatile var bridge: EosSdkBridge? = null
     }
@@ -70,7 +72,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     override fun isCompatible(loop: EventLoop): Boolean = true
 
     override fun localAddress0(): SocketAddress? =
-        localSocket?.let { socket -> bridge.localUser?.let { EosP2PAddress(it, socket) } }
+        localSocket?.let { socket -> bridgeOrNull?.localUser?.let { EosP2PAddress(it, socket) } }
 
     override fun remoteAddress0(): SocketAddress? =
         remoteUser?.let { remote -> localSocket?.let { EosP2PAddress(remote, it) } }
@@ -157,9 +159,11 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
 
         val socket = localSocket
         val remote = remoteUser
-        connectionStateHandle?.let(bridge::removeNotificationHandler)
+        val bridge = bridgeOrNull
+        connectionStateHandle?.let { handle -> bridge?.removeNotificationHandler(handle) }
+        connectionStateHandle = null
         if (socket != null && remote != null) {
-            bridge.closeConnection(socket, remote)
+            bridge?.closeConnection(socket, remote)
             P2PChannelRegistry.unregister(socket, remote)
         }
     }

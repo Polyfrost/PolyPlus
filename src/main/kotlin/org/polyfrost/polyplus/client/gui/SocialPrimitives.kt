@@ -88,7 +88,7 @@ internal fun SocialText(
 @Composable
 internal fun SocialAvatar(playerId: String, size: Dp, modifier: Modifier = Modifier) {
     val uuid = remember(playerId) { runCatching { UUID.fromString(playerId) }.getOrNull() }
-    val head = uuid?.let { MenuHeadCache.get(it, playerId) }
+    val head = uuid?.let { MenuHeadCache.get(it) }
     val shape = ppShape(size / 4)
     if (head != null) {
         Image(head, contentDescription = null, modifier = modifier.size(size).clip(shape))

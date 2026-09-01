@@ -59,11 +59,39 @@ class EosLogThrottleTest {
     }
 
     @Test
+    fun `a failure that clears and comes back much later gets its full burst again`() {
+        val throttle = EosLogThrottle(burst = 2, firstIntervalMs = 1_000, maxIntervalMs = 4_000)
+
+        assertEquals(0, throttle.onMessage(ATTEMPT, 0))
+        assertEquals(0, throttle.onMessage(ATTEMPT, 0))
+        assertNull(throttle.onMessage(ATTEMPT, 0))
+        assertEquals(1, throttle.onMessage(ATTEMPT, 1_000))
+        assertNull(throttle.onMessage(ATTEMPT, 1_001))
+
+        val backAgain = 1_000 + 4_000L * EosLogThrottle.QUIET_RESET_FACTOR + 1
+        assertEquals(1, throttle.onMessage(ATTEMPT, backAgain))
+        assertEquals(0, throttle.onMessage(ATTEMPT, backAgain))
+        assertNull(throttle.onMessage(ATTEMPT, backAgain))
+    }
+
+    @Test
     fun `different messages are throttled independently`() {
         val throttle = EosLogThrottle(burst = 1, firstIntervalMs = 1_000, maxIntervalMs = 1_000)
 
         assertEquals(0, throttle.onMessage(ATTEMPT, 0))
         assertNull(throttle.onMessage(ATTEMPT, 0))
         assertEquals(0, throttle.onMessage(OTHER, 0))
+    }
+
+    @Test
+    fun `two failures alternating keep their own budgets`() {
+        val throttle = EosLogThrottle(burst = 2, firstIntervalMs = 1_000, maxIntervalMs = 1_000)
+
+        assertEquals(0, throttle.onMessage(ATTEMPT, 0))
+        assertEquals(0, throttle.onMessage(OTHER, 0))
+        assertEquals(0, throttle.onMessage(ATTEMPT, 0))
+        assertEquals(0, throttle.onMessage(OTHER, 0))
+        assertNull(throttle.onMessage(ATTEMPT, 0))
+        assertNull(throttle.onMessage(OTHER, 0))
     }
 }

@@ -49,6 +49,10 @@ object P2PPackTransport {
         }
     }
 
+    fun uninstall() {
+        bridge = null
+    }
+
     class Download internal constructor(
         val remote: EosProductUserId,
         val sha1Hex: String,
