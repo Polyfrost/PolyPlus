@@ -249,10 +249,15 @@ loomExt.decompilerOptions.named("vineflower") {
     options.put("mark-corresponding-synthetics", "1") // Adds names to lambdas - useful for mixins
 }
 
+val modOutputGroup = sourceSets.main.get().output
+    .let { files(it.classesDirs, it.resourcesDir) }
+    .joinToString(File.pathSeparator) { it.absolutePath }
+
 loomExt.runs.configureEach {
     ideConfigGenerated(true)
     runDir("../../run") // Shares the run directory between versions
     vmArg("-Dpolyplus.badge.debug=true")
+    vmArg("-Dfabric.classPathGroups=$modOutputGroup")
 }
 loomExt.runs.named("client") {
     client()
@@ -260,6 +265,7 @@ loomExt.runs.named("client") {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("fabric.classPathGroups", modOutputGroup)
     testLogging {
         showStackTraces = true
         exceptionFormat = TestExceptionFormat.FULL

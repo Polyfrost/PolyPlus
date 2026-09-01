@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus
 
 import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.compat.ModConfigDefaults
 import org.polyfrost.polyplus.compat.RrlsConfigCompat
 
 //? if fabric {
@@ -20,6 +21,7 @@ class PolyPlusPreLaunch
         PolyPlusSentry.markGameThread()
         PolyPlusSentry.initialize()
         RrlsConfigCompat.apply()
+        ModConfigDefaults.apply()
     }
 
 }
