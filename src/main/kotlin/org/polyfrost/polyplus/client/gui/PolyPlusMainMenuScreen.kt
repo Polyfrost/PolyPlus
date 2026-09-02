@@ -349,8 +349,8 @@ internal object MenuHeadCache {
         Thread(task, "polyplus-account-head").apply { isDaemon = true }
     }
 
-    private fun <T> withEntry(id: java.util.UUID, block: (Entry) -> T): T =
-        synchronized(entries) { block(entries.getOrPut(id) { Entry() }) }
+    private fun <T> withEntry(id: java.util.UUID, block: (Entry) -> T): T? =
+        synchronized(entries) { entries[id]?.let(block) }
 
     fun get(id: java.util.UUID): ImageBitmap? {
         var fetch = false
@@ -375,11 +375,14 @@ internal object MenuHeadCache {
             }.onFailure { HEAD_LOG.warn("Loading the head for {} failed unexpectedly; will retry", id, it) }
                 .getOrNull()
 
-            val needsFallback = face == null && withEntry(id) { it.shown == null }
+            val needsFallback = face == null && withEntry(id) { it.shown == null } == true
             val fallback = if (needsFallback) runCatching { defaultSkinFace(id) }.getOrNull() else null
 
             val retryIn = synchronized(entries) {
-                val entry = entries.getOrPut(id) { Entry() }
+                val entry = entries[id] ?: run {
+                    fetching.remove(id)
+                    return@synchronized null
+                }
                 if (face != null) {
                     entry.shown = face
                     entry.settled = true

@@ -433,7 +433,7 @@ object PlayerPreviewRenderer {
 
         val fmt = DefaultVertexFormat.POSITION_TEX_COLOR
         //? if >= 26.2 {
-        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(1024)
+        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(GRID_X * GRID_Y * 4 * fmt.getVertexSize())
         val bb: com.mojang.blaze3d.vertex.VertexConsumer = com.mojang.blaze3d.vertex.BufferBuilder(byteBuilder, com.mojang.blaze3d.PrimitiveTopology.QUADS, fmt)
         //?} else {
         /*val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
