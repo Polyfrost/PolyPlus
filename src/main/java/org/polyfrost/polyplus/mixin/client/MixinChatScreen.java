@@ -11,7 +11,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 //? if >= 26.1 {
@@ -20,9 +22,12 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 /*import net.minecraft.client.gui.GuiGraphics;
 *///?}
 //? if >= 1.21.10 {
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 //?}
 
+import org.polyfrost.polyplus.client.emoji.EmojiChatPicker;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -39,6 +44,9 @@ public abstract class MixinChatScreen {
     @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile("(?<![A-Za-z0-9_:/.+\\-]):([a-z0-9_+\\-]{2,})$");
     @Unique private static final int POLYPLUS_MAX = 10;
     @Unique private static final int POLYPLUS_LINE_H = 12;
+    @Unique private static final int POLYPLUS_CHAT_BACKGROUND = 0x80000000;
+
+    @Unique private final EmojiChatPicker polyplus$picker = new EmojiChatPicker();
 
     @Unique private List<String> polyplus$suggestions = Collections.emptyList();
     @Unique private int polyplus$selected = 0;
@@ -116,7 +124,8 @@ public abstract class MixinChatScreen {
     }
 
     @Unique
-    private boolean polyplus$handleKey(int key) {
+    private boolean polyplus$handleKey(int key, boolean shiftDown) {
+        if (polyplus$picker.handleKey(key, shiftDown, this::polyplus$insertEmoji)) return true;
         if (polyplus$suggestions.isEmpty()) return false;
         int n = polyplus$suggestions.size();
         switch (key) {
@@ -156,16 +165,20 @@ public abstract class MixinChatScreen {
         *///?}
         int mouseX, int mouseY, float delta, CallbackInfo ci
     ) {
-        polyplus$refresh();
-        if (polyplus$suggestions.isEmpty()) return;
         Font font = Minecraft.getInstance().font;
+        if (input != null && EmojiRegistry.enabled()) {
+            polyplus$picker.layout(input.getX(), input.getY(), input.getWidth());
+            polyplus$picker.render(graphics, font, mouseX, mouseY);
+        }
+        polyplus$refresh();
+        if (polyplus$suggestions.isEmpty() || polyplus$picker.isOpen()) return;
         int x = input.getX();
         int bottom = input.getY() - 2;
         int top = bottom - polyplus$suggestions.size() * POLYPLUS_LINE_H;
         int width = 0;
         for (String a : polyplus$suggestions) width = Math.max(width, font.width(EmojiRegistry.suggestionRow(a)));
         width += 6;
-        graphics.fill(x, top, x + width, bottom, 0xE0000000);
+        graphics.fill(x, top, x + width, bottom, Minecraft.getInstance().options.getBackgroundColor(POLYPLUS_CHAT_BACKGROUND));
         for (int i = 0; i < polyplus$suggestions.size(); i++) {
             int rowY = top + i * POLYPLUS_LINE_H;
             if (i == polyplus$selected) graphics.fill(x, rowY, x + width, rowY + POLYPLUS_LINE_H, 0x40FFFFFF);
@@ -178,6 +191,20 @@ public abstract class MixinChatScreen {
         }
     }
 
+    //? if >= 1.21.10 {
+    public boolean charTyped(CharacterEvent event) {
+        if (polyplus$picker.charTyped(event.codepoint())) return true;
+        GuiEventListener focused = ((Screen) (Object) this).getFocused();
+        return focused != null && focused.charTyped(event);
+    }
+    //?} else {
+    /*public boolean charTyped(char codepoint, int modifiers) {
+        if (polyplus$picker.charTyped(codepoint)) return true;
+        GuiEventListener focused = ((Screen) (Object) this).getFocused();
+        return focused != null && focused.charTyped(codepoint, modifiers);
+    }
+    *///?}
+
     @WrapMethod(
         //? if >= 1.21.10 {
         method = "keyPressed(Lnet/minecraft/client/input/KeyEvent;)Z"
@@ -187,11 +214,59 @@ public abstract class MixinChatScreen {
     )
     //? if >= 1.21.10 {
     private boolean polyplus$keyPressed(KeyEvent event, Operation<Boolean> original) {
-        return polyplus$handleKey(event.key()) || original.call(event);
+        return polyplus$handleKey(event.key(), event.hasShiftDown()) || original.call(event);
     }
     //?} else {
     /*private boolean polyplus$keyPressed(int key, int scan, int mods, Operation<Boolean> original) {
-        return polyplus$handleKey(key) || original.call(key, scan, mods);
+        return polyplus$handleKey(key, Screen.hasShiftDown()) || original.call(key, scan, mods);
     }
     *///?}
+
+    @Unique
+    private boolean polyplus$emojiClicked(double mouseX, double mouseY, int button, boolean shiftDown) {
+        if (input == null || !EmojiRegistry.enabled()) return false;
+        polyplus$picker.layout(input.getX(), input.getY(), input.getWidth());
+        return polyplus$picker.mouseClicked(mouseX, mouseY, button, shiftDown, this::polyplus$insertEmoji);
+    }
+
+    @Unique
+    private boolean polyplus$emojiScrolled(double mouseX, double mouseY, double deltaY) {
+        if (input == null || !EmojiRegistry.enabled()) return false;
+        polyplus$picker.layout(input.getX(), input.getY(), input.getWidth());
+        return polyplus$picker.mouseScrolled(mouseX, mouseY, deltaY);
+    }
+
+    @Unique
+    private void polyplus$insertEmoji(String alias) {
+        String value = input.getValue();
+        int cursor = Math.min(input.getCursorPosition(), value.length());
+        String insert = ":" + alias + ":";
+        input.setValue(value.substring(0, cursor) + insert + value.substring(cursor));
+        input.setCursorPosition(cursor + insert.length());
+    }
+
+    @WrapMethod(
+        //? if >= 1.21.10 {
+        method = "mouseClicked(Lnet/minecraft/client/input/MouseButtonEvent;Z)Z"
+        //?} else {
+        /*method = "mouseClicked(DDI)Z"
+        *///?}
+    )
+    //? if >= 1.21.10 {
+    private boolean polyplus$mouseClicked(MouseButtonEvent event, boolean doubleClick, Operation<Boolean> original) {
+        if (polyplus$emojiClicked(event.x(), event.y(), event.button(), event.hasShiftDown())) return true;
+        return original.call(event, doubleClick);
+    }
+    //?} else {
+    /*private boolean polyplus$mouseClicked(double mouseX, double mouseY, int button, Operation<Boolean> original) {
+        if (polyplus$emojiClicked(mouseX, mouseY, button, Screen.hasShiftDown())) return true;
+        return original.call(mouseX, mouseY, button);
+    }
+    *///?}
+
+    @WrapMethod(method = "mouseScrolled(DDDD)Z")
+    private boolean polyplus$mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY, Operation<Boolean> original) {
+        if (polyplus$emojiScrolled(mouseX, mouseY, deltaY)) return true;
+        return original.call(mouseX, mouseY, deltaX, deltaY);
+    }
 }

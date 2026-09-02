@@ -110,6 +110,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.skia.Image as SkiaImage
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
@@ -1542,6 +1543,7 @@ private fun OfflineAccountEntry(
             BasicTextField(
                 value = value,
                 onValueChange = { if (it.length <= 16) value = it },
+                modifier = Modifier.trackTextInputFocus(),
                 singleLine = true,
                 enabled = enabled,
                 textStyle = TextStyle(color = TextPrimary, fontSize = 13.sp, fontFamily = bodyFont),

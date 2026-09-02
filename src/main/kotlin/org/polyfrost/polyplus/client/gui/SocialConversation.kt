@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
@@ -410,7 +411,7 @@ private fun MessageBubble(
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                SocialText(message.content, fontSize = 14.sp, color = if (outgoing) androidx.compose.ui.graphics.Color.White else SocialTextPrimary)
+                SocialEmojiText(message.content, fontSize = 14.sp, color = if (outgoing) androidx.compose.ui.graphics.Color.White else SocialTextPrimary)
             }
         }
     }
@@ -472,7 +473,7 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
     val disabled = disabledReason != null
     val trySend = {
         if (!disabled && value.isNotBlank()) {
-            onSend(value.trim())
+            onSend(EmojiRegistry.toShortcodes(value.trim()))
             value = ""
         }
     }
@@ -494,6 +495,12 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
                 maxLength = 500,
                 onSubmit = trySend,
             )
+            EmojiPickerButton { alias ->
+                if (!disabled) {
+                    val insert = ":$alias:"
+                    if (value.length + insert.length <= 500) value += insert
+                }
+            }
             SocialIconButton(
                 SOCIAL_ASSETS + "chevron-right.svg",
                 background = if (!disabled && value.isNotBlank()) Accent.asSocialSelected else null,

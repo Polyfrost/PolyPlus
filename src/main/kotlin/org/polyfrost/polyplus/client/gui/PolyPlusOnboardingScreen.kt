@@ -144,6 +144,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 if (needsSettings) {
                     add(OnboardingPage.LOOK_AND_FEEL)
                     if (OnboardingFeatures.modsPageAvailable) add(OnboardingPage.MODS)
+                    add(OnboardingPage.WATERMARK)
                 }
                 if (needsBlurChoice) add(OnboardingPage.MOTION_BLUR)
                 if (needsSettings) add(OnboardingPage.DONE)
@@ -155,6 +156,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
+        var watermark by remember { mutableStateOf(PolyPlusConfig.watermarkEnabled) }
         var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(1, MOTION_BLUR_MAX)) }
         var blurMode by remember { mutableIntStateOf(OnboardingFeatures.MOTION_BLUR_UNSET) }
         val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
@@ -172,6 +174,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 PolyPlusConfig.onboardingUiStyle = uiStyle
                 PolyPlusConfig.onboardingToggleSprint = toggleSprint
                 PolyPlusConfig.onboardingGuiScale = guiScale
+                PolyPlusConfig.watermarkEnabled = watermark
             }
             if (needsBlurChoice && blurMode != OnboardingFeatures.MOTION_BLUR_UNSET) {
                 PolyPlusConfig.onboardingMotionBlurMode = blurMode
@@ -272,6 +275,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                         guiScale, maxGuiScale, { guiScale = it },
                                     )
                                 OnboardingPage.MODS -> ModsPage(toggleSprint) { toggleSprint = it }
+                                OnboardingPage.WATERMARK -> WatermarkPage(watermark) { watermark = it }
                                 OnboardingPage.MOTION_BLUR ->
                                     if (waitingForOptimization) {
                                         OptimizingPage()
@@ -421,6 +425,50 @@ private fun ModsPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit) {
     Header("Continuing with", "Mods")
     val y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - SPRINT_SECTION_HEIGHT) / 2f
     SprintSection(y, toggleSprint, onToggleSprint)
+}
+
+@Composable
+private fun WatermarkPage(watermark: Boolean, onWatermark: (Boolean) -> Unit) {
+    Header("One last touch:", "Watermark")
+    OnboardingText(
+        "Show the OneClient logo in your inventory and pause menu.\nMove, resize or recolour it later in OneClient settings.",
+        15,
+        Modifier.offset(215.dp, 137.dp).width(450.dp),
+        TextPrimary,
+        FontWeight.Light,
+    )
+    WatermarkPreview(
+        Modifier.offset(((PANEL_WIDTH - WATERMARK_PREVIEW_WIDTH) / 2f).dp, WATERMARK_PREVIEW_Y.dp),
+        watermark,
+    )
+    SectionLabel("OneClient Watermark", WATERMARK_CHOICE_Y)
+    Row(
+        Modifier.offset(232.dp, (WATERMARK_CHOICE_Y + LABEL_HEIGHT).dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ChoiceButton("Show", MAIN_MENU_ASSETS + "logo.svg", watermark, 198f) { onWatermark(true) }
+        ChoiceButton("Hide", MAIN_MENU_ASSETS + "x-close.svg", !watermark, 198f) { onWatermark(false) }
+    }
+}
+
+@Composable
+private fun WatermarkPreview(modifier: Modifier, shown: Boolean) {
+    Box(
+        modifier
+            .size(WATERMARK_PREVIEW_WIDTH.dp, WATERMARK_PREVIEW_HEIGHT.dp)
+            .clip(ppShape(HUD_RADIUS.dp))
+            .background(HudBackground)
+            .alpha(if (shown) 1f else 0.3f),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OnboardingIcon(MAIN_MENU_ASSETS + "logo.svg", Color.White, Modifier.size(28.dp))
+            OnboardingIcon(BRAND_ASSETS + "oneclient.svg", Color.White, Modifier.size(WORDMARK_WIDTH.dp, WORDMARK_HEIGHT.dp))
+        }
+    }
 }
 
 @Composable
@@ -1021,7 +1069,7 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
     )
 }
 
-private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, MOTION_BLUR, COSMETICS, DONE }
+private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, WATERMARK, MOTION_BLUR, COSMETICS, DONE }
 
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
@@ -1036,6 +1084,14 @@ private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
 private const val LABEL_HEIGHT = 32f
 private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
+
+private const val WATERMARK_PREVIEW_WIDTH = 232f
+private const val WATERMARK_PREVIEW_HEIGHT = 56f
+
+private const val WORDMARK_HEIGHT = 18f
+private const val WORDMARK_WIDTH = WORDMARK_HEIGHT * (159f / 19f)
+private const val WATERMARK_PREVIEW_Y = 232f
+private const val WATERMARK_CHOICE_Y = 380f
 
 private const val MODE_CARD_WIDTH = 240f
 private const val MODE_CARD_HEIGHT = 212f
@@ -1058,6 +1114,7 @@ private val LocalPanelWidth = compositionLocalOf { PANEL_WIDTH }
 private val LocalPanelHeight = compositionLocalOf { PANEL_HEIGHT }
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
+private const val BRAND_ASSETS = "assets/polyplus/brand/"
 
 private val PANEL_SHAPE: Shape
     @Composable

@@ -204,7 +204,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
                 }
             }
             val last = group.lastMessage
-            SocialText(
+            SocialEmojiText(
                 when {
                     last == null -> "No messages yet"
                     last.sender == selfId && last.content == SESSION_INVITE_CONTENT -> "You invited them to your world"

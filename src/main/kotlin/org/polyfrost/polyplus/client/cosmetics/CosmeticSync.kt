@@ -142,6 +142,10 @@ object CosmeticSync : EarlyInitializable {
 
     fun refreshVisibleSubscriptions(): Result<Unit> {
         val mc = Minecraft.getInstance()
+        if (!mc.isSameThread) {
+            mc.execute { refreshVisibleSubscriptions() }
+            return Result.success(Unit)
+        }
         val level = mc.level
             ?: return Result.failure(IllegalStateException("No world is loaded"))
 
@@ -229,28 +233,30 @@ object CosmeticSync : EarlyInitializable {
     //? if >= 1.21.1 {
     private fun handleEmotePlay(playerUuid: String, emoteId: Int) {
         val uuid = UUID.fromString(playerUuid)
-        val player = findPlayer(uuid) ?: return
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
             val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@launch
             ClientPlatform.runOnMain {
+                val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
             }
         }
     }
 
-    private fun handleEmoteStop(player: String) {
-        val uuid = UUID.fromString(player)
-        val player = findPlayer(uuid) ?: return
-        (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+    private fun handleEmoteStop(playerUuid: String) {
+        val uuid = UUID.fromString(playerUuid)
+        ClientPlatform.runOnMain {
+            val player = findPlayer(uuid) ?: return@runOnMain
+            (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+        }
     }
     //?}
 
-    private fun applyActiveToPlayer(uuid: UUID, cosmeticIds: List<Int>) {
+    private fun applyActiveToPlayer(uuid: UUID, cosmeticIds: List<Int>) = ClientPlatform.runOnMain {
         val player = findPlayer(uuid)
         if (player == null) {
             LOGGER.debug("Deferred cosmetic apply for {} ({} id(s)) — player not loaded", uuid, cosmeticIds.size)
-            return
+            return@runOnMain
         }
 
         //? if >= 1.21.1 {

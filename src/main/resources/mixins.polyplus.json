@@ -26,6 +26,7 @@
     "client.MixinGui",
     "client.MixinIntegratedServer",
     "client.MixinMinecraft",
+    "client.MixinMinecraftSystemReport",
     "client.MixinPanorama",
     "client.MixinPauseScreen",
     "client.MixinPlayerTabOverlay",
@@ -51,6 +52,7 @@
   ],
   "mixins": [
     "MixinCrashReport",
+    "MixinSystemReport",
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
@@ -65,6 +67,7 @@
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
+    "compat.polytone.MixinPolytoneFabric",
     "compat.sodium.MixinSodiumConfigBuilder",
     "compat.voicechat.MixinClientManager",
     "compat.waveycapes.MixinCustomCapeRenderer",
