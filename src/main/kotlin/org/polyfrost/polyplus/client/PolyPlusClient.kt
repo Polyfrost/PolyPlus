@@ -138,18 +138,18 @@ object PolyPlusClient {
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("login gate") { MinecraftLoginGate.register() }
 
-        val earlyHooks: List<EarlyInitializable> = buildList {
+        val earlyHooks: List<Pair<String, () -> EarlyInitializable>> = buildList {
             //? if >= 1.21.1
-            add(CosmeticsInitializer)
-            add(FriendsRepository)
-            add(GroupsRepository)
+            add("CosmeticsInitializer" to { CosmeticsInitializer })
+            add("FriendsRepository" to { FriendsRepository })
+            add("GroupsRepository" to { GroupsRepository })
             // Global chat is disabled for now.
-            // add(GlobalChatRepository)
-            add(SessionsRepository)
-            add(P2PSessionManager)
+            // add("GlobalChatRepository" to { GlobalChatRepository })
+            add("SessionsRepository" to { SessionsRepository })
+            add("P2PSessionManager" to { P2PSessionManager })
         }
-        earlyHooks.forEach { hook ->
-            step("early init ${hook.javaClass.simpleName}") { hook.earlyInitialize() }
+        earlyHooks.forEach { (name, hook) ->
+            step("early init $name") { hook().earlyInitialize() }
         }
 
         //? if >= 1.21.1
