@@ -77,7 +77,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     override val isLoggedIn: Boolean get() = localUser != null
 
     override fun isStalled(): Boolean =
-        EosTickHealth.isStalled(running && platform != null, lastTickMs, monotonicMs())
+        EosTickHealth.isStalled(running && platform != null, lastTickMs, EosTickHealth.monotonicMs())
 
     companion object {
         @Volatile private var logTarget: EosSdkBridgeImpl? = null
@@ -260,7 +260,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         var tick = 0L
 
         while (running) {
-            lastTickMs = monotonicMs()
+            lastTickMs = EosTickHealth.monotonicMs()
             runCatching { pump() }.onFailure { logger.error("An EOS tick failed", it) }
 
             tick++
@@ -338,8 +338,6 @@ class EosSdkBridgeImpl : EosSdkBridge {
         val nanos = (MIN_TICK_SLEEP_NANOS shl (idleTicks - 1).coerceAtMost(3)).coerceAtMost(MAX_TICK_SLEEP_NANOS)
         java.util.concurrent.locks.LockSupport.parkNanos(nanos)
     }
-
-    private fun monotonicMs(): Long = System.nanoTime() / 1_000_000
 
     private fun detachHandlers() {
         inboundHandler = null
@@ -427,7 +425,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     private fun onLog(category: String, level: EosLogLevel, message: String) {
-        val suppressed = logThrottle.onMessage(message, monotonicMs()) ?: return
+        val suppressed = logThrottle.onMessage(message, EosTickHealth.monotonicMs()) ?: return
         val text = if (suppressed == 0) message else "$message [+$suppressed identical messages suppressed]"
 
         val logName = category.removePrefix("LogEOS").ifBlank { "polyplus/eos" }.let { "polyplus/eos/$it" }
