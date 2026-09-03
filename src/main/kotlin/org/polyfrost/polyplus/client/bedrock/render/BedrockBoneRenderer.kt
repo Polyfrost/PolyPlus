@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.render
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -104,4 +103,3 @@ class BedrockBoneRenderer internal constructor(
         }
     }
 }
-//?}

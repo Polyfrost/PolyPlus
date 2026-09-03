@@ -101,7 +101,7 @@ private fun GlobalChatMessageRow(message: GlobalChatMessage, outgoing: Boolean, 
                     SocialText(timeFor(message.sentAt), fontSize = 10.sp, color = SocialTextSecondary)
                 }
             }
-            SocialText(message.content, fontSize = 14.sp, color = SocialTextPrimary, modifier = Modifier.widthIn(max = 480.dp))
+            SocialEmojiText(message.content, fontSize = 14.sp, color = SocialTextPrimary, modifier = Modifier.widthIn(max = 480.dp))
         }
     }
 }

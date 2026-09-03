@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.client.player.AbstractClientPlayer
@@ -50,4 +49,3 @@ object EmoteApi {
         return CosmeticService.playEmote(emoteId).isSuccess
     }
 }
-//?}

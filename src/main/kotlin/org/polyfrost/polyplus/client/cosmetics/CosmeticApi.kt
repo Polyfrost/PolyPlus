@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.client.player.AbstractClientPlayer
@@ -36,4 +35,3 @@ object CosmeticApi {
         }
     }
 }
-//?}

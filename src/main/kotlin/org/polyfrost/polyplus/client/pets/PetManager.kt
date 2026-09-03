@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import net.minecraft.client.Minecraft
@@ -62,4 +61,3 @@ object PetManager {
         activeByOwner.keys.toList().forEach(::despawn)
     }
 }
-//?}

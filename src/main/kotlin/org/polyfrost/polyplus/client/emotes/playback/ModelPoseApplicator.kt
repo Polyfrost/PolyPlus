@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.playback
 
 import net.minecraft.client.model.geom.ModelPart
@@ -100,4 +99,3 @@ object ModelPoseApplicator {
         }
     }
 }
-//?}

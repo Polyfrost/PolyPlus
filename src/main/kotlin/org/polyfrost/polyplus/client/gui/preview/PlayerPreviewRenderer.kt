@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.graphics.ImageBitmap
@@ -434,7 +433,7 @@ object PlayerPreviewRenderer {
 
         val fmt = DefaultVertexFormat.POSITION_TEX_COLOR
         //? if >= 26.2 {
-        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(1024)
+        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(GRID_X * GRID_Y * 4 * fmt.getVertexSize())
         val bb: com.mojang.blaze3d.vertex.VertexConsumer = com.mojang.blaze3d.vertex.BufferBuilder(byteBuilder, com.mojang.blaze3d.PrimitiveTopology.QUADS, fmt)
         //?} else {
         /*val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
@@ -1159,7 +1158,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun legacyPlayerRenderer(mc: Minecraft, skin: PlayerSkin): PlayerRenderer? {
-        val map = (mc.entityRenderDispatcher as org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherPlayerAccessor)
+        val map = (mc.entityRenderDispatcher as org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor)
             .`polyplus$playerRenderers`()
         return (map[skin.model()] ?: map.values.firstOrNull()) as? PlayerRenderer
     }
@@ -1255,7 +1254,7 @@ object PlayerPreviewRenderer {
         /*val prevCamera = dispatcher.camera
         *///?}
         val realMainTarget = mc.mainRenderTarget
-        (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+        (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
             .`polyplus$setMainRenderTarget`(fbo)
         try {
             //? if >= 1.21.4 {
@@ -1270,7 +1269,7 @@ object PlayerPreviewRenderer {
             fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
-            (mc as org.polyfrost.polyplus.mixin.client.MinecraftMainRenderTargetAccessor)
+            (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
                 .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
             //? if < 1.21.4 {
@@ -1371,4 +1370,3 @@ object PlayerPreviewRenderer {
     }
     *///?}
 }
-//?}

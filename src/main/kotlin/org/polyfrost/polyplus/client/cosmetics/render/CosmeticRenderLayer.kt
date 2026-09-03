@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.render
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -137,4 +136,3 @@ private fun hiddenSlotsFor(player: AbstractClientPlayer): Set<BodySlot> {
     }
     return hidden
 }
-//?}

@@ -22,6 +22,9 @@
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
         ]
     },
+    "languageAdapters": {
+        "polyplus-early": "org.polyfrost.polyplus.compat.EarlyConfigAdapter"
+    },
     "mixins": [
         "mixins.${mod_id}.json"
     ],

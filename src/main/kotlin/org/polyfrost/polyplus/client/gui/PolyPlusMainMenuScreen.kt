@@ -110,6 +110,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.skia.Image as SkiaImage
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
@@ -331,34 +332,107 @@ private object MainMenuRasterAssets {
 }
 
 internal object MenuHeadCache {
-    private val heads = ConcurrentHashMap<java.util.UUID, ImageBitmap>()
-    private val requested: MutableSet<java.util.UUID> = Collections.newSetFromMap(ConcurrentHashMap())
-    var version by mutableStateOf(0)
-        private set
+    private class Entry {
+        var shown by mutableStateOf<ImageBitmap?>(null)
 
-    fun get(id: java.util.UUID, name: String): ImageBitmap? {
-        version
-        heads[id]?.let { return it }
-        if (requested.add(id)) {
-            Thread({
-                val face = runCatching { loadFaceByUuid(id) }.getOrNull()
-                if (face != null) heads[id] = face else requested.remove(id)
-                version++ // snapshot state is writable off-thread
-            }, "polyplus-account-head").apply {
-                isDaemon = true
-                start()
+        var settled = false
+    }
+
+    private val entries = object : LinkedHashMap<java.util.UUID, Entry>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<java.util.UUID, Entry>) = size > MAX_ENTRIES
+    }
+
+    private val fetching = HashMap<java.util.UUID, Int>()
+
+    private const val MAX_ENTRIES = 256
+
+    private val loaders = java.util.concurrent.Executors.newFixedThreadPool(3) { task ->
+        Thread(task, "polyplus-account-head").apply { isDaemon = true }
+    }
+
+    private fun <T> withEntry(id: java.util.UUID, block: (Entry) -> T): T? =
+        synchronized(entries) { entries[id]?.let(block) }
+
+    fun get(id: java.util.UUID): ImageBitmap? {
+        var fetch = false
+        val entry = synchronized(entries) {
+            val entry = entries.getOrPut(id) { Entry() }
+            if (!entry.settled && id !in fetching) {
+                fetching[id] = 0
+                fetch = true
+            }
+            entry
+        }
+        if (fetch) startFetch(id)
+        return entry.shown
+    }
+
+    private fun startFetch(id: java.util.UUID) {
+        loaders.execute {
+            val face = runCatching {
+                val outcome = loadFaceByUuid(id)
+                outcome.exceptionOrNull()?.let { HEAD_LOG.debug("Failed to load head for {}; will retry", id, it) }
+                if (outcome.isSuccess) outcome.getOrNull() ?: defaultSkinFace(id) else null
+            }.onFailure { HEAD_LOG.warn("Loading the head for {} failed unexpectedly; will retry", id, it) }
+                .getOrNull()
+
+            val needsFallback = face == null && withEntry(id) { it.shown == null } == true
+            val fallback = if (needsFallback) runCatching { defaultSkinFace(id) }.getOrNull() else null
+
+            val retryIn = synchronized(entries) {
+                val entry = entries[id] ?: run {
+                    fetching.remove(id)
+                    return@synchronized null
+                }
+                if (face != null) {
+                    entry.shown = face
+                    entry.settled = true
+                    fetching.remove(id)
+                    return@synchronized null
+                }
+
+                if (entry.shown == null) entry.shown = fallback
+                val attempts = (fetching[id] ?: 0) + 1
+                fetching[id] = attempts
+                if (HeadFetchPolicy.shouldRetry(attempts)) {
+                    HeadFetchPolicy.retryDelayMs(attempts)
+                } else {
+                    HEAD_LOG.debug("Giving up on the head for {} after {} attempts", id, attempts)
+                    entry.settled = true
+                    fetching.remove(id)
+                    null
+                }
+            }
+
+            if (retryIn != null) {
+                val retry = org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                    delay(retryIn)
+                    startFetch(id)
+                }
+                retry.invokeOnCompletion { cause ->
+                    if (cause != null) synchronized(entries) { fetching.remove(id) }
+                }
             }
         }
-        return heads[id]
     }
 }
 
 private const val MENU_HEAD_SIZE = 64
+private val HEAD_LOG = org.apache.logging.log4j.LogManager.getLogger("PolyPlus/Heads")
 
-private fun loadFaceByUuid(uuid: java.util.UUID): ImageBitmap? {
-    val url = mojangSkinUrl(uuid) ?: return defaultSkinFace(uuid)
-    val skin = javax.imageio.ImageIO.read(java.net.URI(url).toURL()) ?: return defaultSkinFace(uuid)
-    return buildFace(skin)
+private fun loadFaceByUuid(uuid: java.util.UUID): Result<ImageBitmap?> {
+    val url = mojangSkinUrl(uuid).getOrElse { return Result.failure(it) } ?: return Result.success(null)
+    val skin = runCatching { javax.imageio.ImageIO.read(java.net.URI(url).toURL()) }
+        .getOrElse { return Result.failure(it) }
+    if (skin == null) {
+        HEAD_LOG.debug("Skin texture at {} was not decodable for {}", url, uuid)
+        return Result.success(null)
+    }
+    return Result.success(
+        runCatching { buildFace(skin) }
+            .onFailure { HEAD_LOG.debug("Skin texture at {} is not a usable skin for {}", url, uuid, it) }
+            .getOrNull(),
+    )
 }
 
 private fun defaultSkinFace(uuid: java.util.UUID): ImageBitmap? = runCatching {
@@ -374,15 +448,18 @@ private fun defaultSkinFace(uuid: java.util.UUID): ImageBitmap? = runCatching {
     buildFace(skin)
 }.getOrNull()
 
-private fun mojangSkinUrl(uuid: java.util.UUID): String? = runCatching {
+private fun mojangSkinUrl(uuid: java.util.UUID): Result<String?> = runCatching {
     val id = uuid.toString().replace("-", "")
     val body = httpGetString("https://sessionserver.mojang.com/session/minecraft/profile/$id")
-        ?: return null
+        ?: run {
+            HEAD_LOG.debug("No Mojang profile for {} (offline, or not a premium account)", uuid)
+            return Result.success(null)
+        }
     val root = org.polyfrost.polyplus.client.PolyPlusClient.JSON.parseToJsonElement(body).jsonObject
-    val props = root["properties"]?.jsonArray ?: return null
+    val props = root["properties"]?.jsonArray ?: return Result.success(null)
     val texturesValue = props.firstOrNull {
         it.jsonObject["name"]?.jsonPrimitive?.content == "textures"
-    }?.jsonObject?.get("value")?.jsonPrimitive?.content ?: return null
+    }?.jsonObject?.get("value")?.jsonPrimitive?.content ?: return Result.success(null)
     val decoded = String(
         java.util.Base64.getDecoder().decode(texturesValue),
         java.nio.charset.StandardCharsets.UTF_8,
@@ -391,17 +468,21 @@ private fun mojangSkinUrl(uuid: java.util.UUID): String? = runCatching {
         .jsonObject["textures"]?.jsonObject
         ?.get("SKIN")?.jsonObject
         ?.get("url")?.jsonPrimitive?.content
-}.getOrNull()
+}.onFailure { HEAD_LOG.debug("Failed to read Mojang profile for {}", uuid, it) }
 
 private fun httpGetString(url: String): String? {
     val conn = java.net.URI(url).toURL().openConnection() as java.net.HttpURLConnection
     return try {
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
-        if (conn.responseCode == 200) {
-            conn.inputStream.bufferedReader(java.nio.charset.StandardCharsets.UTF_8).use { it.readText() }
-        } else {
-            null
+        val code = conn.responseCode
+        when {
+            code == 200 -> conn.inputStream.bufferedReader(java.nio.charset.StandardCharsets.UTF_8).use { it.readText() }
+            HeadFetchPolicy.isDefinitiveMiss(code) -> {
+                HEAD_LOG.debug("GET {} returned {}", url, code)
+                null
+            }
+            else -> throw java.io.IOException("GET $url returned $code")
         }
     } finally {
         conn.disconnect()
@@ -712,12 +793,14 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
             HostWorldButton(assetsReady, screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuSocial) {
+            val groups by org.polyfrost.polyplus.client.social.GroupsRepository.groups.collectAsState()
             PillButton(
                 "Social",
                 ASSETS + "message-chat-circle.svg",
                 Modifier.fillMaxWidth(),
                 assetsReady,
                 onClick = { SocialOverlay.open(screen) },
+                badge = groups.any { it.unread },
             )
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
@@ -887,20 +970,32 @@ private fun FooterBrandText(platform: String, assetsReady: Boolean) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush) {
-    Row(
-        modifier = modifier
-            .height(45.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(BorderWidth, borderBrush, PanelShape)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
-        MenuText(label, fontSize = 16.sp)
+private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush, badge: Boolean = false) {
+    Box(modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(45.dp)
+                .clip(PanelShape)
+                .background(PanelBackground)
+                .border(BorderWidth, borderBrush, PanelShape)
+                .clickableWithSound(onClick)
+                .padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
+            MenuText(label, fontSize = 16.sp)
+        }
+        if (badge) {
+            Box(
+                Modifier.align(Alignment.CenterEnd)
+                    .padding(end = 14.dp)
+                    .size(8.dp)
+                    .clip(LocalTheme.current.circleShape)
+                    .background(Accent),
+            )
+        }
     }
 }
 
@@ -1089,7 +1184,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     val activeName = accounts?.firstOrNull { it.active }?.username ?: name
     val chevronRotation = if (open) 0f else 180f
     val localId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId }.getOrNull()
-    val head = localId?.let { MenuHeadCache.get(it, activeName) }
+    val head = localId?.let { MenuHeadCache.get(it) }
 
     Box(
         modifier = Modifier
@@ -1328,7 +1423,7 @@ private fun AccountRow(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var confirmRemove by remember { mutableStateOf(false) }
-    val head = MenuHeadCache.get(account.id, account.username)
+    val head = MenuHeadCache.get(account.id)
     val clickable = enabled && !account.active && !confirmRemove
 
     Row(
@@ -1448,6 +1543,7 @@ private fun OfflineAccountEntry(
             BasicTextField(
                 value = value,
                 onValueChange = { if (it.length <= 16) value = it },
+                modifier = Modifier.trackTextInputFocus(),
                 singleLine = true,
                 enabled = enabled,
                 textStyle = TextStyle(color = TextPrimary, fontSize = 13.sp, fontFamily = bodyFont),

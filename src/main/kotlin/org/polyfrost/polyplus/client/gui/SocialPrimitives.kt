@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
@@ -88,7 +89,7 @@ internal fun SocialText(
 @Composable
 internal fun SocialAvatar(playerId: String, size: Dp, modifier: Modifier = Modifier) {
     val uuid = remember(playerId) { runCatching { UUID.fromString(playerId) }.getOrNull() }
-    val head = uuid?.let { MenuHeadCache.get(it, playerId) }
+    val head = uuid?.let { MenuHeadCache.get(it) }
     val shape = ppShape(size / 4)
     if (head != null) {
         Image(head, contentDescription = null, modifier = modifier.size(size).clip(shape))
@@ -290,7 +291,7 @@ internal fun SocialTextField(
             BasicTextField(
                 value = value,
                 onValueChange = { if (it.length <= maxLength) onValueChange(it) },
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).trackTextInputFocus(),
                 singleLine = true,
                 textStyle = TextStyle(color = SocialTextPrimary, fontSize = 14.sp, fontFamily = bodyFont),
                 cursorBrush = SolidColor(Accent),

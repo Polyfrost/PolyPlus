@@ -27,7 +27,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.p2p.P2PChannelRegistry
 
@@ -35,14 +39,24 @@ class EosSdkBridgeImpl : EosSdkBridge {
     private val logger = LogManager.getLogger()
 
     @Volatile private var platform: EosPlatform? = null
+
+    @Volatile private var sdkInitialized = false
+
     @Volatile private var tickThread: Thread? = null
     @Volatile private var running = false
     private val starting = AtomicBoolean(false)
 
-    private val pendingCalls = ConcurrentLinkedQueue<() -> Unit>()
+    private class PendingCall(val run: () -> Unit, val abandon: () -> Unit)
+
+    private val pendingCalls = ConcurrentLinkedQueue<PendingCall>()
+
+    private var stopped = false
+
+    private val startupSettled = CountDownLatch(1)
+
     private val isOnTickThread: Boolean get() = Thread.currentThread() === tickThread
 
-    private var inboundHandler: ((EosSdkBridge.Received) -> Unit)? = null
+    @Volatile private var inboundHandler: ((EosSdkBridge.Received) -> Unit)? = null
     @Volatile private var loginLostHandler: (() -> Unit)? = null
 
     private data class StateHandlerEntry(val handle: Long, val callback: (EosSdkBridge.ConnectionStateEvent) -> Unit)
@@ -56,6 +70,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
     private var lastLoggedReceiveFailure: Pair<EosProductUserId, String>? = null
 
+    private val logThrottle = EosLogThrottle()
+
     @Volatile private var lastTickMs = 0L
 
     override val isLoggedIn: Boolean get() = localUser != null
@@ -64,47 +80,110 @@ class EosSdkBridgeImpl : EosSdkBridge {
         EosTickHealth.isStalled(running && platform != null, lastTickMs, EosTickHealth.monotonicMs())
 
     companion object {
+        @Volatile private var logTarget: EosSdkBridgeImpl? = null
+
+        @Volatile private var sdkRetired = false
+
+        internal fun markSdkRetired() {
+            sdkRetired = true
+        }
+
         private const val STARTUP_TIMEOUT_SECONDS = 10L
         private const val EOS_CALL_TIMEOUT_SECONDS = 30L
+        private const val SHUTDOWN_TIMEOUT_MS = 2_000L
 
         private const val MIN_TICK_SLEEP_NANOS = 1_000_000L
         private const val MAX_TICK_SLEEP_NANOS = 8_000_000L
-        private const val ACTIVITY_BACKOFF_AFTER_IDLE_TICKS = 4
 
         private const val MAX_PACKETS_PER_TICK = 4096
         private const val CONGESTION_CHECK_EVERY_TICKS = 64
     }
 
-    fun initialize() {
-        if (platform != null || !starting.compareAndSet(false, true)) return
+    fun initialize(): Boolean {
+        if (platform != null) return true
+        if (sdkRetired) {
+            logger.error("EOS has already been shut down in this process; it cannot be started again until a restart")
+            startupSettled.countDown()
+            return false
+        }
+        if (!starting.compareAndSet(false, true)) return platform != null
 
-        val ready = CountDownLatch(1)
         val worker = Thread({
             runCatching { start() }.onFailure { logger.error("Could not start EOS! P2P hosting/joining will be unavailable", it) }
-            ready.countDown()
-            if (platform != null) tickLoop()
+            startupSettled.countDown()
+            if (platform != null) {
+                tickLoop()
+            } else {
+                synchronized(pendingCalls) { stopped = true }
+                rejectPendingCalls()
+                teardown()
+            }
         }, EosTickHealth.THREAD_NAME).apply {
             isDaemon = true
             priority = Thread.NORM_PRIORITY + 1
         }
-        tickThread = worker
-        running = true
-        worker.start()
-
-        if (!ready.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            logger.warn("EOS is still starting after {}s, continuing without it for now", STARTUP_TIMEOUT_SECONDS)
+        synchronized(pendingCalls) {
+            if (stopped) {
+                logger.info("Not starting EOS; this bridge was already shut down")
+                startupSettled.countDown()
+                starting.set(false)
+                return false
+            }
+            tickThread = worker
+            running = true
+            worker.start()
         }
+
+        if (!startupSettled.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            logger.warn("EOS is still starting after {}s, continuing without it for now", STARTUP_TIMEOUT_SECONDS)
+            return true
+        }
+        return platform != null
+    }
+
+    private fun awaitStartup() {
+        if (platform != null || startupSettled.count == 0L) return
+        startupSettled.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    override fun shutdown() {
+        val worker = synchronized(pendingCalls) {
+            stopped = true
+            running = false
+            tickThread
+        }
+
+        detachHandlers()
+
+        if (worker != null) {
+            java.util.concurrent.locks.LockSupport.unpark(worker)
+            worker.join(SHUTDOWN_TIMEOUT_MS)
+        }
+        if (worker != null && worker.isAlive) {
+            logger.warn("The EOS tick thread did not stop within {}ms; leaving it to finish on its own", SHUTDOWN_TIMEOUT_MS)
+        } else {
+            teardown()
+            rejectPendingCalls()
+        }
+        startupSettled.countDown()
     }
 
     private fun start() {
+        if (sdkRetired) {
+            logger.error("Not starting EOS; the SDK has already been shut down in this process")
+            running = false
+            return
+        }
         val init = Eos.initialize(EosInitializeOptions.create(EosConstants.PRODUCT_NAME, EosConstants.PRODUCT_VERSION))
         if (init != EosResult.Success && init != EosResult.AlreadyConfigured) {
             logger.error("EOS::Initialize failed: {}", init)
             running = false
             return
         }
+        sdkInitialized = true
 
-        EosLogging.setCallback { msg -> onLog(msg.category, msg.level, msg.message) }
+        logTarget = this
+        EosLogging.setCallback { msg -> logTarget?.onLog(msg.category, msg.level, msg.message) }
         EosLogging.setLogLevel(EosLogCategory.AllCategories, EosLogLevel.Info)
 
         val options = EosPlatformOptions.create(
@@ -196,13 +275,15 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
             park(idleTicks)
         }
+        runCatching { pump() }.onFailure { logger.warn("The final EOS tick before shutdown failed", it) }
+        rejectPendingCalls()
         teardown()
     }
 
     private fun pump() {
         var call = pendingCalls.poll()
         while (call != null) {
-            runCatching(call).onFailure { logger.warn("A queued EOS call failed", it) }
+            runCatching(call.run).onFailure { logger.warn("A queued EOS call failed", it) }
             call = pendingCalls.poll()
         }
         platform?.tick()
@@ -250,75 +331,118 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     private fun park(idleTicks: Int) {
-        if (idleTicks < ACTIVITY_BACKOFF_AFTER_IDLE_TICKS) {
+        if (idleTicks == 0) {
             Thread.onSpinWait()
             return
         }
-        val steps = (idleTicks - ACTIVITY_BACKOFF_AFTER_IDLE_TICKS).coerceAtMost(10)
-        val nanos = (MIN_TICK_SLEEP_NANOS shl steps).coerceAtMost(MAX_TICK_SLEEP_NANOS)
+        val nanos = (MIN_TICK_SLEEP_NANOS shl (idleTicks - 1).coerceAtMost(3)).coerceAtMost(MAX_TICK_SLEEP_NANOS)
         java.util.concurrent.locks.LockSupport.parkNanos(nanos)
     }
 
+    private fun detachHandlers() {
+        inboundHandler = null
+        loginLostHandler = null
+        requestHandlers.clear()
+        stateHandlers.clear()
+    }
+
+    @Synchronized
     private fun teardown() {
-        val platform = this.platform ?: return
-        this.platform = null
         localUser = null
         hookedUser = null
         loginWatchInstalled.set(false)
         lastLoggedReceiveFailure = null
-        runCatching { platform.close() }.onFailure { logger.warn("Closing the EOS platform failed", it) }
-        runCatching { Eos.shutdown() }.onFailure { logger.warn("Shutting the EOS SDK down failed", it) }
+
+        detachHandlers()
+
+        this.platform?.let { platform ->
+            this.platform = null
+            runCatching { platform.close() }.onFailure { logger.warn("Closing the EOS platform failed", it) }
+        }
+
+        if (sdkInitialized) {
+            sdkInitialized = false
+            sdkRetired = true
+            runCatching { Eos.shutdown() }.onFailure { logger.warn("Shutting the EOS SDK down failed", it) }
+        }
+        if (logTarget === this) logTarget = null
     }
 
-    private fun <T> call(block: () -> T): java.util.concurrent.CompletableFuture<T> {
-        val future = java.util.concurrent.CompletableFuture<T>()
-        if (isOnTickThread) {
-            try {
-                future.complete(block())
-            } catch (e: Throwable) {
-                future.completeExceptionally(e)
-            }
-            return future
-        }
-        pendingCalls.add {
-            try {
-                future.complete(block())
-            } catch (e: Throwable) {
-                future.completeExceptionally(e)
+    private fun enqueue(entry: PendingCall) {
+        synchronized(pendingCalls) {
+            if (!stopped) {
+                pendingCalls.add(entry)
+                tickThread?.let(java.util.concurrent.locks.LockSupport::unpark)
+                return
             }
         }
-        return future
+        entry.abandon()
     }
+
+    private fun rejectPendingCalls() {
+        val abandoned = synchronized(pendingCalls) { generateSequence(pendingCalls::poll).toList() }
+        abandoned.forEach { entry ->
+            runCatching(entry.abandon).onFailure { logger.warn("Abandoning a queued EOS call failed", it) }
+        }
+    }
+
+    private suspend fun <T> awaitOnTick(what: String, block: () -> java.util.concurrent.CompletableFuture<T>): T =
+        try {
+            withTimeout(TimeUnit.SECONDS.toMillis(EOS_CALL_TIMEOUT_SECONDS)) {
+                suspendCancellableCoroutine { cont ->
+                    val entry = PendingCall(
+                        run = {
+                            try {
+                                block().orTimeout(EOS_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                                    .whenComplete { value, error ->
+                                        if (error != null) cont.resumeWithException(error) else cont.resume(value)
+                                    }
+                            } catch (e: Throwable) {
+                                cont.resumeWithException(e)
+                            }
+                        },
+                        abandon = { cont.resumeWithException(IllegalStateException("The EOS SDK is shutting down")) },
+                    )
+                    cont.invokeOnCancellation { pendingCalls.remove(entry) }
+                    if (isOnTickThread) entry.run() else enqueue(entry)
+                }
+            }
+        } catch (e: TimeoutCancellationException) {
+            throw IllegalStateException("$what did not answer within ${EOS_CALL_TIMEOUT_SECONDS}s", e)
+        }
 
     private fun post(block: () -> Unit) {
         if (isOnTickThread) {
             runCatching(block).onFailure { logger.warn("A posted EOS call failed", it) }
-        } else {
-            pendingCalls.add(block)
+            return
         }
+        enqueue(
+            PendingCall(
+                run = { runCatching(block).onFailure { logger.warn("A posted EOS call failed", it) } },
+                abandon = { logger.debug("Dropping a queued EOS call; the SDK is shutting down") },
+            ),
+        )
     }
 
     private fun onLog(category: String, level: EosLogLevel, message: String) {
+        val suppressed = logThrottle.onMessage(message, EosTickHealth.monotonicMs()) ?: return
+        val text = if (suppressed == 0) message else "$message [+$suppressed identical messages suppressed]"
+
         val logName = category.removePrefix("LogEOS").ifBlank { "polyplus/eos" }.let { "polyplus/eos/$it" }
         val log = LogManager.getLogger(logName)
         when (level) {
-            EosLogLevel.Fatal, EosLogLevel.Error -> log.error(message)
-            EosLogLevel.Warning -> log.warn(message)
-            else -> log.info(message)
+            EosLogLevel.Fatal, EosLogLevel.Error -> log.error(text)
+            EosLogLevel.Warning -> log.warn(text)
+            else -> log.info(text)
         }
     }
 
     override suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId> = runCatching {
+        if (platform == null) withContext(Dispatchers.IO) { awaitStartup() }
         check(platform != null) { "EOS SDK has not started yet" }
 
-        val loginResult = suspendCoroutine<gg.sona.eos.connect.LoginResult> { cont ->
-            call {
-                requireNotNull(platform).connect.login(EosExternalCredentialType.OpenIdAccessToken, openIdAccessToken)
-                    .orTimeout(EOS_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .whenComplete { info, error ->
-                        if (error != null) cont.resumeWithException(error) else cont.resume(info)
-                    }
-            }
+        val loginResult = awaitOnTick("EOS::Connect::Login") {
+            requireNotNull(platform).connect.login(EosExternalCredentialType.OpenIdAccessToken, openIdAccessToken)
         }
 
         val userId = if (loginResult.result == EosResult.Success) {
@@ -327,14 +451,8 @@ class EosSdkBridgeImpl : EosSdkBridge {
             check(loginResult.result == EosResult.InvalidUser) { "EOS::Connect::Login failed: ${loginResult.result}" }
             logger.info("No EOS user mapped to this Poly+ account yet, creating one")
 
-            val createResult = suspendCoroutine<gg.sona.eos.connect.LoginResult> { cont ->
-                call {
-                    requireNotNull(platform).connect.createUser(loginResult.continuanceToken)
-                        .orTimeout(EOS_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                        .whenComplete { info, error ->
-                            if (error != null) cont.resumeWithException(error) else cont.resume(info)
-                        }
-                }
+            val createResult = awaitOnTick("EOS::Connect::CreateUser") {
+                requireNotNull(platform).connect.createUser(loginResult.continuanceToken)
             }
             check(createResult.result == EosResult.Success) { "EOS::Connect::CreateUser failed: ${createResult.result}" }
             createResult.localUserId
@@ -354,15 +472,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     override suspend fun queryNatType(): Result<EosSdkBridge.NatType> = runCatching {
-        val result = suspendCoroutine<String> { cont ->
-            call {
-                requireNotNull(platform).p2p.queryNATType()
-                    .orTimeout(EOS_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .whenComplete { info, error ->
-                        if (error != null) cont.resumeWithException(error) else cont.resume(info.natType.toString())
-                    }
-            }
-        }
+        val result = awaitOnTick("EOS::P2P::QueryNATType") { requireNotNull(platform).p2p.queryNATType() }.natType.toString()
         runCatching { EosSdkBridge.NatType.valueOf(result) }.getOrDefault(EosSdkBridge.NatType.Unknown)
     }
 

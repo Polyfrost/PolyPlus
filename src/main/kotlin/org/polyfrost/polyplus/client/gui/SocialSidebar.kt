@@ -15,9 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +41,7 @@ internal fun SocialSidebar(
     onTabChange: (SocialTab) -> Unit,
     groups: List<GroupSummary>,
     showSpecialTab: Boolean,
-    isSearching: Boolean,
+    isFiltered: Boolean,
     friends: List<Friend>,
     selfId: String,
     selectedGroupId: Int?,
@@ -75,7 +76,7 @@ internal fun SocialSidebar(
         when (tab) {
             SocialTab.Chat -> ConversationList(
                 chatGroups,
-                isSearching,
+                isFiltered,
                 selfId,
                 selectedGroupId,
                 onSelectGroup,
@@ -83,7 +84,7 @@ internal fun SocialSidebar(
             )
             SocialTab.Special -> ConversationList(
                 specialGroups,
-                isSearching,
+                isFiltered,
                 selfId,
                 selectedGroupId,
                 onSelectGroup,
@@ -129,7 +130,7 @@ private fun SidebarTabButton(
 @Composable
 private fun ConversationList(
     groups: List<GroupSummary>,
-    isSearching: Boolean,
+    isFiltered: Boolean,
     selfId: String,
     selectedGroupId: Int?,
     onSelectGroup: (Int) -> Unit,
@@ -138,9 +139,9 @@ private fun ConversationList(
     emptyAction: String? = "Add a friend to get started",
 ) {
     if (groups.isEmpty()) {
-        if (isSearching) {
+        if (isFiltered) {
             Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                SocialText("No conversations match your search", fontSize = 13.sp, color = SocialTextSecondary)
+                SocialText("No conversations match your filters", fontSize = 13.sp, color = SocialTextSecondary)
             }
         } else {
             SidebarEmptyState(
@@ -151,11 +152,12 @@ private fun ConversationList(
         }
         return
     }
-    Column(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(8.dp),
+    val sorted = remember(groups) { groups.sortedByDescending { it.lastMessage?.sentAt ?: "" } }
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        groups.sortedByDescending { it.lastMessage?.sentAt ?: "" }.forEach { group ->
+        items(sorted, key = { it.id }) { group ->
             ConversationRow(group, selfId, group.id == selectedGroupId) { onSelectGroup(group.id) }
         }
     }
@@ -202,7 +204,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
                 }
             }
             val last = group.lastMessage
-            SocialText(
+            SocialEmojiText(
                 when {
                     last == null -> "No messages yet"
                     last.sender == selfId && last.content == SESSION_INVITE_CONTENT -> "You invited them to your world"
@@ -254,11 +256,12 @@ private fun FriendQuickList(friends: List<Friend>, onSelectFriend: (String) -> U
         SidebarEmptyState(message = "No friends yet", actionLabel = "Add a friend", onAction = onAddFriend)
         return
     }
-    Column(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(8.dp),
+    val sorted = remember(friends) { friends.sortedWith(compareByDescending<Friend> { it.online }.thenBy { it.player }) }
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        friends.sortedWith(compareByDescending<Friend> { it.online }.thenBy { it.player }).forEach { friend ->
+        items(sorted, key = { it.player }) { friend ->
             val (interaction, hovered) = rememberSocialHover()
             val background by androidx.compose.animation.animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
             Row(

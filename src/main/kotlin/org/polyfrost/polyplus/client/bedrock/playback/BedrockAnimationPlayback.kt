@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.playback
 
 //? if >= 1.21.11 {
@@ -50,4 +49,3 @@ object BedrockAnimationPlayback {
         )
     }
 }
-//?}

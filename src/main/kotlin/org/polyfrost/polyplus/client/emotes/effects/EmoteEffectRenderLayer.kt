@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.effects
 
 import com.mojang.blaze3d.vertex.PoseStack
@@ -86,4 +85,3 @@ private fun resolveController(state: Any): EmoteController? {
     return controller.takeIf { it.isActive }
 }
 *///?}
-//?}

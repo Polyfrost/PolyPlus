@@ -104,6 +104,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
@@ -1692,7 +1693,8 @@ private fun AuraCustomPopover(
                     .clip(ppShape(5.dp))
                     .background(LocalTheme.current.chipBackground)
                     .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         GuiText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
@@ -2075,7 +2077,8 @@ private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSub
                 .clip(ppShape(7.dp))
                 .background(LocalTheme.current.chipBackground)
                 .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 12.dp)
+                .trackTextInputFocus(),
             decorationBox = { inner ->
                 Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {

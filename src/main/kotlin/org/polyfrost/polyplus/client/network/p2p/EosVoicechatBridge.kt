@@ -24,6 +24,10 @@ internal object EosVoicechatBridge {
         }
     }
 
+    fun uninstall() {
+        bridge = null
+    }
+
     internal fun registerClientSocket(socket: EosVoicechatClientSocket) {
         activeClientSocket = socket
     }

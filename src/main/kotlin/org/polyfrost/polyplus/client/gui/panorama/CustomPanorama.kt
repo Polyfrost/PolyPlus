@@ -1,4 +1,3 @@
-//? if >= 1.21.11 {
 package org.polyfrost.polyplus.client.gui.panorama
 
 import com.mojang.blaze3d.platform.NativeImage
@@ -37,6 +36,7 @@ import java.util.zip.ZipInputStream
 private class PanoramaPack(val cacheKey: String, val url: String, val sha1: String)
 
 object CustomPanorama {
+    //? if >= 1.21.11 {
     private val LOGGER = LogManager.getLogger("${PolyPlusConstants.NAME}/Panorama")
 
     private const val FACES = 6
@@ -248,5 +248,5 @@ object CustomPanorama {
 
     private fun sha1Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+    //?}
 }
-//?}

@@ -30,6 +30,9 @@ object FriendsRepository : EarlyInitializable {
     private val _blocked = MutableStateFlow<List<BlockedPlayer>>(emptyList())
     val blocked = _blocked.asStateFlow()
 
+    @Volatile
+    private var fetchedIncomingOnce = false
+
     override fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -65,7 +68,14 @@ object FriendsRepository : EarlyInitializable {
 
     private suspend fun refreshRequests() {
         SocialApi.incomingRequests()
-            .onSuccess { _incomingRequests.value = it }
+            .onSuccess { fresh ->
+                val known = _incomingRequests.value.mapTo(HashSet()) { it.id }
+                _incomingRequests.value = fresh
+                if (fetchedIncomingOnce) {
+                    fresh.filter { it.id !in known }.forEach { notifyFriendRequest(it.id, it.player) }
+                }
+                fetchedIncomingOnce = true
+            }
             .onFailure { LOGGER.error("Failed to refresh incoming friend requests", it) }
         SocialApi.outgoingRequests()
             .onSuccess { _outgoingRequests.value = it }

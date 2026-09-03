@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.render
 
 //? if >= 1.21.4 {
@@ -45,4 +44,3 @@ data class PlayerRenderContext(
         *///?}
     }
 }
-//?}

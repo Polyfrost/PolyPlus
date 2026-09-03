@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import org.joml.Vector3f
@@ -32,4 +31,3 @@ fun BedrockBone.initialEffectPosition(
 }
 
 fun BedrockBone.initialEffectRotation(): Vector3f = rotation.bedrockRotationRadians()
-//?}

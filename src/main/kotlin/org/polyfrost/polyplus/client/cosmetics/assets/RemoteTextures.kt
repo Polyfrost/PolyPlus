@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import com.mojang.blaze3d.platform.NativeImage
@@ -59,4 +58,3 @@ internal object RemoteTextures {
         registered.remove(textureId)
     }
 }
-//?}

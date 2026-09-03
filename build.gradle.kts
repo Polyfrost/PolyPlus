@@ -35,7 +35,6 @@ run {
 
 val minecraftPredicate = property("mod.mc_compat") as String
 
-/** Reads a `stonecutter.properties.toml` entry that only some versions declare. */
 fun optionalProperty(name: String): String? =
     findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
 
@@ -71,10 +70,6 @@ base.archivesName = property("mod.id") as String
 val oneconfigVersion = property("deps.oneconfig") as String
 
 repositories {
-    /**
-     * Restricts dependency search of the given [groups] to the [maven URL][url],
-     * improving the setup speed.
-     */
     fun strictMaven(url: String, alias: String, vararg groups: String) = exclusiveContent {
         forRepository { maven(url) { name = alias } }
         filter { groups.forEach(::includeGroup) }
@@ -188,7 +183,6 @@ tasks.jar {
 dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
 
-    // `applyMojangMappings` is a no-op on 26+.
     dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
@@ -198,10 +192,11 @@ dependencies {
 
     modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
 
-    // Use `mod{dependency type}` even on 26+ - loom-back-compat aliases them.
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
-    modRuntimeOnly("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion")
+    // This is a library, not a traditional mod. It must not use modRuntimeOnly,
+    // or it does not get properly loaded into the test environment on 1.21.x.
+    runtimeOnly("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion")
 
     optionalProperty("deps.sodium")?.let {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }
@@ -249,10 +244,15 @@ loomExt.decompilerOptions.named("vineflower") {
     options.put("mark-corresponding-synthetics", "1") // Adds names to lambdas - useful for mixins
 }
 
+val modOutputGroup = sourceSets.main.get().output
+    .let { files(it.classesDirs, it.resourcesDir) }
+    .joinToString(File.pathSeparator) { it.absolutePath }
+
 loomExt.runs.configureEach {
     ideConfigGenerated(true)
     runDir("../../run") // Shares the run directory between versions
     vmArg("-Dpolyplus.badge.debug=true")
+    vmArg("-Dfabric.classPathGroups=$modOutputGroup")
 }
 loomExt.runs.named("client") {
     client()
@@ -260,6 +260,7 @@ loomExt.runs.named("client") {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("fabric.classPathGroups", modOutputGroup)
     testLogging {
         showStackTraces = true
         exceptionFormat = TestExceptionFormat.FULL
@@ -293,8 +294,6 @@ tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach {
     dependsOn("stonecutterGenerate")
 }
 
-// `loomx.mod(Sources)Jar` returns the jar task for the applied loom variant
-// (`remapJar` when obfuscated, plain `jar` on 26+).
 tasks.register<Copy>("buildAndCollect") {
     group = "build"
     description = "Builds mod jars and copies results to `build/libs/{mod version}/`"

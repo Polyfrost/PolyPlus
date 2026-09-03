@@ -1,6 +1,6 @@
-//? if >= 1.21.11 {
 package org.polyfrost.polyplus.client.gui.panorama
 
+//? if >= 1.21.11 {
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.CubeMapTexture
 import net.minecraft.client.renderer.texture.MipmapStrategy
@@ -11,8 +11,14 @@ import net.minecraft.server.packs.resources.ResourceManager
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+//?}
 
-internal class DiskCubeMapTexture(id: Identifier, private val dir: Path) : CubeMapTexture(id) {
+internal class DiskCubeMapTexture
+    //? if >= 1.21.11 {
+    (id: Identifier, private val dir: Path) : CubeMapTexture(id)
+    //?}
+{
+    //? if >= 1.21.11 {
     override fun loadContents(resourceManager: ResourceManager): TextureContents {
         CustomPanorama.refreshPackOverride(resourceManager)
         var stacked: NativeImage? = null
@@ -51,5 +57,5 @@ internal class DiskCubeMapTexture(id: Identifier, private val dir: Path) : CubeM
     private companion object {
         val FACE_ORDER = intArrayOf(1, 3, 5, 4, 0, 2)
     }
+    //?}
 }
-//?}

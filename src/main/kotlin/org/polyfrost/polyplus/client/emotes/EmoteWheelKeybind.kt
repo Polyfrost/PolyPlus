@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.client.Minecraft
@@ -30,4 +29,3 @@ object EmoteWheelKeybind {
         }
     }
 }
-//?}

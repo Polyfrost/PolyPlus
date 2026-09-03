@@ -53,6 +53,7 @@ import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
+import org.polyfrost.polyplus.client.social.SpecialChatResponses
 
 @Composable
 fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
@@ -66,6 +67,8 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     var showCreateGroup by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var unreadOnly by remember { mutableStateOf(false) }
+    var specialFilter by remember { mutableStateOf(SpecialChatResponses.Filter.All) }
     val mutedGroups = remember { mutableStateOf(setOf<Int>()) }
     val renameOverrides = remember { mutableStateOf(mapOf<Int, String>()) }
 
@@ -78,10 +81,22 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     val names by PlayerNamesRepository.names.collectAsState()
     val hostedSessionId by P2PSessionManager.currentSessionIdFlow.collectAsState()
     val isSpecialChatTarget = SpecialChatRepository.status.collectAsState().value?.isSpecialChatTarget == true
+    val respondedChats by SpecialChatResponses.responded.collectAsState()
+    val scanningResponses by SpecialChatResponses.scanning.collectAsState()
 
-    val visibleGroups = remember(groups, searchQuery, names) {
-        if (searchQuery.isBlank()) groups
-        else groups.filter { rawConversationTitle(it, selfId, names).contains(searchQuery, ignoreCase = true) }
+    val visibleGroups = remember(groups, searchQuery, unreadOnly, specialFilter, respondedChats, selectedGroupId, names) {
+        groups.filter { group ->
+            (!unreadOnly || group.unread || group.id == selectedGroupId) &&
+                (
+                    !group.special || specialFilter == SpecialChatResponses.Filter.All ||
+                        (group.id in respondedChats) == (specialFilter == SpecialChatResponses.Filter.Responded)
+                    ) &&
+                (searchQuery.isBlank() || rawConversationTitle(group, selfId, names).contains(searchQuery, ignoreCase = true))
+        }
+    }
+
+    LaunchedEffect(specialFilter, groups) {
+        if (specialFilter != SpecialChatResponses.Filter.All) SpecialChatResponses.refresh(groups, selfId)
     }
 
     LaunchedEffect(Unit) {
@@ -139,6 +154,17 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                 selfId = selfId,
                 searchOpen = searchOpen,
                 searchQuery = searchQuery,
+                unreadOnly = unreadOnly,
+                onToggleUnreadOnly = { unreadOnly = !unreadOnly },
+                specialFilter = specialFilter.takeIf { isSpecialChatTarget && tab == SocialTab.Special },
+                scanningResponses = scanningResponses,
+                onCycleSpecialFilter = {
+                    specialFilter = when (specialFilter) {
+                        SpecialChatResponses.Filter.All -> SpecialChatResponses.Filter.Awaiting
+                        SpecialChatResponses.Filter.Awaiting -> SpecialChatResponses.Filter.Responded
+                        SpecialChatResponses.Filter.Responded -> SpecialChatResponses.Filter.All
+                    }
+                },
                 onSearchQueryChange = { searchQuery = it },
                 onToggleSearch = {
                     searchOpen = !searchOpen
@@ -166,7 +192,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                     onTabChange = { newTab -> tab = newTab },
                     groups = visibleGroups,
                     showSpecialTab = isSpecialChatTarget,
-                    isSearching = searchQuery.isNotBlank(),
+                    isFiltered = searchQuery.isNotBlank() || unreadOnly || specialFilter != SpecialChatResponses.Filter.All,
                     friends = friends,
                     selfId = selfId,
                     selectedGroupId = selectedGroupId,
@@ -297,6 +323,11 @@ private fun SocialHeaderToolbar(
     selfId: String,
     searchOpen: Boolean,
     searchQuery: String,
+    unreadOnly: Boolean,
+    onToggleUnreadOnly: () -> Unit,
+    specialFilter: SpecialChatResponses.Filter?,
+    scanningResponses: Boolean,
+    onCycleSpecialFilter: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onToggleSearch: () -> Unit,
     onBack: () -> Unit,
@@ -341,6 +372,33 @@ private fun SocialHeaderToolbar(
         } else {
             Spacer(Modifier.weight(1f))
         }
+
+        if (specialFilter != null) {
+            SocialIconButton(
+                SOCIAL_ASSETS + if (scanningResponses) "loading-02.svg" else "check-circle.svg",
+                tooltip = when {
+                    scanningResponses -> "Checking replies..."
+                    specialFilter == SpecialChatResponses.Filter.Awaiting -> "Showing chats awaiting a reply"
+                    specialFilter == SpecialChatResponses.Filter.Responded -> "Showing chats that replied"
+                    else -> "Filter by whether they replied"
+                },
+                background = if (specialFilter != SpecialChatResponses.Filter.All) Accent.asSocialSelected else null,
+                tint = when (specialFilter) {
+                    SpecialChatResponses.Filter.Awaiting -> SocialWarnColor
+                    SpecialChatResponses.Filter.Responded -> Accent
+                    else -> SocialTextPrimary
+                },
+                onClick = onCycleSpecialFilter,
+            )
+        }
+
+        SocialIconButton(
+            SOCIAL_ASSETS + "message-chat-circle.svg",
+            tooltip = if (unreadOnly) "Show all conversations" else "Show unread only",
+            background = if (unreadOnly) Accent.asSocialSelected else null,
+            tint = if (unreadOnly) Accent else SocialTextPrimary,
+            onClick = onToggleUnreadOnly,
+        )
 
         SocialIconButton(
             SOCIAL_ASSETS + "search-lg.svg",

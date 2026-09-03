@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.foundation.Image
@@ -242,4 +241,3 @@ private const val MAX_PITCH = 45f
 private const val LIVE_DRAG_YAW_SENSITIVITY = 0.5f
 private const val LIVE_DRAG_PITCH_SENSITIVITY = 0.5f
 private const val LIVE_MAX_PITCH = 45f
-//?}

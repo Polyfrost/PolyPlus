@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.runtime
 
 import net.minecraft.resources.Identifier
@@ -16,4 +15,3 @@ data class AttachedCosmetic(
     val animation: BedrockAnimation? = null,
     val scale: Float = 1f,
 )
-//?}

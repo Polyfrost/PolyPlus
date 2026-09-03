@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import net.minecraft.util.Mth
@@ -194,4 +193,3 @@ class PetEntity(
                 .add(Attributes.FOLLOW_RANGE, 16.0)
     }
 }
-//?}

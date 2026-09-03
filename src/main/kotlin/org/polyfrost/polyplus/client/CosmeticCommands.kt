@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client
 
 import com.mojang.brigadier.Command
@@ -394,4 +393,3 @@ object CosmeticCommands {
             .mapNotNull(CosmeticCatalog::getEmoteDefinition)
             .map { it.id }
 }
-//?}

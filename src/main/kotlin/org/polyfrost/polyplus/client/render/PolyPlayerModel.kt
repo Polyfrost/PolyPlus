@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.render
 
 //? if >= 1.21.11 {
@@ -8,4 +7,3 @@ typealias PolyPlayerModel = net.minecraft.client.model.player.PlayerModel
 *///?} else {
 /*typealias PolyPlayerModel = net.minecraft.client.model.PlayerModel<net.minecraft.client.player.AbstractClientPlayer>
 *///?}
-//?}
