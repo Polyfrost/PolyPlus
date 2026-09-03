@@ -63,8 +63,15 @@ internal sealed class HostFlowStep {
     object InviteFriends : HostFlowStep()
 }
 
+internal enum class HostMode {
+    FRIENDS,
+    LAN,
+}
+
 private class HostFlowState(val hostingCurrent: Boolean) {
     var step by mutableStateOf<HostFlowStep>(if (hostingCurrent) HostFlowStep.Configure else HostFlowStep.SelectWorld)
+    var hostMode by mutableStateOf(HostMode.FRIENDS)
+    var port by mutableStateOf("")
     var worlds by mutableStateOf<List<HostWorldManager.HostWorldEntry>?>(null)
     var selected by mutableStateOf<HostWorldManager.HostWorldEntry?>(null)
     var gameMode by mutableStateOf(GameType.SURVIVAL)
@@ -117,8 +124,10 @@ internal fun HostWorldFlow(
                 )
                 HostFlowStep.Configure -> WorldConfigurationModal(
                     state = state,
+                    screen = screen,
                     onBack = { if (state.hostingCurrent) onDismiss() else state.step = HostFlowStep.SelectWorld },
                     onNext = { state.step = HostFlowStep.InviteFriends },
+                    onHosted = onDismiss,
                 )
                 HostFlowStep.InviteFriends -> InviteFriendsModal(
                     state = state,
@@ -254,7 +263,16 @@ private fun WorldCard(entry: HostWorldManager.HostWorldEntry, selected: Boolean,
 }
 
 @Composable
-private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, onNext: () -> Unit) {
+private fun WorldConfigurationModal(
+    state: HostFlowState,
+    screen: Screen,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+    onHosted: () -> Unit,
+) {
+    val lan = state.hostMode == HostMode.LAN
+    val portValid = state.port.isBlank() || state.port.trim().toIntOrNull()?.let { it in 1..65535 } == true
+
     ModalPanel(width = 560.dp, height = 520.dp) {
         SocialText("Configure world settings", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         SocialText(
@@ -263,6 +281,16 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
             color = SocialTextSecondary,
         )
 
+        FormRow("Host to") {
+            SocialDropdown(
+                label = "Visibility",
+                options = listOf(HostMode.FRIENDS, HostMode.LAN),
+                selected = state.hostMode,
+                labelFor = { socialHostModeLabel(it) },
+                modifier = Modifier.width(220.dp),
+                onSelect = { state.hostMode = it },
+            )
+        }
         FormRow("Game Mode") {
             SocialDropdown(
                 label = "Mode",
@@ -288,14 +316,29 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
                 SocialToggle("Allow Cheats", state.allowCheats) { state.allowCheats = !state.allowCheats }
             }
         }
-        FormRow("Private Relay") {
-            Box(Modifier.width(220.dp)) {
-                SocialToggle("Private Relay", state.privateRelay) { state.privateRelay = !state.privateRelay }
+        if (lan) {
+            FormRow("Port") {
+                SocialTextField(
+                    value = state.port,
+                    onValueChange = { value -> state.port = value.filter { it.isDigit() } },
+                    placeholder = "Automatic",
+                    maxLength = 5,
+                    modifier = Modifier.width(220.dp),
+                )
             }
-        }
-        FormRow("Resource Pack") {
-            Box(Modifier.width(260.dp)) {
-                SocialToggle("Send yours to joining players", state.autoShareResourcePack) { state.autoShareResourcePack = !state.autoShareResourcePack }
+            if (!portValid) {
+                SocialText("Port must be between 1 and 65535.", fontSize = 12.sp, color = SocialDangerColor)
+            }
+        } else {
+            FormRow("Private Relay") {
+                Box(Modifier.width(220.dp)) {
+                    SocialToggle("Private Relay", state.privateRelay) { state.privateRelay = !state.privateRelay }
+                }
+            }
+            FormRow("Resource Pack") {
+                Box(Modifier.width(260.dp)) {
+                    SocialToggle("Share", state.autoShareResourcePack) { state.autoShareResourcePack = !state.autoShareResourcePack }
+                }
             }
         }
 
@@ -303,9 +346,34 @@ private fun WorldConfigurationModal(state: HostFlowState, onBack: () -> Unit, on
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SocialButton("Back", icon = SOCIAL_ASSETS + "chevron-right.svg", modifier = Modifier.weight(1f), onClick = onBack)
-            SocialButton("Next", icon = SOCIAL_ASSETS + "chevron-right.svg", modifier = Modifier.weight(1f), filled = true, onClick = onNext)
+            SocialButton(
+                if (lan) "Host on LAN" else "Next",
+                icon = SOCIAL_ASSETS + (if (lan) "log-in-04.svg" else "chevron-right.svg"),
+                modifier = Modifier.weight(1f),
+                filled = true,
+                enabled = !lan || portValid,
+                onClick = {
+                    if (!lan) {
+                        onNext()
+                        return@SocialButton
+                    }
+                    val port = state.port.trim().toIntOrNull()
+                    if (state.hostingCurrent) {
+                        HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats, port)
+                    } else {
+                        val entry = state.selected ?: return@SocialButton
+                        HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats, port)
+                    }
+                    onHosted()
+                },
+            )
         }
     }
+}
+
+private fun socialHostModeLabel(mode: HostMode): String = when (mode) {
+    HostMode.FRIENDS -> "Friends (Poly+)"
+    HostMode.LAN -> "LAN"
 }
 
 @Composable
@@ -426,17 +494,18 @@ private fun InviteFriendsModal(
                 },
             )
         }
-        if (eosStatus == EosStatus.Ready && !state.hosting) {
+        if (eosStatus !is EosStatus.Failed && !state.hosting) {
             SocialText(
                 "Host on LAN instead",
                 fontSize = 11.sp,
                 color = SocialTextSecondary,
                 modifier = Modifier.clickableWithSound {
+                    val port = state.port.trim().toIntOrNull()
                     if (state.hostingCurrent) {
-                        HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats)
+                        HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats, port)
                     } else {
                         val entry = state.selected ?: return@clickableWithSound
-                        HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats)
+                        HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats, port)
                     }
                     onHosted()
                 },

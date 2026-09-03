@@ -1,17 +1,23 @@
 package org.polyfrost.polyplus.test
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.polyfrost.polyplus.compat.ModConfigDefaults
 import org.polyfrost.polyplus.compat.ModConfigDefaults.Default
+import java.nio.file.Path
+import kotlin.io.path.writeText
 
 class ModConfigDefaultsTest {
 
     private companion object {
         val SHOW_TOASTS = Default("fastquit", "fastquit.toml", "showToasts", false)
         val NESTED = Default("controlify", "controlify.json", "global.out_of_focus_input", true)
+        val BLOCK_OVERLAY_FACE =
+            Default("simpleblockoverlay", "simpleblockoverlay.json", "disableOverlay", true, newInstallsOnly = true)
     }
 
     @Test
@@ -75,6 +81,30 @@ class ModConfigDefaultsTest {
                 listOf(SHOW_TOASTS),
                 toml = true,
             ),
+        )
+    }
+
+    @Test
+    fun `a new-installs-only default is skipped once the mod owns a config`(@TempDir configDir: Path) {
+        assertTrue(ModConfigDefaults.wanted(BLOCK_OVERLAY_FACE, configDir))
+        configDir.resolve(BLOCK_OVERLAY_FACE.file).writeText("{}")
+        assertFalse(ModConfigDefaults.wanted(BLOCK_OVERLAY_FACE, configDir))
+    }
+
+    @Test
+    fun `an ordinary default still applies over an existing config`(@TempDir configDir: Path) {
+        configDir.resolve(SHOW_TOASTS.file).writeText("showToasts = true\n")
+        assertTrue(ModConfigDefaults.wanted(SHOW_TOASTS, configDir))
+    }
+
+    @Test
+    fun `the block overlay face is turned off for new installs only`() {
+        val default = ModConfigDefaults.DEFAULTS.single { it.modId == "simpleblockoverlay" }
+        assertEquals("disableOverlay", default.key)
+        assertEquals(true, default.value)
+        assertTrue(default.newInstallsOnly)
+        assertTrue(
+            Regex(""""disableOverlay":\s*true""").containsMatchIn(ModConfigDefaults.mergeJson("", listOf(default))),
         )
     }
 

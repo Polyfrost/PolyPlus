@@ -53,6 +53,7 @@ object HostWorldManager {
     private data class PendingHost(
         val gameMode: GameType,
         val allowCheats: Boolean,
+        val port: Int? = null,
         val onPublished: () -> Unit = {},
     )
 
@@ -99,9 +100,9 @@ object HostWorldManager {
         return runCatching { Files.readAllBytes(icon) }.getOrNull()
     }
 
-    fun host(returnScreen: Screen, entry: HostWorldEntry, gameMode: GameType, allowCheats: Boolean) {
+    fun host(returnScreen: Screen, entry: HostWorldEntry, gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
         val mc = Minecraft.getInstance()
-        pending = PendingHost(gameMode, allowCheats)
+        pending = PendingHost(gameMode, allowCheats, port)
         mc.createWorldOpenFlows().openWorld(entry.id) {
             pending = null
             //? if >= 26.2 {
@@ -174,10 +175,10 @@ object HostWorldManager {
         }
     }
 
-    fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean) {
+    fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
         val mc = Minecraft.getInstance()
         if (mc.singleplayerServer == null) return
-        pending = PendingHost(gameMode, allowCheats)
+        pending = PendingHost(gameMode, allowCheats, port)
     }
 
     fun registerLanPublishHook() {
@@ -198,7 +199,7 @@ object HostWorldManager {
             return
         }
 
-        val port = HttpUtil.getAvailablePort()
+        val port = request.port ?: HttpUtil.getAvailablePort()
         val published =
             //? if >= 26.2 {
             server.publishServer(net.minecraft.server.MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
@@ -208,10 +209,10 @@ object HostWorldManager {
         pending = null
 
         if (published) {
-            LOGGER.info("Opened world to LAN on port {} (e4mc will relay if installed)", port)
+            LOGGER.info("Opened world to LAN on port {}", port)
             request.onPublished()
         } else {
-            LOGGER.warn("publishServer returned false — world was not opened to LAN")
+            LOGGER.warn("publishServer returned false — world was not opened to LAN on port {}", port)
         }
     }
 

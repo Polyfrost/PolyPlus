@@ -1051,7 +1051,7 @@ private fun ServerRow(
             MenuText(title, fontSize = 16.sp)
             MenuText(subtitle, fontSize = 13.sp, color = TextSecondary)
         }
-        MenuIcon(ASSETS + "chevron-right.svg", TextSecondary, Modifier.size(20.dp).rotate(90f), assetsReady)
+        MenuIcon(ASSETS + "chevron-right.svg", TextSecondary, Modifier.size(20.dp), assetsReady)
     }
 }
 

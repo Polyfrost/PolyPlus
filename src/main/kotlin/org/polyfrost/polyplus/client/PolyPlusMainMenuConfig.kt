@@ -87,7 +87,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Host World Button",
-        description = "Hide the Host World button (opens a world to LAN via e4mc) on the PolyPlus main menu.",
+        description = "Hide the Host World button on the PolyPlus main menu.",
         subcategory = "Elements",
     )
     var hideMainMenuHostWorld = false

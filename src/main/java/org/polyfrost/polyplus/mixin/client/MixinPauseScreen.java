@@ -4,23 +4,25 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.Component;
 import org.objectweb.asm.Opcodes;
-import org.polyfrost.polyplus.client.host.E4mcSupport;
+import org.polyfrost.polyplus.client.PolyPlusConfig;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(PauseScreen.class)
 public class MixinPauseScreen {
-    //? if < 26.2 {
-    /*@ModifyExpressionValue(
+    @ModifyExpressionValue(
         method = "createPauseMenu",
         at = @At(
             value = "FIELD",
-            target = "Lnet/minecraft/client/gui/screens/PauseScreen;SHARE_TO_LAN:Lnet/minecraft/network/chat/Component;",
+            //? if >= 26.2 {
+            target = "Lnet/minecraft/client/gui/screens/PauseScreen;MULTIPLAYER_OPTIONS:Lnet/minecraft/network/chat/Component;",
+            //?} else {
+            /*target = "Lnet/minecraft/client/gui/screens/PauseScreen;SHARE_TO_LAN:Lnet/minecraft/network/chat/Component;",
+            *///?}
             opcode = Opcodes.GETSTATIC
         )
     )
     private Component polyplus$hostWorldLabel(Component original) {
-        return E4mcSupport.INSTANCE.isPresent() ? Component.translatable("polyplus.hostWorld") : original;
+        return PolyPlusConfig.getReplacePauseLanButton() ? Component.translatable("polyplus.hostWorld") : original;
     }
-    *///?}
 }
