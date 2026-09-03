@@ -35,7 +35,12 @@ object MinecraftLoginGate {
             loginDepth.set(depth + 1)
             return true
         }
-        val held = gate.tryAcquire(LOGIN_WAIT_MS, TimeUnit.MILLISECONDS)
+        val held = try {
+            gate.tryAcquire(LOGIN_WAIT_MS, TimeUnit.MILLISECONDS)
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
         if (held) loginDepth.set(1)
         return held
     }

@@ -21,6 +21,9 @@ import java.io.File
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -62,6 +65,16 @@ object PolyPlusSentry {
     private const val NETTY_THREAD_PREFIX = "Netty "
 
     private const val ESSENTIAL_AUTH_EXCEPTIONS = "gg.essential.minecraftauth.exception."
+
+    private const val OVERFLOW_REPORT_TIMEOUT_MS = 5_000L
+
+    private const val OVERFLOW_REPORT_STACK_BYTES = 8L * 1024 * 1024
+
+    private val overflowReporter: ExecutorService = Executors.newSingleThreadExecutor { task ->
+        Thread(null, task, "PolyPlus Overflow Report", OVERFLOW_REPORT_STACK_BYTES).apply {
+            isDaemon = true
+        }
+    }
 
     private val started = AtomicBoolean(false)
 
@@ -229,6 +242,8 @@ object PolyPlusSentry {
         hub = ourHub
 
         installRuntimeContext(ourHub, minecraftVersion)
+
+        runCatching { overflowReporter.execute { } }
     }
 
     fun shutdown() {
@@ -552,8 +567,25 @@ object PolyPlusSentry {
 
     @JvmStatic
     fun captureCrashReport(title: String?, throwable: Throwable) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
         if (locallyHandled.get() > 0) return
+        val crashed = Thread.currentThread()
+        if (throwable is StackOverflowError && reportOnFreshStack { report(title, throwable, crashed) }) return
+        report(title, throwable, crashed)
+    }
+
+    private fun reportOnFreshStack(block: () -> Unit): Boolean = runCatching {
+        val queued = overflowReporter.submit(Runnable { block() })
+        try {
+            queued.get(OVERFLOW_REPORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+        } catch (ignored: Exception) {
+        }
+        true
+    }.getOrDefault(false)
+
+    private fun report(title: String?, throwable: Throwable, crashed: Thread) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         val hub = activeHub() ?: return
 
@@ -572,8 +604,7 @@ object PolyPlusSentry {
         if (!seen.add(throwable)) return
         if (!allowBySignature(throwable)) return
 
-        val thread = Thread.currentThread()
-        CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, thread) }
+        CrashOutcomeTracker.track { kind -> deliver(throwable, kind, description, crashed) }
     }
 
     private fun isNetworkThreadFailure(throwable: Throwable, thread: Thread): Boolean {

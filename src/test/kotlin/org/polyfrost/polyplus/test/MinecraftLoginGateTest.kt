@@ -39,6 +39,24 @@ class MinecraftLoginGateTest {
     }
 
     @Test
+    fun `an interrupted login gives up the gate instead of killing the join`() = runBlocking {
+        var held: Boolean? = null
+        var interruptKept: Boolean? = null
+
+        val worker = Thread {
+            Thread.currentThread().interrupt()
+            held = MinecraftLoginGate.begin()
+            interruptKept = Thread.currentThread().isInterrupted
+        }
+        worker.start()
+        worker.join(5_000L)
+
+        assertEquals(false, held, "an interrupted login must report that it does not hold the gate")
+        assertEquals(true, interruptKept, "the interrupt must survive so shutdown still proceeds")
+        assertEquals("authorized", authorizeWithin(1_000L), "a permit must not have been consumed")
+    }
+
+    @Test
     fun `a late outcome signal cannot leak a second permit`() = runBlocking {
         MinecraftLoginGate.loginSettled()
         MinecraftLoginGate.loginSettled()

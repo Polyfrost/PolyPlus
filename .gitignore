@@ -21,6 +21,7 @@ build
 versions/*/logs/
 versions/*/config/
 versions/*/oneconfig/
+versions/*/PolyPlus/
 versions/*/mods/
 versions/*/.fabric/
 versions/*/.gradle/

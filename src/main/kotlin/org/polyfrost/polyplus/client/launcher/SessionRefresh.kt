@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
@@ -23,6 +24,8 @@ object SessionRefresh {
     private const val LOGIN_FAILED_KEY = "disconnect.loginFailedInfo"
     private const val INVALID_SESSION_KEY = "disconnect.loginFailedInfo.invalidSession"
     private const val REFRESH_TIMEOUT_MS = 30_000L
+
+    private const val JOIN_BLOCK_TIMEOUT_MS = REFRESH_TIMEOUT_MS
 
     private val refreshLock = Any()
 
@@ -67,14 +70,21 @@ object SessionRefresh {
 
     @JvmStatic
     fun beforeAuthenticate() {
-        runBlocking {
-            awaitPendingRefresh()
-            if (!PolyPlusConfig.autoRefreshSession || refreshedForAttempt) return@runBlocking
-            val account = refreshableActiveAccount() ?: return@runBlocking
-            if (!LauncherAccountStore.isExpired(account.expires)) return@runBlocking
-            LOGGER.info("Session for {} has expired; refreshing it before joining the server", account.username)
-            refreshedForAttempt = true
-            refreshActiveSession()
+        failOpenIfInterrupted(Unit) {
+            runBlocking {
+                val finished = withTimeoutOrNull<Unit>(JOIN_BLOCK_TIMEOUT_MS) {
+                    awaitPendingRefresh()
+                    if (!PolyPlusConfig.autoRefreshSession || refreshedForAttempt) return@withTimeoutOrNull
+                    val account = refreshableActiveAccount() ?: return@withTimeoutOrNull
+                    if (!LauncherAccountStore.isExpired(account.expires)) return@withTimeoutOrNull
+                    LOGGER.info("Session for {} has expired; refreshing it before joining the server", account.username)
+                    refreshedForAttempt = true
+                    refreshActiveSession()
+                }
+                if (finished == null) {
+                    LOGGER.warn("Refreshing the session took too long; joining with the token we already have")
+                }
+            }
         }
     }
 
@@ -84,8 +94,21 @@ object SessionRefresh {
         if (refreshableActiveAccount() == null) return false
         LOGGER.info("The session server rejected the account; refreshing the session and retrying the join")
         refreshedForAttempt = true
-        return runBlocking { refreshActiveSession() }.isSuccess
+        return failOpenIfInterrupted(false) {
+            runBlocking {
+                withTimeoutOrNull(JOIN_BLOCK_TIMEOUT_MS) { refreshActiveSession() }?.isSuccess == true
+            }
+        }
     }
+
+    private fun <T> failOpenIfInterrupted(fallback: T, block: () -> T): T =
+        try {
+            block()
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            LOGGER.debug("Session refresh was interrupted; joining with the token we already have", interrupted)
+            fallback
+        }
 
     @JvmStatic
     fun onInvalidSession() {
