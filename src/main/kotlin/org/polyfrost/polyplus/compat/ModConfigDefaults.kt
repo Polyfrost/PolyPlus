@@ -24,7 +24,13 @@ object ModConfigDefaults {
 
     private val EARLY_MODS = setOf("modernfix", "ferritecore")
 
-    internal class Default(val modId: String, val file: String, val key: String, val value: Any) {
+    internal class Default(
+        val modId: String,
+        val file: String,
+        val key: String,
+        val value: Any,
+        val newInstallsOnly: Boolean = false,
+    ) {
         val id get() = "$file $key = ${render(value)}"
     }
 
@@ -40,6 +46,7 @@ object ModConfigDefaults {
         Default("dynamic_fps", "dynamic_fps.json", "states.invisible.run_garbage_collector", true),
         Default("dynamic_fps", "dynamic_fps.json", "states.invisible.volume_multipliers.master", 1.0),
         Default("citresewn", "citresewn.json", "broken_paths", true),
+        Default("simpleblockoverlay", "simpleblockoverlay.json", "disableOverlay", true, newInstallsOnly = true),
     )
 
     fun applyEarly() = applyMatching { it.modId in EARLY_MODS }
@@ -51,7 +58,9 @@ object ModConfigDefaults {
     private fun applyMatching(select: (Default) -> Boolean) {
         val loader = FabricLoader.getInstance()
         val applied = readApplied(loader.configDir.resolve(APPLIED_FILE))
-        val pending = DEFAULTS.filter { select(it) && it.id !in applied && loader.isModLoaded(it.modId) }
+        val pending = DEFAULTS.filter {
+            select(it) && it.id !in applied && loader.isModLoaded(it.modId) && wanted(it, loader.configDir)
+        }
         if (pending.isEmpty()) return
 
         val done = mutableListOf<String>()
@@ -65,6 +74,9 @@ object ModConfigDefaults {
         }
         if (done.isNotEmpty()) writeApplied(loader.configDir.resolve(APPLIED_FILE), applied + done)
     }
+
+    internal fun wanted(default: Default, configDir: Path): Boolean =
+        !default.newInstallsOnly || !configDir.resolve(default.file).exists()
 
     private fun merge(path: Path, defaults: List<Default>) {
         val text = if (path.exists()) path.readText() else ""
