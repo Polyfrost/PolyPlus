@@ -82,6 +82,7 @@ object SessionRefresh {
                     refreshActiveSession()
                 }
                 if (finished == null) {
+                    refreshedForAttempt = false
                     LOGGER.warn("Refreshing the session took too long; joining with the token we already have")
                 }
             }
