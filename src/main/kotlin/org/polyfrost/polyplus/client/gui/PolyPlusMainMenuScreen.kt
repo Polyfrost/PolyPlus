@@ -52,7 +52,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -102,7 +101,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -334,84 +332,90 @@ private object MainMenuRasterAssets {
 }
 
 internal object MenuHeadCache {
+    private class Entry {
+        var shown by mutableStateOf<ImageBitmap?>(null)
+
+        var settled = false
+    }
+
+    private val entries = object : LinkedHashMap<java.util.UUID, Entry>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<java.util.UUID, Entry>) = size > MAX_ENTRIES
+    }
+
+    private val fetching = HashMap<java.util.UUID, Int>()
+
     private const val MAX_ENTRIES = 256
 
-    private val faces = object : LinkedHashMap<java.util.UUID, ImageBitmap>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<java.util.UUID, ImageBitmap>) = size > MAX_ENTRIES
+    private val loaders = java.util.concurrent.Executors.newFixedThreadPool(3) { task ->
+        Thread(task, "polyplus-account-head").apply { isDaemon = true }
     }
 
-    private val attempts = HashMap<java.util.UUID, Int>()
+    private fun <T> withEntry(id: java.util.UUID, block: (Entry) -> T): T? =
+        synchronized(entries) { entries[id]?.let(block) }
 
-    private val inFlight = HashMap<java.util.UUID, Deferred<ImageBitmap?>>()
-
-    fun cached(id: java.util.UUID): ImageBitmap? = synchronized(faces) { faces[id] }
-
-    suspend fun load(id: java.util.UUID, emit: (ImageBitmap) -> Unit) {
-        cached(id)?.let {
-            emit(it)
-            return
+    fun get(id: java.util.UUID): ImageBitmap? {
+        var fetch = false
+        val entry = synchronized(entries) {
+            val entry = entries.getOrPut(id) { Entry() }
+            if (!entry.settled && id !in fetching) {
+                fetching[id] = 0
+                fetch = true
+            }
+            entry
         }
-        var fallbackShown = false
-        while (HeadFetchPolicy.shouldRetry(attemptsSpent(id))) {
-            val face = fetchShared(id)
-            if (face != null) {
-                synchronized(faces) {
-                    faces[id] = face
-                    attempts.remove(id)
+        if (fetch) startFetch(id)
+        return entry.shown
+    }
+
+    private fun startFetch(id: java.util.UUID) {
+        loaders.execute {
+            val face = runCatching {
+                val outcome = loadFaceByUuid(id)
+                outcome.exceptionOrNull()?.let { HEAD_LOG.debug("Failed to load head for {}; will retry", id, it) }
+                if (outcome.isSuccess) outcome.getOrNull() ?: defaultSkinFace(id) else null
+            }.onFailure { HEAD_LOG.warn("Loading the head for {} failed unexpectedly; will retry", id, it) }
+                .getOrNull()
+
+            val needsFallback = face == null && withEntry(id) { it.shown == null } == true
+            val fallback = if (needsFallback) runCatching { defaultSkinFace(id) }.getOrNull() else null
+
+            val retryIn = synchronized(entries) {
+                val entry = entries[id] ?: run {
+                    fetching.remove(id)
+                    return@synchronized null
                 }
-                emit(face)
-                return
-            }
-            if (!fallbackShown) {
-                fallbackShown = true
-                defaultFace(id)?.let(emit)
-            }
-            val spent = synchronized(faces) {
-                val next = attemptsSpent(id) + 1
-                attempts[id] = next
-                next
-            }
-            if (!HeadFetchPolicy.shouldRetry(spent)) {
-                HEAD_LOG.debug("Giving up on the head for {} after {} attempts", id, spent)
-                break
-            }
-            delay(HeadFetchPolicy.retryDelayMs(spent))
-        }
-        if (!fallbackShown) defaultFace(id)?.let(emit)
-    }
+                if (face != null) {
+                    entry.shown = face
+                    entry.settled = true
+                    fetching.remove(id)
+                    return@synchronized null
+                }
 
-    private fun attemptsSpent(id: java.util.UUID): Int = synchronized(faces) { attempts[id] ?: 0 }
+                if (entry.shown == null) entry.shown = fallback
+                val attempts = (fetching[id] ?: 0) + 1
+                fetching[id] = attempts
+                if (HeadFetchPolicy.shouldRetry(attempts)) {
+                    HeadFetchPolicy.retryDelayMs(attempts)
+                } else {
+                    HEAD_LOG.debug("Giving up on the head for {} after {} attempts", id, attempts)
+                    entry.settled = true
+                    fetching.remove(id)
+                    null
+                }
+            }
 
-    private suspend fun defaultFace(id: java.util.UUID): ImageBitmap? =
-        withContext(Dispatchers.IO) { runCatching { defaultSkinFace(id) }.getOrNull() }
-
-    private suspend fun fetchShared(id: java.util.UUID): ImageBitmap? {
-        val load = synchronized(faces) {
-            inFlight[id]?.takeIf { it.isActive }
-                ?: org.polyfrost.polyplus.client.PolyPlusClient.SCOPE
-                    .async(Dispatchers.IO) { fetchFace(id) }
-                    .also { inFlight[id] = it }
-        }
-        return try {
-            load.await()
-        } finally {
-            synchronized(faces) { if (inFlight[id] === load && !load.isActive) inFlight.remove(id) }
+            if (retryIn != null) {
+                val retry = org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                    delay(retryIn)
+                    startFetch(id)
+                }
+                retry.invokeOnCompletion { cause ->
+                    if (cause != null) synchronized(entries) { fetching.remove(id) }
+                }
+            }
         }
     }
-
-    private fun fetchFace(id: java.util.UUID): ImageBitmap? = runCatching {
-        val outcome = loadFaceByUuid(id)
-        outcome.exceptionOrNull()?.let { HEAD_LOG.debug("Failed to load head for {}; will retry", id, it) }
-        if (outcome.isSuccess) outcome.getOrNull() ?: defaultSkinFace(id) else null
-    }.onFailure { HEAD_LOG.warn("Loading the head for {} failed unexpectedly; will retry", id, it) }
-        .getOrNull()
 }
-
-@Composable
-internal fun rememberMenuHead(id: java.util.UUID?): ImageBitmap? =
-    produceState(id?.let { MenuHeadCache.cached(it) }, id) {
-        if (id != null && value == null) MenuHeadCache.load(id) { value = it }
-    }.value
 
 private const val MENU_HEAD_SIZE = 64
 private val HEAD_LOG = org.apache.logging.log4j.LogManager.getLogger("PolyPlus/Heads")
@@ -1180,7 +1184,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     val activeName = accounts?.firstOrNull { it.active }?.username ?: name
     val chevronRotation = if (open) 0f else 180f
     val localId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId }.getOrNull()
-    val head = rememberMenuHead(localId)
+    val head = localId?.let { MenuHeadCache.get(it) }
 
     Box(
         modifier = Modifier
@@ -1419,7 +1423,7 @@ private fun AccountRow(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var confirmRemove by remember { mutableStateOf(false) }
-    val head = rememberMenuHead(account.id)
+    val head = MenuHeadCache.get(account.id)
     val clickable = enabled && !account.active && !confirmRemove
 
     Row(
