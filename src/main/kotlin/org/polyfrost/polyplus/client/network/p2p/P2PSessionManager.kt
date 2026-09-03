@@ -230,6 +230,7 @@ object P2PSessionManager : EarlyInitializable {
 
     private var stallReported = false
     private var lastStallCheckMs = 0L
+    private var suppressStallUntilMs = 0L
 
     private fun checkForStalledEos() {
         val bridge = this.bridge ?: return
@@ -237,7 +238,10 @@ object P2PSessionManager : EarlyInitializable {
         val lastCheck = lastStallCheckMs
         lastStallCheckMs = now
 
-        if (!EosTickHealth.isObservationTrustworthy(lastCheck, now)) return
+        if (!EosTickHealth.isObservationTrustworthy(lastCheck, now)) {
+            suppressStallUntilMs = now + EosTickHealth.STALL_THRESHOLD_MS
+        }
+        if (now < suppressStallUntilMs) return
 
         if (!bridge.isStalled()) {
             if (stallReported) {
