@@ -113,6 +113,11 @@ data class FeaturedServersSnapshot(
             campaign != null && campaign.isActive(nowMillis) && campaign.campaignId !in dismissedCampaignIds
         }
 
+    fun isMultiplayerRestorable(server: FeaturedServer, nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val campaign = server.featured ?: return false
+        return campaign.isActive(nowMillis) && campaign.campaignId in multiplayerDismissedCampaignIds
+    }
+
     fun sponsoredServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> {
         val featuredIds = featuredServers(nowMillis).asSequence().map(FeaturedServer::id).toHashSet()
         return visibleServers(nowMillis).filterNot { it.id in featuredIds }

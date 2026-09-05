@@ -150,7 +150,7 @@ public final class FeaturedServerRowRegistry {
         }
 
         public boolean dismissHit(double mouseX, double mouseY) {
-            return promoted && !header
+            return !header && dismissWidth > 0
                 && mouseX >= dismissX && mouseX < dismissX + dismissWidth
                 && mouseY >= dismissY && mouseY < dismissY + dismissHeight;
         }

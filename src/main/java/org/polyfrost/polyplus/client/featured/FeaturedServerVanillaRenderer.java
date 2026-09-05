@@ -12,9 +12,17 @@ import net.minecraft.network.chat.Component;
 public final class FeaturedServerVanillaRenderer {
     private static final int SEGMENTS_X = 12;
     private static final int SEGMENTS_Y = 3;
-    private static final int VANILLA_STATUS_RIGHT_PADDING = 25;
+    private static final int VANILLA_STATUS_RIGHT_GAP = 20;
+    private static final int BUTTON_GAP = 5;
+    //? if >= 1.21.10 {
+    private static final int CONTENT_INSET = 2;
+    //?} else {
+    /*private static final int CONTENT_INSET = 0;
+    *///?}
     private static final int SECTION_INSET = 4;
     private static final int SECTION_LABEL_GAP = 5;
+    private static final int CROSS_SIZE = 5;
+    private static final int GLYPH_CAP_HEIGHT = 7;
 
     private FeaturedServerVanillaRenderer() {
     }
@@ -78,23 +86,47 @@ public final class FeaturedServerVanillaRenderer {
         int mouseX,
         int mouseY
     ) {
-        if (!row.promoted() || row.header()) return;
+        if (row.header()) return;
+        boolean restorable = !row.promoted() && FeaturedServers.isMultiplayerRestorable(row.server());
+        if (!row.promoted() && !restorable) {
+            row.dismissBounds(0, 0, 0, 0);
+            return;
+        }
         var font = Minecraft.getInstance().font;
-        var label = Component.translatable("polyplus.featured.dismiss");
-        int textWidth = font.width(label);
+        var label = restorable ? Component.translatable("polyplus.featured.restore") : null;
+        int contentWidth = label != null ? font.width(label) : CROSS_SIZE;
         var status = row.data().state() == ServerData.State.INCOMPATIBLE
             ? row.data().version
             : row.data().status;
         int statusWidth = font.width(status);
-        int textX = row.x() + row.width() - VANILLA_STATUS_RIGHT_PADDING - statusWidth - textWidth;
-        int textY = row.y() + 3;
-        row.dismissBounds(textX - 2, textY - 2, textWidth + 4, 13);
+        int statusX = row.x() + row.width() - CONTENT_INSET - VANILLA_STATUS_RIGHT_GAP - statusWidth;
+        int contentX = statusX - BUTTON_GAP - contentWidth;
+        int contentY = row.y() + CONTENT_INSET + 1;
+        row.dismissBounds(contentX - 2, contentY - 2, contentWidth + 4, 11);
         int color = row.dismissHit(mouseX, mouseY) ? 0xFFFFFFFF : 0xFFAAAAAA;
+        if (label == null) {
+            drawCross(graphics, contentX, contentY + (GLYPH_CAP_HEIGHT - CROSS_SIZE) / 2, color);
+            return;
+        }
         //? if >= 26.1 {
-        graphics.text(font, label, textX, textY, color);
+        graphics.text(font, label, contentX, contentY, color);
         //?} else {
-        /*graphics.drawString(font, label, textX, textY, color);
+        /*graphics.drawString(font, label, contentX, contentY, color);
         *///?}
+    }
+
+    private static void drawCross(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y, int color
+    ) {
+        for (int i = 0; i < CROSS_SIZE; i++) {
+            graphics.fill(x + i, y + i, x + i + 1, y + i + 1, color);
+            graphics.fill(x + CROSS_SIZE - 1 - i, y + i, x + CROSS_SIZE - i, y + i + 1, color);
+        }
     }
 
     private static void drawOutline(

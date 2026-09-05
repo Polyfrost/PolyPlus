@@ -85,6 +85,9 @@ class FeaturedServerCatalogTest {
         assertEquals(listOf("c"), snapshot.mainMenuFeaturedServers(now).map { it.id })
         assertEquals(listOf("a"), snapshot.featuredServers(now).map { it.id })
         assertEquals(listOf("b", "c"), snapshot.sponsoredServers(now).map { it.id })
+        assertTrue(snapshot.isMultiplayerRestorable(decoded.servers[2], now))
+        assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[0], now))
+        assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[1], now))
         assertTrue(snapshot.visibleServers(now + 1_000).isEmpty())
     }
 

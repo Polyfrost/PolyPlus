@@ -209,7 +209,10 @@ public abstract class MixinOnlineServerEntry {
         }
         if (row.dismissHit(mouseX, mouseY)) {
             var campaign = row.server().getFeatured();
-            if (campaign != null) FeaturedServers.dismissMultiplayer(campaign.getCampaignId());
+            if (campaign != null) {
+                if (row.promoted()) FeaturedServers.dismissMultiplayer(campaign.getCampaignId());
+                else FeaturedServers.restoreMultiplayer(campaign.getCampaignId());
+            }
             ((FeaturedServerListAccess) row.list()).polyplus$rebuildFeaturedServers();
             return true;
         }
