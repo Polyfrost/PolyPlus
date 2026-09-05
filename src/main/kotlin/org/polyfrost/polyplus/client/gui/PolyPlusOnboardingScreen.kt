@@ -73,7 +73,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.skia.Matrix33
+import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.Image as SkiaImage
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
@@ -955,12 +955,20 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
                     sourceWidth = image.width
                     sourceHeight = (sourceWidth / destinationRatio).roundToInt()
                 }
-                val localMatrix = Matrix33
-                    .makeTranslate((size.width - destinationWidth) / 2f, (size.height - destinationHeight) / 2f)
-                    .makeConcat(Matrix33.makeScale(destinationWidth / sourceWidth, destinationHeight / sourceHeight))
-                    .makeConcat(Matrix33.makeTranslate(-(image.width - sourceWidth) / 2f, -(image.height - sourceHeight) / 2f))
+                val src = SkiaRect.makeXYWH(
+                    (image.width - sourceWidth) / 2f,
+                    (image.height - sourceHeight) / 2f,
+                    sourceWidth.toFloat(),
+                    sourceHeight.toFloat(),
+                )
+                val dst = SkiaRect.makeXYWH(
+                    (size.width - destinationWidth) / 2f,
+                    (size.height - destinationHeight) / 2f,
+                    destinationWidth,
+                    destinationHeight,
+                )
                 drawIntoCanvas {
-                    UnityMotionBlur.draw(it.skiaCanvas, image, localMatrix, size.width, size.height, motion)
+                    UnityMotionBlur.draw(it.skiaCanvas, image, src, dst, SkiaRect.makeWH(size.width, size.height), motion)
                 }
             }
         }
