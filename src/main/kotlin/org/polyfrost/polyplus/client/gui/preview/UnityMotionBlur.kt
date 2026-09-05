@@ -3,8 +3,7 @@ package org.polyfrost.polyplus.client.gui.preview
 import androidx.compose.ui.geometry.Offset
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.FilterTileMode
-import org.jetbrains.skia.Matrix33
+import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.RuntimeEffect
@@ -59,27 +58,21 @@ object UnityMotionBlur {
     }
 
     private fun drawBlurred(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
-        val localMatrix = Matrix33
-            .makeTranslate(dst.left, dst.top)
-            .makeConcat(Matrix33.makeScale(dst.width / src.width, dst.height / src.height))
-            .makeConcat(Matrix33.makeTranslate(-src.left, -src.top))
-        val source = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR, localMatrix)
-        source.use {
-            val blurred = effect?.let { runtime ->
-                RuntimeShaderBuilder(runtime).use { builder ->
-                    builder.child("DiffuseSampler", source)
-                    builder.uniform("Size", bounds.width, bounds.height)
-                    builder.uniform("Velocity", motion.velocity.x, motion.velocity.y)
-                    builder.uniform("Samples", motion.samples)
-                    builder.uniform("Jitter", JITTER)
-                    builder.makeShader()
-                }
-            }
+        val runtime = effect ?: return blit(canvas, image, src, dst, bounds)
+        val builder = RuntimeShaderBuilder(runtime)
+        builder.uniform("Size", bounds.width, bounds.height)
+        builder.uniform("Velocity", motion.velocity.x, motion.velocity.y)
+        builder.uniform("Samples", motion.samples)
+        builder.uniform("Jitter", JITTER)
+        val filter = builder.use { ImageFilter.makeRuntimeShader(it, "DiffuseSampler", null) }
+        filter.use {
             Paint().use { paint ->
-                paint.shader = blurred ?: source
-                canvas.drawRect(bounds, paint)
+                paint.imageFilter = it
+                canvas.save()
+                canvas.clipRect(bounds)
+                canvas.drawImageRect(image, src, dst, SamplingMode.LINEAR, paint, true)
+                canvas.restore()
             }
-            blurred?.close()
         }
     }
 

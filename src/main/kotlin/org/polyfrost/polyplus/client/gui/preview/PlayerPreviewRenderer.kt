@@ -144,6 +144,12 @@ object PlayerPreviewRenderer {
     @JvmStatic
     fun isRenderingPreview(): Boolean = renderingPreview
 
+    @Volatile
+    private var directPreview = false
+
+    @JvmStatic
+    fun isDirectPreview(): Boolean = directPreview
+
     //? if >= 1.21.10 {
     @Volatile
     private var previewCape: Identifier? = null
@@ -570,6 +576,15 @@ object PlayerPreviewRenderer {
     //?}
 
     private fun renderDirect(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
+        directPreview = true
+        try {
+            renderDirectState(mc, source, yawDeg, w, h, modelScale, verticalAnchor)
+        } finally {
+            directPreview = false
+        }
+    }
+
+    private fun renderDirectState(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
         val baseSkin = localSkin(mc) ?: return
         val skin = capeOverride(source)?.let { withCape(baseSkin, it) } ?: baseSkin
         val equipment = when (source) {

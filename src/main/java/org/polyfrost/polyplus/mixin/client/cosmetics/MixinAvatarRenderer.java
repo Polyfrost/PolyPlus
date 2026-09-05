@@ -5,7 +5,11 @@ import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 //?}
+import net.fabricmc.loader.api.FabricLoader;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
+//? if >= 1.21.10 {
+import org.polyfrost.polyplus.client.cosmetics.render.PreviewCapeLayer;
+//?}
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -57,6 +61,13 @@ public class MixinAvatarRenderer {
 
         invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer(parent));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer(parent));
+
+        //? if >= 1.21.10 {
+        if (FabricLoader.getInstance().isModLoaded("waveycapes")) {
+            invoker.polyplus$layers().add(
+                new PreviewCapeLayer(parent, context.getModelSet(), context.getEquipmentAssets()));
+        }
+        //?}
     }
 
     //? if >= 1.21.4 {

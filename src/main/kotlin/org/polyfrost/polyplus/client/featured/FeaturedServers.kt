@@ -138,6 +138,16 @@ object FeaturedServers {
     }
 
     @JvmStatic
+    fun dismissMultiplayerByAddress(address: String) {
+        if (address.isBlank()) return
+        val normalized = normalizeServerAddress(address)
+        val campaign = snapshot().visibleServers()
+            .firstOrNull { normalizeServerAddress(it.address) == normalized }
+            ?.featured ?: return
+        dismissMultiplayer(campaign.campaignId)
+    }
+
+    @JvmStatic
     fun snapshot(): FeaturedServersSnapshot {
         ensureLoaded()
         return _state.value

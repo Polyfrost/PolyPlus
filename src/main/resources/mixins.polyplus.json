@@ -76,6 +76,7 @@
     "compat.sodium.MixinSodiumConfigBuilder",
     "compat.voicechat.MixinClientManager",
     "compat.waveycapes.MixinCustomCapeRenderer",
+    "compat.waveycapes.MixinCustomCapeRenderLayer",
     "compat.waveycapes.MixinPlayerWrapper"
   ]
 }

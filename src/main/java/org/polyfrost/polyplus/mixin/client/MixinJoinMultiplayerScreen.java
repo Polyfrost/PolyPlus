@@ -32,6 +32,14 @@ public abstract class MixinJoinMultiplayerScreen {
         if (FeaturedServers.revision() != polyplus$featuredRevision) polyplus$refreshFeaturedServers();
     }
 
+    @Inject(method = "deleteCallback", at = @At("HEAD"))
+    private void polyplus$demoteDeletedFeaturedServer(boolean result, CallbackInfo ci) {
+        if (!result || serverSelectionList == null) return;
+        if (serverSelectionList.getSelected() instanceof ServerSelectionList.OnlineServerEntry entry) {
+            FeaturedServers.dismissMultiplayerByAddress(entry.getServerData().ip);
+        }
+    }
+
     @Inject(method = "onSelectedChange", at = @At("RETURN"))
     private void polyplus$disableRemoteRowEditing(CallbackInfo ci) {
         if (serverSelectionList == null) return;
