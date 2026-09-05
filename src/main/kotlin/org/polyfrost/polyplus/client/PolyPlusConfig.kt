@@ -15,7 +15,6 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
-import org.polyfrost.polyplus.client.gui.ClientWatermark
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.social.SocialOverlay
 
@@ -69,82 +68,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         category = "Multiplayer",
     )
     var replacePauseLanButton = true
-
-    @JvmStatic
-    @Switch(
-        title = "OneClient Watermark",
-        description = "Show the OneClient watermark in your inventory and pause menu.",
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkEnabled = true
-
-    @JvmStatic
-    @Dropdown(
-        title = "Position",
-        description = "Where the watermark sits on your screen.",
-        options = [
-            "Top Left", "Top Right", "Bottom Left", "Bottom Right",
-            "Top Center", "Bottom Center", "Left Center", "Right Center",
-        ],
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkPosition = ClientWatermark.POSITION_TOP_CENTER
-
-    @JvmStatic
-    @Slider(
-        title = "Scale",
-        description = "Watermark size, as a percentage of normal.",
-        min = 50f,
-        max = 400f,
-        step = 5f,
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkScale = 100f
-
-    @JvmStatic
-    @Slider(
-        title = "Horizontal Offset",
-        description = "How far the watermark sits from the left or right screen edge, in pixels.",
-        min = 0f,
-        max = 200f,
-        step = 1f,
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkOffsetX = 6f
-
-    @JvmStatic
-    @Slider(
-        title = "Vertical Offset",
-        description = "How far the watermark sits from the top or bottom screen edge, in pixels.",
-        min = 0f,
-        max = 200f,
-        step = 1f,
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkOffsetY = 6f
-
-    @JvmStatic
-    @Switch(
-        title = "Use Accent Color",
-        description = "Draw the watermark in your OneConfig accent color.",
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkAccentColor = false
-
-    @JvmStatic
-    @Color(
-        title = "Color",
-        description = "Color of the watermark logo and text.",
-        category = "Interface",
-        subcategory = "Watermark",
-    )
-    var watermarkColor: PolyColor = PolyColor.WHITE
 
     @JvmStatic
     @Switch(
@@ -203,19 +126,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     init {
         hideIf("apiUrl") { !PolyPlusConstants.IS_DEV_ENV }
-
-        for (option in listOf("watermarkPosition", "watermarkScale", "watermarkOffsetX", "watermarkOffsetY", "watermarkAccentColor")) {
-            hideIf(option) { !watermarkEnabled }
-        }
-        hideIf("watermarkOffsetX") {
-            watermarkPosition == ClientWatermark.POSITION_TOP_CENTER ||
-                watermarkPosition == ClientWatermark.POSITION_BOTTOM_CENTER
-        }
-        hideIf("watermarkOffsetY") {
-            watermarkPosition == ClientWatermark.POSITION_LEFT_CENTER ||
-                watermarkPosition == ClientWatermark.POSITION_RIGHT_CENTER
-        }
-        hideIf("watermarkColor") { !watermarkEnabled || watermarkAccentColor }
 
         addCallback("acceptedLegalTerms") {
             org.polyfrost.polyplus.client.privacy.PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)

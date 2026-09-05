@@ -8,7 +8,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 /*import net.minecraft.client.gui.GuiGraphics;
 *///?}
 import net.minecraft.client.gui.screens.Screen;
-import org.polyfrost.polyplus.client.gui.ClientWatermark;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -54,27 +53,6 @@ public class MixinScreen {
     ) {
         if (MenuPanorama.panoramaBackdrop()) return;
         MenuPanorama.drawBackdrop(graphics, (Screen) (Object) this, true);
-    }
-
-    @Inject(
-        //? if >= 26.1 {
-        method = "extractRenderStateWithTooltipAndSubtitles",
-        //?} else if >= 1.21.10 {
-        /*method = "renderWithTooltipAndSubtitles",
-        *///?} else {
-        /*method = "renderWithTooltip",
-        *///?}
-        at = @At("TAIL")
-    )
-    private void polyplus$drawWatermark(
-        //? if >= 26.1 {
-        GuiGraphicsExtractor graphics,
-        //?} else {
-        /*GuiGraphics graphics,
-        *///?}
-        int mouseX, int mouseY, float tickDelta, CallbackInfo ci
-    ) {
-        ClientWatermark.render(graphics, (Screen) (Object) this);
     }
 
     @WrapMethod(
