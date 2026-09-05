@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -27,6 +28,7 @@ object PrivacyEnforcement {
         if (allowed) PolyPlusSentry.initialize() else PolyPlusSentry.shutdown()
         PolyConnection.applyConsent()
         P2PSessionManager.applyConsent()
+        FeaturedServers.applyConsent()
 
         if (allowed) {
             if (bootstrapped.compareAndSet(false, true)) {

@@ -38,6 +38,7 @@ import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
@@ -137,6 +138,7 @@ object PolyPlusClient {
         step("onboarding") { OnboardingFeatures.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("login gate") { MinecraftLoginGate.register() }
+        step("featured servers") { FeaturedServers.warmUp() }
 
         val earlyHooks: List<Pair<String, () -> EarlyInitializable>> = buildList {
             //? if >= 1.21.1
@@ -201,6 +203,7 @@ object PolyPlusClient {
 
             runCatching { PolyConnection.reconnect() }
             runCatching { P2PSessionManager.reconnect() }
+            runCatching { FeaturedServers.refresh(force = true) }
 
             refreshCosmeticsInternal()
         }

@@ -1,6 +1,9 @@
 {
   "polyplus.hostWorld": "Host World",
   "polyplus.mainmenu.switchToOneClient": "OneClient Menu",
+  "polyplus.featured.sponsored": "Sponsored",
+  "polyplus.featured.sponsored.category": "Sponsored %s",
+  "polyplus.featured.dismiss": "Dismiss",
   "polyplus.mmc.debugifyNote": "OneClient/PolyPlus note: we automatically disable the bannable features from Debugify, so you can keep playing safely.",
   "polyplus.session.refresh": "Refresh Session",
   "polyplus.session.refreshing": "Refreshing session...",
