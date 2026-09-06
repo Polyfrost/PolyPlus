@@ -79,6 +79,8 @@ data class FeaturedCampaign(
     val description: String,
     val ctaLabel: String,
     val imageUrl: String?,
+    val dismissibleInMainMenu: Boolean,
+    val dismissibleInServerList: Boolean,
 ) {
     fun isActive(nowMillis: Long): Boolean = nowMillis >= startsAtMillis && nowMillis < endsAtMillis
 }
@@ -102,20 +104,34 @@ data class FeaturedServersSnapshot(
         if (nowMillis < expiresAtMillis) servers else emptyList()
 
     fun mainMenuFeaturedServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> =
-        activeFeaturedServers(nowMillis, mainMenuDismissedCampaignIds)
+        activeFeaturedServers(nowMillis) { !it.dismissibleInMainMenu || it.campaignId !in mainMenuDismissedCampaignIds }
 
     fun featuredServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> =
-        activeFeaturedServers(nowMillis, multiplayerDismissedCampaignIds)
+        activeFeaturedServers(nowMillis) { !it.dismissibleInServerList || it.campaignId !in multiplayerDismissedCampaignIds }
 
-    private fun activeFeaturedServers(nowMillis: Long, dismissedCampaignIds: Set<String>): List<FeaturedServer> =
+    private inline fun activeFeaturedServers(
+        nowMillis: Long,
+        keep: (FeaturedCampaign) -> Boolean,
+    ): List<FeaturedServer> =
         visibleServers(nowMillis).filter { server ->
             val campaign = server.featured
-            campaign != null && campaign.isActive(nowMillis) && campaign.campaignId !in dismissedCampaignIds
+            campaign != null && campaign.isActive(nowMillis) && keep(campaign)
         }
+
+    fun isMainMenuDismissible(campaignId: String): Boolean =
+        campaignsWithId(campaignId).all(FeaturedCampaign::dismissibleInMainMenu)
+
+    fun isMultiplayerDismissible(campaignId: String): Boolean =
+        campaignsWithId(campaignId).all(FeaturedCampaign::dismissibleInServerList)
+
+    private fun campaignsWithId(campaignId: String): List<FeaturedCampaign> =
+        servers.mapNotNull { it.featured }.filter { it.campaignId == campaignId }
 
     fun isMultiplayerRestorable(server: FeaturedServer, nowMillis: Long = System.currentTimeMillis()): Boolean {
         val campaign = server.featured ?: return false
-        return campaign.isActive(nowMillis) && campaign.campaignId in multiplayerDismissedCampaignIds
+        return campaign.dismissibleInServerList &&
+            campaign.isActive(nowMillis) &&
+            campaign.campaignId in multiplayerDismissedCampaignIds
     }
 
     fun sponsoredServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> {
@@ -179,7 +195,17 @@ object FeaturedServerCatalogCodec {
         require(end > start) { "ends_at must be later than starts_at" }
         val imageUrlText = (imageUrl as? JsonPrimitive)?.takeIf { it.isString }?.content
         val safeImageUrl = imageUrlText?.takeIf(::isHttpsUrl)
-        return FeaturedCampaign(campaignId.trim(), start, end, title.trim(), description.trim(), ctaLabel.trim(), safeImageUrl)
+        return FeaturedCampaign(
+            campaignId.trim(),
+            start,
+            end,
+            title.trim(),
+            description.trim(),
+            ctaLabel.trim(),
+            safeImageUrl,
+            dismissibleInMainMenu,
+            dismissibleInServerList,
+        )
     }
 
     private fun isHttpsUrl(value: String): Boolean = runCatching {
@@ -207,6 +233,8 @@ object FeaturedServerCatalogCodec {
         val description: String = "",
         @SerialName("cta_label") val ctaLabel: String = "",
         @SerialName("image_url") val imageUrl: JsonElement? = null,
+        @SerialName("dismissible_in_main_menu") val dismissibleInMainMenu: Boolean = true,
+        @SerialName("dismissible_in_server_list") val dismissibleInServerList: Boolean = true,
     )
 }
 

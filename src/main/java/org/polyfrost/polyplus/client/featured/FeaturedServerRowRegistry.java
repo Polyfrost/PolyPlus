@@ -21,10 +21,9 @@ public final class FeaturedServerRowRegistry {
         ServerData data,
         FeaturedServer server,
         boolean promoted,
-        boolean header,
-        boolean expanded
+        boolean header
     ) {
-        Row row = new Row(list, entry, screen, data, server, promoted, header, expanded);
+        Row row = new Row(list, entry, screen, data, server, promoted, header);
         ROWS.put(entry, row);
         return row;
     }
@@ -60,7 +59,6 @@ public final class FeaturedServerRowRegistry {
         private final FeaturedServer server;
         private final boolean promoted;
         private final boolean header;
-        private final boolean expanded;
         private int x;
         private int y;
         private int width;
@@ -78,8 +76,7 @@ public final class FeaturedServerRowRegistry {
             ServerData data,
             FeaturedServer server,
             boolean promoted,
-            boolean header,
-            boolean expanded
+            boolean header
         ) {
             this.list = list;
             this.entry = entry;
@@ -88,7 +85,6 @@ public final class FeaturedServerRowRegistry {
             this.server = server;
             this.promoted = promoted;
             this.header = header;
-            this.expanded = expanded;
         }
 
         public ServerSelectionList list() {
@@ -117,10 +113,6 @@ public final class FeaturedServerRowRegistry {
 
         public boolean header() {
             return header;
-        }
-
-        public boolean expanded() {
-            return expanded;
         }
 
         public int x() {

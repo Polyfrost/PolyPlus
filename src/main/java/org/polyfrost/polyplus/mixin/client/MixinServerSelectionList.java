@@ -29,8 +29,6 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
     @Shadow @Final private ServerSelectionList.Entry lanHeader;
     @Shadow @Final private List<ServerSelectionList.NetworkServerEntry> networkServers;
 
-    private boolean polyplus$sponsoredExpanded = true;
-
     @Inject(method = "refreshEntries", at = @At("HEAD"))
     private void polyplus$releaseFeaturedEntries(CallbackInfo ci) {
         FeaturedServerRowRegistry.release((ServerSelectionList) (Object) this);
@@ -38,12 +36,6 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
 
     @Inject(method = "refreshEntries", at = @At("RETURN"))
     private void polyplus$appendFeaturedEntries(CallbackInfo ci) {
-        polyplus$rebuildFeaturedServers();
-    }
-
-    @Override
-    public void polyplus$toggleSponsoredServers() {
-        polyplus$sponsoredExpanded = !polyplus$sponsoredExpanded;
         polyplus$rebuildFeaturedServers();
     }
 
@@ -113,11 +105,9 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         );
         if (hasUnsavedSponsored) {
             addHeader();
-            if (polyplus$sponsoredExpanded) {
-                for (var server : sponsored) {
-                    if (!savedByAddress.containsKey(FeaturedServerModelsKt.normalizeServerAddress(server.getAddress()))) {
-                        addRemote(server, false);
-                    }
+            for (var server : sponsored) {
+                if (!savedByAddress.containsKey(FeaturedServerModelsKt.normalizeServerAddress(server.getAddress()))) {
+                    addRemote(server, false);
                 }
             }
         }
@@ -128,7 +118,7 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         var data = new ServerData(server.getName(), server.getAddress(), ServerData.Type.OTHER);
         var self = (ServerSelectionList) (Object) this;
         var entry = OnlineServerEntryInvoker.polyplus$create(self, screen, data);
-        FeaturedServerRowRegistry.register(entry, self, screen, data, server, promoted, false, false);
+        FeaturedServerRowRegistry.register(entry, self, screen, data, server, promoted, false);
         add(entry);
     }
 
@@ -136,7 +126,7 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         var data = new ServerData("Sponsored", "0.0.0.0", ServerData.Type.OTHER);
         var self = (ServerSelectionList) (Object) this;
         var entry = OnlineServerEntryInvoker.polyplus$create(self, screen, data);
-        FeaturedServerRowRegistry.register(entry, self, screen, data, null, false, true, polyplus$sponsoredExpanded);
+        FeaturedServerRowRegistry.register(entry, self, screen, data, null, false, true);
         add(entry, true);
     }
 

@@ -67,6 +67,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.Shape
@@ -85,6 +86,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -117,6 +119,9 @@ import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.featured.FeaturedServer
+import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -202,6 +207,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             withFrameNanos { }
             //? if >= 1.21.11
             org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
+            launch(Dispatchers.IO) { FeaturedServers.warmUp() }
             val serverLoad = async(Dispatchers.IO) {
                 org.polyfrost.polyplus.client.PolyPlusRecentServers.displayServers()
             }
@@ -216,7 +222,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         var pingTick by remember { mutableStateOf(0) }
         LaunchedEffect(servers) {
-            if (servers.isEmpty()) return@LaunchedEffect
             MainMenuServerPings.start(this, servers)
             while (true) {
                 MainMenuServerPings.tick()
@@ -549,6 +554,8 @@ private val PanelBorderBrush: Brush = object : ShaderBrush() {
     }
 }
 private val ServerIconBackground = Color(0x33FFFFFF)
+private val FeaturedCardBackground: Color
+    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.8f)
 private val CloseBackground = Color(0x80FF4444)
 private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
 
@@ -665,6 +672,15 @@ private fun MainMenu(
                         screen,
                     )
                 }
+                FeaturedServerCard(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 50.dp, bottom = 56.dp)
+                        .guiScaled(scale, TransformOrigin(0f, 1f)),
+                    assetsReady,
+                    pingTick,
+                    actions,
+                )
                 Footer(Modifier.fillMaxSize(), scale, assetsReady)
             }
         }
@@ -917,6 +933,120 @@ private fun ThemeToggleButton(assetsReady: Boolean) {
             PolyPlusConfig.save()
         },
     )
+}
+
+@Composable
+private fun FeaturedServerCard(modifier: Modifier, assetsReady: Boolean, pingTick: Int, actions: MenuActions) {
+    val snapshot by FeaturedServers.state.collectAsState()
+    val server = MainMenuFeaturedServer.current(snapshot) ?: return
+    val campaign = server.featured ?: return
+    val data = remember(server.id, server.address) { MainMenuFeaturedServer.serverData(server) }
+
+    LaunchedEffect(data) { MainMenuServerPings.start(this, listOf(data)) }
+    @Suppress("UNUSED_EXPRESSION") pingTick
+
+    val catalogIcon = rememberRemoteImage(campaign.imageUrl ?: FeaturedServers.iconUrl(server.id))
+    val favicon = rememberFavicon(data.iconBytes)
+
+    Column(
+        modifier = modifier
+            .width(300.dp)
+            .clip(PanelShape)
+            .background(FeaturedCardBackground)
+            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CardText("SPONSORED", 11.sp, TextSecondary, FontWeight.Bold, letterSpacing = 0.8.sp)
+            Spacer(Modifier.weight(1f))
+            if (MainMenuFeaturedServer.isDismissible(server)) {
+                DismissButton(assetsReady) { MainMenuFeaturedServer.dismiss(server) }
+            }
+        }
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CardThumbnail(catalogIcon ?: favicon, assetsReady)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                CardText(campaign.title, 16.sp)
+                CardText(campaign.description, 13.sp, TextSecondary, maxLines = 2)
+            }
+        }
+        CallToActionButton(campaign.ctaLabel) { actions.connect(data) }
+    }
+}
+
+@Composable
+private fun CardThumbnail(image: ImageBitmap?, assetsReady: Boolean) {
+    val modifier = Modifier.size(42.dp).clip(ppShape(6.dp))
+    if (image != null) {
+        Image(
+            image,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+            filterQuality = FilterQuality.Medium,
+        )
+    } else {
+        RasterImage(ASSETS + "server.png", modifier, assetsReady = assetsReady, contentScale = ContentScale.Crop)
+    }
+}
+
+@Composable
+private fun CardText(
+    text: String,
+    fontSize: TextUnit,
+    color: Color = TextPrimary,
+    fontWeight: FontWeight = FontWeight.Normal,
+    maxLines: Int = 1,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+) {
+    BasicText(
+        text = text,
+        maxLines = maxLines,
+        softWrap = maxLines != 1,
+        overflow = TextOverflow.Ellipsis,
+        style = TextStyle(
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            letterSpacing = letterSpacing,
+            fontFamily = LocalTheme.current.typography.family,
+            textAlign = TextAlign.Start,
+        ),
+    )
+}
+
+@Composable
+private fun DismissButton(assetsReady: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val color = if (hovered) TextPrimary else TextSecondary
+    Row(
+        modifier = Modifier
+            .clip(ppShape(4.dp))
+            .hoverable(interaction)
+            .clickableTextWithSound(onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        CardText("Dismiss", 11.sp, color)
+        MenuIcon(ASSETS + "x-close.svg", color, Modifier.size(11.dp), assetsReady)
+    }
+}
+
+@Composable
+private fun CallToActionButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .clip(ppShape(6.dp))
+            .background(Accent)
+            .clickableWithSound(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        MenuText(label, fontSize = 15.sp, color = Color.White, maxLines = 1)
+    }
 }
 
 @Composable

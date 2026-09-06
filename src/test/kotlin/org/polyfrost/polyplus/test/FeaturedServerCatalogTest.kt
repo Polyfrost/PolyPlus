@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.featured.FeaturedServerCatalogCodec
 import org.polyfrost.polyplus.client.featured.FeaturedServerCachePolicy
 import org.polyfrost.polyplus.client.featured.FeaturedServerColors
+import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.FeaturedServersSnapshot
+import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.featured.OutlineStyle
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
 
@@ -89,6 +91,73 @@ class FeaturedServerCatalogTest {
         assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[0], now))
         assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[1], now))
         assertTrue(snapshot.visibleServers(now + 1_000).isEmpty())
+    }
+
+    @Test
+    fun `campaigns are dismissible unless the catalog opts out`() {
+        val decoded = FeaturedServerCatalogCodec.decode(
+            """{"schema_version":1,"servers":[
+              {"id":"sticky","name":"Sticky","address":"sticky.example","outline_color":"none","featured":{"campaign_id":"sticky","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"Sticky","description":"Sticky","cta_label":"Play","dismissible_in_main_menu":true,"dismissible_in_server_list":false}},
+              {"id":"default","name":"Default","address":"default.example","outline_color":"none","featured":{"campaign_id":"default","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"Default","description":"Default","cta_label":"Play"}}
+            ]}""",
+        )
+        val sticky = decoded.servers[0].featured!!
+        val fallback = decoded.servers[1].featured!!
+        assertTrue(sticky.dismissibleInMainMenu)
+        assertFalse(sticky.dismissibleInServerList)
+        assertTrue(fallback.dismissibleInMainMenu)
+        assertTrue(fallback.dismissibleInServerList)
+
+        val now = java.time.Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
+        val snapshot = FeaturedServersSnapshot(
+            decoded.servers,
+            multiplayerDismissedCampaignIds = setOf("sticky", "default"),
+            expiresAtMillis = now + 1_000,
+            revision = 1,
+        )
+        assertEquals(listOf("sticky"), snapshot.featuredServers(now).map { it.id })
+        assertEquals(listOf("default"), snapshot.sponsoredServers(now).map { it.id })
+        assertFalse(snapshot.isMultiplayerDismissible("sticky"))
+        assertTrue(snapshot.isMultiplayerDismissible("default"))
+        assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[0], now))
+        assertTrue(snapshot.isMultiplayerRestorable(decoded.servers[1], now))
+    }
+
+    @Test
+    fun `main menu dismissal is independent of the server list`() {
+        val decoded = FeaturedServerCatalogCodec.decode(
+            """{"schema_version":1,"servers":[
+              {"id":"sticky","name":"Sticky","address":"sticky.example","outline_color":"none","featured":{"campaign_id":"sticky","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"Sticky","description":"Sticky","cta_label":"Play now","dismissible_in_main_menu":false,"dismissible_in_server_list":true}},
+              {"id":"closable","name":"Closable","address":"closable.example","outline_color":"none","featured":{"campaign_id":"closable","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"Closable","description":"Closable","cta_label":"Play now"}}
+            ]}""",
+        )
+        val now = java.time.Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
+        val snapshot = FeaturedServersSnapshot(
+            decoded.servers,
+            mainMenuDismissedCampaignIds = setOf("sticky", "closable"),
+            expiresAtMillis = now + 1_000,
+            revision = 1,
+        )
+        assertFalse(snapshot.isMainMenuDismissible("sticky"))
+        assertTrue(snapshot.isMainMenuDismissible("closable"))
+        assertEquals(listOf("sticky"), snapshot.mainMenuFeaturedServers(now).map { it.id })
+        assertEquals("sticky", MainMenuFeaturedServer.current(snapshot, now)?.id)
+        assertFalse(MainMenuFeaturedServer.isDismissible(decoded.servers[0]))
+        assertTrue(MainMenuFeaturedServer.isDismissible(decoded.servers[1]))
+        assertEquals(listOf("sticky", "closable"), snapshot.featuredServers(now).map { it.id })
+    }
+
+    @Test
+    fun `catalog icons sit next to the catalog itself`() {
+        val catalog = "https://data-v2.polyfrost.org/oneclient/servers.json"
+        assertEquals(
+            "https://data-v2.polyfrost.org/oneclient/servers/colorgens.png",
+            FeaturedServers.iconUrl(catalog, "colorgens"),
+        )
+        assertEquals(
+            "https://data-v2.polyfrost.org/oneclient/servers/a%2Fb%20c.png",
+            FeaturedServers.iconUrl(catalog, "a/b c"),
+        )
     }
 
     @Test

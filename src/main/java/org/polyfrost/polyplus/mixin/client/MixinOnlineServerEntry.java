@@ -35,7 +35,7 @@ public abstract class MixinOnlineServerEntry {
     ) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, left, top, width, height, mouseX, mouseY);
+        FeaturedServerVanillaRenderer.before(graphics, row, left, top, width, height);
         if (row.header()) ci.cancel();
     }
 
@@ -69,7 +69,7 @@ public abstract class MixinOnlineServerEntry {
         var self = (ServerSelectionList.OnlineServerEntry) (Object) this;
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight(), mouseX, mouseY);
+        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight());
         if (row.header()) ci.cancel();
     }
 
@@ -102,7 +102,7 @@ public abstract class MixinOnlineServerEntry {
         var self = (ServerSelectionList.OnlineServerEntry) (Object) this;
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight(), mouseX, mouseY);
+        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight());
         if (row.header()) ci.cancel();
     }
 
@@ -198,15 +198,12 @@ public abstract class MixinOnlineServerEntry {
     private void polyplus$headerNarration(CallbackInfoReturnable<Component> cir) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row != null && row.header()) {
-            cir.setReturnValue(Component.translatable("polyplus.featured.sponsored.category", row.expanded() ? "▼" : "▶"));
+            cir.setReturnValue(Component.translatable("polyplus.featured.sponsored"));
         }
     }
 
     private boolean handleSpecialClick(FeaturedServerRowRegistry.Row row, double mouseX, double mouseY) {
-        if (row.header()) {
-            ((FeaturedServerListAccess) row.list()).polyplus$toggleSponsoredServers();
-            return true;
-        }
+        if (row.header()) return true;
         if (row.dismissHit(mouseX, mouseY)) {
             var campaign = row.server().getFeatured();
             if (campaign != null) {

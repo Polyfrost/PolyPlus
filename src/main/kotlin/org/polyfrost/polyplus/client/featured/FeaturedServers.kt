@@ -15,6 +15,8 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -109,6 +111,7 @@ object FeaturedServers {
         ensureLoaded()
         synchronized(lock) {
             if (campaignId in _state.value.mainMenuDismissedCampaignIds) return
+            if (!_state.value.isMainMenuDismissible(campaignId)) return
             val mainMenuDismissed = _state.value.mainMenuDismissedCampaignIds + campaignId
             publishLocked(
                 _state.value.servers,
@@ -126,6 +129,7 @@ object FeaturedServers {
         ensureLoaded()
         synchronized(lock) {
             if (campaignId in _state.value.multiplayerDismissedCampaignIds) return
+            if (!_state.value.isMultiplayerDismissible(campaignId)) return
             val multiplayerDismissed = _state.value.multiplayerDismissedCampaignIds + campaignId
             publishLocked(
                 _state.value.servers,
@@ -165,6 +169,14 @@ object FeaturedServers {
             .firstOrNull { normalizeServerAddress(it.address) == normalized }
             ?.featured ?: return
         dismissMultiplayer(campaign.campaignId)
+    }
+
+    @JvmStatic
+    fun iconUrl(serverId: String): String = iconUrl(endpoint(), serverId)
+
+    internal fun iconUrl(catalogUrl: String, serverId: String): String {
+        val id = URLEncoder.encode(serverId, StandardCharsets.UTF_8).replace("+", "%20")
+        return "${catalogUrl.removeSuffix(".json")}/$id.png"
     }
 
     @JvmStatic

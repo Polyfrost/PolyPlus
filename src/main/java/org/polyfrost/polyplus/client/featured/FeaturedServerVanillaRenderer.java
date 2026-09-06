@@ -37,21 +37,17 @@ public final class FeaturedServerVanillaRenderer {
         int x,
         int y,
         int width,
-        int height,
-        int mouseX,
-        int mouseY
+        int height
     ) {
         row.bounds(x, y, width, height);
         if (row.header()) {
-            var label = Component.translatable("polyplus.featured.sponsored.category", row.expanded() ? "▼" : "▶");
+            var label = Component.translatable("polyplus.featured.sponsored");
             var font = Minecraft.getInstance().font;
             int labelWidth = font.width(label);
             int labelX = x + (width - labelWidth) / 2;
             int labelY = y + (height - font.lineHeight) / 2;
             int lineY = labelY + (font.lineHeight - 1) / 2;
-            int lineColor = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height
-                ? 0xFFAAAAAA
-                : 0xFF666666;
+            int lineColor = 0xFF666666;
             graphics.fill(
                 x + SECTION_INSET,
                 lineY,
@@ -87,8 +83,10 @@ public final class FeaturedServerVanillaRenderer {
         int mouseY
     ) {
         if (row.header()) return;
+        var campaign = row.server().getFeatured();
+        boolean dismissible = campaign != null && campaign.getDismissibleInServerList();
         boolean restorable = !row.promoted() && FeaturedServers.isMultiplayerRestorable(row.server());
-        if (!row.promoted() && !restorable) {
+        if (!(row.promoted() && dismissible) && !restorable) {
             row.dismissBounds(0, 0, 0, 0);
             return;
         }
