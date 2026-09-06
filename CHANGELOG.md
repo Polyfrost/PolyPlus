@@ -1,2 +1,3 @@
-## 1.2.15
-- main menu card for featured servers
+## 1.2.16
+- Change modernfix defaults
+- Improve sponsored main menu thing design
