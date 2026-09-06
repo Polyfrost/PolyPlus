@@ -30,13 +30,14 @@ object ModConfigDefaults {
         val key: String,
         val value: Any,
         val newInstallsOnly: Boolean = false,
+        val alwaysReapply: Boolean = false,
     ) {
         val id get() = "$file $key = ${render(value)}"
     }
 
     internal val DEFAULTS = listOf(
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_entity_renderers", true),
-        Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_resources", false),
+        Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_resources", false, alwaysReapply = true),
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.faster_item_rendering", true),
         Default("ferritecore", "ferritecore.mixin.properties", "useSmallThreadingDetector", true),
         Default("vmp", "vmp.properties", "show_async_loading_messages", false),
@@ -59,33 +60,39 @@ object ModConfigDefaults {
         val loader = FabricLoader.getInstance()
         val applied = readApplied(loader.configDir.resolve(APPLIED_FILE))
         val pending = DEFAULTS.filter {
-            select(it) && it.id !in applied && loader.isModLoaded(it.modId) && wanted(it, loader.configDir)
+            select(it) && unapplied(it, applied) && loader.isModLoaded(it.modId) && wanted(it, loader.configDir)
         }
         if (pending.isEmpty()) return
 
         val done = mutableListOf<String>()
         pending.groupBy(Default::file).forEach { (file, defaults) ->
             runCatching { merge(loader.configDir.resolve(file), defaults) }
-                .onSuccess {
+                .onSuccess { changed ->
                     done += defaults.map(Default::id)
-                    logger.info("Applied {} default {} settings", defaults.size, file)
+                    if (changed) logger.info("Applied {} default {} settings", defaults.size, file)
                 }
                 .onFailure { logger.warn("Could not apply the default {} settings", file, it) }
         }
-        if (done.isNotEmpty()) writeApplied(loader.configDir.resolve(APPLIED_FILE), applied + done)
+        val fresh = done.filterNot { it in applied }
+        if (fresh.isNotEmpty()) writeApplied(loader.configDir.resolve(APPLIED_FILE), applied + fresh)
     }
+
+    internal fun unapplied(default: Default, applied: Set<String>): Boolean =
+        default.alwaysReapply || default.id !in applied
 
     internal fun wanted(default: Default, configDir: Path): Boolean =
         !default.newInstallsOnly || !configDir.resolve(default.file).exists()
 
-    private fun merge(path: Path, defaults: List<Default>) {
+    private fun merge(path: Path, defaults: List<Default>): Boolean {
         val text = if (path.exists()) path.readText() else ""
         val merged =
             if (path.fileName.toString().endsWith(".json")) mergeJson(text, defaults)
             else mergeFlat(text, defaults, toml = path.fileName.toString().endsWith(".toml"))
+        if (merged == text) return false
 
         path.createParentDirectories()
         writeAtomically(path, merged)
+        return true
     }
 
     private fun writeAtomically(path: Path, text: String) {

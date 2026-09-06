@@ -18,6 +18,8 @@ class ModConfigDefaultsTest {
         val NESTED = Default("controlify", "controlify.json", "global.out_of_focus_input", true)
         val BLOCK_OVERLAY_FACE =
             Default("simpleblockoverlay", "simpleblockoverlay.json", "disableOverlay", true, newInstallsOnly = true)
+        val DYNAMIC_RESOURCES =
+            ModConfigDefaults.DEFAULTS.single { it.key == "mixin.perf.dynamic_resources" }
     }
 
     @Test
@@ -95,6 +97,32 @@ class ModConfigDefaultsTest {
     fun `an ordinary default still applies over an existing config`(@TempDir configDir: Path) {
         configDir.resolve(SHOW_TOASTS.file).writeText("showToasts = true\n")
         assertTrue(ModConfigDefaults.wanted(SHOW_TOASTS, configDir))
+    }
+
+    @Test
+    fun `an ordinary default is skipped once it has been applied`() {
+        assertTrue(ModConfigDefaults.unapplied(SHOW_TOASTS, emptySet()))
+        assertFalse(ModConfigDefaults.unapplied(SHOW_TOASTS, setOf(SHOW_TOASTS.id)))
+    }
+
+    @Test
+    fun `an always-reapply default is applied again even once it is recorded`() {
+        assertTrue(ModConfigDefaults.unapplied(DYNAMIC_RESOURCES, setOf(DYNAMIC_RESOURCES.id)))
+    }
+
+    @Test
+    fun `dynamic resources is turned off for everyone on every launch`() {
+        assertEquals(false, DYNAMIC_RESOURCES.value)
+        assertTrue(DYNAMIC_RESOURCES.alwaysReapply)
+        assertFalse(DYNAMIC_RESOURCES.newInstallsOnly)
+        assertEquals(
+            "mixin.perf.dynamic_resources = false\n",
+            ModConfigDefaults.mergeFlat(
+                "mixin.perf.dynamic_resources = true\n",
+                listOf(DYNAMIC_RESOURCES),
+                toml = false,
+            ),
+        )
     }
 
     @Test
