@@ -1,2 +1,2 @@
-## 1.2.14
-- kill OneClient watermark
+## 1.2.15
+- main menu card for featured servers
