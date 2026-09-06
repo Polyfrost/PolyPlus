@@ -115,11 +115,11 @@ class FeaturedServerCatalogTest {
             expiresAtMillis = now + 1_000,
             revision = 1,
         )
-        assertEquals(listOf("sticky"), snapshot.featuredServers(now).map { it.id })
-        assertEquals(listOf("default"), snapshot.sponsoredServers(now).map { it.id })
+        assertEquals(emptyList<String>(), snapshot.featuredServers(now).map { it.id })
+        assertEquals(listOf("sticky", "default"), snapshot.sponsoredServers(now).map { it.id })
         assertFalse(snapshot.isMultiplayerDismissible("sticky"))
         assertTrue(snapshot.isMultiplayerDismissible("default"))
-        assertFalse(snapshot.isMultiplayerRestorable(decoded.servers[0], now))
+        assertTrue(snapshot.isMultiplayerRestorable(decoded.servers[0], now))
         assertTrue(snapshot.isMultiplayerRestorable(decoded.servers[1], now))
     }
 

@@ -22,6 +22,20 @@ public final class FeaturedServerVanillaRenderer {
     private static final int SECTION_INSET = 4;
     private static final int SECTION_LABEL_GAP = 5;
     private static final int CROSS_SIZE = 5;
+    private static final int STATUS_ICON_WIDTH = 10;
+    private static final int STATUS_ICON_HEIGHT = 8;
+    private static final int STATUS_ICON_RIGHT_GAP = 15;
+    private static final int STAR_SIZE = 7;
+    private static final int STAR_COLOR = 0xFFFFD700;
+    private static final byte[] STAR_ROWS = {
+        0b0001000,
+        0b0011100,
+        0b1111111,
+        0b0111110,
+        0b0011100,
+        0b0110110,
+        0b1100011,
+    };
     private static final int GLYPH_CAP_HEIGHT = 7;
 
     private FeaturedServerVanillaRenderer() {
@@ -83,6 +97,14 @@ public final class FeaturedServerVanillaRenderer {
         int mouseY
     ) {
         if (row.header()) return;
+        if (row.promoted()) {
+            int iconX = row.x() + row.width() - CONTENT_INSET - STATUS_ICON_RIGHT_GAP;
+            drawStar(
+                graphics,
+                iconX + (STATUS_ICON_WIDTH - STAR_SIZE) / 2,
+                row.y() + CONTENT_INSET + STATUS_ICON_HEIGHT + 4
+            );
+        }
         var campaign = row.server().getFeatured();
         boolean dismissible = campaign != null && campaign.getDismissibleInServerList();
         boolean restorable = !row.promoted() && FeaturedServers.isMultiplayerRestorable(row.server());
@@ -111,6 +133,23 @@ public final class FeaturedServerVanillaRenderer {
         //?} else {
         /*graphics.drawString(font, label, contentX, contentY, color);
         *///?}
+    }
+
+    private static void drawStar(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y
+    ) {
+        for (int row = 0; row < STAR_ROWS.length; row++) {
+            int bits = STAR_ROWS[row];
+            for (int col = 0; col < STAR_SIZE; col++) {
+                if ((bits & (1 << (STAR_SIZE - 1 - col))) == 0) continue;
+                graphics.fill(x + col, y + row, x + col + 1, y + row + 1, STAR_COLOR);
+            }
+        }
     }
 
     private static void drawCross(

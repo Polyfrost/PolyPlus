@@ -124,12 +124,13 @@ object FeaturedServers {
     }
 
     @JvmStatic
-    fun dismissMultiplayer(campaignId: String) {
+    @JvmOverloads
+    fun dismissMultiplayer(campaignId: String, force: Boolean = false) {
         if (campaignId.isBlank()) return
         ensureLoaded()
         synchronized(lock) {
             if (campaignId in _state.value.multiplayerDismissedCampaignIds) return
-            if (!_state.value.isMultiplayerDismissible(campaignId)) return
+            if (!force && !_state.value.isMultiplayerDismissible(campaignId)) return
             val multiplayerDismissed = _state.value.multiplayerDismissedCampaignIds + campaignId
             publishLocked(
                 _state.value.servers,
@@ -168,7 +169,7 @@ object FeaturedServers {
         val campaign = snapshot().visibleServers()
             .firstOrNull { normalizeServerAddress(it.address) == normalized }
             ?.featured ?: return
-        dismissMultiplayer(campaign.campaignId)
+        dismissMultiplayer(campaign.campaignId, force = true)
     }
 
     @JvmStatic

@@ -674,9 +674,9 @@ private fun MainMenu(
                 }
                 FeaturedServerCard(
                     Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 50.dp, bottom = 56.dp)
-                        .guiScaled(scale, TransformOrigin(0f, 1f)),
+                        .align(Alignment.TopStart)
+                        .padding(start = 50.dp, top = 50.dp)
+                        .guiScaled(scale, TransformOrigin(0f, 0f)),
                     assetsReady,
                     pingTick,
                     actions,
@@ -958,7 +958,7 @@ private fun FeaturedServerCard(modifier: Modifier, assetsReady: Boolean, pingTic
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            CardText("SPONSORED", 11.sp, TextSecondary, FontWeight.Bold, letterSpacing = 0.8.sp)
+            CardText("SPONSORED", 11.sp, TextSecondary, FontWeight.Medium, letterSpacing = 0.8.sp)
             Spacer(Modifier.weight(1f))
             if (MainMenuFeaturedServer.isDismissible(server)) {
                 DismissButton(assetsReady) { MainMenuFeaturedServer.dismiss(server) }
@@ -1041,11 +1041,12 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(34.dp)
             .clip(ppShape(6.dp))
-            .background(Accent)
+            .background(PanelBackground)
+            .border(BorderWidth, PanelBorderBrush, ppShape(6.dp))
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        MenuText(label, fontSize = 15.sp, color = Color.White, maxLines = 1)
+        MenuText(label, fontSize = 15.sp, color = TextPrimary, maxLines = 1)
     }
 }
 

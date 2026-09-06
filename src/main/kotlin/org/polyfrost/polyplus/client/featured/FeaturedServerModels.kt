@@ -107,7 +107,7 @@ data class FeaturedServersSnapshot(
         activeFeaturedServers(nowMillis) { !it.dismissibleInMainMenu || it.campaignId !in mainMenuDismissedCampaignIds }
 
     fun featuredServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> =
-        activeFeaturedServers(nowMillis) { !it.dismissibleInServerList || it.campaignId !in multiplayerDismissedCampaignIds }
+        activeFeaturedServers(nowMillis) { it.campaignId !in multiplayerDismissedCampaignIds }
 
     private inline fun activeFeaturedServers(
         nowMillis: Long,
@@ -129,9 +129,7 @@ data class FeaturedServersSnapshot(
 
     fun isMultiplayerRestorable(server: FeaturedServer, nowMillis: Long = System.currentTimeMillis()): Boolean {
         val campaign = server.featured ?: return false
-        return campaign.dismissibleInServerList &&
-            campaign.isActive(nowMillis) &&
-            campaign.campaignId in multiplayerDismissedCampaignIds
+        return campaign.isActive(nowMillis) && campaign.campaignId in multiplayerDismissedCampaignIds
     }
 
     fun sponsoredServers(nowMillis: Long = System.currentTimeMillis()): List<FeaturedServer> {

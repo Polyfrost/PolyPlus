@@ -46,7 +46,7 @@ public abstract class MixinJoinMultiplayerScreen {
         var row = FeaturedServerRowRegistry.get(serverSelectionList.getSelected());
         if (row == null) return;
         if (editButton != null) editButton.active = false;
-        if (deleteButton != null) deleteButton.active = false;
+        if (deleteButton != null) deleteButton.active = !row.header();
         if (selectButton != null) selectButton.active = !row.header();
     }
 

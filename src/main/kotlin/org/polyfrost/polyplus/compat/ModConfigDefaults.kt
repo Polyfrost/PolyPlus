@@ -36,7 +36,7 @@ object ModConfigDefaults {
 
     internal val DEFAULTS = listOf(
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_entity_renderers", true),
-        Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_resources", true),
+        Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_resources", false),
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.faster_item_rendering", true),
         Default("ferritecore", "ferritecore.mixin.properties", "useSmallThreadingDetector", true),
         Default("vmp", "vmp.properties", "show_async_loading_messages", false),
