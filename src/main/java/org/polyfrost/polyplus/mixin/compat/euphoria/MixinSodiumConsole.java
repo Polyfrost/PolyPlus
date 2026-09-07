@@ -5,8 +5,12 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 
+// SodiumConsole moved from `integration` to `integration.sodium` in EuphoriaPatcher 1.10.0; keep both.
 @Pseudo
-@Mixin(targets = "com.euphoriapatches.euphoria_patcher.integration.SodiumConsole", remap = false)
+@Mixin(targets = {
+        "com.euphoriapatches.euphoria_patcher.integration.sodium.SodiumConsole",
+        "com.euphoriapatches.euphoria_patcher.integration.SodiumConsole"
+}, remap = false)
 public class MixinSodiumConsole {
     @WrapMethod(
             method = "logMessage(IILjava/lang/String;)V",
