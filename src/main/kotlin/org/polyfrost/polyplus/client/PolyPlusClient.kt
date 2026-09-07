@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.ServerResponseException
@@ -11,6 +12,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.request
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.userAgent
@@ -89,6 +91,15 @@ object PolyPlusClient {
         install(HttpTimeout) {
             connectTimeoutMillis = 15_000
             socketTimeoutMillis = 30_000
+        }
+
+        install(HttpRequestRetry) {
+            maxRetries = 2
+            retryIf { _, _ -> false }
+            retryOnExceptionIf { request, cause ->
+                cause is java.io.IOException && (request.method == HttpMethod.Get || request.method == HttpMethod.Head)
+            }
+            constantDelay(millis = 250, randomizationMs = 250)
         }
 
         install(WebSockets) {

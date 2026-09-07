@@ -12,6 +12,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.GroupsApi
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
+import org.polyfrost.polyplus.client.network.http.responses.GroupLastMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
@@ -159,7 +160,23 @@ object GroupsRepository : EarlyInitializable {
     private fun appendOrReplace(groupId: Int, message: GroupMessage) {
         val flow = messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
         flow.value = (flow.value.filterNot { it.id == message.id } + message).sortedBy { it.id }
-        refreshGroups()
+        touchGroupSummary(groupId, message)
+    }
+
+    private fun touchGroupSummary(groupId: Int, message: GroupMessage) {
+        if (isPending(message.id)) return
+        val newest = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }
+        if (newest != null && newest.id != message.id) return
+        val existing = _groups.value.firstOrNull { it.id == groupId }
+        if (existing == null) {
+            refreshGroups()
+            return
+        }
+        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
+        _groups.value = _groups.value.map {
+            if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || message.sender != selfId) else it
+        }
     }
 
     private fun removeMessage(groupId: Int, messageId: Long) {
