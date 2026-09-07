@@ -13,7 +13,9 @@ import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
     private val LOGGER = LogManager.getLogger()
     private val bridge: EosSdkBridge
-        get() = requireNotNull(EosP2PChannel.Holder.bridge) { "EosP2PServerChannel used before P2PSessionManager.install() was called" }
+        get() = requireNotNull(bridgeOrNull) { "EosP2PServerChannel used before P2PSessionManager.install() was called" }
+
+    private val bridgeOrNull: EosSdkBridge? get() = EosP2PChannel.Holder.bridge
 
     private val config = EosP2PChannelConfig(this)
 
@@ -55,6 +57,7 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
     override fun doClose() {
         open = false
         active = false
+        val bridge = bridgeOrNull ?: return
         requestHandle?.let(bridge::removeNotificationHandler)
         localSocket?.let { socket -> bridge.closeConnection(socket, null) }
     }

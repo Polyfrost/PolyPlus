@@ -548,7 +548,13 @@ object PolyPlusSentry {
     }
 
     @JvmStatic
-    fun captureStalledThread(thread: Thread, stack: Array<StackTraceElement>, description: String) {
+    @JvmOverloads
+    fun captureStalledThread(
+        thread: Thread,
+        stack: Array<StackTraceElement>,
+        description: String,
+        alsoInSdk: Map<Thread, Array<StackTraceElement>> = emptyMap(),
+    ) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         val hub = activeHub() ?: return
@@ -557,11 +563,19 @@ object PolyPlusSentry {
         val event = SentryEvent(stalled)
         event.setTag("mechanism", "thread_stall")
         event.setTag(TAG_THREAD, thread.name)
-        event.fingerprints = listOfNotNull(
-            "thread_stall",
-            thread.name,
-            stack.firstOrNull()?.let { "${it.className}.${normalizeMethodName(it.methodName)}" },
-        )
+        stack.firstOrNull()?.let {
+            event.setTag("stall_site", "${it.className}.${normalizeMethodName(it.methodName)}")
+        }
+        if (alsoInSdk.isNotEmpty()) {
+            event.setTag("stall_peers", alsoInSdk.size.toString())
+            event.setExtra(
+                "threads_in_eos_sdk",
+                alsoInSdk.entries.joinToString("\n\n") { (peer, peerStack) ->
+                    peerStack.joinToString("\n\tat ", prefix = "${peer.name} (${peer.state}):\n\tat ")
+                },
+            )
+        }
+        event.fingerprints = listOf("thread_stall", thread.name)
         hub.captureEvent(event)
     }
 

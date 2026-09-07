@@ -44,6 +44,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
     @Volatile private var tickThread: Thread? = null
     @Volatile private var running = false
+    @Volatile private var abandoned = false
     private val starting = AtomicBoolean(false)
 
     private class PendingCall(val run: () -> Unit, val abandon: () -> Unit)
@@ -84,9 +85,13 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
         @Volatile private var sdkRetired = false
 
+        @Volatile private var sdkPoisoned = false
+
         internal fun markSdkRetired() {
             sdkRetired = true
         }
+
+        internal val isSdkRetired: Boolean get() = sdkRetired
 
         private const val STARTUP_TIMEOUT_SECONDS = 10L
         private const val EOS_CALL_TIMEOUT_SECONDS = 30L
@@ -162,9 +167,25 @@ class EosSdkBridgeImpl : EosSdkBridge {
         if (worker != null && worker.isAlive) {
             logger.warn("The EOS tick thread did not stop within {}ms; leaving it to finish on its own", SHUTDOWN_TIMEOUT_MS)
         } else {
-            teardown()
+            teardown(retireSdk = !abandoned)
             rejectPendingCalls()
         }
+        startupSettled.countDown()
+    }
+
+    fun abandon() {
+        val worker = synchronized(pendingCalls) {
+            if (abandoned) return
+            abandoned = true
+            sdkPoisoned = true
+            stopped = true
+            running = false
+            tickThread
+        }
+        logger.warn("Abandoning a stalled EOS platform, leaking its native resources until the game exits")
+        detachHandlers()
+        rejectPendingCalls()
+        worker?.let(java.util.concurrent.locks.LockSupport::unpark)
         startupSettled.countDown()
     }
 
@@ -277,7 +298,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         }
         runCatching { pump() }.onFailure { logger.warn("The final EOS tick before shutdown failed", it) }
         rejectPendingCalls()
-        teardown()
+        teardown(retireSdk = !abandoned)
     }
 
     private fun pump() {
@@ -347,7 +368,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
     }
 
     @Synchronized
-    private fun teardown() {
+    private fun teardown(retireSdk: Boolean = true) {
         localUser = null
         hookedUser = null
         loginWatchInstalled.set(false)
@@ -362,8 +383,15 @@ class EosSdkBridgeImpl : EosSdkBridge {
 
         if (sdkInitialized) {
             sdkInitialized = false
-            sdkRetired = true
-            runCatching { Eos.shutdown() }.onFailure { logger.warn("Shutting the EOS SDK down failed", it) }
+            when {
+                !retireSdk -> Unit
+                sdkPoisoned ->
+                    logger.warn("Not shutting the EOS SDK down; an abandoned platform from this process is still open")
+                else -> {
+                    sdkRetired = true
+                    runCatching { Eos.shutdown() }.onFailure { logger.warn("Shutting the EOS SDK down failed", it) }
+                }
+            }
         }
         if (logTarget === this) logTarget = null
     }

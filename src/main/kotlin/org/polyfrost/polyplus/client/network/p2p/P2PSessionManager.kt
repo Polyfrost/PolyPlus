@@ -78,6 +78,10 @@ object P2PSessionManager : EarlyInitializable {
     private const val AUTH_READY_TIMEOUT_MS = 15_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
     private const val CHANNEL_CLOSE_TIMEOUT_MS = 250L
+    private const val MAX_STALL_RECOVERIES = 2
+    private const val STALL_RESTART_READY_TIMEOUT_MS = 20_000L
+    private const val EOS_SDK_PACKAGE = "gg.sona.eos"
+    private const val STALL_UNRECOVERABLE = "Poly+ multiplayer stopped responding. Restart your game, and if you see this message, please report it at https://polyfrost.org/discord."
 
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
 
@@ -229,6 +233,7 @@ object P2PSessionManager : EarlyInitializable {
     }
 
     private var stallReported = false
+    private var stallRecoveries = 0
     private var lastStallCheckMs = 0L
     private var suppressStallUntilMs = 0L
 
@@ -254,19 +259,105 @@ object P2PSessionManager : EarlyInitializable {
         if (stallReported) return
 
         stallReported = true
-        val stuck = Thread.getAllStackTraces().entries.firstOrNull { it.key.name == EosTickHealth.THREAD_NAME }
+        val threads = Thread.getAllStackTraces()
+        val stuck = threads.entries.firstOrNull { it.key.name == EosTickHealth.THREAD_NAME }
+        val alsoInSdk = threads
+            .filterKeys { it.name != EosTickHealth.THREAD_NAME }
+            .filterValues { stack -> stack.any { it.className.startsWith(EOS_SDK_PACKAGE) } }
         val description = "${EosTickHealth.THREAD_NAME} hasn't ticked in over ${EosTickHealth.STALL_THRESHOLD_MS}ms"
         LOGGER.error(
-            "{}; P2P hosting and joining are dead until the game restarts.\n{}",
+            "{}.\n{}{}",
             description,
-            stuck?.value?.joinToString("\n\tat ", prefix = "Stuck ${EosTickHealth.THREAD_NAME} thread:\n\tat ")
+            stuck?.value?.let { renderStack("Stuck ${EosTickHealth.THREAD_NAME} thread", it) }
                 ?: "The ${EosTickHealth.THREAD_NAME} thread is gone entirely.",
+            alsoInSdk.entries.joinToString("") { (thread, stack) ->
+                "\n" + renderStack("Thread ${thread.name} is also inside the EOS SDK", stack)
+            },
         )
-        stuck?.let { (thread, stack) -> PolyPlusSentry.captureStalledThread(thread, stack, description) }
-        _status.value = EosStatus.Failed(
-            "Poly+ multiplayer stopped responding. Restart your game, and if you see this message, " +
-                "please report it at discord.gg/polyfrost or in Wyvest's OneClient DMs so we can fix this!",
-        )
+        stuck?.let { (thread, stack) -> PolyPlusSentry.captureStalledThread(thread, stack, description, alsoInSdk) }
+
+        if (!restartStalledEos(bridge)) {
+            _status.value = EosStatus.Failed(STALL_UNRECOVERABLE)
+        }
+    }
+
+    private fun renderStack(label: String, stack: Array<StackTraceElement>): String =
+        stack.joinToString("\n\tat ", prefix = "$label:\n\tat ")
+
+    private fun restartStalledEos(stalled: EosSdkBridge): Boolean {
+        if (stalled !is EosSdkBridgeImpl) return false
+        if (EosSdkBridgeImpl.isSdkRetired) return false
+        if (!PrivacyConsent.allowsOnlineServices()) return false
+        if (stallRecoveries >= MAX_STALL_RECOVERIES) {
+            LOGGER.error("Not restarting EOS again after {} stall(s) this session", stallRecoveries)
+            return false
+        }
+
+        synchronized(consentLock) {
+            if (bridge !== stalled || starting) return false
+            stallRecoveries++
+            starting = true
+            bridge = null
+            stallReported = false
+            EosVoicechatBridge.uninstall()
+            P2PPackTransport.uninstall()
+            _status.value = EosStatus.Connecting
+        }
+
+        LOGGER.warn("Restarting EOS after a stalled tick thread ({} of {})", stallRecoveries, MAX_STALL_RECOVERIES)
+        stopHosting()
+        stalled.abandon()
+
+        PolyPlusClient.SCOPE.launch {
+            withContext(Dispatchers.IO) {
+                closeLiveConnections()
+                EosP2PChannel.Holder.bridge = null
+            }
+
+            val candidate = EosSdkBridgeImpl()
+            val started = runCatching {
+                withContext(Dispatchers.IO) { candidate.takeIf { it.initialize() } }
+            }.onFailure { LOGGER.error("Could not restart EOS after a stall", it) }.getOrNull()
+
+            if (started == null) {
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { candidate.shutdown() }
+            }
+
+            val abandoned = synchronized(consentLock) {
+                starting = false
+                when {
+                    started == null -> {
+                        _status.value = EosStatus.Failed(STALL_UNRECOVERABLE)
+                        false
+                    }
+                    PrivacyConsent.allowsOnlineServices() -> {
+                        install(started)
+                        false
+                    }
+                    else -> {
+                        shutDownForConsent = true
+                        true
+                    }
+                }
+            }
+            if (started == null) return@launch
+            if (abandoned) {
+                LOGGER.info("Consent was withdrawn while EOS was restarting, shutting it back down.")
+                withContext(Dispatchers.IO) { started.shutdown() }
+            } else {
+                awaitRestartedReadiness(started)
+            }
+        }
+        return true
+    }
+
+    private suspend fun awaitRestartedReadiness(restarted: EosSdkBridge) {
+        val settled = withTimeoutOrNull(STALL_RESTART_READY_TIMEOUT_MS.milliseconds) {
+            status.first { it == EosStatus.Ready || it is EosStatus.Failed }
+        }
+        if (settled != null || !isCurrent(restarted)) return
+        LOGGER.error("The restarted EOS bridge never came up within {}ms; multiplayer needs a game restart", STALL_RESTART_READY_TIMEOUT_MS)
+        _status.value = EosStatus.Failed(STALL_UNRECOVERABLE)
     }
 
     fun reconnect() {
