@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
+import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -137,6 +138,7 @@ object PolyPlusClient {
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
+        step("jvm advisor") { JvmAdvisor.initialize() }
         step("login gate") { MinecraftLoginGate.register() }
         step("featured servers") { FeaturedServers.warmUp() }
 

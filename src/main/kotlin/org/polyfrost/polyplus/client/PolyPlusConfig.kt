@@ -44,6 +44,16 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var adaptiveBlurApplied = false
 
     @JvmStatic @Include
+    var jvmAdviceShownAt = 0L
+
+    @JvmStatic
+    @Switch(
+        title = "RAM Analysis Notifications",
+        description = "Check how much memory this pack actually needs and suggest a change when the current allocation is hurting performance. Shown at most once every two days.",
+    )
+    var ramAdviceNotifications = true
+
+    @JvmStatic @Include
     var onboardingLightTheme = false
 
     @JvmStatic @Include
