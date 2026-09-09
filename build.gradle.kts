@@ -208,7 +208,10 @@ dependencies {
 
     compileOnly("com.nikoverflow:exploit-preventer-api:1.0.0")
 
-    modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion")
+    modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion") {
+        // Loom strips the nested Kotlin jars from a remapped copy, so the plain copy above must stay the only candidate
+        exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
+    }
     for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
