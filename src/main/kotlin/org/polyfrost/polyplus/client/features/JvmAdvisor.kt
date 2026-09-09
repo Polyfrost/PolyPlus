@@ -2,6 +2,8 @@ package org.polyfrost.polyplus.client.features
 
 import java.lang.management.ManagementFactory
 import java.lang.management.MemoryType
+import java.nio.file.Files
+import java.nio.file.Paths
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -21,7 +23,6 @@ object JvmAdvisor {
     const val PRESSURE_NORMAL = 1
     const val PRESSURE_WARN = 2
     const val PRESSURE_CRITICAL = 4
-    const val SWAP_PRESSURE_MB = 512L
     const val RESERVED_SYSTEM_MB = 2048L
     const val HEAP_TIGHT_RATIO = 0.70
     const val HEAP_LOOSE_RATIO = 0.35
@@ -31,7 +32,11 @@ object JvmAdvisor {
     const val ZGC_MIN_HEAP_MB = 8192L
     const val MIN_GC_SPIKE_RATIO = 0.5
     const val HEAP_STEP_MB = 2048L
+    const val LINUX_PSI_PERCENT = 10.0
+    const val WINDOWS_LOAD_WARN = 90
+    const val WINDOWS_LOAD_CRITICAL = 95
     private const val MAC_PRESSURE_SYSCTL = "kern.memorystatus_vm_pressure_level"
+    private const val LINUX_PSI_PATH = "/proc/pressure/memory"
     private const val SAMPLE_WINDOW_MS = 5L * 60L * 1000L
     private const val WARMUP_FRAMES = 120L
     private const val SPIKE_FACTOR = 2.0
@@ -46,7 +51,6 @@ object JvmAdvisor {
     data class HostMemory(
         val totalMb: Long,
         val availableMb: Long,
-        val swapUsedMb: Long,
         val pressure: Int,
     )
 
@@ -72,7 +76,7 @@ object JvmAdvisor {
     fun evaluate(s: Snapshot): Advice? {
         val host = s.host
 
-        if (host != null && (host.swapUsedMb >= SWAP_PRESSURE_MB || host.pressure >= PRESSURE_WARN)) {
+        if (host != null && host.pressure >= PRESSURE_WARN) {
             val footprintMb = s.maxHeapMb + s.nonHeapMb
             val budgetMb = host.totalMb - RESERVED_SYSTEM_MB
             if (budgetMb > 0 && footprintMb > budgetMb) {
@@ -278,17 +282,49 @@ object JvmAdvisor {
     private fun hostMemory(): HostMemory? = runCatching {
         val mb = 1024L * 1024L
         val memory = SystemInfo().hardware.memory
+        val totalMb = memory.total / mb
+        val availableMb = memory.available / mb
         HostMemory(
-            totalMb = memory.total / mb,
-            availableMb = memory.available / mb,
-            swapUsedMb = memory.virtualMemory.swapUsed / mb,
-            pressure = macPressure(),
+            totalMb = totalMb,
+            availableMb = availableMb,
+            pressure = systemPressure(totalMb, availableMb),
         )
     }.onFailure { logger.warn("Could not read host memory", it) }.getOrNull()
 
-    private fun macPressure(): Int {
-        if (!System.getProperty("os.name", "").startsWith("Mac")) return PRESSURE_UNKNOWN
-        return runCatching { SysctlUtil.sysctl(MAC_PRESSURE_SYSCTL, PRESSURE_UNKNOWN) }
-            .getOrDefault(PRESSURE_UNKNOWN)
+    private fun systemPressure(totalMb: Long, availableMb: Long): Int {
+        val os = System.getProperty("os.name", "")
+        return runCatching {
+            when {
+                os.startsWith("Mac") -> SysctlUtil.sysctl(MAC_PRESSURE_SYSCTL, PRESSURE_UNKNOWN)
+                os.startsWith("Linux") -> linuxPressure(Files.readString(Paths.get(LINUX_PSI_PATH)))
+                os.startsWith("Windows") -> loadPressure(totalMb, availableMb)
+                else -> PRESSURE_UNKNOWN
+            }
+        }.getOrDefault(PRESSURE_UNKNOWN)
+    }
+
+    @JvmStatic
+    fun linuxPressure(psi: String): Int {
+        val avg300 = Regex("""^(some|full) .*\bavg300=([0-9.]+)""", RegexOption.MULTILINE)
+            .findAll(psi)
+            .associate { it.groupValues[1] to it.groupValues[2].toDouble() }
+        val some = avg300["some"] ?: return PRESSURE_UNKNOWN
+        val full = avg300["full"] ?: return PRESSURE_UNKNOWN
+        return when {
+            full >= LINUX_PSI_PERCENT -> PRESSURE_CRITICAL
+            some >= LINUX_PSI_PERCENT -> PRESSURE_WARN
+            else -> PRESSURE_NORMAL
+        }
+    }
+
+    @JvmStatic
+    fun loadPressure(totalMb: Long, availableMb: Long): Int {
+        if (totalMb <= 0) return PRESSURE_UNKNOWN
+        val load = 100 - 100 * availableMb / totalMb
+        return when {
+            load >= WINDOWS_LOAD_CRITICAL -> PRESSURE_CRITICAL
+            load >= WINDOWS_LOAD_WARN -> PRESSURE_WARN
+            else -> PRESSURE_NORMAL
+        }
     }
 }
