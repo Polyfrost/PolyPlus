@@ -9,6 +9,7 @@ import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
+import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import org.polyfrost.polyplus.client.PolyPlusConfig
 
 object OnboardingFeatures {
@@ -97,7 +98,7 @@ object OnboardingFeatures {
             light -> PolyGlassLight
             else -> PolyGlassDark
         }
-        ThemeRegistry.activate(theme)
+        ThemeRegistry.activate(ThemeBrandingUtil.branded(theme))
     }
 
     private fun applyToggleSprint(enabled: Boolean) {
