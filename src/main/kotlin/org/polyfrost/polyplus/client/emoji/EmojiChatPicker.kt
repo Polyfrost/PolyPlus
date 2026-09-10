@@ -6,6 +6,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
 import java.util.function.Consumer
+import org.polyfrost.polyplus.compat.ChattingButtonRow
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?} else {
@@ -24,6 +25,7 @@ class EmojiChatPicker {
 
     private var buttonX = 0
     private var buttonY = 0
+    private var buttonSize = BUTTON
     private var panelX = 0
     private var panelY = 0
     private var columns = MIN_COLUMNS
@@ -37,9 +39,11 @@ class EmojiChatPicker {
     fun layout(inputX: Int, inputY: Int, inputWidth: Int) {
         columns = ((inputWidth - PADDING * 2 - SCROLLBAR) / CELL).coerceIn(MIN_COLUMNS, MAX_COLUMNS)
         val boxTop = inputY - CHAT_BOX_INSET
-        buttonX = (inputX + inputWidth - BUTTON - GAP).coerceAtLeast(0)
-        buttonY = (boxTop - GAP - BUTTON).coerceAtLeast(0)
-        panelX = inputX.coerceAtMost(buttonX + BUTTON - panelWidth()).coerceAtLeast(0)
+        val slot = ChattingButtonRow.slot()
+        buttonSize = if (slot != null) ChattingButtonRow.SIZE else BUTTON
+        buttonX = (slot?.x ?: (inputX + inputWidth - BUTTON - GAP)).coerceAtLeast(0)
+        buttonY = (slot?.y ?: (boxTop - GAP - BUTTON)).coerceAtLeast(0)
+        panelX = inputX.coerceAtMost(buttonX + buttonSize - panelWidth()).coerceAtLeast(0)
         panelY = (buttonY - GAP - panelHeight()).coerceAtLeast(0)
     }
 
@@ -91,12 +95,12 @@ class EmojiChatPicker {
     fun render(graphics: PickerGraphics, font: Font, mouseX: Int, mouseY: Int) {
         if (!EmojiRegistry.enabled()) return
         renderButton(graphics, font, mouseX, mouseY)
-        if (isOpen) renderPanel(graphics, font, mouseX, mouseY)
+        if (isOpen) renderPanel(graphics, font, mouseX, mouseY) else if (buttonHovered) renderTooltip(graphics, font)
     }
 
     fun mouseClicked(mouseX: Double, mouseY: Double, button: Int, shiftDown: Boolean, onPick: Consumer<String>): Boolean {
         if (!EmojiRegistry.enabled() || button != 0) return false
-        if (inRect(mouseX, mouseY, buttonX, buttonY, BUTTON, BUTTON)) {
+        if (inRect(mouseX, mouseY, buttonX, buttonY, buttonSize, buttonSize)) {
             toggle()
             return true
         }
@@ -147,15 +151,29 @@ class EmojiChatPicker {
     }
 
     private fun renderButton(graphics: PickerGraphics, font: Font, mouseX: Int, mouseY: Int) {
-        val hovered = inRect(mouseX.toDouble(), mouseY.toDouble(), buttonX, buttonY, BUTTON, BUTTON)
+        val hovered = inRect(mouseX.toDouble(), mouseY.toDouble(), buttonX, buttonY, buttonSize, buttonSize)
         if (hovered && !buttonHovered) buttonGlyph = randomGlyph()
         buttonHovered = hovered
-        graphics.fill(buttonX, buttonY, buttonX + BUTTON, buttonY + BUTTON, background())
-        if (hovered || isOpen) {
-            graphics.fill(buttonX, buttonY, buttonX + BUTTON, buttonY + BUTTON, HIGHLIGHT)
+        val highlighted = hovered || isOpen
+        val chatting = ChattingButtonRow.background(highlighted)
+        graphics.fill(buttonX, buttonY, buttonX + buttonSize, buttonY + buttonSize, chatting ?: background())
+        if (chatting == null && highlighted) {
+            graphics.fill(buttonX, buttonY, buttonX + buttonSize, buttonY + buttonSize, HIGHLIGHT)
         }
         val glyph = buttonGlyph ?: defaultGlyph() ?: return
-        drawGlyph(graphics, font, glyph, buttonX, buttonY)
+        drawGlyph(graphics, font, glyph, buttonX, buttonY, buttonSize)
+    }
+
+    private fun renderTooltip(graphics: PickerGraphics, font: Font) {
+        val window = Minecraft.getInstance().window
+        val textWidth = font.width(TOOLTIP)
+        val x = (buttonX + (buttonSize - textWidth) / 2)
+            .coerceIn(TOOLTIP_MARGIN, (window.guiScaledWidth - textWidth - TOOLTIP_MARGIN).coerceAtLeast(TOOLTIP_MARGIN))
+        val y = (buttonY - TOOLTIP_HEIGHT - TOOLTIP_GAP)
+            .coerceIn(TOOLTIP_MARGIN, (window.guiScaledHeight - TOOLTIP_HEIGHT - 6).coerceAtLeast(TOOLTIP_MARGIN))
+        graphics.fill(x - 4, y - 3, x + textWidth + 4, y + TOOLTIP_HEIGHT + 3, TOOLTIP_BACKGROUND)
+        graphics.fill(x - 3, y - 4, x + textWidth + 3, y + TOOLTIP_HEIGHT + 4, TOOLTIP_BACKGROUND)
+        drawString(graphics, font, TOOLTIP, x, y, SELECTED_TEXT_COLOR)
     }
 
     private fun renderPanel(graphics: PickerGraphics, font: Font, mouseX: Int, mouseY: Int) {
@@ -235,10 +253,32 @@ class EmojiChatPicker {
         return (scrollRow + row) * columns + col
     }
 
-    private fun drawGlyph(graphics: PickerGraphics, font: Font, glyph: String, cellX: Int, cellY: Int) {
+    private fun drawGlyph(graphics: PickerGraphics, font: Font, glyph: String, cellX: Int, cellY: Int, cell: Int = CELL) {
         val component = EmojiFont.glyph(glyph, Style.EMPTY)
-        val width = font.width(component)
-        drawText(graphics, font, component.visualOrderText, cellX + (CELL - width) / 2, cellY + 2, -1)
+        val seq = component.visualOrderText
+        val scale = if (cell < CELL) (cell - GLYPH_INSET * 2).toFloat() / GLYPH else 1f
+        if (scale == 1f) {
+            val width = font.width(component)
+            drawText(graphics, font, seq, cellX + (cell - width) / 2, cellY + (cell - GLYPH + 1) / 2, -1)
+            return
+        }
+        val inset = (cell - GLYPH * scale) / 2f
+        val x = cellX + inset
+        val y = cellY + inset + GLYPH_RISE * scale
+        val pose = graphics.pose()
+        //? if >= 1.21.6 {
+        pose.pushMatrix()
+        pose.translate(x, y)
+        pose.scale(scale, scale)
+        drawText(graphics, font, seq, 0, 0, -1)
+        pose.popMatrix()
+        //?} else {
+        /*pose.pushPose()
+        pose.translate(x.toDouble(), y.toDouble(), 0.0)
+        pose.scale(scale, scale, 1f)
+        drawText(graphics, font, seq, 0, 0, -1)
+        pose.popPose()
+        *///?}
     }
 
     private fun drawString(graphics: PickerGraphics, font: Font, text: String, x: Int, y: Int, color: Int) {
@@ -288,6 +328,9 @@ class EmojiChatPicker {
 
     private companion object {
         const val CELL = 12
+        const val GLYPH = 9
+        const val GLYPH_INSET = 1
+        const val GLYPH_RISE = 1f
         const val LINE = 12
         const val ROWS = 7
         const val MIN_COLUMNS = 8
@@ -302,6 +345,11 @@ class EmojiChatPicker {
         const val CARET_PERIOD = 1000L
         const val SECTION_SIGN = '§'
         const val HINT = "search emoji"
+        const val TOOLTIP = "Emoji Picker"
+        const val TOOLTIP_HEIGHT = 8
+        const val TOOLTIP_GAP = 8
+        const val TOOLTIP_MARGIN = 4
+        const val TOOLTIP_BACKGROUND = 0xF0100010.toInt()
         const val EMPTY_LABEL = "no emoji"
         const val NO_MATCH = "no matches"
         const val KEY_ESCAPE = 256
