@@ -10,6 +10,7 @@ object P2PConnectionContext {
     @JvmStatic
     fun hasPendingJoin(): Boolean = pendingTarget != null
 
+    @JvmStatic
     fun clearPendingJoin() {
         pendingTarget = null
     }

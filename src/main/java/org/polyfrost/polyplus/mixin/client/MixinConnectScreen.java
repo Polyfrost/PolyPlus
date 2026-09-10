@@ -8,6 +8,7 @@ import net.minecraft.client.multiplayer.TransferState;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.polyfrost.polyplus.client.PolyPlusRecentServers;
 import org.polyfrost.polyplus.client.launcher.SessionRefresh;
+import org.polyfrost.polyplus.client.network.p2p.P2PConnectionContext;
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,8 +28,11 @@ public class MixinConnectScreen {
         CallbackInfo ci
     ) {
         SessionRefresh.onConnectStarted(screen, address, serverData, quickPlay, transferState);
-        if (serverData != null && !P2PSessionManager.P2P_PLACEHOLDER_IP.equals(serverData.ip)) {
-            PolyPlusRecentServers.record(serverData.name, serverData.ip);
+        if (serverData == null || !P2PSessionManager.P2P_PLACEHOLDER_IP.equals(serverData.ip)) {
+            P2PConnectionContext.clearPendingJoin();
+            if (serverData != null) {
+                PolyPlusRecentServers.record(serverData.name, serverData.ip);
+            }
         }
     }
 }
