@@ -107,12 +107,14 @@ object PolyAuthorization {
         return job
     }
 
-    private suspend fun authorize(): Authorized = MinecraftLoginGate.whileNotLoggingIn(LOGIN_GATE_TIMEOUT_MS) {
+    private suspend fun authorize(): Authorized {
         val user = Minecraft.getInstance().user
         val profileId = user.profileId
         val playerName = user.name
         val serverId = generateServerId()
-        authorizeSessionService(serverId, profileId, user.accessToken)
+        MinecraftLoginGate.whileNotLoggingIn(LOGIN_GATE_TIMEOUT_MS) {
+            authorizeSessionService(serverId, profileId, user.accessToken)
+        }
         val response = PolyPlusClient.HTTP
             .post("${PolyPlusConfig.apiUrl}/account/login") {
                 expectSuccess = true
@@ -127,7 +129,7 @@ object PolyAuthorization {
             }
             .bodyOrThrow<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
-        Authorized(profileId, response)
+        return Authorized(profileId, response)
     }
 
     private const val LOADER =

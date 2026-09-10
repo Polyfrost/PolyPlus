@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 object MinecraftLoginGate {
-    private const val MAX_HOLD_MS = 20_000L
+    internal const val MAX_HOLD_MS = 20_000L
 
-    private const val LOGIN_WAIT_MS = 10_000L
+    private const val LOGIN_WAIT_MS = 2_000L
 
     private const val POLL_MS = 25L
 
@@ -35,6 +35,7 @@ object MinecraftLoginGate {
             loginDepth.set(depth + 1)
             return true
         }
+        releaseStaleHold()
         val held = try {
             gate.tryAcquire(LOGIN_WAIT_MS, TimeUnit.MILLISECONDS)
         } catch (interrupted: InterruptedException) {
@@ -62,6 +63,10 @@ object MinecraftLoginGate {
         if (awaitingOutcome.compareAndSet(true, false)) gate.release()
     }
 
+    internal fun releaseStaleHold(now: Long = System.currentTimeMillis()) {
+        if (awaitingOutcome.get() && now >= holdUntilMs) loginSettled()
+    }
+
     suspend fun <T> whileNotLoggingIn(timeoutMs: Long, block: suspend () -> T): T {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -72,7 +77,7 @@ object MinecraftLoginGate {
                     gate.release()
                 }
             }
-            if (awaitingOutcome.get() && System.currentTimeMillis() >= holdUntilMs) loginSettled()
+            releaseStaleHold()
             delay(POLL_MS)
         }
         return block()

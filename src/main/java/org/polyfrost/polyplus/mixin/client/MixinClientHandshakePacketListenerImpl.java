@@ -20,25 +20,21 @@ public class MixinClientHandshakePacketListenerImpl {
     @WrapMethod(method = "authenticateServer")
     private Component polyplus$refreshExpiredSession(String digest, Operation<Component> original) {
         SessionRefresh.beforeAuthenticate();
-        Component error = polyplus$authenticate(digest, original);
-        boolean disconnects = this.serverData == null || !this.serverData.isLan();
-        if (error == null || !disconnects || !SessionRefresh.isInvalidSession(error)) {
-            return error;
-        }
-        while (SessionRefresh.refreshAfterRejection()) {
-            error = polyplus$authenticate(digest, original);
-            if (error == null || !SessionRefresh.isInvalidSession(error)) {
-                return error;
-            }
-        }
-        SessionRefresh.onInvalidSession();
-        return error;
-    }
-
-    private Component polyplus$authenticate(String digest, Operation<Component> original) {
         boolean held = MinecraftLoginGate.begin();
         try {
-            return original.call(digest);
+            Component error = original.call(digest);
+            boolean disconnects = this.serverData == null || !this.serverData.isLan();
+            if (error == null || !disconnects || !SessionRefresh.isInvalidSession(error)) {
+                return error;
+            }
+            while (SessionRefresh.refreshAfterRejection()) {
+                error = original.call(digest);
+                if (error == null || !SessionRefresh.isInvalidSession(error)) {
+                    return error;
+                }
+            }
+            SessionRefresh.onInvalidSession();
+            return error;
         } finally {
             MinecraftLoginGate.end(held);
         }

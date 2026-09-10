@@ -67,4 +67,15 @@ class MinecraftLoginGateTest {
         MinecraftLoginGate.end(held)
         MinecraftLoginGate.loginSettled()
     }
+
+    @Test
+    fun `a login that never settles cannot shut the gate for good`() = runBlocking {
+        val held = MinecraftLoginGate.begin()
+        assertTrue(held, "an idle gate must let the login in")
+        MinecraftLoginGate.end(held)
+        assertNull(authorizeWithin(200L), "the hold must stand while the outcome is still pending")
+
+        MinecraftLoginGate.releaseStaleHold(System.currentTimeMillis() + MinecraftLoginGate.MAX_HOLD_MS + 1)
+        assertEquals("authorized", authorizeWithin(1_000L), "a hold past its deadline must be reclaimed")
+    }
 }
