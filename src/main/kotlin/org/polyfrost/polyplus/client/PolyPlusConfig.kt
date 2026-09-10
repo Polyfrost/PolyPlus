@@ -29,6 +29,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var appliedDefaults = ""
 
     @JvmStatic @Include
+    var modOrderSeed = ""
+
+    @JvmStatic @Include
     var onboardingCompleted = false
 
     @JvmStatic @Include

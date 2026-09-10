@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.features
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,11 +23,29 @@ object DefaultModOrder {
 
         val path = orderFile()
         val current = readOrder(path)
-        val merged = merge(current, defaults)
+        val seed = defaults.joinToString("\n").hashCode().toString()
+        val reseed = PolyPlusConfig.modOrderSeed != seed
+        val merged = merge(current, defaults).let { if (reseed) realign(it, defaults) else it }
+
+        if (reseed) {
+            PolyPlusConfig.modOrderSeed = seed
+            PolyPlusConfig.save()
+        }
         if (merged == current) return
 
         write(path, merged)
-        logger.info("Seeded {} mod order entries into {}", merged.size - current.size, path)
+        logger.info("Updated the mod order in {} ({} new entries)", path, merged.size - current.size)
+    }
+
+    internal fun realign(current: List<String>, defaults: List<String>): List<String> {
+        val known = defaults.toSet()
+        val slots = current.indices.filter { current[it] in known }
+        val ordered = defaults.filter { it in current }
+        if (slots.size != ordered.size) return current
+
+        val result = current.toMutableList()
+        slots.forEachIndexed { i, slot -> result[slot] = ordered[i] }
+        return result
     }
 
     internal fun merge(current: List<String>, defaults: List<String>): List<String> {

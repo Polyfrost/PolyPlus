@@ -46,6 +46,22 @@ class DefaultModOrderTest {
     }
 
     @Test
+    fun `realign restores the bundled order of bundled mods`() {
+        assertEquals(
+            listOf("a", "b", "c", "d", "e"),
+            DefaultModOrder.realign(listOf("a", "c", "b", "e", "d"), DEFAULTS),
+        )
+    }
+
+    @Test
+    fun `realign leaves user added mods in their slots`() {
+        assertEquals(
+            listOf("mine", "a", "b", "yours", "c"),
+            DefaultModOrder.realign(listOf("mine", "c", "b", "yours", "a"), DEFAULTS),
+        )
+    }
+
+    @Test
     fun `mods outside the bundled list keep their place`() {
         assertEquals(
             listOf("mine", "a", "b", "c", "d", "e"),
