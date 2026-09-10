@@ -5,6 +5,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.network.chat.Component
 import net.minecraft.util.HttpUtil
 import net.minecraft.world.level.GameType
 import org.apache.logging.log4j.LogManager
@@ -194,6 +195,8 @@ object HostWorldManager {
         if (mc.connection == null) return
         if (server.isPublished) {
             pending = null
+            //? if >= 26.2
+            if (request.allowCheats) server.setWorldAllowCommands(true)
             bindPendingP2PListener(server)
             request.onPublished()
             return
@@ -210,10 +213,30 @@ object HostWorldManager {
 
         if (published) {
             LOGGER.info("Opened world to LAN on port {}", port)
+            //? if >= 26.2
+            if (request.allowCheats) server.setWorldAllowCommands(true)
+            announce(mc, Component.translatable(PUBLISH_STARTED_KEY, port))
             request.onPublished()
         } else {
             LOGGER.warn("publishServer returned false — world was not opened to LAN on port {}", port)
+            announce(mc, Component.translatable("commands.publish.failed"))
         }
+    }
+
+    private val PUBLISH_STARTED_KEY =
+        //? if >= 26.2 {
+        "commands.publish.started.lan"
+        //?} else
+        //"commands.publish.started"
+
+    private fun announce(mc: Minecraft, message: Component) {
+        //? if >= 26.2 {
+        mc.gui.hud.chat.addClientSystemMessage(message)
+        //?} else if >= 26.1 {
+        /*mc.gui.chat.addClientSystemMessage(message)
+        *///?} else {
+        /*mc.gui.chat.addMessage(message)
+        *///?}
     }
 
     private fun bindPendingP2PListener(server: net.minecraft.server.MinecraftServer) {
