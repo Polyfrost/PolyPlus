@@ -150,8 +150,6 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun navigationGroups(original: List<NavigationGroup>): List<NavigationGroup> {
-        if (!PrivacyConsent.allowsOnlineServices()) return original
-
         if (original.any { group -> group.routes.any { it.route == PolyPlusCosmeticsRoute } }) {
             return original
         }
@@ -169,7 +167,6 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun addRoutes(builder: NavGraphBuilder) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
         builder.polyPlusCosmeticsGraph()
     }
 

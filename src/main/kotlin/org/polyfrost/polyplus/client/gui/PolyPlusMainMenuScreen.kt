@@ -805,10 +805,10 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
             AccountPill(name = playerName(), assetsReady = assetsReady)
         }
-        if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld && PrivacyConsent.allowsOnlineServices()) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld) {
             HostWorldButton(assetsReady, screen)
         }
-        if (!PolyPlusMainMenuConfig.hideMainMenuSocial && PrivacyConsent.allowsOnlineServices()) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuSocial) {
             val groups by org.polyfrost.polyplus.client.social.GroupsRepository.groups.collectAsState()
             PillButton(
                 "Social",
