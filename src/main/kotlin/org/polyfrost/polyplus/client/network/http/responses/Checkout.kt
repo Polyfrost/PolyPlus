@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CreateCheckoutRequest(
     val player: String,
-    val prices: List<String>,
+    val products: List<String>,
     val buyer: String? = null,
 )
 

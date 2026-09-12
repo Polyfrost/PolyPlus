@@ -21,17 +21,17 @@ object BillingService {
 
     class AlreadyOwnedException(message: String) : Exception(message)
 
-    suspend fun createCheckout(priceIds: List<String>): Result<CreateCheckoutResponse> {
-        val prices = priceIds.filter { it.isNotBlank() }
-        if (prices.isEmpty()) {
+    suspend fun createCheckout(productIds: List<String>): Result<CreateCheckoutResponse> {
+        val products = productIds.filter { it.isNotBlank() }
+        if (products.isEmpty()) {
             return Result.failure(IllegalArgumentException("Nothing to check out"))
         }
         val player = ClientPlatform.localPlayerUuid().toString()
         val result = PolyPlusClient.HTTP.postBodyAuthorized<CreateCheckoutResponse>(
-            "${PolyPlusConfig.apiUrl}/stripe/create",
+            "${PolyPlusConfig.apiUrl}/v1/checkout/create",
         ) {
             contentType(ContentType.Application.Json)
-            setBody(CreateCheckoutRequest(player = player, prices = prices))
+            setBody(CreateCheckoutRequest(player = player, products = products))
         }
 
         val error = result.exceptionOrNull() ?: return result
@@ -39,7 +39,7 @@ object BillingService {
             LOGGER.info("Checkout refused by the backend: {}", message)
             return Result.failure(AlreadyOwnedException(message))
         }
-        LOGGER.error("Failed to create Stripe checkout", error)
+        LOGGER.error("Failed to create checkout", error)
         return result
     }
 
@@ -51,8 +51,8 @@ object BillingService {
             ?: "You already own this item."
     }
 
-    suspend fun checkoutAndOpen(priceIds: List<String>): Result<String> =
-        createCheckout(priceIds).map { response ->
+    suspend fun checkoutAndOpen(productIds: List<String>): Result<String> =
+        createCheckout(productIds).map { response ->
             ClientPlatform.openUri(response.url)
             response.url
         }

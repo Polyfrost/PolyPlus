@@ -12,9 +12,9 @@ data class BundleInfo(
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("base_price") val basePrice: Float? = null,
     @SerialName("discount_rate") val discountRate: Int? = null,
-    @SerialName("stripe_price_id") val stripePriceId: String? = null,
+    @SerialName("store_product_id") val storeProductId: String? = null,
 ) {
-    val purchasable: Boolean get() = !stripePriceId.isNullOrBlank()
+    val purchasable: Boolean get() = !storeProductId.isNullOrBlank()
 
     val free: Boolean get() = (finalPrice ?: 0f) <= 0f
 
