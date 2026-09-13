@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -96,6 +98,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.features.OnboardingFeatures.ModCard
 import org.polyfrost.polyplus.client.gui.preview.UnityMotionBlur
 import org.polyfrost.polyplus.client.gui.preview.VanillaTextures
 import org.polyfrost.polyplus.client.legal.LegalDocument
@@ -113,6 +116,18 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
 
     override fun shouldCloseOnEsc(): Boolean = false
+
+    override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
+        val capture = OnboardingKeyCapture.pending ?: return false
+        capture(
+            if (key == ESCAPE_KEY) {
+                null
+            } else {
+                com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(key)
+            },
+        )
+        return true
+    }
 
     //? if <26.1 {
     /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
@@ -155,9 +170,14 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val needsSettings = remember { !PolyPlusConfig.onboardingCompleted }
         val needsModSettings = remember { OnboardingFeatures.needsModSettingsChoice() }
         val needsBlurChoice = remember { OnboardingFeatures.needsMotionBlurChoice() }
-        val showsModSettings = (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
+        val showsModSettings = remember {
+            (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
+        }
         val modReads = remember { ModReads.read(showsModSettings) }
-        val modCards = modReads.cards
+        val offeredCards = remember {
+            OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
+        }
+        val modCards = remember { offeredCards - ModCard.GAMMA }
         val sprintSection = needsSettings && OnboardingFeatures.polySprintAvailable
         val showsModsPage = showsModSettings && (modCards.isNotEmpty() || sprintSection)
         val pages = remember {
@@ -170,6 +190,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         add(OnboardingPage.MODS_MORE)
                     }
                 }
+                if (showsModSettings && ModCard.GAMMA in offeredCards) add(OnboardingPage.FULLBRIGHT)
                 if (needsBlurChoice) add(OnboardingPage.MOTION_BLUR)
                 if (needsSettings || needsModSettings) add(OnboardingPage.DONE)
             }.ifEmpty { listOf(OnboardingPage.DONE) }
@@ -189,6 +210,13 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var horseOpacity by remember { mutableStateOf(modReads.horse ?: PolyPlusConfig.onboardingHorseOpacity) }
         var waveyCapes by remember { mutableStateOf(modReads.capes ?: PolyPlusConfig.onboardingWaveyCapes) }
         var skinLayers by remember { mutableStateOf(modReads.layers ?: PolyPlusConfig.onboardingSkinLayers) }
+        var gamma by remember {
+            mutableStateOf((modReads.gamma ?: PolyPlusConfig.onboardingGamma).clampGamma())
+        }
+        var gammaToggled by remember {
+            mutableStateOf((modReads.gammaToggled ?: PolyPlusConfig.onboardingGammaToggled).clampGamma())
+        }
+        var gammaSmooth by remember { mutableStateOf(modReads.gammaSmooth ?: PolyPlusConfig.onboardingGammaSmooth) }
         var itemOffsetX by remember { mutableStateOf(modReads.itemX ?: PolyPlusConfig.onboardingItemOffsetX) }
         var itemOffsetY by remember { mutableStateOf(modReads.itemY ?: PolyPlusConfig.onboardingItemOffsetY) }
         var itemOffsetZ by remember { mutableStateOf(modReads.itemZ ?: PolyPlusConfig.onboardingItemOffsetZ) }
@@ -216,31 +244,59 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 PolyPlusConfig.onboardingToggleSprint = toggleSprint
             }
             if (showsModSettings) {
-                PolyPlusConfig.onboardingBetterGrassMode = grassMode
-                PolyPlusConfig.onboardingFireOverlayHeight = fireHeight
-                PolyPlusConfig.onboardingFireOverlayOpacity = fireOpacity
-                PolyPlusConfig.onboardingShieldHeight = shieldHeight
-                PolyPlusConfig.onboardingHorseOpacity = horseOpacity
-                PolyPlusConfig.onboardingWaveyCapes = waveyCapes
-                PolyPlusConfig.onboardingSkinLayers = skinLayers
-                PolyPlusConfig.onboardingItemOffsetX = itemOffsetX
-                PolyPlusConfig.onboardingItemOffsetY = itemOffsetY
-                PolyPlusConfig.onboardingItemOffsetZ = itemOffsetZ
-                PolyPlusConfig.onboardingItemScale = itemScale
-                fun settled(card: ModCard) = card !in modCards || card !in touched
-                PolyPlusConfig.onboardingBetterGrassSettled = settled(ModCard.GRASS)
-                PolyPlusConfig.onboardingFireOverlaySettled = settled(ModCard.FIRE_OVERLAY)
-                PolyPlusConfig.onboardingShieldHeightSettled = settled(ModCard.SHIELD_HEIGHT)
-                PolyPlusConfig.onboardingMountOpacitySettled = settled(ModCard.MOUNT)
-                PolyPlusConfig.onboardingWaveyCapesSettled = settled(ModCard.CAPES)
-                PolyPlusConfig.onboardingSkinLayersSettled = settled(ModCard.SKIN_LAYERS)
-                PolyPlusConfig.onboardingItemPositionsSettled = settled(ModCard.ITEM)
-                if (showsModSettings) {
-                    PolyPlusConfig.onboardingModSettingsVersion = OnboardingFeatures.completedModSettingsVersion(
-                        PolyPlusConfig.onboardingModSettingsVersion,
-                        OnboardingFeatures.modCardCount,
+                val startedAtVersion = PolyPlusConfig.onboardingModSettingsVersion
+                fun <T> chosen(card: ModCard, value: T, stored: T): T = if (card in offeredCards) value else stored
+                PolyPlusConfig.onboardingBetterGrassMode =
+                    chosen(ModCard.GRASS, grassMode, PolyPlusConfig.onboardingBetterGrassMode)
+                PolyPlusConfig.onboardingFireOverlayHeight =
+                    chosen(ModCard.FIRE_OVERLAY, fireHeight, PolyPlusConfig.onboardingFireOverlayHeight)
+                PolyPlusConfig.onboardingFireOverlayOpacity =
+                    chosen(ModCard.FIRE_OVERLAY, fireOpacity, PolyPlusConfig.onboardingFireOverlayOpacity)
+                PolyPlusConfig.onboardingShieldHeight =
+                    chosen(ModCard.SHIELD_HEIGHT, shieldHeight, PolyPlusConfig.onboardingShieldHeight)
+                PolyPlusConfig.onboardingHorseOpacity =
+                    chosen(ModCard.MOUNT, horseOpacity, PolyPlusConfig.onboardingHorseOpacity)
+                PolyPlusConfig.onboardingWaveyCapes =
+                    chosen(ModCard.CAPES, waveyCapes, PolyPlusConfig.onboardingWaveyCapes)
+                PolyPlusConfig.onboardingSkinLayers =
+                    chosen(ModCard.SKIN_LAYERS, skinLayers, PolyPlusConfig.onboardingSkinLayers)
+                PolyPlusConfig.onboardingGamma =
+                    chosen(ModCard.GAMMA, gamma, PolyPlusConfig.onboardingGamma)
+                PolyPlusConfig.onboardingGammaToggled =
+                    chosen(ModCard.GAMMA, gammaToggled, PolyPlusConfig.onboardingGammaToggled)
+                PolyPlusConfig.onboardingGammaSmooth =
+                    chosen(ModCard.GAMMA, gammaSmooth, PolyPlusConfig.onboardingGammaSmooth)
+                PolyPlusConfig.onboardingItemOffsetX =
+                    chosen(ModCard.ITEM, itemOffsetX, PolyPlusConfig.onboardingItemOffsetX)
+                PolyPlusConfig.onboardingItemOffsetY =
+                    chosen(ModCard.ITEM, itemOffsetY, PolyPlusConfig.onboardingItemOffsetY)
+                PolyPlusConfig.onboardingItemOffsetZ =
+                    chosen(ModCard.ITEM, itemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ)
+                PolyPlusConfig.onboardingItemScale =
+                    chosen(ModCard.ITEM, itemScale, PolyPlusConfig.onboardingItemScale)
+                val available = OnboardingFeatures.availableCards
+                fun settled(card: ModCard, current: Boolean) =
+                    OnboardingFeatures.settledAfterRun(
+                        card, offeredCards, available, touched, current, startedAtVersion,
                     )
-                }
+                PolyPlusConfig.onboardingBetterGrassSettled =
+                    settled(ModCard.GRASS, PolyPlusConfig.onboardingBetterGrassSettled)
+                PolyPlusConfig.onboardingFireOverlaySettled =
+                    settled(ModCard.FIRE_OVERLAY, PolyPlusConfig.onboardingFireOverlaySettled)
+                PolyPlusConfig.onboardingShieldHeightSettled =
+                    settled(ModCard.SHIELD_HEIGHT, PolyPlusConfig.onboardingShieldHeightSettled)
+                PolyPlusConfig.onboardingMountOpacitySettled =
+                    settled(ModCard.MOUNT, PolyPlusConfig.onboardingMountOpacitySettled)
+                PolyPlusConfig.onboardingWaveyCapesSettled =
+                    settled(ModCard.CAPES, PolyPlusConfig.onboardingWaveyCapesSettled)
+                PolyPlusConfig.onboardingSkinLayersSettled =
+                    settled(ModCard.SKIN_LAYERS, PolyPlusConfig.onboardingSkinLayersSettled)
+                PolyPlusConfig.onboardingGammaSettled =
+                    settled(ModCard.GAMMA, PolyPlusConfig.onboardingGammaSettled)
+                PolyPlusConfig.onboardingItemPositionsSettled =
+                    settled(ModCard.ITEM, PolyPlusConfig.onboardingItemPositionsSettled)
+                PolyPlusConfig.onboardingModSettingsVersion =
+                    OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
             }
             if (needsBlurChoice && blurMode != OnboardingFeatures.MOTION_BLUR_UNSET) {
                 PolyPlusConfig.onboardingMotionBlurMode = blurMode
@@ -365,6 +421,12 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                             itemOffsetZ = z
                                         },
                                         itemScale, { touch(ModCard.ITEM, itemScale, it); itemScale = it },
+                                    )
+                                OnboardingPage.FULLBRIGHT ->
+                                    FullbrightPage(
+                                        gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
+                                        gammaToggled, { touch(ModCard.GAMMA, gammaToggled, it); gammaToggled = it },
+                                        gammaSmooth, { touch(ModCard.GAMMA, gammaSmooth, it); gammaSmooth = it },
                                     )
                                 OnboardingPage.MOTION_BLUR ->
                                     if (waitingForOptimization) {
@@ -568,6 +630,7 @@ private fun ModsPage(
                 ModCard.MOUNT -> MountOpacityCard(horseOpacity, onHorseOpacity)
                 ModCard.CAPES -> WaveyCapesCard(waveyCapes, onWaveyCapes)
                 ModCard.SKIN_LAYERS -> SkinLayersCard(skinLayers, onSkinLayers)
+                ModCard.GAMMA -> Unit
             }
         }
     }
@@ -755,6 +818,111 @@ private fun SkinLayersCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
 }
 
 @Composable
+private fun FullbrightPage(
+    gamma: Float,
+    onGamma: (Float) -> Unit,
+    toggled: Float,
+    onToggled: (Float) -> Unit,
+    smooth: Boolean,
+    onSmooth: (Boolean) -> Unit,
+) {
+    Header("Continuing with", "Fullbright")
+    Box(Modifier.offset(FULLBRIGHT_LEFT.dp, FULLBRIGHT_TOP.dp)) {
+        GammaPreview(gamma, FULLBRIGHT_PREVIEW_WIDTH, FULLBRIGHT_PREVIEW_HEIGHT)
+    }
+    OnboardingText(
+        "Raise the brightness past vanilla's limit so caves and night stop hiding what is in front " +
+            "of you, and pick what the mod's toggle key jumps to.",
+        12,
+        Modifier.offset(FULLBRIGHT_LEFT.dp, (FULLBRIGHT_TOP + FULLBRIGHT_PREVIEW_HEIGHT + 14f).dp)
+            .width(FULLBRIGHT_PREVIEW_WIDTH.dp),
+        TextSecondary,
+        FontWeight.Light,
+        TextAlign.Start,
+    )
+    val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
+    Column(
+        Modifier.offset(FULLBRIGHT_COLUMN.dp, (FULLBRIGHT_TOP + 18f).dp),
+        verticalArrangement = Arrangement.spacedBy(FULLBRIGHT_ROW_GAP.dp),
+    ) {
+        PageSlider("Brightness", (gamma - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(gamma)) {
+            onGamma(OnboardingFeatures.GAMMA_MIN + it * span)
+        }
+        PageSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(toggled)) {
+            onToggled(OnboardingFeatures.GAMMA_MIN + it * span)
+        }
+        PageRow("Smooth fade") {
+            ModeChip("On", smooth) { onSmooth(true) }
+            Spacer(Modifier.width(MOD_CHIP_GAP.dp))
+            ModeChip("Off", !smooth) { onSmooth(false) }
+        }
+        PageRow("Toggle key") { ToggleKeyButton() }
+    }
+}
+
+@Composable
+private fun PageRow(label: String, content: @Composable RowScope.() -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OnboardingText(
+            label,
+            12,
+            Modifier.width(FULLBRIGHT_LABEL_WIDTH.dp),
+            TextSecondary,
+            FontWeight.Light,
+            TextAlign.Start,
+        )
+        content()
+    }
+}
+
+@Composable
+private fun PageSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
+    PageRow(label) {
+        OnboardingSlider(progress, FULLBRIGHT_SLIDER_WIDTH, onProgress)
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier.width(MOD_VALUE_WIDTH.dp).height(24.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
+                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) { OnboardingText(value, 11, color = TextPrimary, weight = FontWeight.Light) }
+    }
+}
+
+@Composable
+private fun ToggleKeyButton() {
+    var capturing by remember { mutableStateOf(false) }
+    var label by remember { mutableStateOf(OnboardingFeatures.gammaToggleKeyLabel() ?: "Unbound") }
+    DisposableEffect(Unit) {
+        onDispose { OnboardingKeyCapture.pending = null }
+    }
+    val shape = ppShape(6.dp)
+    Box(
+        Modifier.width(FULLBRIGHT_KEY_WIDTH.dp).height(26.dp).clip(shape)
+            .background(if (capturing) Accent.asSelectedBackground else ChoiceBackground)
+            .border(1.dp, if (capturing) SolidColor(Accent) else PanelBorderBrush, shape)
+            .clickableWithSound {
+                if (capturing) return@clickableWithSound
+                capturing = true
+                OnboardingKeyCapture.pending = { key ->
+                    capturing = false
+                    OnboardingKeyCapture.pending = null
+                    if (key != null && OnboardingFeatures.bindGammaToggleKey(key)) {
+                        label = OnboardingFeatures.gammaToggleKeyLabel() ?: "Unbound"
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        OnboardingText(
+            if (capturing) "Press a key" else label,
+            11,
+            color = TextPrimary,
+            weight = if (capturing) FontWeight.Medium else FontWeight.Light,
+        )
+    }
+}
+
+@Composable
 private fun OnOffChips(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(MOD_CHIP_GAP.dp)) {
         ModeChip("On", enabled) { onEnabled(true) }
@@ -784,6 +952,9 @@ private fun FireSlider(label: String, progress: Float, value: String, onProgress
 }
 
 private fun String.fmt(vararg args: Any?): String = String.format(Locale.ROOT, this, *args)
+
+private fun Float.clampGamma(): Float =
+    coerceIn(OnboardingFeatures.GAMMA_MIN, OnboardingFeatures.GAMMA_MAX)
 
 private fun fireHeightLabel(height: Float): String =
     if (height >= -0.001f) "Vanilla" else "%.2f".fmt(height)
@@ -1429,11 +1600,16 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PreviewFrame(caption: String, draw: DrawScope.() -> Unit) {
+private fun PreviewFrame(
+    caption: String,
+    width: Float = MOD_PREVIEW_WIDTH,
+    height: Float = MOD_PREVIEW_HEIGHT,
+    draw: DrawScope.() -> Unit,
+) {
     val shape = ppShape(6.dp)
     Box(
         Modifier
-            .size(MOD_PREVIEW_WIDTH.dp, MOD_PREVIEW_HEIGHT.dp)
+            .size(width.dp, height.dp)
             .clip(shape)
             .background(PreviewBackground)
             .border(1.dp, PanelBorderBrush, shape),
@@ -1480,6 +1656,27 @@ private fun SkinLayersPreview(enabled: Boolean) {
     }
 }
 
+@Composable
+private fun GammaPreview(gamma: Float, width: Float, height: Float) {
+    val (darkPath, brightPath) = gammaPreviewPaths
+    val dark = remember { loadOnboardingImage(darkPath) }
+    val bright = remember { loadOnboardingImage(brightPath) }
+    val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
+    val fade by animateFloatAsState((gamma - OnboardingFeatures.GAMMA_MIN) / span, animationSpec = spring())
+    PreviewFrame(
+        if (gamma <= OnboardingFeatures.GAMMA_MIN + 0.5f) "Vanilla brightest" else "%.0f%% brightness".fmt(gamma),
+        width,
+        height,
+    ) {
+        drawIntoCanvas { canvas ->
+            val skia = canvas.skiaCanvas
+            dark?.let { skia.drawCover(it, size.width, size.height) }
+            val lit = bright ?: return@drawIntoCanvas
+            skia.drawCover(lit, size.width, size.height, fade)
+        }
+    }
+}
+
 private fun betterGrassCaption(mode: Int): String = when (mode) {
     OnboardingFeatures.BETTER_GRASS_OFF -> "Bare dirt sides"
     OnboardingFeatures.BETTER_GRASS_FASTEST -> "Grass on every side"
@@ -1488,6 +1685,8 @@ private fun betterGrassCaption(mode: Int): String = when (mode) {
 }
 
 internal fun betterGrassPreviewPath(mode: String): String = GRASS_ASSETS + "grass-${mode.lowercase()}.png"
+
+internal val gammaPreviewPaths: List<String> = listOf(GAMMA_ASSETS + GAMMA_DARK, GAMMA_ASSETS + GAMMA_BRIGHT)
 
 @Composable
 private fun BetterGrassPreview(mode: Int) {
@@ -1940,9 +2139,14 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
     )
 }
 
-private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, MODS_MORE, MOTION_BLUR, COSMETICS, DONE }
+internal object OnboardingKeyCapture {
+    @Volatile
+    var pending: ((com.mojang.blaze3d.platform.InputConstants.Key?) -> Unit)? = null
+}
 
-private enum class ModCard { GRASS, FIRE_OVERLAY, SHIELD_HEIGHT, MOUNT, CAPES, SKIN_LAYERS, ITEM }
+private const val ESCAPE_KEY = 256
+
+private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, MODS_MORE, FULLBRIGHT, MOTION_BLUR, COSMETICS, DONE }
 
 private class ModReads(
     val grass: Int?,
@@ -1952,6 +2156,9 @@ private class ModReads(
     val horse: Float?,
     val capes: Boolean?,
     val layers: Boolean?,
+    val gamma: Float?,
+    val gammaToggled: Float?,
+    val gammaSmooth: Boolean?,
     val itemX: Float?,
     val itemY: Float?,
     val itemZ: Float?,
@@ -1967,6 +2174,7 @@ private class ModReads(
         if (horse != null) add(ModCard.MOUNT)
         if (capes != null) add(ModCard.CAPES)
         if (layers != null) add(ModCard.SKIN_LAYERS)
+        if (gamma != null) add(ModCard.GAMMA)
     }
 
     companion object {
@@ -1995,6 +2203,15 @@ private class ModReads(
                 },
                 layers = ifAvailable(OnboardingFeatures.skinLayersAvailable) {
                     OnboardingFeatures.currentSkinLayers()
+                },
+                gamma = ifAvailable(OnboardingFeatures.gammaUtilsAvailable) {
+                    OnboardingFeatures.currentGamma()
+                },
+                gammaToggled = ifAvailable(OnboardingFeatures.gammaUtilsAvailable) {
+                    OnboardingFeatures.currentGammaToggled()
+                },
+                gammaSmooth = ifAvailable(OnboardingFeatures.gammaUtilsAvailable) {
+                    OnboardingFeatures.currentGammaSmooth()
                 },
                 itemX = ifAvailable(items) { OnboardingFeatures.currentItemOffsetX() },
                 itemY = ifAvailable(items) { OnboardingFeatures.currentItemOffsetY() },
@@ -2047,6 +2264,15 @@ private const val PROJ_F = 1.4281480f
 private const val PROJ_ASPECT = 3024f / 1898f
 private const val FRAME_Y_SCALE = 1898f / 1512f
 private const val FRAME_Y_OFFSET = 156f / 1512f
+private const val FULLBRIGHT_TOP = 172f
+private const val FULLBRIGHT_LEFT = 48f
+private const val FULLBRIGHT_COLUMN = 496f
+private const val FULLBRIGHT_PREVIEW_WIDTH = 420f
+private const val FULLBRIGHT_PREVIEW_HEIGHT = 260f
+private const val FULLBRIGHT_LABEL_WIDTH = 104f
+private const val FULLBRIGHT_SLIDER_WIDTH = 150f
+private const val FULLBRIGHT_KEY_WIDTH = 120f
+private const val FULLBRIGHT_ROW_GAP = 45f
 private const val MOD_CHIP_WIDTH = (MOD_PREVIEW_WIDTH - MOD_CHIP_GAP) / 2f
 private const val MOD_VALUE_WIDTH = 58f
 private const val MOD_CARDS_PER_PAGE = 3
@@ -2094,6 +2320,9 @@ private const val MOUNT_SCENE = "mount-scene.png"
 private const val MOUNT_FULL = "mount-full.png"
 private const val WAVEY_ASSETS = "assets/polyplus/onboarding/waveycapes/"
 private const val SKINLAYERS_ASSETS = "assets/polyplus/onboarding/skinlayers/"
+private const val GAMMA_ASSETS = "assets/polyplus/onboarding/gamma/"
+private const val GAMMA_DARK = "gamma-dark.png"
+private const val GAMMA_BRIGHT = "gamma-bright.png"
 private const val SHIELD_ASSETS = "assets/polyplus/onboarding/shield/"
 private const val SHIELD_SCENE = "shield-scene.png"
 private const val SHIELD_LAYER = "shield-layer.png"

@@ -35,6 +35,7 @@ object OnboardingFeatures {
     val mountOpacityAvailable: Boolean by lazy { classExists(MOUNT_OPACITY_CONFIG) }
     val waveyCapesAvailable: Boolean by lazy { classExists(WAVEY_MOD_BASE) }
     val skinLayersAvailable: Boolean by lazy { classExists(SKIN_LAYERS_MOD_BASE) }
+    val gammaUtilsAvailable: Boolean by lazy { classExists(GAMMA_UTILS) }
     val shieldHeightAvailable: Boolean by lazy {
         hasFloatingField(OVERLAY_TWEAKS_CONFIG, SHIELD_HEIGHT)
     }
@@ -46,29 +47,64 @@ object OnboardingFeatures {
         }.isSuccess
     }
 
+    enum class ModCard(val introducedIn: Int) {
+        GRASS(1),
+        FIRE_OVERLAY(1),
+        SHIELD_HEIGHT(1),
+        MOUNT(1),
+        CAPES(1),
+        SKIN_LAYERS(1),
+        ITEM(1),
+        GAMMA(2),
+    }
+
+    val ModCard.available: Boolean
+        get() = when (this) {
+            ModCard.GRASS -> betterGrassAvailable
+            ModCard.FIRE_OVERLAY -> fireOverlayAvailable
+            ModCard.SHIELD_HEIGHT -> shieldHeightAvailable
+            ModCard.MOUNT -> mountOpacityAvailable
+            ModCard.CAPES -> waveyCapesAvailable
+            ModCard.SKIN_LAYERS -> skinLayersAvailable
+            ModCard.ITEM -> itemPositionsAvailable
+            ModCard.GAMMA -> gammaUtilsAvailable && currentGamma() != null
+        }
+
     val modsPageAvailable: Boolean
         get() = polySprintAvailable || modCardCount > 0
 
+    val availableCards: List<ModCard>
+        get() = ModCard.entries.filter { it.available }
+
     val modCardCount: Int
-        get() = listOf(
-            betterGrassAvailable,
-            fireOverlayAvailable,
-            shieldHeightAvailable,
-            itemPositionsAvailable,
-            mountOpacityAvailable,
-            waveyCapesAvailable,
-            skinLayersAvailable,
-        ).count { it }
+        get() = availableCards.size
 
     @JvmStatic
     fun needsModSettingsChoice(): Boolean =
-        shouldShowModSettings(PolyPlusConfig.onboardingModSettingsVersion, modCardCount)
+        newModCards(PolyPlusConfig.onboardingModSettingsVersion, availableCards).isNotEmpty()
 
-    internal fun shouldShowModSettings(completedVersion: Int, availableCards: Int): Boolean =
-        availableCards > 0 && completedVersion < MOD_SETTINGS_VERSION
+    internal fun newModCards(completedVersion: Int, available: List<ModCard>): List<ModCard> =
+        available.filter { it.introducedIn > completedVersion }
 
-    internal fun completedModSettingsVersion(completedVersion: Int, availableCards: Int): Int =
-        if (availableCards > 0) MOD_SETTINGS_VERSION else completedVersion
+    internal fun settledAfterRun(
+        card: ModCard,
+        offered: List<ModCard>,
+        available: List<ModCard>,
+        touched: Set<ModCard>,
+        current: Boolean,
+        completedVersion: Int,
+    ): Boolean = when {
+        card in offered -> card !in touched
+        card !in available -> true
+        card.introducedIn > completedVersion -> true
+        else -> current
+    }
+
+    internal fun completedModSettingsVersion(completedVersion: Int, available: List<ModCard>): Int =
+        maxOf(completedVersion, available.maxOfOrNull { it.introducedIn } ?: completedVersion)
+
+    private fun ModCard.pendingApply(settled: Boolean): Boolean =
+        !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
 
     @JvmStatic
     fun needsMotionBlurChoice(): Boolean =
@@ -119,8 +155,6 @@ object OnboardingFeatures {
     }
 
     private fun applyPendingModOptions(force: Boolean = false): Boolean {
-        if (PolyPlusConfig.onboardingModSettingsVersion < MOD_SETTINGS_VERSION) return false
-        if (!hasPendingModOptions()) return false
         val now = System.currentTimeMillis()
         if (force) {
             modApplyAttempts = 0
@@ -128,16 +162,17 @@ object OnboardingFeatures {
         } else if (now < nextModApplyAttemptMs || modApplyAttempts >= MOD_APPLY_MAX_ATTEMPTS) {
             return false
         }
+        if (!hasPendingModOptions()) return false
 
         var changed = false
-        if (betterGrassAvailable && !PolyPlusConfig.onboardingBetterGrassSettled) {
+        if (ModCard.GRASS.pendingApply(PolyPlusConfig.onboardingBetterGrassSettled)) {
             if (applyBetterGrass(PolyPlusConfig.onboardingBetterGrassMode)) {
                 PolyPlusConfig.onboardingBetterGrassSettled = true
                 changed = true
             }
         }
-        val fireOverlayPending = fireOverlayAvailable && !PolyPlusConfig.onboardingFireOverlaySettled
-        val shieldHeightPending = shieldHeightAvailable && !PolyPlusConfig.onboardingShieldHeightSettled
+        val fireOverlayPending = ModCard.FIRE_OVERLAY.pendingApply(PolyPlusConfig.onboardingFireOverlaySettled)
+        val shieldHeightPending = ModCard.SHIELD_HEIGHT.pendingApply(PolyPlusConfig.onboardingShieldHeightSettled)
         if (fireOverlayPending || shieldHeightPending) {
             val applied = applyFireOverlay(
                 PolyPlusConfig.onboardingFireOverlayHeight,
@@ -152,25 +187,36 @@ object OnboardingFeatures {
                 changed = true
             }
         }
-        if (mountOpacityAvailable && !PolyPlusConfig.onboardingMountOpacitySettled) {
+        if (ModCard.MOUNT.pendingApply(PolyPlusConfig.onboardingMountOpacitySettled)) {
             if (applyHorseOpacity(PolyPlusConfig.onboardingHorseOpacity)) {
                 PolyPlusConfig.onboardingMountOpacitySettled = true
                 changed = true
             }
         }
-        if (waveyCapesAvailable && !PolyPlusConfig.onboardingWaveyCapesSettled) {
+        if (ModCard.CAPES.pendingApply(PolyPlusConfig.onboardingWaveyCapesSettled)) {
             if (applyWaveyCapes(PolyPlusConfig.onboardingWaveyCapes)) {
                 PolyPlusConfig.onboardingWaveyCapesSettled = true
                 changed = true
             }
         }
-        if (skinLayersAvailable && !PolyPlusConfig.onboardingSkinLayersSettled) {
+        if (ModCard.SKIN_LAYERS.pendingApply(PolyPlusConfig.onboardingSkinLayersSettled)) {
             if (applySkinLayers(PolyPlusConfig.onboardingSkinLayers)) {
                 PolyPlusConfig.onboardingSkinLayersSettled = true
                 changed = true
             }
         }
-        if (itemPositionsAvailable && !PolyPlusConfig.onboardingItemPositionsSettled) {
+        if (ModCard.GAMMA.pendingApply(PolyPlusConfig.onboardingGammaSettled)) {
+            if (applyGamma(
+                    PolyPlusConfig.onboardingGamma,
+                    PolyPlusConfig.onboardingGammaToggled,
+                    PolyPlusConfig.onboardingGammaSmooth,
+                )
+            ) {
+                PolyPlusConfig.onboardingGammaSettled = true
+                changed = true
+            }
+        }
+        if (ModCard.ITEM.pendingApply(PolyPlusConfig.onboardingItemPositionsSettled)) {
             val applied = applyItemPosition(
                 PolyPlusConfig.onboardingItemOffsetX,
                 PolyPlusConfig.onboardingItemOffsetY,
@@ -198,13 +244,14 @@ object OnboardingFeatures {
     }
 
     private fun hasPendingModOptions(): Boolean =
-        (betterGrassAvailable && !PolyPlusConfig.onboardingBetterGrassSettled) ||
-            (fireOverlayAvailable && !PolyPlusConfig.onboardingFireOverlaySettled) ||
-            (shieldHeightAvailable && !PolyPlusConfig.onboardingShieldHeightSettled) ||
-            (mountOpacityAvailable && !PolyPlusConfig.onboardingMountOpacitySettled) ||
-            (waveyCapesAvailable && !PolyPlusConfig.onboardingWaveyCapesSettled) ||
-            (skinLayersAvailable && !PolyPlusConfig.onboardingSkinLayersSettled) ||
-            (itemPositionsAvailable && !PolyPlusConfig.onboardingItemPositionsSettled)
+        ModCard.GRASS.pendingApply(PolyPlusConfig.onboardingBetterGrassSettled) ||
+            ModCard.FIRE_OVERLAY.pendingApply(PolyPlusConfig.onboardingFireOverlaySettled) ||
+            ModCard.SHIELD_HEIGHT.pendingApply(PolyPlusConfig.onboardingShieldHeightSettled) ||
+            ModCard.MOUNT.pendingApply(PolyPlusConfig.onboardingMountOpacitySettled) ||
+            ModCard.CAPES.pendingApply(PolyPlusConfig.onboardingWaveyCapesSettled) ||
+            ModCard.SKIN_LAYERS.pendingApply(PolyPlusConfig.onboardingSkinLayersSettled) ||
+            ModCard.GAMMA.pendingApply(PolyPlusConfig.onboardingGammaSettled) ||
+            ModCard.ITEM.pendingApply(PolyPlusConfig.onboardingItemPositionsSettled)
 
     private fun logModApplyFailure(key: String, message: String, error: Throwable) {
         if (error is ClassNotFoundException) return
@@ -469,6 +516,66 @@ object OnboardingFeatures {
         logModApplyFailure("skin-layers", "Could not apply the 3D Skin Layers preference", it)
     }.getOrDefault(false)
 
+    private fun gammaSettings(): Any {
+        val config = Class.forName(GAMMA_UTILS).getMethod("getConfig").invoke(null)
+            ?: error("Gamma Utils is not initialised yet")
+        return config.javaClass.getField("gamma").get(config) ?: error("Gamma Utils has no gamma settings")
+    }
+
+    fun currentGamma(): Float? = runCatching {
+        val gamma = gammaSettings()
+        if (gamma.javaClass.getMethod("isDynamicEnabled").invoke(gamma) as Boolean) {
+            error("Gamma Utils is running dynamic gamma")
+        }
+        ((gamma.javaClass.getMethod("getValue").invoke(gamma) as Double) * 100.0).toFloat()
+    }.getOrNull()
+
+    fun currentGammaToggled(): Float? = runCatching {
+        val gamma = gammaSettings()
+        ((gamma.javaClass.getMethod("getToggledValue").invoke(gamma) as Double) * 100.0).toFloat()
+    }.getOrNull()
+
+    fun currentGammaSmooth(): Boolean? = runCatching {
+        val gamma = gammaSettings()
+        gamma.javaClass.getMethod("isSmoothTransitionEnabled").invoke(gamma) as Boolean
+    }.getOrNull()
+
+    fun gammaToggleKey(): net.minecraft.client.KeyMapping? = runCatching {
+        Minecraft.getInstance().options.keyMappings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
+    }.getOrNull()
+
+    fun gammaToggleKeyLabel(): String? = runCatching {
+        gammaToggleKey()?.translatedKeyMessage?.string
+    }.getOrNull()
+
+    fun bindGammaToggleKey(key: com.mojang.blaze3d.platform.InputConstants.Key): Boolean = runCatching {
+        val mapping = gammaToggleKey() ?: error("Gamma Utils has no toggle binding")
+        mapping.setKey(key)
+        net.minecraft.client.KeyMapping.resetMapping()
+        Minecraft.getInstance().options.save()
+        true
+    }.onFailure {
+        logModApplyFailure("gamma-utils-key", "Could not rebind the Gamma Utils toggle key", it)
+    }.getOrDefault(false)
+
+    fun applyGamma(percent: Float, toggled: Float, smooth: Boolean): Boolean = runCatching {
+        val gamma = gammaSettings()
+        gamma.javaClass.getMethod("setSmoothTransitionStatus", Boolean::class.javaPrimitiveType)
+            .invoke(gamma, smooth)
+        Class.forName(GAMMA_MANAGER).getMethod(
+            "setGamma",
+            Double::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        ).invoke(null, (percent.coerceIn(GAMMA_MIN, GAMMA_MAX) / 100f).toDouble(), false, false)
+        gamma.javaClass.getMethod("setToggledValue", Double::class.javaPrimitiveType)
+            .invoke(gamma, (toggled.coerceIn(GAMMA_MIN, GAMMA_MAX) / 100f).toDouble())
+        Class.forName(GAMMA_UTILS).getMethod("saveConfig").invoke(null)
+        true
+    }.onFailure {
+        logModApplyFailure("gamma-utils", "Could not apply the Gamma Utils preference", it)
+    }.getOrDefault(false)
+
     private fun animatiumExtras(): Any {
         val configClass = Class.forName(ANIMATIUM_CONFIG)
         val instance = configClass.getMethod("instance").invoke(null) ?: error("Animatium config is unavailable")
@@ -534,7 +641,7 @@ object OnboardingFeatures {
         loadWithoutInit(className).getField(fieldName).type
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
-    const val MOD_SETTINGS_VERSION = 1
+    const val MOD_SETTINGS_VERSION = 2
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L
@@ -602,6 +709,12 @@ object OnboardingFeatures {
         "enableLeftPants",
         "enableRightPants",
     )
+
+    private const val GAMMA_UTILS = "io.github.sjouwer.gammautils.GammaUtils"
+    private const val GAMMA_MANAGER = "io.github.sjouwer.gammautils.GammaManager"
+    private const val GAMMA_TOGGLE_KEY = "key.gammautils.gammaToggle"
+    const val GAMMA_MIN = 100f
+    const val GAMMA_MAX = 1500f
 
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"

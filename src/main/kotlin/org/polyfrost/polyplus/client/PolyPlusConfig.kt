@@ -136,6 +136,12 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingGamma = 100f
 
     @JvmStatic @Include
+    var onboardingGammaToggled = 1500f
+
+    @JvmStatic @Include
+    var onboardingGammaSmooth = false
+
+    @JvmStatic @Include
     var onboardingGammaSettled = false
 
     @JvmStatic
