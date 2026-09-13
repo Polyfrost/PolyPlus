@@ -14,6 +14,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.RamGuideScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import oshi.SystemInfo
+import oshi.hardware.GlobalMemory
 import oshi.util.platform.mac.SysctlUtil
 
 object JvmAdvisor {
@@ -27,6 +28,8 @@ object JvmAdvisor {
     const val HEAP_TIGHT_RATIO = 0.70
     const val HEAP_LOOSE_RATIO = 0.35
     const val HEAP_OVERSIZED_RATIO = 0.5
+    const val HEAP_OVERSIZED_RATIO_SMALL = 0.35
+    const val SMALL_HOST_MB = 8192L
     const val GC_TIME_BUDGET = 0.02
     const val ZGC_MIN_CORES = 12
     const val ZGC_MIN_HEAP_MB = 8192L
@@ -35,6 +38,9 @@ object JvmAdvisor {
     const val LINUX_PSI_PERCENT = 10.0
     const val WINDOWS_LOAD_WARN = 90
     const val WINDOWS_LOAD_CRITICAL = 95
+    const val SWAP_WARN = 60
+    const val SWAP_CRITICAL = 85
+    const val SWAP_LOAD_FLOOR = 70
     private const val MAC_PRESSURE_SYSCTL = "kern.memorystatus_vm_pressure_level"
     private const val LINUX_PSI_PATH = "/proc/pressure/memory"
     private const val SAMPLE_WINDOW_MS = 5L * 60L * 1000L
@@ -131,7 +137,7 @@ object JvmAdvisor {
         if (host != null &&
             s.liveSetMb > 0 &&
             s.liveSetMb < s.maxHeapMb * HEAP_LOOSE_RATIO &&
-            s.maxHeapMb > host.totalMb * HEAP_OVERSIZED_RATIO
+            s.maxHeapMb > host.totalMb * oversizedRatio(host.totalMb)
         ) {
             val suggested = (s.maxHeapMb - HEAP_STEP_MB).coerceAtLeast(s.liveSetMb * 2)
             if (suggested < s.maxHeapMb) {
@@ -158,6 +164,10 @@ object JvmAdvisor {
         }
         return null
     }
+
+    @JvmStatic
+    fun oversizedRatio(totalMb: Long): Double =
+        if (totalMb <= SMALL_HOST_MB) HEAP_OVERSIZED_RATIO_SMALL else HEAP_OVERSIZED_RATIO
 
     private var lastFrameNanos = 0L
     private var lastGcMillis = -1L
@@ -287,17 +297,23 @@ object JvmAdvisor {
         HostMemory(
             totalMb = totalMb,
             availableMb = availableMb,
-            pressure = systemPressure(totalMb, availableMb),
+            pressure = systemPressure(memory, totalMb, availableMb),
         )
     }.onFailure { logger.warn("Could not read host memory", it) }.getOrNull()
 
-    private fun systemPressure(totalMb: Long, availableMb: Long): Int {
+    private fun systemPressure(memory: GlobalMemory, totalMb: Long, availableMb: Long): Int {
         val os = System.getProperty("os.name", "")
         return runCatching {
             when {
                 os.startsWith("Mac") -> SysctlUtil.sysctl(MAC_PRESSURE_SYSCTL, PRESSURE_UNKNOWN)
                 os.startsWith("Linux") -> linuxPressure(Files.readString(Paths.get(LINUX_PSI_PATH)))
-                os.startsWith("Windows") -> loadPressure(totalMb, availableMb)
+                os.startsWith("Windows") -> {
+                    val mb = 1024L * 1024L
+                    val swap = runCatching {
+                        memory.virtualMemory.let { it.swapUsed / mb to it.swapTotal / mb }
+                    }.getOrDefault(0L to 0L)
+                    loadPressure(totalMb, availableMb, swap.first, swap.second)
+                }
                 else -> PRESSURE_UNKNOWN
             }
         }.getOrDefault(PRESSURE_UNKNOWN)
@@ -318,12 +334,15 @@ object JvmAdvisor {
     }
 
     @JvmStatic
-    fun loadPressure(totalMb: Long, availableMb: Long): Int {
+    @JvmOverloads
+    fun loadPressure(totalMb: Long, availableMb: Long, swapUsedMb: Long = 0, swapTotalMb: Long = 0): Int {
         if (totalMb <= 0) return PRESSURE_UNKNOWN
         val load = 100 - 100 * availableMb / totalMb
+        val swap = if (swapTotalMb > 0) 100 * swapUsedMb / swapTotalMb else 0
+        val swapping = load >= SWAP_LOAD_FLOOR
         return when {
-            load >= WINDOWS_LOAD_CRITICAL -> PRESSURE_CRITICAL
-            load >= WINDOWS_LOAD_WARN -> PRESSURE_WARN
+            load >= WINDOWS_LOAD_CRITICAL || (swapping && swap >= SWAP_CRITICAL) -> PRESSURE_CRITICAL
+            load >= WINDOWS_LOAD_WARN || (swapping && swap >= SWAP_WARN) -> PRESSURE_WARN
             else -> PRESSURE_NORMAL
         }
     }

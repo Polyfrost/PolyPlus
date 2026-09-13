@@ -182,4 +182,43 @@ class JvmAdvisorTest {
         assertEquals(JvmAdvisor.PRESSURE_CRITICAL, JvmAdvisor.loadPressure(1000, 50))
         assertEquals(JvmAdvisor.PRESSURE_UNKNOWN, JvmAdvisor.loadPressure(0, 0))
     }
+
+    @Test
+    fun `a busy machine paging heavily is pressured before its physical load is`() {
+        assertEquals(JvmAdvisor.PRESSURE_WARN, JvmAdvisor.loadPressure(8154, 2065, 7816, 9434))
+        assertEquals(JvmAdvisor.PRESSURE_CRITICAL, JvmAdvisor.loadPressure(8154, 2065, 9000, 9434))
+    }
+
+    @Test
+    fun `swap on an otherwise idle machine is not called pressure`() {
+        assertEquals(JvmAdvisor.PRESSURE_NORMAL, JvmAdvisor.loadPressure(16384, 12000, 900, 1024))
+    }
+
+    @Test
+    fun `a machine without a pagefile is judged on physical load alone`() {
+        assertEquals(JvmAdvisor.PRESSURE_NORMAL, JvmAdvisor.loadPressure(8154, 2065, 0, 0))
+    }
+
+    @Test
+    fun `half of a small machine is an oversized heap`() {
+        assertEquals(JvmAdvisor.HEAP_OVERSIZED_RATIO_SMALL, JvmAdvisor.oversizedRatio(8192))
+        assertEquals(JvmAdvisor.HEAP_OVERSIZED_RATIO, JvmAdvisor.oversizedRatio(16384))
+        val small = HostMemory(totalMb = 8154, availableMb = 3000, pressure = 1)
+        val advice = JvmAdvisor.evaluate(snapshot(maxHeapMb = 3072, liveSetMb = 605, host = small))
+        assertEquals(Kind.LOWER_HEAP, advice?.kind)
+        assertTrue(advice!!.suggestedMb >= 605, advice.message)
+    }
+
+    @Test
+    fun `a 3 GB heap on a thrashing 8 GB box is told to close apps`() {
+        val host = HostMemory(
+            totalMb = 8154,
+            availableMb = 2065,
+            pressure = JvmAdvisor.loadPressure(8154, 2065, 7816, 9434),
+        )
+        val advice = JvmAdvisor.evaluate(
+            snapshot(maxHeapMb = 3072, liveSetMb = 605, nonHeapMb = 432, cores = 4, host = host),
+        )
+        assertEquals(Kind.FREE_SYSTEM_MEMORY, advice?.kind)
+    }
 }
