@@ -25,6 +25,8 @@ object BedrockAttachedModelRenderer {
         val translucent: Boolean = false,
         val backOffset: Float = 0f,
         val scale: Float = 1f,
+        val textureVScale: Float = 1f,
+        val textureVOffset: Float = 0f,
     )
 
     private fun prepare(draw: DrawCall) {
@@ -67,7 +69,15 @@ object BedrockAttachedModelRenderer {
                 submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
                     val localStack = PoseStack()
                     localStack.last().set(basePose)
-                    attachment.rootBone.render(localStack, buffer, lightCoords, overlayCoords, draw.color)
+                    attachment.rootBone.render(
+                        localStack,
+                        buffer,
+                        lightCoords,
+                        overlayCoords,
+                        draw.color,
+                        draw.textureVScale,
+                        draw.textureVOffset,
+                    )
                 }
 
                 poseStack.popPose()
@@ -97,7 +107,15 @@ object BedrockAttachedModelRenderer {
                 if (draw.scale != 1f) {
                     poseStack.scale(draw.scale, draw.scale, draw.scale)
                 }
-                attachment.rootBone.render(poseStack, buffer, lightCoords, overlayCoords, draw.color)
+                attachment.rootBone.render(
+                    poseStack,
+                    buffer,
+                    lightCoords,
+                    overlayCoords,
+                    draw.color,
+                    draw.textureVScale,
+                    draw.textureVOffset,
+                )
                 poseStack.popPose()
             }
         }
