@@ -70,6 +70,7 @@
     "compat.essential.MixinModalManager",
     "compat.essential.MixinPartnerModConfig",
     "compat.euphoria.MixinSodiumConsole",
+    "compat.mountopacity.MixinEntityHook",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",

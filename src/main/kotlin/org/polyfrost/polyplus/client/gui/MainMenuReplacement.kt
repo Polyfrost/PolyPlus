@@ -18,7 +18,11 @@ object MainMenuReplacement {
 
     @JvmStatic
     fun create(): Screen =
-        if (!PolyPlusConfig.onboardingCompleted || PrivacyConsent.needsPrompt() || OnboardingFeatures.needsMotionBlurChoice()) {
+        if (!PolyPlusConfig.onboardingCompleted ||
+            PrivacyConsent.needsPrompt() ||
+            OnboardingFeatures.needsModSettingsChoice() ||
+            OnboardingFeatures.needsMotionBlurChoice()
+        ) {
             PolyPlusOnboardingScreen()
         } else {
             PolyPlusMainMenuScreen()

@@ -44,6 +44,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingPolyBlurApplied = false
 
     @JvmStatic @Include
+    var onboardingModSettingsVersion = 0
+
+    @JvmStatic @Include
     var adaptiveBlurApplied = false
 
     @JvmStatic @Include
@@ -73,6 +76,67 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var onboardingGuiScale = 0
+
+    @JvmStatic @Include
+    var onboardingBetterGrassMode = 3
+
+    @JvmStatic @Include
+    var onboardingBetterGrassSettled = false
+
+    @JvmStatic @Include
+    var onboardingFireOverlayHeight = 0.0
+
+    @JvmStatic @Include
+    var onboardingFireOverlayOpacity = 100f
+
+    @JvmStatic @Include
+    var onboardingShieldHeight = 0f
+
+    @JvmStatic @Include
+    var onboardingFireOverlaySettled = false
+
+    @JvmStatic @Include
+    var onboardingShieldHeightSettled = false
+
+    @JvmStatic @Include
+    var onboardingHorseOpacity = 100f
+
+    @JvmStatic @Include
+    var onboardingMountOpacitySettled = false
+
+    @JvmStatic @Include
+    var onboardingWaveyCapes = true
+
+    @JvmStatic @Include
+    var onboardingWaveyCapesSettled = false
+
+    @JvmStatic @Include
+    var onboardingSkinLayers = true
+
+    @JvmStatic @Include
+    var onboardingSkinLayersSettled = false
+
+    @JvmStatic @Include
+    var onboardingItemOffsetX = 0f
+
+    @JvmStatic @Include
+    var onboardingItemOffsetY = 0f
+
+    @JvmStatic @Include
+    var onboardingItemOffsetZ = 0f
+
+    @JvmStatic @Include
+    var onboardingItemScale = 1f
+
+    @JvmStatic @Include
+    var onboardingItemPositionsSettled = false
+
+    /** Gamma Utils' brightness as the mod stores it, where 100 is vanilla maximum. */
+    @JvmStatic @Include
+    var onboardingGamma = 100f
+
+    @JvmStatic @Include
+    var onboardingGammaSettled = false
 
     @JvmStatic
     @Switch(
