@@ -9,10 +9,15 @@ import java.time.Instant
 
 class AccountExpiryTest {
     @Test
-    fun `an unreadable expiry counts as expired`() {
-        assertTrue(LauncherAccountStore.isExpired(""))
-        assertTrue(LauncherAccountStore.isExpired("2026-09-11T12:00:00"))
-        assertTrue(LauncherAccountStore.isExpired("1757606400"))
+    fun `an unreadable expiry counts as unknown, not expired`() {
+        assertFalse(LauncherAccountStore.isExpired(""))
+        assertFalse(LauncherAccountStore.isExpired("2026-09-11T12:00:00"))
+        assertFalse(LauncherAccountStore.isExpired("1757606400"))
+    }
+
+    @Test
+    fun `an offset expiry is still readable`() {
+        assertFalse(LauncherAccountStore.isExpired(Instant.now().plus(Duration.ofHours(1)).toString().replace("Z", "+00:00")))
     }
 
     @Test

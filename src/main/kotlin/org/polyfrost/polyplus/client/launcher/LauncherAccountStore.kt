@@ -71,7 +71,7 @@ object LauncherAccountStore {
     fun isMicrosoft(account: StoredAccount): Boolean = account.kind.equals("microsoft", ignoreCase = true)
 
     fun isExpired(expires: String): Boolean {
-        val at = runCatching { Instant.parse(expires) }.getOrNull() ?: return true
+        val at = runCatching { Instant.parse(expires) }.getOrNull() ?: return false
         return at.isBefore(Instant.now().plusSeconds(EXPIRY_GRACE_SECONDS))
     }
 
