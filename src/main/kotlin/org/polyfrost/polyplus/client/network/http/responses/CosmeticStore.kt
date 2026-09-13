@@ -59,7 +59,7 @@ data class CosmeticSearchResponse(
 
 @Serializable
 data class CosmeticStoreView(
-    @SerialName("stripe_price_id") val stripePriceId: String? = null,
+    @SerialName("store_product_id") val storeProductId: String? = null,
     val id: Int,
     val name: String = "Cosmetic",
     val description: String? = null,
@@ -73,7 +73,7 @@ data class CosmeticStoreView(
     val tags: CosmeticTags = CosmeticTags(),
     val variants: List<StoreVariant>? = null,
 ) {
-    val purchasable: Boolean get() = !stripePriceId.isNullOrBlank()
+    val purchasable: Boolean get() = !storeProductId.isNullOrBlank()
 
     val variantList: List<StoreVariant>
         get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))

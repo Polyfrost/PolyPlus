@@ -207,7 +207,7 @@ private data class CartEntry(
     val basePrice: Float?,
     val finalPrice: Float?,
     val discountRate: Int?,
-    val stripePriceId: String?,
+    val storeProductId: String?,
     val coverAssetId: Int? = null,
 ) {
     val free: Boolean get() = (finalPrice ?: 0f) <= 0f
@@ -216,9 +216,9 @@ private data class CartEntry(
 }
 
 private fun BundleInfo.toCartEntry(): CartEntry =
-    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
+    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, storeProductId)
 
-private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, stripePriceId: String?): CartEntry =
+private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProductId: String?): CartEntry =
     CartEntry(
         cosmeticCartKey(variant.id),
         cartName(variant),
@@ -226,7 +226,7 @@ private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, stripePric
         basePrice,
         finalPrice,
         discountRate,
-        stripePriceId,
+        storeProductId,
         coverAssetId,
     )
 
@@ -341,14 +341,14 @@ private fun PolyPlusCosmeticsScreen() {
     }
 
     fun checkout() {
-        val priceIds = cart.mapNotNull { it.stripePriceId }
-        if (priceIds.isEmpty()) {
+        val productIds = cart.mapNotNull { it.storeProductId }
+        if (productIds.isEmpty()) {
             status = "Nothing purchasable in your cart yet."
             return
         }
         status = "Opening checkout..."
         PolyPlusClient.SCOPE.launch {
-            val result = BillingService.checkoutAndOpen(priceIds)
+            val result = BillingService.checkoutAndOpen(productIds)
             ClientPlatform.runOnMain {
                 status = result.fold(
                     onSuccess = { "Checkout opened in your browser." },
@@ -472,7 +472,7 @@ private fun PolyPlusCosmeticsScreen() {
                         PolyPlusClient.SCOPE.launch {
                             val view = CosmeticStore.view(variant.id).getOrNull()
                             ClientPlatform.runOnMain {
-                                val priceId = view?.stripePriceId
+                                val priceId = view?.storeProductId
                                 if (priceId.isNullOrBlank()) {
                                     status = "$label isn't purchasable yet."
                                 } else if (cart.none { it.key == key }) {
@@ -492,7 +492,7 @@ private fun PolyPlusCosmeticsScreen() {
                     status = "Opening checkout..."
                     PolyPlusClient.SCOPE.launch {
                         val view = CosmeticStore.view(variant.id).getOrNull()
-                        val priceId = view?.stripePriceId
+                        val priceId = view?.storeProductId
                         if (priceId.isNullOrBlank()) {
                             ClientPlatform.runOnMain { status = "$label isn't purchasable yet." }
                         } else {
@@ -804,7 +804,7 @@ private fun TransactionRow(tx: TransactionInfo) {
             GuiText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             GuiText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
-        tx.amount?.let { GuiText(money(it), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+        tx.amount?.let { GuiText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
         GuiText(
             tx.status.displayName,
             color = statusColor(tx.status),
@@ -818,7 +818,7 @@ private fun statusColor(status: TransactionStatus): Color = when (status) {
     TransactionStatus.Completed -> Color(0xFF239A60)
     TransactionStatus.Pending -> Color(0xFFE0A030)
     TransactionStatus.Failed -> Color(0xFFFF4444)
-    TransactionStatus.Refunded -> Color(0xFF8A9296)
+    TransactionStatus.Refunded, TransactionStatus.PartiallyRefunded, TransactionStatus.Chargeback -> Color(0xFF8A9296)
     TransactionStatus.Unknown -> Color(0xFF8A9296)
 }
 
@@ -2346,9 +2346,9 @@ private fun StoreDetailPanel(
                         info.description?.takeIf { it.isNotBlank() }?.let {
                             GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                         }
-                        if (status != null) {
-                            GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        }
+                    }
+                    if (status != null) {
+                        GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                     }
                     if (variant.id in ownedIds) {
                         GuiText(
@@ -2778,4 +2778,7 @@ private fun cardBrush(): Brush =
         ),
     )
 
-private fun money(amount: Float): String = "$" + String.format("%.2f", amount)
+private fun money(amount: Float, currency: String? = null): String {
+    val formatted = String.format("%.2f", amount)
+    return if (currency == null || currency.equals("usd", ignoreCase = true)) "$$formatted" else "$formatted ${currency.uppercase()}"
+}
