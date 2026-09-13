@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import org.joml.Matrix4fc
 import org.joml.Vector3f
 
@@ -25,7 +25,7 @@ data class BedrockQuad(
     val lightLevel: Int = -1,
 ) {
     fun emit(
-        pose: PoseStack.Pose,
+        pose: Pose,
         buffer: VertexConsumer,
         lightCoords: Int,
         overlayCoords: Int,

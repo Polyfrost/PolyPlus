@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.pets
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.culling.Frustum

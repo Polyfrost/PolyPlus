@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
 //? if >= 1.21.11 {
-import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.polyplus.client.render.NativeImage
 import net.minecraft.client.renderer.texture.CubeMapTexture
 import net.minecraft.client.renderer.texture.MipmapStrategy
 import net.minecraft.client.renderer.texture.TextureContents

@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics.assets
 
-import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.polyplus.client.render.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier

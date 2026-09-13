@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import org.polyfrost.polyplus.client.render.PoseStack
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.joml.Quaternionf
 import org.joml.Vector3f

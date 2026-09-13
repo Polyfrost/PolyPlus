@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import net.minecraft.core.Direction
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockBone
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCube
@@ -20,7 +20,7 @@ class BedrockMesh private constructor(
     val quads: List<BedrockQuad>,
 ) {
     fun render(
-        pose: PoseStack.Pose,
+        pose: Pose,
         buffer: VertexConsumer,
         lightCoords: Int,
         overlayCoords: Int,

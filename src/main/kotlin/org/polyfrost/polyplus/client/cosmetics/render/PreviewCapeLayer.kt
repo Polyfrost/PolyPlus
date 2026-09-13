@@ -1,7 +1,7 @@
 //? if >= 1.21.10 {
 package org.polyfrost.polyplus.client.cosmetics.render
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.model.geom.EntityModelSet
 import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.client.renderer.entity.RenderLayerParent

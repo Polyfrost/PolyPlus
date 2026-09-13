@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics.render
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 //? if >= 1.21.10 {
 import net.minecraft.client.renderer.SubmitNodeCollector

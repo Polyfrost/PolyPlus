@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.features
 
-import com.mojang.blaze3d.platform.InputConstants
+import org.polyfrost.polyplus.client.render.InputConstants
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft

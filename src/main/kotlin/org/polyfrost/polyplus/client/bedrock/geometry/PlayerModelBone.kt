@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.bedrock.geometry
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.model.geom.ModelPart
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants

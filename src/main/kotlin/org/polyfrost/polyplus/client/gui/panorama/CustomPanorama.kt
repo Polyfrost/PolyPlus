@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
-import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.polyplus.client.render.NativeImage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout

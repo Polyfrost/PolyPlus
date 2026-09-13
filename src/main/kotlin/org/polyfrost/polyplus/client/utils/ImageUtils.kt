@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.utils
 
-import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.polyplus.client.render.NativeImage
 import java.awt.image.BufferedImage
 
 fun BufferedImage.toNativeImage(): NativeImage {

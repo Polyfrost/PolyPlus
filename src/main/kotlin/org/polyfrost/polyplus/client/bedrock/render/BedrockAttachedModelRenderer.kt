@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 //? if >= 1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderTypes
 //?} else {

@@ -1,24 +1,14 @@
 package org.polyfrost.polyplus.client.social
 
-import com.mojang.blaze3d.platform.InputConstants
-//? if >= 26.1 {
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
-//?} else {
+//? if < 26.1 {
 /*import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
 *///?}
-import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
-import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.oneconfig.api.event.v1.eventHandler
-import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
-import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.SocialOverlayScreen
-import org.lwjgl.glfw.GLFW
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 object SocialOverlay {

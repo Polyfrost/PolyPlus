@@ -108,7 +108,7 @@ val flkProvidedVersions: Map<String, String> = run {
             val missing = flkProvidedModules - resolved.keys
             check(missing.isEmpty()) {
                 "fabric-language-kotlin $fabricLanguageKotlinVersion no longer ships $missing; " +
-                    "drop them from flkProvidedModules so they get bundled again"
+                        "drop them from flkProvidedModules so they get bundled again"
             }
         }
 }
@@ -212,7 +212,18 @@ dependencies {
         // Loom strips the nested Kotlin jars from a remapped copy, so the plain copy above must stay the only candidate
         exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
     }
-    for (module in listOf("commands", "config", "config-impl", "hud", "notifications", "poly-compose", "utils", "internal", "ui", "events")) {
+    for (module in listOf(
+        "commands",
+        "config",
+        "config-impl",
+        "hud",
+        "notifications",
+        "poly-compose",
+        "utils",
+        "internal",
+        "ui",
+        "events"
+    )) {
         implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
     }
 
