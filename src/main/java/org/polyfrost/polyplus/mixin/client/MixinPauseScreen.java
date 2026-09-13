@@ -5,6 +5,7 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.Component;
 import org.objectweb.asm.Opcodes;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -23,6 +24,8 @@ public class MixinPauseScreen {
         )
     )
     private Component polyplus$hostWorldLabel(Component original) {
-        return PolyPlusConfig.getReplacePauseLanButton() ? Component.translatable("polyplus.hostWorld") : original;
+        return PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices()
+            ? Component.translatable("polyplus.hostWorld")
+            : original;
     }
 }

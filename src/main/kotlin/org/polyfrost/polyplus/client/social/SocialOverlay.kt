@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.SocialOverlayScreen
 import org.lwjgl.glfw.GLFW
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 object SocialOverlay {
     private val logger = LogManager.getLogger("polyplus/social-overlay")
@@ -58,6 +59,10 @@ object SocialOverlay {
 
     /** Explicit open, e.g. from a button - always allowed regardless of the current screen. */
     fun open(from: Screen? = currentScreen()) {
+        if (!PrivacyConsent.allowsOnlineServices()) {
+            logger.debug("Ignoring social overlay open: online services are disabled (ToS not accepted)")
+            return
+        }
         previousScreen = from
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
