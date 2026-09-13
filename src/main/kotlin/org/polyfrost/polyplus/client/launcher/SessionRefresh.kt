@@ -1,8 +1,10 @@
 package org.polyfrost.polyplus.client.launcher
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -17,6 +19,7 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import java.util.UUID
 
 object SessionRefresh {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -25,12 +28,27 @@ object SessionRefresh {
     private const val INVALID_SESSION_KEY = "disconnect.loginFailedInfo.invalidSession"
     private const val REFRESH_TIMEOUT_MS = 30_000L
 
-    private const val JOIN_BLOCK_TIMEOUT_MS = REFRESH_TIMEOUT_MS
+    private const val PREJOIN_WAIT_MS = 1_000L
+
+    private const val REJOIN_REFRESH_WAIT_MS = 2_500L
+
+    private const val REFRESH_COOLDOWN_MS = 5 * 60 * 1000L
+
+    private const val REJECTION_COOLDOWN_MS = 30 * 1000L
 
     private val refreshLock = Any()
 
+    private data class RefreshTarget(
+        val id: UUID,
+        val account: LauncherAccountStore.StoredAccount,
+    )
+
+    private val pendingRefreshes = mutableMapOf<UUID, Deferred<Result<Unit>>>()
+
+    private val lastRefreshStartedMs = mutableMapOf<UUID, Long>()
+
     @Volatile
-    private var inFlightRefresh: Deferred<Result<Unit>>? = null
+    private var refreshProbe: CompletableDeferred<Unit>? = null
 
     private class ConnectionAttempt(
         val parent: Screen,
@@ -65,24 +83,33 @@ object SessionRefresh {
         if (parent != null && address != null && server != null) {
             lastAttempt = ConnectionAttempt(parent, address, server, quickPlay, transferState)
         }
-        if (reconnecting) reconnecting = false else refreshedForAttempt = false
+        val wasReconnecting = reconnecting
+        if (wasReconnecting) reconnecting = false else refreshedForAttempt = false
+        if (!wasReconnecting) startRefreshIfExpired()
+    }
+
+    private fun startRefreshIfExpired() {
+        if (!PolyPlusConfig.autoRefreshSession) return
+        val probe = CompletableDeferred<Unit>()
+        refreshProbe = probe
+        PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
+            val target = refreshableActiveTarget() ?: return@launch
+            if (!LauncherAccountStore.isExpired(target.account.expires)) return@launch
+            if (automaticRefresh(target) == null) return@launch
+            LOGGER.info("Session for {} has expired; refreshing it before joining the server", target.account.username)
+        }.invokeOnCompletion { probe.complete(Unit) }
     }
 
     @JvmStatic
     fun beforeAuthenticate() {
+        if (!hasPendingRefresh()) {
+            refreshedForAttempt = false
+            startRefreshIfExpired()
+        }
         failOpenIfInterrupted(Unit) {
             runBlocking {
-                val finished = withTimeoutOrNull<Unit>(JOIN_BLOCK_TIMEOUT_MS) {
-                    awaitPendingRefresh()
-                    if (!PolyPlusConfig.autoRefreshSession || refreshedForAttempt) return@withTimeoutOrNull
-                    val account = refreshableActiveAccount() ?: return@withTimeoutOrNull
-                    if (!LauncherAccountStore.isExpired(account.expires)) return@withTimeoutOrNull
-                    LOGGER.info("Session for {} has expired; refreshing it before joining the server", account.username)
-                    refreshedForAttempt = true
-                    refreshActiveSession()
-                }
+                val finished = withTimeoutOrNull(PREJOIN_WAIT_MS) { awaitPendingRefresh() }
                 if (finished == null) {
-                    refreshedForAttempt = false
                     LOGGER.warn("Refreshing the session took too long; joining with the token we already have")
                 }
             }
@@ -92,14 +119,26 @@ object SessionRefresh {
     @JvmStatic
     fun refreshAfterRejection(): Boolean {
         if (!PolyPlusConfig.autoRefreshSession || refreshedForAttempt) return false
-        if (refreshableActiveAccount() == null) return false
+        val target = refreshableActiveTarget() ?: return false
+        val refresh = automaticRefresh(target, REJECTION_COOLDOWN_MS, reuseCompleted = true) ?: return false
         LOGGER.info("The session server rejected the account; refreshing the session and retrying the join")
         refreshedForAttempt = true
         return failOpenIfInterrupted(false) {
             runBlocking {
-                withTimeoutOrNull(JOIN_BLOCK_TIMEOUT_MS) { refreshActiveSession() }?.isSuccess == true
+                val result = withTimeoutOrNull(REJOIN_REFRESH_WAIT_MS) {
+                    refresh.await().also { consumeRefreshResult(target.id, refresh) }
+                }
+                if (result == null) {
+                    LOGGER.warn("The refresh outran the server's login timeout; leaving the retry to the prompt")
+                }
+                result?.isSuccess == true
             }
         }
+    }
+
+    private fun hasPendingRefresh(): Boolean = synchronized(refreshLock) {
+        val id = activeProfileId() ?: return@synchronized false
+        pendingRefreshes[id]?.isActive == true
     }
 
     private fun <T> failOpenIfInterrupted(fallback: T, block: () -> T): T =
@@ -129,7 +168,7 @@ object SessionRefresh {
     fun createPrompt(): SessionRefreshPrompt? {
         if (!invalidSessionPending) return null
         invalidSessionPending = false
-        if (lastAttempt == null || refreshableActiveAccount() == null) return null
+        if (lastAttempt == null || refreshableActiveTarget() == null) return null
         return SessionRefreshPrompt()
     }
 
@@ -154,37 +193,81 @@ object SessionRefresh {
     internal fun refreshAfterSwitch(account: LauncherAccountStore.StoredAccount) {
         if (!PolyPlusConfig.autoRefreshSession) return
         if (!LauncherAccountStore.isRefreshable(account) || !LauncherAccountStore.isExpired(account.expires)) return
+        val target = refreshTarget(account) ?: return
+        if (automaticRefresh(target) == null) return
         LOGGER.info("Session for {} has expired; refreshing it in the background", account.username)
-        pendingRefresh()
     }
 
-    internal suspend fun refreshActiveSession(): Result<Unit> = pendingRefresh().await()
+    internal suspend fun refreshActiveSession(): Result<Unit> {
+        val target = refreshableActiveTarget()
+            ?: return Result.failure(IllegalStateException("The active account cannot be refreshed"))
+        val refresh = promptedRefresh(target)
+        return refresh.await().also { consumeRefreshResult(target.id, refresh) }
+    }
 
-    private fun pendingRefresh(): Deferred<Result<Unit>> = synchronized(refreshLock) {
-        inFlightRefresh?.takeIf { it.isActive }
-            ?: PolyPlusClient.SCOPE.async(Dispatchers.IO) { performRefresh() }.also { inFlightRefresh = it }
+    private fun automaticRefresh(
+        target: RefreshTarget,
+        cooldownMs: Long = REFRESH_COOLDOWN_MS,
+        reuseCompleted: Boolean = false,
+    ): Deferred<Result<Unit>>? = synchronized(refreshLock) {
+        pendingRefreshes[target.id]?.takeIf { it.isActive || reuseCompleted }?.let { return@synchronized it }
+        val last = lastRefreshStartedMs[target.id]
+        if (last != null && System.currentTimeMillis() - last < cooldownMs) return@synchronized null
+        newRefresh(target)
+    }
+
+    private fun promptedRefresh(target: RefreshTarget): Deferred<Result<Unit>> = synchronized(refreshLock) {
+        pendingRefreshes[target.id]?.takeIf { it.isActive } ?: newRefresh(target)
     }
 
     private suspend fun awaitPendingRefresh() {
-        synchronized(refreshLock) { inFlightRefresh?.takeIf { it.isActive } }?.await()
+        refreshProbe?.await()
+        val id = activeProfileId() ?: return
+        val refresh = synchronized(refreshLock) {
+            pendingRefreshes[id]
+        } ?: return
+        refresh.await()
+        consumeRefreshResult(id, refresh)
     }
 
-    private suspend fun performRefresh(): Result<Unit> {
-        val account = refreshableActiveAccount()
-            ?: return Result.failure(IllegalStateException("The active account cannot be refreshed"))
-        val id = LauncherAccountStore.parseUuid(account.id)
-            ?: return Result.failure(IllegalStateException("The active account has a malformed ID"))
+    private fun newRefresh(target: RefreshTarget): Deferred<Result<Unit>> {
+        val now = System.currentTimeMillis()
+        for (id in lastRefreshStartedMs.keys.toList()) {
+            if (id == target.id || now - lastRefreshStartedMs[id]!! < REFRESH_COOLDOWN_MS) continue
+            if (pendingRefreshes[id]?.isActive == true) continue
+            pendingRefreshes.remove(id)
+            lastRefreshStartedMs.remove(id)
+        }
+        lastRefreshStartedMs[target.id] = now
+        return PolyPlusClient.SCOPE.async(Dispatchers.IO) { performRefresh(target) }.also {
+            pendingRefreshes[target.id] = it
+        }
+    }
+
+    private fun consumeRefreshResult(id: UUID, refresh: Deferred<Result<Unit>>) = synchronized(refreshLock) {
+        if (pendingRefreshes[id] === refresh) pendingRefreshes.remove(id)
+    }
+
+    private suspend fun performRefresh(target: RefreshTarget): Result<Unit> {
         return runCatching {
-            withTimeout(REFRESH_TIMEOUT_MS) { OneLauncherAccounts.refresh(id, refreshClient = false) }
-            LOGGER.info("Refreshed the session for {}", account.username)
-        }.onFailure { LOGGER.warn("Could not refresh the session for {}", account.username, it) }
+            withTimeout(REFRESH_TIMEOUT_MS) { OneLauncherAccounts.refresh(target.id, refreshClient = false) }
+            LOGGER.info("Refreshed the session for {}", target.account.username)
+        }.onFailure { LOGGER.warn("Could not refresh the session for {}", target.account.username, it) }
     }
 
-    private fun refreshableActiveAccount(): LauncherAccountStore.StoredAccount? {
+    private fun refreshableActiveTarget(): RefreshTarget? {
         SessionAccounts.capture()
-        val id = runCatching { Minecraft.getInstance().user.profileId }.getOrNull() ?: return null
-        return LauncherAccountStore.load().users.values
+        val id = activeProfileId() ?: return null
+        val account = LauncherAccountStore.load().users.values
             .firstOrNull { LauncherAccountStore.parseUuid(it.id) == id }
             ?.takeIf(LauncherAccountStore::isRefreshable)
+            ?: return null
+        return RefreshTarget(id, account)
     }
+
+    private fun refreshTarget(account: LauncherAccountStore.StoredAccount): RefreshTarget? =
+        LauncherAccountStore.parseUuid(account.id)?.let { RefreshTarget(it, account) }
+
+    private fun activeProfileId(): UUID? =
+        runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
 }

@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import org.polyfrost.polyplus.client.launcher.SessionRefresh;
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate;
@@ -17,10 +18,14 @@ public class MixinClientHandshakePacketListenerImpl {
     @Final
     private ServerData serverData;
 
+    @Shadow
+    @Final
+    private Connection connection;
+
     @WrapMethod(method = "authenticateServer")
     private Component polyplus$refreshExpiredSession(String digest, Operation<Component> original) {
         SessionRefresh.beforeAuthenticate();
-        boolean held = MinecraftLoginGate.begin();
+        boolean held = MinecraftLoginGate.begin(this.connection);
         try {
             Component error = original.call(digest);
             boolean disconnects = this.serverData == null || !this.serverData.isLan();
@@ -36,7 +41,7 @@ public class MixinClientHandshakePacketListenerImpl {
             SessionRefresh.onInvalidSession();
             return error;
         } finally {
-            MinecraftLoginGate.end(held);
+            MinecraftLoginGate.end(this.connection, held);
         }
     }
 }

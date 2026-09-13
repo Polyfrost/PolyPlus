@@ -1,8 +1,11 @@
 package org.polyfrost.polyplus.client.network.http
 
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
@@ -12,6 +15,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -30,6 +34,7 @@ object PolyAuthorization {
     private const val TOKEN_TTL_MS = 2 * 60 * 60 * 1000L
     private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L
     private const val LOGIN_GATE_TIMEOUT_MS = 30 * 1000L
+    private const val JOIN_ATTEMPTS = 3
 
     private var cachedResponse: AuthResponse? = null
     private var cachedExpiresAtMs = 0L
@@ -107,17 +112,59 @@ object PolyAuthorization {
         return job
     }
 
-    private suspend fun authorize(): Authorized {
+    private suspend fun authorize(): Authorized = withSessionJoinRetry { joined ->
         val user = Minecraft.getInstance().user
         val profileId = user.profileId
         val playerName = user.name
         val serverId = generateServerId()
-        MinecraftLoginGate.whileNotLoggingIn(LOGIN_GATE_TIMEOUT_MS) {
-            authorizeSessionService(serverId, profileId, user.accessToken)
+        if (PolyPlusConfig.apiUrl != BackendUrl.LOCAL) {
+            if (authorizeSessionService(serverId, profileId, user.accessToken)) joined()
         }
+        try {
+            login(serverId, profileId, playerName)
+        } catch (rejected: ClientRequestException) {
+            if (rejected.response.status != HttpStatusCode.Unauthorized) throw rejected
+            throw SessionVerificationException(rejected)
+        }
+    }
+
+    internal class SessionVerificationException(override val cause: Throwable) : Exception(cause)
+
+    internal suspend fun <T> withSessionJoinRetry(block: suspend (joined: () -> Unit) -> T): T {
+        val deadline = System.currentTimeMillis() + LOGIN_GATE_TIMEOUT_MS
+        var attempt = 0
+        while (true) {
+            attempt++
+            var joined = false
+            var generation = 0
+            try {
+                val remaining = (deadline - System.currentTimeMillis()).coerceAtLeast(0L)
+                return MinecraftLoginGate.whileNotLoggingIn(remaining) {
+                    generation = MinecraftLoginGate.failOpenGeneration
+                    block { joined = true }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (refused: SessionVerificationException) {
+                if (!joined ||
+                    MinecraftLoginGate.failOpenGeneration == generation ||
+                    attempt >= JOIN_ATTEMPTS ||
+                    System.currentTimeMillis() >= deadline
+                ) {
+                    throw refused.cause
+                }
+                LOGGER.warn("A login replaced the pending session-service join; retrying authorization", refused.cause)
+            }
+        }
+    }
+
+    private suspend fun login(serverId: String, profileId: UUID, playerName: String): Authorized {
         val response = PolyPlusClient.HTTP
             .post("${PolyPlusConfig.apiUrl}/account/login") {
                 expectSuccess = true
+                if (PolyPlusConfig.apiUrl == BackendUrl.LOCAL) {
+                    parameter("player", profileId.toString())
+                }
                 parameter("server_id", serverId)
                 parameter("username", playerName)
                 parameter("client_version", PolyPlusConstants.VERSION)
@@ -147,7 +194,7 @@ object PolyAuthorization {
         return (0..<32).joinToString("") { "${chars.random()}" }
     }
 
-    private fun authorizeSessionService(serverId: String, profileId: UUID, accessToken: String) {
+    private fun authorizeSessionService(serverId: String, profileId: UUID, accessToken: String): Boolean {
         try {
             Minecraft.getInstance().
                 //?if >= 1.21.10 {
@@ -158,7 +205,9 @@ object PolyAuthorization {
                 .joinServer(profileId, accessToken, serverId)
         } catch (e: Exception) {
             LOGGER.error("Failed to authenticate with Mojang", e)
+            return false
         }
+        return true
     }
 
     private class Authorized(val profileId: UUID, val response: AuthResponse)

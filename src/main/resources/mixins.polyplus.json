@@ -38,6 +38,8 @@
     "client.MixinTabButton",
     "client.MixinTitleScreen",
     "client.access.CameraAccessor",
+    "client.access.ClientCommonPacketListenerAccessor",
+    "client.access.ClientHandshakePacketListenerAccessor",
     "client.access.ClientPacketListenerAccessor",
     "client.access.MinecraftAccessor",
     "client.access.AbstractSelectionListAccessor",
