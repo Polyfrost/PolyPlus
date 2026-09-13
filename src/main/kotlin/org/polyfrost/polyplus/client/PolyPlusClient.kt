@@ -60,6 +60,8 @@ import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+//? if >= 26.2
+import org.polyfrost.polyplus.compat.RrlsCrashGuard
 import org.polyfrost.polyplus.utils.EarlyInitializable
 
 object PolyPlusClient {
@@ -148,6 +150,8 @@ object PolyPlusClient {
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
+        //? if >= 26.2
+        step("rrls crash guard") { RrlsCrashGuard.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("login gate") { MinecraftLoginGate.register() }
