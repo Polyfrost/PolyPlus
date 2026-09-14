@@ -1,0 +1,246 @@
+package org.polyfrost.polyplus.client.featured;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.network.chat.Component;
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics;
+*///?}
+
+public final class FeaturedServerVanillaRenderer {
+    private static final int SEGMENTS_X = 12;
+    private static final int SEGMENTS_Y = 3;
+    private static final int VANILLA_STATUS_RIGHT_GAP = 20;
+    private static final int BUTTON_GAP = 5;
+    //? if >= 1.21.10 {
+    private static final int CONTENT_INSET = 2;
+    //?} else {
+    /*private static final int CONTENT_INSET = 0;
+    *///?}
+    private static final int SECTION_INSET = 4;
+    private static final int SECTION_LABEL_GAP = 5;
+    private static final int CROSS_SIZE = 5;
+    private static final int STATUS_ICON_WIDTH = 10;
+    private static final int STATUS_ICON_HEIGHT = 8;
+    private static final int STATUS_ICON_RIGHT_GAP = 15;
+    private static final int STAR_SIZE = 7;
+    private static final int STAR_COLOR = 0xFFFFD700;
+    private static final byte[] STAR_ROWS = {
+        0b0001000,
+        0b0011100,
+        0b1111111,
+        0b0111110,
+        0b0011100,
+        0b0110110,
+        0b1100011,
+    };
+    private static final int GLYPH_CAP_HEIGHT = 7;
+
+    private FeaturedServerVanillaRenderer() {
+    }
+
+    public static void before(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        FeaturedServerRowRegistry.Row row,
+        int x,
+        int y,
+        int width,
+        int height
+    ) {
+        row.bounds(x, y, width, height);
+        if (row.header()) {
+            var label = Component.translatable("polyplus.featured.sponsored");
+            var font = Minecraft.getInstance().font;
+            int labelWidth = font.width(label);
+            int labelX = x + (width - labelWidth) / 2;
+            int labelY = y + (height - font.lineHeight) / 2;
+            int lineY = labelY + (font.lineHeight - 1) / 2;
+            int lineColor = 0xFF666666;
+            graphics.fill(
+                x + SECTION_INSET,
+                lineY,
+                Math.max(x + SECTION_INSET, labelX - SECTION_LABEL_GAP),
+                lineY + 1,
+                lineColor
+            );
+            graphics.fill(
+                Math.min(x + width - SECTION_INSET, labelX + labelWidth + SECTION_LABEL_GAP),
+                lineY,
+                x + width - SECTION_INSET,
+                lineY + 1,
+                lineColor
+            );
+            //? if >= 26.1 {
+            graphics.text(font, label, labelX, labelY, 0xFFAAAAAA);
+            //?} else {
+            /*graphics.drawString(font, label, labelX, labelY, 0xFFAAAAAA);
+            *///?}
+            return;
+        }
+        drawOutline(graphics, row.server().getOutlineStyle(), x, y, width, height);
+    }
+
+    public static void after(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        FeaturedServerRowRegistry.Row row,
+        int mouseX,
+        int mouseY
+    ) {
+        if (row.header()) return;
+        if (row.promoted()) {
+            int iconX = row.x() + row.width() - CONTENT_INSET - STATUS_ICON_RIGHT_GAP;
+            drawStar(
+                graphics,
+                iconX + (STATUS_ICON_WIDTH - STAR_SIZE) / 2,
+                row.y() + CONTENT_INSET + STATUS_ICON_HEIGHT + 4
+            );
+        }
+        var campaign = row.server().getFeatured();
+        boolean dismissible = campaign != null && campaign.getDismissibleInServerList();
+        boolean restorable = !row.promoted() && FeaturedServers.isMultiplayerRestorable(row.server());
+        if (!(row.promoted() && dismissible) && !restorable) {
+            row.dismissBounds(0, 0, 0, 0);
+            return;
+        }
+        var font = Minecraft.getInstance().font;
+        var label = restorable ? Component.translatable("polyplus.featured.restore") : null;
+        int contentWidth = label != null ? font.width(label) : CROSS_SIZE;
+        var status = row.data().state() == ServerData.State.INCOMPATIBLE
+            ? row.data().version
+            : row.data().status;
+        int statusWidth = font.width(status);
+        int statusX = row.x() + row.width() - CONTENT_INSET - VANILLA_STATUS_RIGHT_GAP - statusWidth;
+        int contentX = statusX - BUTTON_GAP - contentWidth;
+        int contentY = row.y() + CONTENT_INSET + 1;
+        row.dismissBounds(contentX - 2, contentY - 2, contentWidth + 4, 11);
+        int color = row.dismissHit(mouseX, mouseY) ? 0xFFFFFFFF : 0xFFAAAAAA;
+        if (label == null) {
+            drawCross(graphics, contentX, contentY + (GLYPH_CAP_HEIGHT - CROSS_SIZE) / 2, color);
+            return;
+        }
+        //? if >= 26.1 {
+        graphics.text(font, label, contentX, contentY, color);
+        //?} else {
+        /*graphics.drawString(font, label, contentX, contentY, color);
+        *///?}
+    }
+
+    private static void drawStar(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y
+    ) {
+        for (int row = 0; row < STAR_ROWS.length; row++) {
+            int bits = STAR_ROWS[row];
+            for (int col = 0; col < STAR_SIZE; col++) {
+                if ((bits & (1 << (STAR_SIZE - 1 - col))) == 0) continue;
+                graphics.fill(x + col, y + row, x + col + 1, y + row + 1, STAR_COLOR);
+            }
+        }
+    }
+
+    private static void drawCross(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y, int color
+    ) {
+        for (int i = 0; i < CROSS_SIZE; i++) {
+            graphics.fill(x + i, y + i, x + i + 1, y + i + 1, color);
+            graphics.fill(x + CROSS_SIZE - 1 - i, y + i, x + CROSS_SIZE - i, y + i + 1, color);
+        }
+    }
+
+    private static void drawOutline(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        OutlineStyle style,
+        int x,
+        int y,
+        int width,
+        int height
+    ) {
+        if (style instanceof OutlineStyle.None) return;
+        if (!(style instanceof OutlineStyle.Rainbow)) {
+            int color = FeaturedServerColors.INSTANCE.colorAt(style, 0f, 0L);
+            solid(graphics, x, y, width, height, color);
+            return;
+        }
+        long now = System.nanoTime() / 1_000_000L;
+        int perimeter = Math.max(1, 2 * (width + height));
+        horizontal(graphics, x, y, width, SEGMENTS_X, 0, perimeter, now, false);
+        vertical(graphics, x + width - 1, y, height, SEGMENTS_Y, width, perimeter, now, false);
+        horizontal(graphics, x, y + height - 1, width, SEGMENTS_X, width + height, perimeter, now, true);
+        vertical(graphics, x, y, height, SEGMENTS_Y, 2 * width + height, perimeter, now, true);
+    }
+
+    private static void solid(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y, int width, int height, int color
+    ) {
+        graphics.fill(x, y, x + width, y + 1, color);
+        graphics.fill(x, y + height - 1, x + width, y + height, color);
+        graphics.fill(x, y, x + 1, y + height, color);
+        graphics.fill(x + width - 1, y, x + width, y + height, color);
+    }
+
+    private static void horizontal(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y, int length, int segments, int distance, int perimeter, long now, boolean reverse
+    ) {
+        for (int i = 0; i < segments; i++) {
+            int start = i * length / segments;
+            int end = (i + 1) * length / segments;
+            int along = reverse ? length - start : start;
+            int color = FeaturedServerColors.INSTANCE.rainbowAt((distance + along) / (float) perimeter, now);
+            graphics.fill(x + start, y, x + Math.max(start + 1, end), y + 1, color);
+        }
+    }
+
+    private static void vertical(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int x, int y, int length, int segments, int distance, int perimeter, long now, boolean reverse
+    ) {
+        for (int i = 0; i < segments; i++) {
+            int start = i * length / segments;
+            int end = (i + 1) * length / segments;
+            int along = reverse ? length - start : start;
+            int color = FeaturedServerColors.INSTANCE.rainbowAt((distance + along) / (float) perimeter, now);
+            graphics.fill(x, y + start, x + 1, y + Math.max(start + 1, end), color);
+        }
+    }
+
+}

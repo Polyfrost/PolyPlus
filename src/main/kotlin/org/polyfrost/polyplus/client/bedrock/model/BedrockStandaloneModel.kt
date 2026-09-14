@@ -1,6 +1,6 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.model
 
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
 import org.polyfrost.polyplus.client.bedrock.geometry.bedrockPivotOffset
 import org.polyfrost.polyplus.client.bedrock.geometry.bedrockRotationRadians
@@ -8,7 +8,6 @@ import org.polyfrost.polyplus.client.bedrock.geometry.childrenByParent
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.bedrock.render.BedrockBoneRenderer
 import org.polyfrost.polyplus.client.bedrock.render.BedrockMesh
-import org.joml.Vector3f
 
 class BedrockStandaloneModel private constructor(
     val roots: List<BedrockBoneRenderer>,
@@ -54,4 +53,3 @@ class BedrockStandaloneModel private constructor(
         }
     }
 }
-//?}

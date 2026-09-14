@@ -1,16 +1,15 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import net.minecraft.core.Direction
+import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockBone
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCube
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCubeFace
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockFaceUv
 import org.polyfrost.polyplus.client.bedrock.geometry.bedrockRotationRadians
-import org.joml.Quaternionf
-import org.joml.Vector3f
 import kotlin.collections.iterator
 import kotlin.math.abs
 import kotlin.math.floor
@@ -21,7 +20,7 @@ class BedrockMesh private constructor(
     val quads: List<BedrockQuad>,
 ) {
     fun render(
-        pose: PoseStack.Pose,
+        pose: Pose,
         buffer: VertexConsumer,
         lightCoords: Int,
         overlayCoords: Int,
@@ -236,8 +235,7 @@ class BedrockMesh private constructor(
             val height = abs(cube.size.y)
             val depth = abs(cube.size.z)
 
-            // Blockbench floors box-UV dimensions - if we dont, then it results
-            // in fucked up UV
+            // Blockbench floors box-UV dimensions and skipping that mangles the UV
             val uvWidth = floor(width)
             val uvHeight = floor(height)
             val uvDepth = floor(depth)
@@ -336,8 +334,7 @@ class BedrockMesh private constructor(
             flipU: Boolean,
             facing: Direction,
         ): BedrockQuad? {
-            // flipU swaps the U span so the texture mirrors horizontally (Bedrock
-            // `"mirror"`), without touching geometry winding.
+            // flipU mirrors the texture horizontally without touching geometry winding
             val u0 = if (flipU) u1In else u0In
             val u1 = if (flipU) u0In else u1In
             if (abs(u1 - u0) < BILLBOARD_EPSILON || abs(v1 - v0) < BILLBOARD_EPSILON) {
@@ -379,4 +376,3 @@ class BedrockMesh private constructor(
         private const val BILLBOARD_HALF_THICKNESS = 0.01f
     }
 }
-//?}

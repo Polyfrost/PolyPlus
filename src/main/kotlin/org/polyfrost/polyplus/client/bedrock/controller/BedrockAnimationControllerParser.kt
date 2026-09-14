@@ -1,7 +1,7 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.controller
 
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.JsonPrimitive
@@ -107,7 +107,7 @@ object BedrockAnimationControllerParser {
         return result
     }
 
-    private fun readExpression(element: com.google.gson.JsonElement): MolangExpr {
+    private fun readExpression(element: JsonElement): MolangExpr {
         if (!element.isJsonPrimitive) return Number(0.0)
         val primitive = element.asJsonPrimitive
         return when {
@@ -136,4 +136,3 @@ object BedrockAnimationControllerParser {
         }
     }
 }
-//?}

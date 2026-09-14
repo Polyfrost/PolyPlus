@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.resources.Identifier
@@ -14,4 +13,3 @@ sealed interface CosmeticEquipResult {
 
     data class UnknownCosmetic(val id: Identifier) : CosmeticEquipResult
 }
-//?}

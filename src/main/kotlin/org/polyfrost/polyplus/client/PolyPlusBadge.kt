@@ -1,28 +1,33 @@
 package org.polyfrost.polyplus.client
 
+import com.mojang.authlib.GameProfile
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.PlayerInfo
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.resources.Identifier
-//? if >= 1.21.10 {
-import net.minecraft.network.chat.FontDescription
-//?}
-//? if >= 1.21.1 {
-import com.mojang.authlib.GameProfile
-//?}
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import java.util.UUID
+
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
-//? if >= 1.21.1 && < 26.1 {
-/*import net.minecraft.client.gui.GuiGraphics
-*///?}
+
+//? if >= 1.21.10 {
+import net.minecraft.network.chat.FontDescription
+//?}
+
 //? if >= 1.21.8 {
 import net.minecraft.client.renderer.RenderPipelines
 //?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
 //? if >= 1.21.4 && < 1.21.8 {
 /*import net.minecraft.client.renderer.RenderType
 *///?}
-import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
-import java.util.UUID
 
 object PolyPlusBadge {
     private val FONT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "badge")
@@ -45,6 +50,9 @@ object PolyPlusBadge {
     @JvmField
     val badgeGlyph: Component = Component.literal(GLYPH).setStyle(BADGE_STYLE)
 
+    @JvmField
+    val badgeIcon: Component = Component.literal(GLYPH.substring(0, 1)).setStyle(BADGE_STYLE)
+
     @JvmStatic
     fun decorate(name: Component, uuid: UUID): Component {
         if (!shouldBadge(uuid)) return name
@@ -55,6 +63,49 @@ object PolyPlusBadge {
     }
 
     //? if >= 1.21.1 {
+    // Some servers (e.g. Hypixel SkyBlock) use placeholder profiles with fake
+    // UUIDs in the visible part of the tab list, so we match against the name
+    // as a fallback
+    private val NAME_TOKEN = Regex("[A-Za-z0-9_]{3,16}")
+
+    private val proxiedTabUuids = HashMap<UUID, ProxiedTabEntry>()
+
+    private class ProxiedTabEntry(val displayName: String, val resolved: UUID?)
+
+    @JvmStatic
+    fun shouldBadgeTab(info: PlayerInfo): Boolean {
+        if (!PolyPlusConfig.showPolyPlusIndicator) return false
+        if (DEBUG_FORCE) return true
+        if (CosmeticCatalog.isPolyPlusUser(tabUuid(info.profile))) return true
+        val proxied = resolveProxiedTabUuid(info) ?: return false
+        return CosmeticCatalog.isPolyPlusUser(proxied)
+    }
+
+    fun clearTabCache() {
+        proxiedTabUuids.clear()
+    }
+
+    private fun resolveProxiedTabUuid(info: PlayerInfo): UUID? {
+        val displayName = info.tabListDisplayName?.string ?: return null
+        val id = tabUuid(info.profile)
+        val cached = proxiedTabUuids[id]
+        if (cached != null && cached.displayName == displayName) return cached.resolved
+
+        val resolved = lookUpPlayerListEntry(displayName)
+        proxiedTabUuids[id] = ProxiedTabEntry(displayName, resolved)
+        return resolved
+    }
+
+    private fun lookUpPlayerListEntry(displayName: String): UUID? {
+        val connection = Minecraft.getInstance().connection ?: return null
+        for (token in NAME_TOKEN.findAll(displayName)) {
+            val entry = connection.getPlayerInfo(token.value) ?: continue
+            val id = tabUuid(entry.profile)
+            if (id.version() == 4) return id
+        }
+        return null
+    }
+
     private val BADGE_TEXTURE: Identifier = Identifier.fromNamespaceAndPath("polyplus", "textures/badge.png")
 
     private const val TEX_W = 48

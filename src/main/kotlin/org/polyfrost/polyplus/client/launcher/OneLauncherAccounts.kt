@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.launcher
 
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 object OneLauncherAccounts {
@@ -24,21 +27,16 @@ object OneLauncherAccounts {
 
         return (store.users.values + listOfNotNull(session)).mapNotNull { stored ->
             val id = LauncherAccountStore.parseUuid(stored.id) ?: return@mapNotNull null
-            val microsoft = stored.kind.equals("microsoft", ignoreCase = true)
+            val microsoft = LauncherAccountStore.isMicrosoft(stored)
             Account(
                 id = id,
                 username = stored.username,
                 microsoft = microsoft,
                 active = id == activeId,
-                // The launch account has no refresh token, so it can never be refreshed.
-                expired = microsoft && stored !== session && isExpired(stored.expires),
+                // The launch account has no refresh token so it can never be refreshed
+                expired = microsoft && stored !== session && LauncherAccountStore.isExpired(stored.expires),
             )
         }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })
-    }
-
-    private fun isExpired(expires: String): Boolean {
-        val at = runCatching { java.time.Instant.parse(expires) }.getOrNull() ?: return true
-        return at.isBefore(java.time.Instant.now().plusSeconds(60))
     }
 
     fun switchTo(id: UUID): Boolean {
@@ -49,6 +47,7 @@ object OneLauncherAccounts {
             ?: SessionAccounts.find(id)?.let { session ->
                 if (!AccountSwitch.apply(session)) return false
                 SessionAccounts.markActive(session.id)
+                PolyPlusClient.refresh()
                 return true
             }
             ?: run {
@@ -58,6 +57,8 @@ object OneLauncherAccounts {
         if (!AccountSwitch.apply(stored)) return false
         SessionAccounts.markActive(stored.id)
         LauncherAccountStore.save(store.copy(defaultUser = stored.id))
+        SessionRefresh.refreshAfterSwitch(stored)
+        PolyPlusClient.refresh()
         return true
     }
 
@@ -81,12 +82,12 @@ object OneLauncherAccounts {
 
     fun cancelLogin(session: MicrosoftAuth.MicrosoftLoginSession) = MicrosoftAuth.cancelLogin(session)
 
-    suspend fun refresh(id: UUID): Account {
+    suspend fun refresh(id: UUID, refreshClient: Boolean = true): Account {
         val store = LauncherAccountStore.load()
         val key = store.users.keys.firstOrNull { LauncherAccountStore.parseUuid(it) == id }
             ?: error("Account not found")
         val stored = store.users[key] ?: error("Account not found")
-        require(stored.kind.equals("microsoft", ignoreCase = true)) {
+        require(LauncherAccountStore.isMicrosoft(stored)) {
             "Only Microsoft accounts can be refreshed"
         }
 
@@ -98,7 +99,10 @@ object OneLauncherAccounts {
 
         val isDefault = SessionAccounts.activeId?.let { LauncherAccountStore.parseUuid(it) == id }
             ?: (current.defaultUser == key)
-        if (isDefault) AccountSwitch.apply(refreshed)
+        if (isDefault) {
+            AccountSwitch.apply(refreshed)
+            if (refreshClient) PolyPlusClient.refresh()
+        }
         return refreshed.toAccount(active = isDefault)
     }
 
@@ -107,12 +111,6 @@ object OneLauncherAccounts {
         val store = LauncherAccountStore.load()
         val session = SessionAccounts.transientAccount(store)
 
-        require(
-            LauncherAccountStore.hasMicrosoftAccount(store) ||
-                session?.kind.equals("microsoft", ignoreCase = true)
-        ) {
-            "Add a Microsoft account before creating offline accounts"
-        }
         require(username.length in 3..16) { "Username must be 3-16 characters" }
         require(username.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }) {
             "Username may only contain letters, digits, and underscores"
@@ -124,7 +122,7 @@ object OneLauncherAccounts {
         val account = LauncherAccountStore.StoredAccount(
             id = offlineUuid(username).toString(),
             username = username,
-            expires = java.time.Instant.now().plus(java.time.Duration.ofDays(3650)).toString(),
+            expires = Instant.now().plus(Duration.ofDays(3650)).toString(),
             kind = "offline",
         )
 
@@ -145,8 +143,8 @@ object OneLauncherAccounts {
     private fun LauncherAccountStore.StoredAccount.toAccount(active: Boolean) = Account(
         id = LauncherAccountStore.parseUuid(id) ?: UUID(0L, 0L),
         username = username,
-        microsoft = kind.equals("microsoft", ignoreCase = true),
+        microsoft = LauncherAccountStore.isMicrosoft(this),
         active = active,
-        expired = kind.equals("microsoft", ignoreCase = true) && isExpired(expires),
+        expired = LauncherAccountStore.isMicrosoft(this) && LauncherAccountStore.isExpired(expires),
     )
 }

@@ -1,16 +1,18 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.playback
 
-//? if >= 1.21.11 {
-import net.minecraft.util.Util
-//?} else {
-/*import net.minecraft.Util
-*///?}
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.LoopMode
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
 import kotlin.math.min
+
+//? if >= 1.21.11 {
+import net.minecraft.util.Util
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.Util
+*///?}
 
 object BedrockAnimationPlayback {
     fun resolveTimeTicks(
@@ -50,4 +52,3 @@ object BedrockAnimationPlayback {
         )
     }
 }
-//?}

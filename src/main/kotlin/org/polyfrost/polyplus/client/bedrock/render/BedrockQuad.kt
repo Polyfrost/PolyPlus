@@ -1,8 +1,7 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import org.joml.Matrix4fc
 import org.joml.Vector3f
 
@@ -22,11 +21,11 @@ data class BedrockQuad(
     val nx: Float,
     val ny: Float,
     val nz: Float,
-    /** Fake-glow light level 0..15, or -1 to render at the incoming ambient light. */
+    // Fake glow 0..15 or -1 for incoming ambient light
     val lightLevel: Int = -1,
 ) {
     fun emit(
-        pose: PoseStack.Pose,
+        pose: Pose,
         buffer: VertexConsumer,
         lightCoords: Int,
         overlayCoords: Int,
@@ -84,4 +83,3 @@ data class BedrockQuad(
         }
     }
 }
-//?}

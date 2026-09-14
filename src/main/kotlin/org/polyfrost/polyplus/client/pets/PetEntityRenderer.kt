@@ -1,15 +1,11 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
-import com.mojang.blaze3d.vertex.PoseStack
+import org.polyfrost.polyplus.client.render.PoseStack
 import com.mojang.math.Axis
-import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.culling.Frustum
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.resources.Identifier
-import net.minecraft.util.Mth
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
@@ -18,20 +14,36 @@ import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import java.util.concurrent.ConcurrentHashMap
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.SubmitNodeCollector
-import net.minecraft.client.renderer.entity.state.EntityRenderState
-//?}
-//? if >= 1.21.10 && < 26.1 {
-/*import net.minecraft.client.renderer.state.CameraRenderState
-*///?}
+
 //? if >= 26.1 {
 import net.minecraft.client.renderer.state.level.CameraRenderState
 //?}
+
 //? if >= 1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderTypes
-//?} else {
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+//?}
+
+//? if >= 1.21.4 {
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.culling.Frustum
+import net.minecraft.client.renderer.entity.state.EntityRenderState
+import net.minecraft.util.Mth
+//?}
+
+//? if >= 1.21.10 && < 26.1 {
+/*import net.minecraft.client.renderer.state.CameraRenderState
+*///?}
+
+//? if < 1.21.11 {
 /*import net.minecraft.client.renderer.RenderType
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
 
 private val FALLBACK_TEXTURE = Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "textures/pets/missing.png")
@@ -174,8 +186,8 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) : EntityRendere
     }
 }
 //?} elif >= 1.21.4 {
-/*
-class PetRenderState : net.minecraft.client.renderer.entity.state.EntityRenderState() {
+
+/*class PetRenderState : EntityRenderState() {
     var definition: PetDefinition? = null
     var pose: PetPose? = null
     var bodyYaw: Float = 0f
@@ -218,7 +230,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
         super.extractRenderState(entity, state, partialTick)
         val definition = entity.definition
         state.definition = definition
-        state.bodyYaw = net.minecraft.util.Mth.rotLerp(partialTick, entity.yRotO, entity.yRot)
+        state.bodyYaw = Mth.rotLerp(partialTick, entity.yRotO, entity.yRot)
         state.pose = if (definition != null) samplePose(entity, definition, partialTick, molangVariables) else null
         val frameCount = definition?.textureFrameCount ?: 1
         state.textureFrame = if (frameCount > 1) (entity.tickCount / TICKS_PER_TEXTURE_FRAME) % frameCount else 0
@@ -229,7 +241,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
     override fun render(
         state: PetRenderState,
         poseStack: PoseStack,
-        buffer: net.minecraft.client.renderer.MultiBufferSource,
+        buffer: MultiBufferSource,
         packedLight: Int,
     ) {
         val definition = state.definition ?: return
@@ -252,7 +264,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
         val vScale = 1f / frameCount
         val vOffset = state.textureFrame.toFloat() / frameCount
 
-        val vertexConsumer = buffer.getBuffer(net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture))
+        val vertexConsumer = buffer.getBuffer(RenderType.entityCutoutNoCull(definition.texture))
         for (root in model.roots) {
             root.render(poseStack, vertexConsumer, packedLight, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
         }
@@ -263,7 +275,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
 *///?} else {
 
 /*class PetEntityRenderer(context: EntityRendererProvider.Context) :
-    net.minecraft.client.renderer.entity.EntityRenderer<PetEntity>(context) {
+    EntityRenderer<PetEntity>(context) {
     private val modelCache = ConcurrentHashMap<Int, BedrockStandaloneModel>()
     private val molangVariables = mutableMapOf<String, Float>()
 
@@ -277,7 +289,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
         entityYaw: Float,
         partialTicks: Float,
         poseStack: PoseStack,
-        buffer: net.minecraft.client.renderer.MultiBufferSource,
+        buffer: MultiBufferSource,
         packedLight: Int,
     ) {
         val definition = entity.definition ?: return
@@ -300,7 +312,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
         val vScale = 1f / frameCount
         val vOffset = if (frameCount > 1) ((entity.tickCount / TICKS_PER_TEXTURE_FRAME) % frameCount).toFloat() / frameCount else 0f
 
-        val vertexConsumer = buffer.getBuffer(net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture))
+        val vertexConsumer = buffer.getBuffer(RenderType.entityCutoutNoCull(definition.texture))
         for (root in model.roots) {
             root.render(poseStack, vertexConsumer, packedLight, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
         }
@@ -309,4 +321,3 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
     }
 }
 *///?}
-//?}

@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.gui
 
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
 //? if fabric {
@@ -48,7 +49,7 @@ internal object ModIntegrationButtons {
     }
 }
 
-/** Opens a screen from another mod, reflectively, so the class need not be present at compile time. */
+// Reflective so the other mod's class need not be present at compile time
 private class ParentScreenFactory(private val className: String) {
     private val constructor by lazy {
         runCatching {
@@ -61,11 +62,11 @@ private class ParentScreenFactory(private val className: String) {
 
     fun open(parent: Screen) {
         val screen = runCatching { constructor?.newInstance(parent) as? Screen }.getOrNull() ?: return
-        val mc = net.minecraft.client.Minecraft.getInstance()
+        val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*mc.gui.setScreen(screen)
-        *///?} else {
-        mc.setScreen(screen)
-        //?}
+        mc.gui.setScreen(screen)
+        //?} else {
+        /*mc.setScreen(screen)
+        *///?}
     }
 }

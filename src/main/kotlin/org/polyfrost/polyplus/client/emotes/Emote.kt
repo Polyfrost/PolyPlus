@@ -1,11 +1,10 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
-import org.polyfrost.polyplus.client.emotes.effects.EmoteEffect
 import org.polyfrost.polyplus.client.emotes.conditions.EmoteRules
+import org.polyfrost.polyplus.client.emotes.effects.EmoteEffect
 
 data class Emote(
     val id: Identifier,
@@ -14,4 +13,3 @@ data class Emote(
     val effects: List<EmoteEffect> = emptyList(),
     val rules: EmoteRules = EmoteRules.DEFAULT,
 )
-//?}

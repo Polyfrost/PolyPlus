@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.molang
 
 sealed interface MolangExpr {
@@ -27,4 +26,3 @@ data class MolangStatement(
     val target: MolangExpr.Member?,
     val expression: MolangExpr,
 )
-//?}

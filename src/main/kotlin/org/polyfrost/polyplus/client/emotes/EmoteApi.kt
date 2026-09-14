@@ -1,8 +1,7 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes
 
+import net.minecraft.client.Minecraft
 import net.minecraft.client.player.AbstractClientPlayer
-import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -10,6 +9,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.emotes.conditions.EmoteConditions
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import kotlinx.coroutines.launch
 
 object EmoteApi {
     fun findEmote(emoteId: Int): Emote? = CosmeticAssetCache.getEmote(emoteId)
@@ -33,7 +33,7 @@ object EmoteApi {
             if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
             val emote = findEmote(emoteId) ?: return@launch
             ClientPlatform.runOnMain {
-                val player = net.minecraft.client.Minecraft.getInstance().player ?: return@runOnMain
+                val player = Minecraft.getInstance().player ?: return@runOnMain
                 play(player, emote)
             }
         }
@@ -50,4 +50,3 @@ object EmoteApi {
         return CosmeticService.playEmote(emoteId).isSuccess
     }
 }
-//?}

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import com.google.gson.JsonObject
@@ -72,7 +71,6 @@ internal object PetAssetParser {
             manifestAsset.open().use { JsonParser.parseReader(it.reader()).asJsonObject }
         } catch (ex: Exception) {
             logger.error("Failed to parse pet manifest for cosmetic {}", cosmeticId, ex)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(ex)
             return null
         }
 
@@ -118,7 +116,6 @@ internal object PetAssetParser {
             )
         } catch (ex: Exception) {
             logger.error("Failed to load pet cosmetic {}", cosmeticId, ex)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(ex)
             null
         }
     }
@@ -193,4 +190,3 @@ internal object PetAssetParser {
         return pixelHeight / declaredHeight
     }
 }
-//?}

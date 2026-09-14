@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import org.joml.Vector2f
@@ -30,10 +29,7 @@ data class BedrockBone(
     val pivot: Vector3f,
     val rotation: Vector3f,
     val cubes: List<BedrockCube>,
-    /**
-     * Fake-glow light level 0..15 parsed from a `glow`/`glowN` marker in the bone
-     * (Blockbench group) name. `-1` = no marker; inherit parent or render at ambient light.
-     */
+    // Parsed from a glow/glowN marker in the bone name -1 inherits parent or ambient light
     val lightLevel: Int = -1,
 )
 
@@ -44,11 +40,7 @@ data class BedrockCube(
     val inflate: Float,
     val pivot: Vector3f? = null,
     val rotation: Vector3f = Vector3f(),
-    /**
-     * Horizontal texture flip (Bedrock `"mirror"`). Independent of a negative
-     * [size]
-     * Auto-detected for mirrored bone pairs in AttachedCosmeticParser.
-     */
+    // Horizontal texture flip independent of a negative size auto-detected for mirrored bone pairs
     val mirror: Boolean = false,
 )
 
@@ -70,4 +62,3 @@ enum class BedrockCubeFace {
     UP,
     DOWN,
 }
-//?}

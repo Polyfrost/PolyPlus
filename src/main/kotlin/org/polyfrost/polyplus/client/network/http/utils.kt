@@ -17,18 +17,13 @@ import io.ktor.http.isSuccess
 
 suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuilder.() -> Unit): HttpResponse {
     val response = request {
-        // Authorize
         bearerAuth(PolyAuthorization.current())
-
-        // Apply the user's customizations to the request
         apply(block)
     }
 
     if (response.status == HttpStatusCode.Unauthorized) {
         return request {
-            // Refresh token and re-authorize
             bearerAuth(PolyAuthorization.refresh())
-
             apply(block)
         }
     }

@@ -1,10 +1,10 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.utils.intAt
 import org.polyfrost.polyplus.client.utils.optionalArray
 import org.polyfrost.polyplus.client.utils.optionalFloat
@@ -13,7 +13,6 @@ import org.polyfrost.polyplus.client.utils.optionalObject
 import org.polyfrost.polyplus.client.utils.optionalString
 import org.polyfrost.polyplus.client.utils.toVec2
 import org.polyfrost.polyplus.client.utils.toVec3
-import org.joml.Vector3f
 import java.io.InputStream
 import java.io.InputStreamReader
 
@@ -109,10 +108,7 @@ object BedrockGeometryParser {
         )
     }
 
-    /**
-     * Fake-glow marker in a Blockbench group name. `glow` -> fullbright (15),
-     * `glowN` -> level N clamped 0..15. Returns -1 when absent.
-     */
+    // glow means fullbright glowN means level N clamped to 0..15 absent means -1
     private fun parseGlowLevel(name: String): Int {
         val match = GLOW_PATTERN.find(name) ?: return -1
         val digits = match.groupValues[1]
@@ -161,4 +157,3 @@ object BedrockGeometryParser {
 
 
 }
-//?}

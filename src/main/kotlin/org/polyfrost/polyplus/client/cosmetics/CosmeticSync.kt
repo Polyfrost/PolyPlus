@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
@@ -7,19 +8,17 @@ import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
-//? if >= 1.21.1
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
-import kotlinx.coroutines.launch
+import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
-//? if >= 1.21.1
-import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.Batcher
@@ -27,6 +26,8 @@ import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.launch
 
 object CosmeticSync : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -35,11 +36,22 @@ object CosmeticSync : EarlyInitializable {
     }
     private val subscribedPlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
+    private val pendingSubscriptions = ConcurrentHashMap<Long, List<String>>()
+    private val nextRequestId = AtomicLong()
+
     private const val MAX_PLAYERS_PER_REQUEST = 64
+
+    private const val MAX_PLAYER_SUBSCRIPTIONS = 512
+
+    @Volatile
+    private var capWarned = false
 
     //? if >= 1.21.1 {
     private const val RECONCILE_INTERVAL_TICKS = 20
     private var reconcileTicks = 0
+
+    private const val RESUBSCRIBE_INTERVAL_TICKS = 600
+    private var resubscribeTicks = 0
     //?}
 
     override fun earlyInitialize() {
@@ -55,18 +67,23 @@ object CosmeticSync : EarlyInitializable {
                 reconcileTicks = 0
                 reconcileVisiblePlayers()
             }
+            if (++resubscribeTicks >= RESUBSCRIBE_INTERVAL_TICKS) {
+                resubscribeTicks = 0
+                refreshVisibleSubscriptions()
+            }
             Unit
         }.register()
         //?}
 
-        eventHandler<WorldEvent.Unload> {
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             unsubscribeAllPlayers()
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
+            PolyPlusBadge.clearTabCache()
             CosmeticAssetCache.reset()
             PetManager.despawnAll()
             //?}
-        }.register()
+        }
 
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -79,6 +96,7 @@ object CosmeticSync : EarlyInitializable {
                     CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.online)
                 }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
+                is ClientboundPacket.Error -> handleError(packet)
                 //? if >= 1.21.1 {
                 is ClientboundPacket.PlayerEmoteStarted -> handleEmotePlay(packet.player, packet.emoteId)
                 is ClientboundPacket.PlayerEmoteStopped -> handleEmoteStop(packet.player)
@@ -121,15 +139,26 @@ object CosmeticSync : EarlyInitializable {
 
     fun refreshVisibleSubscriptions(): Result<Unit> {
         val mc = Minecraft.getInstance()
+        if (!mc.isSameThread) {
+            mc.execute { refreshVisibleSubscriptions() }
+            return Result.success(Unit)
+        }
         val level = mc.level
             ?: return Result.failure(IllegalStateException("No world is loaded"))
 
-        val known = HashSet<String>()
-        mc.connection?.onlinePlayerIds?.forEach { known.add(it.toString()) }
-        level.players().forEach { known.add(it.uuid.toString()) }
-        val visible = known
-            .mapNotNull(::normalizePlayerUuid)
-            .toSet()
+        val visible = LinkedHashSet<String>()
+        val self = mc.player
+        val loaded = level.players().let { players ->
+            if (self == null) players else players.sortedBy { it.distanceToSqr(self) }
+        }
+        for (player in loaded) {
+            if (visible.size >= MAX_PLAYER_SUBSCRIPTIONS) break
+            normalizePlayerUuid(player.uuid.toString())?.let(visible::add)
+        }
+        for (uuid in mc.connection?.onlinePlayerIds ?: emptyList()) {
+            if (visible.size >= MAX_PLAYER_SUBSCRIPTIONS) break
+            normalizePlayerUuid(uuid.toString())?.let(visible::add)
+        }
 
         val stale = subscribedPlayers.filter { it !in visible }
         unsubscribePlayers(stale)
@@ -138,6 +167,8 @@ object CosmeticSync : EarlyInitializable {
 
     fun resubscribeVisiblePlayers(): Result<Unit> {
         subscribedPlayers.clear()
+        pendingSubscriptions.clear()
+        capWarned = false
         return refreshVisibleSubscriptions()
     }
 
@@ -150,6 +181,11 @@ object CosmeticSync : EarlyInitializable {
     }
 
     private fun handleSubscriptionSnapshot(packet: ClientboundPacket.SubscriptionSnapshot) {
+        packet.requestId?.let(pendingSubscriptions::remove)
+        if (packet.rejected.isNotEmpty()) {
+            rollBackSubscriptions(packet.rejected)
+            LOGGER.warn("PolyPlus server rejected {} subscription(s).", packet.rejected.size)
+        }
         for ((uuidString, equipment) in packet.equipped) {
             val uuid = UUID.fromString(uuidString)
             CosmeticCatalog.applyRemoteEquipped(uuid, equipment)
@@ -194,28 +230,30 @@ object CosmeticSync : EarlyInitializable {
     //? if >= 1.21.1 {
     private fun handleEmotePlay(playerUuid: String, emoteId: Int) {
         val uuid = UUID.fromString(playerUuid)
-        val player = findPlayer(uuid) ?: return
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
             val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@launch
             ClientPlatform.runOnMain {
+                val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
             }
         }
     }
 
-    private fun handleEmoteStop(player: String) {
-        val uuid = UUID.fromString(player)
-        val player = findPlayer(uuid) ?: return
-        (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+    private fun handleEmoteStop(playerUuid: String) {
+        val uuid = UUID.fromString(playerUuid)
+        ClientPlatform.runOnMain {
+            val player = findPlayer(uuid) ?: return@runOnMain
+            (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+        }
     }
     //?}
 
-    private fun applyActiveToPlayer(uuid: UUID, cosmeticIds: List<Int>) {
+    private fun applyActiveToPlayer(uuid: UUID, cosmeticIds: List<Int>) = ClientPlatform.runOnMain {
         val player = findPlayer(uuid)
         if (player == null) {
             LOGGER.debug("Deferred cosmetic apply for {} ({} id(s)) — player not loaded", uuid, cosmeticIds.size)
-            return
+            return@runOnMain
         }
 
         //? if >= 1.21.1 {
@@ -227,8 +265,8 @@ object CosmeticSync : EarlyInitializable {
             val definition = CosmeticCatalog.getDefinition(id) ?: continue
             when (definition.type) {
                 CosmeticType.Cape -> Unit
-                // Backpack/Glasses/Wings/Glove are reconciled from the catalog
-                // above so unequips are handled even when no id is passed here.
+                // Backpack Glasses Wings and Glove are reconciled from the catalog above so
+                // unequips are handled even when no id is passed here
                 CosmeticType.Backpack,
                 CosmeticType.Glasses,
                 CosmeticType.Wings,
@@ -273,6 +311,7 @@ object CosmeticSync : EarlyInitializable {
 
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
+        reconcileCape(equipped[BodySlot.Cape])
         for (slot in ATTACHED_SLOTS) {
             val desiredId = equipped[slot]
             val current = CosmeticApi.equippedSlot(player, slot)
@@ -296,6 +335,15 @@ object CosmeticSync : EarlyInitializable {
                     CosmeticApi.unequipSlot(player, slot)
                     CosmeticApi.equipLocal(player, attached.copy(slot = slot))
                 }
+            }
+        }
+    }
+
+    private fun reconcileCape(cosmeticId: Int?) {
+        if (cosmeticId == null || CosmeticAssetCache.getCapeResource(cosmeticId) != null) return
+        PolyPlusClient.SCOPE.launch {
+            if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
+                LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)
             }
         }
     }
@@ -353,21 +401,58 @@ object CosmeticSync : EarlyInitializable {
     }
 
     private fun subscribePlayers(players: Iterable<String>): Result<Unit> {
-        val added = players
-            .mapNotNull(::normalizePlayerUuid)
-            .filter(subscribedPlayers::add)
+        val added = ArrayList<String>()
+        var dropped = 0
+        for (player in players.mapNotNull(::normalizePlayerUuid)) {
+            if (player in subscribedPlayers) continue
+            if (subscribedPlayers.size >= MAX_PLAYER_SUBSCRIPTIONS) {
+                dropped++
+                continue
+            }
+            if (subscribedPlayers.add(player)) {
+                added.add(player)
+            }
+        }
+        if (dropped > 0 && !capWarned) {
+            capWarned = true
+            LOGGER.warn(
+                "PolyPlus is at its subscription cap ({}); skipping {} further player(s).",
+                MAX_PLAYER_SUBSCRIPTIONS,
+                dropped,
+            )
+        }
         if (added.isEmpty()) {
             return Result.success(Unit)
         }
 
         for (chunk in added.chunked(MAX_PLAYERS_PER_REQUEST)) {
-            val result = PolyConnection.sendPacket(ServerboundPacket.SubscribePlayers(chunk))
+            val requestId = nextRequestId.incrementAndGet()
+            pendingSubscriptions[requestId] = chunk
+            val result = PolyConnection.sendPacket(ServerboundPacket.SubscribePlayers(chunk, requestId))
             if (result.isFailure) {
-                subscribedPlayers.removeAll(added)
+                pendingSubscriptions.remove(requestId)
+                subscribedPlayers.removeAll(added.toSet())
                 return result
             }
         }
         return Result.success(Unit)
+    }
+
+    private fun rollBackSubscriptions(players: Collection<String>) {
+        if (players.isEmpty()) return
+        subscribedPlayers.removeAll(players.toSet())
+    }
+
+    private fun handleError(packet: ClientboundPacket.Error) {
+        val requestId = packet.requestId ?: return
+        val players = pendingSubscriptions.remove(requestId) ?: return
+        rollBackSubscriptions(players)
+        LOGGER.warn(
+            "PolyPlus subscription request {} was rejected ({}): rolled back {} player(s).",
+            requestId,
+            packet.code,
+            players.size,
+        )
     }
 
     private fun unsubscribePlayers(players: Iterable<String>): Result<Unit> {
@@ -386,6 +471,8 @@ object CosmeticSync : EarlyInitializable {
     private fun unsubscribeAllPlayers() {
         val players = subscribedPlayers.toList()
         subscribedPlayers.clear()
+        pendingSubscriptions.clear()
+        capWarned = false
         if (players.isNotEmpty()) {
             PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(players))
         }
@@ -401,5 +488,5 @@ object CosmeticSync : EarlyInitializable {
         return uuid.takeIf { it.isRealPlayer() }?.toString()
     }
 
-    private fun UUID.isRealPlayer(): Boolean = version() != 2
+    private fun UUID.isRealPlayer(): Boolean = version() == 4
 }

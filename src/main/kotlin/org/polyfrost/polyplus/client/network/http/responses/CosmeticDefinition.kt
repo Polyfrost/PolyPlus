@@ -12,18 +12,11 @@ data class CosmeticDefinition(
     val hash: String,
     @SerialName("allowed_slots") val allowedSlots: List<BodySlot> = emptyList(),
     val groupId: Int = id,
-    /** The group's display name (the cosmetic's own name when standalone). */
     val groupName: String = name,
-    /** The user-facing variant label within the group (e.g. "Blue"). */
     val variantName: String = name,
-    /** The skin model this variant targets ("slim"/"wide"); null when the
-     *  variant is model-independent (most cosmetics). */
+    // "slim"/"wide" or null when the variant is model-independent
     val model: String? = null,
 ) {
-    /**
-     * The slot this cosmetic should occupy when equipped without an explicit
-     * choice
-     */
     fun preferredSlot(): BodySlot? {
         val default = type.defaultSlot()
         if (default != null && (allowedSlots.isEmpty() || default in allowedSlots)) {

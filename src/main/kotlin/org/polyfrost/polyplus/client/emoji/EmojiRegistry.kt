@@ -1,18 +1,21 @@
 package org.polyfrost.polyplus.client.emoji
 
-import kotlinx.serialization.json.Json
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.contents.PlainTextContents
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.util.FormattedCharSequence
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.regex.Pattern
+import kotlinx.serialization.json.Json
 
 object EmojiRegistry {
     private val LOGGER = LogManager.getLogger()
     private const val SHORTCODE = ":[a-z0-9_+\\-]+:"
+    private const val PUA_START = 0xF0000
+    private const val PUA_END = 0xFFFFD
     private val JSON = Json { ignoreUnknownKeys = true }
 
     private val shortcodes: Map<String, String> by lazy { loadMap("shortcodes.json") }
@@ -63,14 +66,14 @@ object EmojiRegistry {
         }
         return runCatching {
             stream.bufferedReader().use { JSON.decodeFromString<Map<String, String>>(it.readText()) }
-        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }.getOrDefault(emptyMap())
+        }.onFailure { LOGGER.error("Failed to load emoji map {}", name, it) }.getOrDefault(emptyMap())
     }
 
     @JvmStatic
     fun resolve(alias: String): String? = shortcodes[alias]
 
     @JvmStatic
-    fun suggestionRow(alias: String): net.minecraft.util.FormattedCharSequence {
+    fun suggestionRow(alias: String): FormattedCharSequence {
         val comp = Component.empty()
         shortcodes[alias]?.let { comp.append(EmojiFont.glyph(it, Style.EMPTY)).append(Component.literal(" ")) }
         comp.append(Component.literal(":$alias:"))
@@ -95,8 +98,8 @@ object EmojiRegistry {
     fun enabled(): Boolean = PolyPlusConfig.showChatEmoji
 
     @JvmStatic
-    fun transformForViewer(component: Component): Component =
-        if (!enabled()) component else transform(component)
+    fun transformForViewer(component: Component?): Component? =
+        if (component == null || !enabled()) component else transform(component)
 
     fun transform(component: Component): Component {
         val contents = component.contents
@@ -126,7 +129,7 @@ object EmojiRegistry {
         contents: TranslatableContents,
         style: Style,
     ): MutableComponent? {
-        val args = contents.args
+        val args: Array<out Any?> = contents.args
         var changed = false
         val newArgs = arrayOfNulls<Any>(args.size)
         for (i in args.indices) {
@@ -169,8 +172,66 @@ object EmojiRegistry {
     }
 
     @JvmStatic
-    fun styleInput(text: String, base: Style): net.minecraft.util.FormattedCharSequence? =
+    fun styleInput(text: String, base: Style): FormattedCharSequence? =
         expand(text, base, EMOJI)?.visualOrderText
+
+    data class EmojiEntry(val glyph: String, val alias: String, val aliases: List<String>)
+
+    sealed interface Segment {
+        data class Text(val text: String) : Segment
+        data class Emoji(val glyph: String) : Segment
+    }
+
+    val catalog: List<EmojiEntry> by lazy {
+        val byGlyph = LinkedHashMap<String, MutableList<String>>()
+        for ((alias, glyph) in shortcodes) byGlyph.getOrPut(glyph) { ArrayList() }.add(alias)
+        byGlyph.entries
+            .sortedBy { atlasIndex(it.key) }
+            .map { (glyph, aliases) ->
+                EmojiEntry(glyph, aliases.minByOrNull { it.length } ?: "", aliases.sorted())
+            }
+    }
+
+    @JvmStatic
+    @JvmOverloads
+    fun search(query: String, limit: Int = Int.MAX_VALUE): List<EmojiEntry> {
+        val q = query.trim().lowercase().removePrefix(":").removeSuffix(":")
+        if (q.isEmpty()) return if (limit >= catalog.size) catalog else catalog.take(limit)
+        val prefixed = ArrayList<EmojiEntry>()
+        val contained = ArrayList<EmojiEntry>()
+        for (entry in catalog) {
+            when {
+                entry.aliases.any { it.startsWith(q) } -> prefixed.add(entry)
+                entry.aliases.any { it.contains(q) } -> contained.add(entry)
+            }
+        }
+        prefixed.addAll(contained)
+        return if (limit >= prefixed.size) prefixed else prefixed.subList(0, limit).toList()
+    }
+
+    @JvmStatic
+    fun atlasIndex(glyph: String): Int {
+        if (glyph.isEmpty()) return -1
+        val cp = glyph.codePointAt(0)
+        return if (cp < PUA_START || cp > PUA_END) -1 else cp - PUA_START
+    }
+
+    @JvmStatic
+    fun segments(text: String): List<Segment> {
+        if (text.isEmpty()) return listOf(Segment.Text(text))
+        val matcher = EMOJI.matcher(text)
+        val out = ArrayList<Segment>()
+        var last = 0
+        while (matcher.find()) {
+            val glyph = glyphFor(matcher.group()) ?: continue
+            if (matcher.start() > last) out.add(Segment.Text(text.substring(last, matcher.start())))
+            out.add(Segment.Emoji(glyph))
+            last = matcher.end()
+        }
+        if (out.isEmpty()) return listOf(Segment.Text(text))
+        if (last < text.length) out.add(Segment.Text(text.substring(last)))
+        return out
+    }
 
     @JvmStatic
     fun toShortcodes(text: String): String {

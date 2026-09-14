@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.animation
 
 import com.google.gson.JsonArray
@@ -7,16 +6,16 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.JsonPrimitive
 import org.apache.logging.log4j.LogManager
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
 import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
+import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
 import org.polyfrost.polyplus.client.bedrock.molang.MolangParser
 import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
 import org.polyfrost.polyplus.client.bedrock.molang.MolangVector3
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
 import org.polyfrost.polyplus.client.utils.optionalString
-import org.joml.Vector3f
 import java.io.InputStream
 import java.io.InputStreamReader
 
@@ -370,4 +369,3 @@ object BedrockAnimationParser {
         return if (max <= 0f) 1f else max
     }
 }
-//?}

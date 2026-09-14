@@ -1,25 +1,32 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.effects
 
-import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.client.renderer.entity.RenderLayerParent
+import net.minecraft.client.renderer.entity.layers.RenderLayer
+import org.polyfrost.polyplus.client.emotes.playback.EmoteController
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
-//? if < 1.21.4
-//import net.minecraft.client.player.AbstractClientPlayer
+import org.polyfrost.polyplus.client.render.PoseStack
+
 //? if >= 1.21.10 {
 import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.client.renderer.entity.state.AvatarRenderState
-//?} elif >= 1.21.4 {
-/*import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.client.renderer.entity.state.PlayerRenderState
-*///?} else {
+//?}
+
+//? if >= 1.21.4 {
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess
+//?}
+
+//? if >= 1.21.4 && < 1.21.10 {
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState
+*///?}
+
+//? if < 1.21.10 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
-import net.minecraft.client.renderer.entity.RenderLayerParent
-import net.minecraft.client.renderer.entity.layers.RenderLayer
-//? if >= 1.21.4
-import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess
+
+//? if = 1.21.1 {
+/*import net.minecraft.client.player.AbstractClientPlayer
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
-import org.polyfrost.polyplus.client.emotes.playback.EmoteController
+*///?}
 
 //? if >= 1.21.10 {
 class EmoteEffectRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerModel>) : RenderLayer<AvatarRenderState, PlayerModel>(renderer) {
@@ -86,4 +93,3 @@ private fun resolveController(state: Any): EmoteController? {
     return controller.takeIf { it.isActive }
 }
 *///?}
-//?}

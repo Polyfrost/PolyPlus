@@ -1,24 +1,22 @@
 package org.polyfrost.polyplus.client
 
-import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import org.lwjgl.glfw.GLFW
 import org.polyfrost.oneconfig.api.config.v1.Config
-import org.polyfrost.oneconfig.api.config.v1.Property.Display
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
-import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
+import org.polyfrost.oneconfig.api.config.v1.annotations.Keybind
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
+import org.polyfrost.oneconfig.api.ui.v1.keybind.KeyModifiers
+import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.gui.MainMenuBackground
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
+import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
+import org.polyfrost.polyplus.client.social.SocialOverlay
 
-private const val MAIN_MENU_FPS_HEADROOM = 60
-private const val FALLBACK_MONITOR_REFRESH_RATE = 60
-private const val VANILLA_MAIN_MENU_FPS_LIMIT = 60
-private const val MAX_CUSTOM_MAIN_MENU_FPS_LIMIT = 260f
-
-object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants.NAME, Category.OTHER) {
+object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConstants.NAME} (OneClient)", Category.OTHER) {
     @Transient
     private val LOGGER = LogManager.getLogger()
 
@@ -27,6 +25,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic @Include
     var appliedDefaults = ""
+
+    @JvmStatic @Include
+    var modOrderSeed = ""
 
     @JvmStatic @Include
     var onboardingCompleted = false
@@ -41,7 +42,20 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var onboardingPolyBlurApplied = false
 
     @JvmStatic @Include
+    var onboardingModSettingsVersion = 0
+
+    @JvmStatic @Include
     var adaptiveBlurApplied = false
+
+    @JvmStatic @Include
+    var jvmAdviceShownAt = 0L
+
+    @JvmStatic
+    @Switch(
+        title = "RAM Analysis Notifications",
+        description = "Check how much memory this pack actually needs and suggest a change when the current allocation is hurting performance. Shown at most once every two days.",
+    )
+    var ramAdviceNotifications = true
 
     @JvmStatic @Include
     var onboardingLightTheme = false
@@ -53,90 +67,88 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     var onboardingToggleSprint = true
 
     @JvmStatic @Include
+    var onboardingMotionBlurMode = -1
+
+    @JvmStatic @Include
     var onboardingMotionBlur = 3
 
     @JvmStatic @Include
     var onboardingGuiScale = 0
 
-    @JvmStatic
-    @Switch(
-        title = "Vanilla Main Menu",
-        description = "Disable the PolyPlus main menu and use the vanilla Minecraft title screen instead.",
-        category = "Main Menu",
-    )
-    var useVanillaMainMenu = false
+    @JvmStatic @Include
+    var onboardingBetterGrassMode = 3
+
+    @JvmStatic @Include
+    var onboardingBetterGrassSettled = false
+
+    @JvmStatic @Include
+    var onboardingFireOverlayHeight = 0.0
+
+    @JvmStatic @Include
+    var onboardingFireOverlayOpacity = 100f
+
+    @JvmStatic @Include
+    var onboardingShieldHeight = 0f
+
+    @JvmStatic @Include
+    var onboardingFireOverlaySettled = false
+
+    @JvmStatic @Include
+    var onboardingShieldHeightSettled = false
+
+    @JvmStatic @Include
+    var onboardingHorseOpacity = 100f
+
+    @JvmStatic @Include
+    var onboardingMountOpacitySettled = false
+
+    @JvmStatic @Include
+    var onboardingWaveyCapes = true
+
+    @JvmStatic @Include
+    var onboardingWaveyCapesSettled = false
+
+    @JvmStatic @Include
+    var onboardingSkinLayers = true
+
+    @JvmStatic @Include
+    var onboardingSkinLayersSettled = false
+
+    @JvmStatic @Include
+    var onboardingItemOffsetX = 0f
+
+    @JvmStatic @Include
+    var onboardingItemOffsetY = 0f
+
+    @JvmStatic @Include
+    var onboardingItemOffsetZ = 0f
+
+    @JvmStatic @Include
+    var onboardingItemScale = 1f
+
+    @JvmStatic @Include
+    var onboardingItemPositionsSettled = false
+
+    /** Gamma Utils' brightness as the mod stores it, where 100 is vanilla maximum. */
+    @JvmStatic @Include
+    var onboardingGamma = 100f
+
+    @JvmStatic @Include
+    var onboardingGammaToggled = 1500f
+
+    @JvmStatic @Include
+    var onboardingGammaSmooth = false
+
+    @JvmStatic @Include
+    var onboardingGammaSettled = false
 
     @JvmStatic
     @Switch(
-        title = "Hide Quickplay",
-        description = "Hide the Quickplay recent servers panel on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
+        title = "Replace Pause Menu LAN Button",
+        description = "Replace the vanilla 'Open to LAN' pause menu button with the PolyPlus Host World flow, for hosting your current world over EOS P2P.",
+        category = "Multiplayer",
     )
-    var hideMainMenuQuickplay = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Player Preview",
-        description = "Hide the 3D player preview on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuPlayerPreview = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Alt Manager",
-        description = "Hide the account/alt manager pill on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuAltManager = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Social Button",
-        description = "Hide the Social button on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuSocial = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Cosmetics Button",
-        description = "Hide the Cosmetics button on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuCosmetics = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Realms Button",
-        description = "Hide the Realms button on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuRealms = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Host World Button",
-        description = "Hide the Host World button (opens a world to LAN via e4mc) on the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuHostWorld = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Mod Buttons",
-        description = "Hide the row of buttons for supported mods at the bottom of the PolyPlus main menu.",
-        category = "Main Menu",
-        subcategory = "Elements",
-    )
-    var hideMainMenuModButtons = false
+    var replacePauseLanButton = true
 
     @JvmStatic
     @Switch(
@@ -154,64 +166,10 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
 
     @JvmStatic
     @Switch(
-        title = "Hide Head Cosmetics With Helmet",
-        description = "Automatically hide hat cosmetics when a helmet is equipped to avoid clipping.",
-        category = "Cosmetics",
+        title = "Automatically Refresh Session",
+        description = "Automatically refresh your Microsoft account session when it expires.",
     )
-    var hideHeadCosmeticsWithHelmet = false
-
-    @JvmStatic
-    @Switch(
-        title = "Hide Feet Cosmetics With Boots",
-        description = "Automatically hide boots cosmetics when boots are equipped to avoid clipping.",
-        category = "Cosmetics",
-    )
-    var hideFeetCosmeticsWithBoots = true
-
-    @JvmStatic
-    @Dropdown(
-        title = "Main Menu FPS Limit",
-        description = "Choose how the PolyPlus main menu frame cap is selected.",
-        options = ["Vanilla (60 FPS limit)", "Smart (monitor refresh rate + 60)", "Custom (15-260 value)"],
-        category = "Main Menu",
-    )
-    var mainMenuFpsLimitMode: MainMenuFpsLimitMode = MainMenuFpsLimitMode.SMART
-
-    @JvmStatic
-    @Slider(
-        title = "Custom Main Menu FPS Limit",
-        description = "Frame cap used when Main Menu FPS Limit is set to Custom.",
-        min = 15f,
-        max = MAX_CUSTOM_MAIN_MENU_FPS_LIMIT,
-        step = 5f,
-        category = "Main Menu",
-    )
-    var mainMenuFpsLimit = 260
-
-    @JvmStatic
-    @Dropdown(
-        title = "Menu Backdrop",
-        description = "Choose what appears behind the PolyPlus main menu.",
-        options = ["PolyPlus", "Minecraft Panorama"],
-        category = "Main Menu",
-    )
-    var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
-
-    @JvmStatic
-    @Switch(
-        title = "Custom Panorama",
-        description = "Use the PolyPlus panorama instead of the vanilla Minecraft one.",
-        category = "Main Menu",
-    )
-    var customPanorama = true
-
-    @JvmStatic
-    @Switch(
-        title = "Panorama In All Menus",
-        description = "Keep the panorama behind every menu (settings, multiplayer, singleplayer, etc.) instead of the dirt background.",
-        category = "Main Menu",
-    )
-    var panoramaInAllMenus = false
+    var autoRefreshSession = true
 
     @JvmStatic
     @Switch(
@@ -221,66 +179,43 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", PolyPlusConstants
     )
     var acceptedLegalTerms = true
 
+    @Keybind(
+        title = "Socials Menu",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus Socials menu",
+    )
+    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(GLFW.GLFW_KEY_P), null, KeyModifiers.SHIFT, 0L) { state ->
+        if (state) {
+            SocialOverlay.toggle()
+        }
+        true
+    }
+
+    @Keybind(
+        title = "Emote Wheel",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus Emote Wheel",
+    )
+    var emoteWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        EmoteWheelKeybind.onKeybindState(state)
+        true
+    }
+
     @Dropdown(title = "API URL", description = "The URL used for the PolyPlus API. Only change if you know what you're doing.")
     var apiUrl: BackendUrl = BackendUrl.PRODUCTION
+        get() = if (PolyPlusConstants.IS_DEV_ENV) field else BackendUrl.PRODUCTION
 
     init {
-        addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
-            if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
-        }
-
-        addDependency("customPanorama", "Menu Backdrop") {
-            if (!customPanoramaSupported()) Display.HIDDEN
-            else if (mainMenuBackground == MainMenuBackground.PANORAMA) Display.SHOWN
-            else Display.DISABLED
-        }
-
-        addCallback("customPanorama") {
-            //? if >= 1.21.11
-            if (customPanorama) org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
-        }
-
-        addDependency("hideMainMenuRealms", "Realms is unavailable") {
-            if (realmsSupported()) Display.SHOWN else Display.HIDDEN
-        }
+        hideIf("apiUrl") { !PolyPlusConstants.IS_DEV_ENV }
 
         addCallback("acceptedLegalTerms") {
-            org.polyfrost.polyplus.client.privacy.PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
+            PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
         }
 
         addCallback("apiUrl") {
             LOGGER.info("API URL changed to $apiUrl, refreshing API data...")
-            PolyConnection.reconnect() // Reconnect WebSocket under new URL
-            PolyPlusClient.refresh() // Refresh API tokens, cosmetic data, etc.
+            PolyConnection.reconnect()
+            PolyPlusClient.refresh()
         }
     }
-
-    @JvmStatic
-    fun customPanoramaSupported(): Boolean =
-        //? if >= 1.21.11 {
-        org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.isAvailable()
-        //?} else {
-        /*false
-        *///?}
-
-    @JvmStatic
-    fun realmsSupported(): Boolean =
-        runCatching { Minecraft.getInstance().allowsRealms() }.getOrDefault(false)
-
-    @JvmStatic
-    fun defaultMainMenuFpsLimit(): Int {
-        val fallback = FALLBACK_MONITOR_REFRESH_RATE + MAIN_MENU_FPS_HEADROOM
-        return runCatching {
-            val refreshRate = Minecraft.getInstance().window.refreshRate
-            if (refreshRate > 0) refreshRate + MAIN_MENU_FPS_HEADROOM else fallback
-        }.getOrDefault(fallback)
-    }
-
-    @JvmStatic
-    fun activeMainMenuFpsLimit(): Int =
-        when (mainMenuFpsLimitMode) {
-            MainMenuFpsLimitMode.VANILLA -> VANILLA_MAIN_MENU_FPS_LIMIT
-            MainMenuFpsLimitMode.SMART -> defaultMainMenuFpsLimit()
-            MainMenuFpsLimitMode.CUSTOM -> mainMenuFpsLimit
-        }
 }

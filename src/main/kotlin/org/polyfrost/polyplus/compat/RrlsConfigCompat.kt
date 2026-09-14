@@ -7,21 +7,9 @@ import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
-/**
- * Remove Reloading Screen keeps its settings in `config/rrls.toml` in one of two mutually
- * unreadable layouts. Builds for 1.21.1 and older store a flat file through Cloth Config's
- * AutoConfig, while builds for 1.21.4 and newer store a sectioned file through a NeoForge config
- * spec.
- *
- * Sharing one config directory across game versions hands each build the other's file. AutoConfig's
- * TOML parser cannot read the `nan` literal the sectioned layout writes for `easingArg` and takes
- * the game down with it, and the sectioned layout quietly falls back to its defaults when handed a
- * flat file.
- *
- * This rewrites the file into the layout the installed build understands before Remove Reloading
- * Screen reads it, carrying over every setting the two layouts share. Settings exclusive to the
- * other layout are kept in a backup beside the config and restored when that layout comes back.
- */
+// Remove Reloading Screen writes config/rrls.toml in two mutually unreadable layouts and a shared
+// config directory hands each build the other's file so rewrite it before rrls reads it
+// Settings exclusive to the other layout live in a backup beside the config
 object RrlsConfigCompat {
 
     private val logger = LogManager.getLogger("PolyPlus/RrlsConfigCompat")
@@ -34,20 +22,15 @@ object RrlsConfigCompat {
         "org/redlance/dima_dencep/mods/rrls/fabric/ConfigExpectPlatformImpl.class"
 
     internal enum class Format(val backupSuffix: String) {
-        /** Flat file read by Cloth Config's AutoConfig through toml4j. */
         LEGACY(".polyplus-legacy.bak"),
 
-        /** Sectioned file read by a NeoForge config spec through NightConfig. */
         MODERN(".polyplus-modern.bak"),
     }
 
     private enum class Kind { BOOLEAN, NUMBER, STRING, ENUM }
 
-    /**
-     * One Remove Reloading Screen setting. [legacyKey] and [modernKey] are `null` when the layout
-     * in question has no equivalent. [legacyValues], where given, lists the enum constants the
-     * legacy layout knows; anything else makes its parser throw, so it is dropped instead.
-     */
+    // Null keys mean the layout has no equivalent Values outside legacyValues make the legacy
+    // parser throw so they are dropped
     private class Option(
         val legacyKey: String?,
         val modernKey: String?,
@@ -104,7 +87,7 @@ object RrlsConfigCompat {
         val backup = configDir.resolve(CONFIG_FILE + installed.backupSuffix)
         val preserved = if (backup.exists()) backup.readText() else ""
 
-        // Nothing worth keeping: let Remove Reloading Screen write its own defaults instead.
+        // Nothing worth keeping let Remove Reloading Screen write its own defaults
         val rewritten = translate(text, installed, preserved)
         if (rewritten.isEmpty()) return
 
@@ -130,7 +113,6 @@ object RrlsConfigCompat {
         }
     }
 
-    /** The layout [text] is written in, or `null` when it holds no setting either layout knows. */
     internal fun detectFormat(text: String): Format? {
         val values = parse(text)
         return when {
@@ -140,12 +122,11 @@ object RrlsConfigCompat {
         }
     }
 
-    /** Whether a build using [target] can read [text] without crashing or losing settings. */
     internal fun isUsableBy(text: String, target: Format): Boolean {
         if (detectFormat(text) != target) return false
 
         val values = parse(text)
-        // Every literal has to survive the legacy parser, including ones under keys it ignores.
+        // Every literal has to survive the legacy parser including ones under keys it ignores
         if (target == Format.LEGACY && values.values.any { !isLexableByToml4j(it) }) return false
 
         return OPTIONS.all { option ->
@@ -154,10 +135,7 @@ object RrlsConfigCompat {
         }
     }
 
-    /**
-     * Rewrites [text] in the [target] layout. Settings the layouts share are carried over; ones
-     * only [target] has are taken from [preserved], the last file written in that layout.
-     */
+    // Settings only the target layout has come from preserved the last file written in it
     internal fun translate(text: String, target: Format, preserved: String): String {
         val source = parse(text)
         val sourceFormat = detectFormat(text) ?: target
@@ -191,7 +169,6 @@ object RrlsConfigCompat {
         }
     }
 
-    /** Normalises [raw] into a literal [target] accepts, or `null` when it has no valid reading. */
     private fun sanitize(raw: String, option: Option, target: Format): String? = when (option.kind) {
         Kind.BOOLEAN -> raw.takeIf { it == "true" || it == "false" }
         Kind.NUMBER -> sanitizeNumber(raw, target)
@@ -202,7 +179,7 @@ object RrlsConfigCompat {
     private fun sanitizeNumber(raw: String, target: Format): String? {
         val value = raw.toDoubleOrNull()
         if (value != null && value.isFinite()) return value.toString()
-        // Only the sectioned layout's parser understands `nan` and `inf`.
+        // Only the sectioned layout's parser understands nan and inf
         return raw.takeIf { target == Format.MODERN && it in NON_FINITE_NUMBERS }
     }
 
@@ -219,10 +196,7 @@ object RrlsConfigCompat {
         else -> FINITE_NUMBER.matches(raw)
     }
 
-    /**
-     * Reads the values of every `key = value` line, keyed by `key` at the top level and
-     * `section.key` inside a table. Values stay as their raw literals.
-     */
+    // Keyed by key at the top level and section.key inside a table values stay as raw literals
     private fun parse(text: String): Map<String, String> {
         val values = LinkedHashMap<String, String>()
         var section = ""

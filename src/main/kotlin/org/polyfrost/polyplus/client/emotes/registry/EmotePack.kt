@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.registry
 
 import net.minecraft.resources.Identifier
@@ -45,4 +44,3 @@ internal fun String.animationStem(): String =
 
 private fun emoteAsset(path: String): Identifier =
     Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, path)
-//?}

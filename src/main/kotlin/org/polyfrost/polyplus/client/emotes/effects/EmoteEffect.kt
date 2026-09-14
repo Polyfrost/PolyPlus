@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.effects
 
 import net.minecraft.resources.Identifier
@@ -11,4 +10,3 @@ data class EmoteEffect(
     val texture: Identifier,
     val model: BedrockEffectModel,
 )
-//?}

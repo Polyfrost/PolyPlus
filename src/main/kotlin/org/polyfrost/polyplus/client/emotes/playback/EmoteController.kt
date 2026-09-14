@@ -1,13 +1,6 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.playback
 
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import net.minecraft.client.player.AbstractClientPlayer
-//? if >= 1.21.11 {
-import net.minecraft.util.Util
-//?} else {
-/*import net.minecraft.Util
-*///?}
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.LoopMode
 import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
@@ -16,6 +9,15 @@ import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.emotes.Emote
 import org.polyfrost.polyplus.client.emotes.conditions.EmoteConditions
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+
+//? if >= 1.21.11 {
+import net.minecraft.util.Util
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.Util
+*///?}
 
 private const val BLEND_MS = 140f
 class EmoteController {
@@ -187,4 +189,3 @@ class EmoteController {
         ) : Phase()
     }
 }
-//?}

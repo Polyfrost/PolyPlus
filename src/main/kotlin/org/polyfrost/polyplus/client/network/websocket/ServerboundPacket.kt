@@ -1,8 +1,8 @@
 package org.polyfrost.polyplus.client.network.websocket
 
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 
 @Serializable
 sealed interface ServerboundPacket {
@@ -14,7 +14,10 @@ sealed interface ServerboundPacket {
 
     @Serializable
     @SerialName("SubscribePlayers")
-    data class SubscribePlayers(val players: List<String>) : ServerboundPacket {
+    data class SubscribePlayers(
+        val players: List<String>,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket {
         constructor(vararg players: String) : this(players.toList())
     }
 

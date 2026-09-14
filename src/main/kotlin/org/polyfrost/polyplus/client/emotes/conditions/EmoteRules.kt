@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.conditions
 
 data class EmoteRules(
@@ -14,4 +13,3 @@ data class EmoteRules(
         val DEFAULT = EmoteRules()
     }
 }
-//?}

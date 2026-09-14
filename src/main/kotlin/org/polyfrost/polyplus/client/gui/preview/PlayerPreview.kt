@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.foundation.Image
@@ -6,6 +5,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -13,32 +14,39 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
-val LocalPlayerPreviewOpacity = androidx.compose.runtime.compositionLocalOf { 1f }
+//? if < 1.21.5 || >= 1.21.8 {
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha
+//?}
+
+val LocalPlayerPreviewOpacity = compositionLocalOf { 1f }
 
 object PlayerPreviewDim {
-    private const val DIMMED = 0.18f
+    private const val HIDDEN = 0f
     var factor by mutableStateOf(1f)
         private set
     private var depth = 0
 
     fun push() {
         depth++
-        factor = DIMMED
+        factor = HIDDEN
     }
 
     fun pop() {
@@ -88,9 +96,9 @@ private fun PlayerPreviewLive(
 ) {
     val entry = remember { PlayerPreviewOverlay.register() }
     val overlayOpacity = LocalPlayerPreviewOpacity.current *
-        org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha.current *
+        LocalOneConfigContentAlpha.current *
         PlayerPreviewDim.factor
-    androidx.compose.runtime.DisposableEffect(entry) {
+    DisposableEffect(entry) {
         onDispose {
             PlayerPreviewOverlay.reportBounds(entry, 0f, 0f, 0f, 0f, visible = false)
             PlayerPreviewOverlay.unregister(entry.id)
@@ -102,7 +110,7 @@ private fun PlayerPreviewLive(
         entry.spinAccum = 0f; entry.lastSpinNanos = 0L
     }
 
-    androidx.compose.runtime.SideEffect {
+    SideEffect {
         entry.source = source
         entry.modelScale = modelScale
         entry.verticalAnchor = verticalAnchor
@@ -168,7 +176,7 @@ private fun PlayerPreviewBitmap(
     var dragging by remember { mutableStateOf(false) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
 
-    androidx.compose.runtime.LaunchedEffect(autoSpin) {
+    LaunchedEffect(autoSpin) {
         if (autoSpin) {
             while (true) {
                 if (!dragging) yaw += AUTO_SPIN_DEG_PER_TICK
@@ -179,7 +187,7 @@ private fun PlayerPreviewBitmap(
 
     val bitmap: ImageBitmap? by produceState(null, source, yaw, pitch, sizePx, modelScale, verticalAnchor, previewKey) {
         if (sizePx.width > 0 && sizePx.height > 0) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            withContext(Dispatchers.Default) {
                 var attempts = 0
                 while (attempts < CAPTURE_POLL_ATTEMPTS) {
                     val bmp = PlayerPreviewRenderer.capture(source, yaw, pitch, sizePx.width, sizePx.height, modelScale, verticalAnchor, previewKey)
@@ -242,4 +250,3 @@ private const val MAX_PITCH = 45f
 private const val LIVE_DRAG_YAW_SENSITIVITY = 0.5f
 private const val LIVE_DRAG_PITCH_SENSITIVITY = 0.5f
 private const val LIVE_MAX_PITCH = 45f
-//?}

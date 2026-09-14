@@ -1,26 +1,35 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.SubmitNodeCollector
-import net.minecraft.client.renderer.entity.state.AvatarRenderState
-//?} elif >= 1.21.4 {
-/*import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.client.renderer.entity.state.PlayerRenderState
-*///?} else {
-/*import net.minecraft.client.renderer.MultiBufferSource
-*///?}
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
+import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.render.BedrockAttachedModelRenderer
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.playback.CosmeticPlayback
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+import net.minecraft.client.renderer.entity.state.AvatarRenderState
+//?}
+
+//? if >= 1.21.4 && < 1.21.10 {
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+*///?}
+
+//? if = 1.21.1 {
+/*import net.minecraft.client.player.AbstractClientPlayer
+*///?}
 
 object CosmeticRenderer {
     private const val CHESTPLATE_BACK_OFFSET = 1.5f / 16f
+    private const val TICKS_PER_TEXTURE_FRAME = 4f
 
     //? if >= 1.21.10 {
     fun submit(
@@ -63,7 +72,7 @@ object CosmeticRenderer {
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
         lightCoords: Int,
-        player: net.minecraft.client.player.AbstractClientPlayer,
+        player: AbstractClientPlayer,
         renderContext: PlayerRenderContext,
         playerModel: PlayerModel,
         equipment: CosmeticEquipment,
@@ -90,6 +99,13 @@ object CosmeticRenderer {
             val color = if (tinted) particleColor!! else -1
             val translucent = tinted && (color ushr 24) != 0xFF
             val backOffset = if (chestplateEquipped && entry.cosmetic.slot == BodySlot.Backpack) CHESTPLATE_BACK_OFFSET else 0f
+            val frameCount = entry.cosmetic.textureFrameCount
+            val textureFrame = if (frameCount > 1) {
+                val step = (BedrockAnimationPlayback.elapsedTicksSince(entry.startTimeMs) / TICKS_PER_TEXTURE_FRAME).toInt()
+                Math.floorMod(step, frameCount)
+            } else {
+                0
+            }
             BedrockAttachedModelRenderer.DrawCall(
                 model = entry.cosmetic.model,
                 texture = entry.cosmetic.texture,
@@ -99,7 +115,8 @@ object CosmeticRenderer {
                 translucent = translucent,
                 backOffset = backOffset,
                 scale = entry.cosmetic.scale,
+                textureVScale = 1f / frameCount,
+                textureVOffset = textureFrame.toFloat() / frameCount,
             )
         }
 }
-//?}

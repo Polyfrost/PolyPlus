@@ -1,12 +1,9 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.io.path.relativeTo
 
 internal object DiskAssetReader {
     data class Asset(
@@ -38,4 +35,3 @@ internal object DiskAssetReader {
 
     fun open(asset: Asset): InputStream = asset.open()
 }
-//?}

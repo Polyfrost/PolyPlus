@@ -1,11 +1,10 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client
 
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
-import kotlinx.coroutines.launch
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
@@ -16,9 +15,10 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import kotlinx.coroutines.launch
 
 object CosmeticCommands {
-    private typealias Source = net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
+    private typealias Source = FabricClientCommandSource
     private typealias commands = PolyPlusCommands.commands
 
     fun build(): LiteralArgumentBuilder<Source> =
@@ -394,4 +394,3 @@ object CosmeticCommands {
             .mapNotNull(CosmeticCatalog::getEmoteDefinition)
             .map { it.id }
 }
-//?}

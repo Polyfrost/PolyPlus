@@ -1,14 +1,11 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipInputStream
 import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
 import kotlin.io.path.outputStream
 
 internal class OutOfDiskSpaceException(cause: IOException) :
@@ -62,4 +59,3 @@ internal object AssetArchive {
 
     fun readBytes(path: Path): ByteArray = Files.readAllBytes(path)
 }
-//?}

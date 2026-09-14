@@ -1,9 +1,8 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.molang
 
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
-import org.joml.Vector3f
 import kotlin.math.PI
 
 class MolangContext(
@@ -83,4 +82,3 @@ data class MolangVector3(
         }
     }
 }
-//?}

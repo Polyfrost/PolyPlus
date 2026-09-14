@@ -1,8 +1,5 @@
 package org.polyfrost.polyplus.client.launcher
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -10,12 +7,18 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.Instant
 import java.util.UUID
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 object LauncherAccountStore {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
     private const val AUTH_FILE = "auth.json"
     private const val MAX_WALK_UP = 5
+
+    private const val EXPIRY_GRACE_SECONDS = 60L
 
     private val WRITE_JSON = Json {
         prettyPrint = true
@@ -65,8 +68,14 @@ object LauncherAccountStore {
         }.onFailure { LOGGER.warn("Failed to write launcher auth file at {}", file, it) }
     }
 
-    fun hasMicrosoftAccount(store: CredentialsStore): Boolean =
-        store.users.values.any { it.kind.equals("microsoft", ignoreCase = true) }
+    fun isMicrosoft(account: StoredAccount): Boolean = account.kind.equals("microsoft", ignoreCase = true)
+
+    fun isExpired(expires: String): Boolean {
+        val at = runCatching { Instant.parse(expires) }.getOrNull() ?: return false
+        return at.isBefore(Instant.now().plusSeconds(EXPIRY_GRACE_SECONDS))
+    }
+
+    fun isRefreshable(account: StoredAccount): Boolean = isMicrosoft(account) && account.refreshToken.isNotBlank()
 
     fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
 

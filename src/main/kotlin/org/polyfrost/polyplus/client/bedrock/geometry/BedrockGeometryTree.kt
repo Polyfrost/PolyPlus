@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 fun BedrockGeometry.childrenByParent(): Map<String, List<String>> =
@@ -35,4 +34,3 @@ fun BedrockGeometry.resolvePlayerAttachBone(): PlayerModelBone? {
 
     return null
 }
-//?}

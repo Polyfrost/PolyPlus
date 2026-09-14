@@ -1,9 +1,10 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.render
 
 //? if >= 1.21.4 {
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState
-//?} else {
+//?}
+
+//? if = 1.21.1 {
 /*import net.minecraft.client.player.AbstractClientPlayer
 *///?}
 
@@ -45,4 +46,3 @@ data class PlayerRenderContext(
         *///?}
     }
 }
-//?}

@@ -2,9 +2,8 @@ plugins {
     id("dev.kikugie.stonecutter")
 }
 
-stonecutter active "26.1-fabric"
+stonecutter active "26.2-fabric"
 
-// Used to preprocess mixin json file
 stonecutter handlers {
     inherit("json5", "json")
 }

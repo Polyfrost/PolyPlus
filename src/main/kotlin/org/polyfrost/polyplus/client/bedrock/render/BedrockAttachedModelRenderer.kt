@@ -1,20 +1,26 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.bedrock.render
 
-import com.mojang.blaze3d.vertex.PoseStack
-//? if >= 1.21.11 {
-import net.minecraft.client.renderer.rendertype.RenderTypes
-//?} else {
-/*import net.minecraft.client.renderer.RenderType
-*///?}
-//? if >= 1.21.10
-import net.minecraft.client.renderer.SubmitNodeCollector
-//? if < 1.21.10
-//import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.bedrock.model.BedrockEffectModel
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if >= 1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderTypes
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.client.renderer.RenderType
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+*///?}
 
 object BedrockAttachedModelRenderer {
     data class DrawCall(
@@ -26,6 +32,8 @@ object BedrockAttachedModelRenderer {
         val translucent: Boolean = false,
         val backOffset: Float = 0f,
         val scale: Float = 1f,
+        val textureVScale: Float = 1f,
+        val textureVOffset: Float = 0f,
     )
 
     private fun prepare(draw: DrawCall) {
@@ -68,7 +76,15 @@ object BedrockAttachedModelRenderer {
                 submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
                     val localStack = PoseStack()
                     localStack.last().set(basePose)
-                    attachment.rootBone.render(localStack, buffer, lightCoords, overlayCoords, draw.color)
+                    attachment.rootBone.render(
+                        localStack,
+                        buffer,
+                        lightCoords,
+                        overlayCoords,
+                        draw.color,
+                        draw.textureVScale,
+                        draw.textureVOffset,
+                    )
                 }
 
                 poseStack.popPose()
@@ -98,11 +114,18 @@ object BedrockAttachedModelRenderer {
                 if (draw.scale != 1f) {
                     poseStack.scale(draw.scale, draw.scale, draw.scale)
                 }
-                attachment.rootBone.render(poseStack, buffer, lightCoords, overlayCoords, draw.color)
+                attachment.rootBone.render(
+                    poseStack,
+                    buffer,
+                    lightCoords,
+                    overlayCoords,
+                    draw.color,
+                    draw.textureVScale,
+                    draw.textureVOffset,
+                )
                 poseStack.popPose()
             }
         }
     }
     *///?}
 }
-//?}

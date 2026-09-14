@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.features
 
-import com.mojang.blaze3d.platform.InputConstants
+import org.polyfrost.polyplus.client.render.InputConstants
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
@@ -9,6 +9,7 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import java.lang.reflect.Modifier
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -34,7 +35,12 @@ object DefaultSettings {
         "zoomify.key.zoom.secondary",
         "key.optigui.inspect",
         "key.blackbarconcealer.toggle",
+        "key.debug.noxesium",
+        "Open Mod Configuration",
+        "Reload Mod",
     )
+
+    private val POST_LEGACY_UNBINDS = setOf("key.debug.noxesium", "Open Mod Configuration", "Reload Mod")
 
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
@@ -48,13 +54,14 @@ object DefaultSettings {
         "org.visuals.legacy.animatium.util.config.Version",
     )
 
-    private const val ANIMATIUM_PRESET = "MODERN"
+    private val ANIMATIUM_PRESET = listOf("VANILLA", "MODERN")
 
     private const val ANIMATIUM_ID = "animatium"
     private const val BETTER_SCREENS_ID = "betterscreens"
     private const val CONFIRM_DISCONNECT_ID = "confirmdisconnect"
     private const val CONTROLIFY_ID = "controlify"
     private const val BOBBY_ID = "bobby"
+    private const val MODMENU_ID = "modmenu"
 
     private const val BOBBY_CONFIG_FILE = "bobby.conf"
     private const val BOBBY_DYNAMIC_MULTI_WORLD = "dynamic-multi-world"
@@ -68,6 +75,7 @@ object DefaultSettings {
         "items" to listOf(
             AnimatiumOption("itemPositions", value = true),
             AnimatiumOption("itemPositionsInThirdPerson", value = true),
+            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
             AnimatiumOption("itemUsageSwinging", value = true),
             AnimatiumOption("disableSwingOnUse", value = false),
             AnimatiumOption("itemPickupPosition", value = true),
@@ -82,8 +90,15 @@ object DefaultSettings {
     private val ANIMATIUM_FIXUPS = mapOf(
         "items" to listOf(
             AnimatiumOption("disableSwingOnUse", value = false),
+            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
         ),
     )
+
+    private const val MODMENU_MAIN = "com.terraformersmc.modmenu.ModMenu"
+    private const val MODMENU_CONFIG = "com.terraformersmc.modmenu.config.ModMenuConfig"
+    private const val MODMENU_CONFIG_MANAGER = "com.terraformersmc.modmenu.config.ModMenuConfigManager"
+
+    private val MODMENU_COUNT_OPTIONS = listOf("COUNT_CHILDREN", "COUNT_LIBRARIES", "COUNT_HIDDEN_MODS")
 
     private const val BETTER_SCREENS_CONFIG = "dev.microcontrollers.betterscreens.config.BetterScreensConfig"
     private const val CONFIRM_DISCONNECT_CONFIG = "dev.microcontrollers.confirmdisconnect.config.ConfirmDisconnectConfig"
@@ -142,7 +157,7 @@ object DefaultSettings {
         )
         add(
             Task(
-                id = "animatium-config",
+                id = "animatium-config-2",
                 label = "Animatium",
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumConfig,
@@ -150,7 +165,7 @@ object DefaultSettings {
         )
         add(
             Task(
-                id = "animatium-swing-on-use",
+                id = "animatium-item-fixups",
                 label = "Animatium",
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
                 apply = ::applyAnimatiumFixups,
@@ -169,6 +184,15 @@ object DefaultSettings {
         )
         add(
             Task(
+                id = "modmenu-mod-count",
+                label = "Mod Menu mod count",
+                isPresent = { modLoaded(MODMENU_ID) && findClass(MODMENU_CONFIG) != null },
+                apply = ::applyModMenuModCount,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
                 id = "animatium-packs",
                 label = "Animatium resource packs",
                 isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
@@ -182,6 +206,7 @@ object DefaultSettings {
         label = "keybinds",
         isPresent = { keyMappings().any { matches(it.name) } },
         apply = { unbindMatching(matches) },
+        coveredByLegacyFlag = id !in POST_LEGACY_UNBINDS,
     )
 
     private val LEGACY_TASKS = (INIT_TASKS + TICK_TASKS).filter(Task::coveredByLegacyFlag)
@@ -237,9 +262,10 @@ object DefaultSettings {
             when {
                 task.id in applied -> iterator.remove()
                 isPresent(task) -> {
-                    attempt(task.label, task.apply)
-                    applied += task.id
-                    changed = true
+                    if (attempt(task.label, task.apply)) {
+                        applied += task.id
+                        changed = true
+                    }
                     iterator.remove()
                 }
                 !task.retryable || ++task.attempts > RETRY_SCAN_LIMIT -> iterator.remove()
@@ -258,20 +284,19 @@ object DefaultSettings {
         PolyPlusConfig.save()
     }
 
-    private inline fun attempt(what: String, block: () -> Unit) {
+    private inline fun attempt(what: String, block: () -> Unit): Boolean =
         runCatching(block).onFailure {
             logger.warn("Could not apply default settings for {}", what, it)
             failures += what
-        }
-    }
+        }.isSuccess
 
     private fun reportFailures() {
         if (reported || failures.isEmpty()) return
         val minecraft = Minecraft.getInstance()
         //? if >= 26.2 {
-        /*if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
-        *///?} else
-        if (minecraft.overlay != null || minecraft.screen == null) return
+        if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
+        //?} else
+        //if (minecraft.overlay != null || minecraft.screen == null) return
 
         reported = true
         runCatching {
@@ -353,6 +378,17 @@ object DefaultSettings {
         logger.info("Enabled Bobby dynamic multi-world")
     }
 
+    private fun applyModMenuModCount() {
+        val config = findClass(MODMENU_CONFIG) ?: error("$MODMENU_CONFIG is missing")
+        MODMENU_COUNT_OPTIONS.forEach { name ->
+            val option = config.getField(name).get(null)
+            option.javaClass.getMethod("setValue", Boolean::class.javaPrimitiveType).invoke(option, false)
+        }
+        findClass(MODMENU_CONFIG_MANAGER)?.getMethod("save")?.invoke(null)
+        findClass(MODMENU_MAIN)?.getMethod("clearModCountCache")?.invoke(null)
+        logger.info("Limited the Mod Menu mod count to non-library mods in the mods folder")
+    }
+
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
         val type = findClass(className) ?: error("$className is missing")
         val handler = type.getField("CONFIG").get(null)
@@ -378,7 +414,7 @@ object DefaultSettings {
 
         configClass.getMethod("save").invoke(null)
         reloadAnimatium()
-        logger.info("Applied the Animatium {} preset with PolyPlus overrides", ANIMATIUM_PRESET)
+        logger.info("Applied the Animatium modern-animations preset with PolyPlus overrides")
     }
 
     private fun applyAnimatiumFixups() {
@@ -405,11 +441,20 @@ object DefaultSettings {
     private fun applyAnimatiumPreset(configClass: Class<*>, config: Any) {
         val versionClass = findFirstClass(ANIMATIUM_VERSION)
             ?: error("Animatium has none of $ANIMATIUM_VERSION")
-        val preset = enumConstant(versionClass, ANIMATIUM_PRESET)
+        val preset = ANIMATIUM_PRESET.firstNotNullOfOrNull { name ->
+            runCatching { enumConstant(versionClass, name) }.getOrNull()
+        } ?: error("Animatium has none of the $ANIMATIUM_PRESET presets")
 
-        val legacyApply = runCatching { versionClass.getMethod("apply", configClass) }.getOrNull()
-        if (legacyApply != null) legacyApply.invoke(preset, config)
-        else versionClass.getMethod("apply").invoke(preset)
+        val apply = versionClass.methods.firstOrNull { it.name == "apply" && !Modifier.isStatic(it.modifiers) }
+            ?: error("Animatium ${versionClass.simpleName} has no apply method")
+        val arguments = apply.parameterTypes.map { type ->
+            when {
+                type.isAssignableFrom(configClass) -> config
+                type == Boolean::class.javaPrimitiveType -> false
+                else -> error("Animatium ${versionClass.simpleName}#apply takes an unknown ${type.name}")
+            }
+        }
+        apply.invoke(preset, *arguments.toTypedArray())
     }
 
     private fun reloadAnimatium() {
@@ -462,7 +507,7 @@ object DefaultSettings {
     }
 
     private fun isAnimatiumPack(id: String): Boolean =
-        id.substringBefore(':').equals("animatium", ignoreCase = true)
+        id.substringBefore(':').substringBefore('/').equals(ANIMATIUM_ID, ignoreCase = true)
 
     private fun modLoaded(id: String): Boolean = FabricLoader.getInstance().isModLoaded(id)
 

@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.pets
 
 import net.minecraft.client.Minecraft
@@ -7,6 +6,8 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.cos
+import kotlin.math.sin
 
 object PetManager {
     private val LOGGER = LogManager.getLogger()
@@ -37,8 +38,8 @@ object PetManager {
             val entity = PetEntity(PetEntities.PET_ENTITY_TYPE, level)
             entity.initialize(definition, owner)
             val angle = Math.toRadians(ownerEntity.yRot.toDouble()) + Math.PI
-            val spawnX = ownerEntity.x + kotlin.math.sin(angle) * 1.5
-            val spawnZ = ownerEntity.z - kotlin.math.cos(angle) * 1.5
+            val spawnX = ownerEntity.x + sin(angle) * 1.5
+            val spawnZ = ownerEntity.z - cos(angle) * 1.5
             //? if >= 1.21.5 {
             entity.snapTo(spawnX, ownerEntity.y, spawnZ, 0f, 0f)
             //?} else {
@@ -62,4 +63,3 @@ object PetManager {
         activeByOwner.keys.toList().forEach(::despawn)
     }
 }
-//?}

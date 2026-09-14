@@ -6,6 +6,8 @@ object PolyPlusConstants {
     const val ID = "polyplus"
     const val NAME = "PolyPlus"
 
+    val IS_DEV_ENV: Boolean = FabricLoader.getInstance().isDevelopmentEnvironment
+
     val VERSION: String = FabricLoader.getInstance()
         .getModContainer(ID)
         .map { it.metadata.version.friendlyString }

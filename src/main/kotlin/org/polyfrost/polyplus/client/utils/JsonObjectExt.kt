@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.utils
 
 import com.google.gson.JsonArray
@@ -44,4 +43,3 @@ fun JsonArray?.toVec3(default: Vector3f = Vector3f()): Vector3f {
 
 fun JsonArray?.toVec2(default: Vector2f = Vector2f()): Vector2f =
     Vector2f(floatAt(0, default.x), floatAt(1, default.y))
-//?}

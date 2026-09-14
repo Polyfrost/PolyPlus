@@ -3,7 +3,31 @@ package org.polyfrost.polyplus.client.cosmetics
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
+import net.minecraft.resources.Identifier
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
+import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
+import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
+import org.polyfrost.polyplus.client.cosmetics.assets.BedrockPlayerGeometryCache
+import org.polyfrost.polyplus.client.cosmetics.assets.EmoteAssetParser
+import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
+import org.polyfrost.polyplus.client.cosmetics.assets.PetAssetParser
+import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
+import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
+import org.polyfrost.polyplus.client.emotes.Emote
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.utils.HashManager
+import java.io.File
+import java.nio.file.Path
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.imageio.ImageIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -12,32 +36,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import net.minecraft.resources.Identifier
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
-import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
-import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
-//? if >= 1.21.1 {
-import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
-import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
-import org.polyfrost.polyplus.client.cosmetics.assets.BedrockPlayerGeometryCache
-import org.polyfrost.polyplus.client.cosmetics.assets.EmoteAssetParser
-import org.polyfrost.polyplus.client.cosmetics.assets.PetAssetParser
-import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
-import org.polyfrost.polyplus.client.emotes.Emote
-//?}
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import org.polyfrost.polyplus.utils.HashManager
-import java.io.File
-import java.nio.file.Path
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.imageio.ImageIO
 
 object CosmeticAssetCache {
     private val LOGGER = LogManager.getLogger()
@@ -117,11 +115,9 @@ object CosmeticAssetCache {
                                             if (error is OutOfDiskSpaceException) {
                                                 if (outOfSpace.compareAndSet(false, true)) {
                                                     LOGGER.error("Out of disk space caching cosmetics; aborting the batch", error)
-                                                    org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
                                                 }
                                             } else {
                                                 LOGGER.error("Failed to download cosmetic {}", definition.id, error)
-                                                org.polyfrost.polyplus.client.PolyPlusSentry.capture(error)
                                             }
                                         }
                                 }
@@ -143,7 +139,7 @@ object CosmeticAssetCache {
                 for (definition in definitions) {
                     parseLock.withLock {
                         runCatching { loadCosmeticAssetsLocked(definition) }
-                            .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it); org.polyfrost.polyplus.client.PolyPlusSentry.capture(it) }
+                            .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
                     }
                     if (trackProgress) CosmeticLoadProgress.stepAssets()
                 }
@@ -156,7 +152,6 @@ object CosmeticAssetCache {
     private fun ensureBaseDir(): Boolean {
         if (baseDir.exists() || baseDir.mkdirs()) return true
         LOGGER.error("Failed to create cosmetics directory at ${baseDir.absolutePath}")
-        org.polyfrost.polyplus.client.PolyPlusSentry.captureMessage("Failed to create cosmetics directory at ${baseDir.absolutePath}")
         return false
     }
 
@@ -212,7 +207,6 @@ object CosmeticAssetCache {
                 true
             }.getOrElse {
                 LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
-                org.polyfrost.polyplus.client.PolyPlusSentry.capture(it)
                 false
             }
         }

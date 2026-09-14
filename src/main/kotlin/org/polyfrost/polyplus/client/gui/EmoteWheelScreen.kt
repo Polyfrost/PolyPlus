@@ -1,6 +1,8 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -39,22 +38,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 
 private val WHEEL_DIAMETER = 420.dp
 private val INNER_DIAMETER = 190.dp
@@ -76,9 +82,9 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun shouldCloseOnEsc(): Boolean = true
 
     //? if <26.1 {
-    /*override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    /*override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     *///?} else {
-    override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     //?}
 
     override fun onClose() {
@@ -96,7 +102,6 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                             CosmeticService.playEmote(emoteId)
                                 .onFailure {
                                     logger.error("Failed to play emote {}", emoteId, it)
-                                    PolyPlusSentry.capture(it)
                                 }
                         }
                     }
@@ -110,17 +115,17 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         Minecraft.getInstance().execute {
             val mc = Minecraft.getInstance()
             //? if >= 26.2 {
-            /*if (mc.gui.screen() === this) mc.gui.setScreen(null)
-            *///?} else {
-            if (mc.screen === this) mc.setScreen(null)
-            //?}
+            if (mc.gui.screen() === this) mc.gui.setScreen(null)
+            //?} else {
+            /*if (mc.screen === this) mc.setScreen(null)
+            *///?}
         }
     }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun EmoteWheelContent(logger: org.apache.logging.log4j.Logger, onRelease: (Int?) -> Unit) {
+private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
     val slots = remember {
         val ownedIds = CosmeticCatalog.ownedEmoteIds()
         val owned = CosmeticCatalog.allEmoteDefinitions()
@@ -164,7 +169,7 @@ private fun EmoteWheelContent(logger: org.apache.logging.log4j.Logger, onRelease
     LaunchedEffect(Unit) {
         while (isActive) {
             withFrameNanos {}
-            if (!org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind.isHeld()) {
+            if (!EmoteWheelKeybind.isHeld()) {
                 onRelease(slots.getOrNull(hoveredSlot)?.id)
                 break
             }
@@ -261,4 +266,3 @@ private fun WheelCanvas(
         }
     }
 }
-//?}

@@ -1,9 +1,23 @@
 package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.GenericMessageScreen
+import net.minecraft.client.gui.screens.LevelLoadingScreen
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.gui.screens.ReceivingLevelScreen
+*///?}
 
 object MenuPanorama {
     @JvmField
@@ -19,16 +33,16 @@ object MenuPanorama {
     fun menusActive(): Boolean = menusActive(currentScreen())
 
     private fun menusActive(screen: Any?): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
         if (Minecraft.getInstance().level == null) return true
         return isLoadingScreen(screen)
     }
 
     private fun isLoadingScreen(screen: Any?): Boolean {
-        if (screen is net.minecraft.client.gui.screens.GenericMessageScreen) return true
-        if (screen is net.minecraft.client.gui.screens.LevelLoadingScreen) return true
+        if (screen is GenericMessageScreen) return true
+        if (screen is LevelLoadingScreen) return true
         //? if < 1.21.10 {
-        /*if (screen is net.minecraft.client.gui.screens.ReceivingLevelScreen) return true
+        /*if (screen is ReceivingLevelScreen) return true
         *///?}
         return false
     }
@@ -37,7 +51,7 @@ object MenuPanorama {
     fun active(screen: Screen): Boolean = menusActive(screen) && screen !is ComposeScreen
 
     private fun backdropWanted(screen: Screen, onPanoramaPass: Boolean): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
         if (!onPanoramaPass && !menusActive(screen)) return false
         return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
     }
@@ -59,14 +73,14 @@ object MenuPanorama {
 
     @JvmStatic
     fun suppressPanorama(): Boolean {
-        if (!PolyPlusConfig.panoramaInAllMenus || panoramaBackdrop()) return false
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus || panoramaBackdrop()) return false
         val screen = currentScreen() ?: return false
         return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
     }
 
     //? if >= 26.1 {
     @JvmStatic
-    fun drawBackdrop(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, screen: Screen, onPanoramaPass: Boolean): Boolean {
+    fun drawBackdrop(ctx: GuiGraphicsExtractor, screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
         if (!panoramaBackdrop()) {
@@ -79,7 +93,7 @@ object MenuPanorama {
     }
     //?} else {
     /*@JvmStatic
-    fun drawBackdrop(ctx: net.minecraft.client.gui.GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
+    fun drawBackdrop(ctx: GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
         if (!panoramaBackdrop()) {
@@ -94,8 +108,8 @@ object MenuPanorama {
 
     private fun currentScreen() =
         //? if >= 26.2 {
-        /*Minecraft.getInstance().gui.screen()
-        *///?} else {
-        Minecraft.getInstance().screen
-        //?}
+        Minecraft.getInstance().gui.screen()
+        //?} else {
+        /*Minecraft.getInstance().screen
+        *///?}
 }

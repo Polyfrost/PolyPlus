@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable(with = TransactionProvider.Serializer::class)
 enum class TransactionProvider {
     Stripe,
+    Paynow,
     Ingame,
     AdminGrant,
     Unknown;
@@ -20,6 +21,7 @@ enum class TransactionProvider {
     val serializedName: String
         get() = when (this) {
             Stripe -> "stripe"
+            Paynow -> "paynow"
             Ingame -> "ingame"
             AdminGrant -> "admin_grant"
             Unknown -> "unknown"
@@ -28,6 +30,7 @@ enum class TransactionProvider {
     val displayName: String
         get() = when (this) {
             Stripe -> "Stripe"
+            Paynow -> "PayNow"
             Ingame -> "In-game"
             AdminGrant -> "Admin grant"
             Unknown -> "Unknown"
@@ -57,6 +60,8 @@ enum class TransactionStatus {
     Completed,
     Failed,
     Refunded,
+    PartiallyRefunded,
+    Chargeback,
     Unknown;
 
     val serializedName: String
@@ -65,6 +70,8 @@ enum class TransactionStatus {
             Completed -> "completed"
             Failed -> "failed"
             Refunded -> "refunded"
+            PartiallyRefunded -> "partially_refunded"
+            Chargeback -> "chargeback"
             Unknown -> "unknown"
         }
 
@@ -74,6 +81,8 @@ enum class TransactionStatus {
             Completed -> "Completed"
             Failed -> "Failed"
             Refunded -> "Refunded"
+            PartiallyRefunded -> "Partially refunded"
+            Chargeback -> "Chargeback"
             Unknown -> "Unknown"
         }
 
@@ -100,12 +109,15 @@ data class TransactionInfo(
     val id: Int,
     val provider: TransactionProvider,
     val status: TransactionStatus,
-    val amount: Float? = null,
+    @SerialName("amount_minor") val amountMinor: Long? = null,
+    val currency: String? = null,
     val buyer: String? = null,
     @SerialName("discount_rate") val discountRate: Int? = null,
-    @SerialName("stripe_payment_id") val stripePaymentId: String? = null,
+    @SerialName("provider_transaction_id") val providerTransactionId: String? = null,
     @SerialName("raw_metadata") val rawMetadata: JsonElement? = null,
-)
+) {
+    val amount: Float? get() = amountMinor?.let { it / 100f }
+}
 
 @Serializable
 data class TransactionsResponse(

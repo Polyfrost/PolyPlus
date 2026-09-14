@@ -1,17 +1,24 @@
 package org.polyfrost.polyplus.client.host
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import net.minecraft.SharedConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.network.chat.Component
+import net.minecraft.server.MinecraftServer
 import net.minecraft.util.HttpUtil
 import net.minecraft.world.level.GameType
 import org.apache.logging.log4j.LogManager
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 //?}
 
 object HostWorldManager {
@@ -19,9 +26,9 @@ object HostWorldManager {
 
     val clientVersionName: String by lazy {
         //? if <1.21.6 {
-        /*net.minecraft.SharedConstants.getCurrentVersion().name
+        /*SharedConstants.getCurrentVersion().name
         *///?} else
-        net.minecraft.SharedConstants.getCurrentVersion().name()
+        SharedConstants.getCurrentVersion().name()
     }
 
     enum class Compat {
@@ -45,7 +52,12 @@ object HostWorldManager {
         val compat: Compat,
     )
 
-    private data class PendingHost(val gameMode: GameType, val allowCheats: Boolean)
+    private data class PendingHost(
+        val gameMode: GameType,
+        val allowCheats: Boolean,
+        val port: Int? = null,
+        val onPublished: () -> Unit = {},
+    )
 
     @Volatile
     private var pending: PendingHost? = null
@@ -90,17 +102,85 @@ object HostWorldManager {
         return runCatching { Files.readAllBytes(icon) }.getOrNull()
     }
 
-    fun host(returnScreen: Screen, entry: HostWorldEntry, gameMode: GameType, allowCheats: Boolean) {
+    fun host(returnScreen: Screen, entry: HostWorldEntry, gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
         val mc = Minecraft.getInstance()
-        pending = PendingHost(gameMode, allowCheats)
+        pending = PendingHost(gameMode, allowCheats, port)
         mc.createWorldOpenFlows().openWorld(entry.id) {
             pending = null
             //? if >= 26.2 {
-            /*mc.gui.setScreen(returnScreen)
-            *///?} else {
-            mc.setScreen(returnScreen)
-            //?}
+            mc.gui.setScreen(returnScreen)
+            //?} else {
+            /*mc.setScreen(returnScreen)
+            *///?}
         }
+    }
+
+    fun hostViaP2P(
+        returnScreen: Screen,
+        entry: HostWorldEntry,
+        gameMode: GameType,
+        allowCheats: Boolean,
+        privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+                mc.createWorldOpenFlows().openWorld(entry.id) {
+                    //? if >= 26.2 {
+                    mc.gui.setScreen(returnScreen)
+                    //?} else {
+                    /*mc.setScreen(returnScreen)
+                    *///?}
+                }
+                LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
+            }
+        }
+    }
+
+    fun hostCurrentWorldViaP2P(
+        gameMode: GameType,
+        allowCheats: Boolean,
+        privateRelay: Boolean = true,
+        autoShareResourcePack: Boolean = false,
+        onFailure: (Throwable) -> Unit = {},
+        onHosted: (String) -> Unit = {},
+    ) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) {
+            onFailure(IllegalStateException("Not currently in a singleplayer world"))
+            return
+        }
+
+        PolyPlusClient.SCOPE.launch {
+            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
+            result.onFailure {
+                LOGGER.error("Failed to create a P2P hosting session", it)
+                onFailure(it)
+            }
+            val session = result.getOrNull() ?: return@launch
+
+            mc.execute {
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+            }
+        }
+    }
+
+    fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
+        val mc = Minecraft.getInstance()
+        if (mc.singleplayerServer == null) return
+        pending = PendingHost(gameMode, allowCheats, port)
     }
 
     fun registerLanPublishHook() {
@@ -116,22 +196,54 @@ object HostWorldManager {
         if (mc.connection == null) return
         if (server.isPublished) {
             pending = null
+            //? if >= 26.2
+            if (request.allowCheats) server.setWorldAllowCommands(true)
+            bindPendingP2PListener(server)
+            request.onPublished()
             return
         }
 
-        val port = HttpUtil.getAvailablePort()
+        val port = request.port ?: HttpUtil.getAvailablePort()
         val published =
             //? if >= 26.2 {
-            /*server.publishServer(net.minecraft.server.MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
-            *///?} else {
-            server.publishServer(request.gameMode, request.allowCheats, port)
-            //?}
+            server.publishServer(MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
+            //?} else {
+            /*server.publishServer(request.gameMode, request.allowCheats, port)
+            *///?}
         pending = null
 
         if (published) {
-            LOGGER.info("Opened world to LAN on port {} (e4mc will relay if installed)", port)
+            LOGGER.info("Opened world to LAN on port {}", port)
+            //? if >= 26.2
+            if (request.allowCheats) server.setWorldAllowCommands(true)
+            announce(mc, Component.translatable(PUBLISH_STARTED_KEY, port))
+            request.onPublished()
         } else {
-            LOGGER.warn("publishServer returned false — world was not opened to LAN")
+            LOGGER.warn("publishServer returned false — world was not opened to LAN on port {}", port)
+            announce(mc, Component.translatable("commands.publish.failed"))
         }
+    }
+
+    private val PUBLISH_STARTED_KEY =
+        //? if >= 26.2 {
+        "commands.publish.started.lan"
+        //?} else
+        //"commands.publish.started"
+
+    private fun announce(mc: Minecraft, message: Component) {
+        //? if >= 26.2 {
+        mc.gui.hud.chat.addClientSystemMessage(message)
+        //?} else if >= 26.1 {
+        /*mc.gui.chat.addClientSystemMessage(message)
+        *///?} else {
+        /*mc.gui.chat.addMessage(message)
+        *///?}
+    }
+
+    private fun bindPendingP2PListener(server: MinecraftServer) {
+        if (!P2PListenContext.hasPendingListen()) return
+        runCatching { server.connection.startTcpServerListener(null, HttpUtil.getAvailablePort()) }
+            .onSuccess { LOGGER.info("Bound an extra EOS P2P listener for the new session") }
+            .onFailure { LOGGER.error("Failed to bind the EOS P2P listener for the new session", it) }
     }
 }

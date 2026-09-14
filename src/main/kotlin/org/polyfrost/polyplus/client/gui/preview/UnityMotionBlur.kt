@@ -1,15 +1,15 @@
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.geometry.Offset
+import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.FilterTileMode
-import org.jetbrains.skia.Matrix33
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Image as SkiaImage
 
 object UnityMotionBlur {
     private const val MAX_BLUR = 0.08f
@@ -20,8 +20,12 @@ object UnityMotionBlur {
 
     private const val SAMPLE_LIMIT = 32
 
-    /** A still camera: no smear, PolyBlur's resting sample count. */
     val NONE = Motion(Offset.Zero, MIN_SAMPLES)
+
+    private val LOGGER = LogManager.getLogger("PolyPlus/MotionBlurPreview")
+
+    @Volatile
+    private var shaderUsable = true
 
     private val effect: RuntimeEffect? by lazy {
         runCatching { RuntimeEffect.makeForShader(SKSL) }.getOrNull()
@@ -35,24 +39,40 @@ object UnityMotionBlur {
         return Motion(Offset(intensity, 0f), samples)
     }
 
-    fun draw(canvas: Canvas, image: SkiaImage, localMatrix: Matrix33, width: Float, height: Float, motion: Motion) {
-        val source = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR, localMatrix)
-        source.use {
-            val blurred = effect?.let { runtime ->
-                RuntimeShaderBuilder(runtime).use { builder ->
-                    builder.child("DiffuseSampler", source)
-                    builder.uniform("Size", width, height)
-                    builder.uniform("Velocity", motion.velocity.x, motion.velocity.y)
-                    builder.uniform("Samples", motion.samples)
-                    builder.uniform("Jitter", JITTER)
-                    builder.makeShader()
-                }
-            }
+    fun draw(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
+        if (!shaderUsable) return blit(canvas, image, src, dst, bounds)
+        try {
+            drawBlurred(canvas, image, src, dst, bounds, motion)
+        } catch (e: LinkageError) {
+            shaderUsable = false
+            LOGGER.warn("Motion blur preview disabled; skiko API mismatch", e)
+            blit(canvas, image, src, dst, bounds)
+        }
+    }
+
+    private fun blit(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect) {
+        canvas.save()
+        canvas.clipRect(bounds)
+        canvas.drawImageRect(image, src, dst, SamplingMode.LINEAR, null, true)
+        canvas.restore()
+    }
+
+    private fun drawBlurred(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
+        val runtime = effect ?: return blit(canvas, image, src, dst, bounds)
+        val builder = RuntimeShaderBuilder(runtime)
+        builder.uniform("Size", bounds.width, bounds.height)
+        builder.uniform("Velocity", motion.velocity.x, motion.velocity.y)
+        builder.uniform("Samples", motion.samples)
+        builder.uniform("Jitter", JITTER)
+        val filter = builder.use { ImageFilter.makeRuntimeShader(it, "DiffuseSampler", null) }
+        filter.use {
             Paint().use { paint ->
-                paint.shader = blurred ?: source
-                canvas.drawRect(Rect.makeWH(width, height), paint)
+                paint.imageFilter = it
+                canvas.save()
+                canvas.clipRect(bounds)
+                canvas.drawImageRect(image, src, dst, SamplingMode.LINEAR, paint, true)
+                canvas.restore()
             }
-            blurred?.close()
         }
     }
 

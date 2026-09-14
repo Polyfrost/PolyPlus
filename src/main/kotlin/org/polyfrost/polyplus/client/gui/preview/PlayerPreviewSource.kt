@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.gui.preview
 
 import net.minecraft.resources.Identifier
@@ -14,4 +13,3 @@ sealed interface PlayerPreviewSource {
         val pet: PetDefinition? = null,
     ) : PlayerPreviewSource
 }
-//?}

@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client
 
-import kotlinx.serialization.Serializable
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.ServerList
 import java.io.File
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class RecentServer(val name: String, val ip: String)

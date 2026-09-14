@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.emotes.conditions
 
 import com.google.gson.JsonObject
@@ -45,4 +44,3 @@ internal object EmoteRulesParser {
         return null
     }
 }
-//?}

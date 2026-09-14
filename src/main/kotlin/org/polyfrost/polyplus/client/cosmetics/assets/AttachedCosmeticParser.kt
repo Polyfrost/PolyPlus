@@ -1,4 +1,3 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics.assets
 
 import net.minecraft.resources.Identifier
@@ -19,6 +18,7 @@ import org.slf4j.LoggerFactory
 import java.io.DataInputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.math.abs
 
 internal object AttachedCosmeticParser {
     private val logger: Logger = LoggerFactory.getLogger("${PolyPlusConstants.ID}/cosmetics")
@@ -50,17 +50,21 @@ internal object AttachedCosmeticParser {
                     return null
                 }
 
-                // A model exported straight from Blockbench usually doesn't parent
-                // its bones to a player bone, so it would have nothing to attach to.
-                // Auto-attach it to the slot's natural body part (wings -> body,
-                // hat -> head, ...) so uploads just work without hand-editing.
+                // Blockbench exports rarely parent bones to a player bone so fall back to the
+                // slot's natural body part and let uploads work unedited
+                val attachedGeometry = ensureAttached(parsed, slot, anchor)
+                val textureFrameCount = detectTextureFrameCount(attachedGeometry, textureFile)
                 val geometry = applyAutoMirror(
-                    reconcileTextureSize(
-                        ensureAttached(parsed, slot, anchor),
-                        textureFile,
-                        cosmeticId,
-                    ),
+                    if (textureFrameCount > 1) attachedGeometry else reconcileTextureSize(attachedGeometry, textureFile, cosmeticId),
                 )
+                if (textureFrameCount > 1) {
+                    logger.debug(
+                        "Cosmetic {} texture read as a {}-frame vertical sheet of {}px frames",
+                        cosmeticId,
+                        textureFrameCount,
+                        attachedGeometry.description.textureHeight,
+                    )
+                }
 
                 val textureId = Identifier.fromNamespaceAndPath(
                     PolyPlusConstants.ID,
@@ -74,11 +78,11 @@ internal object AttachedCosmeticParser {
                     model = BedrockEffectModel.build(geometry, playerGeometry),
                     animation = findAnimation(root, cosmeticId),
                     scale = scale,
+                    textureFrameCount = textureFrameCount,
                 )
             }
         } catch (ex: Exception) {
             logger.error("Failed to load attached cosmetic {}", cosmeticId, ex)
-            org.polyfrost.polyplus.client.PolyPlusSentry.capture(ex)
             null
         }
     }
@@ -94,9 +98,9 @@ internal object AttachedCosmeticParser {
             val hasNegativeMirror = bones.any { other ->
                 other.name != bone.name &&
                     other.pivot.x < 0f &&
-                    kotlin.math.abs(other.pivot.x + bone.pivot.x) < MIRROR_EPSILON &&
-                    kotlin.math.abs(other.pivot.y - bone.pivot.y) < MIRROR_EPSILON &&
-                    kotlin.math.abs(other.pivot.z - bone.pivot.z) < MIRROR_EPSILON
+                    abs(other.pivot.x + bone.pivot.x) < MIRROR_EPSILON &&
+                    abs(other.pivot.y - bone.pivot.y) < MIRROR_EPSILON &&
+                    abs(other.pivot.z - bone.pivot.z) < MIRROR_EPSILON
             }
             if (!hasNegativeMirror) return@inner bone
             bone.copy(cubes = bone.cubes.map { if (it.uv.faces.isEmpty()) it.copy(mirror = !it.mirror) else it })
@@ -127,6 +131,37 @@ internal object AttachedCosmeticParser {
         return geometry.copy(
             description = description.copy(textureWidth = width, textureHeight = height),
         )
+    }
+
+    private fun detectTextureFrameCount(geometry: BedrockGeometry, textureFile: Path): Int {
+        val (width, height) = pngSize(textureFile) ?: return 1
+        val description = geometry.description
+        return detectVerticalTextureFrameCount(
+            description.textureWidth,
+            description.textureHeight,
+            width,
+            height,
+            maxUvVExtent(geometry),
+        )
+    }
+
+    private fun maxUvVExtent(geometry: BedrockGeometry): Float {
+        var extent = 0f
+        for (bone in geometry.bones.values) {
+            for (cube in bone.cubes) {
+                if (cube.uv.faces.isEmpty()) {
+                    val box = cube.uv.box
+                    if (box.size < 2) continue
+                    extent = maxOf(extent, box[1] + abs(cube.size.z) + abs(cube.size.y))
+                    continue
+                }
+                for (face in cube.uv.faces.values) {
+                    if (face.size.x == 0f || face.size.y == 0f) continue
+                    extent = maxOf(extent, face.uv.y + maxOf(face.size.y, 0f))
+                }
+            }
+        }
+        return extent
     }
 
     private fun pngSize(file: Path): Pair<Int, Int>? = try {
@@ -278,4 +313,19 @@ internal object AttachedCosmeticParser {
         return (preferred ?: pngs.first()).file
     }
 }
-//?}
+
+private const val MIN_SHEET_FRAMES = 3
+
+internal fun detectVerticalTextureFrameCount(
+    declaredWidth: Int,
+    declaredHeight: Int,
+    actualWidth: Int,
+    actualHeight: Int,
+    maxUvV: Float,
+): Int {
+    if (actualWidth != declaredWidth || declaredHeight <= 0 || actualHeight <= declaredHeight) return 1
+    if (actualHeight % declaredHeight != 0) return 1
+    if (maxUvV > declaredHeight) return 1
+    val frames = actualHeight / declaredHeight
+    return if (frames >= MIN_SHEET_FRAMES) frames else 1
+}

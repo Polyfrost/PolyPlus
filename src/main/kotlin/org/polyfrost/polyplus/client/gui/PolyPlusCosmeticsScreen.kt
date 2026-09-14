@@ -1,16 +1,25 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,6 +35,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -33,20 +43,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -70,31 +75,34 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
 import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
@@ -112,7 +120,9 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
@@ -121,9 +131,15 @@ import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.time.Duration
+import java.time.Instant
+import java.time.OffsetDateTime
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
 @Serializable
 data object PolyPlusCosmeticsRoute
@@ -137,6 +153,8 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun navigationGroups(original: List<NavigationGroup>): List<NavigationGroup> {
+        if (!PrivacyConsent.allowsOnlineServices()) return original
+
         if (original.any { group -> group.routes.any { it.route == PolyPlusCosmeticsRoute } }) {
             return original
         }
@@ -154,6 +172,7 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun addRoutes(builder: NavGraphBuilder) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
         builder.polyPlusCosmeticsGraph()
     }
 
@@ -194,7 +213,7 @@ private data class CartEntry(
     val basePrice: Float?,
     val finalPrice: Float?,
     val discountRate: Int?,
-    val stripePriceId: String?,
+    val storeProductId: String?,
     val coverAssetId: Int? = null,
 ) {
     val free: Boolean get() = (finalPrice ?: 0f) <= 0f
@@ -203,9 +222,9 @@ private data class CartEntry(
 }
 
 private fun BundleInfo.toCartEntry(): CartEntry =
-    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, stripePriceId)
+    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, storeProductId)
 
-private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, stripePriceId: String?): CartEntry =
+private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProductId: String?): CartEntry =
     CartEntry(
         cosmeticCartKey(variant.id),
         cartName(variant),
@@ -213,7 +232,7 @@ private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, stripePric
         basePrice,
         finalPrice,
         discountRate,
-        stripePriceId,
+        storeProductId,
         coverAssetId,
     )
 
@@ -328,14 +347,14 @@ private fun PolyPlusCosmeticsScreen() {
     }
 
     fun checkout() {
-        val priceIds = cart.mapNotNull { it.stripePriceId }
-        if (priceIds.isEmpty()) {
+        val productIds = cart.mapNotNull { it.storeProductId }
+        if (productIds.isEmpty()) {
             status = "Nothing purchasable in your cart yet."
             return
         }
         status = "Opening checkout..."
         PolyPlusClient.SCOPE.launch {
-            val result = BillingService.checkoutAndOpen(priceIds)
+            val result = BillingService.checkoutAndOpen(productIds)
             ClientPlatform.runOnMain {
                 status = result.fold(
                     onSuccess = { "Checkout opened in your browser." },
@@ -459,7 +478,7 @@ private fun PolyPlusCosmeticsScreen() {
                         PolyPlusClient.SCOPE.launch {
                             val view = CosmeticStore.view(variant.id).getOrNull()
                             ClientPlatform.runOnMain {
-                                val priceId = view?.stripePriceId
+                                val priceId = view?.storeProductId
                                 if (priceId.isNullOrBlank()) {
                                     status = "$label isn't purchasable yet."
                                 } else if (cart.none { it.key == key }) {
@@ -479,7 +498,7 @@ private fun PolyPlusCosmeticsScreen() {
                     status = "Opening checkout..."
                     PolyPlusClient.SCOPE.launch {
                         val view = CosmeticStore.view(variant.id).getOrNull()
-                        val priceId = view?.stripePriceId
+                        val priceId = view?.storeProductId
                         if (priceId.isNullOrBlank()) {
                             ClientPlatform.runOnMain { status = "$label isn't purchasable yet." }
                         } else {
@@ -791,7 +810,7 @@ private fun TransactionRow(tx: TransactionInfo) {
             GuiText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             GuiText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
-        tx.amount?.let { GuiText(money(it), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+        tx.amount?.let { GuiText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
         GuiText(
             tx.status.displayName,
             color = statusColor(tx.status),
@@ -805,7 +824,7 @@ private fun statusColor(status: TransactionStatus): Color = when (status) {
     TransactionStatus.Completed -> Color(0xFF239A60)
     TransactionStatus.Pending -> Color(0xFFE0A030)
     TransactionStatus.Failed -> Color(0xFFFF4444)
-    TransactionStatus.Refunded -> Color(0xFF8A9296)
+    TransactionStatus.Refunded, TransactionStatus.PartiallyRefunded, TransactionStatus.Chargeback -> Color(0xFF8A9296)
     TransactionStatus.Unknown -> Color(0xFF8A9296)
 }
 
@@ -878,8 +897,8 @@ private fun CosmeticCard(
             .clickable(onClick = activate),
     ) {
         CosmeticThumbnail(item, Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        GuiText(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
+        CardLabel(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
 
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
@@ -946,7 +965,7 @@ private fun BundleCard(
             .clickable(onClick = onSelect),
     ) {
         CheckerThumbnail(Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(bundle.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(bundle.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically) {
             PriceLabel(bundle)
         }
@@ -1076,7 +1095,7 @@ private fun PreviewPanel(
             .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
         val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
-            .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
+            .containsKey(BodySlot.Hat)
         PlayerPreview(
             Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
             source = PlayerPreviewSource.LocalLive,
@@ -1160,6 +1179,10 @@ private fun PreviewPill(
             }
         }
         if (customOpen && showAuraColor) {
+            DisposableEffect(Unit) {
+                PlayerPreviewDim.push()
+                onDispose { PlayerPreviewDim.pop() }
+            }
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, pillHeight + popoverGapPx),
@@ -1356,18 +1379,18 @@ private val VARIANT_WHEEL_STEP = 48.dp
 private val VARIANT_ARROW_STEP = 96.dp
 
 private val AURA_COLORS: List<Int> = listOf(
-    0xFFFF4444.toInt(), // red
-    0xFFFF9E3D.toInt(), // orange
-    0xFFF4D03F.toInt(), // yellow
-    0xFF2ECC71.toInt(), // green
-    0xFF1ABC9C.toInt(), // teal
-    0xFF3DA5FF.toInt(), // blue
-    0xFF6C5CE7.toInt(), // indigo
-    0xFFB05CFF.toInt(), // purple
-    0xFFFF6FD8.toInt(), // pink
-    0xFFFFFFFF.toInt(), // white
-    0xFF3A3F43.toInt(), // dark
-    0xFF9BA2A6.toInt(), // gray
+    0xFFFF4444.toInt(),
+    0xFFFF9E3D.toInt(),
+    0xFFF4D03F.toInt(),
+    0xFF2ECC71.toInt(),
+    0xFF1ABC9C.toInt(),
+    0xFF3DA5FF.toInt(),
+    0xFF6C5CE7.toInt(),
+    0xFFB05CFF.toInt(),
+    0xFFFF6FD8.toInt(),
+    0xFFFFFFFF.toInt(),
+    0xFF3A3F43.toInt(),
+    0xFF9BA2A6.toInt(),
 )
 
 private const val DEFAULT_AURA_ARGB: Int = -1
@@ -1676,7 +1699,8 @@ private fun AuraCustomPopover(
                     .clip(ppShape(5.dp))
                     .background(LocalTheme.current.chipBackground)
                     .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         GuiText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
@@ -1870,8 +1894,8 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
 private fun isNewItem(createdAt: String): Boolean {
     if (createdAt.isBlank()) return false
     return runCatching {
-        val created = java.time.OffsetDateTime.parse(createdAt).toInstant()
-        created.isAfter(java.time.Instant.now().minus(java.time.Duration.ofDays(7)))
+        val created = OffsetDateTime.parse(createdAt).toInstant()
+        created.isAfter(Instant.now().minus(Duration.ofDays(7)))
     }.getOrDefault(false)
 }
 
@@ -2059,7 +2083,8 @@ private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSub
                 .clip(ppShape(7.dp))
                 .background(LocalTheme.current.chipBackground)
                 .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 12.dp)
+                .trackTextInputFocus(),
             decorationBox = { inner ->
                 Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
@@ -2136,7 +2161,7 @@ private fun StoreCard(
             .clickable(onClick = onSelect),
     ) {
         StoreThumbnail(info, variant.id, Modifier.offset(17.dp, 17.dp).size(144.dp))
-        GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PriceLabel(info)
             if (variantCount > 1) {
@@ -2327,9 +2352,9 @@ private fun StoreDetailPanel(
                         info.description?.takeIf { it.isNotBlank() }?.let {
                             GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                         }
-                        if (status != null) {
-                            GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        }
+                    }
+                    if (status != null) {
+                        GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                     }
                     if (variant.id in ownedIds) {
                         GuiText(
@@ -2410,7 +2435,7 @@ private fun BundlePreviewPanel(
     ) {
         val bundleSource = rememberBundlePreviewSource(bundleView)
         val bundleHasHat = (bundleSource as? PlayerPreviewSource.Override)
-            ?.equipment?.get(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat) != null
+            ?.equipment?.get(BodySlot.Hat) != null
         PlayerPreview(
             Modifier.align(Alignment.Center).fillMaxWidth().height(300.dp),
             source = bundleSource,
@@ -2571,6 +2596,9 @@ private fun GuiText(
     fontWeight: FontWeight = FontWeight.Normal,
     textAlign: TextAlign = TextAlign.Start,
     textDecoration: TextDecoration? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     BasicText(
         text = text,
@@ -2583,7 +2611,72 @@ private fun GuiText(
             textAlign = textAlign,
             textDecoration = textDecoration,
         ),
+        maxLines = maxLines,
+        overflow = overflow,
+        onTextLayout = onTextLayout,
     )
+}
+
+@Composable
+private fun CardLabel(
+    text: String,
+    color: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    fontWeight: FontWeight = FontWeight.Normal,
+) {
+    var truncated by remember(text) { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+
+    Box(modifier.hoverable(interaction)) {
+        GuiText(
+            text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { truncated = it.hasVisualOverflow },
+        )
+        if (truncated && hovered) {
+            TooltipPopup(text)
+        }
+    }
+}
+
+@Composable
+private fun TooltipPopup(text: String) {
+    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
+    val positionProvider = remember(gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                val above = anchorBounds.top - gap - popupContentSize.height
+                val y = if (above >= 0) above else anchorBounds.bottom + gap
+                return IntOffset(x, y)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        Box(
+            modifier = Modifier.widthIn(max = 240.dp)
+                .clip(ppShape(6.dp))
+                .background(LocalTheme.current.popupBackground)
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            GuiText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
+        }
+    }
 }
 
 @Composable
@@ -2691,4 +2784,7 @@ private fun cardBrush(): Brush =
         ),
     )
 
-private fun money(amount: Float): String = "$" + String.format("%.2f", amount)
+private fun money(amount: Float, currency: String? = null): String {
+    val formatted = String.format("%.2f", amount)
+    return if (currency == null || currency.equals("usd", ignoreCase = true)) "$$formatted" else "$formatted ${currency.uppercase()}"
+}

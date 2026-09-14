@@ -1,15 +1,17 @@
-//? if >= 1.21.1 {
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.resources.Identifier
-//? if >= 1.21.11 {
-import net.minecraft.util.Util
-//?} else {
-/*import net.minecraft.Util
-*///?}
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import java.util.EnumMap
+
+//? if >= 1.21.11 {
+import net.minecraft.util.Util
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.Util
+*///?}
 
 class CosmeticEquipment {
     private val equipped = EnumMap<BodySlot, EquippedEntry>(BodySlot::class.java)
@@ -48,4 +50,3 @@ class CosmeticEquipment {
         val startTimeMs: Long,
     )
 }
-//?}
