@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 //?}
 
 //? if = 1.21.10 {
-/*import net.minecraft.resources.ResourceLocation;
+/*import net.minecraft.resources.Identifier;
 *///?}
 
 @Pseudo
