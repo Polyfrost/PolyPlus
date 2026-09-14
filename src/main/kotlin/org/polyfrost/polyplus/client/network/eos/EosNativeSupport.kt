@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.network.eos
 
+import org.apache.logging.log4j.LogManager
 import java.lang.management.ManagementFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.management.ObjectName
-import org.apache.logging.log4j.LogManager
 
 object EosNativeSupport {
     private val LOGGER = LogManager.getLogger()

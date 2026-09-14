@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.social
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.SpecialChatApi
 import org.polyfrost.polyplus.client.network.http.responses.SpecialChatStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 object SpecialChatRepository {
     private val LOGGER = LogManager.getLogger()

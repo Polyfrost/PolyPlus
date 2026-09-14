@@ -5,21 +5,25 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
-//? if >= 26.2 {
-import net.minecraft.client.gui.screens.MultiplayerOptionsScreen;
-//?} else {
-/*import net.minecraft.client.gui.screens.ShareToLanScreen;
-*///?}
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.social.SocialOverlay;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
-import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
+//? if = 26.2 {
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.screens.MultiplayerOptionsScreen;
+//?}
+
+//? if < 26.2 {
+/*import net.minecraft.client.gui.screens.ShareToLanScreen;
+*///?}
+
 //? if >= 26.2 {
-@Mixin(net.minecraft.client.gui.Gui.class)
+@Mixin(Gui.class)
 //?} else {
 /*@Mixin(Minecraft.class)
 *///?}

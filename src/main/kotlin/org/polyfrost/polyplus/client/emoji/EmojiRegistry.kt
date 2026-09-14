@@ -1,14 +1,15 @@
 package org.polyfrost.polyplus.client.emoji
 
-import kotlinx.serialization.json.Json
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.contents.PlainTextContents
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.util.FormattedCharSequence
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.regex.Pattern
+import kotlinx.serialization.json.Json
 
 object EmojiRegistry {
     private val LOGGER = LogManager.getLogger()
@@ -72,7 +73,7 @@ object EmojiRegistry {
     fun resolve(alias: String): String? = shortcodes[alias]
 
     @JvmStatic
-    fun suggestionRow(alias: String): net.minecraft.util.FormattedCharSequence {
+    fun suggestionRow(alias: String): FormattedCharSequence {
         val comp = Component.empty()
         shortcodes[alias]?.let { comp.append(EmojiFont.glyph(it, Style.EMPTY)).append(Component.literal(" ")) }
         comp.append(Component.literal(":$alias:"))
@@ -171,7 +172,7 @@ object EmojiRegistry {
     }
 
     @JvmStatic
-    fun styleInput(text: String, base: Style): net.minecraft.util.FormattedCharSequence? =
+    fun styleInput(text: String, base: Style): FormattedCharSequence? =
         expand(text, base, EMOJI)?.visualOrderText
 
     data class EmojiEntry(val glyph: String, val alias: String, val aliases: List<String>)

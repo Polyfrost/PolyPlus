@@ -2,14 +2,6 @@ package org.polyfrost.polyplus.client.featured
 
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -19,6 +11,15 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 object FeaturedServers {
     private const val PRODUCTION_URL = "https://data-v2.polyfrost.org/oneclient/servers.json"
@@ -323,14 +324,14 @@ object FeaturedServers {
 
     @Serializable
     private data class CacheEnvelope(
-        @kotlinx.serialization.SerialName("fetched_at") val fetchedAtMillis: Long,
+        @SerialName("fetched_at") val fetchedAtMillis: Long,
         val body: String,
     )
 
     @Serializable
     private data class Dismissals(
-        @kotlinx.serialization.SerialName("main_menu_campaign_ids") val mainMenuCampaignIds: Set<String> = emptySet(),
-        @kotlinx.serialization.SerialName("multiplayer_campaign_ids") val multiplayerCampaignIds: Set<String> = emptySet(),
+        @SerialName("main_menu_campaign_ids") val mainMenuCampaignIds: Set<String> = emptySet(),
+        @SerialName("multiplayer_campaign_ids") val multiplayerCampaignIds: Set<String> = emptySet(),
     )
 }
 

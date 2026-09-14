@@ -17,10 +17,22 @@ import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
 import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
 import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.io.EOFException
 import java.io.File
+import java.io.IOException
+import java.lang.reflect.InvocationTargetException
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.UnknownHostException
+import java.nio.channels.ClosedChannelException
+import java.nio.channels.UnresolvedAddressException
+import java.nio.file.FileSystemException
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -131,9 +143,9 @@ object PolyPlusSentry {
             val next = cause.cause ?: break
             if (next === cause) break // self-referencing chain
             val isWrapper = when (cause) {
-                is java.lang.reflect.InvocationTargetException,
-                is java.util.concurrent.ExecutionException,
-                is java.util.concurrent.CompletionException,
+                is InvocationTargetException,
+                is ExecutionException,
+                is CompletionException,
                 is ExceptionInInitializerError,
                 is BootstrapMethodError,
                 -> true
@@ -342,20 +354,20 @@ object PolyPlusSentry {
                 is ConnectTimeoutException,
                 is SocketTimeoutException,
                 is java.net.SocketTimeoutException,
-                is java.net.ConnectException,
-                is java.net.UnknownHostException,
-                is java.net.SocketException,
-                is java.nio.channels.UnresolvedAddressException,
-                is java.nio.channels.ClosedChannelException,
-                is java.io.EOFException,
-                is java.nio.file.FileSystemException,
+                is ConnectException,
+                is UnknownHostException,
+                is SocketException,
+                is UnresolvedAddressException,
+                is ClosedChannelException,
+                is EOFException,
+                is FileSystemException,
                 -> return true
                 is ClientRequestException ->
                     if (cause.response.status == HttpStatusCode.Unauthorized) return true
                 is IllegalStateException ->
                     // Truncated HTTP body
                     if (cause.message?.contains("Content-Length", ignoreCase = true) == true) return true
-                is java.io.IOException ->
+                is IOException ->
                     cause.message?.let { m ->
                         if (m.contains("No space left", ignoreCase = true) ||
                             m.contains("not enough space", ignoreCase = true) ||
@@ -375,7 +387,7 @@ object PolyPlusSentry {
     private fun isBenignCancellation(throwable: Throwable): Boolean {
         var cause: Throwable? = throwable
         while (cause != null) {
-            if (cause is java.util.concurrent.CancellationException) return true
+            if (cause is CancellationException) return true
             if (cause.message?.contains("The coroutine scope left the composition", ignoreCase = true) == true) {
                 return true
             }

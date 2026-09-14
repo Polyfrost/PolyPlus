@@ -1,28 +1,38 @@
 package org.polyfrost.polyplus.client.cosmetics.render
 
-import org.polyfrost.polyplus.client.render.PoseStack
-//? if >= 1.21.4
-import net.minecraft.client.Minecraft
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import net.minecraft.client.player.AbstractClientPlayer
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.SubmitNodeCollector
-import net.minecraft.client.renderer.entity.state.AvatarRenderState
-//?} elif >= 1.21.4 {
-/*import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.client.renderer.entity.state.PlayerRenderState
-*///?} else {
-/*import net.minecraft.client.renderer.MultiBufferSource
-*///?}
 import net.minecraft.client.renderer.entity.RenderLayerParent
 import net.minecraft.client.renderer.entity.layers.RenderLayer
 import net.minecraft.world.entity.EquipmentSlot
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
-import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.render.PlayerRenderContext
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+import net.minecraft.client.renderer.entity.state.AvatarRenderState
+//?}
+
+//? if >= 1.21.4 {
+import net.minecraft.client.Minecraft
+//?}
+
+//? if >= 1.21.4 && < 1.21.10 {
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+*///?}
+
+//? if = 1.21.1 {
+/*import org.polyfrost.polyplus.client.render.PlayerRenderContext
+*///?}
 
 //? if >= 1.21.10 {
 class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerModel>) :
@@ -84,7 +94,7 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
 
 //? if >= 1.21.4 {
 private fun resolveEquipment(entityId: Int): CosmeticEquipment? {
-    org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewEquipment(entityId)?.let { return it }
+    PlayerPreviewRenderer.previewEquipment(entityId)?.let { return it }
     val level = Minecraft.getInstance().level ?: return null
     val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return null
     if (entity !is PlayerCosmeticsAccess) return null
@@ -92,7 +102,7 @@ private fun resolveEquipment(entityId: Int): CosmeticEquipment? {
 }
 
 private fun resolveParticleColor(entityId: Int): Int? {
-    org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewParticleColor(entityId)?.let { return it }
+    PlayerPreviewRenderer.previewParticleColor(entityId)?.let { return it }
     val level = Minecraft.getInstance().level ?: return null
     val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return null
     return CosmeticCatalog.getParticleColor(entity.uuid)
@@ -111,13 +121,13 @@ private fun resolveHiddenSlots(entityId: Int): Set<BodySlot> {
 }
 //?} else {
 /*private fun resolveEquipment(player: AbstractClientPlayer): CosmeticEquipment? {
-    org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewEquipment(player.id)?.let { return it }
+    PlayerPreviewRenderer.previewEquipment(player.id)?.let { return it }
     if (player !is PlayerCosmeticsAccess) return null
     return player.`polyplus$cosmeticEquipment`()
 }
 
 private fun resolveParticleColor(player: AbstractClientPlayer): Int? =
-    org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer.previewParticleColor(player.id)
+    PlayerPreviewRenderer.previewParticleColor(player.id)
         ?: CosmeticCatalog.getParticleColor(player.uuid)
 
 private fun resolveChestplateEquipped(player: AbstractClientPlayer): Boolean =

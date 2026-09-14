@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.resourcepack
 
+import net.minecraft.client.Minecraft
+import org.apache.logging.log4j.LogManager
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import net.minecraft.client.Minecraft
-import org.apache.logging.log4j.LogManager
 
 object SharedResourcePack {
     private val LOGGER = LogManager.getLogger("PolyPlus/SharedPack")

@@ -98,9 +98,9 @@ internal object AttachedCosmeticParser {
             val hasNegativeMirror = bones.any { other ->
                 other.name != bone.name &&
                     other.pivot.x < 0f &&
-                    kotlin.math.abs(other.pivot.x + bone.pivot.x) < MIRROR_EPSILON &&
-                    kotlin.math.abs(other.pivot.y - bone.pivot.y) < MIRROR_EPSILON &&
-                    kotlin.math.abs(other.pivot.z - bone.pivot.z) < MIRROR_EPSILON
+                    abs(other.pivot.x + bone.pivot.x) < MIRROR_EPSILON &&
+                    abs(other.pivot.y - bone.pivot.y) < MIRROR_EPSILON &&
+                    abs(other.pivot.z - bone.pivot.z) < MIRROR_EPSILON
             }
             if (!hasNegativeMirror) return@inner bone
             bone.copy(cubes = bone.cubes.map { if (it.uv.faces.isEmpty()) it.copy(mirror = !it.mirror) else it })

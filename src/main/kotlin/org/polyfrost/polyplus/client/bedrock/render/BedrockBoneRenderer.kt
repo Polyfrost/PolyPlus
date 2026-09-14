@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import org.polyfrost.polyplus.client.render.PoseStack
-import org.polyfrost.polyplus.client.render.VertexConsumer
-import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
+import org.polyfrost.polyplus.client.render.PoseStack
+import org.polyfrost.polyplus.client.render.VertexConsumer
 
 class BedrockBoneRenderer internal constructor(
     val name: String,

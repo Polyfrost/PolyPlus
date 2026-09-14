@@ -1,8 +1,5 @@
 package org.polyfrost.polyplus.client.social
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -11,6 +8,10 @@ import org.polyfrost.polyplus.client.network.http.responses.GlobalChatMessage
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.EarlyInitializable
+import java.time.Instant
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 object GlobalChatRepository : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -28,7 +29,7 @@ object GlobalChatRepository : EarlyInitializable {
                     id = packet.messageId,
                     sender = packet.sender,
                     content = packet.content,
-                    sentAt = java.time.Instant.now().toString(),
+                    sentAt = Instant.now().toString(),
                 ),
             )
         }.register()

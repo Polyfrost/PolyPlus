@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.network.http
 
-import kotlinx.coroutines.delay
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents
 import org.apache.logging.log4j.LogManager
@@ -10,6 +9,7 @@ import java.util.IdentityHashMap
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.delay
 
 object MinecraftLoginGate {
     private val LOGGER = LogManager.getLogger("PolyPlus/LoginGate")

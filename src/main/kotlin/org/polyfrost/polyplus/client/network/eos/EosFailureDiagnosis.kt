@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.network.eos
 
+import com.sun.management.UnixOperatingSystemMXBean
 import java.lang.management.ManagementFactory
 
 object EosFailureDiagnosis {
@@ -20,7 +21,7 @@ object EosFailureDiagnosis {
     }
 
     fun openFileDescriptors(): Long? = runCatching {
-        (ManagementFactory.getOperatingSystemMXBean() as? com.sun.management.UnixOperatingSystemMXBean)
+        (ManagementFactory.getOperatingSystemMXBean() as? UnixOperatingSystemMXBean)
             ?.openFileDescriptorCount
     }.getOrNull()
 }

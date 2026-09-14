@@ -8,7 +8,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -37,9 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,16 +58,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -76,26 +74,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.skia.BlendMode
-import org.jetbrains.skia.ColorFilter
+import net.minecraft.client.Minecraft
 import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.BlendMode
+import org.jetbrains.skia.Canvas as SkiaCanvas
+import org.jetbrains.skia.ColorFilter
+import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Path
 import org.jetbrains.skia.Point
-import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Canvas as SkiaCanvas
 import org.jetbrains.skia.Rect as SkiaRect
-import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.SamplingMode
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.features.OnboardingFeatures.ModCard
@@ -106,11 +106,19 @@ import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 
 class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -130,11 +138,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     //? if <26.1 {
-    /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
         renderPanorama(ctx, tickDelta)
         if (firstFrameDrawn) {
-            val gameRenderer = net.minecraft.client.Minecraft.getInstance().gameRenderer
+            val gameRenderer = Minecraft.getInstance().gameRenderer
             //? if <1.21.4 {
             /*gameRenderer.processBlurEffect(tickDelta)
             *///?} else {
@@ -145,11 +153,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         firstFrameDrawn = true
     }
 
-    override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     *///?} else {
-    override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
-        net.minecraft.client.Minecraft.getInstance().gameRenderer
+        Minecraft.getInstance().gameRenderer
             //? if >= 26.2 {
             .panorama()
             .extractRenderState(ctx, width, height)
@@ -161,7 +169,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
-    override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     //?}
 
     @Composable
@@ -230,7 +238,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
         var guiScale by remember {
             mutableIntStateOf(
-                net.minecraft.client.Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+                Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
             )
         }
         LaunchedEffect(lightTheme, uiStyle) {
@@ -312,7 +320,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 if (showsModSettings) OnboardingFeatures.applySavedModSettings()
                 if (needsBlurChoice) OnboardingFeatures.applySavedMotionBlur()
             }
-            val mc = net.minecraft.client.Minecraft.getInstance()
+            val mc = Minecraft.getInstance()
             //? if >= 26.2 {
             mc.gui.setScreen(PolyPlusMainMenuScreen())
             //?} else {
@@ -557,7 +565,7 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
+                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
                     .size(thumbSize)
                     .clip(ppShape(7.dp))
                     .background(TextPrimary),
@@ -1081,7 +1089,7 @@ private fun OnboardingSlider(progress: Float, width: Float, onProgress: (Float) 
             Modifier
                 .align(Alignment.CenterStart)
                 .offset {
-                    androidx.compose.ui.unit.IntOffset(
+                    IntOffset(
                         (animated * (trackWidthPx - thumbSize.toPx())).roundToInt(),
                         0,
                     )
@@ -1240,7 +1248,7 @@ private fun BlurStrengthSlider(motionBlur: Int, disabled: Boolean, onMotionBlur:
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
+                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
                     .size(thumbSize)
                     .clip(ppShape(7.dp))
                     .background(TextPrimary),
@@ -1456,7 +1464,7 @@ private fun Checkerboard(modifier: Modifier) {
             var x = 0f
             var col = 0
             while (x < size.width) {
-                drawRect(if ((row + col) % 2 == 0) Color(0xFF666666) else Color(0xFF4A4A4A), androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Size(cell, cell))
+                drawRect(if ((row + col) % 2 == 0) Color(0xFF666666) else Color(0xFF4A4A4A), Offset(x, y), Size(cell, cell))
                 x += cell
                 col++
             }
@@ -2362,8 +2370,8 @@ private val ImpactHeavy = Color(0xFFE8836B)
 private val PanelBorderBrush: Brush = object : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val radians = Math.toRadians(PanelBorderAngleDeg)
-        val ux = kotlin.math.cos(radians).toFloat()
-        val uy = kotlin.math.sin(radians).toFloat()
+        val ux = cos(radians).toFloat()
+        val uy = sin(radians).toFloat()
         val len = size.width * ux + size.height * uy
         return LinearGradientShader(
             from = Offset.Zero,

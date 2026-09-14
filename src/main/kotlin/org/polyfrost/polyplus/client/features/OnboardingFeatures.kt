@@ -9,12 +9,13 @@ import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
-import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.ThemeBrandingUtil
+import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
     private val logger = LogManager.getLogger("PolyPlus/Onboarding")
-    private val warnedModApplyFailures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val warnedModApplyFailures = ConcurrentHashMap.newKeySet<String>()
 
     @Volatile
     private var nextModApplyAttemptMs = 0L

@@ -1,13 +1,16 @@
 package org.polyfrost.polyplus.client.featured;
 
-//? if >= 26.1 {
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-//?} else {
-/*import net.minecraft.client.gui.GuiGraphics;
-*///?}
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics;
+*///?}
 
 public final class FeaturedServerVanillaRenderer {
     private static final int SEGMENTS_X = 12;

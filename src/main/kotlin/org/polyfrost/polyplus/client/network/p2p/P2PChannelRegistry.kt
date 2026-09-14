@@ -1,8 +1,8 @@
 package org.polyfrost.polyplus.client.network.p2p
 
-import java.util.concurrent.ConcurrentHashMap
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
+import java.util.concurrent.ConcurrentHashMap
 
 internal object P2PChannelRegistry {
     private data class Key(val socket: EosP2PSocketId, val remote: EosProductUserId)

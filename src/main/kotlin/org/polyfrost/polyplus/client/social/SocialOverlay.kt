@@ -1,8 +1,5 @@
 package org.polyfrost.polyplus.client.social
 
-//? if < 26.1 {
-/*import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
-*///?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen

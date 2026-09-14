@@ -2,106 +2,159 @@ package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import com.mojang.blaze3d.vertex.VertexConsumer
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
-import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.lang.invoke.MethodHandle
+import java.lang.invoke.MethodHandles
+import java.lang.invoke.MethodType
+import java.util.concurrent.ConcurrentHashMap
+
+//? if = 26.2 {
+import com.mojang.blaze3d.GpuFormat
+import com.mojang.blaze3d.PrimitiveTopology
+import com.mojang.blaze3d.vertex.ByteBufferBuilder
+import net.minecraft.client.renderer.Projection
+import net.minecraft.client.renderer.SubmitNodeStorage
+import org.joml.Vector4f
+//?}
+
+//? if >= 26.1 {
+import net.minecraft.client.renderer.ProjectionMatrixBuffer
+import net.minecraft.client.renderer.state.level.CameraRenderState
+//?}
+
+//? if >= 1.21.11 {
+import com.mojang.blaze3d.textures.FilterMode
+import net.minecraft.client.renderer.rendertype.RenderTypes
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.model.HumanoidModel
+import net.minecraft.client.renderer.SubmitNodeCollector
+import net.minecraft.client.renderer.entity.state.AvatarRenderState
+import net.minecraft.core.ClientAsset
+import net.minecraft.world.entity.HumanoidArm
+import net.minecraft.world.entity.player.PlayerSkin
+//?}
+
 //? if >= 1.21.8 {
-import com.mojang.blaze3d.ProjectionType
 import com.mojang.blaze3d.buffers.GpuBuffer
-import kotlinx.coroutines.launch
+import com.mojang.blaze3d.textures.GpuTexture
+import com.mojang.blaze3d.textures.GpuTextureView
+import com.mojang.blaze3d.vertex.BufferBuilder
+import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.client.renderer.texture.OverlayTexture
+import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
+import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
+import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
+import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
+import org.polyfrost.polyplus.client.cosmetics.PetDefinition
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import java.nio.ByteBuffer
+import java.util.UUID
+//?}
+
+//? if = 1.21.4 || >= 1.21.8 {
+import com.mojang.blaze3d.ProjectionType
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess
+import org.polyfrost.polyplus.client.emotes.playback.EmoteController
+//?}
+
+//? if < 1.21.5 || >= 1.21.8 {
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.platform.Lighting
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.textures.FilterMode
-import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
-//? if < 26.2 {
-/*import com.mojang.blaze3d.vertex.Tesselator
-*///?}
-import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.RenderPipelines
-//? if >= 1.21.10 {
-import net.minecraft.client.model.HumanoidModel
+import net.minecraft.client.resources.DefaultPlayerSkin
+import org.joml.Quaternionf
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
+import org.slf4j.LoggerFactory
 //?}
+
+//? if < 1.21.5 || >= 26.1 {
+import org.joml.Matrix4f
+//?}
+
+//? if = 1.21.1 || >= 1.21.8 {
+import com.mojang.authlib.GameProfile
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.player.RemotePlayer
-//? if < 26.1 {
-/*import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
+import java.util.Collections
+import kotlinx.coroutines.launch
+//?}
+
+//? if = 1.21.1 || >= 1.21.10 {
+import net.minecraft.world.phys.Vec3
+//?}
+
+//? if = 1.21.1 || = 26.2 {
+import java.util.Optional
+//?}
+
+//? if >= 1.21.8 && < 26.2 {
+/*import java.util.OptionalInt
 *///?}
+
+//? if < 1.21.5 || >= 1.21.8 && < 26.2 {
+/*import com.mojang.blaze3d.vertex.Tesselator
+import com.mojang.blaze3d.vertex.VertexFormat
+*///?}
+
 //? if >= 1.21.10 && < 26.1 {
 /*import net.minecraft.client.renderer.state.CameraRenderState
 *///?}
-//? if >= 26.1 {
-import net.minecraft.client.renderer.ProjectionMatrixBuffer
-import net.minecraft.client.renderer.state.level.CameraRenderState
-import org.joml.Matrix4f
-//?}
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.entity.state.AvatarRenderState
-//?} else {
-/*import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRenderState
+
+//? if >= 1.21.8 && < 26.1 {
+/*import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer
 *///?}
-import net.minecraft.client.resources.DefaultPlayerSkin
-//? if >= 1.21.10 {
-import net.minecraft.core.ClientAsset
-import net.minecraft.world.entity.HumanoidArm
-//?}
-import net.minecraft.resources.Identifier
-//? if >= 1.21.10 {
-import net.minecraft.world.entity.player.PlayerSkin
-//?} else {
+
+//? if >= 1.21.8 && < 1.21.11 {
+/*import net.minecraft.client.renderer.RenderType
+*///?}
+
+//? if = 1.21.8 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRenderState
+*///?}
+
+//? if < 1.21.5 || = 1.21.8 {
 /*import net.minecraft.client.resources.PlayerSkin
 *///?}
-import org.joml.Quaternionf
-import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
-import org.polyfrost.polyplus.client.utils.ClientPlatform
-//?}
-//? if >= 1.21.5 && < 1.21.8 {
-/*import org.polyfrost.polyplus.client.utils.ClientPlatform
-*///?}
-//? if >= 1.21.1 && < 1.21.5 {
-/*import com.mojang.blaze3d.pipeline.RenderTarget
-import com.mojang.blaze3d.pipeline.TextureTarget
-import com.mojang.blaze3d.platform.Lighting
-import com.mojang.blaze3d.platform.NativeImage
-import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.BufferUploader
-import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.Tesselator
-import com.mojang.blaze3d.vertex.VertexFormat
-import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.GameRenderer
-import org.joml.Matrix4f
-import org.joml.Quaternionf
-import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
-import org.polyfrost.polyplus.client.utils.ClientPlatform
-*///?}
-//? if >= 1.21.4 && < 1.21.5 {
-/*import com.mojang.blaze3d.ProjectionType
+
+//? if = 1.21.4 {
+/*import net.minecraft.client.renderer.CoreShaders
 import net.minecraft.client.renderer.entity.player.PlayerRenderer
 import net.minecraft.client.renderer.entity.state.PlayerRenderState
-import net.minecraft.client.resources.DefaultPlayerSkin
-import net.minecraft.client.resources.PlayerSkin
+import org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor
 *///?}
-//? if >= 1.21.1 && < 1.21.4 {
-/*import com.mojang.authlib.GameProfile
-import com.mojang.blaze3d.vertex.VertexSorting
-import kotlinx.coroutines.launch
+
+//? if < 1.21.5 {
+/*import com.mojang.blaze3d.platform.GlStateManager
+import com.mojang.blaze3d.platform.NativeImage
+import com.mojang.blaze3d.vertex.BufferUploader
+import org.lwjgl.opengl.GL30
+import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
+*///?}
+
+//? if = 1.21.1 {
+/*import com.mojang.blaze3d.vertex.VertexSorting
+import com.mojang.serialization.Lifecycle
 import net.minecraft.client.Camera
-import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.multiplayer.ClientPacketListener
 import net.minecraft.client.multiplayer.PlayerInfo
-import net.minecraft.client.player.AbstractClientPlayer
-import net.minecraft.client.player.RemotePlayer
-import net.minecraft.client.resources.DefaultPlayerSkin
-import net.minecraft.client.resources.PlayerSkin
+import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.core.Holder
 import net.minecraft.core.MappedRegistry
 import net.minecraft.core.Registry
@@ -126,14 +179,16 @@ import net.minecraft.world.level.biome.Biomes
 import net.minecraft.world.level.biome.MobSpawnSettings
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes
 import net.minecraft.world.level.dimension.DimensionType
-import net.minecraft.world.phys.Vec3
 import net.minecraft.world.scores.Scoreboard
 import org.polyfrost.polyplus.mixin.client.access.CameraAccessor
 import org.polyfrost.polyplus.mixin.client.access.ClientPacketListenerAccessor
+import sun.misc.Unsafe
+import java.lang.reflect.Modifier
+import java.util.stream.Stream
 *///?}
 
 object PlayerPreviewRenderer {
-    private val equipmentByEntityId = java.util.concurrent.ConcurrentHashMap<Int, CosmeticEquipment>()
+    private val equipmentByEntityId = ConcurrentHashMap<Int, CosmeticEquipment>()
 
     @JvmStatic
     fun previewEquipment(entityId: Int): CosmeticEquipment? = equipmentByEntityId[entityId]
@@ -161,12 +216,12 @@ object PlayerPreviewRenderer {
     @JvmStatic
     fun previewParticleColor(entityId: Int): Int? =
         if (equipmentByEntityId.containsKey(entityId)) {
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
+            CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
         } else {
             null
         }
 
-    private val latestByKey = java.util.concurrent.ConcurrentHashMap<Any, ImageBitmap>()
+    private val latestByKey = ConcurrentHashMap<Any, ImageBitmap>()
 
     fun cached(key: Any): ImageBitmap? = latestByKey[key]
 
@@ -259,7 +314,7 @@ object PlayerPreviewRenderer {
         return a
     }
 
-    private fun buildFadeQuad(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
+    private fun buildFadeQuad(bb: VertexConsumer, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         for (iy in 0 until GRID_Y) {
             val ty0 = iy / GRID_Y.toFloat(); val ty1 = (iy + 1) / GRID_Y.toFloat()
             for (ix in 0 until GRID_X) {
@@ -272,18 +327,18 @@ object PlayerPreviewRenderer {
         }
     }
 
-    private fun addFadeVertex(bb: com.mojang.blaze3d.vertex.VertexConsumer, x: Int, y: Int, w: Int, h: Int, tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
+    private fun addFadeVertex(bb: VertexConsumer, x: Int, y: Int, w: Int, h: Int, tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         val px = x + tx * w
         val py = y + ty * h
         val a = (fadeAlpha(tx, ty, fadeEdges, bottomFade) * opacity * 255f).toInt().coerceIn(0, 255)
         bb.addVertex(px, py, 0f).setUv(tx, 1f - ty).setColor(255, 255, 255, a)
     }
 
-    private val mountOpacitySetter: java.lang.invoke.MethodHandle? = runCatching {
+    private val mountOpacitySetter: MethodHandle? = runCatching {
         val hook = Class.forName("dev.microcontrollers.mountopacity.hook.EntityRenderStateHook")
-        java.lang.invoke.MethodHandles.lookup()
-            .findVirtual(hook, "mountopacity\$setOpacity", java.lang.invoke.MethodType.methodType(Void.TYPE, Float::class.javaPrimitiveType))
-            .asType(java.lang.invoke.MethodType.methodType(Void.TYPE, Any::class.java, Float::class.javaPrimitiveType))
+        MethodHandles.lookup()
+            .findVirtual(hook, "mountopacity\$setOpacity", MethodType.methodType(Void.TYPE, Float::class.javaPrimitiveType))
+            .asType(MethodType.methodType(Void.TYPE, Any::class.java, Float::class.javaPrimitiveType))
     }.getOrNull()
 
     private fun applyModCompat(state: Any) {
@@ -291,7 +346,7 @@ object PlayerPreviewRenderer {
     }
 
     //? if >= 1.21.8 {
-    private val LOG = org.slf4j.LoggerFactory.getLogger("polyplus/preview")
+    private val LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val MAX_DIM = 512
 
     private val loggedSkips = HashSet<String>()
@@ -305,7 +360,7 @@ object PlayerPreviewRenderer {
 
     private var target: TextureTarget? = null
     private var dummy: AbstractClientPlayer? = null
-    private var dummyProfileId: java.util.UUID? = null
+    private var dummyProfileId: UUID? = null
     //? if < 26.1 {
     /*private val projection by lazy { CachedOrthoProjectionMatrixBuffer("polyplus_preview", -1000f, 1000f, true) }
     *///?}
@@ -316,8 +371,8 @@ object PlayerPreviewRenderer {
         Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f)
     //?}
     //? if >= 26.2 {
-    private fun orthoProjection(w: Int, h: Int): net.minecraft.client.renderer.Projection =
-        net.minecraft.client.renderer.Projection().apply { setupOrtho(-1000f, 1000f, w.toFloat(), h.toFloat(), true) }
+    private fun orthoProjection(w: Int, h: Int): Projection =
+        Projection().apply { setupOrtho(-1000f, 1000f, w.toFloat(), h.toFloat(), true) }
     //?}
 
     private fun ensureTarget(w: Int, h: Int): TextureTarget {
@@ -325,7 +380,7 @@ object PlayerPreviewRenderer {
         if (existing != null && existing.width == w && existing.height == h) return existing
         existing?.destroyBuffers()
         //? if >= 26.2 {
-        return TextureTarget("polyplus_player_preview", w, h, true, com.mojang.blaze3d.GpuFormat.RGBA8_UNORM).also { target = it }
+        return TextureTarget("polyplus_player_preview", w, h, true, GpuFormat.RGBA8_UNORM).also { target = it }
         //?} else {
         /*return TextureTarget("polyplus_player_preview", w, h, true).also { target = it }
         *///?}
@@ -350,7 +405,7 @@ object PlayerPreviewRenderer {
 
         //? if >= 26.2 {
         RenderSystem.getDevice().createCommandEncoder()
-            .clearColorAndDepthTextures(colorTex, org.joml.Vector4f(0f, 0f, 0f, 0f), depthTex, 0.0)
+            .clearColorAndDepthTextures(colorTex, Vector4f(0f, 0f, 0f, 0f), depthTex, 0.0)
         //?} else {
         /*RenderSystem.getDevice().createCommandEncoder()
             .clearColorAndDepthTextures(colorTex, 0x00000000, depthTex, 1.0)
@@ -439,16 +494,16 @@ object PlayerPreviewRenderer {
 
         val fmt = DefaultVertexFormat.POSITION_TEX_COLOR
         //? if >= 26.2 {
-        val byteBuilder = com.mojang.blaze3d.vertex.ByteBufferBuilder(GRID_X * GRID_Y * 4 * fmt.getVertexSize())
-        val bb: com.mojang.blaze3d.vertex.VertexConsumer = com.mojang.blaze3d.vertex.BufferBuilder(byteBuilder, com.mojang.blaze3d.PrimitiveTopology.QUADS, fmt)
+        val byteBuilder = ByteBufferBuilder(GRID_X * GRID_Y * 4 * fmt.getVertexSize())
+        val bb: VertexConsumer = BufferBuilder(byteBuilder, PrimitiveTopology.QUADS, fmt)
         //?} else {
-        /*val bb: com.mojang.blaze3d.vertex.VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
+        /*val bb: VertexConsumer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, fmt)
         *///?}
         buildFadeQuad(bb, x, y, w, h, fadeEdges, bottomFade, opacity)
         //? if >= 26.2 {
-        val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: run { byteBuilder.close(); return }
+        val mesh = (bb as BufferBuilder).build() ?: run { byteBuilder.close(); return }
         //?} else {
-        /*val mesh = (bb as com.mojang.blaze3d.vertex.BufferBuilder).build() ?: return
+        /*val mesh = (bb as BufferBuilder).build() ?: return
         *///?}
         val indexCount = GRID_X * GRID_Y * 6
 
@@ -457,7 +512,7 @@ object PlayerPreviewRenderer {
             val vbuf = device.createBuffer({ "polyplus_preview_quad" }, GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer())
             try {
                 //? if >= 26.2 {
-                val seq = RenderSystem.getSequentialBuffer(com.mojang.blaze3d.PrimitiveTopology.QUADS)
+                val seq = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS)
                 //?} else {
                 /*val seq = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS)
                 *///?}
@@ -474,9 +529,9 @@ object PlayerPreviewRenderer {
                 *///?}
                 val encoder = device.createCommandEncoder()
                 //? if >= 26.2 {
-                val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.Optional.empty())
+                val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, Optional.empty())
                 //?} else {
-                /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, java.util.OptionalInt.empty())
+                /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, OptionalInt.empty())
                 *///?}
                 try {
                     pass.setPipeline(RenderPipelines.GUI_TEXTURED)
@@ -554,14 +609,14 @@ object PlayerPreviewRenderer {
         *///?}
         val camera = CameraRenderState().apply {
             orientation = Quaternionf().rotateY(Math.PI.toFloat())
-            pos = net.minecraft.world.phys.Vec3.ZERO
+            pos = Vec3.ZERO
             //? if < 26.1 {
-            /*entityPos = net.minecraft.world.phys.Vec3.ZERO
+            /*entityPos = Vec3.ZERO
             *///?}
         }
         //? if >= 26.2 {
         val features = mc.gameRenderer.featureRenderDispatcher()
-        val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
+        val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
@@ -622,14 +677,14 @@ object PlayerPreviewRenderer {
         //? if >= 1.21.10 {
         val camera = CameraRenderState().apply {
             orientation = Quaternionf().rotateY(Math.PI.toFloat())
-            pos = net.minecraft.world.phys.Vec3.ZERO
+            pos = Vec3.ZERO
             //? if < 26.1 {
-            /*entityPos = net.minecraft.world.phys.Vec3.ZERO
+            /*entityPos = Vec3.ZERO
             *///?}
         }
         //? if >= 26.2 {
         val features = mc.gameRenderer.featureRenderDispatcher()
-        val submitStorage = net.minecraft.client.renderer.SubmitNodeStorage()
+        val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
@@ -654,24 +709,24 @@ object PlayerPreviewRenderer {
         *///?}
     }
 
-    private fun previewPet(source: PlayerPreviewSource): org.polyfrost.polyplus.client.cosmetics.PetDefinition? = when (source) {
+    private fun previewPet(source: PlayerPreviewSource): PetDefinition? = when (source) {
         is PlayerPreviewSource.Override -> source.pet
         PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
-                ?.let { org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getPetDefinition(it) }
+            CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
+                ?.let { CosmeticAssetCache.getPetDefinition(it) }
     }
 
     private val previewPetModelCache =
-        java.util.concurrent.ConcurrentHashMap<Int, org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel>()
+        ConcurrentHashMap<Int, BedrockStandaloneModel>()
 
-    private fun idlePetPose(definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition): Map<String, org.polyfrost.polyplus.client.bedrock.playback.BoneTransform> {
+    private fun idlePetPose(definition: PetDefinition): Map<String, BoneTransform> {
         val animationName = definition.stateMap["idle"] ?: definition.stateMap.values.firstOrNull()
         val animation = animationName?.let { definition.animations[it] } ?: return emptyMap()
-        val timeTicks = org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback.resolveTimeTicks(
+        val timeTicks = BedrockAnimationPlayback.resolveTimeTicks(
             animation,
             (System.nanoTime() / 50_000_000L).toFloat(),
         )
-        return org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
+        return AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
     }
 
     private const val PREVIEW_PET_SIDE_OFFSET = -0.65
@@ -679,7 +734,7 @@ object PlayerPreviewRenderer {
     // Must match PetEntityRenderer's per-frame hold time
     private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
 
-    private fun previewTextureFrame(definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition): Pair<Float, Float> {
+    private fun previewTextureFrame(definition: PetDefinition): Pair<Float, Float> {
         val frameCount = definition.textureFrameCount
         if (frameCount <= 1) return 1f to 0f
         val ticks = System.nanoTime() / 50_000_000L
@@ -689,25 +744,25 @@ object PlayerPreviewRenderer {
 
     //? if >= 1.21.10 {
     private fun submitPreviewPet(
-        definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition,
+        definition: PetDefinition,
         poseStack: PoseStack,
-        submitNodeCollector: net.minecraft.client.renderer.SubmitNodeCollector,
+        submitNodeCollector: SubmitNodeCollector,
         lightCoords: Int,
         yawDeg: Float,
     ) {
         val model = previewPetModelCache.getOrPut(definition.id) {
-            org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel.build(definition.geometry)
+            BedrockStandaloneModel.build(definition.geometry)
         }
         val pose = idlePetPose(definition)
         model.resetPose()
         if (pose.isNotEmpty()) model.applyPose(pose, 1f)
 
         //? if >= 26.1 {
-        val renderType = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(definition.texture)
+        val renderType = RenderTypes.entityCutout(definition.texture)
         //?} elif >= 1.21.11 {
-        /*val renderType = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull(definition.texture)
+        /*val renderType = RenderTypes.entityCutoutNoCull(definition.texture)
         *///?} else {
-        /*val renderType = net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture)
+        /*val renderType = RenderType.entityCutoutNoCull(definition.texture)
         *///?}
 
         poseStack.pushPose()
@@ -719,47 +774,47 @@ object PlayerPreviewRenderer {
             val localStack = PoseStack()
             localStack.last().set(basePose)
             for (root in model.roots) {
-                root.render(localStack, buffer, lightCoords, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
+                root.render(localStack, buffer, lightCoords, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
             }
         }
         poseStack.popPose()
     }
     //?} else {
     /*private fun renderPreviewPetLegacy(
-        definition: org.polyfrost.polyplus.client.cosmetics.PetDefinition?,
+        definition: PetDefinition?,
         poseStack: PoseStack,
-        bufferSource: net.minecraft.client.renderer.MultiBufferSource,
+        bufferSource: MultiBufferSource,
         yawDeg: Float,
     ) {
         if (definition == null) return
         val model = previewPetModelCache.getOrPut(definition.id) {
-            org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel.build(definition.geometry)
+            BedrockStandaloneModel.build(definition.geometry)
         }
         val pose = idlePetPose(definition)
         model.resetPose()
         if (pose.isNotEmpty()) model.applyPose(pose, 1f)
 
-        val buffer = bufferSource.getBuffer(net.minecraft.client.renderer.RenderType.entityCutoutNoCull(definition.texture))
+        val buffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(definition.texture))
         poseStack.pushPose()
         poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
         poseStack.mulPose(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
         val (vScale, vOffset) = previewTextureFrame(definition)
         for (root in model.roots) {
-            root.render(poseStack, buffer, 0xF000F0, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
+            root.render(poseStack, buffer, 0xF000F0, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
         }
         poseStack.popPose()
     }
     *///?}
 
-    private val loadAttempted = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Int, Boolean>())
+    private val loadAttempted = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
 
     private var cachedLocalEquipment: CosmeticEquipment? = null
     private var cachedLocalKey: List<String>? = null
 
     private fun localEquipment(): CosmeticEquipment {
-        val ids = org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().ids()
-        val resolved = ids.map { id -> org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getAttachedCosmetic(id) }
+        val ids = CosmeticCatalog.localEquipped().ids()
+        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
         val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
         cachedLocalEquipment?.let { if (cachedLocalKey == key) return it }
 
@@ -769,8 +824,8 @@ object PlayerPreviewRenderer {
             if (attached != null) {
                 equipment.equip(attached)
             } else if (loadAttempted.add(id)) {
-                org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
-                    runCatching { org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                PolyPlusClient.SCOPE.launch {
+                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
                 }
             }
         }
@@ -782,8 +837,8 @@ object PlayerPreviewRenderer {
     private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override -> source.capeTexture
         PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            CosmeticCatalog.localEquipped().cape?.let {
+                CosmeticAssetCache.getCapeResource(it)
             }
     }
 
@@ -796,10 +851,10 @@ object PlayerPreviewRenderer {
     *///?}
 
     @Volatile
-    private var resolvedProfile: com.mojang.authlib.GameProfile? = null
-    private var resolvingProfileId: java.util.UUID? = null
+    private var resolvedProfile: GameProfile? = null
+    private var resolvingProfileId: UUID? = null
 
-    private fun texturedProfile(mc: Minecraft): com.mojang.authlib.GameProfile? {
+    private fun texturedProfile(mc: Minecraft): GameProfile? {
         val id = mc.user.profileId
         val startup = mc.gameProfile
         if (startup.id == id) return startup // startup profile already carries textures
@@ -808,14 +863,14 @@ object PlayerPreviewRenderer {
             if (resolvingProfileId != id) {
                 resolvingProfileId = id
                 val name = mc.user.name
-                org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                PolyPlusClient.SCOPE.launch {
                     val fetched = runCatching {
                         //? if >= 1.21.10 {
                         mc.services().sessionService().fetchProfile(id, false)?.profile()
                         //?} else {
                         /*mc.minecraftSessionService.fetchProfile(id, false)?.profile()
                         *///?}
-                    }.getOrNull() ?: com.mojang.authlib.GameProfile(id, name)
+                    }.getOrNull() ?: GameProfile(id, name)
                     synchronized(this@PlayerPreviewRenderer) {
                         if (resolvingProfileId == id) {
                             resolvedProfile = fetched
@@ -830,13 +885,13 @@ object PlayerPreviewRenderer {
 
     //? if >= 1.21.10 {
     private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(com.mojang.authlib.GameProfile(mc.user.profileId, mc.user.name))
+        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(GameProfile(mc.user.profileId, mc.user.name))
         return runCatching { mc.skinManager.createLookup(profile, false).get() }.getOrNull()
             ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
     }
     //?} else {
     /*private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(com.mojang.authlib.GameProfile(mc.user.profileId, mc.user.name))
+        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(GameProfile(mc.user.profileId, mc.user.name))
         return runCatching { mc.skinManager.getInsecureSkin(profile) }.getOrNull()
             ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
     }
@@ -844,8 +899,8 @@ object PlayerPreviewRenderer {
 
     //? if >= 1.21.10 {
     private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
-        (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
-            ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        (this as? AvatarEmoteRenderAccess)
+            ?.`polyplus$bindEmoteController`(EmoteController())
         applyModCompat(this)
         this.skin = skin
         mainArm = HumanoidArm.RIGHT
@@ -865,8 +920,8 @@ object PlayerPreviewRenderer {
     }
     //?} else {
     /*private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
-        (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
-            ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        (this as? AvatarEmoteRenderAccess)
+            ?.`polyplus$bindEmoteController`(EmoteController())
         applyModCompat(this)
         this.skin = skin
         showHat = true
@@ -907,7 +962,7 @@ object PlayerPreviewRenderer {
         equipmentByEntityId[player.id] = equipment
     }
 
-    private fun readback(colorTex: com.mojang.blaze3d.textures.GpuTexture, w: Int, h: Int, key: Any) {
+    private fun readback(colorTex: GpuTexture, w: Int, h: Int, key: Any) {
         val device = RenderSystem.getDevice()
         //? if >= 26.2 {
         val pixelSize = colorTex.format.blockSize()
@@ -939,7 +994,7 @@ object PlayerPreviewRenderer {
         }, 0)
     }
 
-    private fun toImageBitmap(data: java.nio.ByteBuffer, w: Int, h: Int, pixelSize: Int): ImageBitmap {
+    private fun toImageBitmap(data: ByteBuffer, w: Int, h: Int, pixelSize: Int): ImageBitmap {
         val out = ByteArray(w * h * 4)
         val fade = edgeFadeColumns(w)
         val rowFade = topFadeRows(h)
@@ -973,7 +1028,7 @@ object PlayerPreviewRenderer {
     }*///?}
 
     //? if >= 1.21.1 && < 1.21.5 {
-    /*private val LEGACY_LOG = org.slf4j.LoggerFactory.getLogger("polyplus/preview")
+    /*private val LEGACY_LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val LEGACY_MAX_DIM = 512
     private const val LEGACY_PREVIEW_ENTITY_ID = Int.MIN_VALUE + 1
     private var legacyTarget: TextureTarget? = null
@@ -1054,9 +1109,9 @@ object PlayerPreviewRenderer {
         }
 
         private fun damageRegistry(): Registry<DamageType> {
-            val registry = MappedRegistry(Registries.DAMAGE_TYPE, com.mojang.serialization.Lifecycle.stable())
+            val registry = MappedRegistry(Registries.DAMAGE_TYPE, Lifecycle.stable())
             for (field in DamageTypes::class.java.declaredFields) {
-                if (!java.lang.reflect.Modifier.isStatic(field.modifiers)) continue
+                if (!Modifier.isStatic(field.modifiers)) continue
                 if (!ResourceKey::class.java.isAssignableFrom(field.type)) continue
                 @Suppress("UNCHECKED_CAST")
                 val key = field.get(null) as ResourceKey<DamageType>
@@ -1067,7 +1122,7 @@ object PlayerPreviewRenderer {
         }
 
         private fun biomeRegistry(): Registry<Biome> {
-            val registry = MappedRegistry(Registries.BIOME, com.mojang.serialization.Lifecycle.stable())
+            val registry = MappedRegistry(Registries.BIOME, Lifecycle.stable())
             val biome = Biome.BiomeBuilder()
                 .hasPrecipitation(false)
                 .temperature(0.8f)
@@ -1097,28 +1152,28 @@ object PlayerPreviewRenderer {
         private val base: RegistryAccess.Frozen,
         private val overrides: Map<ResourceKey<*>, Registry<*>>,
     ) : RegistryAccess.Frozen {
-        override fun <E> registry(key: ResourceKey<out Registry<out E>>): java.util.Optional<Registry<E>> {
+        override fun <E> registry(key: ResourceKey<out Registry<out E>>): Optional<Registry<E>> {
             overrides[key]?.let {
                 @Suppress("UNCHECKED_CAST")
-                return java.util.Optional.of(it as Registry<E>)
+                return Optional.of(it as Registry<E>)
             }
             return base.registry(key)
         }
 
-        override fun registries(): java.util.stream.Stream<RegistryAccess.RegistryEntry<*>> = base.registries()
+        override fun registries(): Stream<RegistryAccess.RegistryEntry<*>> = base.registries()
     }
 
-    private val UNSAFE: sun.misc.Unsafe by lazy {
-        val f = sun.misc.Unsafe::class.java.getDeclaredField("theUnsafe")
+    private val UNSAFE: Unsafe by lazy {
+        val f = Unsafe::class.java.getDeclaredField("theUnsafe")
         f.isAccessible = true
-        f.get(null) as sun.misc.Unsafe
+        f.get(null) as Unsafe
     }
 
     private fun capeOverrideLegacy(source: PlayerPreviewSource): ResourceLocation? = when (source) {
         is PlayerPreviewSource.Override -> source.capeTexture
         PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            CosmeticCatalog.localEquipped().cape?.let {
+                CosmeticAssetCache.getCapeResource(it)
             }
     }
 
@@ -1137,14 +1192,14 @@ object PlayerPreviewRenderer {
     }
 
     private val legacyLoadAttempted =
-        java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Int, Boolean>())
+        Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
 
     private var cachedLegacyEquipment: CosmeticEquipment? = null
     private var cachedLegacyKey: List<String>? = null
 
     private fun legacyLocalEquipment(): CosmeticEquipment {
-        val ids = org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().ids()
-        val resolved = ids.map { id -> org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getAttachedCosmetic(id) }
+        val ids = CosmeticCatalog.localEquipped().ids()
+        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
         val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
         cachedLegacyEquipment?.let { if (cachedLegacyKey == key) return it }
 
@@ -1154,8 +1209,8 @@ object PlayerPreviewRenderer {
             if (attached != null) {
                 equipment.equip(attached)
             } else if (legacyLoadAttempted.add(id)) {
-                org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
-                    runCatching { org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                PolyPlusClient.SCOPE.launch {
+                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
                 }
             }
         }
@@ -1173,14 +1228,14 @@ object PlayerPreviewRenderer {
     }
 
     private fun legacyPlayerRenderer(mc: Minecraft, skin: PlayerSkin): PlayerRenderer? {
-        val map = (mc.entityRenderDispatcher as org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor)
+        val map = (mc.entityRenderDispatcher as EntityRenderDispatcherAccessor)
             .`polyplus$playerRenderers`()
         return (map[skin.model()] ?: map.values.firstOrNull()) as? PlayerRenderer
     }
 
     private fun legacyState(skin: PlayerSkin, yawDeg: Float): PlayerRenderState = PlayerRenderState().apply {
-        (this as? org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess)
-            ?.`polyplus$bindEmoteController`(org.polyfrost.polyplus.client.emotes.playback.EmoteController())
+        (this as? AvatarEmoteRenderAccess)
+            ?.`polyplus$bindEmoteController`(EmoteController())
         applyModCompat(this)
         this.skin = skin
         showHat = true
@@ -1221,7 +1276,7 @@ object PlayerPreviewRenderer {
         val skin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
         val player = legacyDummy(mc, level) ?: return null
         val cape = capeOverrideLegacy(source)
-            ?: org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
+            ?: CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
         player.skinOverride = cape?.let { withCapeLegacy(skin, it) } ?: skin
         bindLegacyEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
@@ -1269,7 +1324,7 @@ object PlayerPreviewRenderer {
         /*val prevCamera = dispatcher.camera
         *///?}
         val realMainTarget = mc.mainRenderTarget
-        (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
+        (mc as MinecraftAccessor)
             .`polyplus$setMainRenderTarget`(fbo)
         try {
             //? if >= 1.21.4 {
@@ -1284,7 +1339,7 @@ object PlayerPreviewRenderer {
             fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
-            (mc as org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor)
+            (mc as MinecraftAccessor)
                 .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
             //? if < 1.21.4 {
@@ -1317,22 +1372,22 @@ object PlayerPreviewRenderer {
     private fun compositeOntoTargetLegacy(target: RenderTarget, fbo: TextureTarget, x: Int, y: Int, w: Int, h: Int, fadeEdges: Boolean, bottomFade: Float, opacity: Float) {
         val fbW = target.width
         val fbH = target.height
-        com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0)
-        com.mojang.blaze3d.platform.GlStateManager._viewport(0, 0, fbW, fbH)
+        GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
+        GlStateManager._viewport(0, 0, fbW, fbH)
         RenderSystem.backupProjectionMatrix()
         val ortho = Matrix4f().setOrtho(0f, fbW.toFloat(), fbH.toFloat(), 0f, -1000f, 1000f)
         //? if >= 1.21.4 {
         RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC)
         //?}
         //? if < 1.21.4 {
-        /*RenderSystem.setProjectionMatrix(ortho, com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z)
+        /*RenderSystem.setProjectionMatrix(ortho, VertexSorting.ORTHOGRAPHIC_Z)
         *///?}
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
         RenderSystem.disableDepthTest()
         RenderSystem.disableCull()
         //? if >= 1.21.4 {
-        RenderSystem.setShader(net.minecraft.client.renderer.CoreShaders.POSITION_TEX_COLOR)
+        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR)
         //?}
         //? if < 1.21.4 {
         /*RenderSystem.setShader(GameRenderer::getPositionTexColorShader)

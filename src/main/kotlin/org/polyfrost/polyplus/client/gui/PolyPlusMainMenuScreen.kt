@@ -1,18 +1,11 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,18 +13,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,14 +28,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,23 +52,25 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -88,22 +78,81 @@ import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.window.PopupPositionProvider
-import kotlin.math.roundToInt
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.mojang.realmsclient.RealmsMainScreen
+import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.ConnectScreen
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
+import net.minecraft.client.gui.screens.options.OptionsScreen
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
+import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.ServerStatusPinger
+import net.minecraft.client.multiplayer.resolver.ServerAddress
+import net.minecraft.client.resources.DefaultPlayerSkin
+import org.apache.logging.log4j.LogManager
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.ImageInfo
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
+import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
+import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
+import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
+import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusRecentServers
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
+import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
+import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
+import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.social.FriendsRepository
+import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.awt.image.BufferedImage
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+import java.util.Collections
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import javax.imageio.ImageIO
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,34 +160,19 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.jetbrains.skia.Image as SkiaImage
-import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
-import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
-import org.polyfrost.polyplus.client.featured.FeaturedServer
-import org.polyfrost.polyplus.client.featured.FeaturedServers
-import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
-import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
-import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
-import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.social.SocialOverlay
-import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.privacy.PrivacyConsent
-import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if >= 1.21.11 {
+import net.minecraft.server.network.EventLoopGroupHolder
+import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -153,13 +187,13 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun shouldCloseOnEsc(): Boolean = false
 
     //? if <26.1 {
-    /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             renderPanorama(ctx, tickDelta)
             if (firstFrameDrawn) {
-                val gameRenderer = net.minecraft.client.Minecraft.getInstance().gameRenderer
+                val gameRenderer = Minecraft.getInstance().gameRenderer
                 //? if <1.21.4 {
                 /*gameRenderer.processBlurEffect(tickDelta)
                 *///?} else {
@@ -171,11 +205,11 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         firstFrameDrawn = true
     }
     *///?} else {
-    override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
-            net.minecraft.client.Minecraft.getInstance().gameRenderer
+            Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
                 .panorama()
                 .extractRenderState(ctx, width, height)
@@ -190,26 +224,26 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     //?}
 
     //? if <26.1 {
-    /*override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
     *///?} else {
-    override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
     //?}
 
     @Composable
     override fun compose() {
-        val mc = net.minecraft.client.Minecraft.getInstance()
+        val mc = Minecraft.getInstance()
         var assetsReady by remember { mutableStateOf(false) }
-        var servers by remember { mutableStateOf<List<net.minecraft.client.multiplayer.ServerData>>(emptyList()) }
+        var servers by remember { mutableStateOf<List<ServerData>>(emptyList()) }
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
             //? if >= 1.21.11
-            org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
+            CustomPanorama.initialize()
             launch(Dispatchers.IO) { FeaturedServers.warmUp() }
             val serverLoad = async(Dispatchers.IO) {
-                org.polyfrost.polyplus.client.PolyPlusRecentServers.displayServers()
+                PolyPlusRecentServers.displayServers()
             }
             val assetLoad = async(Dispatchers.IO) {
                 MainMenuRasterAssets.preload()
@@ -237,36 +271,36 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 actions = MenuActions(
                     singleplayer = {
                         //? if >= 26.2 {
-                        mc.gui.setScreen(net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(this))
+                        mc.gui.setScreen(SelectWorldScreen(this))
                         //?} else {
-                        /*mc.setScreen(net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(this))
+                        /*mc.setScreen(SelectWorldScreen(this))
                         *///?}
                     },
                     multiplayer = {
                         //? if >= 26.2 {
-                        mc.gui.setScreen(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this))
+                        mc.gui.setScreen(JoinMultiplayerScreen(this))
                         //?} else {
-                        /*mc.setScreen(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this))
+                        /*mc.setScreen(JoinMultiplayerScreen(this))
                         *///?}
                     },
                     realms = if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
                         {
                             //? if >= 26.2 {
-                            mc.gui.setScreen(com.mojang.realmsclient.RealmsMainScreen(this))
+                            mc.gui.setScreen(RealmsMainScreen(this))
                             //?} else {
-                            /*mc.setScreen(com.mojang.realmsclient.RealmsMainScreen(this))
+                            /*mc.setScreen(RealmsMainScreen(this))
                             *///?}
                         }
                     } else null,
                     settings = {
                         //? if >= 26.1 {
                         //? if >= 26.2 {
-                        mc.gui.setScreen(net.minecraft.client.gui.screens.options.OptionsScreen(this, mc.options, false))
+                        mc.gui.setScreen(OptionsScreen(this, mc.options, false))
                         //?} else {
-                        /*mc.setScreen(net.minecraft.client.gui.screens.options.OptionsScreen(this, mc.options, false))
+                        /*mc.setScreen(OptionsScreen(this, mc.options, false))
                         *///?}
                         //?} else {
-                        /*mc.setScreen(net.minecraft.client.gui.screens.options.OptionsScreen(this, mc.options))
+                        /*mc.setScreen(OptionsScreen(this, mc.options))
                         *///?}
                     },
                     mods = { PolyPlusOneConfigIntegration.openMods() },
@@ -281,23 +315,23 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
     }
 
-    private fun connectTo(mc: net.minecraft.client.Minecraft, server: net.minecraft.client.multiplayer.ServerData) {
-        val address = net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(server.ip)
-        net.minecraft.client.gui.screens.ConnectScreen.startConnecting(this, mc, address, server, false, null)
+    private fun connectTo(mc: Minecraft, server: ServerData) {
+        val address = ServerAddress.parseString(server.ip)
+        ConnectScreen.startConnecting(this, mc, address, server, false, null)
     }
 }
 
 private object MainMenuServerPings {
-    private val pinger = net.minecraft.client.multiplayer.ServerStatusPinger()
-    private val started = Collections.newSetFromMap(ConcurrentHashMap<net.minecraft.client.multiplayer.ServerData, Boolean>())
+    private val pinger = ServerStatusPinger()
+    private val started = Collections.newSetFromMap(ConcurrentHashMap<ServerData, Boolean>())
 
-    fun start(scope: CoroutineScope, servers: List<net.minecraft.client.multiplayer.ServerData>) {
+    fun start(scope: CoroutineScope, servers: List<ServerData>) {
         servers.forEach { data ->
             if (started.add(data)) {
                 scope.launch(Dispatchers.IO) {
                     val ok = runCatching {
                         //? if >= 1.21.11 {
-                        val elg = net.minecraft.server.network.EventLoopGroupHolder.remote(false)
+                        val elg = EventLoopGroupHolder.remote(false)
                         pinger.pingServer(data, Runnable {}, Runnable {}, elg)
                         //?} else {
                         /*pinger.pingServer(data, Runnable {}, Runnable {})
@@ -343,22 +377,22 @@ internal object MenuHeadCache {
         var settled = false
     }
 
-    private val entries = object : LinkedHashMap<java.util.UUID, Entry>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<java.util.UUID, Entry>) = size > MAX_ENTRIES
+    private val entries = object : LinkedHashMap<UUID, Entry>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<UUID, Entry>) = size > MAX_ENTRIES
     }
 
-    private val fetching = HashMap<java.util.UUID, Int>()
+    private val fetching = HashMap<UUID, Int>()
 
     private const val MAX_ENTRIES = 256
 
-    private val loaders = java.util.concurrent.Executors.newFixedThreadPool(3) { task ->
+    private val loaders = Executors.newFixedThreadPool(3) { task ->
         Thread(task, "polyplus-account-head").apply { isDaemon = true }
     }
 
-    private fun <T> withEntry(id: java.util.UUID, block: (Entry) -> T): T? =
+    private fun <T> withEntry(id: UUID, block: (Entry) -> T): T? =
         synchronized(entries) { entries[id]?.let(block) }
 
-    fun get(id: java.util.UUID): ImageBitmap? {
+    fun get(id: UUID): ImageBitmap? {
         var fetch = false
         val entry = synchronized(entries) {
             val entry = entries.getOrPut(id) { Entry() }
@@ -372,7 +406,7 @@ internal object MenuHeadCache {
         return entry.shown
     }
 
-    private fun startFetch(id: java.util.UUID) {
+    private fun startFetch(id: UUID) {
         loaders.execute {
             val face = runCatching {
                 val outcome = loadFaceByUuid(id)
@@ -410,7 +444,7 @@ internal object MenuHeadCache {
             }
 
             if (retryIn != null) {
-                val retry = org.polyfrost.polyplus.client.PolyPlusClient.SCOPE.launch {
+                val retry = PolyPlusClient.SCOPE.launch {
                     delay(retryIn)
                     startFetch(id)
                 }
@@ -423,11 +457,11 @@ internal object MenuHeadCache {
 }
 
 private const val MENU_HEAD_SIZE = 64
-private val HEAD_LOG = org.apache.logging.log4j.LogManager.getLogger("PolyPlus/Heads")
+private val HEAD_LOG = LogManager.getLogger("PolyPlus/Heads")
 
-private fun loadFaceByUuid(uuid: java.util.UUID): Result<ImageBitmap?> {
+private fun loadFaceByUuid(uuid: UUID): Result<ImageBitmap?> {
     val url = mojangSkinUrl(uuid).getOrElse { return Result.failure(it) } ?: return Result.success(null)
-    val skin = runCatching { javax.imageio.ImageIO.read(java.net.URI(url).toURL()) }
+    val skin = runCatching { ImageIO.read(URI(url).toURL()) }
         .getOrElse { return Result.failure(it) }
     if (skin == null) {
         HEAD_LOG.debug("Skin texture at {} was not decodable for {}", url, uuid)
@@ -440,61 +474,61 @@ private fun loadFaceByUuid(uuid: java.util.UUID): Result<ImageBitmap?> {
     )
 }
 
-private fun defaultSkinFace(uuid: java.util.UUID): ImageBitmap? = runCatching {
-    val skinAsset = net.minecraft.client.resources.DefaultPlayerSkin.get(uuid)
+private fun defaultSkinFace(uuid: UUID): ImageBitmap? = runCatching {
+    val skinAsset = DefaultPlayerSkin.get(uuid)
     //? if >= 1.21.10 {
     val location = skinAsset.body().texturePath()
     //?} else {
     /*val location = skinAsset.texture()
     *///?}
-    val manager = net.minecraft.client.Minecraft.getInstance().resourceManager
+    val manager = Minecraft.getInstance().resourceManager
     val resource = manager.getResource(location).orElse(null) ?: return null
-    val skin = resource.open().use { javax.imageio.ImageIO.read(it) } ?: return null
+    val skin = resource.open().use { ImageIO.read(it) } ?: return null
     buildFace(skin)
 }.getOrNull()
 
-private fun mojangSkinUrl(uuid: java.util.UUID): Result<String?> = runCatching {
+private fun mojangSkinUrl(uuid: UUID): Result<String?> = runCatching {
     val id = uuid.toString().replace("-", "")
     val body = httpGetString("https://sessionserver.mojang.com/session/minecraft/profile/$id")
         ?: run {
             HEAD_LOG.debug("No Mojang profile for {} (offline, or not a premium account)", uuid)
             return Result.success(null)
         }
-    val root = org.polyfrost.polyplus.client.PolyPlusClient.JSON.parseToJsonElement(body).jsonObject
+    val root = PolyPlusClient.JSON.parseToJsonElement(body).jsonObject
     val props = root["properties"]?.jsonArray ?: return Result.success(null)
     val texturesValue = props.firstOrNull {
         it.jsonObject["name"]?.jsonPrimitive?.content == "textures"
     }?.jsonObject?.get("value")?.jsonPrimitive?.content ?: return Result.success(null)
     val decoded = String(
-        java.util.Base64.getDecoder().decode(texturesValue),
-        java.nio.charset.StandardCharsets.UTF_8,
+        Base64.getDecoder().decode(texturesValue),
+        StandardCharsets.UTF_8,
     )
-    org.polyfrost.polyplus.client.PolyPlusClient.JSON.parseToJsonElement(decoded)
+    PolyPlusClient.JSON.parseToJsonElement(decoded)
         .jsonObject["textures"]?.jsonObject
         ?.get("SKIN")?.jsonObject
         ?.get("url")?.jsonPrimitive?.content
 }.onFailure { HEAD_LOG.debug("Failed to read Mojang profile for {}", uuid, it) }
 
 private fun httpGetString(url: String): String? {
-    val conn = java.net.URI(url).toURL().openConnection() as java.net.HttpURLConnection
+    val conn = URI(url).toURL().openConnection() as HttpURLConnection
     return try {
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
         val code = conn.responseCode
         when {
-            code == 200 -> conn.inputStream.bufferedReader(java.nio.charset.StandardCharsets.UTF_8).use { it.readText() }
+            code == 200 -> conn.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
             HeadFetchPolicy.isDefinitiveMiss(code) -> {
                 HEAD_LOG.debug("GET {} returned {}", url, code)
                 null
             }
-            else -> throw java.io.IOException("GET $url returned $code")
+            else -> throw IOException("GET $url returned $code")
         }
     } finally {
         conn.disconnect()
     }
 }
 
-private fun buildFace(skin: java.awt.image.BufferedImage): ImageBitmap {
+private fun buildFace(skin: BufferedImage): ImageBitmap {
     val size = MENU_HEAD_SIZE
     val out = ByteArray(size * size * 4)
     for (y in 0 until size) {
@@ -511,7 +545,7 @@ private fun buildFace(skin: java.awt.image.BufferedImage): ImageBitmap {
             out[i + 3] = 0xFF.toByte()           // A
         }
     }
-    return SkiaImage.makeRaster(org.jetbrains.skia.ImageInfo.makeN32Premul(size, size), out, size * 4)
+    return SkiaImage.makeRaster(ImageInfo.makeN32Premul(size, size), out, size * 4)
         .toComposeImageBitmap()
 }
 
@@ -523,7 +557,7 @@ private class MenuActions(
     val mods: () -> Unit,
     val fullscreen: () -> Unit,
     val quit: () -> Unit,
-    val connect: (net.minecraft.client.multiplayer.ServerData) -> Unit,
+    val connect: (ServerData) -> Unit,
 )
 
 private const val ASSETS = "assets/polyplus/mainmenu/"
@@ -538,8 +572,8 @@ private const val PanelBorderAngleDeg = 20.0
 private val PanelBorderBrush: Brush = object : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val radians = Math.toRadians(PanelBorderAngleDeg)
-        val ux = kotlin.math.cos(radians).toFloat()
-        val uy = kotlin.math.sin(radians).toFloat()
+        val ux = cos(radians).toFloat()
+        val uy = sin(radians).toFloat()
         val len = size.width * ux + size.height * uy
         return LinearGradientShader(
             from = Offset.Zero,
@@ -588,7 +622,7 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
 
 internal const val REFERENCE_GUI_SCALE = 2f
 
-internal fun mcGuiScale(): Int = net.minecraft.client.Minecraft.getInstance().window.guiScale.toInt()
+internal fun mcGuiScale(): Int = Minecraft.getInstance().window.guiScale.toInt()
 
 internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI_SCALE).coerceIn(0.01f, 1f)
 
@@ -603,10 +637,10 @@ private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier
 
 @Composable
 private fun MainMenu(
-    screen: net.minecraft.client.gui.screens.Screen,
+    screen: Screen,
     guiScale: Int,
     actions: MenuActions,
-    servers: List<net.minecraft.client.multiplayer.ServerData>,
+    servers: List<ServerData>,
     pingTick: Int,
     assetsReady: Boolean,
 ) {
@@ -725,7 +759,7 @@ private fun MainLogo(assetsReady: Boolean) {
 @Composable
 private fun LeftColumn(
     modifier: Modifier,
-    servers: List<net.minecraft.client.multiplayer.ServerData>,
+    servers: List<ServerData>,
     pingTick: Int,
     actions: MenuActions,
     assetsReady: Boolean,
@@ -762,7 +796,7 @@ private fun LeftColumn(
     }
 }
 
-private fun serverStatusText(server: net.minecraft.client.multiplayer.ServerData): String {
+private fun serverStatusText(server: ServerData): String {
     val players = server.players
     return when {
         players != null -> "%,d players online".format(players.online())
@@ -771,16 +805,16 @@ private fun serverStatusText(server: net.minecraft.client.multiplayer.ServerData
 }
 
 @Composable
-private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
+private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen) {
     Column(
         modifier = modifier.width(300.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!PolyPlusMainMenuConfig.hideMainMenuPlayerPreview) {
-        val hasHeadCosmetic = org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+        val hasHeadCosmetic = CosmeticCatalog
             .localEquipped().equipped
-            .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
+            .containsKey(BodySlot.Hat)
         val previewHeight = if (hasHeadCosmetic) 270.dp else 210.dp
         val previewScale = if (hasHeadCosmetic) 0.82f else 1.05f
         val previewFadeStart = if (hasHeadCosmetic) 0.784f else 0.72243f
@@ -809,7 +843,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
             HostWorldButton(assetsReady, screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuSocial && PrivacyConsent.allowsOnlineServices()) {
-            val groups by org.polyfrost.polyplus.client.social.GroupsRepository.groups.collectAsState()
+            val groups by GroupsRepository.groups.collectAsState()
             PillButton(
                 "Social",
                 ASSETS + "message-chat-circle.svg",
@@ -832,13 +866,13 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: net.mi
 }
 
 @Composable
-private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.gui.screens.Screen) {
+private fun HostWorldButton(assetsReady: Boolean, screen: Screen) {
     var showFlow by remember { mutableStateOf(false) }
     var hostingCurrentWorld by remember { mutableStateOf(false) }
-    val friends by org.polyfrost.polyplus.client.social.FriendsRepository.friends.collectAsState()
-    val groups by org.polyfrost.polyplus.client.social.GroupsRepository.groups.collectAsState()
+    val friends by FriendsRepository.friends.collectAsState()
+    val groups by GroupsRepository.groups.collectAsState()
     val selfId = remember {
-        runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
     }
 
     PillButton(
@@ -847,9 +881,9 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
         modifier = Modifier.fillMaxWidth(),
         assetsReady = assetsReady,
         onClick = {
-            hostingCurrentWorld = net.minecraft.client.Minecraft.getInstance().singleplayerServer != null
-            org.polyfrost.polyplus.client.social.FriendsRepository.refreshAll()
-            org.polyfrost.polyplus.client.social.GroupsRepository.refreshGroups()
+            hostingCurrentWorld = Minecraft.getInstance().singleplayerServer != null
+            FriendsRepository.refreshAll()
+            GroupsRepository.refreshGroups()
             showFlow = true
         },
     )
@@ -869,7 +903,7 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
 private fun ModIntegrationBar(
     modifier: Modifier,
     assetsReady: Boolean,
-    screen: net.minecraft.client.gui.screens.Screen,
+    screen: Screen,
 ) {
     val buttons = ModIntegrationButtons.available()
     if (buttons.isEmpty()) return
@@ -908,11 +942,11 @@ private fun VanillaMenuButton(assetsReady: Boolean) {
         onClick = {
             PolyPlusMainMenuConfig.useVanillaMainMenu = true
             PolyPlusMainMenuConfig.save()
-            val mc = net.minecraft.client.Minecraft.getInstance()
+            val mc = Minecraft.getInstance()
             //? if >= 26.2 {
-            mc.gui.setScreen(net.minecraft.client.gui.screens.TitleScreen())
+            mc.gui.setScreen(TitleScreen())
             //?} else {
-            /*mc.setScreen(net.minecraft.client.gui.screens.TitleScreen())
+            /*mc.setScreen(TitleScreen())
             *///?}
         },
     )
@@ -1198,10 +1232,10 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
     var busy by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var errorSteps by remember { mutableStateOf<List<String>?>(null) }
-    var loginSession by remember { mutableStateOf<org.polyfrost.polyplus.client.launcher.MicrosoftAuth.MicrosoftLoginSession?>(null) }
-    var loginJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var loginSession by remember { mutableStateOf<MicrosoftAuth.MicrosoftLoginSession?>(null) }
+    var loginJob by remember { mutableStateOf<Job?>(null) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
-    var pillBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    var pillBounds by remember { mutableStateOf(Rect.Zero) }
 
     suspend fun reload() {
         accounts = withContext(Dispatchers.IO) { OneLauncherAccounts.list() }
@@ -1314,7 +1348,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
 
     val activeName = accounts?.firstOrNull { it.active }?.username ?: name
     val chevronRotation = if (open) 0f else 180f
-    val localId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId }.getOrNull()
+    val localId = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
     val head = localId?.let { MenuHeadCache.get(it) }
 
     Box(
@@ -1417,7 +1451,7 @@ private fun AccountSwitcherPanel(
     busy: String?,
     error: String?,
     errorSteps: List<String>?,
-    loginSession: org.polyfrost.polyplus.client.launcher.MicrosoftAuth.MicrosoftLoginSession?,
+    loginSession: MicrosoftAuth.MicrosoftLoginSession?,
     onSwitch: (OneLauncherAccounts.Account) -> Unit,
     onRemove: (OneLauncherAccounts.Account) -> Unit,
     onRefresh: (OneLauncherAccounts.Account) -> Unit,
@@ -1770,7 +1804,7 @@ private fun MicrosoftLoginPopup(
                         assetsReady = assetsReady,
                         onClick = {
                             runCatching {
-                                net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                                Minecraft.getInstance().keyboardHandler.setClipboard(code)
                             }
                         },
                     )
@@ -1886,7 +1920,7 @@ private fun DeviceCodeCard(
                 assetsReady = assetsReady,
                 onClick = {
                     runCatching {
-                        net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                        Minecraft.getInstance().keyboardHandler.setClipboard(code)
                     }
                 },
             )
@@ -2102,13 +2136,13 @@ private fun rememberRaster(path: String): ImageBitmap? = remember(path) {
 }
 
 private fun playerName(): String = runCatching {
-    net.minecraft.client.Minecraft.getInstance().user.name
+    Minecraft.getInstance().user.name
 }.getOrDefault("Player")
 
 private fun platformLabel(): String = runCatching {
     //? if fabric {
     val loaderName = "Fabric"
-    val mcVersion = net.fabricmc.loader.api.FabricLoader.getInstance()
+    val mcVersion = FabricLoader.getInstance()
         .getModContainer("minecraft").map { it.metadata.version.friendlyString }.orElse("")
     //?} else {
     /*val loaderName = "NeoForge"

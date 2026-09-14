@@ -4,15 +4,18 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.utils.v1.Multithreading
-//? if >= 1.21.10 {
-import net.minecraft.world.entity.player.PlayerModelType
-//?} else {
-/*import net.minecraft.client.resources.PlayerSkin
-*///?}
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
+
+//? if >= 1.21.10 {
+import net.minecraft.world.entity.player.PlayerModelType
+//?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.resources.PlayerSkin
+*///?}
 
 object ClientPlatform {
     val isWindows: Boolean

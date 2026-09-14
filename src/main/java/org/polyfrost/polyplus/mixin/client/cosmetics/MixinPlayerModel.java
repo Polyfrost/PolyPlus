@@ -1,34 +1,39 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
-//? if >= 1.21.4
-import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
-//? if < 1.21.4 {
-/*import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
-import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess;
-*///?}
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.render.PlayerRenderContext;
 import org.spongepowered.asm.mixin.Mixin;
-//? if < 1.21.4
-//import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 //? if >= 1.21.11 {
 import net.minecraft.client.model.player.PlayerModel;
-//?} else {
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+//?}
+
+//? if >= 1.21.4 {
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
+//?}
+
+//? if < 1.21.11 {
 /*import net.minecraft.client.model.PlayerModel;
 *///?}
-//? if < 1.21.4 {
+
+//? if >= 1.21.4 && < 1.21.10 {
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+*///?}
+
+//? if = 1.21.1 {
 /*import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.world.entity.LivingEntity;
-*///?}
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-//?} elif >= 1.21.4 {
-/*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess;
+import org.spongepowered.asm.mixin.Unique;
 *///?}
 
 @Mixin(PlayerModel.class)

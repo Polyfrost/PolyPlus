@@ -3,12 +3,12 @@ package org.polyfrost.polyplus.client.network.p2p
 import io.netty.channel.AbstractServerChannel
 import io.netty.channel.ChannelMetadata
 import io.netty.channel.EventLoop
-import java.net.SocketAddress
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
+import java.net.SocketAddress
 
 class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
     private val LOGGER = LogManager.getLogger()

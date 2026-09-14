@@ -2,13 +2,10 @@ package org.polyfrost.polyplus.client
 
 import org.apache.logging.log4j.LogManager
 import org.lwjgl.glfw.GLFW
-import org.polyfrost.compose.render.PolyColor
 import org.polyfrost.oneconfig.api.config.v1.Config
-import org.polyfrost.oneconfig.api.config.v1.annotations.Color
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Keybind
-import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeyModifiers
 import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
@@ -16,6 +13,7 @@ import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
+import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
 
 object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConstants.NAME} (OneClient)", Category.OTHER) {
@@ -211,7 +209,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         hideIf("apiUrl") { !PolyPlusConstants.IS_DEV_ENV }
 
         addCallback("acceptedLegalTerms") {
-            org.polyfrost.polyplus.client.privacy.PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
+            PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
         }
 
         addCallback("apiUrl") {

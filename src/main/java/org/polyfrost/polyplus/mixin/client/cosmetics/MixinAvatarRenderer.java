@@ -1,15 +1,8 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
-//? if >= 1.21.4 {
-import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
-import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
-import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
-//?}
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
-//? if >= 1.21.10 {
-import org.polyfrost.polyplus.client.cosmetics.render.PreviewCapeLayer;
-//?}
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,21 +11,33 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 //? if >= 1.21.11 {
 import net.minecraft.client.model.player.PlayerModel;
-//?} else {
-/*import net.minecraft.client.model.PlayerModel;
-*///?}
-import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.RenderLayerParent;
+//?}
+
 //? if >= 1.21.10 {
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.world.entity.Avatar;
-//?} else {
-/*import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import org.polyfrost.polyplus.client.cosmetics.render.PreviewCapeLayer;
+//?}
+
+//? if >= 1.21.4 {
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
+import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.client.model.PlayerModel;
 *///?}
+
 //? if >= 1.21.4 && < 1.21.10 {
 /*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 *///?}
 
 //? if >= 1.21.10 {

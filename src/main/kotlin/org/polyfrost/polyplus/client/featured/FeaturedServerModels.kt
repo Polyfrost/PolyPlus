@@ -1,5 +1,9 @@
 package org.polyfrost.polyplus.client.featured
 
+import org.apache.logging.log4j.LogManager
+import java.net.URI
+import java.time.Instant
+import java.util.Collections
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,10 +20,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.apache.logging.log4j.LogManager
-import java.net.URI
-import java.time.Instant
-import java.util.Collections
 
 sealed interface OutlineStyle {
     data class Solid(val argb: Int) : OutlineStyle

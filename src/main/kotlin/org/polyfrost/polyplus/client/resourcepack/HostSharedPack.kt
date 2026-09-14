@@ -1,9 +1,5 @@
 package org.polyfrost.polyplus.client.resourcepack
 
-import java.util.UUID
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import net.minecraft.server.MinecraftServer
@@ -11,6 +7,10 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress
 import org.polyfrost.polyplus.client.social.SocialErrors
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 //? if fabric {
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents

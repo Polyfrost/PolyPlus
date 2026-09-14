@@ -5,7 +5,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ServerChannel;
-import java.net.InetAddress;
 import net.minecraft.server.network.ServerConnectionListener;
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId;
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress;
@@ -13,6 +12,7 @@ import org.polyfrost.polyplus.client.network.p2p.EosP2PServerChannel;
 import org.polyfrost.polyplus.client.network.p2p.P2PListenContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import java.net.InetAddress;
 
 @Mixin(ServerConnectionListener.class)
 public abstract class MixinServerConnectionListener {

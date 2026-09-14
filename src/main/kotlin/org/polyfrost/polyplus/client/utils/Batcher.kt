@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.utils
 
+import org.polyfrost.polyplus.client.PolyPlusClient
+import java.time.Duration
 import kotlinx.atomicfu.locks.ReentrantLock
 import kotlinx.atomicfu.locks.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.polyfrost.polyplus.client.PolyPlusClient
-import java.time.Duration
 
 class Batcher<T, C: MutableCollection<T>>(val delay: Duration, val set: C, val onBatch: suspend CoroutineScope.(C) -> Unit) {
     private val lock = ReentrantLock()

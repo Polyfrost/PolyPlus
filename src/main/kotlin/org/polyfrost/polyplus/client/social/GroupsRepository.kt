@@ -1,11 +1,6 @@
 package org.polyfrost.polyplus.client.social
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
@@ -19,6 +14,13 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.EarlyInitializable
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 object GroupsRepository : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -104,11 +106,11 @@ object GroupsRepository : EarlyInitializable {
     }
 
     fun sendMessage(groupId: Int, content: String, idempotencyKey: String? = null) = PolyPlusClient.SCOPE.launch {
-        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
         val tempId = PENDING_ID_BASE + pendingIdCounter.getAndIncrement()
         appendOrReplace(
             groupId,
-            GroupMessage(id = tempId, sender = selfId, content = content, sentAt = java.time.Instant.now().toString(), editedAt = null),
+            GroupMessage(id = tempId, sender = selfId, content = content, sentAt = Instant.now().toString(), editedAt = null),
         )
 
         GroupsApi.sendMessage(groupId, content, idempotencyKey)
@@ -172,7 +174,7 @@ object GroupsRepository : EarlyInitializable {
             refreshGroups()
             return
         }
-        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
         val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
         _groups.value = _groups.value.map {
             if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || message.sender != selfId) else it
@@ -192,7 +194,7 @@ object GroupsRepository : EarlyInitializable {
                 id = packet.messageId,
                 sender = packet.sender,
                 content = packet.content,
-                sentAt = java.time.Instant.now().toString(),
+                sentAt = Instant.now().toString(),
                 editedAt = null,
                 sessionInvite = packet.sessionInviteId?.let {
                     GroupMessageSessionInvite(id = it, sessionId = "", status = packet.sessionInviteStatus ?: "pending")
@@ -203,7 +205,7 @@ object GroupsRepository : EarlyInitializable {
     }
 
     private fun notifyMessageReceived(groupId: Int, messageId: Long, sender: String, content: String) {
-        val selfId = runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
         if (sender == selfId) return
         if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
 

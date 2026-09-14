@@ -3,12 +3,6 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
-//? if >= 1.21.10 {
-import net.minecraft.core.ClientAsset;
-import net.minecraft.world.entity.player.PlayerSkin;
-//?} else {
-/*import net.minecraft.client.resources.PlayerSkin;
-*///?}
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
@@ -20,6 +14,15 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+//? if >= 1.21.10 {
+import net.minecraft.core.ClientAsset;
+import net.minecraft.world.entity.player.PlayerSkin;
+//?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.resources.PlayerSkin;
+*///?}
 
 @Mixin(AbstractClientPlayer.class)
 public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, PlayerCosmeticsAccess {

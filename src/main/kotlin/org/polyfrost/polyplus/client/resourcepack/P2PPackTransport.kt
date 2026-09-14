@@ -1,5 +1,10 @@
 package org.polyfrost.polyplus.client.resourcepack
 
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
+import org.polyfrost.polyplus.client.network.eos.EosProductUserId
+import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
@@ -12,11 +17,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
-import org.polyfrost.polyplus.client.network.eos.EosProductUserId
-import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 
 object P2PPackTransport {
     private val LOGGER = LogManager.getLogger("PolyPlus/PackTransport")

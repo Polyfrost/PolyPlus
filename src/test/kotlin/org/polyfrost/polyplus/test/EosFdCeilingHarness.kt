@@ -11,9 +11,6 @@ import gg.sona.eos.common.EosExternalCredentialType
 import gg.sona.eos.logging.EosLogCategory
 import gg.sona.eos.logging.EosLogLevel
 import gg.sona.eos.logging.EosLogging
-import java.io.FileInputStream
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -21,6 +18,9 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.polyfrost.polyplus.client.network.eos.EosConstants
 import org.polyfrost.polyplus.client.network.eos.EosFailureDiagnosis
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
+import java.io.FileInputStream
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 
 @EnabledIfEnvironmentVariable(named = EosFdCeilingHarness.ARM_ENV, matches = "control|flood")
 class EosFdCeilingHarness {

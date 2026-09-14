@@ -1,18 +1,27 @@
 package org.polyfrost.polyplus.mixin.client;
 
+import org.spongepowered.asm.mixin.Mixin;
+
+//? if >= 26.1 {
+import net.minecraft.client.renderer.Panorama;
+//?}
+
 //? if >= 1.21.11 {
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.resources.Identifier;
 import org.objectweb.asm.Opcodes;
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama;
-//?}
-import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.renderer.PanoramaRenderer;
+*///?}
 
 //? if >= 26.1 {
-@Mixin(net.minecraft.client.renderer.Panorama.class)
+@Mixin(Panorama.class)
 //?} else {
-/*@Mixin(net.minecraft.client.renderer.PanoramaRenderer.class)
+/*@Mixin(PanoramaRenderer.class)
 *///?}
 public class MixinPanorama {
     //? if >= 1.21.11 {

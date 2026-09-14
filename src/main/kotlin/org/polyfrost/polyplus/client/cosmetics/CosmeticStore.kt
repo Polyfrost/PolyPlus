@@ -3,17 +3,17 @@ package org.polyfrost.polyplus.client.cosmetics
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticSearchResponse
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreView
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticSearchResponse
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreView
 
 object CosmeticStore {
     private val LOGGER = LogManager.getLogger()

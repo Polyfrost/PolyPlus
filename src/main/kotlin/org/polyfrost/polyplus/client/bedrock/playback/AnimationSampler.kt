@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.bedrock.playback
 
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.BoneAnimation
@@ -9,7 +10,6 @@ import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
 import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
 import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
-import org.joml.Vector3f
 import kotlin.math.pow
 
 object AnimationSampler {

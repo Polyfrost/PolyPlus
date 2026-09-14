@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.test
 
-import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticList
+import kotlinx.serialization.json.Json
 
 class CosmeticCatalogResilienceTest {
     private companion object {

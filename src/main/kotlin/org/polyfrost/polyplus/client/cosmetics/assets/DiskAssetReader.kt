@@ -4,8 +4,6 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.io.path.relativeTo
 
 internal object DiskAssetReader {
     data class Asset(

@@ -10,6 +10,14 @@ import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
 object MenuBackgroundPass {
     private const val PARALLAX_EASE = 0.02f
 
@@ -26,7 +34,7 @@ object MenuBackgroundPass {
 
     //? if >= 26.1 {
     @JvmStatic
-    fun renderInline(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, panorama: Boolean, screen: Any): Boolean {
+    fun renderInline(ctx: GuiGraphicsExtractor, panorama: Boolean, screen: Any): Boolean {
         if (!SkiaCtx.isReady) return false
         if (screen is ComposeScreen) {
             SkiaCtx.queueHudDraw { render(panorama) }
@@ -39,7 +47,7 @@ object MenuBackgroundPass {
     }
     //?} else {
     /*@JvmStatic
-    fun renderInline(ctx: net.minecraft.client.gui.GuiGraphics, panorama: Boolean, screen: Any): Boolean {
+    fun renderInline(ctx: GuiGraphics, panorama: Boolean, screen: Any): Boolean {
         if (!SkiaCtx.isReady) return false
         if (screen is ComposeScreen) {
             SkiaCtx.queueHudDraw { render(panorama) }

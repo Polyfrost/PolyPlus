@@ -1,23 +1,24 @@
 package org.polyfrost.polyplus.client.host
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import net.minecraft.SharedConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
+import net.minecraft.server.MinecraftServer
 import net.minecraft.util.HttpUtil
 import net.minecraft.world.level.GameType
 import org.apache.logging.log4j.LogManager
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
-
 //?}
 
 object HostWorldManager {
@@ -25,9 +26,9 @@ object HostWorldManager {
 
     val clientVersionName: String by lazy {
         //? if <1.21.6 {
-        /*net.minecraft.SharedConstants.getCurrentVersion().name
+        /*SharedConstants.getCurrentVersion().name
         *///?} else
-        net.minecraft.SharedConstants.getCurrentVersion().name()
+        SharedConstants.getCurrentVersion().name()
     }
 
     enum class Compat {
@@ -205,7 +206,7 @@ object HostWorldManager {
         val port = request.port ?: HttpUtil.getAvailablePort()
         val published =
             //? if >= 26.2 {
-            server.publishServer(net.minecraft.server.MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
+            server.publishServer(MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
             //?} else {
             /*server.publishServer(request.gameMode, request.allowCheats, port)
             *///?}
@@ -239,7 +240,7 @@ object HostWorldManager {
         *///?}
     }
 
-    private fun bindPendingP2PListener(server: net.minecraft.server.MinecraftServer) {
+    private fun bindPendingP2PListener(server: MinecraftServer) {
         if (!P2PListenContext.hasPendingListen()) return
         runCatching { server.connection.startTcpServerListener(null, HttpUtil.getAvailablePort()) }
             .onSuccess { LOGGER.info("Bound an extra EOS P2P listener for the new session") }

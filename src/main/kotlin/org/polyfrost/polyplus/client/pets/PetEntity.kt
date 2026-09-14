@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.pets
 
 import net.minecraft.util.Mth
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.MoverType
@@ -8,14 +11,13 @@ import net.minecraft.world.entity.PathfinderMob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.player.Player
-import net.minecraft.world.InteractionHand
-import net.minecraft.world.InteractionResult
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.polyfrost.polyplus.client.bedrock.controller.BedrockAnimationControllerRunner
 import org.polyfrost.polyplus.client.cosmetics.PetArchetype
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import java.util.UUID
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -68,9 +70,9 @@ class PetEntity(
     }
 
     //? if >= 1.21.5 {
-    override fun causeFallDamage(fallDistance: Double, multiplier: Float, source: net.minecraft.world.damagesource.DamageSource): Boolean = false
+    override fun causeFallDamage(fallDistance: Double, multiplier: Float, source: DamageSource): Boolean = false
     //?} else {
-    /*override fun causeFallDamage(fallDistance: Float, multiplier: Float, source: net.minecraft.world.damagesource.DamageSource): Boolean = false
+    /*override fun causeFallDamage(fallDistance: Float, multiplier: Float, source: DamageSource): Boolean = false
     *///?}
 
     override fun tick() {
@@ -111,7 +113,7 @@ class PetEntity(
 
         if (def.archetype == PetArchetype.Walking) {
             if (distance > 0.1) {
-                val moveYaw = Math.toDegrees(kotlin.math.atan2(-toDesired.x, toDesired.z)).toFloat()
+                val moveYaw = Math.toDegrees(atan2(-toDesired.x, toDesired.z)).toFloat()
                 yRot = Mth.rotLerp(FOLLOW_EASE.toFloat(), yRot, moveYaw)
             } else {
                 yRot = Mth.rotLerp(FOLLOW_EASE.toFloat(), yRot, owner.yRot)

@@ -1,11 +1,5 @@
 package org.polyfrost.polyplus.test
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -16,6 +10,12 @@ import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MinecraftLoginGateTest {
     private val noFallthrough = 60_000L

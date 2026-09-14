@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.bedrock.controller
 
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
@@ -8,7 +9,6 @@ import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
-import org.joml.Vector3f
 
 class BedrockAnimationControllerRunner(
     private val controller: BedrockAnimationController,

@@ -8,10 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -23,15 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.polyplus.client.network.http.PlayersApi
+import org.polyfrost.polyplus.client.social.FriendsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.polyfrost.polyplus.client.network.http.PlayersApi
-import org.polyfrost.polyplus.client.social.FriendsRepository
 
 @Composable
 internal fun AddFriendDialog(onDismiss: () -> Unit) {
@@ -81,7 +80,7 @@ internal fun AddFriendDialog(onDismiss: () -> Unit) {
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SocialText("Add Friend", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                SocialText("Add Friend", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 SocialText("Enter a username to send a friend request", fontSize = 13.sp, color = SocialTextSecondary)
                 SocialTextField(
                     value = username,

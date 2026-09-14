@@ -1,8 +1,16 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -12,8 +20,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,18 +43,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -75,10 +75,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
@@ -100,13 +100,9 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
 import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
@@ -126,6 +122,7 @@ import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
@@ -134,9 +131,15 @@ import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.time.Duration
+import java.time.Instant
+import java.time.OffsetDateTime
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
 @Serializable
 data object PolyPlusCosmeticsRoute
@@ -1092,7 +1095,7 @@ private fun PreviewPanel(
             .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
         val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
-            .containsKey(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat)
+            .containsKey(BodySlot.Hat)
         PlayerPreview(
             Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
             source = PlayerPreviewSource.LocalLive,
@@ -1891,8 +1894,8 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
 private fun isNewItem(createdAt: String): Boolean {
     if (createdAt.isBlank()) return false
     return runCatching {
-        val created = java.time.OffsetDateTime.parse(createdAt).toInstant()
-        created.isAfter(java.time.Instant.now().minus(java.time.Duration.ofDays(7)))
+        val created = OffsetDateTime.parse(createdAt).toInstant()
+        created.isAfter(Instant.now().minus(Duration.ofDays(7)))
     }.getOrDefault(false)
 }
 
@@ -2432,7 +2435,7 @@ private fun BundlePreviewPanel(
     ) {
         val bundleSource = rememberBundlePreviewSource(bundleView)
         val bundleHasHat = (bundleSource as? PlayerPreviewSource.Override)
-            ?.equipment?.get(org.polyfrost.polyplus.client.network.http.responses.BodySlot.Hat) != null
+            ?.equipment?.get(BodySlot.Hat) != null
         PlayerPreview(
             Modifier.align(Alignment.Center).fillMaxWidth().height(300.dp),
             source = bundleSource,

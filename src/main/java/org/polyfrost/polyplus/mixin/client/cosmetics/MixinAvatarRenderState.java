@@ -1,19 +1,20 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
-//? if >= 1.21.4 {
-import java.util.Collections;
-import java.util.Map;
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+//?}
 
-import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
+//? if >= 1.21.4 {
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform;
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+import java.util.Collections;
+import java.util.Map;
 //?}
 
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-//?} elif >= 1.21.4 {
+//? if >= 1.21.4 && < 1.21.10 {
 /*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
 *///?}
 

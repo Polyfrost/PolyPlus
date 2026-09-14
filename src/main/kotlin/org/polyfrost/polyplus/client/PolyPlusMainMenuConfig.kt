@@ -4,14 +4,18 @@ import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
-import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.config.v1.Property.Display
+import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.MainMenuBackground
+
+//? if >= 1.21.11 {
+import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
+//?}
 
 private const val MAIN_MENU_FPS_HEADROOM = 60
 private const val FALLBACK_MONITOR_REFRESH_RATE = 60
@@ -161,7 +165,7 @@ object PolyPlusMainMenuConfig : Config(
 
         addCallback("customPanorama") {
             //? if >= 1.21.11
-            if (customPanorama) org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize()
+            if (customPanorama) CustomPanorama.initialize()
         }
 
         addDependency("hideMainMenuRealms", "Realms is unavailable") {
@@ -187,7 +191,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     fun customPanoramaSupported(): Boolean =
         //? if >= 1.21.11 {
-        org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.isAvailable()
+        CustomPanorama.isAvailable()
         //?} else {
         /*false
         *///?}

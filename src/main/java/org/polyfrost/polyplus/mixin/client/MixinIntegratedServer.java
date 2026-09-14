@@ -1,12 +1,15 @@
 package org.polyfrost.polyplus.mixin.client;
 
+import net.minecraft.client.server.IntegratedServer;
+import org.spongepowered.asm.mixin.Mixin;
+
+//? if = 26.2 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.server.IntegratedServer;
-import org.spongepowered.asm.mixin.Mixin;
+//?}
 
 @Mixin(IntegratedServer.class)
 public class MixinIntegratedServer {

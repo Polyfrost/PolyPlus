@@ -5,11 +5,14 @@ import net.minecraft.client.gui.Font
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
-import java.util.function.Consumer
 import org.polyfrost.polyplus.compat.ChattingButtonRow
+import java.util.function.Consumer
+
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?} else {
+//?}
+
+//? if < 26.1 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 

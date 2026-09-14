@@ -1,15 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-//? if >= 26.1 {
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-//?} else {
-/*import net.minecraft.client.gui.GuiGraphics;
-*///?}
-//? if >= 1.21.10 {
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-//?}
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -24,6 +15,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics;
+*///?}
 
 @Mixin(ServerSelectionList.OnlineServerEntry.class)
 public abstract class MixinOnlineServerEntry {

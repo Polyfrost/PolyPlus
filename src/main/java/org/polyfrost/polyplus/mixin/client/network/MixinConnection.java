@@ -6,13 +6,13 @@ import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import java.net.InetAddress;
 import net.minecraft.network.Connection;
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress;
 import org.polyfrost.polyplus.client.network.p2p.EosP2PChannel;
 import org.polyfrost.polyplus.client.network.p2p.P2PConnectionContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import java.net.InetAddress;
 
 @Mixin(Connection.class)
 public abstract class MixinConnection {

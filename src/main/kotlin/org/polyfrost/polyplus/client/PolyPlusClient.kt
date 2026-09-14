@@ -17,52 +17,57 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
-import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
-//? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
+import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
-//?}
-import java.util.concurrent.atomic.AtomicBoolean
 import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.host.HostWorldManager
-import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
+import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
-import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
-import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
-import org.polyfrost.polyplus.client.privacy.PrivacyGate
-import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.pets.PetEntities
+import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
+import org.polyfrost.polyplus.client.privacy.PrivacyGate
+import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
-import org.polyfrost.polyplus.client.social.GlobalChatRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-//? if >= 26.2
-import org.polyfrost.polyplus.compat.RrlsCrashGuard
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.utils.EarlyInitializable
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+
+//? if = 26.2 {
+import org.polyfrost.polyplus.compat.RrlsCrashGuard
+//?}
+
+//? if >= 1.21.11 {
+import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
+//?}
 
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
@@ -99,7 +104,7 @@ object PolyPlusClient {
             maxRetries = 2
             retryIf { _, _ -> false }
             retryOnExceptionIf { request, cause ->
-                cause is java.io.IOException && (request.method == HttpMethod.Get || request.method == HttpMethod.Head)
+                cause is IOException && (request.method == HttpMethod.Get || request.method == HttpMethod.Head)
             }
             constantDelay(millis = 250, randomizationMs = 250)
         }
@@ -174,7 +179,7 @@ object PolyPlusClient {
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
         step("social overlay keybind") { SocialOverlay.registerKeybind() }
-        step("vanilla menu button") { org.polyfrost.polyplus.client.gui.VanillaMenuButton.register() }
+        step("vanilla menu button") { VanillaMenuButton.register() }
 
         step("websocket") {
             PolyConnection.initialize {
@@ -202,7 +207,7 @@ object PolyPlusClient {
         step("commands") { PolyPlusCommands.register() }
         step("host world") { HostWorldManager.registerLanPublishHook() }
         //? if >= 1.21.11
-        step("panorama") { org.polyfrost.polyplus.client.gui.panorama.CustomPanorama.initialize() }
+        step("panorama") { CustomPanorama.initialize() }
     }
 
     // Full reset of auth caches and API data

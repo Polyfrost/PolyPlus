@@ -9,16 +9,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -41,12 +39,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.world.Difficulty
 import net.minecraft.world.level.GameType
 import org.jetbrains.skia.Image
-import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -96,8 +97,8 @@ internal fun HostWorldFlow(
     val state = remember { HostFlowState(hostingCurrent) }
 
     DisposableEffect(Unit) {
-        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
-        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+        PlayerPreviewDim.push()
+        onDispose { PlayerPreviewDim.pop() }
     }
 
     LaunchedEffect(Unit) {
@@ -566,8 +567,8 @@ private fun FriendInviteRow(friend: Friend, invited: Boolean, onToggle: (Boolean
 }
 
 private fun openSelectWorldScreen() {
-    val mc = net.minecraft.client.Minecraft.getInstance()
-    val target = net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(net.minecraft.client.gui.screens.TitleScreen())
+    val mc = Minecraft.getInstance()
+    val target = SelectWorldScreen(TitleScreen())
     //? if >= 26.2 {
     mc.gui.setScreen(target)
     //?} else {

@@ -1,13 +1,27 @@
 package org.polyfrost.polyplus.client.gui.preview
 
-//? if < 1.21.5 || >= 1.21.8 {
-import com.mojang.blaze3d.pipeline.RenderTarget
-//?}
+import net.minecraft.client.Minecraft
+import org.slf4j.LoggerFactory
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+//? if < 1.21.5 || >= 1.21.8 {
+import com.mojang.blaze3d.pipeline.RenderTarget
+import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+//?}
+
+//? if >= 1.21.8 && < 26.1 {
+/*import com.mojang.blaze3d.opengl.GlDevice
+import com.mojang.blaze3d.opengl.GlStateManager
+import com.mojang.blaze3d.opengl.GlTexture
+import com.mojang.blaze3d.systems.RenderSystem
+import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL30
+*///?}
+
 object PlayerPreviewOverlay {
-    private val LOG = org.slf4j.LoggerFactory.getLogger("polyplus/preview-overlay")
+    private val LOG = LoggerFactory.getLogger("polyplus/preview-overlay")
 
     class Entry internal constructor(@JvmField val id: Long) {
         @Volatile @JvmField var source: PlayerPreviewSource = PlayerPreviewSource.LocalLive
@@ -34,7 +48,7 @@ object PlayerPreviewOverlay {
         @Volatile @JvmField var fh: Float = 0f
         @Volatile @JvmField var visible: Boolean = false
 
-        @Volatile @JvmField var owner: java.lang.ref.WeakReference<Any>? = null
+        @Volatile @JvmField var owner: WeakReference<Any>? = null
     }
 
     private val entries = ConcurrentHashMap<Long, Entry>()
@@ -52,11 +66,11 @@ object PlayerPreviewOverlay {
 
     fun reportBounds(entry: Entry, fx: Float, fy: Float, fw: Float, fh: Float, visible: Boolean) {
         entry.fx = fx; entry.fy = fy; entry.fw = fw; entry.fh = fh; entry.visible = visible
-        entry.owner = if (visible) currentScreen()?.let { java.lang.ref.WeakReference(it) } else null
+        entry.owner = if (visible) currentScreen()?.let { WeakReference(it) } else null
     }
 
     private fun currentScreen(): Any? {
-        val mc = net.minecraft.client.Minecraft.getInstance() ?: return null
+        val mc = Minecraft.getInstance() ?: return null
         //? if >= 26.2 {
         return mc.gui?.screen()
         //?} else {
@@ -75,13 +89,13 @@ object PlayerPreviewOverlay {
     @JvmStatic
     fun renderAll(target: RenderTarget) {
         if (java.lang.Boolean.getBoolean("pp.overlay.off")) return
-        val mc = net.minecraft.client.Minecraft.getInstance()
+        val mc = Minecraft.getInstance()
         //? if >= 26.2 {
         val screen = mc?.gui?.screen()
         //?} else {
         /*val screen = mc?.screen
         *///?}
-        if (screen !is org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen) {
+        if (screen !is ComposeScreen) {
             clear()
             return
         }
@@ -124,28 +138,28 @@ object PlayerPreviewOverlay {
     //? if >= 1.21.8 && < 26.1 {
     /*private fun mainFbo(target: RenderTarget): Int {
         val colorTex = target.colorTexture ?: return -1
-        val device = com.mojang.blaze3d.systems.RenderSystem.getDevice() as? com.mojang.blaze3d.opengl.GlDevice ?: return -1
-        return (colorTex as com.mojang.blaze3d.opengl.GlTexture).getFbo(device.directStateAccess(), target.depthTexture)
+        val device = RenderSystem.getDevice() as? GlDevice ?: return -1
+        return (colorTex as GlTexture).getFbo(device.directStateAccess(), target.depthTexture)
     }
 
     private fun foldBackBufferIntoTarget(target: RenderTarget) {
         val fbo = mainFbo(target); if (fbo < 0) return
         val w = target.width; val h = target.height
-        com.mojang.blaze3d.opengl.GlStateManager._disableScissorTest()
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, 0)
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER, fbo)
-        org.lwjgl.opengl.GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT, org.lwjgl.opengl.GL11.GL_NEAREST)
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0)
+        GlStateManager._disableScissorTest()
+        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, 0)
+        GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, fbo)
+        GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST)
+        GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
     }
 
     private fun presentTargetToBackBuffer(target: RenderTarget) {
         val fbo = mainFbo(target); if (fbo < 0) return
         val w = target.width; val h = target.height
-        com.mojang.blaze3d.opengl.GlStateManager._disableScissorTest()
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, fbo)
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER, 0)
-        org.lwjgl.opengl.GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT, org.lwjgl.opengl.GL11.GL_NEAREST)
-        com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0)
+        GlStateManager._disableScissorTest()
+        GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, fbo)
+        GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0)
+        GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST)
+        GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
     }
     *///?}
 }

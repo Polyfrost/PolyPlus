@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.gui
 
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
 //? if fabric {
@@ -61,7 +62,7 @@ private class ParentScreenFactory(private val className: String) {
 
     fun open(parent: Screen) {
         val screen = runCatching { constructor?.newInstance(parent) as? Screen }.getOrNull() ?: return
-        val mc = net.minecraft.client.Minecraft.getInstance()
+        val mc = Minecraft.getInstance()
         //? if >= 26.2 {
         mc.gui.setScreen(screen)
         //?} else {

@@ -1,9 +1,5 @@
 package org.polyfrost.polyplus.client.features
 
-import java.lang.management.ManagementFactory
-import java.lang.management.MemoryType
-import java.nio.file.Files
-import java.nio.file.Paths
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -16,6 +12,10 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import oshi.SystemInfo
 import oshi.hardware.GlobalMemory
 import oshi.util.platform.mac.SysctlUtil
+import java.lang.management.ManagementFactory
+import java.lang.management.MemoryType
+import java.nio.file.Files
+import java.nio.file.Paths
 
 object JvmAdvisor {
     private val logger = LogManager.getLogger("PolyPlus/JvmAdvisor")

@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.bedrock.animation
 
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
 import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
 import org.polyfrost.polyplus.client.bedrock.molang.MolangVector3
-import org.joml.Vector3f
 
 data class BedrockAnimationFile(
     val animations: Map<String, BedrockAnimation>,

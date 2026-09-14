@@ -2,11 +2,11 @@ package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.resources.Identifier
-import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import kotlinx.coroutines.launch
 
 object CosmeticApi {
     fun equipped(player: AbstractClientPlayer): Collection<CosmeticEquipment.EquippedEntry> =

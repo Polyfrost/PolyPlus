@@ -17,23 +17,25 @@ import gg.sona.eos.p2p.EosNetworkConnectionType
 import gg.sona.eos.p2p.EosP2PSocketId as SdkSocketId
 import gg.sona.eos.p2p.EosPacketReliability
 import gg.sona.eos.p2p.EosRelayControl
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.network.p2p.P2PChannelRegistry
 import java.nio.ByteBuffer
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.LockSupport
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.network.p2p.P2PChannelRegistry
+import kotlinx.coroutines.withTimeout
 
 class EosSdkBridgeImpl : EosSdkBridge {
     private val logger = LogManager.getLogger()
@@ -161,7 +163,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         detachHandlers()
 
         if (worker != null) {
-            java.util.concurrent.locks.LockSupport.unpark(worker)
+            LockSupport.unpark(worker)
             worker.join(SHUTDOWN_TIMEOUT_MS)
         }
         if (worker != null && worker.isAlive) {
@@ -185,7 +187,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         logger.warn("Abandoning a stalled EOS platform, leaking its native resources until the game exits")
         detachHandlers()
         rejectPendingCalls()
-        worker?.let(java.util.concurrent.locks.LockSupport::unpark)
+        worker?.let(LockSupport::unpark)
         startupSettled.countDown()
     }
 
@@ -357,7 +359,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
             return
         }
         val nanos = (MIN_TICK_SLEEP_NANOS shl (idleTicks - 1).coerceAtMost(3)).coerceAtMost(MAX_TICK_SLEEP_NANOS)
-        java.util.concurrent.locks.LockSupport.parkNanos(nanos)
+        LockSupport.parkNanos(nanos)
     }
 
     private fun detachHandlers() {
@@ -400,7 +402,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         synchronized(pendingCalls) {
             if (!stopped) {
                 pendingCalls.add(entry)
-                tickThread?.let(java.util.concurrent.locks.LockSupport::unpark)
+                tickThread?.let(LockSupport::unpark)
                 return
             }
         }
@@ -414,7 +416,7 @@ class EosSdkBridgeImpl : EosSdkBridge {
         }
     }
 
-    private suspend fun <T> awaitOnTick(what: String, block: () -> java.util.concurrent.CompletableFuture<T>): T =
+    private suspend fun <T> awaitOnTick(what: String, block: () -> CompletableFuture<T>): T =
         try {
             withTimeout(TimeUnit.SECONDS.toMillis(EOS_CALL_TIMEOUT_SECONDS)) {
                 suspendCancellableCoroutine { cont ->
