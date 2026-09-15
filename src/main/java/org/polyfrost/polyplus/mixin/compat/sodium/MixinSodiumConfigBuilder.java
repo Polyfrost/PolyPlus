@@ -3,7 +3,7 @@ package org.polyfrost.polyplus.mixin.compat.sodium;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 
-//? if >= 1.21.11 {
+//? if sodium {
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.caffeinemc.mods.sodium.api.config.StorageEventHandler;
 import net.caffeinemc.mods.sodium.api.config.structure.ConfigBuilder;
@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.At;
 @Pseudo
 @Mixin(targets = "net.caffeinemc.mods.sodium.client.gui.SodiumConfigBuilder", remap = false)
 public class MixinSodiumConfigBuilder {
-    //? if >= 1.21.11 {
+    //? if sodium {
     @ModifyExpressionValue(
             method = "buildGeneralPage",
             at = @At(

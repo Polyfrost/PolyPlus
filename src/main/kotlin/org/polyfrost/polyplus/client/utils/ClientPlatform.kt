@@ -1,7 +1,9 @@
 package org.polyfrost.polyplus.client.utils
 
+import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.joml.Quaternionf
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.utils.v1.Multithreading
 import java.net.URI
@@ -26,6 +28,13 @@ object ClientPlatform {
 
     val isLinux: Boolean
         get() = System.getProperty("os.name").lowercase().contains("linux")
+
+    fun monitorRefreshRate(): Int =
+        //? if >= 26.3 {
+        Minecraft.getInstance().window.activeVideoMode?.refreshRate?.toInt() ?: 0
+        //?} else {
+        /*Minecraft.getInstance().window.refreshRate
+        *///?}
 
     fun runOnMain(action: () -> Unit) {
         val client = Minecraft.getInstance()
@@ -91,4 +100,12 @@ object ClientPlatform {
         //?} else {
         /*Minecraft.getInstance().player?.skin?.model() == PlayerSkin.Model.SLIM
         *///?}
+}
+
+fun PoseStack.rotateBy(rotation: Quaternionf) {
+    //? if >= 26.3 {
+    rotate(rotation)
+    //?} else {
+    /*mulPose(rotation)
+    *///?}
 }

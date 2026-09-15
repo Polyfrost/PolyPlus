@@ -10,8 +10,13 @@ object EmoteConditions {
     fun allows(player: AbstractClientPlayer, rules: EmoteRules): Boolean {
         if (player.isSleeping
             || player.isBlocking
-            || player.swinging
+            //? if >= 26.3 {
+            || player.isSwinging
+            || player.getSwingAnimation(1.0f) > 0f
+            //?} else {
+            /*|| player.swinging
             || player.getAttackAnim(1.0f) > 0f
+            *///?}
         ) {
             return false
         }

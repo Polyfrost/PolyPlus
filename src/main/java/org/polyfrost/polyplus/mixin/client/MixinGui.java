@@ -5,18 +5,24 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
-import org.polyfrost.polyplus.client.PolyPlusConfig;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
-import org.polyfrost.polyplus.client.social.SocialOverlay;
-import org.polyfrost.polyplus.client.utils.ClientPlatform;
-import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-//? if = 26.2 {
+//? if >= 26.2 {
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.screens.MultiplayerOptionsScreen;
 //?}
+
+//? if = 26.2 {
+/*import net.minecraft.client.gui.screens.MultiplayerOptionsScreen;
+*///?}
+
+//? if < 26.3 {
+/*import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.social.SocialOverlay;
+import org.polyfrost.polyplus.client.utils.ClientPlatform;
+import org.polyfrost.polyplus.privacy.PrivacyConsent;
+*///?}
 
 //? if < 26.2 {
 /*import net.minecraft.client.gui.screens.ShareToLanScreen;
@@ -30,14 +36,18 @@ import net.minecraft.client.gui.screens.MultiplayerOptionsScreen;
 public class MixinGui {
     @WrapMethod(method = "setScreen")
     private void polyplus$replaceScreen(Screen screen, Operation<Void> original) {
-        //? if >= 26.2 {
-        if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof MultiplayerOptionsScreen) {
-        //?} else {
-        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof ShareToLanScreen) {
-        *///?}
+        // on 26.3+ the LAN controls live inside World Options, so MixinWorldOptionsScreen handles them instead
+        //? if = 26.2 {
+        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof MultiplayerOptionsScreen) {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }
+        *///?} elif < 26.2 {
+        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof ShareToLanScreen) {
+            SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
+            return;
+        }
+        *///?}
         if (MainMenuReplacement.enabled() && polyplus$opensTitleScreen(screen)) {
             if (!MainMenuReplacement.alreadyOpen()) {
                 original.call(MainMenuReplacement.create());

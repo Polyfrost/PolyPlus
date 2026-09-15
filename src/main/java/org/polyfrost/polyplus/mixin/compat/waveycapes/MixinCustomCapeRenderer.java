@@ -24,8 +24,13 @@ public class MixinCustomCapeRenderer {
         }
         poseStack.pushPose();
         poseStack.translate(0.0D, 0.0D, 0.125D);
-        poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
+        //? if >= 26.3 {
+        poseStack.rotate(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
+        poseStack.rotate(new Quaternionf().rotateY((float) Math.toRadians(180.0)));
+        //?} else {
+        /*poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
         poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(180.0)));
+        *///?}
     }
     //?}
 }

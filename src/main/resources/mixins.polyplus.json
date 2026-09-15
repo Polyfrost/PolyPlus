@@ -28,9 +28,12 @@
     "client.MixinMinecraft",
     "client.MixinMinecraftSystemReport",
     "client.MixinJoinMultiplayerScreen",
+    //? if >= 26.3
+    "client.MixinWorldOptionsScreen",
     "client.MixinOnlineServerEntry",
     "client.MixinPanorama",
-    "client.MixinPauseScreen",
+    //? if <26.3
+    //"client.MixinPauseScreen",
     "client.MixinPlayerTabOverlay",
     "client.MixinRenderTarget",
     "client.MixinScreen",

@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.Unique;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-//? if = 26.2 {
+//? if >= 26.2 {
 import net.minecraft.CrashReportDetail;
 //?}
 

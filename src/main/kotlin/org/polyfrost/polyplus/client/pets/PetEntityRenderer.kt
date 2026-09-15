@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.pets
 
-import org.polyfrost.polyplus.client.render.PoseStack
 import com.mojang.math.Axis
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
@@ -13,6 +12,8 @@ import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
+import org.polyfrost.polyplus.client.render.PoseStack
+import org.polyfrost.polyplus.client.utils.rotateBy
 import java.util.concurrent.ConcurrentHashMap
 
 //? if >= 26.1 {
@@ -101,19 +102,34 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) : EntityRendere
 
     override fun createRenderState(): PetRenderState = PetRenderState()
 
+    //? if >= 26.3 {
     override fun shouldRender(
         entity: PetEntity,
         frustum: Frustum,
         camX: Double,
         camY: Double,
         camZ: Double,
+        partialTicks: Float,
     ): Boolean {
+    //?} else {
+    /*override fun shouldRender(
+        entity: PetEntity,
+        frustum: Frustum,
+        camX: Double,
+        camY: Double,
+        camZ: Double,
+    ): Boolean {
+    *///?}
         val mc = Minecraft.getInstance()
         val isOwnPet = entity.ownerUuid == mc.player?.uuid
         if (mc.options.cameraType.isFirstPerson && isOwnPet) {
             return false
         }
-        if (!super.shouldRender(entity, frustum, camX, camY, camZ)) {
+        //? if >= 26.3 {
+        if (!super.shouldRender(entity, frustum, camX, camY, camZ, partialTicks)) {
+        //?} else {
+        /*if (!super.shouldRender(entity, frustum, camX, camY, camZ)) {
+        *///?}
             return false
         }
         if (!isOwnPet) {
@@ -151,7 +167,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) : EntityRendere
 
         poseStack.pushPose()
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.mulPose(Axis.YP.rotationDegrees(180f + state.bodyYaw))
+        poseStack.rotateBy(Axis.YP.rotationDegrees(180f + state.bodyYaw))
 
         model.resetPose()
         if (pose.to.isEmpty()) {
@@ -250,7 +266,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
 
         poseStack.pushPose()
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.mulPose(Axis.YP.rotationDegrees(180f + state.bodyYaw))
+        poseStack.rotateBy(Axis.YP.rotationDegrees(180f + state.bodyYaw))
 
         model.resetPose()
         if (pose.to.isEmpty()) {
@@ -297,7 +313,7 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
 
         poseStack.pushPose()
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.mulPose(Axis.YP.rotationDegrees(180f + entityYaw))
+        poseStack.rotateBy(Axis.YP.rotationDegrees(180f + entityYaw))
 
         model.resetPose()
         val pose = samplePose(entity, definition, partialTicks, molangVariables)

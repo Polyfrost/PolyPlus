@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 
-//? if = 26.2 {
+//? if >= 26.2 {
 import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricEntityType
 //?}
 

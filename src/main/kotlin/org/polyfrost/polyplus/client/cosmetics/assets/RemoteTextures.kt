@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.cosmetics.assets
 
-import org.polyfrost.polyplus.client.render.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.render.NativeImage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
 import java.nio.file.Files

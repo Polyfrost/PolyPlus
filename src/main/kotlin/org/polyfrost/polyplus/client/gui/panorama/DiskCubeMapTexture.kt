@@ -1,13 +1,13 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
 //? if >= 1.21.11 {
-import org.polyfrost.polyplus.client.render.NativeImage
 import net.minecraft.client.renderer.texture.CubeMapTexture
 import net.minecraft.client.renderer.texture.MipmapStrategy
 import net.minecraft.client.renderer.texture.TextureContents
 import net.minecraft.client.resources.metadata.texture.TextureMetadataSection
 import net.minecraft.resources.Identifier
 import net.minecraft.server.packs.resources.ResourceManager
+import org.polyfrost.polyplus.client.render.NativeImage
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path

@@ -205,9 +205,16 @@ object HostWorldManager {
 
         val port = request.port ?: HttpUtil.getAvailablePort()
         val published =
-            //? if >= 26.2 {
-            server.publishServer(MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
-            //?} else {
+            //? if >= 26.3 {
+            run {
+                server.setWorldGameType(request.gameMode)
+                // guest command access is ignored unless the world itself allows commands
+                if (request.allowCheats) server.setWorldAllowCommands(true)
+                server.publishServer(MinecraftServer.MultiplayerScope.LAN, request.allowCheats, port)
+            }
+            //?} elif >= 26.2 {
+            /*server.publishServer(MinecraftServer.MultiplayerScope.LAN, request.gameMode, request.allowCheats, port)
+            *///?} else {
             /*server.publishServer(request.gameMode, request.allowCheats, port)
             *///?}
         pending = null

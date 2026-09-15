@@ -12,6 +12,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.MainMenuBackground
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 1.21.11 {
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
@@ -204,7 +205,7 @@ object PolyPlusMainMenuConfig : Config(
     fun defaultMainMenuFpsLimit(): Int {
         val fallback = FALLBACK_MONITOR_REFRESH_RATE + MAIN_MENU_FPS_HEADROOM
         return runCatching {
-            val refreshRate = Minecraft.getInstance().window.refreshRate
+            val refreshRate = ClientPlatform.monitorRefreshRate()
             if (refreshRate > 0) refreshRate + MAIN_MENU_FPS_HEADROOM else fallback
         }.getOrDefault(fallback)
     }

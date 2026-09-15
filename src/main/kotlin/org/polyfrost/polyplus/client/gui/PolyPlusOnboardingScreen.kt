@@ -34,9 +34,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.BlendMode
@@ -131,7 +132,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             if (key == ESCAPE_KEY) {
                 null
             } else {
-                com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(key)
+                //? if >= 26.3 {
+                InputConstants.Type.KEYBOARD.getOrCreate(key)
+                //?} else {
+                /*InputConstants.Type.KEYSYM.getOrCreate(key)
+                *///?}
             },
         )
         return true
@@ -2149,7 +2154,7 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
 
 internal object OnboardingKeyCapture {
     @Volatile
-    var pending: ((com.mojang.blaze3d.platform.InputConstants.Key?) -> Unit)? = null
+    var pending: ((InputConstants.Key?) -> Unit)? = null
 }
 
 private const val ESCAPE_KEY = 256

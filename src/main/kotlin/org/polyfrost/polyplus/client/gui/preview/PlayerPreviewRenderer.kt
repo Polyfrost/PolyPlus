@@ -13,9 +13,18 @@ import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.util.concurrent.ConcurrentHashMap
 
-//? if = 26.2 {
-import com.mojang.blaze3d.GpuFormat
-import com.mojang.blaze3d.PrimitiveTopology
+//? if >= 26.3 {
+import com.mojang.renderpearl.api.GpuFormat
+import com.mojang.renderpearl.api.buffers.GpuBuffer
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology
+import com.mojang.renderpearl.api.textures.FilterMode
+import com.mojang.renderpearl.api.textures.GpuTexture
+import com.mojang.renderpearl.api.textures.GpuTextureView
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher
+import java.util.OptionalDouble
+//?}
+
+//? if >= 26.2 {
 import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import net.minecraft.client.renderer.Projection
 import net.minecraft.client.renderer.SubmitNodeStorage
@@ -28,7 +37,6 @@ import net.minecraft.client.renderer.state.level.CameraRenderState
 //?}
 
 //? if >= 1.21.11 {
-import com.mojang.blaze3d.textures.FilterMode
 import net.minecraft.client.renderer.rendertype.RenderTypes
 //?}
 
@@ -42,9 +50,6 @@ import net.minecraft.world.entity.player.PlayerSkin
 //?}
 
 //? if >= 1.21.8 {
-import com.mojang.blaze3d.buffers.GpuBuffer
-import com.mojang.blaze3d.textures.GpuTexture
-import com.mojang.blaze3d.textures.GpuTextureView
 import com.mojang.blaze3d.vertex.BufferBuilder
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.OverlayTexture
@@ -77,6 +82,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.DefaultPlayerSkin
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
+import org.polyfrost.polyplus.client.utils.rotateBy
 import org.slf4j.LoggerFactory
 //?}
 
@@ -99,9 +105,28 @@ import kotlinx.coroutines.launch
 import net.minecraft.world.phys.Vec3
 //?}
 
-//? if = 1.21.1 || = 26.2 {
+//? if = 1.21.1 || >= 26.2 {
 import java.util.Optional
 //?}
+
+//? if = 26.2 {
+/*import com.mojang.blaze3d.GpuFormat
+import com.mojang.blaze3d.PrimitiveTopology
+*///?}
+
+//? if >= 1.21.11 && < 26.3 {
+/*import com.mojang.blaze3d.textures.FilterMode
+*///?}
+
+//? if >= 1.21.8 && < 26.3 {
+/*import com.mojang.blaze3d.buffers.GpuBuffer
+import com.mojang.blaze3d.textures.GpuTexture
+import com.mojang.blaze3d.textures.GpuTextureView
+*///?}
+
+//? if < 1.21.5 || >= 1.21.8 && < 26.3 {
+/*import com.mojang.blaze3d.vertex.VertexFormat
+*///?}
 
 //? if >= 1.21.8 && < 26.2 {
 /*import java.util.OptionalInt
@@ -109,7 +134,6 @@ import java.util.Optional
 
 //? if < 1.21.5 || >= 1.21.8 && < 26.2 {
 /*import com.mojang.blaze3d.vertex.Tesselator
-import com.mojang.blaze3d.vertex.VertexFormat
 *///?}
 
 //? if >= 1.21.10 && < 26.1 {
@@ -359,6 +383,26 @@ object PlayerPreviewRenderer {
     }
 
     private var target: TextureTarget? = null
+    //? if >= 26.3 {
+    private var passColorView: GpuTextureView? = null
+    private var passDepthView: GpuTextureView? = null
+
+    private fun renderFeatures(mc: Minecraft, storage: SubmitNodeStorage) {
+        val colorView = passColorView ?: return
+        mc.gameRenderer.featureRenderDispatcher().prepareFrame(storage).use { frame ->
+            RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                { "polyplus_preview" },
+                colorView,
+                Optional.empty(),
+                passDepthView,
+                OptionalDouble.empty(),
+            ).use { pass ->
+                RenderSystem.bindDefaultUniforms(pass)
+                FeatureRenderDispatcher.renderAllFeatures(pass, frame)
+            }
+        }
+    }
+    //?}
     private var dummy: AbstractClientPlayer? = null
     private var dummyProfileId: UUID? = null
     //? if < 26.1 {
@@ -379,9 +423,15 @@ object PlayerPreviewRenderer {
         val existing = target
         if (existing != null && existing.width == w && existing.height == h) return existing
         existing?.destroyBuffers()
-        //? if >= 26.2 {
-        return TextureTarget("polyplus_player_preview", w, h, true, GpuFormat.RGBA8_UNORM).also { target = it }
-        //?} else {
+        //? if >= 26.3 {
+        return TextureTarget(
+            "polyplus_player_preview", w, h,
+            GpuFormat.RGBA8_UNORM,
+            GpuFormat.D32_FLOAT,
+        ).also { target = it }
+        //?} elif >= 26.2 {
+        /*return TextureTarget("polyplus_player_preview", w, h, true, GpuFormat.RGBA8_UNORM).also { target = it }
+        *///?} else {
         /*return TextureTarget("polyplus_player_preview", w, h, true).also { target = it }
         *///?}
     }
@@ -421,8 +471,13 @@ object PlayerPreviewRenderer {
         RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(w, h)), ProjectionType.ORTHOGRAPHIC)
         //?}
         *///?}
-        RenderSystem.outputColorTextureOverride = colorView
+        //? if >= 26.3 {
+        passColorView = colorView
+        passDepthView = depthView
+        //?} else {
+        /*RenderSystem.outputColorTextureOverride = colorView
         RenderSystem.outputDepthTextureOverride = depthView
+        *///?}
         //? if >= 26.1 {
         val scissor = RenderSystem.getScissorStateForRenderTypeDraws()
         val hadScissor = scissor.enabled()
@@ -463,8 +518,13 @@ object PlayerPreviewRenderer {
             //? if >= 26.2 {
             RenderSystem.getModelViewStack().popMatrix()
             //?}
-            RenderSystem.outputColorTextureOverride = null
+            //? if >= 26.3 {
+            passColorView = null
+            passDepthView = null
+            //?} else {
+            /*RenderSystem.outputColorTextureOverride = null
             RenderSystem.outputDepthTextureOverride = null
+            *///?}
             RenderSystem.restoreProjectionMatrix()
             savedLights?.let { RenderSystem.setShaderLights(it) }
             savedFog?.let { RenderSystem.setShaderFog(it) }
@@ -534,15 +594,21 @@ object PlayerPreviewRenderer {
                 /*val pass = encoder.createRenderPass({ "polyplus_preview_composite" }, dstView, OptionalInt.empty())
                 *///?}
                 try {
-                    pass.setPipeline(RenderPipelines.GUI_TEXTURED)
+                    //? if >= 26.3 {
+                    pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.GUI_TEXTURED))
+                    //?} else {
+                    /*pass.setPipeline(RenderPipelines.GUI_TEXTURED)
+                    *///?}
                     RenderSystem.bindDefaultUniforms(pass)
                     //? if >= 26.2 {
                     pass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(Matrix4f()))
                     //?}
-                    //? if >= 1.21.11 {
-                    val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
+                    //? if >= 26.3 {
+                    pass.setUniform("Sampler0", srcView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR))
+                    //?} elif >= 1.21.11 {
+                    /*val sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
                     pass.bindTexture("Sampler0", srcView, sampler)
-                    //?} else {
+                    *///?} else {
                     /*pass.bindSampler("Sampler0", srcView)
                     *///?}
                     //? if >= 26.2 {
@@ -600,7 +666,7 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
-        pose.mulPose(Quaternionf().rotateZ(Math.PI.toFloat()))
+        pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         //? if >= 26.2 {
         mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
@@ -614,13 +680,18 @@ object PlayerPreviewRenderer {
             /*entityPos = Vec3.ZERO
             *///?}
         }
-        //? if >= 26.2 {
-        val features = mc.gameRenderer.featureRenderDispatcher()
+        //? if >= 26.3 {
+        val submitStorage = SubmitNodeStorage()
+        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
+        renderFeatures(mc, submitStorage)
+        //?} elif >= 26.2 {
+        /*val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
-        //?} else {
+        *///?} else {
         /*val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
@@ -667,7 +738,7 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
-        pose.mulPose(Quaternionf().rotateZ(Math.PI.toFloat()))
+        pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         //? if >= 26.2 {
         mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
@@ -682,13 +753,18 @@ object PlayerPreviewRenderer {
             /*entityPos = Vec3.ZERO
             *///?}
         }
-        //? if >= 26.2 {
-        val features = mc.gameRenderer.featureRenderDispatcher()
+        //? if >= 26.3 {
+        val submitStorage = SubmitNodeStorage()
+        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
+        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
+        renderFeatures(mc, submitStorage)
+        //?} elif >= 26.2 {
+        /*val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
         features.renderAllFeatures(submitStorage)
-        //?} else {
+        *///?} else {
         /*val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
         previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
@@ -768,7 +844,7 @@ object PlayerPreviewRenderer {
         poseStack.pushPose()
         poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.mulPose(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
+        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
         val (vScale, vOffset) = previewTextureFrame(definition)
         submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
             val localStack = PoseStack()
@@ -798,7 +874,7 @@ object PlayerPreviewRenderer {
         poseStack.pushPose()
         poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
         poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.mulPose(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
+        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
         val (vScale, vOffset) = previewTextureFrame(definition)
         for (root in model.roots) {
             root.render(poseStack, buffer, 0xF000F0, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
@@ -1314,7 +1390,7 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
-        pose.mulPose(Quaternionf().rotateZ(Math.PI.toFloat()))
+        pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         Lighting.setupForEntityInInventory()
         val dispatcher = mc.entityRenderDispatcher

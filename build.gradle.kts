@@ -33,10 +33,16 @@ run {
     stonecutter.properties.tags(version, loader)
 }
 
-val minecraftPredicate = property("mod.mc_compat") as String
-
 fun optionalProperty(name: String): String? =
     findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
+
+val mcDependencyVersion: String = optionalProperty("deps.minecraft") ?: mcVersion
+
+val minecraftPredicate = property("mod.mc_compat") as String
+
+stonecutter constants {
+    put("sodium", optionalProperty("deps.sodium") != null)
+}
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
 val fabricLanguageKotlinVersion = property("deps.fabric_language_kotlin") as String
@@ -181,7 +187,7 @@ tasks.jar {
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:$mcVersion")
+    minecraft("com.mojang:minecraft:$mcDependencyVersion")
 
     dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
 
@@ -319,13 +325,13 @@ tasks.register<Copy>("buildAndCollect") {
 
 val modVersion = property("mod.version") as String
 val modrinthMinecraftVersionOverride = mapOf(
-    "26.1" to listOf("26.1", "26.1.1", "26.1.2")
+    "26.1" to listOf("26.1", "26.1.1", "26.1.2"),
 )
 val modrinthId = listOf("oneconfig.publish.modrinth", "publish.modrinth")
     .firstNotNullOfOrNull { findProperty(it) }?.toString()?.takeIf { it.isNotBlank() }
 val modrinthToken = listOf("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
     .firstNotNullOfOrNull { findProperty(it) }?.toString()?.takeIf { it.isNotBlank() }
-val minecraftVersion = modrinthMinecraftVersionOverride[mcVersion] ?: listOf(mcVersion)
+val minecraftVersion = modrinthMinecraftVersionOverride[mcVersion] ?: listOf(mcDependencyVersion)
 val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
 
 publishMods {

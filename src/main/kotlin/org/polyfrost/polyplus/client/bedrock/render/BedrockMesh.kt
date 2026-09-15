@@ -1,7 +1,5 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import org.polyfrost.polyplus.client.render.Pose
-import org.polyfrost.polyplus.client.render.VertexConsumer
 import net.minecraft.core.Direction
 import org.joml.Quaternionf
 import org.joml.Vector3f
@@ -10,6 +8,8 @@ import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCube
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCubeFace
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockFaceUv
 import org.polyfrost.polyplus.client.bedrock.geometry.bedrockRotationRadians
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 import kotlin.collections.iterator
 import kotlin.math.abs
 import kotlin.math.floor

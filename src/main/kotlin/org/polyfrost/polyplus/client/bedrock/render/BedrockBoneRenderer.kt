@@ -5,6 +5,7 @@ import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.render.PoseStack
 import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.utils.rotateBy
 
 class BedrockBoneRenderer internal constructor(
     val name: String,
@@ -58,7 +59,7 @@ class BedrockBoneRenderer internal constructor(
     fun translateAndRotate(poseStack: PoseStack) {
         poseStack.translate(x / BedrockQuad.PIXEL_SCALE, y / BedrockQuad.PIXEL_SCALE, z / BedrockQuad.PIXEL_SCALE)
         if (xRot != 0f || yRot != 0f || zRot != 0f) {
-            poseStack.mulPose(Quaternionf().rotationZYX(zRot, yRot, xRot))
+            poseStack.rotateBy(Quaternionf().rotationZYX(zRot, yRot, xRot))
         }
         if (xScale != 1f || yScale != 1f || zScale != 1f) {
             poseStack.scale(xScale, yScale, zScale)

@@ -16,7 +16,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinJoinMultiplayerScreen {
     @Shadow protected ServerSelectionList serverSelectionList;
     @Shadow private Button editButton;
-    @Shadow private Button selectButton;
+    //? if >= 26.3 {
+    @Shadow private Button joinButton;
+    //?} else {
+    /*@Shadow private Button selectButton;
+    *///?}
     @Shadow private Button deleteButton;
 
     private long polyplus$featuredRevision = Long.MIN_VALUE;
@@ -47,7 +51,11 @@ public abstract class MixinJoinMultiplayerScreen {
         if (row == null) return;
         if (editButton != null) editButton.active = false;
         if (deleteButton != null) deleteButton.active = !row.header();
-        if (selectButton != null) selectButton.active = !row.header();
+        //? if >= 26.3 {
+        if (joinButton != null) joinButton.active = !row.header();
+        //?} else {
+        /*if (selectButton != null) selectButton.active = !row.header();
+        *///?}
     }
 
     private void polyplus$refreshFeaturedServers() {

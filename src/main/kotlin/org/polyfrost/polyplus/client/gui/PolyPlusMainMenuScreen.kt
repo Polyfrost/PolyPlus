@@ -293,18 +293,26 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         }
                     } else null,
                     settings = {
-                        //? if >= 26.1 {
-                        //? if >= 26.2 {
-                        mc.gui.setScreen(OptionsScreen(this, mc.options, false))
-                        //?} else {
+                        //? if >= 26.3 {
+                        mc.gui.setScreen(OptionsScreen(this, mc.options))
+                        //?} elif >= 26.2 {
+                        /*mc.gui.setScreen(OptionsScreen(this, mc.options, false))
+                        *///?} elif >= 26.1 {
                         /*mc.setScreen(OptionsScreen(this, mc.options, false))
-                        *///?}
-                        //?} else {
+                        *///?} else {
                         /*mc.setScreen(OptionsScreen(this, mc.options))
                         *///?}
                     },
                     mods = { PolyPlusOneConfigIntegration.openMods() },
-                    fullscreen = { mc.window.toggleFullScreen() },
+                    //? if >= 26.3 {
+                    // the window follows the option now
+                    fullscreen = {
+                        mc.options.fullscreen().set(!mc.options.fullscreen().get())
+                        mc.options.save()
+                    },
+                    //?} else {
+                    /*fullscreen = { mc.window.toggleFullScreen() },
+                    *///?}
                     quit = { mc.stop() },
                     connect = { server -> connectTo(mc, server) },
                 ),

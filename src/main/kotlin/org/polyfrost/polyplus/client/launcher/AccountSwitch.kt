@@ -1,8 +1,13 @@
 package org.polyfrost.polyplus.client.launcher
 
 import com.mojang.authlib.minecraft.UserApiService
-import com.mojang.authlib.yggdrasil.ProfileResult
+//? if >= 26.3 {
+import com.mojang.authlib.services.MinecraftServicesDiscoveryService
+import com.mojang.authlib.services.ProfileResult
+//?} else {
+/*import com.mojang.authlib.yggdrasil.ProfileResult
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService
+*///?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.User
 import net.minecraft.client.multiplayer.ProfileKeyPairManager
@@ -58,7 +63,11 @@ object AccountSwitch {
     private fun createUserApiService(accessToken: String, microsoft: Boolean): UserApiService {
         if (!microsoft) return UserApiService.OFFLINE
         return runCatching {
-            YggdrasilAuthenticationService(Minecraft.getInstance().proxy).createUserApiService(accessToken)
+            //? if >= 26.3 {
+            MinecraftServicesDiscoveryService.create(Minecraft.getInstance().proxy, true).createUserApiService(accessToken)
+            //?} else {
+            /*YggdrasilAuthenticationService(Minecraft.getInstance().proxy).createUserApiService(accessToken)
+            *///?}
         }.onFailure {
             LOGGER.warn("Could not create the user API service for the switched account", it)
         }.getOrDefault(UserApiService.OFFLINE)

@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.features
 
+import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -541,7 +543,7 @@ object OnboardingFeatures {
         gamma.javaClass.getMethod("isSmoothTransitionEnabled").invoke(gamma) as Boolean
     }.getOrNull()
 
-    fun gammaToggleKey(): net.minecraft.client.KeyMapping? = runCatching {
+    fun gammaToggleKey(): KeyMapping? = runCatching {
         Minecraft.getInstance().options.keyMappings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
     }.getOrNull()
 
@@ -549,10 +551,10 @@ object OnboardingFeatures {
         gammaToggleKey()?.translatedKeyMessage?.string
     }.getOrNull()
 
-    fun bindGammaToggleKey(key: com.mojang.blaze3d.platform.InputConstants.Key): Boolean = runCatching {
+    fun bindGammaToggleKey(key: InputConstants.Key): Boolean = runCatching {
         val mapping = gammaToggleKey() ?: error("Gamma Utils has no toggle binding")
         mapping.setKey(key)
-        net.minecraft.client.KeyMapping.resetMapping()
+        KeyMapping.resetMapping()
         Minecraft.getInstance().options.save()
         true
     }.onFailure {

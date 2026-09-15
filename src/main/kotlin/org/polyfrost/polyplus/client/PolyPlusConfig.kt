@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client
 
+import com.mojang.blaze3d.platform.InputConstants
 import org.apache.logging.log4j.LogManager
-import org.lwjgl.glfw.GLFW
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
@@ -184,7 +184,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         subcategory = "Keybinds",
         description = "Open the PolyPlus Socials menu",
     )
-    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(GLFW.GLFW_KEY_P), null, KeyModifiers.SHIFT, 0L) { state ->
+    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_P), null, KeyModifiers.SHIFT, 0L) { state ->
         if (state) {
             SocialOverlay.toggle()
         }

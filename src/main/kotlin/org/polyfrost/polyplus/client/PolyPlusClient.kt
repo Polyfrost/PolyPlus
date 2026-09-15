@@ -61,7 +61,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
-//? if = 26.2 {
+//? if >= 26.2 {
 import org.polyfrost.polyplus.compat.RrlsCrashGuard
 //?}
 
