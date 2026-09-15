@@ -96,8 +96,8 @@ internal fun HostWorldFlow(
     val state = remember { HostFlowState(hostingCurrent) }
 
     DisposableEffect(Unit) {
-        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.push()
-        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim.pop() }
+        org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression.push()
+        onDispose { org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression.pop() }
     }
 
     LaunchedEffect(Unit) {

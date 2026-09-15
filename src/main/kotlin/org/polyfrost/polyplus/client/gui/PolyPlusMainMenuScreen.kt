@@ -138,7 +138,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -841,27 +841,29 @@ private fun HostWorldButton(assetsReady: Boolean, screen: net.minecraft.client.g
         runCatching { net.minecraft.client.Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
     }
 
-    PillButton(
-        label = "Host World",
-        icon = ASSETS + "log-in-04.svg",
-        modifier = Modifier.fillMaxWidth(),
-        assetsReady = assetsReady,
-        onClick = {
-            hostingCurrentWorld = net.minecraft.client.Minecraft.getInstance().singleplayerServer != null
-            org.polyfrost.polyplus.client.social.FriendsRepository.refreshAll()
-            org.polyfrost.polyplus.client.social.GroupsRepository.refreshGroups()
-            showFlow = true
-        },
-    )
-    if (showFlow) {
-        HostWorldFlow(
-            screen = screen,
-            friends = friends,
-            groups = groups,
-            selfId = selfId,
-            hostingCurrent = hostingCurrentWorld,
-            onDismiss = { showFlow = false },
+    Box(Modifier.fillMaxWidth()) {
+        PillButton(
+            label = "Host World",
+            icon = ASSETS + "log-in-04.svg",
+            modifier = Modifier.fillMaxWidth(),
+            assetsReady = assetsReady,
+            onClick = {
+                hostingCurrentWorld = net.minecraft.client.Minecraft.getInstance().singleplayerServer != null
+                org.polyfrost.polyplus.client.social.FriendsRepository.refreshAll()
+                org.polyfrost.polyplus.client.social.GroupsRepository.refreshGroups()
+                showFlow = true
+            },
         )
+        if (showFlow) {
+            HostWorldFlow(
+                screen = screen,
+                friends = friends,
+                groups = groups,
+                selfId = selfId,
+                hostingCurrent = hostingCurrentWorld,
+                onDismiss = { showFlow = false },
+            )
+        }
     }
 }
 
@@ -1368,8 +1370,8 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                 }
             }
             DisposableEffect(Unit) {
-                PlayerPreviewDim.push()
-                onDispose { PlayerPreviewDim.pop() }
+                PlayerPreviewSuppression.push()
+                onDispose { PlayerPreviewSuppression.pop() }
             }
             Popup(
                 popupPositionProvider = positionProvider,
@@ -1704,8 +1706,8 @@ private fun MicrosoftLoginPopup(
     onCancel: () -> Unit,
 ) {
     DisposableEffect(Unit) {
-        PlayerPreviewDim.push()
-        onDispose { PlayerPreviewDim.pop() }
+        PlayerPreviewSuppression.push()
+        onDispose { PlayerPreviewSuppression.pop() }
     }
     Popup(
         alignment = Alignment.Center,
@@ -2023,8 +2025,8 @@ private fun NotificationBell(assetsReady: Boolean) {
         )
         if (expanded) {
             DisposableEffect(Unit) {
-                PlayerPreviewDim.push()
-                onDispose { PlayerPreviewDim.pop() }
+                PlayerPreviewSuppression.push()
+                onDispose { PlayerPreviewSuppression.pop() }
             }
             Popup(
                 alignment = Alignment.TopEnd,

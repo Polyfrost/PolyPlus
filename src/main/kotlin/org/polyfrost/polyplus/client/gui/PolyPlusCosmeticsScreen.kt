@@ -124,7 +124,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewDim
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
@@ -1177,8 +1177,8 @@ private fun PreviewPill(
         }
         if (customOpen && showAuraColor) {
             DisposableEffect(Unit) {
-                PlayerPreviewDim.push()
-                onDispose { PlayerPreviewDim.pop() }
+                PlayerPreviewSuppression.push()
+                onDispose { PlayerPreviewSuppression.pop() }
             }
             Popup(
                 alignment = Alignment.TopEnd,
