@@ -89,6 +89,7 @@ import net.minecraft.client.renderer.entity.player.PlayerRenderer
 import net.minecraft.client.renderer.entity.state.PlayerRenderState
 import net.minecraft.client.resources.DefaultPlayerSkin
 import net.minecraft.client.resources.PlayerSkin
+import net.minecraft.resources.Identifier
 *///?}
 //? if >= 1.21.1 && < 1.21.4 {
 /*import com.mojang.authlib.GameProfile
@@ -110,8 +111,8 @@ import net.minecraft.core.RegistrySetBuilder
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.registries.Registries
 import net.minecraft.data.worldgen.DimensionTypes
+import net.minecraft.resources.Identifier
 import net.minecraft.resources.ResourceKey
-import net.minecraft.resources.ResourceLocation
 import net.minecraft.util.profiling.InactiveProfiler
 import net.minecraft.world.Difficulty
 import net.minecraft.world.damagesource.DamageScaling
@@ -169,6 +170,10 @@ object PlayerPreviewRenderer {
     private val latestByKey = java.util.concurrent.ConcurrentHashMap<Any, ImageBitmap>()
 
     fun cached(key: Any): ImageBitmap? = latestByKey[key]
+
+    fun evict(key: Any) {
+        latestByKey.remove(key)
+    }
 
     fun capture(
         source: PlayerPreviewSource,
@@ -779,22 +784,6 @@ object PlayerPreviewRenderer {
         return equipment
     }
 
-    private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
-        is PlayerPreviewSource.Override -> source.capeTexture
-        PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
-            }
-    }
-
-    //? if >= 1.21.10 {
-    private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
-        PlayerSkin(skin.body(), ClientAsset.ResourceTexture(cape), skin.elytra(), skin.model(), skin.secure())
-    //?} else {
-    /*private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
-        PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
-    *///?}
-
     @Volatile
     private var resolvedProfile: com.mojang.authlib.GameProfile? = null
     private var resolvingProfileId: java.util.UUID? = null
@@ -963,6 +952,27 @@ object PlayerPreviewRenderer {
 
     //?}
 
+    //? if < 1.21.5 || >= 1.21.8 {
+    private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
+        is PlayerPreviewSource.Override ->
+            source.capeCosmeticId?.let {
+                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            }
+        PlayerPreviewSource.LocalLive ->
+            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
+                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            }
+    }
+
+    //? if >= 1.21.10 {
+    private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
+        PlayerSkin(skin.body(), ClientAsset.ResourceTexture(cape), skin.elytra(), skin.model(), skin.secure())
+    //?} else {
+    /*private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
+        PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
+    *///?}
+    //?}
+
     //? if >= 1.21.5 && < 1.21.8 {
     /*private fun testPattern(w: Int, h: Int, yawDeg: Float): ImageBitmap {
         val bytes = ByteArray(w * h * 4)
@@ -1114,17 +1124,6 @@ object PlayerPreviewRenderer {
         f.get(null) as sun.misc.Unsafe
     }
 
-    private fun capeOverrideLegacy(source: PlayerPreviewSource): ResourceLocation? = when (source) {
-        is PlayerPreviewSource.Override -> source.capeTexture
-        PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
-            }
-    }
-
-    private fun withCapeLegacy(skin: PlayerSkin, cape: ResourceLocation): PlayerSkin =
-        PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
-
     private fun bindLegacyEquipment(player: AbstractClientPlayer, source: PlayerPreviewSource) {
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
@@ -1205,7 +1204,8 @@ object PlayerPreviewRenderer {
         val mc = Minecraft.getInstance()
 
         //? if >= 1.21.4 {
-        val skin = legacySkin(mc) ?: return null
+        val baseSkin = legacySkin(mc) ?: return null
+        val skin = capeOverride(source)?.let { withCape(baseSkin, it) } ?: baseSkin
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
             PlayerPreviewSource.LocalLive ->
@@ -1220,9 +1220,9 @@ object PlayerPreviewRenderer {
         val level = mc.level ?: PreviewWorld.level() ?: return null
         val skin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
         val player = legacyDummy(mc, level) ?: return null
-        val cape = capeOverrideLegacy(source)
+        val cape = capeOverride(source)
             ?: org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
-        player.skinOverride = cape?.let { withCapeLegacy(skin, it) } ?: skin
+        player.skinOverride = cape?.let { withCape(skin, it) } ?: skin
         bindLegacyEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = yawDeg; player.yBodyRotO = yawDeg

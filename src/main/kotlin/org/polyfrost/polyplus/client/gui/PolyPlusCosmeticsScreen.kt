@@ -1795,7 +1795,7 @@ private fun CenteredNote(text: String) {
 
 @Composable
 private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
-    val source = rememberCosmeticPreviewSource(item)
+    val (source, loadTick) = rememberCosmeticPreviewSource(item)
     val framing = cosmeticPreviewFraming(item.type)
     Box(modifier) {
         CheckerThumbnail(Modifier.fillMaxSize())
@@ -1808,11 +1808,18 @@ private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
                 modelScale = framing.modelScale,
                 verticalAnchor = framing.verticalAnchor,
                 initialYaw = framing.yawDeg,
-                previewKey = "card-${item.groupId}",
-                live = item.type == CosmeticType.Aura,
+                previewKey = "card-${item.groupId}-$loadTick",
+                live = needsLivePreview(item.type, source),
             )
         }
     }
+}
+
+private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource) = when (type) {
+    CosmeticType.Aura -> true
+    CosmeticType.Cape ->
+        (source as? PlayerPreviewSource.Override)?.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true
+    else -> false
 }
 
 private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)
@@ -1834,39 +1841,32 @@ private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (t
 }
 
 @Composable
-private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): PlayerPreviewSource? {
-    val cosmeticId = item.equippedVariantId ?: item.variants.firstOrNull()?.id ?: return null
+private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): Pair<PlayerPreviewSource?, Int> {
+    val cosmeticId = item.equippedVariantId ?: item.variants.firstOrNull()?.id ?: return null to 0
     return rememberCosmeticPreviewSource(cosmeticId, item.type)
 }
 
 @Composable
-private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): PlayerPreviewSource? {
+private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): Pair<PlayerPreviewSource?, Int> {
     val isCape = type == CosmeticType.Cape
     val isPet = type == CosmeticType.Pet
 
     var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
-    var loadTick by remember(cosmeticId) { mutableIntStateOf(0) }
     LaunchedEffect(cosmeticId) {
         val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
         val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
         previewId = id
-        val loaded = when {
-            isCape -> CosmeticAssetCache.getCapeResource(id) != null
-            isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
-            else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
-        }
-        if (!loaded) {
-            CosmeticAssetCache.ensureCosmeticLoaded(id)
-            loadTick++
-        }
+        if (!isPreviewAssetLoaded(id, isCape, isPet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
     }
 
-    return remember(previewId, loadTick, isCape, isPet) {
+    val loadTick = CosmeticAssetCache.installs.let {
+        (if (isPreviewAssetLoaded(previewId, isCape, isPet)) 1 else 0) +
+            (if (isCape && CosmeticAssetCache.isCapeAnimated(previewId)) 2 else 0)
+    }
+
+    val source = remember(previewId, loadTick, isCape, isPet) {
         when {
-            isCape -> {
-                val cape = CosmeticAssetCache.getCapeResource(previewId) ?: return@remember null
-                PlayerPreviewSource.Override(CosmeticEquipment(), capeTexture = cape)
-            }
+            isCape -> PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId)
             isPet -> {
                 val attached = CosmeticAssetCache.getAttachedCosmetic(previewId)
                 if (attached != null) {
@@ -1886,6 +1886,13 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
             }
         }
     }
+    return source to loadTick
+}
+
+private fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
+    isCape -> CosmeticAssetCache.isCapeLoaded(id)
+    isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+    else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 
 private fun isNewItem(createdAt: String): Boolean {
@@ -2218,7 +2225,7 @@ private fun StoreCard(
 
 @Composable
 private fun StoreThumbnail(info: CosmeticStoreInfo, variantId: Int, modifier: Modifier) {
-    val source = rememberCosmeticPreviewSource(variantId, info.type)
+    val (source, loadTick) = rememberCosmeticPreviewSource(variantId, info.type)
     val framing = cosmeticPreviewFraming(info.type)
     Box(modifier) {
         CheckerThumbnail(Modifier.fillMaxSize())
@@ -2231,8 +2238,8 @@ private fun StoreThumbnail(info: CosmeticStoreInfo, variantId: Int, modifier: Mo
                 modelScale = framing.modelScale,
                 verticalAnchor = framing.verticalAnchor,
                 initialYaw = framing.yawDeg,
-                previewKey = "store-$variantId",
-                live = info.type == CosmeticType.Aura,
+                previewKey = "store-$variantId-$loadTick",
+                live = needsLivePreview(info.type, source),
             )
         }
     }
@@ -2260,7 +2267,7 @@ private fun StoreDetailPanel(
             if (info == null || variant == null) {
                 CenteredNote("Select a cosmetic to preview it.")
             } else {
-                val source = rememberCosmeticPreviewSource(variant.id, info.type)
+                val (source, _) = rememberCosmeticPreviewSource(variant.id, info.type)
                 val fades = info.type != CosmeticType.Boots
                 PlayerPreview(
                     Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),

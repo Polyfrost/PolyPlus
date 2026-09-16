@@ -343,7 +343,7 @@ object CosmeticSync : EarlyInitializable {
     }
 
     private fun reconcileCape(cosmeticId: Int?) {
-        if (cosmeticId == null || CosmeticAssetCache.getCapeResource(cosmeticId) != null) return
+        if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
                 LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)

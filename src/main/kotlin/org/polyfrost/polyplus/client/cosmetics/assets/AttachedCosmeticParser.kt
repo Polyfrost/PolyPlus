@@ -322,10 +322,12 @@ internal fun detectVerticalTextureFrameCount(
     actualWidth: Int,
     actualHeight: Int,
     maxUvV: Float,
+    minFrames: Int = MIN_SHEET_FRAMES,
 ): Int {
-    if (actualWidth != declaredWidth || declaredHeight <= 0 || actualHeight <= declaredHeight) return 1
+    if (declaredWidth <= 0 || declaredHeight <= 0) return 1
+    if (actualWidth != declaredWidth || actualHeight <= declaredHeight) return 1
     if (actualHeight % declaredHeight != 0) return 1
     if (maxUvV > declaredHeight) return 1
     val frames = actualHeight / declaredHeight
-    return if (frames >= MIN_SHEET_FRAMES) frames else 1
+    return if (frames >= minFrames) frames else 1
 }

@@ -1,5 +1,8 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
@@ -19,6 +22,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
 import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
+import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
@@ -49,12 +53,18 @@ object CosmeticAssetCache {
     val baseDir: File = File("${PolyPlusConstants.NAME}/cosmetics")
 
     private val hashManager = HashManager(baseDir.resolve("hashes.json"))
-    private val capes = HashMap<Int, CachedCosmetic>()
+    private val capes = ConcurrentHashMap<Int, CachedCosmetic>()
+
+    @Volatile
+    private var generation = 0
+
+    var installs by mutableIntStateOf(0)
+        private set
     //? if >= 1.21.1 {
-    private val emotesByCosmeticId = HashMap<Int, List<Emote>>()
-    private val emotesById = HashMap<Int, Emote>()
-    private val attachedById = HashMap<Int, AttachedCosmetic>()
-    private val petsById = HashMap<Int, PetDefinition>()
+    private val emotesByCosmeticId = ConcurrentHashMap<Int, List<Emote>>()
+    private val emotesById = ConcurrentHashMap<Int, Emote>()
+    private val attachedById = ConcurrentHashMap<Int, AttachedCosmetic>()
+    private val petsById = ConcurrentHashMap<Int, PetDefinition>()
     //?}
 
     private val parsedHashes = ConcurrentHashMap<Int, String>()
@@ -66,6 +76,10 @@ object CosmeticAssetCache {
     }
 
     fun getCapeResource(id: Int): Identifier? = capes[id]?.asResource()
+
+    fun isCapeLoaded(id: Int): Boolean = capes.containsKey(id)
+
+    fun isCapeAnimated(id: Int): Boolean = (capes[id] as? CachedCosmetic.Cape)?.isAnimated == true
 
     //? if >= 1.21.1 {
     fun getEmote(emoteId: Int): Emote? = emotesById[emoteId]
@@ -80,7 +94,13 @@ object CosmeticAssetCache {
     //?}
 
     fun reset() {
-        capes.clear()
+        generation++
+        val stale = capes.keys.toList().mapNotNull(capes::remove)
+        if (stale.isNotEmpty()) {
+            ClientPlatform.runOnMain {
+                for (cape in stale) (cape as? CachedCosmetic.Cape)?.release()
+            }
+        }
         parsedHashes.clear()
         //? if >= 1.21.1 {
         emotesByCosmeticId.clear()
@@ -95,6 +115,9 @@ object CosmeticAssetCache {
     const val PRELOAD_STEPS_PER_DEFINITION = 2
 
     private const val MAX_PARALLEL_DOWNLOADS = 8
+
+    private const val CAPE_SHEET_EXTENSION = "sheet"
+    private const val APPLE_DOUBLE_PREFIX = "._"
 
     suspend fun preloadDefinitions(
         definitions: Collection<CosmeticDefinition>,
@@ -271,9 +294,21 @@ object CosmeticAssetCache {
         }
     }
 
+    private fun installOnMain(stamp: Int, install: () -> Unit) {
+        ClientPlatform.runOnMain {
+            if (stamp != generation) return@runOnMain
+            install()
+            installs++
+        }
+    }
+
     private fun loadCape(id: Int, dir: Path) {
-        val png = dir.toFile().walkTopDown()
-            .firstOrNull { it.isFile && it.extension.equals("png", ignoreCase = true) }
+        val stamp = generation
+        val files = dir.toFile().walkTopDown()
+            .filter { it.isFile && !it.name.startsWith(APPLE_DOUBLE_PREFIX) }
+            .sortedBy { it.invariantSeparatorsPath }
+            .toList()
+        val png = files.firstOrNull { it.extension.equals("png", ignoreCase = true) }
             ?: dir.resolve("asset.bin").toFile().takeIf { it.exists() }
             ?: return
 
@@ -283,13 +318,58 @@ object CosmeticAssetCache {
             return
         }
 
-        ClientPlatform.runOnMain {
-            capes[id] = CachedCosmetic.Cape(image)
+        val sheetFile = files.firstOrNull { it.extension.equals(CAPE_SHEET_EXTENSION, ignoreCase = true) }
+        val sheet = sheetFile?.let { file ->
+            runCatching { ImageIO.read(file) }.getOrNull().also {
+                if (it == null) LOGGER.warn("Ignoring cape sheet {} for cosmetic {}: it could not be decoded", file, id)
+            }
+        }
+        val frames = if (sheet == null) {
+            1
+        } else {
+            val detected =
+                detectVerticalTextureFrameCount(image.width, image.height, sheet.width, sheet.height, 0f, minFrames = 2)
+            when {
+                detected < 2 -> {
+                    LOGGER.warn(
+                        "Ignoring cape sheet {} for cosmetic {}: not a whole-number stack of {}x{} frames",
+                        sheetFile,
+                        id,
+                        image.width,
+                        image.height,
+                    )
+                    1
+                }
+
+                !capeFrameWithinBudget(sheet.width, sheet.height / detected) -> {
+                    LOGGER.warn(
+                        "Ignoring cape sheet {} for cosmetic {}: a {}x{} frame is too big to re-upload",
+                        sheetFile,
+                        id,
+                        sheet.width,
+                        sheet.height / detected,
+                    )
+                    1
+                }
+
+                else -> detected
+            }
+        }
+
+        val source = sheet?.takeIf { frames > 1 } ?: image
+        installOnMain(stamp) {
+            capes[id] = CachedCosmetic.Cape(
+                id,
+                source,
+                frames,
+                if (frames > 1 && sheetFile != null) capeMillisPerFrameFromName(sheetFile.name) else DEFAULT_MILLIS_PER_FRAME,
+            )
         }
     }
 
     //? if >= 1.21.1 {
     private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null) {
+        val stamp = generation
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()
         if (!BedrockPlayerGeometryCache.isReady()) {
@@ -302,12 +382,13 @@ object CosmeticAssetCache {
         val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
         val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return
 
-        ClientPlatform.runOnMain {
+        installOnMain(stamp) {
             attachedById[id] = attached
         }
     }
 
     private fun loadEmote(id: Int, dir: Path) {
+        val stamp = generation
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()
         if (!BedrockPlayerGeometryCache.isReady()) {
@@ -324,13 +405,14 @@ object CosmeticAssetCache {
             return
         }
 
-        ClientPlatform.runOnMain {
+        installOnMain(stamp) {
             emotesByCosmeticId[id] = parsed
             emotesById[id] = parsed.first()
         }
     }
 
     private fun loadPet(id: Int, dir: Path) {
+        val stamp = generation
         when (PetAssetParser.peekArchetype(dir)) {
             PetArchetype.Shoulder -> loadAttachedCosmetic(id, dir, BodySlot.Pet, PetAssetParser.peekScale(dir), PetAssetParser.peekAnchor(dir))
             PetArchetype.Flying, PetArchetype.Walking -> {
@@ -338,7 +420,7 @@ object CosmeticAssetCache {
                     LOGGER.warn("Failed to parse pet cosmetic {}", id)
                     return
                 }
-                ClientPlatform.runOnMain {
+                installOnMain(stamp) {
                     petsById[id] = parsed
                 }
             }
@@ -353,3 +435,8 @@ object CosmeticAssetCache {
             else -> "cosmetic-$id"
         }
 }
+
+private const val MAX_CAPE_FRAME_PIXELS = 1024L * 512
+
+internal fun capeFrameWithinBudget(frameWidth: Int, frameHeight: Int): Boolean =
+    frameWidth.toLong() * frameHeight <= MAX_CAPE_FRAME_PIXELS

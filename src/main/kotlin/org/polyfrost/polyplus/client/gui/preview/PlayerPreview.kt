@@ -166,6 +166,10 @@ private fun PlayerPreviewBitmap(
     var dragging by remember { mutableStateOf(false) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
 
+    androidx.compose.runtime.DisposableEffect(previewKey) {
+        onDispose { PlayerPreviewRenderer.evict(previewKey) }
+    }
+
     androidx.compose.runtime.LaunchedEffect(autoSpin) {
         if (autoSpin) {
             while (true) {

@@ -24,6 +24,7 @@ versions/*/oneconfig/
 versions/*/PolyPlus/
 versions/*/mods/
 versions/*/.fabric/
+versions/*/.lwjgl/
 versions/*/.gradle/
 versions/*/saves/
 versions/*/screenshots/
