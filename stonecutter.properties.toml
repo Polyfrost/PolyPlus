@@ -3,7 +3,7 @@ mod.id = "polyplus"
 mod.version = "1.2.23"
 mod.group = "org.polyfrost"
 
-deps.fabric_loader = "0.19.3"
+deps.fabric_loader = "0.19.5"
 deps.fabric_language_kotlin = "1.13.13+kotlin.2.4.10"
 deps.oneconfig = "1.2.0"
 deps.kotlin = "2.4.10"

@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
@@ -44,11 +45,28 @@ object OnboardingFeatures {
     }
 
     val itemPositionsAvailable: Boolean by lazy {
-        runCatching {
-            val extras = loadWithoutInit(ANIMATIUM_CONFIG).getField("extras").type
-            ITEM_POSITION_FIELDS.forEach { extras.getField(it) }
-        }.isSuccess
+        animatiumSupportsItemPositions(modVersion(ANIMATIUM_ID)) &&
+            runCatching {
+                val extras = loadWithoutInit(ANIMATIUM_CONFIG).getField("extras").type
+                ITEM_POSITION_FIELDS.forEach { extras.getField(it) }
+            }.isSuccess
     }
+
+    internal fun animatiumSupportsItemPositions(version: String?): Boolean {
+        val parts = version.orEmpty().trimStart('v', 'V')
+            .takeWhile { it.isDigit() || it == '.' }
+            .split('.')
+            .mapNotNull(String::toIntOrNull)
+        val major = parts.firstOrNull() ?: return true
+        val minor = parts.getOrNull(1) ?: 0
+        return major > ANIMATIUM_ITEM_POSITION_MAJOR ||
+            (major == ANIMATIUM_ITEM_POSITION_MAJOR && minor >= ANIMATIUM_ITEM_POSITION_MINOR)
+    }
+
+    private fun modVersion(id: String): String? =
+        runCatching {
+            FabricLoader.getInstance().getModContainer(id).orElse(null)?.metadata?.version?.friendlyString
+        }.getOrNull()
 
     enum class ModCard(val introducedIn: Int) {
         GRASS(1),
@@ -719,8 +737,11 @@ object OnboardingFeatures {
     const val GAMMA_MIN = 100f
     const val GAMMA_MAX = 1500f
 
+    private const val ANIMATIUM_ID = "animatium"
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
+    private const val ANIMATIUM_ITEM_POSITION_MAJOR = 4
+    private const val ANIMATIUM_ITEM_POSITION_MINOR = 3
     private const val ITEM_OFFSET_X = "itemOffsetX"
     private const val ITEM_OFFSET_Y = "itemOffsetY"
     private const val ITEM_OFFSET_Z = "itemOffsetZ"
