@@ -1,2 +1,3 @@
-## 1.2.25
-- Fixed keybinds on 26.3
+## 1.2.26
+- Add animated cape support
+- Fix player preview disappearing on pop-ups
