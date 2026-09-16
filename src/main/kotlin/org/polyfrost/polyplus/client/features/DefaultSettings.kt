@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.features
 
-import org.polyfrost.polyplus.client.render.InputConstants
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
@@ -9,6 +8,7 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.render.InputConstants
 import java.lang.reflect.Modifier
 import java.nio.file.Path
 import kotlin.io.path.exists

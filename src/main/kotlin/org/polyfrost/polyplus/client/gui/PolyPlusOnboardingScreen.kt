@@ -8,7 +8,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -35,11 +34,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,16 +58,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -76,26 +74,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.skia.BlendMode
-import org.jetbrains.skia.ColorFilter
+import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.client.Minecraft
 import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.BlendMode
+import org.jetbrains.skia.Canvas as SkiaCanvas
+import org.jetbrains.skia.ColorFilter
+import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Path
 import org.jetbrains.skia.Point
-import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Canvas as SkiaCanvas
 import org.jetbrains.skia.Rect as SkiaRect
-import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.SamplingMode
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.features.OnboardingFeatures.ModCard
@@ -106,11 +107,19 @@ import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 
 class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -123,18 +132,22 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             if (key == ESCAPE_KEY) {
                 null
             } else {
-                com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(key)
+                //? if >= 26.3 {
+                InputConstants.Type.KEYBOARD.getOrCreate(key)
+                //?} else {
+                /*InputConstants.Type.KEYSYM.getOrCreate(key)
+                *///?}
             },
         )
         return true
     }
 
     //? if <26.1 {
-    /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
         renderPanorama(ctx, tickDelta)
         if (firstFrameDrawn) {
-            val gameRenderer = net.minecraft.client.Minecraft.getInstance().gameRenderer
+            val gameRenderer = Minecraft.getInstance().gameRenderer
             //? if <1.21.4 {
             /*gameRenderer.processBlurEffect(tickDelta)
             *///?} else {
@@ -145,11 +158,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         firstFrameDrawn = true
     }
 
-    override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     *///?} else {
-    override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
-        net.minecraft.client.Minecraft.getInstance().gameRenderer
+        Minecraft.getInstance().gameRenderer
             //? if >= 26.2 {
             .panorama()
             .extractRenderState(ctx, width, height)
@@ -161,7 +174,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
-    override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     //?}
 
     @Composable
@@ -177,23 +190,18 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val offeredCards = remember {
             OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
         }
-        val modCards = remember { offeredCards - ModCard.GAMMA }
-        val sprintSection = needsSettings && OnboardingFeatures.polySprintAvailable
-        val showsModsPage = showsModSettings && (modCards.isNotEmpty() || sprintSection)
+        val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
         val pages = remember {
             buildList {
-                if (needsTerms) add(OnboardingPage.TERMS)
-                if (needsSettings) add(OnboardingPage.LOOK_AND_FEEL)
-                if (showsModsPage) {
-                    add(OnboardingPage.MODS)
-                    repeat((modPageCount(modCards.size) - 1).coerceAtLeast(0)) {
-                        add(OnboardingPage.MODS_MORE)
-                    }
+                if (needsTerms) add(OnboardingStep.Terms)
+                if (needsSettings) add(OnboardingStep.LookAndFeel)
+                if (showsModSettings) {
+                    if (sprintStep) add(OnboardingStep.Sprint)
+                    offeredCards.chunked(MOD_CARDS_PER_PAGE).forEach { add(OnboardingStep.Mods(it)) }
                 }
-                if (showsModSettings && ModCard.GAMMA in offeredCards) add(OnboardingPage.FULLBRIGHT)
-                if (needsBlurChoice) add(OnboardingPage.MOTION_BLUR)
-                if (needsSettings || needsModSettings) add(OnboardingPage.DONE)
-            }.ifEmpty { listOf(OnboardingPage.DONE) }
+                if (needsBlurChoice) add(OnboardingStep.MotionBlur)
+                if (needsSettings || needsModSettings) add(OnboardingStep.Done)
+            }.ifEmpty { listOf(OnboardingStep.Done) }
         }
         var page by remember { mutableIntStateOf(0) }
         var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
@@ -230,7 +238,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
         var guiScale by remember {
             mutableIntStateOf(
-                net.minecraft.client.Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+                Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
             )
         }
         LaunchedEffect(lightTheme, uiStyle) {
@@ -312,7 +320,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 if (showsModSettings) OnboardingFeatures.applySavedModSettings()
                 if (needsBlurChoice) OnboardingFeatures.applySavedMotionBlur()
             }
-            val mc = net.minecraft.client.Minecraft.getInstance()
+            val mc = Minecraft.getInstance()
             //? if >= 26.2 {
             mc.gui.setScreen(PolyPlusMainMenuScreen())
             //?} else {
@@ -321,7 +329,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
 
         val waitingForOptimization =
-            pages[page] == OnboardingPage.MOTION_BLUR && !AdaptiveBlurDefaults.sampled
+            pages[page] == OnboardingStep.MotionBlur && !AdaptiveBlurDefaults.sampled
 
         val recordLegalChoice = { accepted: Boolean ->
             val document = legalDocument
@@ -346,7 +354,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
                 val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
                     guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
-                val compact = pages[page] == OnboardingPage.TERMS
+                val compact = pages[page] == OnboardingStep.Terms
                 val panelWidth by animateFloatAsState(
                     if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
                     animationSpec = spring(),
@@ -384,51 +392,97 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 .background(PageBackground.copy(alpha = 0.9f))
                                 .border(BorderWidth, LocalTheme.current.borderColor, PANEL_SHAPE),
                         ) {
-                            when (pages[page]) {
-                                OnboardingPage.TERMS ->
+                            when (val step = pages[page]) {
+                                OnboardingStep.Terms ->
                                     TermsPage(
                                         legalDocument,
                                         termsAccepted,
                                         { termsAccepted = it },
                                         { legalDocument = it },
                                     )
-                                OnboardingPage.LOOK_AND_FEEL ->
+                                OnboardingStep.LookAndFeel ->
                                     LookAndFeelPage(
                                         lightTheme, { lightTheme = it },
                                         uiStyle, { uiStyle = it },
                                         guiScale, maxGuiScale, { guiScale = it },
                                     )
-                                OnboardingPage.MODS, OnboardingPage.MODS_MORE ->
-                                    ModsPage(
-                                        modCards,
-                                        pages.take(page + 1).count { it == OnboardingPage.MODS_MORE },
-                                        needsSettings,
-                                        toggleSprint, { toggleSprint = it },
-                                        grassMode, { touch(ModCard.GRASS, grassMode, it); grassMode = it },
-                                        fireHeight, { touch(ModCard.FIRE_OVERLAY, fireHeight, it); fireHeight = it },
-                                        fireOpacity, { touch(ModCard.FIRE_OVERLAY, fireOpacity, it); fireOpacity = it },
-                                        shieldHeight, { touch(ModCard.SHIELD_HEIGHT, shieldHeight, it); shieldHeight = it },
-                                        horseOpacity, { touch(ModCard.MOUNT, horseOpacity, it); horseOpacity = it },
-                                        waveyCapes, { touch(ModCard.CAPES, waveyCapes, it); waveyCapes = it },
-                                        skinLayers, { touch(ModCard.SKIN_LAYERS, skinLayers, it); skinLayers = it },
-                                        itemOffsetX, itemOffsetY, itemOffsetZ,
-                                        { x, y, z ->
-                                            if (x != itemOffsetX || y != itemOffsetY || z != itemOffsetZ) {
-                                                touched += ModCard.ITEM
+                                OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
+                                is OnboardingStep.Mods -> {
+                                    Header("Continuing with", "Mods")
+                                    ModCardRow(step.cards.size) {
+                                        step.cards.forEach { card ->
+                                            when (card) {
+                                                ModCard.GRASS ->
+                                                    BetterGrassCard(grassMode) {
+                                                        touch(ModCard.GRASS, grassMode, it)
+                                                        grassMode = it
+                                                    }
+                                                ModCard.FIRE_OVERLAY ->
+                                                    FireOverlayCard(
+                                                        fireHeight,
+                                                        { touch(ModCard.FIRE_OVERLAY, fireHeight, it); fireHeight = it },
+                                                        fireOpacity,
+                                                        {
+                                                            touch(ModCard.FIRE_OVERLAY, fireOpacity, it)
+                                                            fireOpacity = it
+                                                        },
+                                                    )
+                                                ModCard.SHIELD_HEIGHT ->
+                                                    ShieldHeightCard(shieldHeight) {
+                                                        touch(ModCard.SHIELD_HEIGHT, shieldHeight, it)
+                                                        shieldHeight = it
+                                                    }
+                                                ModCard.MOUNT ->
+                                                    MountOpacityCard(horseOpacity) {
+                                                        touch(ModCard.MOUNT, horseOpacity, it)
+                                                        horseOpacity = it
+                                                    }
+                                                ModCard.CAPES ->
+                                                    WaveyCapesCard(waveyCapes) {
+                                                        touch(ModCard.CAPES, waveyCapes, it)
+                                                        waveyCapes = it
+                                                    }
+                                                ModCard.SKIN_LAYERS ->
+                                                    SkinLayersCard(skinLayers) {
+                                                        touch(ModCard.SKIN_LAYERS, skinLayers, it)
+                                                        skinLayers = it
+                                                    }
+                                                ModCard.ITEM ->
+                                                    ItemPositionCard(
+                                                        itemOffsetX, itemOffsetY, itemOffsetZ,
+                                                        { x, y, z ->
+                                                            if (x != itemOffsetX ||
+                                                                y != itemOffsetY ||
+                                                                z != itemOffsetZ
+                                                            ) {
+                                                                touched += ModCard.ITEM
+                                                            }
+                                                            itemOffsetX = x
+                                                            itemOffsetY = y
+                                                            itemOffsetZ = z
+                                                        },
+                                                        itemScale,
+                                                        { touch(ModCard.ITEM, itemScale, it); itemScale = it },
+                                                    )
+                                                ModCard.GAMMA ->
+                                                    FullbrightCard(
+                                                        gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
+                                                        gammaToggled,
+                                                        {
+                                                            touch(ModCard.GAMMA, gammaToggled, it)
+                                                            gammaToggled = it
+                                                        },
+                                                        gammaSmooth,
+                                                        {
+                                                            touch(ModCard.GAMMA, gammaSmooth, it)
+                                                            gammaSmooth = it
+                                                        },
+                                                    )
                                             }
-                                            itemOffsetX = x
-                                            itemOffsetY = y
-                                            itemOffsetZ = z
-                                        },
-                                        itemScale, { touch(ModCard.ITEM, itemScale, it); itemScale = it },
-                                    )
-                                OnboardingPage.FULLBRIGHT ->
-                                    FullbrightPage(
-                                        gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
-                                        gammaToggled, { touch(ModCard.GAMMA, gammaToggled, it); gammaToggled = it },
-                                        gammaSmooth, { touch(ModCard.GAMMA, gammaSmooth, it); gammaSmooth = it },
-                                    )
-                                OnboardingPage.MOTION_BLUR ->
+                                        }
+                                    }
+                                }
+                                OnboardingStep.MotionBlur ->
                                     if (waitingForOptimization) {
                                         OptimizingPage()
                                     } else {
@@ -439,17 +493,17 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                             { motionBlur = it },
                                         )
                                     }
-                                OnboardingPage.COSMETICS -> CosmeticsPage(
+                                OnboardingStep.Cosmetics -> CosmeticsPage(
                                     onClaim = { PolyPlusClient.refreshCosmetics() },
                                     onStore = {
                                         finish()
                                         PolyPlusOneConfigIntegration.openCosmetics()
                                     },
                                 )
-                                OnboardingPage.DONE -> DonePage()
+                                OnboardingStep.Done -> DonePage()
                             }
-                            val terms = pages[page] == OnboardingPage.TERMS
-                            val blurUnanswered = pages[page] == OnboardingPage.MOTION_BLUR &&
+                            val terms = pages[page] == OnboardingStep.Terms
+                            val blurUnanswered = pages[page] == OnboardingStep.MotionBlur &&
                                 blurMode == OnboardingFeatures.MOTION_BLUR_UNSET
                             BottomNavigation(
                                 page,
@@ -557,7 +611,7 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
+                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
                     .size(thumbSize)
                     .clip(ppShape(7.dp))
                     .background(TextPrimary),
@@ -573,124 +627,229 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
 }
 
 @Composable
-private fun ModsPage(
-    allCards: List<ModCard>,
-    modPage: Int,
-    showSprint: Boolean,
-    toggleSprint: Boolean,
-    onToggleSprint: (Boolean) -> Unit,
-    grassMode: Int,
-    onGrassMode: (Int) -> Unit,
-    fireHeight: Double,
-    onFireHeight: (Double) -> Unit,
-    fireOpacity: Float,
-    onFireOpacity: (Float) -> Unit,
-    shieldHeight: Float,
-    onShieldHeight: (Float) -> Unit,
-    horseOpacity: Float,
-    onHorseOpacity: (Float) -> Unit,
-    waveyCapes: Boolean,
-    onWaveyCapes: (Boolean) -> Unit,
-    skinLayers: Boolean,
-    onSkinLayers: (Boolean) -> Unit,
-    itemOffsetX: Float,
-    itemOffsetY: Float,
-    itemOffsetZ: Float,
-    onItemOffset: (Float, Float, Float) -> Unit,
-    itemScale: Float,
-    onItemScale: (Float) -> Unit,
-) {
-    Header("Continuing with", "Mods")
-
-    val range = modPageRange(allCards.size, modPage)
-    val cards = if (range.isEmpty()) emptyList() else allCards.subList(range.first, range.last + 1)
-    val sprint = showSprint && OnboardingFeatures.polySprintAvailable && modPage == 0
-
-    val total = (if (sprint) SPRINT_SECTION_HEIGHT + SECTION_GAP else 0f) +
-        (if (cards.isEmpty()) -SECTION_GAP else MOD_CARD_HEIGHT)
-    var y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - total) / 2f
-    if (sprint) {
-        SprintSection(y, toggleSprint, onToggleSprint)
-        y += SPRINT_SECTION_HEIGHT + SECTION_GAP
-    }
-    if (cards.isEmpty()) return
-
-    val rowWidth = cards.size * MOD_CARD_WIDTH + (cards.size - 1) * MOD_CARD_GAP
+private fun ModCardRow(count: Int, content: @Composable RowScope.() -> Unit) {
+    val rowWidth = count * CARD_WIDTH + (count - 1) * CARD_GAP
     Row(
-        Modifier.offset(((LocalPanelWidth.current - rowWidth) / 2f).dp, y.dp),
-        horizontalArrangement = Arrangement.spacedBy(MOD_CARD_GAP.dp),
+        Modifier.offset(((LocalPanelWidth.current - rowWidth) / 2f).dp, CARD_TOP.dp),
+        horizontalArrangement = Arrangement.spacedBy(CARD_GAP.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun ModCardFrame(
+    title: String,
+    icon: String,
+    description: String,
+    preview: @Composable () -> Unit,
+    controls: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
+        Modifier
+            .size(CARD_WIDTH.dp, CARD_HEIGHT.dp)
+            .clip(ButtonShape)
+            .background(ChoiceBackground)
+            .border(BorderWidth, PanelBorderBrush, ButtonShape),
     ) {
-        cards.forEach { card ->
-            when (card) {
-                ModCard.GRASS -> BetterGrassCard(grassMode, onGrassMode)
-                ModCard.FIRE_OVERLAY -> FireOverlayCard(fireHeight, onFireHeight, fireOpacity, onFireOpacity)
-                ModCard.SHIELD_HEIGHT -> ShieldHeightCard(shieldHeight, onShieldHeight)
-                ModCard.ITEM ->
-                    ItemPositionCard(itemOffsetX, itemOffsetY, itemOffsetZ, itemScale, onItemOffset, onItemScale)
-                ModCard.MOUNT -> MountOpacityCard(horseOpacity, onHorseOpacity)
-                ModCard.CAPES -> WaveyCapesCard(waveyCapes, onWaveyCapes)
-                ModCard.SKIN_LAYERS -> SkinLayersCard(skinLayers, onSkinLayers)
-                ModCard.GAMMA -> Unit
+        Column(Modifier.fillMaxSize().padding(CARD_PADDING.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OnboardingIcon(icon, TextPrimary, Modifier.size(22.dp))
+                OnboardingText(title, 17, color = TextPrimary, weight = FontWeight.Medium)
+            }
+            Spacer(Modifier.height(CARD_TITLE_GAP.dp))
+            preview()
+            Spacer(Modifier.height(CARD_DESC_GAP.dp))
+            OnboardingText(
+                description,
+                12,
+                Modifier.width(CARD_CONTENT_WIDTH.dp),
+                TextSecondary,
+                FontWeight.Light,
+                TextAlign.Start,
+            )
+            Spacer(Modifier.weight(1f))
+            Column(
+                Modifier.width(CARD_CONTENT_WIDTH.dp),
+                verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp),
+                content = controls,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CardLabel(label: String) {
+    OnboardingText(
+        label,
+        12,
+        Modifier.width(CARD_LABEL_WIDTH.dp),
+        TextSecondary,
+        FontWeight.Light,
+        TextAlign.Start,
+    )
+}
+
+@Composable
+private fun CardSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
+    Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
+        CardLabel(label)
+        Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+        OnboardingSlider(progress, CARD_SLIDER_WIDTH, onProgress)
+        Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+        Box(
+            Modifier.width(CARD_VALUE_WIDTH.dp).height(CARD_ROW_HEIGHT.dp).clip(ppShape(6.dp))
+                .background(ChoiceBackground).border(1.dp, PanelBorderBrush, ppShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) { OnboardingText(value, 12, color = TextPrimary, weight = FontWeight.Light) }
+    }
+}
+
+@Composable
+private fun CardChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = ppShape(6.dp)
+    Box(
+        Modifier
+            .size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp)
+            .clip(shape)
+            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
+            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, shape)
+            .clickableWithSound { if (!selected) onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        OnboardingText(label, 12, color = TextPrimary, weight = if (selected) FontWeight.Medium else FontWeight.Light)
+    }
+}
+
+@Composable
+private fun CardToggle(label: String, enabled: Boolean, onEnabled: (Boolean) -> Unit) {
+    Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
+        CardLabel(label)
+        Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+        CardChip("On", enabled) { onEnabled(true) }
+        Spacer(Modifier.width(CARD_CHIP_GAP.dp))
+        CardChip("Off", !enabled) { onEnabled(false) }
+    }
+}
+
+/**
+ * A dropdown for modes that are a list rather than a yes/no. Controls sit at the foot of the card,
+ * so the menu opens upward. It reserves the open menu's height up front and pins the closed row to
+ * the bottom of that box: the row never moves, and the menu stays inside its parent's bounds, which
+ * a negative offset would not — Compose does not hit-test children drawn outside their parent.
+ */
+@Composable
+private fun CardDropdown(label: String, options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val shape = ppShape(6.dp)
+    val menuHeight = options.size * CARD_MENU_ITEM_HEIGHT + CARD_MENU_PADDING * 2f
+    Box(Modifier.width(CARD_CONTENT_WIDTH.dp).height((menuHeight + CARD_MENU_GAP + CARD_ROW_HEIGHT).dp)) {
+        if (expanded) {
+            Column(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(CARD_DROPDOWN_WIDTH.dp, menuHeight.dp)
+                    .shadow(10.dp, shape, ambientColor = ShadowColor, spotColor = ShadowColor)
+                    .clip(shape)
+                    .background(MenuBackground)
+                    .border(BorderWidth, PanelBorderBrush, shape)
+                    .padding(vertical = CARD_MENU_PADDING.dp),
+            ) {
+                options.forEachIndexed { index, option ->
+                    CardMenuItem(option, index == selected) {
+                        if (index != selected) onSelect(index)
+                        expanded = false
+                    }
+                }
+            }
+        }
+        Row(
+            Modifier.align(Alignment.BottomStart).height(CARD_ROW_HEIGHT.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CardLabel(label)
+            Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+            Row(
+                Modifier
+                    .size(CARD_DROPDOWN_WIDTH.dp, CARD_ROW_HEIGHT.dp)
+                    .clip(shape)
+                    .background(if (expanded) Accent.asSelectedBackground else ChoiceBackground)
+                    .border(BorderWidth, if (expanded) SolidColor(Accent) else PanelBorderBrush, shape)
+                    .clickableWithSound { expanded = !expanded }
+                    .padding(horizontal = CARD_MENU_INSET.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OnboardingText(
+                    options.getOrElse(selected) { options.first() },
+                    12,
+                    Modifier.weight(1f),
+                    TextPrimary,
+                    FontWeight.Medium,
+                    TextAlign.Start,
+                )
+                OnboardingIcon(ONBOARDING_ASSETS + "chevron-selector.svg", TextSecondary, Modifier.size(13.dp))
             }
         }
     }
 }
 
-internal fun modPageCount(cards: Int): Int = (cards + MOD_CARDS_PER_PAGE - 1) / MOD_CARDS_PER_PAGE
-
-internal fun modPageRange(cards: Int, modPage: Int): IntRange {
-    val pageCount = modPageCount(cards)
-    if (pageCount == 0) return IntRange.EMPTY
-    return (cards * modPage / pageCount) until (cards * (modPage + 1) / pageCount)
+@Composable
+private fun CardMenuItem(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(CARD_MENU_ITEM_HEIGHT.dp)
+            .background(if (selected) Accent.asSelectedBackground else Color.Transparent)
+            .clickableWithSound(onClick)
+            .padding(horizontal = CARD_MENU_INSET.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OnboardingText(
+            label,
+            12,
+            Modifier.weight(1f),
+            TextPrimary,
+            if (selected) FontWeight.Medium else FontWeight.Light,
+            TextAlign.Start,
+        )
+        if (selected) OnboardingIcon(MAIN_MENU_ASSETS + "check.svg", Accent, Modifier.size(12.dp))
+    }
 }
 
 @Composable
-private fun ModCard(title: String, icon: String, content: @Composable ColumnScope.() -> Unit) {
-    Box(
-        Modifier
-            .size(MOD_CARD_WIDTH.dp, MOD_CARD_HEIGHT.dp)
-            .clip(ButtonShape)
-            .background(ChoiceBackground)
-            .border(BorderWidth, PanelBorderBrush, ButtonShape),
+private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit) {
+    Header("Continuing with", "Toggle Sprint")
+    Column(
+        Modifier.fillMaxSize().padding(top = CONTENT_TOP.dp, bottom = (PANEL_HEIGHT - CONTENT_BOTTOM).dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Column(Modifier.fillMaxSize().padding(MOD_CARD_PADDING.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OnboardingIcon(icon, TextPrimary, Modifier.size(18.dp))
-                OnboardingText(title, 15, color = TextPrimary, weight = FontWeight.Medium)
-            }
-            Spacer(Modifier.height(10.dp))
-            content()
+        OnboardingText(
+            "Turn sprinting into a toggle so you keep running after you let go of the key.",
+            13,
+            Modifier.width(460.dp),
+            TextSecondary,
+            FontWeight.Light,
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f) { onToggleSprint(true) }
+            ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f) { onToggleSprint(false) }
         }
     }
 }
 
 @Composable
 private fun BetterGrassCard(mode: Int, onMode: (Int) -> Unit) {
-    ModCard("Better Grass", MAIN_MENU_ASSETS + "minecraft-block.svg") {
-        BetterGrassPreview(mode)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            "Carry grass down the sides of blocks so slopes and terraces stop showing bare dirt.",
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
-        Column(verticalArrangement = Arrangement.spacedBy(MOD_CHIP_GAP.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(MOD_CHIP_GAP.dp)) {
-                ModeChip("Off", mode == 0) { onMode(0) }
-                ModeChip("Fastest", mode == 1) { onMode(1) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(MOD_CHIP_GAP.dp)) {
-                ModeChip("Fast", mode == 2) { onMode(2) }
-                ModeChip("Fancy", mode == 3) { onMode(3) }
-            }
-        }
+    ModCardFrame(
+        "Better Grass",
+        MAIN_MENU_ASSETS + "minecraft-block.svg",
+        "Carry grass down the sides of blocks so slopes and terraces stop showing bare dirt.",
+        { BetterGrassPreview(mode) },
+    ) {
+        CardDropdown("Mode", listOf("Off", "Fastest", "Fast", "Fancy"), mode, onMode)
     }
 }
 
@@ -701,32 +860,25 @@ private fun FireOverlayCard(
     opacity: Float,
     onOpacity: (Float) -> Unit,
 ) {
-    ModCard("Fire Overlay", ONBOARDING_ASSETS + "zap.svg") {
-        FireOverlayPreview(height, opacity)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            if (OnboardingFeatures.fireOverlayOpacityAvailable) {
-                "Push the flames down the screen and fade them so burning does not blind you."
-            } else {
-                "Push the flames down the screen so burning does not block your view."
-            },
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
+    ModCardFrame(
+        "Fire Overlay",
+        ONBOARDING_ASSETS + "zap.svg",
+        if (OnboardingFeatures.fireOverlayOpacityAvailable) {
+            "Push the flames down the screen and fade them so burning does not blind you."
+        } else {
+            "Push the flames down the screen so burning does not block your view."
+        },
+        { FireOverlayPreview(height, opacity) },
+    ) {
         val span = OnboardingFeatures.FIRE_OVERLAY_MAX - OnboardingFeatures.FIRE_OVERLAY_MIN
-        FireSlider(
+        CardSlider(
             "Height",
             ((height - OnboardingFeatures.FIRE_OVERLAY_MIN) / span).toFloat(),
             fireHeightLabel(height.toFloat()),
         ) { onHeight(OnboardingFeatures.FIRE_OVERLAY_MIN + it * span) }
         if (OnboardingFeatures.fireOverlayOpacityAvailable) {
-            Spacer(Modifier.height(MOD_CHIP_GAP.dp))
             val opacitySpan = OnboardingFeatures.FIRE_OPACITY_MAX - OnboardingFeatures.FIRE_OPACITY_MIN
-            FireSlider(
+            CardSlider(
                 "Fade",
                 (opacity - OnboardingFeatures.FIRE_OPACITY_MIN) / opacitySpan,
                 "%.0f%%".fmt(opacity),
@@ -737,20 +889,14 @@ private fun FireOverlayCard(
 
 @Composable
 private fun ShieldHeightCard(height: Float, onHeight: (Float) -> Unit) {
-    ModCard("Shield Height", MAIN_MENU_ASSETS + "key-01.svg") {
-        ShieldPreview(height)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            "Drop the raised shield down so it stops covering what you are looking at.",
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
+    ModCardFrame(
+        "Shield Height",
+        MAIN_MENU_ASSETS + "key-01.svg",
+        "Drop the raised shield down so it stops covering what you are looking at.",
+        { ShieldPreview(height) },
+    ) {
         val span = OnboardingFeatures.SHIELD_HEIGHT_MAX - OnboardingFeatures.SHIELD_HEIGHT_MIN
-        FireSlider(
+        CardSlider(
             "Height",
             (height - OnboardingFeatures.SHIELD_HEIGHT_MIN) / span,
             fireHeightLabel(height),
@@ -760,20 +906,14 @@ private fun ShieldHeightCard(height: Float, onHeight: (Float) -> Unit) {
 
 @Composable
 private fun MountOpacityCard(opacity: Float, onOpacity: (Float) -> Unit) {
-    ModCard("Mount Opacity", ONBOARDING_ASSETS + "compass.svg") {
-        HorsePreview(opacity)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            "Fade every mount you ride together so its head stays out of your way.",
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
+    ModCardFrame(
+        "Mount Opacity",
+        ONBOARDING_ASSETS + "compass.svg",
+        "Fade every mount you ride together so its head stays out of your way.",
+        { HorsePreview(opacity) },
+    ) {
         val span = OnboardingFeatures.HORSE_OPACITY_MAX - OnboardingFeatures.HORSE_OPACITY_MIN
-        FireSlider(
+        CardSlider(
             "Mounts",
             (opacity - OnboardingFeatures.HORSE_OPACITY_MIN) / span,
             "%.0f%%".fmt(opacity),
@@ -783,42 +923,65 @@ private fun MountOpacityCard(opacity: Float, onOpacity: (Float) -> Unit) {
 
 @Composable
 private fun WaveyCapesCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
-    ModCard("Wavey Capes", MAIN_MENU_ASSETS + "user-01.svg") {
-        CapePreview(enabled)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            "Simulate your cape so it swings and settles as you move instead of staying a flat board.",
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
-        OnOffChips(enabled, onEnabled)
+    ModCardFrame(
+        "Wavey Capes",
+        MAIN_MENU_ASSETS + "user-01.svg",
+        "Simulate your cape so it swings and settles as you move instead of staying a flat board.",
+        { CapePreview(enabled) },
+    ) {
+        CardToggle("Waving", enabled, onEnabled)
     }
 }
 
 @Composable
 private fun SkinLayersCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
-    ModCard("3D Skin Layers", MAIN_MENU_ASSETS + "image-01.svg") {
-        SkinLayersPreview(enabled)
-        Spacer(Modifier.height(MOD_DESC_GAP.dp))
-        OnboardingText(
-            "Lift every outer layer of your skin off the model at once so hats and jackets have depth.",
-            12,
-            Modifier.width(MOD_PREVIEW_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        Spacer(Modifier.weight(1f))
-        OnOffChips(enabled, onEnabled)
+    ModCardFrame(
+        "3D Skin Layers",
+        MAIN_MENU_ASSETS + "image-01.svg",
+        "Lift every outer layer of your skin off the model at once so hats and jackets have depth.",
+        { SkinLayersPreview(enabled) },
+    ) {
+        CardToggle("Depth", enabled, onEnabled)
     }
 }
 
 @Composable
-private fun FullbrightPage(
+private fun ItemPositionCard(
+    offsetX: Float,
+    offsetY: Float,
+    offsetZ: Float,
+    onOffset: (Float, Float, Float) -> Unit,
+    scale: Float,
+    onScale: (Float) -> Unit,
+) {
+    ModCardFrame(
+        "Item Position",
+        MAIN_MENU_ASSETS + "package-01.svg",
+        "Move the item in your hand out of the way, or pull it closer, without touching your FOV.",
+        { ItemPositionPreview(offsetX, offsetY, offsetZ, scale) },
+    ) {
+        CardOffsetSlider("Left/right", offsetX) { onOffset(it, offsetY, offsetZ) }
+        CardOffsetSlider("Up/down", offsetY) { onOffset(offsetX, it, offsetZ) }
+        CardOffsetSlider("Near/far", offsetZ) { onOffset(offsetX, offsetY, it) }
+        val scaleSpan = OnboardingFeatures.ITEM_SCALE_MAX - OnboardingFeatures.ITEM_SCALE_MIN
+        CardSlider(
+            "Size",
+            (scale - OnboardingFeatures.ITEM_SCALE_MIN) / scaleSpan,
+            "%.1f".fmt(scale),
+        ) { onScale(snapTo(OnboardingFeatures.ITEM_SCALE_MIN + it * scaleSpan, ITEM_SCALE_STEP)) }
+    }
+}
+
+@Composable
+private fun CardOffsetSlider(label: String, value: Float, onValue: (Float) -> Unit) {
+    val span = OnboardingFeatures.ITEM_OFFSET_MAX - OnboardingFeatures.ITEM_OFFSET_MIN
+    CardSlider(label, (value - OnboardingFeatures.ITEM_OFFSET_MIN) / span, "%.1f".fmt(value)) {
+        onValue(snapTo(OnboardingFeatures.ITEM_OFFSET_MIN + it * span, ITEM_OFFSET_STEP))
+    }
+}
+
+@Composable
+private fun FullbrightCard(
     gamma: Float,
     onGamma: (Float) -> Unit,
     toggled: Float,
@@ -826,65 +989,25 @@ private fun FullbrightPage(
     smooth: Boolean,
     onSmooth: (Boolean) -> Unit,
 ) {
-    Header("Continuing with", "Fullbright")
-    Box(Modifier.offset(FULLBRIGHT_LEFT.dp, FULLBRIGHT_TOP.dp)) {
-        GammaPreview(gamma, FULLBRIGHT_PREVIEW_WIDTH, FULLBRIGHT_PREVIEW_HEIGHT)
-    }
-    OnboardingText(
-        "Raise the brightness past vanilla's limit so caves and night stop hiding what is in front " +
-            "of you, and pick what the mod's toggle key jumps to.",
-        12,
-        Modifier.offset(FULLBRIGHT_LEFT.dp, (FULLBRIGHT_TOP + FULLBRIGHT_PREVIEW_HEIGHT + 14f).dp)
-            .width(FULLBRIGHT_PREVIEW_WIDTH.dp),
-        TextSecondary,
-        FontWeight.Light,
-        TextAlign.Start,
-    )
-    val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
-    Column(
-        Modifier.offset(FULLBRIGHT_COLUMN.dp, (FULLBRIGHT_TOP + 18f).dp),
-        verticalArrangement = Arrangement.spacedBy(FULLBRIGHT_ROW_GAP.dp),
+    ModCardFrame(
+        "Fullbright",
+        "assets/polyplus/ico/stars.svg",
+        "Raise the brightness past vanilla's limit so caves and night stop hiding what is in front of you.",
+        { GammaPreview(gamma) },
     ) {
-        PageSlider("Brightness", (gamma - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(gamma)) {
+        val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
+        CardSlider("Brightness", (gamma - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(gamma)) {
             onGamma(OnboardingFeatures.GAMMA_MIN + it * span)
         }
-        PageSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(toggled)) {
+        CardSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(toggled)) {
             onToggled(OnboardingFeatures.GAMMA_MIN + it * span)
         }
-        PageRow("Smooth fade") {
-            ModeChip("On", smooth) { onSmooth(true) }
-            Spacer(Modifier.width(MOD_CHIP_GAP.dp))
-            ModeChip("Off", !smooth) { onSmooth(false) }
+        CardToggle("Smooth", smooth, onSmooth)
+        Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
+            CardLabel("Toggle key")
+            Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+            ToggleKeyButton()
         }
-        PageRow("Toggle key") { ToggleKeyButton() }
-    }
-}
-
-@Composable
-private fun PageRow(label: String, content: @Composable RowScope.() -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OnboardingText(
-            label,
-            12,
-            Modifier.width(FULLBRIGHT_LABEL_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        content()
-    }
-}
-
-@Composable
-private fun PageSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
-    PageRow(label) {
-        OnboardingSlider(progress, FULLBRIGHT_SLIDER_WIDTH, onProgress)
-        Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier.width(MOD_VALUE_WIDTH.dp).height(24.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
-            contentAlignment = Alignment.Center,
-        ) { OnboardingText(value, 11, color = TextPrimary, weight = FontWeight.Light) }
     }
 }
 
@@ -897,9 +1020,9 @@ private fun ToggleKeyButton() {
     }
     val shape = ppShape(6.dp)
     Box(
-        Modifier.width(FULLBRIGHT_KEY_WIDTH.dp).height(26.dp).clip(shape)
+        Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp).clip(shape)
             .background(if (capturing) Accent.asSelectedBackground else ChoiceBackground)
-            .border(1.dp, if (capturing) SolidColor(Accent) else PanelBorderBrush, shape)
+            .border(BorderWidth, if (capturing) SolidColor(Accent) else PanelBorderBrush, shape)
             .clickableWithSound {
                 if (capturing) return@clickableWithSound
                 capturing = true
@@ -915,39 +1038,10 @@ private fun ToggleKeyButton() {
     ) {
         OnboardingText(
             if (capturing) "Press a key" else label,
-            11,
+            12,
             color = TextPrimary,
             weight = if (capturing) FontWeight.Medium else FontWeight.Light,
         )
-    }
-}
-
-@Composable
-private fun OnOffChips(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(MOD_CHIP_GAP.dp)) {
-        ModeChip("On", enabled) { onEnabled(true) }
-        ModeChip("Off", !enabled) { onEnabled(false) }
-    }
-}
-
-@Composable
-private fun FireSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OnboardingText(
-            label,
-            11,
-            Modifier.width(FIRE_LABEL_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        OnboardingSlider(progress, FIRE_SLIDER_WIDTH, onProgress)
-        Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier.width(MOD_VALUE_WIDTH.dp).height(24.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
-            contentAlignment = Alignment.Center,
-        ) { OnboardingText(value, 11, color = TextPrimary, weight = FontWeight.Light) }
     }
 }
 
@@ -959,82 +1053,7 @@ private fun Float.clampGamma(): Float =
 private fun fireHeightLabel(height: Float): String =
     if (height >= -0.001f) "Vanilla" else "%.2f".fmt(height)
 
-@Composable
-private fun ItemPositionCard(
-    offsetX: Float,
-    offsetY: Float,
-    offsetZ: Float,
-    scale: Float,
-    onOffset: (Float, Float, Float) -> Unit,
-    onScale: (Float) -> Unit,
-) {
-    ModCard("Item Position", MAIN_MENU_ASSETS + "package-01.svg") {
-        ItemPositionPreview(offsetX, offsetY, offsetZ, scale)
-        Spacer(Modifier.weight(1f))
-        OffsetSlider("X", offsetX) { onOffset(it, offsetY, offsetZ) }
-        Spacer(Modifier.height(MOD_CHIP_GAP.dp))
-        OffsetSlider("Y", offsetY) { onOffset(offsetX, it, offsetZ) }
-        Spacer(Modifier.height(MOD_CHIP_GAP.dp))
-        OffsetSlider("Z", offsetZ) { onOffset(offsetX, offsetY, it) }
-        Spacer(Modifier.height(MOD_CHIP_GAP.dp))
-        val scaleSpan = OnboardingFeatures.ITEM_SCALE_MAX - OnboardingFeatures.ITEM_SCALE_MIN
-        LabelledSlider(
-            "Size",
-            (scale - OnboardingFeatures.ITEM_SCALE_MIN) / scaleSpan,
-            "%.1f".fmt(scale),
-        ) { onScale(snapTo(OnboardingFeatures.ITEM_SCALE_MIN + it * scaleSpan, ITEM_SCALE_STEP)) }
-    }
-}
-
 private fun snapTo(value: Float, step: Float): Float = (value / step).roundToInt() * step
-
-@Composable
-private fun OffsetSlider(label: String, value: Float, onValue: (Float) -> Unit) {
-    val span = OnboardingFeatures.ITEM_OFFSET_MAX - OnboardingFeatures.ITEM_OFFSET_MIN
-    LabelledSlider(label, (value - OnboardingFeatures.ITEM_OFFSET_MIN) / span, "%.1f".fmt(value)) {
-        onValue(snapTo(OnboardingFeatures.ITEM_OFFSET_MIN + it * span, ITEM_OFFSET_STEP))
-    }
-}
-
-@Composable
-private fun LabelledSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OnboardingText(
-            label,
-            11,
-            Modifier.width(MOD_SLIDER_LABEL_WIDTH.dp),
-            TextSecondary,
-            FontWeight.Light,
-            TextAlign.Start,
-        )
-        OnboardingSlider(progress, MOD_ROW_SLIDER_WIDTH, onProgress)
-        Spacer(Modifier.width(6.dp))
-        OnboardingText(
-            value,
-            11,
-            Modifier.width(MOD_ROW_VALUE_WIDTH.dp),
-            TextPrimary,
-            FontWeight.Light,
-            TextAlign.End,
-        )
-    }
-}
-
-@Composable
-private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = ppShape(6.dp)
-    Box(
-        Modifier
-            .size(MOD_CHIP_WIDTH.dp, 26.dp)
-            .clip(shape)
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(1.dp, if (selected) SolidColor(Accent) else PanelBorderBrush, shape)
-            .clickableWithSound { if (!selected) onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        OnboardingText(label, 12, color = TextPrimary, weight = if (selected) FontWeight.Medium else FontWeight.Light)
-    }
-}
 
 @Composable
 private fun OnboardingSlider(progress: Float, width: Float, onProgress: (Float) -> Unit) {
@@ -1081,7 +1100,7 @@ private fun OnboardingSlider(progress: Float, width: Float, onProgress: (Float) 
             Modifier
                 .align(Alignment.CenterStart)
                 .offset {
-                    androidx.compose.ui.unit.IntOffset(
+                    IntOffset(
                         (animated * (trackWidthPx - thumbSize.toPx())).roundToInt(),
                         0,
                     )
@@ -1119,15 +1138,6 @@ private fun OptimizingPage() {
             TextSecondary,
             FontWeight.Light,
         )
-    }
-}
-
-@Composable
-private fun SprintSection(y: Float, toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit) {
-    SectionLabel("Toggle Sprint", y)
-    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f) { onToggleSprint(true) }
-        ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f) { onToggleSprint(false) }
     }
 }
 
@@ -1240,7 +1250,7 @@ private fun BlurStrengthSlider(motionBlur: Int, disabled: Boolean, onMotionBlur:
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset { androidx.compose.ui.unit.IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
+                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
                     .size(thumbSize)
                     .clip(ppShape(7.dp))
                     .background(TextPrimary),
@@ -1456,7 +1466,7 @@ private fun Checkerboard(modifier: Modifier) {
             var x = 0f
             var col = 0
             while (x < size.width) {
-                drawRect(if ((row + col) % 2 == 0) Color(0xFF666666) else Color(0xFF4A4A4A), androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Size(cell, cell))
+                drawRect(if ((row + col) % 2 == 0) Color(0xFF666666) else Color(0xFF4A4A4A), Offset(x, y), Size(cell, cell))
                 x += cell
                 col++
             }
@@ -1594,16 +1604,13 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
                 }
             }
         }
-        val caption = if (strength == 0) "Motion blur off" else "Maximum blur at this strength"
-        OnboardingText(caption, 13, Modifier.align(Alignment.Center), Color(0xBFFFFFFF), FontWeight.Light)
     }
 }
 
 @Composable
 private fun PreviewFrame(
-    caption: String,
-    width: Float = MOD_PREVIEW_WIDTH,
-    height: Float = MOD_PREVIEW_HEIGHT,
+    width: Float = CARD_CONTENT_WIDTH,
+    height: Float = CARD_PREVIEW_HEIGHT,
     draw: DrawScope.() -> Unit,
 ) {
     val shape = ppShape(6.dp)
@@ -1615,11 +1622,6 @@ private fun PreviewFrame(
             .border(1.dp, PanelBorderBrush, shape),
     ) {
         Canvas(Modifier.fillMaxSize(), draw)
-        Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(CAPTION_HEIGHT.dp)
-                .background(CaptionScrim),
-            contentAlignment = Alignment.Center,
-        ) { OnboardingText(caption, 11, color = Color(0xF2FFFFFF), weight = FontWeight.Light) }
     }
 }
 
@@ -1641,7 +1643,7 @@ private fun CapePreview(enabled: Boolean) {
     } else {
         still
     }
-    PreviewFrame(if (enabled) "Simulated and waving" else "Vanilla stiff cape") {
+    PreviewFrame {
         drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
     }
 }
@@ -1651,23 +1653,19 @@ private fun SkinLayersPreview(enabled: Boolean) {
     val on = remember { loadOnboardingImage(SKINLAYERS_ASSETS + "on.png") }
     val off = remember { loadOnboardingImage(SKINLAYERS_ASSETS + "off.png") }
     val shot = if (enabled) on else off
-    PreviewFrame(if (enabled) "Layers with depth" else "Flat layers") {
+    PreviewFrame {
         drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
     }
 }
 
 @Composable
-private fun GammaPreview(gamma: Float, width: Float, height: Float) {
+private fun GammaPreview(gamma: Float) {
     val (darkPath, brightPath) = gammaPreviewPaths
     val dark = remember { loadOnboardingImage(darkPath) }
     val bright = remember { loadOnboardingImage(brightPath) }
     val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
     val fade by animateFloatAsState((gamma - OnboardingFeatures.GAMMA_MIN) / span, animationSpec = spring())
-    PreviewFrame(
-        if (gamma <= OnboardingFeatures.GAMMA_MIN + 0.5f) "Vanilla brightest" else "%.0f%% brightness".fmt(gamma),
-        width,
-        height,
-    ) {
+    PreviewFrame {
         drawIntoCanvas { canvas ->
             val skia = canvas.skiaCanvas
             dark?.let { skia.drawCover(it, size.width, size.height) }
@@ -1675,13 +1673,6 @@ private fun GammaPreview(gamma: Float, width: Float, height: Float) {
             skia.drawCover(lit, size.width, size.height, fade)
         }
     }
-}
-
-private fun betterGrassCaption(mode: Int): String = when (mode) {
-    OnboardingFeatures.BETTER_GRASS_OFF -> "Bare dirt sides"
-    OnboardingFeatures.BETTER_GRASS_FASTEST -> "Grass on every side"
-    OnboardingFeatures.BETTER_GRASS_FANCY -> "Blended grass edges"
-    else -> "Grass where terrain steps down"
 }
 
 internal fun betterGrassPreviewPath(mode: String): String = GRASS_ASSETS + "grass-${mode.lowercase()}.png"
@@ -1694,7 +1685,7 @@ private fun BetterGrassPreview(mode: Int) {
         OnboardingFeatures.BETTER_GRASS_MODES.map { loadOnboardingImage(betterGrassPreviewPath(it)) }
     }
     val shot = shots.getOrNull(mode)
-    PreviewFrame(betterGrassCaption(mode)) {
+    PreviewFrame {
         drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
     }
 }
@@ -1705,9 +1696,7 @@ private fun FireOverlayPreview(height: Double, opacity: Float) {
     val scene = remember { loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png") }
     val shift by animateFloatAsState((-height).toFloat(), animationSpec = spring())
     val fade by animateFloatAsState(opacity / OnboardingFeatures.FIRE_OPACITY_MAX, animationSpec = spring())
-    PreviewFrame(
-        if (height >= OnboardingFeatures.FIRE_OVERLAY_MAX - 0.001) "Vanilla height" else "Lowered %.2f".fmt(height),
-    ) {
+    PreviewFrame {
         drawIntoCanvas { canvas -> scene?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
         drawRect(SceneShade)
         val flames = fire ?: return@PreviewFrame
@@ -1736,9 +1725,7 @@ private fun HorsePreview(opacity: Float) {
         opacity / OnboardingFeatures.HORSE_OPACITY_MAX,
         animationSpec = spring(),
     )
-    PreviewFrame(
-        if (opacity >= OnboardingFeatures.HORSE_OPACITY_MAX - 0.5f) "Solid" else "%.0f%% opaque".fmt(opacity),
-    ) {
+    PreviewFrame {
         drawIntoCanvas { canvas ->
             val skia = canvas.skiaCanvas
             scene?.let { skia.drawCover(it, size.width, size.height) }
@@ -1755,7 +1742,7 @@ private fun ShieldPreview(height: Float) {
     }
     val shield = remember { loadOnboardingImage(SHIELD_ASSETS + SHIELD_LAYER) }
     val drop by animateFloatAsState(-height, animationSpec = spring())
-    PreviewFrame(fireHeightLabel(height).let { if (it == "Vanilla") "Vanilla height" else "Lowered $it" }) {
+    PreviewFrame {
         drawIntoCanvas { canvas ->
             val skia = canvas.skiaCanvas
             scene?.let { skia.drawCover(it, size.width, size.height) }
@@ -1776,12 +1763,7 @@ private fun ItemPositionPreview(offsetX: Float, offsetY: Float, offsetZ: Float, 
     val y by animateFloatAsState(offsetY, animationSpec = spring())
     val z by animateFloatAsState(offsetZ, animationSpec = spring())
     val itemScale by animateFloatAsState(scale, animationSpec = spring())
-    val caption = if (isDefaultItemPosition(offsetX, offsetY, offsetZ, scale)) {
-        "Default position"
-    } else {
-        "X %.1f  Y %.1f  Z %.1f  ×%.1f".fmt(offsetX, offsetY, offsetZ, scale)
-    }
-    PreviewFrame(caption) {
+    PreviewFrame {
         drawIntoCanvas { canvas ->
             val skia = canvas.skiaCanvas
             scene?.let { skia.drawCover(it, size.width, size.height) }
@@ -1789,9 +1771,6 @@ private fun ItemPositionPreview(offsetX: Float, offsetY: Float, offsetZ: Float, 
         }
     }
 }
-
-private fun isDefaultItemPosition(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float): Boolean =
-    offsetX == 0f && offsetY == 0f && offsetZ == 0f && scale == 1f
 
 private fun buildItemFaces(image: SkiaImage): List<ItemFace> {
     val bitmap = runCatching { Bitmap.makeFromImage(image) }.getOrNull() ?: return emptyList()
@@ -2141,12 +2120,22 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
 
 internal object OnboardingKeyCapture {
     @Volatile
-    var pending: ((com.mojang.blaze3d.platform.InputConstants.Key?) -> Unit)? = null
+    var pending: ((InputConstants.Key?) -> Unit)? = null
 }
 
 private const val ESCAPE_KEY = 256
 
-private enum class OnboardingPage { TERMS, LOOK_AND_FEEL, MODS, MODS_MORE, FULLBRIGHT, MOTION_BLUR, COSMETICS, DONE }
+private sealed interface OnboardingStep {
+    data object Terms : OnboardingStep
+    data object LookAndFeel : OnboardingStep
+    data object Sprint : OnboardingStep
+
+    data class Mods(val cards: List<ModCard>) : OnboardingStep
+
+    data object MotionBlur : OnboardingStep
+    data object Cosmetics : OnboardingStep
+    data object Done : OnboardingStep
+}
 
 private class ModReads(
     val grass: Int?,
@@ -2234,19 +2223,32 @@ private const val CONTENT_TOP = 140f
 private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
 private const val LABEL_HEIGHT = 32f
-private const val SPRINT_SECTION_HEIGHT = LABEL_HEIGHT + 32f
-
-private const val MOD_CARD_WIDTH = 240f
-private const val MOD_CARD_HEIGHT = 300f
-private const val MOD_CARD_GAP = 18f
-private const val MOD_CARD_PADDING = 16f
-private const val MOD_PREVIEW_WIDTH = MOD_CARD_WIDTH - MOD_CARD_PADDING * 2f
-private const val MOD_PREVIEW_HEIGHT = 104f
-private const val MOD_CHIP_GAP = 6f
-private const val MOD_DESC_GAP = 10f
-private const val MOD_SLIDER_LABEL_WIDTH = 28f
-private const val MOD_ROW_VALUE_WIDTH = 24f
-private const val MOD_ROW_SLIDER_WIDTH = MOD_PREVIEW_WIDTH - MOD_SLIDER_LABEL_WIDTH - MOD_ROW_VALUE_WIDTH - 6f
+private const val MOD_CARDS_PER_PAGE = 2
+private const val CARD_MARGIN = 48f
+private const val CARD_GAP = 24f
+private const val CARD_WIDTH = (PANEL_WIDTH - CARD_MARGIN * 2f - CARD_GAP) / MOD_CARDS_PER_PAGE
+private const val CARD_TOP = 134f
+private const val CARD_HEIGHT = 430f
+private const val CARD_PADDING = 20f
+private const val CARD_CONTENT_WIDTH = CARD_WIDTH - CARD_PADDING * 2f
+private const val CARD_PREVIEW_HEIGHT = 150f
+private const val CARD_TITLE_GAP = 12f
+private const val CARD_DESC_GAP = 12f
+private const val CARD_ROW_GAP = 6f
+private const val CARD_ROW_HEIGHT = 28f
+private const val CARD_ROW_GUTTER = 8f
+private const val CARD_LABEL_WIDTH = 78f
+private const val CARD_VALUE_WIDTH = 62f
+private const val CARD_SLIDER_WIDTH =
+    CARD_CONTENT_WIDTH - CARD_LABEL_WIDTH - CARD_VALUE_WIDTH - CARD_ROW_GUTTER * 2f
+private const val CARD_DROPDOWN_WIDTH = CARD_CONTENT_WIDTH - CARD_LABEL_WIDTH - CARD_ROW_GUTTER
+private const val CARD_MENU_ITEM_HEIGHT = 26f
+private const val CARD_MENU_PADDING = 5f
+private const val CARD_MENU_INSET = 10f
+private const val CARD_MENU_GAP = 6f
+private const val CARD_CHIP_GAP = 8f
+private const val CARD_CHIP_WIDTH =
+    (CARD_CONTENT_WIDTH - CARD_LABEL_WIDTH - CARD_ROW_GUTTER - CARD_CHIP_GAP) / 2f
 private const val ITEM_OFFSET_STEP = 0.5f
 private const val ITEM_SCALE_STEP = 0.1f
 
@@ -2264,26 +2266,9 @@ private const val PROJ_F = 1.4281480f
 private const val PROJ_ASPECT = 3024f / 1898f
 private const val FRAME_Y_SCALE = 1898f / 1512f
 private const val FRAME_Y_OFFSET = 156f / 1512f
-private const val FULLBRIGHT_TOP = 172f
-private const val FULLBRIGHT_LEFT = 48f
-private const val FULLBRIGHT_COLUMN = 496f
-private const val FULLBRIGHT_PREVIEW_WIDTH = 420f
-private const val FULLBRIGHT_PREVIEW_HEIGHT = 260f
-private const val FULLBRIGHT_LABEL_WIDTH = 104f
-private const val FULLBRIGHT_SLIDER_WIDTH = 150f
-private const val FULLBRIGHT_KEY_WIDTH = 120f
-private const val FULLBRIGHT_ROW_GAP = 45f
-private const val MOD_CHIP_WIDTH = (MOD_PREVIEW_WIDTH - MOD_CHIP_GAP) / 2f
-private const val MOD_VALUE_WIDTH = 58f
-private const val MOD_CARDS_PER_PAGE = 3
-private const val FIRE_LABEL_WIDTH = 38f
-private const val FIRE_SLIDER_WIDTH = MOD_PREVIEW_WIDTH - FIRE_LABEL_WIDTH - MOD_VALUE_WIDTH - 8f
-
 private const val CAPE_WAVE_FRAMES = 8
 private const val CAPE_WAVE_LOOP_MS = 1080
 
-private const val CAPTION_HEIGHT = 17f
-private val CaptionScrim = Color(0xA6000000)
 private const val FIRE_QUAD_OFFSET = 0.12f
 private const val FIRE_BASELINE = 0.3f
 private const val FIRE_ALPHA = 0xCC
@@ -2345,6 +2330,8 @@ private val ShadowColor = Color(0x26000000)
 
 private val ChoiceBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
+private val MenuBackground: Color
+    @Composable get() = LocalTheme.current.componentBackground
 private val TextPrimary: Color
     @Composable get() = LocalTheme.current.textColor
 private val TextSecondary: Color
@@ -2362,8 +2349,8 @@ private val ImpactHeavy = Color(0xFFE8836B)
 private val PanelBorderBrush: Brush = object : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val radians = Math.toRadians(PanelBorderAngleDeg)
-        val ux = kotlin.math.cos(radians).toFloat()
-        val uy = kotlin.math.sin(radians).toFloat()
+        val ux = cos(radians).toFloat()
+        val uy = sin(radians).toFloat()
         val len = size.width * ux + size.height * uy
         return LinearGradientShader(
             from = Offset.Zero,

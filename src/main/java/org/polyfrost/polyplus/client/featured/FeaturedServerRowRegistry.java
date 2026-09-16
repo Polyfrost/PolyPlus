@@ -3,7 +3,6 @@ package org.polyfrost.polyplus.client.featured;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.multiplayer.ServerData;
-
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.WeakHashMap;

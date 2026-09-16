@@ -1,17 +1,5 @@
 package org.polyfrost.polyplus.client.network.p2p
 
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
@@ -31,10 +19,11 @@ import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
 import org.polyfrost.polyplus.client.network.eos.EosTickHealth
+import org.polyfrost.polyplus.client.network.http.AccountApi
 import org.polyfrost.polyplus.client.network.http.SessionsApi
-import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
+import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
@@ -42,7 +31,20 @@ import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 object P2PSessionManager : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()
@@ -136,7 +138,7 @@ object P2PSessionManager : EarlyInitializable {
                     }.onFailure { LOGGER.error("Starting EOS failed; P2P hosting/joining is unavailable", it) }
                         .getOrNull()
                     if (started == null) {
-                        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { candidate.shutdown() }
+                        withContext(NonCancellable + Dispatchers.IO) { candidate.shutdown() }
                     }
 
                     val abandoned = synchronized(consentLock) {
@@ -320,7 +322,7 @@ object P2PSessionManager : EarlyInitializable {
             }.onFailure { LOGGER.error("Could not restart EOS after a stall", it) }.getOrNull()
 
             if (started == null) {
-                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { candidate.shutdown() }
+                withContext(NonCancellable + Dispatchers.IO) { candidate.shutdown() }
             }
 
             val abandoned = synchronized(consentLock) {
@@ -387,7 +389,7 @@ object P2PSessionManager : EarlyInitializable {
         }
 
         if (user != null) {
-            org.polyfrost.polyplus.client.network.http.AccountApi.linkPuid(user.raw)
+            AccountApi.linkPuid(user.raw)
                 .onSuccess { if (isCurrent(bridge)) _status.value = EosStatus.Ready }
                 .onFailure {
                     LOGGER.error("Failed to link EOS ProductUserId with the backend", it)

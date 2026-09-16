@@ -5,14 +5,6 @@ import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.async
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.BackendUrl
@@ -25,6 +17,14 @@ import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.UUID
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalAtomicApi::class)
 object PolyAuthorization {

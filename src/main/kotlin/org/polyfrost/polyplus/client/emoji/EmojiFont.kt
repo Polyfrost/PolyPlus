@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.emoji
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.resources.Identifier
+
 //? if >= 1.21.10 {
 import net.minecraft.network.chat.FontDescription
 //?}

@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.utils
 
+import org.polyfrost.polyplus.client.PolyPlusClient
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import org.polyfrost.polyplus.client.PolyPlusClient
-import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 
 class HashManager(val file: File) {
     @Volatile

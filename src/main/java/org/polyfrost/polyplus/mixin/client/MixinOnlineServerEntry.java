@@ -1,18 +1,9 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-//? if >= 26.1 {
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-//?} else {
-/*import net.minecraft.client.gui.GuiGraphics;
-*///?}
-//? if >= 1.21.10 {
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-//?}
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
 import org.polyfrost.polyplus.client.featured.FeaturedServerVanillaRenderer;
@@ -24,6 +15,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics;
+*///?}
 
 @Mixin(ServerSelectionList.OnlineServerEntry.class)
 public abstract class MixinOnlineServerEntry {
@@ -134,7 +138,7 @@ public abstract class MixinOnlineServerEntry {
     private void polyplus$mouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+        if (button != InputConstants.MOUSE_BUTTON_LEFT) {
             cir.setReturnValue(false);
             return;
         }
@@ -151,7 +155,7 @@ public abstract class MixinOnlineServerEntry {
     private void polyplus$keyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        if (!row.header() && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+        if (!row.header() && (keyCode == InputConstants.KEY_RETURN || keyCode == InputConstants.KEY_NUMPADENTER)) {
             row.screen().joinSelectedServer();
             cir.setReturnValue(true);
         } else {
@@ -163,7 +167,7 @@ public abstract class MixinOnlineServerEntry {
     private void polyplus$mouseClicked(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+        if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) {
             cir.setReturnValue(false);
             return;
         }

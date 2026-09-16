@@ -2,10 +2,10 @@ package org.polyfrost.polyplus.mixin.compat.voicechat;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import java.net.SocketAddress;
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import java.net.SocketAddress;
 
 @Pseudo
 @Mixin(targets = "de.maxhenkel.voicechat.voice.client.ClientManager", remap = false)

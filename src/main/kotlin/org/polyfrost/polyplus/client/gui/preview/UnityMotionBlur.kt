@@ -3,13 +3,13 @@ package org.polyfrost.polyplus.client.gui.preview
 import androidx.compose.ui.geometry.Offset
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Canvas
+import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Image as SkiaImage
 
 object UnityMotionBlur {
     private const val MAX_BLUR = 0.08f

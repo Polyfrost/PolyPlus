@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.compat
 
-import java.lang.reflect.Method
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
+import java.lang.reflect.Method
 
 internal object ChattingButtonRow {
 

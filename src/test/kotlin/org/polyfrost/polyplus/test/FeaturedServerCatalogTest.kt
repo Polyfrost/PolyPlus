@@ -1,19 +1,21 @@
 package org.polyfrost.polyplus.test
 
-import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.polyfrost.polyplus.client.featured.FeaturedServerCatalogCodec
 import org.polyfrost.polyplus.client.featured.FeaturedServerCachePolicy
+import org.polyfrost.polyplus.client.featured.FeaturedServerCatalogCodec
 import org.polyfrost.polyplus.client.featured.FeaturedServerColors
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.FeaturedServersSnapshot
 import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.featured.OutlineStyle
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
+import java.time.Instant
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 
 class FeaturedServerCatalogTest {
     @Test
@@ -76,7 +78,7 @@ class FeaturedServerCatalogTest {
               {"id":"c","name":"C","address":"c.example","outline_color":"#ffffff","featured":{"campaign_id":"three","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"C","description":"C","cta_label":"Play"}}
             ]}""",
         )
-        val now = java.time.Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
         val snapshot = FeaturedServersSnapshot(
             decoded.servers,
             mainMenuDismissedCampaignIds = setOf("one"),
@@ -108,7 +110,7 @@ class FeaturedServerCatalogTest {
         assertTrue(fallback.dismissibleInMainMenu)
         assertTrue(fallback.dismissibleInServerList)
 
-        val now = java.time.Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
         val snapshot = FeaturedServersSnapshot(
             decoded.servers,
             multiplayerDismissedCampaignIds = setOf("sticky", "default"),
@@ -131,7 +133,7 @@ class FeaturedServerCatalogTest {
               {"id":"closable","name":"Closable","address":"closable.example","outline_color":"none","featured":{"campaign_id":"closable","starts_at":"2026-01-01T00:00:00Z","ends_at":"2027-01-01T00:00:00Z","title":"Closable","description":"Closable","cta_label":"Play now"}}
             ]}""",
         )
-        val now = java.time.Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-09-05T00:00:00Z").toEpochMilli()
         val snapshot = FeaturedServersSnapshot(
             decoded.servers,
             mainMenuDismissedCampaignIds = setOf("sticky", "closable"),
@@ -167,7 +169,7 @@ class FeaturedServerCatalogTest {
         assertFalse(start == FeaturedServerColors.rainbowAt(0.25f, 0L))
         assertFalse(start == FeaturedServerColors.rainbowAt(0f, 1_000L))
         assertEquals(0x00000000, FeaturedServerColors.colorAt(OutlineStyle.None, 0f, 0L))
-        assertEquals(FeaturedServerColors.FALLBACK_ARGB, FeaturedServerColors.colorAt(OutlineStyle.Unsupported(kotlinx.serialization.json.JsonNull), 0f, 0L))
+        assertEquals(FeaturedServerColors.FALLBACK_ARGB, FeaturedServerColors.colorAt(OutlineStyle.Unsupported(JsonNull), 0f, 0L))
     }
 
     @Test

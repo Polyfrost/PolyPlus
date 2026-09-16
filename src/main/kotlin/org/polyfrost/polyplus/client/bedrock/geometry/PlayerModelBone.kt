@@ -1,12 +1,14 @@
 package org.polyfrost.polyplus.client.bedrock.geometry
 
-import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.model.geom.ModelPart
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
-import org.polyfrost.polyplus.client.bedrock.BedrockConstants
-//? if < 1.21.4
-//import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess
 import org.joml.Vector3f
+import org.polyfrost.polyplus.client.bedrock.BedrockConstants
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if = 1.21.1 {
+/*import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess
+*///?}
 
 enum class PlayerModelBone(val serializedName: String) {
     ROOT("root"),

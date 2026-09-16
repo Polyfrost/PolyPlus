@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
-import org.polyfrost.polyplus.client.render.NativeImage
+//? if >= 1.21.11 {
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -9,8 +9,6 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.userAgent
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
@@ -23,6 +21,7 @@ import org.polyfrost.polyplus.client.gui.MenuPanorama
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen
 import org.polyfrost.polyplus.client.gui.mainMenuPanoramaEnabled
+import org.polyfrost.polyplus.client.render.NativeImage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -32,6 +31,9 @@ import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+//?}
 
 private class PanoramaPack(val cacheKey: String, val url: String, val sha1: String)
 

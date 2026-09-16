@@ -7,13 +7,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
 //? if >= 26.2 {
 import net.minecraft.CrashReportDetail;
-//?} else {
+//?}
+
+//? if < 26.2 {
 /*import java.util.function.Supplier;
 *///?}
 

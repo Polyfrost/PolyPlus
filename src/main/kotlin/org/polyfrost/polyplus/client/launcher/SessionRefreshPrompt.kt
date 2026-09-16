@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.launcher
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SessionRefreshPrompt internal constructor() {
     private enum class Stage { IDLE, REFRESHING, RECONNECTING, FAILED }

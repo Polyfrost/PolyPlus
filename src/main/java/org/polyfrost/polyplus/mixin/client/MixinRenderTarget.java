@@ -1,14 +1,15 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.minecraft.client.Minecraft;
-//? if >= 26.1 && < 26.2 {
-/*import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
-*///?}
 import org.spongepowered.asm.mixin.Mixin;
+
+//? if = 26.1 {
+/*import net.minecraft.client.Minecraft;
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+*///?}
 
 @Mixin(RenderTarget.class)
 public class MixinRenderTarget {

@@ -1,15 +1,16 @@
 package org.polyfrost.polyplus.mixin.client;
 
-//? if >= 26.2 {
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
-//?}
 import net.minecraft.client.Minecraft;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+//? if >= 26.2 {
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
+//?}
 
 @Mixin(value = Minecraft.class, priority = 1500)
 public class MixinMinecraft {
@@ -23,7 +24,11 @@ public class MixinMinecraft {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
+            //? if >= 26.3 {
+            target = "Lcom/mojang/renderpearl/api/device/GpuSurface;blitFromTexture(Lcom/mojang/renderpearl/api/commands/CommandEncoder;Lcom/mojang/renderpearl/api/textures/GpuTextureView;)V"
+            //?} else {
+            /*target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
+            *///?}
         )
     )
     private void polyplus$renderPreviewOverlay(CallbackInfo ci) {

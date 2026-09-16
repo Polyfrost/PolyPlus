@@ -8,8 +8,8 @@ import io.ktor.http.contentType
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.network.http.postBodyAuthorized
 import org.polyfrost.polyplus.client.network.http.getBodyAuthorized
+import org.polyfrost.polyplus.client.network.http.postBodyAuthorized
 import org.polyfrost.polyplus.client.network.http.responses.CreateCheckoutRequest
 import org.polyfrost.polyplus.client.network.http.responses.CreateCheckoutResponse
 import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo

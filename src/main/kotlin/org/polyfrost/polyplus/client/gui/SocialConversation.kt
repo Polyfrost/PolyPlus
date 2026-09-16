@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,14 +25,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
@@ -50,6 +55,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun ConversationView(
@@ -217,11 +223,11 @@ private fun ConversationHeader(
             Box {
                 SocialIconButton(SOCIAL_ASSETS + "dots-vertical.svg", tooltip = "Group options", onClick = { menuOpen = !menuOpen })
                 if (menuOpen) {
-                    androidx.compose.ui.window.Popup(
+                    Popup(
                         alignment = Alignment.TopEnd,
-                        offset = androidx.compose.ui.unit.IntOffset(0, 44),
+                        offset = IntOffset(0, 44),
                         onDismissRequest = { menuOpen = false },
-                        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+                        properties = PopupProperties(focusable = true),
                     ) {
                         GroupOverflowMenu(
                             onInvite = { menuOpen = false; onInvite() },
@@ -276,9 +282,9 @@ private fun GroupOverflowMenu(
 }
 
 @Composable
-private fun OverflowMenuItem(icon: String, label: String, color: androidx.compose.ui.graphics.Color = SocialTextPrimary, onClick: () -> Unit) {
+private fun OverflowMenuItem(icon: String, label: String, color: Color = SocialTextPrimary, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
-    val background by androidx.compose.animation.animateColorAsState(if (hovered) SocialHoverOverlay else androidx.compose.ui.graphics.Color.Transparent)
+    val background by animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -394,7 +400,7 @@ private fun MessageBubble(
                     SocialText(
                         PlayerNamesRepository.displayName(message.sender),
                         fontSize = 12.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                     )
                 }
@@ -411,7 +417,7 @@ private fun MessageBubble(
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                SocialEmojiText(message.content, fontSize = 14.sp, color = if (outgoing) androidx.compose.ui.graphics.Color.White else SocialTextPrimary)
+                SocialEmojiText(message.content, fontSize = 14.sp, color = if (outgoing) Color.White else SocialTextPrimary)
             }
         }
     }

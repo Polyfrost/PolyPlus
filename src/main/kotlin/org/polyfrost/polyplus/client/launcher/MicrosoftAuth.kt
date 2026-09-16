@@ -17,6 +17,20 @@ import io.ktor.http.Parameters
 import io.ktor.http.contentType
 import io.ktor.http.formUrlEncode
 import io.ktor.http.isSuccess
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.URLDecoder
+import java.nio.channels.UnresolvedAddressException
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.time.Instant
+import java.util.Base64
+import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -31,19 +45,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusClient
-import java.io.IOException
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.time.Instant
-import java.util.Base64
-import java.util.UUID
-import kotlin.time.Duration.Companion.seconds
 
 object MicrosoftAuth {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -178,7 +179,7 @@ object MicrosoftAuth {
             }
         } catch (e: IOException) {
             throw MicrosoftAuthErrors.network(e)
-        } catch (e: java.nio.channels.UnresolvedAddressException) {
+        } catch (e: UnresolvedAddressException) {
             throw MicrosoftAuthErrors.network(e)
         }
         if (!response.status.isSuccess()) {
@@ -203,7 +204,7 @@ object MicrosoftAuth {
             }
         } catch (e: IOException) {
             throw MicrosoftAuthErrors.network(e)
-        } catch (e: java.nio.channels.UnresolvedAddressException) {
+        } catch (e: UnresolvedAddressException) {
             throw MicrosoftAuthErrors.network(e)
         }
         if (!response.status.isSuccess()) {
@@ -238,7 +239,7 @@ object MicrosoftAuth {
                 }
             } catch (e: IOException) {
                 throw MicrosoftAuthErrors.network(e)
-            } catch (e: java.nio.channels.UnresolvedAddressException) {
+            } catch (e: UnresolvedAddressException) {
                 throw MicrosoftAuthErrors.network(e)
             }
             if (response.status.isSuccess()) {

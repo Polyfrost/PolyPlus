@@ -2,12 +2,12 @@ package org.polyfrost.polyplus.client.resourcepack
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 
 object PackHttpBridge {
     private val LOGGER = LogManager.getLogger("PolyPlus/PackBridge")

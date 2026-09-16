@@ -1,5 +1,8 @@
 package org.polyfrost.polyplus.client.social
 
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.http.GroupsApi
+import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -8,9 +11,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.network.http.GroupsApi
-import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 
 object SpecialChatResponses {
     enum class Filter { All, Responded, Awaiting }

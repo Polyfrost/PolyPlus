@@ -14,6 +14,7 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
 
 object PolyPlusCrashLogUploader {
     private const val MAX_ATTACHMENT_BYTES = 512 * 1024
@@ -160,7 +161,7 @@ object PolyPlusCrashLogUploader {
         return handled.any {
             it.throwableClass == throwableClass &&
                 it.topFrame == topFrame &&
-                kotlin.math.abs(it.at - fileTime) <= LIVE_MATCH_WINDOW_MS
+                abs(it.at - fileTime) <= LIVE_MATCH_WINDOW_MS
         }
     }
 

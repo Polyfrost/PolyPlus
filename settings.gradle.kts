@@ -42,9 +42,9 @@ dependencyResolutionManagement {
 
 stonecutter.create(rootProject) {
     // Per-version dependencies live in stonecutter.properties.toml
-    val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2")
+    val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2", "26.3")
     versions(mcVersions.associateBy { "$it-fabric" })
-    vcsVersion = "26.2-fabric"
+    vcsVersion = "26.3-fabric"
 }
 
 rootProject.name = "PolyPlus"

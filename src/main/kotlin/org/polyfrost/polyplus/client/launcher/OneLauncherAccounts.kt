@@ -2,6 +2,8 @@ package org.polyfrost.polyplus.client.launcher
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 object OneLauncherAccounts {
@@ -120,7 +122,7 @@ object OneLauncherAccounts {
         val account = LauncherAccountStore.StoredAccount(
             id = offlineUuid(username).toString(),
             username = username,
-            expires = java.time.Instant.now().plus(java.time.Duration.ofDays(3650)).toString(),
+            expires = Instant.now().plus(Duration.ofDays(3650)).toString(),
             kind = "offline",
         )
 

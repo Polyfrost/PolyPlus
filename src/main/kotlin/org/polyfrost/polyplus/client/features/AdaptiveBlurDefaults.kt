@@ -11,6 +11,7 @@ import org.polyfrost.oneconfig.api.event.v1.events.FramebufferRenderEvent
 import org.polyfrost.oneconfig.api.event.v1.events.MainMenuFpsEvent
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object AdaptiveBlurDefaults {
     private val logger = LogManager.getLogger("PolyPlus/AdaptiveBlur")
@@ -151,7 +152,7 @@ object AdaptiveBlurDefaults {
     }
 
     private fun refreshRate(): Int = runCatching {
-        Minecraft.getInstance().window.refreshRate.takeIf { it > 0 } ?: FALLBACK_REFRESH_RATE
+        ClientPlatform.monitorRefreshRate().takeIf { it > 0 } ?: FALLBACK_REFRESH_RATE
     }.getOrDefault(FALLBACK_REFRESH_RATE)
 
     private fun polyBlurInstance(): Any? = runCatching {

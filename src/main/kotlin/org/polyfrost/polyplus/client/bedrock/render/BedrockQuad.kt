@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import org.polyfrost.polyplus.client.render.Pose
-import org.polyfrost.polyplus.client.render.VertexConsumer
 import org.joml.Matrix4fc
 import org.joml.Vector3f
+import org.polyfrost.polyplus.client.render.Pose
+import org.polyfrost.polyplus.client.render.VertexConsumer
 
 data class BedrockMeshVertex(
     val x: Float,

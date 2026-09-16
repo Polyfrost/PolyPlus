@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.emoji
 
-import kotlinx.serialization.Serializable
 import net.minecraft.client.Minecraft
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
+import kotlinx.serialization.Serializable
 
 object EmojiRecents {
     private const val MAX = 18

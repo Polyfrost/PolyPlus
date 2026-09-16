@@ -4,15 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.http.PlayersApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.network.http.PlayersApi
 
 object PlayerNamesRepository {
     private val LOGGER = LogManager.getLogger()

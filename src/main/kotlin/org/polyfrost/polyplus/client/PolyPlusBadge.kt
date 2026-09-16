@@ -1,30 +1,33 @@
 package org.polyfrost.polyplus.client
 
-import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.Style
-import net.minecraft.resources.Identifier
-//? if >= 1.21.10 {
-import net.minecraft.network.chat.FontDescription
-//?}
-//? if >= 1.21.1 {
 import com.mojang.authlib.GameProfile
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.PlayerInfo
-//?}
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Style
+import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import java.util.UUID
+
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
-//? if >= 1.21.1 && < 26.1 {
-/*import net.minecraft.client.gui.GuiGraphics
-*///?}
+
+//? if >= 1.21.10 {
+import net.minecraft.network.chat.FontDescription
+//?}
+
 //? if >= 1.21.8 {
 import net.minecraft.client.renderer.RenderPipelines
 //?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
 //? if >= 1.21.4 && < 1.21.8 {
 /*import net.minecraft.client.renderer.RenderType
 *///?}
-import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
-import java.util.UUID
 
 object PolyPlusBadge {
     private val FONT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "badge")

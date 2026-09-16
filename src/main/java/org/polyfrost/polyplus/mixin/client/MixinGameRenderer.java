@@ -1,20 +1,28 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-//? if >= 26.1 {
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.renderer.state.gui.GuiRenderState;
-//?}
 import net.minecraft.client.renderer.GameRenderer;
-import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreenKt;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+
+//? if >= 26.2 {
+import net.minecraft.util.ARGB;
+//?}
+
+//? if >= 26.1 {
+import net.minecraft.client.renderer.state.gui.GuiRenderState;
+import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+//?}
+
+//? if >= 26.1 && < 26.3 {
+/*import net.minecraft.client.DeltaTracker;
+*///?}
 
 @Mixin(GameRenderer.class)
 public class MixinGameRenderer {
@@ -41,7 +49,11 @@ public class MixinGameRenderer {
 
     //? if >= 26.1 {
     @Inject(method = "render", at = @At("HEAD"))
-    private void polyplus$dropCoveredPanorama(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+    //? if >= 26.3 {
+    private void polyplus$dropCoveredPanorama(CallbackInfo ci) {
+    //?} else {
+    /*private void polyplus$dropCoveredPanorama(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+    *///?}
         if (!MenuPanorama.suppressPanorama()) return;
 
         GameRenderer self = (GameRenderer) (Object) this;
@@ -55,7 +67,7 @@ public class MixinGameRenderer {
 
         if (MenuPanorama.backdropFilled()) return;
         //? if >= 26.2 {
-        net.minecraft.util.ARGB.setVector4fFromARGB32(state.clearColorOverride, MenuPanorama.BASE_COLOR);
+        ARGB.setVector4fFromARGB32(state.clearColorOverride, MenuPanorama.BASE_COLOR);
         //?} else {
         /*state.clearColorOverride = MenuPanorama.BASE_COLOR;
         *///?}

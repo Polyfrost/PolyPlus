@@ -5,9 +5,6 @@ import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -26,6 +23,9 @@ import org.polyfrost.polyplus.client.network.http.responses.SetEquippedCosmetics
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object CosmeticCatalog {
     private val LOGGER = LogManager.getLogger()

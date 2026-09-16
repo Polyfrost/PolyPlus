@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.test
 
-import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 
 class EosSdkBridgeShutdownTest {
     @Test

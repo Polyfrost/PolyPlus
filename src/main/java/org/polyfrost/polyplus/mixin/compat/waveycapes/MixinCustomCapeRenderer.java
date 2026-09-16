@@ -1,13 +1,16 @@
 package org.polyfrost.polyplus.mixin.compat.waveycapes;
 
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+
+//? if >= 1.21.10 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Quaternionf;
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.Coerce;
+//?}
 
 @Pseudo
 @Mixin(targets = "dev.tr7zw.waveycapes.render.CustomCapeRenderer", remap = false)
@@ -21,8 +24,13 @@ public class MixinCustomCapeRenderer {
         }
         poseStack.pushPose();
         poseStack.translate(0.0D, 0.0D, 0.125D);
-        poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
+        //? if >= 26.3 {
+        poseStack.rotate(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
+        poseStack.rotate(new Quaternionf().rotateY((float) Math.toRadians(180.0)));
+        //?} else {
+        /*poseStack.mulPose(new Quaternionf().rotateX((float) Math.toRadians(6.0)));
         poseStack.mulPose(new Quaternionf().rotateY((float) Math.toRadians(180.0)));
+        *///?}
     }
     //?}
 }

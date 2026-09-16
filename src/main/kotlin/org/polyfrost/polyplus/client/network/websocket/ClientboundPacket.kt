@@ -1,8 +1,8 @@
 package org.polyfrost.polyplus.client.network.websocket
 
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 
 @Serializable
 sealed interface ClientboundPacket {

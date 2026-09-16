@@ -1,15 +1,19 @@
 package org.polyfrost.polyplus.client.emoji
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
-import java.util.function.Consumer
 import org.polyfrost.polyplus.compat.ChattingButtonRow
+import java.util.function.Consumer
+
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?} else {
+//?}
+
+//? if < 26.1 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
@@ -65,18 +69,18 @@ class EmojiChatPicker {
     fun handleKey(key: Int, shiftDown: Boolean, onPick: Consumer<String>): Boolean {
         if (!isOpen) return false
         when (key) {
-            KEY_ESCAPE -> close()
-            KEY_BACKSPACE -> if (query.isNotEmpty()) {
+            InputConstants.KEY_ESCAPE -> close()
+            InputConstants.KEY_BACKSPACE -> if (query.isNotEmpty()) {
                 query = query.dropLast(1)
                 refresh()
             }
-            KEY_ENTER, KEY_NUMPAD_ENTER, KEY_TAB -> entries.getOrNull(selected)?.let { pick(it, shiftDown, onPick) }
-            KEY_LEFT -> move(-1)
-            KEY_RIGHT -> move(1)
-            KEY_UP -> move(-columns)
-            KEY_DOWN -> move(columns)
-            KEY_PAGE_UP -> move(-columns * ROWS)
-            KEY_PAGE_DOWN -> move(columns * ROWS)
+            InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER, InputConstants.KEY_TAB -> entries.getOrNull(selected)?.let { pick(it, shiftDown, onPick) }
+            InputConstants.KEY_LEFT -> move(-1)
+            InputConstants.KEY_RIGHT -> move(1)
+            InputConstants.KEY_UP -> move(-columns)
+            InputConstants.KEY_DOWN -> move(columns)
+            InputConstants.KEY_PAGEUP -> move(-columns * ROWS)
+            InputConstants.KEY_PAGEDOWN -> move(columns * ROWS)
             else -> return false
         }
         return true
@@ -352,17 +356,6 @@ class EmojiChatPicker {
         const val TOOLTIP_BACKGROUND = 0xF0100010.toInt()
         const val EMPTY_LABEL = "no emoji"
         const val NO_MATCH = "no matches"
-        const val KEY_ESCAPE = 256
-        const val KEY_ENTER = 257
-        const val KEY_TAB = 258
-        const val KEY_BACKSPACE = 259
-        const val KEY_RIGHT = 262
-        const val KEY_LEFT = 263
-        const val KEY_DOWN = 264
-        const val KEY_UP = 265
-        const val KEY_PAGE_UP = 266
-        const val KEY_PAGE_DOWN = 267
-        const val KEY_NUMPAD_ENTER = 335
         const val CHAT_BACKGROUND = 0x80000000.toInt()
         const val HIGHLIGHT = 0x40FFFFFF
         const val SELECTION = 0x28FFFFFF

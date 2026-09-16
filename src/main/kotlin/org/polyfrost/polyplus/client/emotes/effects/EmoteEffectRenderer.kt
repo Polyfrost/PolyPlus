@@ -1,20 +1,31 @@
 package org.polyfrost.polyplus.client.emotes.effects
 
-import org.polyfrost.polyplus.client.render.PoseStack
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
-//? if >= 1.21.10 {
-import net.minecraft.client.renderer.SubmitNodeCollector
-import net.minecraft.client.renderer.entity.state.AvatarRenderState
-//?} elif >= 1.21.4 {
-/*import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.client.renderer.entity.state.PlayerRenderState
-*///?} else {
-/*import net.minecraft.client.renderer.MultiBufferSource
-*///?}
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
 import org.polyfrost.polyplus.client.bedrock.render.BedrockAttachedModelRenderer
 import org.polyfrost.polyplus.client.emotes.playback.EmotePlaybackSnapshot
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+import net.minecraft.client.renderer.entity.state.AvatarRenderState
+//?}
+
+//? if >= 1.21.4 {
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
+//?}
+
+//? if >= 1.21.4 && < 1.21.10 {
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+*///?}
+
+//? if = 1.21.1 {
+/*import net.minecraft.client.player.AbstractClientPlayer
+*///?}
 
 object EmoteEffectRenderer {
     //? if >= 1.21.10 {
@@ -50,7 +61,7 @@ object EmoteEffectRenderer {
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
         lightCoords: Int,
-        player: net.minecraft.client.player.AbstractClientPlayer,
+        player: AbstractClientPlayer,
         playerModel: PlayerModel,
         snapshot: EmotePlaybackSnapshot,
     ) {

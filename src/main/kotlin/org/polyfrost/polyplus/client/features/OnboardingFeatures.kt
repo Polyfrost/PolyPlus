@@ -1,5 +1,8 @@
 package org.polyfrost.polyplus.client.features
 
+import com.mojang.blaze3d.platform.InputConstants
+import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -9,12 +12,13 @@ import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
-import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.ThemeBrandingUtil
+import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
     private val logger = LogManager.getLogger("PolyPlus/Onboarding")
-    private val warnedModApplyFailures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val warnedModApplyFailures = ConcurrentHashMap.newKeySet<String>()
 
     @Volatile
     private var nextModApplyAttemptMs = 0L
@@ -41,11 +45,28 @@ object OnboardingFeatures {
     }
 
     val itemPositionsAvailable: Boolean by lazy {
-        runCatching {
-            val extras = loadWithoutInit(ANIMATIUM_CONFIG).getField("extras").type
-            ITEM_POSITION_FIELDS.forEach { extras.getField(it) }
-        }.isSuccess
+        animatiumSupportsItemPositions(modVersion(ANIMATIUM_ID)) &&
+            runCatching {
+                val extras = loadWithoutInit(ANIMATIUM_CONFIG).getField("extras").type
+                ITEM_POSITION_FIELDS.forEach { extras.getField(it) }
+            }.isSuccess
     }
+
+    internal fun animatiumSupportsItemPositions(version: String?): Boolean {
+        val parts = version.orEmpty().trimStart('v', 'V')
+            .takeWhile { it.isDigit() || it == '.' }
+            .split('.')
+            .mapNotNull(String::toIntOrNull)
+        val major = parts.firstOrNull() ?: return true
+        val minor = parts.getOrNull(1) ?: 0
+        return major > ANIMATIUM_ITEM_POSITION_MAJOR ||
+            (major == ANIMATIUM_ITEM_POSITION_MAJOR && minor >= ANIMATIUM_ITEM_POSITION_MINOR)
+    }
+
+    private fun modVersion(id: String): String? =
+        runCatching {
+            FabricLoader.getInstance().getModContainer(id).orElse(null)?.metadata?.version?.friendlyString
+        }.getOrNull()
 
     enum class ModCard(val introducedIn: Int) {
         GRASS(1),
@@ -540,7 +561,7 @@ object OnboardingFeatures {
         gamma.javaClass.getMethod("isSmoothTransitionEnabled").invoke(gamma) as Boolean
     }.getOrNull()
 
-    fun gammaToggleKey(): net.minecraft.client.KeyMapping? = runCatching {
+    fun gammaToggleKey(): KeyMapping? = runCatching {
         Minecraft.getInstance().options.keyMappings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
     }.getOrNull()
 
@@ -548,10 +569,10 @@ object OnboardingFeatures {
         gammaToggleKey()?.translatedKeyMessage?.string
     }.getOrNull()
 
-    fun bindGammaToggleKey(key: com.mojang.blaze3d.platform.InputConstants.Key): Boolean = runCatching {
+    fun bindGammaToggleKey(key: InputConstants.Key): Boolean = runCatching {
         val mapping = gammaToggleKey() ?: error("Gamma Utils has no toggle binding")
         mapping.setKey(key)
-        net.minecraft.client.KeyMapping.resetMapping()
+        KeyMapping.resetMapping()
         Minecraft.getInstance().options.save()
         true
     }.onFailure {
@@ -716,8 +737,11 @@ object OnboardingFeatures {
     const val GAMMA_MIN = 100f
     const val GAMMA_MAX = 1500f
 
+    private const val ANIMATIUM_ID = "animatium"
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
+    private const val ANIMATIUM_ITEM_POSITION_MAJOR = 4
+    private const val ANIMATIUM_ITEM_POSITION_MINOR = 3
     private const val ITEM_OFFSET_X = "itemOffsetX"
     private const val ITEM_OFFSET_Y = "itemOffsetY"
     private const val ITEM_OFFSET_Z = "itemOffsetZ"

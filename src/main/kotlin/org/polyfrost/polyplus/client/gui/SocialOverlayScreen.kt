@@ -1,13 +1,24 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.runtime.Composable
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.social.SocialOverlay
-import androidx.compose.runtime.Composable
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if >= 1.21.10 {
+import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 
 class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
@@ -29,12 +40,12 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     //? if <26.1 {
-    /*override fun render(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
             MenuBackgroundPass.enqueue(true)
             renderPanorama(ctx, tickDelta)
             if (firstFrameDrawn) {
-                val gameRenderer = net.minecraft.client.Minecraft.getInstance().gameRenderer
+                val gameRenderer = Minecraft.getInstance().gameRenderer
                 //? if <1.21.4 {
                 /*gameRenderer.processBlurEffect(tickDelta)
                 *///?} else {
@@ -55,15 +66,15 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         firstFrameDrawn = true
     }
 
-    override fun renderBackground(ctx: net.minecraft.client.gui.GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) return
         super.renderBackground(ctx, mouseX, mouseY, tickDelta)
     }
     *///?} else {
-    override fun extractRenderState(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
             MenuBackgroundPass.enqueue(true)
-            net.minecraft.client.Minecraft.getInstance().gameRenderer
+            Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
                 .panorama()
                 .extractRenderState(ctx, width, height)
@@ -83,7 +94,7 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
-    override fun extractBackground(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) return
         super.extractBackground(ctx, mouseX, mouseY, tickDelta)
     }

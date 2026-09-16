@@ -1,19 +1,26 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
-import org.polyfrost.polyplus.client.render.PoseStack
-//? if >= 1.21.11 {
-import net.minecraft.client.renderer.rendertype.RenderTypes
-//?} else {
-/*import net.minecraft.client.renderer.RenderType
-*///?}
-//? if >= 1.21.10
-import net.minecraft.client.renderer.SubmitNodeCollector
-//? if < 1.21.10
-//import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.bedrock.model.BedrockEffectModel
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
+import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if >= 1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderTypes
+//?}
+
+//? if >= 1.21.10 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+//?}
+
+//? if < 1.21.11 {
+/*import net.minecraft.client.renderer.RenderType
+*///?}
+
+//? if < 1.21.10 {
+/*import net.minecraft.client.renderer.MultiBufferSource
+*///?}
 
 object BedrockAttachedModelRenderer {
     data class DrawCall(

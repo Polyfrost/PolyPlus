@@ -8,21 +8,17 @@ import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
-//? if >= 1.21.1
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
-import kotlinx.coroutines.launch
-//? if >= 1.21.1
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
-//? if >= 1.21.1
-import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.Batcher
@@ -31,6 +27,7 @@ import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.launch
 
 object CosmeticSync : EarlyInitializable {
     private val LOGGER = LogManager.getLogger()

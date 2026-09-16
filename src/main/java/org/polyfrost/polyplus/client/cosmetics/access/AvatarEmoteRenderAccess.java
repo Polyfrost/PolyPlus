@@ -1,10 +1,8 @@
 package org.polyfrost.polyplus.client.cosmetics.access;
 
-import java.util.Collections;
-import java.util.Map;
-
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import java.util.Map;
 
 public interface AvatarEmoteRenderAccess {
 

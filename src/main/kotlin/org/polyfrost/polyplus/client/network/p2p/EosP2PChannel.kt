@@ -10,14 +10,14 @@ import io.netty.channel.ChannelOutboundBuffer
 import io.netty.channel.ChannelPromise
 import io.netty.channel.EventLoop
 import io.netty.handler.timeout.ReadTimeoutHandler
-import java.net.SocketAddress
-import java.nio.ByteBuffer
-import java.util.concurrent.TimeUnit
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
+import java.net.SocketAddress
+import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 
 class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(parent) {
     constructor() : this(null)

@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.emotes.playback
 
 import net.minecraft.client.model.geom.ModelPart
-import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
+import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 
 object ModelPoseApplicator {
     fun resetAnimatedPlayerBones(model: PlayerModel, animatedBoneNames: Iterable<String>) {

@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
-import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.network.http.responses.Friend
@@ -107,9 +108,9 @@ private fun SidebarTabButton(
     onClick: () -> Unit,
 ) {
     val (interaction, hovered) = rememberSocialHover()
-    val background by androidx.compose.animation.animateColorAsState(if (selected) Accent.asSocialSelected else if (hovered) SocialHoverOverlay else Color.Transparent)
-    val border by androidx.compose.animation.animateColorAsState(if (selected) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
-    val textColor by androidx.compose.animation.animateColorAsState(if (selected) Accent else SocialTextSecondary)
+    val background by animateColorAsState(if (selected) Accent.asSocialSelected else if (hovered) SocialHoverOverlay else Color.Transparent)
+    val border by animateColorAsState(if (selected) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
+    val textColor by animateColorAsState(if (selected) Accent else SocialTextSecondary)
     Box(
         modifier = modifier
             .height(30.dp)
@@ -169,7 +170,7 @@ private const val SESSION_INVITE_CONTENT = "Invited you to their world"
 private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boolean, onClick: () -> Unit) {
     val title = conversationDisplayTitle(group, selfId)
     val (interaction, hovered) = rememberSocialHover()
-    val border by androidx.compose.animation.animateColorAsState(
+    val border by animateColorAsState(
         when {
             selected -> Accent
             hovered -> SocialHoverBorder
@@ -241,7 +242,7 @@ private fun GlobalChatSidebarInfo() {
         verticalArrangement = Arrangement.Center,
     ) {
         Box(Modifier.size(44.dp).clip(LocalTheme.current.circleShape).background(SocialControlBackground), contentAlignment = Alignment.Center) {
-            org.polyfrost.oneconfig.internal.ui.components.Icon(SOCIAL_ASSETS + "image-01.svg", Accent, Modifier.size(20.dp))
+            Icon(SOCIAL_ASSETS + "image-01.svg", Accent, Modifier.size(20.dp))
         }
         Spacer(Modifier.height(10.dp))
         SocialText("Global Chat", fontSize = 14.sp)
@@ -263,7 +264,7 @@ private fun FriendQuickList(friends: List<Friend>, onSelectFriend: (String) -> U
     ) {
         items(sorted, key = { it.player }) { friend ->
             val (interaction, hovered) = rememberSocialHover()
-            val background by androidx.compose.animation.animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
+            val background by animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

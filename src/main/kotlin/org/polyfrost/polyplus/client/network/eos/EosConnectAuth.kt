@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.network.eos
 
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.network.http.OidcApi
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.network.http.OidcApi
 
 object EosConnectAuth {
     private val LOGGER = LogManager.getLogger()

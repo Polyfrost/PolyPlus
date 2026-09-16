@@ -2,14 +2,17 @@ package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-//? if >= 26.1 {
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-//?} else {
-/*import net.minecraft.client.gui.GuiGraphics;
-*///?}
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.spongepowered.asm.mixin.Mixin;
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+//?}
+
+//? if < 26.1 {
+/*import net.minecraft.client.gui.GuiGraphics;
+*///?}
 
 @Mixin(AbstractSelectionList.class)
 public class MixinAbstractSelectionList {
