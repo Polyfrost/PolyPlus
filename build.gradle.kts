@@ -122,6 +122,11 @@ val flkProvidedVersions: Map<String, String> = run {
 configurations.all {
     resolutionStrategy.eachDependency {
         flkProvidedVersions["${requested.group}:${requested.name}"]?.let { useVersion(it) }
+        // OneConfig 1.2.0 for 26.2 declares a snapshot that Sonatype has since purged; the
+        // release build targets the same game range. PolyPlus never touches this API directly.
+        if (requested.group == "net.kyori" && requested.name == "adventure-platform-fabric" && requested.version == "7.0.0-SNAPSHOT") {
+            useVersion("7.0.0")
+        }
     }
 }
 
