@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.CommandSuggestions;
@@ -131,17 +132,17 @@ public abstract class MixinChatScreen {
         if (polyplus$suggestions.isEmpty()) return false;
         int n = polyplus$suggestions.size();
         switch (key) {
-            case 265:
+            case InputConstants.KEY_UP:
                 polyplus$selected = (polyplus$selected - 1 + n) % n;
                 return true;
-            case 264:
+            case InputConstants.KEY_DOWN:
                 polyplus$selected = (polyplus$selected + 1) % n;
                 return true;
-            case 258:
-            case 257:
-            case 335:
+            case InputConstants.KEY_TAB:
+            case InputConstants.KEY_RETURN:
+            case InputConstants.KEY_NUMPADENTER:
                 return polyplus$accept();
-            case 256:
+            case InputConstants.KEY_ESCAPE:
                 polyplus$suggestions = Collections.emptyList();
                 polyplus$tokenStart = -1;
                 polyplus$token = null;
