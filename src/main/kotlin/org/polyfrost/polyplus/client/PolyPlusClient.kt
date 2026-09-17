@@ -32,6 +32,7 @@ import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
+import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -159,6 +160,7 @@ object PolyPlusClient {
         step("rrls crash guard") { RrlsCrashGuard.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
+        step("modpack diff") { ModpackDiff.logAsync() }
         step("login gate") { MinecraftLoginGate.register() }
         step("featured servers") { FeaturedServers.warmUp() }
 
