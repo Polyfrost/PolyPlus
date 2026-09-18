@@ -1,2 +1,2 @@
-## 1.2.28
-- Now shows where each mod keeps the settings onboarding wrote
+## 1.2.29
+- New panorama for 26.3

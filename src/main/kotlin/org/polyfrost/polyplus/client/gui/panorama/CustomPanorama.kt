@@ -59,13 +59,19 @@ object CustomPanorama {
     private const val VANILLA_PACK_ID = "vanilla"
 
     private val PACK: PanoramaPack? =
-        //? if >= 26.2 {
+        //? if >= 26.3 {
         PanoramaPack(
+            cacheKey = "wilderness-bound-1.0.0",
+            url = "https://cdn.modrinth.com/data/qelvBItP/versions/fgtTJ04S/Wilderness%20Bound%20Panorama.zip",
+            sha1 = "ddc955b5798b02ee431b13a7a97d8d2e58782771",
+        )
+        //?} elif >= 26.2 {
+        /*PanoramaPack(
             cacheKey = "alt-chaos-cubed-1.1.2",
             url = "https://cdn.modrinth.com/data/abtyNK6x/versions/VNOEJAJZ/Alt%20Chaos%20Cubed%20Panorama%201.1%20Shader.zip",
             sha1 = "ea2d2987f2bae1d70f3bab797655508e5eebe419",
         )
-        //?} elif >= 26.1 {
+        *///?} elif >= 26.1 {
         /*null
         *///?} else {
         /*PanoramaPack(
