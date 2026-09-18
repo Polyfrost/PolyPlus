@@ -1,2 +1,2 @@
-## 1.2.27
-- Add more information in logs for debugging.
+## 1.2.28
+- Now shows where each mod keeps the settings onboarding wrote
