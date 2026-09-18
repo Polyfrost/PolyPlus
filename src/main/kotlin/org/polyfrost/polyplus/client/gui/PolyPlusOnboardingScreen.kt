@@ -183,6 +183,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val needsSettings = remember { !PolyPlusConfig.onboardingCompleted }
         val needsModSettings = remember { OnboardingFeatures.needsModSettingsChoice() }
         val needsBlurChoice = remember { OnboardingFeatures.needsMotionBlurChoice() }
+        val owedGuides = remember { OnboardingFeatures.pendingGuides().mapNotNull(ModGuide::of).toSet() }
         val showsModSettings = remember {
             (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
         }
@@ -191,7 +192,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
         }
         val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
-        val pages = remember {
+        var guides by remember {
+            mutableStateOf(owedGuides)
+        }
+        val pages = remember(guides) {
             buildList {
                 if (needsTerms) add(OnboardingStep.Terms)
                 if (needsSettings) add(OnboardingStep.LookAndFeel)
@@ -200,6 +204,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     offeredCards.chunked(MOD_CARDS_PER_PAGE).forEach { add(OnboardingStep.Mods(it)) }
                 }
                 if (needsBlurChoice) add(OnboardingStep.MotionBlur)
+                ModGuide.entries.filter { it in guides }.forEach { add(OnboardingStep.Guide(it)) }
                 if (needsSettings || needsModSettings) add(OnboardingStep.Done)
             }.ifEmpty { listOf(OnboardingStep.Done) }
         }
@@ -225,13 +230,36 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             mutableStateOf((modReads.gammaToggled ?: PolyPlusConfig.onboardingGammaToggled).clampGamma())
         }
         var gammaSmooth by remember { mutableStateOf(modReads.gammaSmooth ?: PolyPlusConfig.onboardingGammaSmooth) }
-        var itemOffsetX by remember { mutableStateOf(modReads.itemX ?: PolyPlusConfig.onboardingItemOffsetX) }
-        var itemOffsetY by remember { mutableStateOf(modReads.itemY ?: PolyPlusConfig.onboardingItemOffsetY) }
-        var itemOffsetZ by remember { mutableStateOf(modReads.itemZ ?: PolyPlusConfig.onboardingItemOffsetZ) }
-        var itemScale by remember { mutableStateOf(modReads.itemScale ?: PolyPlusConfig.onboardingItemScale) }
+        // The notice runs without the mod cards, so it reads Animatium itself instead of the cards' values.
+        fun itemValue(fromCards: Float?, live: () -> Float?, stored: Float): Float =
+            fromCards ?: (if (ModGuide.ITEM in owedGuides) live() else null) ?: stored
+        var itemOffsetX by remember {
+            mutableStateOf(
+                itemValue(modReads.itemX, OnboardingFeatures::currentItemOffsetX, PolyPlusConfig.onboardingItemOffsetX),
+            )
+        }
+        var itemOffsetY by remember {
+            mutableStateOf(
+                itemValue(modReads.itemY, OnboardingFeatures::currentItemOffsetY, PolyPlusConfig.onboardingItemOffsetY),
+            )
+        }
+        var itemOffsetZ by remember {
+            mutableStateOf(
+                itemValue(modReads.itemZ, OnboardingFeatures::currentItemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ),
+            )
+        }
+        var itemScale by remember {
+            mutableStateOf(
+                itemValue(modReads.itemScale, OnboardingFeatures::currentItemScale, PolyPlusConfig.onboardingItemScale),
+            )
+        }
         val touched = remember { mutableSetOf<ModCard>() }
+        fun markTouched(card: ModCard) {
+            touched += card
+            ModGuide.of(card)?.let { guides = guides + it }
+        }
         fun <T> touch(card: ModCard, old: T, new: T) {
-            if (old != new) touched += card
+            if (old != new) markTouched(card)
         }
         var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(1, MOTION_BLUR_MAX)) }
         var blurMode by remember { mutableIntStateOf(OnboardingFeatures.MOTION_BLUR_UNSET) }
@@ -312,6 +340,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 PolyPlusConfig.onboardingPolyBlurApplied = false
                 PolyPlusConfig.adaptiveBlurApplied = true
             }
+            OnboardingFeatures.markGuidesShown(guides.map { it.card })
             PolyPlusConfig.onboardingCompleted = true
             PolyPlusConfig.save()
             if (needsSettings) {
@@ -455,7 +484,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                                                 y != itemOffsetY ||
                                                                 z != itemOffsetZ
                                                             ) {
-                                                                touched += ModCard.ITEM
+                                                                markTouched(ModCard.ITEM)
                                                             }
                                                             itemOffsetX = x
                                                             itemOffsetY = y
@@ -493,6 +522,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                             { motionBlur = it },
                                         )
                                     }
+                                is OnboardingStep.Guide -> GuidePage(step.guide)
                                 OnboardingStep.Cosmetics -> CosmeticsPage(
                                     onClaim = { PolyPlusClient.refreshCosmetics() },
                                     onStore = {
@@ -503,6 +533,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 OnboardingStep.Done -> DonePage()
                             }
                             val terms = pages[page] == OnboardingStep.Terms
+                            val guidePage = pages[page] as? OnboardingStep.Guide
+                            val resettableScale = guidePage?.guide == ModGuide.ITEM &&
+                                !OnboardingFeatures.isDefaultItemScale(itemScale)
                             val blurUnanswered = pages[page] == OnboardingStep.MotionBlur &&
                                 blurMode == OnboardingFeatures.MOTION_BLUR_UNSET
                             BottomNavigation(
@@ -512,10 +545,26 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 onBack = { page-- },
                                 onNext = if (terms) ({ answerTerms(true) }) else advance,
                                 nextEnabled = !waitingForOptimization && !blurUnanswered && (!terms || termsAccepted),
-                                allowSkip = !terms && !needsBlurChoice,
-                                nextLabel = if (terms) "Agree" else null,
-                                secondaryLabel = if (terms) "Decline" else null,
-                                onSecondary = { answerTerms(false) },
+                                allowSkip = !terms && guidePage == null && !needsBlurChoice,
+                                nextLabel = when {
+                                    terms -> "Agree"
+                                    guidePage != null -> "Got it"
+                                    else -> null
+                                },
+                                secondaryLabel = when {
+                                    terms -> "Decline"
+                                    resettableScale -> "Reset"
+                                    else -> null
+                                },
+                                onSecondary = {
+                                    if (terms) {
+                                        answerTerms(false)
+                                    } else {
+                                        itemScale = OnboardingFeatures.ITEM_SCALE_DEFAULT
+                                        // A run that never offered the card writes nothing on finish, so write now.
+                                        if (ModCard.ITEM !in offeredCards) OnboardingFeatures.resetItemScale()
+                                    }
+                                },
                             )
                         }
                     }
@@ -960,12 +1009,13 @@ private fun ItemPositionCard(
         "Move the item in your hand out of the way, or pull it closer, without touching your FOV.",
         { ItemPositionPreview(offsetX, offsetY, offsetZ, scale) },
     ) {
-        CardOffsetSlider("Left/right", offsetX) { onOffset(it, offsetY, offsetZ) }
-        CardOffsetSlider("Up/down", offsetY) { onOffset(offsetX, it, offsetZ) }
-        CardOffsetSlider("Near/far", offsetZ) { onOffset(offsetX, offsetY, it) }
+        CardOffsetSlider("Item Offset X", offsetX) { onOffset(it, offsetY, offsetZ) }
+        CardOffsetSlider("Item Offset Y", offsetY) { onOffset(offsetX, it, offsetZ) }
+        CardOffsetSlider("Item Offset Z", offsetZ) { onOffset(offsetX, offsetY, it) }
         val scaleSpan = OnboardingFeatures.ITEM_SCALE_MAX - OnboardingFeatures.ITEM_SCALE_MIN
         CardSlider(
-            "Size",
+            // One slider drives Animatium's three Item Scale axes together.
+            "Item Scale",
             (scale - OnboardingFeatures.ITEM_SCALE_MIN) / scaleSpan,
             "%.1f".fmt(scale),
         ) { onScale(snapTo(OnboardingFeatures.ITEM_SCALE_MIN + it * scaleSpan, ITEM_SCALE_STEP)) }
@@ -1368,6 +1418,48 @@ private fun DonePage() {
 }
 
 @Composable
+private fun GuidePage(guide: ModGuide) {
+    Header("Where to change this later", guide.feature)
+    OnboardingText(
+        guide.route,
+        15,
+        Modifier.offset(GUIDE_MARGIN.dp, GUIDE_TEXT_Y.dp).width(GUIDE_WIDTH.dp),
+        TextPrimary,
+        FontWeight.Light,
+    )
+    OnboardingText(
+        guide.options,
+        13,
+        Modifier.offset(GUIDE_MARGIN.dp, (GUIDE_TEXT_Y + 24f).dp).width(GUIDE_WIDTH.dp),
+        TextSecondary,
+        FontWeight.Light,
+    )
+    GuideShot(guide.path)
+}
+
+@Composable
+private fun GuideShot(path: String) {
+    val shot = remember(path) { loadOnboardingImage(path) } ?: return
+    val fit = minOf(GUIDE_WIDTH / shot.width, GUIDE_HEIGHT / shot.height)
+    val shape = ppShape(6.dp)
+    Box(
+        Modifier.offset(0.dp, GUIDE_SHOT_Y.dp).width(PANEL_WIDTH.dp).height(GUIDE_HEIGHT.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            Modifier
+                .size((shot.width * fit).dp, (shot.height * fit).dp)
+                .clip(shape)
+                .border(1.dp, PanelBorderBrush, shape),
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawIntoCanvas { canvas -> canvas.skiaCanvas.drawCover(shot, size.width, size.height) }
+            }
+        }
+    }
+}
+
+@Composable
 private fun Header(kicker: String, title: String) {
     val width = LocalPanelWidth.current
     OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(width.dp), TextPrimary, FontWeight.Normal)
@@ -1678,6 +1770,8 @@ private fun GammaPreview(gamma: Float) {
 internal fun betterGrassPreviewPath(mode: String): String = GRASS_ASSETS + "grass-${mode.lowercase()}.png"
 
 internal val gammaPreviewPaths: List<String> = listOf(GAMMA_ASSETS + GAMMA_DARK, GAMMA_ASSETS + GAMMA_BRIGHT)
+
+internal val modGuidePaths: List<String> = ModGuide.entries.map { it.path }
 
 @Composable
 private fun BetterGrassPreview(mode: Int) {
@@ -2125,6 +2219,57 @@ internal object OnboardingKeyCapture {
 
 private const val ESCAPE_KEY = 256
 
+private enum class ModGuide(
+    val card: ModCard,
+    val feature: String,
+    val route: String,
+    val options: String,
+    val shot: String,
+) {
+    GRASS(
+        ModCard.GRASS,
+        "Better Grass",
+        "Mods \u2192 LambdaBetterGrass",
+        "Better Grass",
+        "better-grass.png",
+    ),
+    FIRE(
+        ModCard.FIRE_OVERLAY,
+        "Fire Overlay",
+        "Mods \u2192 Overlay Tweaks \u2192 HUD \u2192 Fire",
+        "Fire Overlay Height and Fire Overlay Opacity",
+        "overlay-fire.png",
+    ),
+    SHIELD(
+        ModCard.SHIELD_HEIGHT,
+        "Shield Height",
+        "Mods \u2192 Overlay Tweaks \u2192 Items \u2192 Shields",
+        "Shield Height",
+        "overlay-shield.png",
+    ),
+    MOUNT(
+        ModCard.MOUNT,
+        "Mount Opacity",
+        "Mods \u2192 Mount Opacity \u2192 General",
+        "One slider per mount you can ride",
+        "mount-opacity.png",
+    ),
+    ITEM(
+        ModCard.ITEM,
+        "Item Position",
+        "Mods \u2192 Animatium \u2192 Extras \u2192 Item Modifications",
+        "Item Scale X/Y/Z and Item Offset X/Y/Z",
+        "animatium.png",
+    ),
+    ;
+
+    val path: String get() = GUIDE_ASSETS + shot
+
+    companion object {
+        fun of(card: ModCard): ModGuide? = entries.firstOrNull { it.card == card }
+    }
+}
+
 private sealed interface OnboardingStep {
     data object Terms : OnboardingStep
     data object LookAndFeel : OnboardingStep
@@ -2133,6 +2278,9 @@ private sealed interface OnboardingStep {
     data class Mods(val cards: List<ModCard>) : OnboardingStep
 
     data object MotionBlur : OnboardingStep
+
+    data class Guide(val guide: ModGuide) : OnboardingStep
+
     data object Cosmetics : OnboardingStep
     data object Done : OnboardingStep
 }
@@ -2237,7 +2385,7 @@ private const val CARD_DESC_GAP = 12f
 private const val CARD_ROW_GAP = 6f
 private const val CARD_ROW_HEIGHT = 28f
 private const val CARD_ROW_GUTTER = 8f
-private const val CARD_LABEL_WIDTH = 78f
+private const val CARD_LABEL_WIDTH = 94f
 private const val CARD_VALUE_WIDTH = 62f
 private const val CARD_SLIDER_WIDTH =
     CARD_CONTENT_WIDTH - CARD_LABEL_WIDTH - CARD_VALUE_WIDTH - CARD_ROW_GUTTER * 2f
@@ -2312,6 +2460,12 @@ private const val SHIELD_ASSETS = "assets/polyplus/onboarding/shield/"
 private const val SHIELD_SCENE = "shield-scene.png"
 private const val SHIELD_LAYER = "shield-layer.png"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
+private const val GUIDE_ASSETS = "assets/polyplus/onboarding/guides/"
+private const val GUIDE_TEXT_Y = 128f
+private const val GUIDE_SHOT_Y = 188f
+private const val GUIDE_HEIGHT = CONTENT_BOTTOM - GUIDE_SHOT_Y
+private const val GUIDE_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
+private const val GUIDE_MARGIN = CARD_MARGIN
 
 private val PANEL_SHAPE: Shape
     @Composable
