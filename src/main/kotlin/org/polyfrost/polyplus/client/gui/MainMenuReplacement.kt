@@ -21,7 +21,8 @@ object MainMenuReplacement {
         if (!PolyPlusConfig.onboardingCompleted ||
             PrivacyConsent.needsPrompt() ||
             OnboardingFeatures.needsModSettingsChoice() ||
-            OnboardingFeatures.needsMotionBlurChoice()
+            OnboardingFeatures.needsMotionBlurChoice() ||
+            OnboardingFeatures.needsGuides()
         ) {
             PolyPlusOnboardingScreen()
         } else {

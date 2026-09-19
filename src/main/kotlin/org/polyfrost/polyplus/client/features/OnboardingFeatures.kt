@@ -15,6 +15,7 @@ import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 object OnboardingFeatures {
     private val logger = LogManager.getLogger("PolyPlus/Onboarding")
@@ -126,6 +127,93 @@ object OnboardingFeatures {
 
     private fun ModCard.pendingApply(settled: Boolean): Boolean =
         !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
+
+    fun isDefaultItemScale(scale: Float): Boolean = abs(scale - ITEM_SCALE_DEFAULT) < 0.001f
+
+    val guidedCards: List<ModCard> = listOf(
+        ModCard.GRASS,
+        ModCard.FIRE_OVERLAY,
+        ModCard.SHIELD_HEIGHT,
+        ModCard.MOUNT,
+        ModCard.ITEM,
+    )
+
+    internal fun guideFlag(card: ModCard): Int = when (card) {
+        ModCard.GRASS -> 1
+        ModCard.FIRE_OVERLAY -> 2
+        ModCard.SHIELD_HEIGHT -> 4
+        ModCard.MOUNT -> 8
+        ModCard.ITEM -> 16
+        else -> 0
+    }
+
+    @JvmStatic
+    fun pendingGuides(): List<ModCard> {
+        if (!PolyPlusConfig.onboardingCompleted) return emptyList()
+        return guidedCards.filter { card ->
+            guideNeeded(
+                card,
+                shown = PolyPlusConfig.onboardingGuidesShown,
+                completedVersion = PolyPlusConfig.onboardingModSettingsVersion,
+                available = card.available,
+                movedFromDefault = card.movedFromDefault(),
+            )
+        }
+    }
+
+    internal fun guideNeeded(
+        card: ModCard,
+        shown: Int,
+        completedVersion: Int,
+        available: Boolean,
+        movedFromDefault: Boolean,
+    ): Boolean {
+        val flag = guideFlag(card)
+        return flag != 0 &&
+            shown and flag == 0 &&
+            available &&
+            completedVersion >= card.introducedIn &&
+            movedFromDefault
+    }
+
+    @JvmStatic
+    fun needsGuides(): Boolean = pendingGuides().isNotEmpty()
+
+    fun markGuidesShown(cards: Collection<ModCard>) {
+        PolyPlusConfig.onboardingGuidesShown = cards.fold(PolyPlusConfig.onboardingGuidesShown) { mask, card ->
+            mask or guideFlag(card)
+        }
+    }
+
+    /** Whether the mod sits off the value it ships with, the only reason to explain where that value lives. */
+    private fun ModCard.movedFromDefault(): Boolean = when (this) {
+        ModCard.GRASS -> (currentBetterGrassMode() ?: BETTER_GRASS_FANCY) != BETTER_GRASS_FANCY
+        ModCard.FIRE_OVERLAY ->
+            (currentFireOverlayHeight() ?: FIRE_OVERLAY_MAX) < FIRE_OVERLAY_MAX - 0.001 ||
+                (currentFireOverlayOpacity() ?: FIRE_OPACITY_MAX) < FIRE_OPACITY_MAX - 0.001f
+        ModCard.SHIELD_HEIGHT -> (currentShieldHeight() ?: SHIELD_HEIGHT_MAX) < SHIELD_HEIGHT_MAX - 0.001f
+        ModCard.MOUNT -> (currentHorseOpacity() ?: HORSE_OPACITY_MAX) < HORSE_OPACITY_MAX - 0.001f
+        ModCard.ITEM -> !isDefaultItemScale(currentItemScale() ?: ITEM_SCALE_DEFAULT) || itemOffsetsMoved()
+        else -> false
+    }
+
+    private fun itemOffsetsMoved(): Boolean =
+        listOf(currentItemOffsetX(), currentItemOffsetY(), currentItemOffsetZ())
+            .any { it != null && abs(it) > 0.001f }
+
+    fun resetItemScale(): Boolean {
+        val applied = applyItemPosition(
+            currentItemOffsetX() ?: PolyPlusConfig.onboardingItemOffsetX,
+            currentItemOffsetY() ?: PolyPlusConfig.onboardingItemOffsetY,
+            currentItemOffsetZ() ?: PolyPlusConfig.onboardingItemOffsetZ,
+            ITEM_SCALE_DEFAULT,
+        )
+        if (applied) {
+            PolyPlusConfig.onboardingItemScale = ITEM_SCALE_DEFAULT
+            PolyPlusConfig.save()
+        }
+        return applied
+    }
 
     @JvmStatic
     fun needsMotionBlurChoice(): Boolean =
@@ -751,6 +839,7 @@ object OnboardingFeatures {
 
     const val ITEM_OFFSET_MIN = -10f
     const val ITEM_OFFSET_MAX = 10f
+    const val ITEM_SCALE_DEFAULT = 1f
     const val ITEM_SCALE_MIN = 0.5f
     const val ITEM_SCALE_MAX = 2f
 }

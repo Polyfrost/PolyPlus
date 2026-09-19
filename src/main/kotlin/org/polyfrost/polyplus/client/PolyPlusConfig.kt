@@ -129,6 +129,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     @JvmStatic @Include
     var onboardingItemPositionsSettled = false
 
+    @JvmStatic @Include
+    var onboardingGuidesShown = 0
+
     /** Gamma Utils' brightness as the mod stores it, where 100 is vanilla maximum. */
     @JvmStatic @Include
     var onboardingGamma = 100f
