@@ -41,7 +41,6 @@ zoomify
 redaction.json
 gammautils
 numericalenchantments
-screenshotmessageenhancer
 polyplus-mainmenu.json
 polyplus.json
 polyplus-cosmetics.json
@@ -65,9 +64,9 @@ skyblockpv/config
 skyblocker
 skycubed/config
 skyocean/config
+skyboxify
 smoothskies
 countdown.json
-skyboxify
 dynamic_fps
 soundtweaks.json
 sound_physics_perfected
@@ -94,6 +93,8 @@ modernfix
 debugify
 obe
 particle_core
+screenshotmessageenhancer
+screenshotmessageenhancer.json
 screenshotcompression
 cull-fewer-leaves
 blackbarconcealer
@@ -101,3 +102,10 @@ crashpatch.json
 notenoughcrashes
 creativecore
 eclipseui
+tntcountdown
+iris
+shieldfixes
+smartsearch.json
+structure_layout_optimizer
+nbtac
+smoothscrollingrefurbished
