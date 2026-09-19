@@ -62,6 +62,11 @@ object DefaultSettings {
     private const val CONTROLIFY_ID = "controlify"
     private const val BOBBY_ID = "bobby"
     private const val MODMENU_ID = "modmenu"
+    private const val IQ_ID = "iqaddons"
+
+    private const val IQ_PHASE_THREE_CONFIG = "net.iqaddons.mod.config.categories.PhaseThreeConfig"
+    private const val RESOURCEFUL_CONFIGURATIONS = "com.teamresourceful.resourcefulconfig.common.config.Configurations"
+    private const val RESOURCEFUL_CONFIG = "com.teamresourceful.resourcefulconfig.api.types.ResourcefulConfig"
 
     private const val BOBBY_CONFIG_FILE = "bobby.conf"
     private const val BOBBY_DYNAMIC_MULTI_WORLD = "dynamic-multi-world"
@@ -188,6 +193,15 @@ object DefaultSettings {
                 label = "Mod Menu mod count",
                 isPresent = { modLoaded(MODMENU_ID) && findClass(MODMENU_CONFIG) != null },
                 apply = ::applyModMenuModCount,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
+                id = "iq-block-useless-perks",
+                label = "IQ Addons",
+                isPresent = { modLoaded(IQ_ID) && findClass(IQ_PHASE_THREE_CONFIG) != null },
+                apply = ::disableIqBlockUselessPerks,
                 coveredByLegacyFlag = false,
             ),
         )
@@ -387,6 +401,19 @@ object DefaultSettings {
         findClass(MODMENU_CONFIG_MANAGER)?.getMethod("save")?.invoke(null)
         findClass(MODMENU_MAIN)?.getMethod("clearModCountCache")?.invoke(null)
         logger.info("Limited the Mod Menu mod count to non-library mods in the mods folder")
+    }
+
+    private fun disableIqBlockUselessPerks() {
+        val category = findClass(IQ_PHASE_THREE_CONFIG) ?: error("$IQ_PHASE_THREE_CONFIG is missing")
+        category.getField("blockUselessPerks").setBoolean(null, false)
+
+        val registry = findClass(RESOURCEFUL_CONFIGURATIONS) ?: error("$RESOURCEFUL_CONFIGURATIONS is missing")
+        val configs = registry.getField("INSTANCE").get(null)
+        val config = registry.getMethod("getConfig", String::class.java).invoke(configs, IQ_ID)
+            ?: error("IQ Addons has not registered its '$IQ_ID' config")
+        val configType = findClass(RESOURCEFUL_CONFIG) ?: error("$RESOURCEFUL_CONFIG is missing")
+        configType.getMethod("save").invoke(config)
+        logger.info("Disabled IQ Addons Block Useless Perks")
     }
 
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
