@@ -149,7 +149,12 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     //? if = 1.8.9 {
-    /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun init() {
+        MenuPanorama.legacyPanorama()
+        super.init()
+    }
+
+    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
         super.render(mouseX, mouseY, tickDelta)
     }

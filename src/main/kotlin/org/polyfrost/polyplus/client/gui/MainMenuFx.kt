@@ -8,20 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageShader
-import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
@@ -97,32 +87,6 @@ private fun softRadial(color: Color, alpha: Float, center: Offset, radius: Float
     return Brush.radialGradient(colorStops = stops, center = center, radius = radius)
 }
 
-private const val NOISE_SIZE = 64
-
-private val NoiseBrush: ShaderBrush by lazy {
-    val bmp = ImageBitmap(NOISE_SIZE, NOISE_SIZE)
-    var seed = 0x9E3779B9.toInt()
-    CanvasDrawScope().draw(
-        Density(1f),
-        LayoutDirection.Ltr,
-        Canvas(bmp),
-        Size(NOISE_SIZE.toFloat(), NOISE_SIZE.toFloat()),
-    ) {
-        for (y in 0 until NOISE_SIZE) {
-            for (x in 0 until NOISE_SIZE) {
-                seed = seed * 1664525 + 1013904223
-                val v = (seed ushr 24) and 0xFF
-                drawRect(Color(v, v, v), Offset(x.toFloat(), y.toFloat()), Size(1f, 1f))
-            }
-        }
-    }
-    ShaderBrush(ImageShader(bmp, TileMode.Repeated, TileMode.Repeated))
-}
-
-private fun DrawScope.drawDither() {
-    drawRect(brush = NoiseBrush, alpha = 0.035f, blendMode = BlendMode.Overlay)
-}
-
 fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
     drawRect(FxPageBackground)
     val mdx = (mouse.x - 0.5f) * size.width
@@ -139,7 +103,6 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
     drawAurora(time)
     drawParticles(time, mouse)
     drawVignette(time)
-    drawDither()
 }
 
 private fun DrawScope.drawAurora(time: Float) {
@@ -217,7 +180,6 @@ private val GlowMask = listOf(
 fun DrawScope.drawPanoramaOverlay() {
     drawPanoramaBlackBackground()
     drawPanoramaGlowMask()
-    drawDither()
 }
 
 private fun DrawScope.drawPanoramaBlackBackground() {
