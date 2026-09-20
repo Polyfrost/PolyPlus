@@ -80,14 +80,14 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     override fun newUnsafe(): AbstractUnsafe = object : AbstractUnsafe() {
         override fun connect(remoteAddress: SocketAddress, localAddress: SocketAddress?, promise: ChannelPromise) {
             try {
-                require(remoteAddress is EosP2PAddress) {
-                    "EosP2PChannel can only connect to an EosP2PAddress, got $remoteAddress"
+                val target = requireNotNull(P2PConnectionContext.resolveTarget(remoteAddress)) {
+                    "EosP2PChannel needs an EosP2PAddress or an armed P2P join, got $remoteAddress"
                 }
-                localSocket = (localAddress as? EosP2PAddress)?.socket ?: remoteAddress.socket
-                remoteUser = remoteAddress.user
+                localSocket = (localAddress as? EosP2PAddress)?.socket ?: target.socket
+                remoteUser = target.user
                 activate()
                 // Explicitly request the connection now
-                bridge.acceptConnection(remoteAddress.socket, remoteAddress.user)
+                bridge.acceptConnection(target.socket, target.user)
                 promise.setSuccess()
                 pipeline().fireChannelActive()
             } catch (e: Throwable) {

@@ -10,6 +10,7 @@ import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress
 import org.polyfrost.polyplus.client.network.p2p.P2PConnectionContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import java.net.InetSocketAddress
 
 class P2PConnectionArmTest {
     private val host = EosProductUserId("0002eac")
@@ -35,5 +36,18 @@ class P2PConnectionArmTest {
 
         assertFalse(P2PConnectionContext.hasPendingJoin(), "the ordinary connect must not get an EOS channel")
         assertNull(P2PConnectionContext.consumeAddressOverride(), "an ordinary join must not be sent over EOS")
+    }
+
+    @Test
+    fun `a bootstrap that resolved the address first still reaches the armed peer`() {
+        P2PConnectionContext.setPendingJoin(target)
+
+        assertEquals(
+            EosP2PAddress(host, socket),
+            P2PConnectionContext.resolveTarget(InetSocketAddress.createUnresolved("localhost", 25565)),
+            "netfix hands the channel a plain socket address; the arm must supply the peer",
+        )
+        assertFalse(P2PConnectionContext.hasPendingJoin(), "resolving must disarm")
+        assertNull(P2PConnectionContext.resolveTarget(InetSocketAddress.createUnresolved("localhost", 25565)))
     }
 }
