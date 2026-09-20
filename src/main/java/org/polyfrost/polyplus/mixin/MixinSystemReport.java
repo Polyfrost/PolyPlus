@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.SystemReport;
@@ -53,3 +54,4 @@ public class MixinSystemReport {
         return writer.toString().replace("\r\n", "\n").strip().replace("\n", "\n\t\t");
     }
 }
+//?}

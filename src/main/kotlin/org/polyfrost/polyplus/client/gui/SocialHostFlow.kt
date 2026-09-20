@@ -42,9 +42,15 @@ import androidx.compose.ui.window.PopupProperties
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
-import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.world.Difficulty
+//? if > 1.8.9 {
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.world.level.GameType
+//?} else {
+/*import net.minecraft.client.gui.screen.world.SelectWorldScreen
+import org.polyfrost.polyplus.client.host.GameType
+import org.polyfrost.polyplus.client.social.setScreen
+*///?}
 import org.jetbrains.skia.Image
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
@@ -318,6 +324,7 @@ private fun WorldConfigurationModal(
             }
         }
         if (lan) {
+            //? if > 1.8.9 {
             FormRow("Port") {
                 SocialTextField(
                     value = state.port,
@@ -330,6 +337,7 @@ private fun WorldConfigurationModal(
             if (!portValid) {
                 SocialText("Port must be between 1 and 65535.", fontSize = 12.sp, color = SocialDangerColor)
             }
+            //?}
         } else {
             FormRow("Private Relay") {
                 Box(Modifier.width(220.dp)) {
@@ -576,7 +584,10 @@ private fun openSelectWorldScreen() {
     *///?}
 }
 
+//? if > 1.8.9 {
 private fun socialGameModeLabel(mode: GameType): String = mode.getName().replaceFirstChar { it.uppercase() }
+//?} else
+//private fun socialGameModeLabel(mode: GameType): String = mode.key.replaceFirstChar { it.uppercase() }
 
 private fun socialDifficultyLabel(difficulty: Difficulty): String = when (difficulty) {
     Difficulty.PEACEFUL -> "Peaceful"

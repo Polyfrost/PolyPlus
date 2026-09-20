@@ -23,8 +23,10 @@ object EmoteWheelKeybind {
         if (currentScreen == null) {
             //? if >= 26.2 {
             mc.gui.setScreen(EmoteWheelScreen())
-            //?} else {
+            //?} elif > 1.8.9 {
             /*mc.setScreen(EmoteWheelScreen())
+            *///?} else {
+            /*mc.openScreen(EmoteWheelScreen())
             *///?}
         }
     }

@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.gui.preview
 
+//? if > 1.8.9 {
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.mojang.blaze3d.vertex.VertexConsumer
@@ -812,7 +813,6 @@ object PlayerPreviewRenderer {
 
     private const val PREVIEW_PET_SIDE_OFFSET = -0.65
 
-    // Must match PetEntityRenderer's per-frame hold time
     private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
 
     private fun previewTextureFrame(definition: PetDefinition): Pair<Float, Float> {
@@ -1516,3 +1516,450 @@ object PlayerPreviewRenderer {
     }
     *///?}
 }
+//?} else {
+/*import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import net.minecraft.client.Minecraft
+import net.minecraft.client.render.vertex.Tesselator
+import net.minecraft.client.render.model.Model
+import net.minecraft.client.render.model.entity.PlayerModel
+import net.minecraft.client.render.pipeline.RenderTarget
+import net.minecraft.client.render.platform.GLX
+import net.minecraft.client.render.platform.GlStateManager
+import net.minecraft.client.render.platform.Lighting
+import net.minecraft.client.render.vertex.DefaultVertexFormat
+import net.minecraft.client.resource.skin.DefaultSkinUtils
+import net.minecraft.resources.Identifier
+import com.mojang.authlib.minecraft.MinecraftProfileTexture
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.ImageInfo
+import org.lwjgl.BufferUtils
+import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL30
+import org.joml.Quaternionf
+import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
+import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
+import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
+import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
+import org.polyfrost.polyplus.client.cosmetics.PetDefinition
+import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.utils.rotateBy
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderer
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.render.PlayerRenderContext
+import org.polyfrost.polyplus.client.render.PoseStack
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import kotlinx.coroutines.launch
+import java.util.Collections
+import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+
+object PlayerPreviewRenderer {
+    private val LOG = LoggerFactory.getLogger("polyplus/preview")
+    private const val MAX_DIM = 512
+    private const val MODEL_SCALE = 0.0625f
+    private const val PLAYER_BB_HEIGHT = 1.8f
+    private const val EDGE_FADE_FRACTION = 0.18f
+    private const val GRID = 16
+    private const val FULL_BRIGHT = 0xF000F0
+
+    private val latestByKey = ConcurrentHashMap<Any, ImageBitmap>()
+    private val models = HashMap<Boolean, PlayerModel>()
+    private var target: RenderTarget? = null
+
+    fun cached(key: Any): ImageBitmap? = latestByKey[key]
+
+    fun evict(key: Any) {
+        latestByKey.remove(key)
+    }
+
+    fun capture(
+        source: PlayerPreviewSource,
+        yawDeg: Float,
+        pitchDeg: Float,
+        widthPx: Int,
+        heightPx: Int,
+        modelScale: Float,
+        verticalAnchor: Float,
+        key: Any = source,
+    ): ImageBitmap? {
+        if (widthPx <= 0 || heightPx <= 0) return latestByKey[key]
+        val w = widthPx.coerceAtMost(MAX_DIM)
+        val h = heightPx.coerceAtMost(MAX_DIM)
+        ClientPlatform.runOnMain {
+            runCatching {
+                val fbo = renderOffscreen(source, yawDeg, w, h, modelScale, verticalAnchor) ?: return@runCatching
+                latestByKey[key] = readback(fbo, w, h)
+            }.onFailure { LOG.error("[preview] capture failed", it) }
+        }
+        return latestByKey[key]
+    }
+
+    fun dispose() {
+        val t = target
+        target = null
+        latestByKey.clear()
+        if (t != null) ClientPlatform.runOnMain { runCatching { t.destroyBuffers() } }
+    }
+
+    @JvmStatic
+    fun renderOverlayEntry(target: RenderTarget, e: PlayerPreviewOverlay.Entry, yawDeg: Float, pitchDeg: Float, rectX: Int, rectY: Int, rectW: Int, rectH: Int) {
+        if (rectW <= 0 || rectH <= 0) return
+        val fit = minOf(1f, MAX_DIM.toFloat() / maxOf(rectW, rectH))
+        val w = (rectW * fit).toInt().coerceAtLeast(1)
+        val h = (rectH * fit).toInt().coerceAtLeast(1)
+        val fbo = renderOffscreen(e.source, yawDeg, w, h, e.modelScale, e.verticalAnchor) ?: return
+        withSavedFramebuffer {
+            target.bindWrite(false)
+            GlStateManager.viewport(0, 0, target.viewWidth, target.viewHeight)
+            withOrtho(target.viewWidth, target.viewHeight) {
+                GlStateManager.disableDepthTest()
+                GlStateManager.depthMask(false)
+                GlStateManager.disableLighting()
+                GlStateManager.disableAlphaTest()
+                GlStateManager.enableTexture()
+                GlStateManager.enableBlend()
+                GlStateManager.blendFuncSeparate(770, 771, 1, 771)
+                GlStateManager.color4f(1f, 1f, 1f, 1f)
+                fbo.bindRead()
+                val u = w.toFloat() / fbo.width
+                val v = h.toFloat() / fbo.height
+                val buffer = Tesselator.getInstance().buffer
+                buffer.begin(GL11.GL_QUADS, DefaultVertexFormat.POSITION_TEX_COLOR)
+                for (iy in 0 until GRID) {
+                    for (ix in 0 until GRID) {
+                        for ((cx, cy) in QUAD_CORNERS) {
+                            val tx = (ix + cx) / GRID.toFloat()
+                            val ty = (iy + cy) / GRID.toFloat()
+                            val a = (fadeAlpha(tx, ty, e.fadeEdges, e.bottomFade) * e.opacity * 255f).toInt().coerceIn(0, 255)
+                            buffer.vertex((rectX + tx * rectW).toDouble(), (rectY + ty * rectH).toDouble(), 0.0)
+                                .texture((tx * u).toDouble(), ((1f - ty) * v).toDouble())
+                                .color(255, 255, 255, a)
+                                .nextVertex()
+                        }
+                    }
+                }
+                Tesselator.getInstance().end()
+                fbo.unbindRead()
+                GlStateManager.disableBlend()
+                GlStateManager.enableAlphaTest()
+                GlStateManager.depthMask(true)
+                GlStateManager.enableDepthTest()
+            }
+        }
+    }
+
+    private val QUAD_CORNERS = listOf(0 to 0, 0 to 1, 1 to 1, 1 to 0)
+
+    private fun smooth(t: Float): Float {
+        val c = t.coerceIn(0f, 1f)
+        return c * c * c * (c * (c * 6f - 15f) + 10f)
+    }
+
+    private fun fadeAlpha(tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float): Float {
+        var a = 1f
+        if (fadeEdges) {
+            a *= smooth(minOf(tx, 1f - tx) / EDGE_FADE_FRACTION)
+            a *= smooth(ty / EDGE_FADE_FRACTION)
+        }
+        if (bottomFade > 0f) a *= smooth((1f - ty) / bottomFade)
+        return a
+    }
+
+    private fun ensureTarget(w: Int, h: Int): RenderTarget {
+        val existing = target
+        if (existing != null && existing.viewWidth == w && existing.viewHeight == h) return existing
+        existing?.destroyBuffers()
+        return RenderTarget(w, h, true).also {
+            it.setClearColor(0f, 0f, 0f, 0f)
+            target = it
+        }
+    }
+
+    private fun renderOffscreen(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): RenderTarget? {
+        if (!GLX.useFbo()) return null
+        val mc = Minecraft.getInstance()
+        var fbo: RenderTarget? = null
+        withSavedFramebuffer {
+            val target = ensureTarget(w, h)
+            resyncGlState()
+            target.clear()
+            target.bindWrite(true)
+            withOrtho(w, h) {
+                runCatching { drawPlayer(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
+                    .onFailure { LOG.error("[preview] player draw failed", it) }
+            }
+            fbo = target
+        }
+        return fbo
+    }
+
+    private fun resyncGlState() {
+        GlStateManager.disableDepthTest(); GlStateManager.enableDepthTest()
+        GlStateManager.depthFunc(GL11.GL_ALWAYS); GlStateManager.depthFunc(GL11.GL_LEQUAL)
+        GlStateManager.depthMask(false); GlStateManager.depthMask(true)
+        GlStateManager.colorMask(false, false, false, false); GlStateManager.colorMask(true, true, true, true)
+        GlStateManager.enableCull(); GlStateManager.disableCull()
+        GlStateManager.enableBlend(); GlStateManager.disableBlend()
+        GlStateManager.enableLighting(); GlStateManager.disableLighting()
+        GL11.glDisable(GL11.GL_SCISSOR_TEST)
+        GL11.glDisable(GL11.GL_STENCIL_TEST)
+    }
+
+    private fun drawPlayer(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
+        val (skin, slim) = localSkin(mc)
+        val model = models.getOrPut(slim) { PlayerModel(0f, slim) }
+        val scale = h * modelScale
+
+        GlStateManager.activeTexture(GLX.GL_TEXTURE1)
+        GlStateManager.disableTexture()
+        GlStateManager.activeTexture(GLX.GL_TEXTURE0)
+        GlStateManager.enableTexture()
+        GlStateManager.enableDepthTest()
+        GlStateManager.depthMask(true)
+        GlStateManager.disableBlend()
+        GlStateManager.enableAlphaTest()
+        GlStateManager.alphaFunc(GL11.GL_GREATER, 0.1f)
+        GlStateManager.enableColorMaterial()
+        GlStateManager.color4f(1f, 1f, 1f, 1f)
+
+        GlStateManager.pushMatrix()
+        GlStateManager.translatef(w / 2f, h * verticalAnchor + scale * PLAYER_BB_HEIGHT / 2f, 50f)
+        GlStateManager.scalef(-scale, scale, scale)
+        GlStateManager.pushMatrix()
+        GlStateManager.rotatef(180f, 0f, 0f, 1f)
+        GlStateManager.rotatef(135f, 0f, 1f, 0f)
+        Lighting.turnOn()
+        GlStateManager.popMatrix()
+        GlStateManager.enableRescaleNormal()
+        GlStateManager.disableCull()
+        previewPet(source)?.let { drawPreviewPet(it, yawDeg) }
+        GlStateManager.rotatef(yawDeg, 0f, 1f, 0f)
+        GlStateManager.scalef(0.9375f, 0.9375f, 0.9375f)
+        GlStateManager.translatef(0f, -1.5078125f, 0f)
+
+        Model.copyRotation(model.head, model.hat)
+        Model.copyRotation(model.leftLeg, model.leftPants)
+        Model.copyRotation(model.rightLeg, model.rightPants)
+        Model.copyRotation(model.leftArm, model.leftSleeve)
+        Model.copyRotation(model.rightArm, model.rightSleeve)
+        Model.copyRotation(model.body, model.jacket)
+
+        mc.textureManager.bind(skin)
+        for (part in listOf(
+            model.head, model.body, model.rightArm, model.leftArm, model.rightLeg, model.leftLeg,
+            model.hat, model.leftPants, model.rightPants, model.leftSleeve, model.rightSleeve, model.jacket,
+        )) {
+            part.render(MODEL_SCALE)
+        }
+
+        capeFor(mc, source)?.let { cape ->
+            mc.textureManager.bind(cape)
+            GlStateManager.pushMatrix()
+            GlStateManager.translatef(0f, 0f, 0.125f)
+            GlStateManager.rotatef(6f, 1f, 0f, 0f)
+            GlStateManager.rotatef(180f, 0f, 1f, 0f)
+            model.renderCape(MODEL_SCALE)
+            GlStateManager.popMatrix()
+        }
+
+        val equipment = equipmentFor(source)
+        if (equipment.equipped().isNotEmpty()) {
+            val renderContext = PlayerRenderContext(
+                ageInTicks = mc.player?.ticks?.toFloat() ?: 0f,
+                walkAnimationSpeed = 0f,
+                isCrouching = false,
+                isOnGround = false,
+                isInWater = false,
+                swimAmount = 0f,
+                isInvisible = false,
+            )
+            CosmeticRenderer.render(
+                PoseStack(),
+                FULL_BRIGHT,
+                renderContext,
+                model,
+                equipment,
+                CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid()),
+                false,
+                emptySet(),
+            )
+        }
+
+        GlStateManager.enableCull()
+        GlStateManager.disableRescaleNormal()
+        GlStateManager.popMatrix()
+        Lighting.turnOff()
+        GlStateManager.disableColorMaterial()
+    }
+
+    private fun previewPet(source: PlayerPreviewSource): PetDefinition? = when (source) {
+        is PlayerPreviewSource.Override -> source.pet
+        PlayerPreviewSource.LocalLive ->
+            CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
+                ?.let { CosmeticAssetCache.getPetDefinition(it) }
+    }
+
+    private val previewPetModelCache = ConcurrentHashMap<Int, BedrockStandaloneModel>()
+
+    private fun idlePetPose(definition: PetDefinition): Map<String, BoneTransform> {
+        val animationName = definition.stateMap["idle"] ?: definition.stateMap.values.firstOrNull()
+        val animation = animationName?.let { definition.animations[it] } ?: return emptyMap()
+        val timeTicks = BedrockAnimationPlayback.resolveTimeTicks(
+            animation,
+            (System.nanoTime() / 50_000_000L).toFloat(),
+        )
+        return AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
+    }
+
+    private const val PREVIEW_PET_SIDE_OFFSET = -0.65f
+
+    private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
+
+    private fun previewTextureFrame(definition: PetDefinition): Pair<Float, Float> {
+        val frameCount = definition.textureFrameCount
+        if (frameCount <= 1) return 1f to 0f
+        val ticks = System.nanoTime() / 50_000_000L
+        val frame = (ticks / PREVIEW_TICKS_PER_TEXTURE_FRAME) % frameCount
+        return (1f / frameCount) to (frame.toFloat() / frameCount)
+    }
+
+    private fun drawPreviewPet(definition: PetDefinition, yawDeg: Float) {
+        val model = previewPetModelCache.getOrPut(definition.id) {
+            BedrockStandaloneModel.build(definition.geometry)
+        }
+        val pose = idlePetPose(definition)
+        model.resetPose()
+        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
+
+        val poseStack = PoseStack()
+        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0f, 0f)
+        poseStack.scale(-definition.scale, definition.scale, -definition.scale)
+        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
+        val (vScale, vOffset) = previewTextureFrame(definition)
+        VertexConsumer.draw(definition.texture, false) { buffer ->
+            for (root in model.roots) {
+                root.render(poseStack, buffer, FULL_BRIGHT, 0, vScale = vScale, vOffset = vOffset)
+            }
+        }
+    }
+
+    private fun capeFor(mc: Minecraft, source: PlayerPreviewSource): Identifier? = when (source) {
+        is PlayerPreviewSource.Override ->
+            if (source.equipment.get(BodySlot.Backpack) != null) null
+            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource)
+        PlayerPreviewSource.LocalLive ->
+            CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
+                ?: mc.player?.capeTextureLocation
+    }
+
+    private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
+        is PlayerPreviewSource.Override -> source.equipment
+        PlayerPreviewSource.LocalLive -> localEquipment()
+    }
+
+    private val loadAttempted = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
+    private var cachedLocalEquipment: CosmeticEquipment? = null
+    private var cachedLocalKey: List<String>? = null
+
+    private fun localEquipment(): CosmeticEquipment {
+        val ids = CosmeticCatalog.localEquipped().ids()
+        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
+        val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
+        cachedLocalEquipment?.let { if (cachedLocalKey == key) return it }
+
+        val equipment = CosmeticEquipment()
+        ids.forEachIndexed { i, id ->
+            val attached = resolved[i]
+            if (attached != null) {
+                equipment.equip(attached)
+            } else if (loadAttempted.add(id)) {
+                PolyPlusClient.SCOPE.launch {
+                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                }
+            }
+        }
+        cachedLocalEquipment = equipment
+        cachedLocalKey = key
+        return equipment
+    }
+
+    @Volatile
+    private var fetchedSkin: Pair<Identifier, Boolean>? = null
+    private var skinRequested = false
+
+    private fun localSkin(mc: Minecraft): Pair<Identifier, Boolean> {
+        mc.player?.let { return it.skinTextureLocation to (it.modelType == "slim") }
+        fetchedSkin?.let { return it }
+        val profile = mc.session.profile
+        if (!skinRequested) {
+            skinRequested = true
+            mc.skinManager.register(profile, { type, location, texture ->
+                if (type == MinecraftProfileTexture.Type.SKIN) fetchedSkin = location to (texture.getMetadata("model") == "slim")
+            }, false)
+        }
+        return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
+    }
+
+    private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {
+        val data = BufferUtils.createByteBuffer(w * h * 4)
+        withSavedFramebuffer {
+            fbo.bindWrite(false)
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1)
+            GL11.glReadPixels(0, 0, w, h, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, data)
+        }
+        val out = ByteArray(w * h * 4)
+        for (y in 0 until h) {
+            val outRow = h - 1 - y
+            val ty = (outRow + 0.5f) / h
+            for (x in 0 until w) {
+                val f = fadeAlpha((x + 0.5f) / w, ty, true, 0f)
+                val si = (y * w + x) * 4
+                val di = (outRow * w + x) * 4
+                out[di] = scaleByte(data.get(si + 2).toInt() and 0xFF, f)
+                out[di + 1] = scaleByte(data.get(si + 1).toInt() and 0xFF, f)
+                out[di + 2] = scaleByte(data.get(si).toInt() and 0xFF, f)
+                out[di + 3] = scaleByte(data.get(si + 3).toInt() and 0xFF, f)
+            }
+        }
+        return SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap()
+    }
+
+    private fun scaleByte(v: Int, f: Float): Byte = (v * f).toInt().coerceAtMost(255).toByte()
+
+    private inline fun withSavedFramebuffer(block: () -> Unit) {
+        val fb = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
+        val viewport = IntArray(4)
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport)
+        try {
+            block()
+        } finally {
+            GLX.bindFramebuffer(GLX.GL_FRAMEBUFFER, fb)
+            GlStateManager.viewport(viewport[0], viewport[1], viewport[2], viewport[3])
+        }
+    }
+
+    private inline fun withOrtho(w: Int, h: Int, block: () -> Unit) {
+        GlStateManager.matrixMode(GL11.GL_PROJECTION)
+        GlStateManager.pushMatrix()
+        GlStateManager.loadIdentity()
+        GlStateManager.ortho(0.0, w.toDouble(), h.toDouble(), 0.0, 1000.0, 3000.0)
+        GlStateManager.matrixMode(GL11.GL_MODELVIEW)
+        GlStateManager.pushMatrix()
+        GlStateManager.loadIdentity()
+        GlStateManager.translatef(0f, 0f, -2000f)
+        try {
+            block()
+        } finally {
+            GlStateManager.matrixMode(GL11.GL_PROJECTION)
+            GlStateManager.popMatrix()
+            GlStateManager.matrixMode(GL11.GL_MODELVIEW)
+            GlStateManager.popMatrix()
+        }
+    }
+}
+*///?}

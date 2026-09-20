@@ -14,13 +14,16 @@ import net.minecraft.client.renderer.rendertype.RenderTypes
 import net.minecraft.client.renderer.SubmitNodeCollector
 //?}
 
-//? if < 1.21.11 {
+//? if < 1.21.11 && > 1.8.9 {
 /*import net.minecraft.client.renderer.RenderType
 *///?}
 
-//? if < 1.21.10 {
+//? if < 1.21.10 && > 1.8.9 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
+
+//? if = 1.8.9
+//import org.polyfrost.polyplus.client.render.VertexConsumer
 
 object BedrockAttachedModelRenderer {
     data class DrawCall(
@@ -91,7 +94,7 @@ object BedrockAttachedModelRenderer {
             }
         }
     }
-    //?} else {
+    //?} elif > 1.8.9 {
     /*fun render(
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
@@ -124,6 +127,40 @@ object BedrockAttachedModelRenderer {
                     draw.textureVOffset,
                 )
                 poseStack.popPose()
+            }
+        }
+    }
+    *///?} else {
+    /*fun render(
+        poseStack: PoseStack,
+        lightCoords: Int,
+        overlayCoords: Int,
+        playerModel: PlayerModel,
+        draws: Iterable<DrawCall>,
+    ) {
+        for (draw in draws) {
+            prepare(draw)
+            VertexConsumer.draw(draw.texture, draw.translucent) { buffer ->
+                for (attachment in draw.model.attachments) {
+                    poseStack.pushPose()
+                    attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
+                    if (draw.backOffset != 0f) {
+                        poseStack.translate(0f, 0f, draw.backOffset)
+                    }
+                    if (draw.scale != 1f) {
+                        poseStack.scale(draw.scale, draw.scale, draw.scale)
+                    }
+                    attachment.rootBone.render(
+                        poseStack,
+                        buffer,
+                        lightCoords,
+                        overlayCoords,
+                        draw.color,
+                        draw.textureVScale,
+                        draw.textureVOffset,
+                    )
+                    poseStack.popPose()
+                }
             }
         }
     }

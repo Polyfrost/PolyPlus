@@ -9,6 +9,11 @@ import net.minecraft.util.FormattedCharSequence
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.regex.Pattern
+//? if = 1.8.9 {
+/*import net.minecraft.text.LiteralText
+import net.minecraft.text.Text
+import net.minecraft.text.TranslatableText
+*///?}
 import kotlinx.serialization.json.Json
 
 object EmojiRegistry {
@@ -101,6 +106,46 @@ object EmojiRegistry {
     fun transformForViewer(component: Component?): Component? =
         if (component == null || !enabled()) component else transform(component)
 
+    //? if = 1.8.9 {
+    /*@JvmStatic
+    fun transformLegacy(text: Text?): Text? = if (text == null || !enabled()) text else legacy(text)
+
+    private fun legacy(text: Text): Text {
+        val out: Text = when (text) {
+            is Component -> return transform(text)
+            is LiteralText -> LiteralText(expandLegacy(text.rawString))
+            is TranslatableText -> TranslatableText(text.key, *text.args.map {
+                when (it) {
+                    is Text -> legacy(it)
+                    is String -> expandLegacy(it)
+                    else -> it
+                }
+            }.toTypedArray())
+            else -> return text
+        }
+        out.setStyle(text.style.deepCopy())
+        for (sibling in text.siblings) out.append(legacy(sibling))
+        return out
+    }
+
+    private fun expandLegacy(text: String): String {
+        val matcher = EMOJI_SHORTCODE.matcher(text)
+        if (!matcher.find()) return text
+        val sb = StringBuilder(text.length)
+        var last = 0
+        do {
+            val glyph = glyphFor(matcher.group()) ?: continue
+            sb.append(text, last, matcher.start()).append(EmojiFont.legacyChar(glyph))
+            last = matcher.end()
+        } while (matcher.find())
+        return sb.append(text, last, text.length).toString()
+    }
+
+    @JvmStatic
+    fun suggestionText(alias: String): String =
+        (shortcodes[alias]?.let { EmojiFont.legacyChar(it) + " " } ?: "") + ":$alias:"
+    *///?}
+
     fun transform(component: Component): Component {
         val contents = component.contents
         val expandedSelf: MutableComponent? = when (contents) {
@@ -113,7 +158,11 @@ object EmojiRegistry {
         var siblingsChanged = false
         val newSiblings = ArrayList<Component>(siblings.size)
         for (sibling in siblings) {
+            //? if > 1.8.9 {
             val transformed = transform(sibling)
+            //?} else {
+            /*val transformed = transform(sibling as Component)
+            *///?}
             if (transformed !== sibling) siblingsChanged = true
             newSiblings.add(transformed)
         }
@@ -129,6 +178,7 @@ object EmojiRegistry {
         contents: TranslatableContents,
         style: Style,
     ): MutableComponent? {
+        //? if > 1.8.9 {
         val args: Array<out Any?> = contents.args
         var changed = false
         val newArgs = arrayOfNulls<Any>(args.size)
@@ -151,6 +201,9 @@ object EmojiRegistry {
         @Suppress("UNCHECKED_CAST")
         val rebuilt = TranslatableContents(contents.key, contents.fallback, newArgs as Array<Any>)
         return MutableComponent.create(rebuilt).setStyle(style)
+        //?} else {
+        /*return null
+        *///?}
     }
 
     private fun expand(text: String, style: Style, pattern: Pattern): MutableComponent? {

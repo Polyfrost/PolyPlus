@@ -7,7 +7,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 //? if < 1.21.5 || >= 1.21.8 {
+//? if > 1.8.9 {
 import com.mojang.blaze3d.pipeline.RenderTarget
+//?} else {
+/*import net.minecraft.client.render.pipeline.RenderTarget
+*///?}
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 //?}
 

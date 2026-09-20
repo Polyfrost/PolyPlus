@@ -5,6 +5,7 @@ import dev.kikugie.loomx.LoomCompatDependencyExtension
 import dev.kikugie.loomx.LoomCompatProjectExtension
 import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.ornithemc.ploceus.api.PloceusGradleExtensionApi
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.kotlin.dsl.getByName
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmExtension
@@ -17,6 +18,8 @@ plugins {
     id("org.jetbrains.kotlinx.atomicfu")
     id("com.gradleup.shadow")
     id("dev.kikugie.loom-back-compat")
+    id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
+    id("ploceus") version "1.17.4" apply false
     id("me.modmuss50.mod-publish-plugin")
 }
 
@@ -27,6 +30,22 @@ shadow {
 val stonecutter = extensions.getByName("stonecutter") as StonecutterBuildExtension
 val loomx = extensions.getByType<LoomCompatProjectExtension>()
 val mcVersion = stonecutter.current.version
+val isOrnithe = mcVersion == "1.8.9"
+val loader = if (isOrnithe) "ornithe" else "fabric"
+val ploceus = if (isOrnithe) {
+    pluginManager.apply("net.fabricmc.fabric-loom-remap")
+    pluginManager.apply("ploceus")
+
+    configurations.configureEach {
+        exclude(group = "org.lwjgl.lwjgl")
+    }
+
+    extensions.getByType<PloceusGradleExtensionApi>().apply {
+        setIntermediaryGeneration(2)
+    }
+} else {
+    null
+}
 
 run {
     val (version, loader) = stonecutter.current.project.split("-", limit = 2)
@@ -130,8 +149,28 @@ configurations.all {
     }
 }
 
+if (isOrnithe) {
+    sourceSets.main {
+        val excluded = listOf(
+            "**/client/network/p2p/P2PVoicechatPlugin.kt",
+            "**/client/network/p2p/EosVoicechat*.kt",
+            "**/mixin/compat/animatium/**",
+            "**/mixin/compat/essential/**",
+            "**/mixin/compat/euphoria/**",
+            "**/mixin/compat/mountopacity/**",
+            "**/mixin/compat/polytone/**",
+            "**/mixin/compat/rrls/**",
+            "**/mixin/compat/sodium/**",
+            "**/mixin/compat/voicechat/**",
+            "**/mixin/compat/waveycapes/**",
+        )
+        java.exclude(excluded)
+        kotlin.exclude(excluded)
+    }
+}
+
 val javaVersion = when {
-    stonecutter.current.parsed >= "26.1" -> 25
+    isOrnithe || stonecutter.current.parsed >= "26.1" -> 25
     else -> 21
 }
 
@@ -194,16 +233,29 @@ tasks.jar {
 dependencies {
     minecraft("com.mojang:minecraft:$mcDependencyVersion")
 
-    dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
+    if (isOrnithe) {
+        mappings(ploceus!!.layeredMappings {
+            mappings("net.ornithemc:feather-gen2:$mcVersion+build.${property("feather_build")}:v2") {
+                containsUnpick()
+            }
+            mappings(rootProject.file("mappings/feather-overrides.tiny"))
+        })
+        testCompileOnly("net.ornithemc.osl-gen2:entrypoints:${property("deps.osl_entrypoints")}")
+        include(implementation("org.joml:joml:1.10.8")!!)
+    } else {
+        dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
+    }
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
     annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:$mixinSquaredVersion")
 
-    modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
-
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+    if (!isOrnithe) {
+        modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
+        modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+        modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
+    }
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
     // This is a library, not a traditional mod. It must not use modRuntimeOnly,
     // or it does not get properly loaded into the test environment on 1.21.x.
@@ -213,13 +265,11 @@ dependencies {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }
     }
 
-    modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
-
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
 
     compileOnly("com.nikoverflow:exploit-preventer-api:1.0.0")
 
-    modImplementation("org.polyfrost.oneconfig:$mcVersion-fabric:$oneconfigVersion") {
+    modImplementation("org.polyfrost.oneconfig:$mcVersion-$loader:$oneconfigVersion") {
         // Loom strips the nested Kotlin jars from a remapped copy, so the plain copy above must stay the only candidate
         exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
     }
@@ -300,6 +350,9 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("modVersion", modVersion)
     inputs.property("minorMcVersion", minecraftPredicate)
     filesMatching("fabric.mod.json") {
+        if (isOrnithe) filter { line ->
+            line.takeUnless { "\"fabric-api\"" in it }?.replace("\"java\": \">=21\"", "\"java\": \">=25\"")
+        }
         expand(
             mapOf(
                 "mod_id" to modId,
@@ -347,7 +400,7 @@ publishMods {
     changelog = changelogs
     type = STABLE
 
-    modLoaders.add("fabric")
+    modLoaders.add(loader)
 
     dryRun = modrinthId == null || modrinthToken == null
 

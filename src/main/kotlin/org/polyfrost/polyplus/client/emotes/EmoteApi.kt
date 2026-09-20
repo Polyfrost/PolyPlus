@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.client.Minecraft
+//? if > 1.8.9 {
 import net.minecraft.client.player.AbstractClientPlayer
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity as AbstractClientPlayer
+*///?}
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog

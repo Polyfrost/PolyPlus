@@ -2,9 +2,6 @@ package org.polyfrost.polyplus.client
 
 import com.mojang.authlib.GameProfile
 import net.minecraft.client.Minecraft
-import net.minecraft.client.multiplayer.PlayerInfo
-import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.Style
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import java.util.UUID
@@ -21,8 +18,18 @@ import net.minecraft.network.chat.FontDescription
 import net.minecraft.client.renderer.RenderPipelines
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
+//? if > 1.8.9 {
+import net.minecraft.client.multiplayer.PlayerInfo
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Style
+//?} else {
+/*import net.minecraft.client.gui.GuiElement
+import net.minecraft.client.network.PlayerInfo
+import net.minecraft.client.render.platform.GlStateManager
 *///?}
 
 //? if >= 1.21.4 && < 1.21.8 {
@@ -30,15 +37,16 @@ import net.minecraft.client.renderer.RenderPipelines
 *///?}
 
 object PolyPlusBadge {
-    private val FONT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "badge")
-
-    private const val GLYPH = "\uE000\uE001"
-
     private val DEBUG_FORCE = java.lang.Boolean.getBoolean("polyplus.badge.debug")
 
     @JvmStatic
     fun shouldBadge(uuid: UUID): Boolean =
         PolyPlusConfig.showPolyPlusIndicator && (DEBUG_FORCE || CosmeticCatalog.isPolyPlusUser(uuid))
+
+    //? if > 1.8.9 {
+    private val FONT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "badge")
+
+    private const val GLYPH = "\uE000\uE001"
 
     private val BADGE_STYLE: Style =
         //? if >= 1.21.10 {
@@ -61,8 +69,9 @@ object PolyPlusBadge {
             .append(badgeGlyph)
             .append(name)
     }
+    //?}
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     // Some servers (e.g. Hypixel SkyBlock) use placeholder profiles with fake
     // UUIDs in the visible part of the tab list, so we match against the name
     // as a fallback
@@ -86,7 +95,11 @@ object PolyPlusBadge {
     }
 
     private fun resolveProxiedTabUuid(info: PlayerInfo): UUID? {
+        //? if > 1.8.9 {
         val displayName = info.tabListDisplayName?.string ?: return null
+        //?} else {
+        /*val displayName = info.displayName?.string ?: return null
+        *///?}
         val id = tabUuid(info.profile)
         val cached = proxiedTabUuids[id]
         if (cached != null && cached.displayName == displayName) return cached.resolved
@@ -97,9 +110,15 @@ object PolyPlusBadge {
     }
 
     private fun lookUpPlayerListEntry(displayName: String): UUID? {
+        //? if > 1.8.9 {
         val connection = Minecraft.getInstance().connection ?: return null
         for (token in NAME_TOKEN.findAll(displayName)) {
             val entry = connection.getPlayerInfo(token.value) ?: continue
+        //?} else {
+        /*val connection = Minecraft.getInstance().networkHandler ?: return null
+        for (token in NAME_TOKEN.findAll(displayName)) {
+            val entry = connection.getOnlinePlayer(token.value) ?: continue
+        *///?}
             val id = tabUuid(entry.profile)
             if (id.version() == 4) return id
         }
@@ -134,8 +153,10 @@ object PolyPlusBadge {
     @JvmStatic
     //? if >= 26.1 {
     fun blitTab(graphics: GuiGraphicsExtractor, x: Int, y: Int) {
-    //?} else {
+    //?} elif > 1.8.9 {
     /*fun blitTab(graphics: GuiGraphics, x: Int, y: Int) {
+    *///?} else {
+    /*fun blitTab(x: Int, y: Int) {
     *///?}
         val bx = x + PAD_LEFT
         val by = y + BADGE_Y_OFFSET
@@ -159,7 +180,7 @@ object PolyPlusBadge {
             TEX_W, TEX_H,
             TEX_W, TEX_H,
         )
-        *///?} else {
+        *///?} elif > 1.8.9 {
         /*graphics.blit(
             BADGE_TEXTURE,
             bx, by,
@@ -168,7 +189,26 @@ object PolyPlusBadge {
             TEX_W, TEX_H,
             TEX_W, TEX_H,
         )
+        *///?} else {
+        /*drawBadge(bx, by)
         *///?}
     }
+
+    //? if = 1.8.9 {
+    /*@JvmStatic
+    fun drawBadge(x: Int, y: Int) {
+        Minecraft.getInstance().textureManager.bind(BADGE_TEXTURE)
+        GlStateManager.enableBlend()
+        GlStateManager.blendFuncSeparate(770, 771, 1, 0)
+        GlStateManager.color4f(1f, 1f, 1f, 1f)
+        GuiElement.drawTexture(x, y, 0f, 0f, TEX_W, TEX_H, BADGE_W, BADGE_H, TEX_W.toFloat(), TEX_H.toFloat())
+    }
+
+    @JvmStatic
+    fun badgesNameTag(entity: Any?, name: String): Boolean =
+        entity is net.minecraft.client.entity.living.player.ClientPlayerEntity &&
+            name == entity.displayName.formattedString &&
+            shouldBadge(entity.uuid)
+    *///?}
     //?}
 }

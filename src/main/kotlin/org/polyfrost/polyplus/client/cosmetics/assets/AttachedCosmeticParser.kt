@@ -313,21 +313,3 @@ internal object AttachedCosmeticParser {
         return (preferred ?: pngs.first()).file
     }
 }
-
-private const val MIN_SHEET_FRAMES = 3
-
-internal fun detectVerticalTextureFrameCount(
-    declaredWidth: Int,
-    declaredHeight: Int,
-    actualWidth: Int,
-    actualHeight: Int,
-    maxUvV: Float,
-    minFrames: Int = MIN_SHEET_FRAMES,
-): Int {
-    if (declaredWidth <= 0 || declaredHeight <= 0) return 1
-    if (actualWidth != declaredWidth || actualHeight <= declaredHeight) return 1
-    if (actualHeight % declaredHeight != 0) return 1
-    if (maxUvV > declaredHeight) return 1
-    val frames = actualHeight / declaredHeight
-    return if (frames >= minFrames) frames else 1
-}

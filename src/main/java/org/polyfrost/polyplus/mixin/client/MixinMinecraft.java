@@ -14,10 +14,17 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
 
 @Mixin(value = Minecraft.class, priority = 1500)
 public class MixinMinecraft {
+    //? if > 1.8.9 {
     @Inject(method = "runTick", at = @At("HEAD"))
     private void polyplus$beginMenuBackdropFrame(boolean renderLevel, CallbackInfo ci) {
         MenuPanorama.beginPass();
     }
+    //?} else {
+    /*@Inject(method = "runGame", at = @At("HEAD"))
+    private void polyplus$beginMenuBackdropFrame(CallbackInfo ci) {
+        MenuPanorama.beginPass();
+    }
+    *///?}
 
     //? if >= 26.2 {
     @Inject(

@@ -13,11 +13,13 @@
   "client": [
     "client.MixinAbstractSelectionList",
     "client.MixinChatComponent",
+    //? if > 1.8.9
     "client.MixinChatListener",
     "client.MixinChatScreen",
     "client.MixinClientHandshakePacketListenerImpl",
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
+    //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
     "client.MixinEntityRenderer",
@@ -31,6 +33,7 @@
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
     "client.MixinOnlineServerEntry",
+    //? if > 1.8.9
     "client.MixinPanorama",
     //? if <26.3
     //"client.MixinPauseScreen",
@@ -38,16 +41,20 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
+    //? if > 1.8.9
     "client.MixinTabButton",
     "client.MixinTitleScreen",
+    //? if > 1.8.9
     "client.access.CameraAccessor",
     "client.access.ClientCommonPacketListenerAccessor",
     "client.access.ClientHandshakePacketListenerAccessor",
     "client.access.ClientPacketListenerAccessor",
     "client.access.MinecraftAccessor",
+    //? if > 1.8.9
     "client.access.AbstractSelectionListAccessor",
     "client.access.OnlineServerEntryInvoker",
     "client.access.ScreenAccessor",
+    //? if > 1.8.9
     "client.access.UserAccessor",
     "client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
@@ -55,36 +62,59 @@
     "client.cosmetics.MixinAvatarRenderer",
     //? if >= 1.21.4
     "client.cosmetics.MixinAvatarRenderState",
+    //? if = 1.8.9
+    //"client.cosmetics.MixinLivingEntityRenderer",
     "client.cosmetics.MixinPlayerModel",
-    "client.network.MixinClientCommonPacketListenerImpl",
+    //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",
-    "client.privacy.MixinAnvilScreen"
+    //? if > 1.8.9
+    "client.privacy.MixinAnvilScreen",
+    //? if = 1.8.9
+    //"client.MixinEmojiTextRenderer",
+    //? if = 1.8.9
+    //"client.access.TitleScreenInvoker",
+    "client.network.MixinClientCommonPacketListenerImpl"
   ],
   "mixins": [
     "MixinCrashReport",
+    //? if > 1.8.9
     "MixinSystemReport",
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
     "client.network.MixinServerGamePacketListenerImpl",
-    "client.network.ServerCommonPacketListenerAccessor",
+    //? if > 1.8.9
     "compat.animatium.MixinToastUtil",
+    //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
+    //? if > 1.8.9
     "compat.essential.MixinModalManager",
+    //? if > 1.8.9
     "compat.essential.MixinPartnerModConfig",
+    //? if > 1.8.9
     "compat.euphoria.MixinSodiumConsole",
+    //? if > 1.8.9
     "compat.mountopacity.MixinEntityHook",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
+    //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2
     "compat.rrls.MixinOverlayHelper",
+    //? if > 1.8.9
     "compat.sodium.MixinSodiumConfigBuilder",
+    //? if > 1.8.9
     "compat.voicechat.MixinClientManager",
+    //? if > 1.8.9
     "compat.waveycapes.MixinCustomCapeRenderer",
+    //? if > 1.8.9
     "compat.waveycapes.MixinCustomCapeRenderLayer",
-    "compat.waveycapes.MixinPlayerWrapper"
+    //? if > 1.8.9
+    "compat.waveycapes.MixinPlayerWrapper",
+    //? if = 1.8.9
+    //"client.network.MixinPlayerManager",
+    "client.network.ServerCommonPacketListenerAccessor"
   ]
 }

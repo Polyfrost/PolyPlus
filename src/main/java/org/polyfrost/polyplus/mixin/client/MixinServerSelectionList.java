@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.multiplayer.ServerData;
@@ -153,3 +154,119 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         return (List<ServerSelectionList.Entry>) (List<?>) ((AbstractSelectionListAccessor) this).polyplus$children();
     }
 }
+//?} else {
+/*import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget;
+import net.minecraft.client.gui.widget.EntryListWidget;
+import net.minecraft.client.gui.widget.LanServerEntry;
+import net.minecraft.client.gui.widget.ServerListEntryWidget;
+import net.minecraft.client.options.ServerList;
+import net.minecraft.client.options.ServerListEntry;
+import org.polyfrost.polyplus.client.featured.FeaturedServer;
+import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
+import org.polyfrost.polyplus.client.featured.FeaturedServerModelsKt;
+import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
+import org.polyfrost.polyplus.client.featured.FeaturedServers;
+import org.polyfrost.polyplus.mixin.client.access.OnlineServerEntryInvoker;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+@Mixin(MultiplayerServerListWidget.class)
+public abstract class MixinServerSelectionList implements FeaturedServerListAccess {
+    @Shadow @Final private MultiplayerScreen parent;
+    @Shadow @Final private List<ServerListEntryWidget> servers;
+    @Shadow @Final private List<LanServerEntry> lanServers;
+
+    @Unique
+    private final List<EntryListWidget.Entry> polyplus$featured = new ArrayList<>();
+
+    @Inject(method = "setServers", at = @At("RETURN"))
+    private void polyplus$appendFeaturedEntries(ServerList list, CallbackInfo ci) {
+        polyplus$rebuildFeaturedServers();
+    }
+
+    @Inject(method = "size", at = @At("RETURN"), cancellable = true)
+    private void polyplus$countFeaturedEntries(CallbackInfoReturnable<Integer> cir) {
+        cir.setReturnValue(cir.getReturnValue() + polyplus$featured.size());
+    }
+
+    @Inject(method = "getEntry", at = @At("HEAD"), cancellable = true)
+    private void polyplus$featuredEntry(int index, CallbackInfoReturnable<EntryListWidget.Entry> cir) {
+        int featuredIndex = index - (servers.size() + 1 + lanServers.size());
+        if (featuredIndex >= 0 && featuredIndex < polyplus$featured.size()) {
+            cir.setReturnValue(polyplus$featured.get(featuredIndex));
+        }
+    }
+
+    @Override
+    public void polyplus$rebuildFeaturedServers() {
+        var self = (MultiplayerServerListWidget) (Object) this;
+        FeaturedServerRowRegistry.release(self);
+        polyplus$featured.clear();
+
+        long now = System.currentTimeMillis();
+        var snapshot = FeaturedServers.snapshot();
+        var saved = new HashSet<String>();
+        for (var entry : servers) saved.add(FeaturedServerModelsKt.normalizeServerAddress(entry.fetchServer().ip));
+
+        for (var server : snapshot.featuredServers(now)) {
+            if (!saved.contains(FeaturedServerModelsKt.normalizeServerAddress(server.getAddress()))) {
+                polyplus$addRemote(server, true);
+            }
+        }
+        boolean headerAdded = false;
+        for (var server : snapshot.sponsoredServers(now)) {
+            if (saved.contains(FeaturedServerModelsKt.normalizeServerAddress(server.getAddress()))) continue;
+            if (!headerAdded) {
+                polyplus$featured.add(new FeaturedServerRowRegistry.Header());
+                headerAdded = true;
+            }
+            polyplus$addRemote(server, false);
+        }
+        if (self.getCurrentServerIndex() >= servers.size() + 1 + lanServers.size() + polyplus$featured.size()) {
+            self.setCurrentServerIndex(-1);
+        }
+    }
+
+    @Unique
+    private void polyplus$addRemote(FeaturedServer server, boolean promoted) {
+        var data = new ServerListEntry(server.getName(), server.getAddress(), false);
+        var entry = OnlineServerEntryInvoker.polyplus$create(parent, data);
+        FeaturedServerRowRegistry.register(entry, (MultiplayerServerListWidget) (Object) this, parent, data, server, promoted);
+        polyplus$featured.add(entry);
+    }
+
+    @Override
+    public void polyplus$saveFeaturedServer(FeaturedServerRowRegistry.Row row) {
+        ServerList list = parent.getServerList();
+        var address = FeaturedServerModelsKt.normalizeServerAddress(row.data().ip);
+        int index = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (FeaturedServerModelsKt.normalizeServerAddress(list.get(i).ip).equals(address)) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            list.add(new ServerListEntry(row.data().name, row.data().ip, false));
+            index = list.size() - 1;
+            if (row.promoted()) {
+                for (int i = index; i > 0; i--) list.swap(i, i - 1);
+                index = 0;
+            }
+            list.save();
+        }
+        ((MultiplayerServerListWidget) (Object) this).setServers(list);
+        parent.moveToServer(index);
+    }
+}
+*///?}

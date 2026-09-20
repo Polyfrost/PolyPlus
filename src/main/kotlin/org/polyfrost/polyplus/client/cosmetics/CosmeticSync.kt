@@ -1,10 +1,15 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
+//? if > 1.8.9 {
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity as AbstractClientPlayer
+import net.minecraft.network.packet.s2c.play.PlayerInfoS2CPacket
+*///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
@@ -18,8 +23,8 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
-import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.Batcher
 import org.polyfrost.polyplus.utils.EarlyInitializable
@@ -46,7 +51,7 @@ object CosmeticSync : EarlyInitializable {
     @Volatile
     private var capWarned = false
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     private const val RECONCILE_INTERVAL_TICKS = 20
     private var reconcileTicks = 0
 
@@ -61,7 +66,7 @@ object CosmeticSync : EarlyInitializable {
             Unit
         }.register()
 
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         eventHandler<TickEvent.End> {
             if (++reconcileTicks >= RECONCILE_INTERVAL_TICKS) {
                 reconcileTicks = 0
@@ -75,6 +80,7 @@ object CosmeticSync : EarlyInitializable {
         }.register()
         //?}
 
+        //? if > 1.8.9 {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             unsubscribeAllPlayers()
             CosmeticCatalog.reset()
@@ -84,6 +90,20 @@ object CosmeticSync : EarlyInitializable {
             PetManager.despawnAll()
             //?}
         }
+        //?} else {
+        /*eventHandler<TickEvent.End> {
+            val connected = Minecraft.getInstance().networkHandler != null
+            if (wasConnected && !connected) {
+                unsubscribeAllPlayers()
+                CosmeticCatalog.reset()
+                PolyPlusBadge.clearTabCache()
+                CosmeticAssetCache.reset()
+                PetManager.despawnAll()
+            }
+            wasConnected = connected
+            Unit
+        }.register()
+        *///?}
 
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -97,7 +117,7 @@ object CosmeticSync : EarlyInitializable {
                 }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
                 is ClientboundPacket.Error -> handleError(packet)
-                //? if >= 1.21.1 {
+                //? if >= 1.21.1 || = 1.8.9 {
                 is ClientboundPacket.PlayerEmoteStarted -> handleEmotePlay(packet.player, packet.emoteId)
                 is ClientboundPacket.PlayerEmoteStopped -> handleEmoteStop(packet.player)
                 is ClientboundPacket.EmotePlay -> handleEmotePlay(packet.player, packet.emoteId)
@@ -107,6 +127,7 @@ object CosmeticSync : EarlyInitializable {
             }
         }.register()
 
+        //? if > 1.8.9 {
         eventHandler<PacketEvent.Receive> { event ->
             val packet = event.getPacket<Any>() as? ClientboundPlayerInfoUpdatePacket ?: return@eventHandler
             for (action in packet.actions()) {
@@ -118,11 +139,30 @@ object CosmeticSync : EarlyInitializable {
             val packet = event.getPacket<Any>() as? ClientboundPlayerInfoRemovePacket ?: return@eventHandler
             val removed = ArrayList<String>()
             for (uuid in packet.profileIds()) {
+        //?} else {
+        /*eventHandler<PacketEvent.Receive> { event ->
+            val packet = event.getPacket<Any>() as? PlayerInfoS2CPacket ?: return@eventHandler
+            if (packet.action == PlayerInfoS2CPacket.Action.ADD_PLAYER) {
+                for (entry in packet.entries) {
+                    val uuid = entry.profile.id
+                    if (uuid.isRealPlayer()) BATCHER.add(uuid.toString())
+                }
+            }
+        }
+
+        eventHandler<PacketEvent.Receive> { event ->
+            val packet = event.getPacket<Any>() as? PlayerInfoS2CPacket ?: return@eventHandler
+            if (packet.action != PlayerInfoS2CPacket.Action.REMOVE_PLAYER) return@eventHandler
+            val removed = ArrayList<String>()
+            for (uuid in packet.entries.map { it.profile.id }) {
+        *///?}
                 if (!uuid.isRealPlayer()) continue
                 CosmeticCatalog.removeRemote(uuid)
                 removed.add(uuid.toString())
-                //? if >= 1.21.1 {
+                //? if >= 1.21.1 || = 1.8.9 {
                 handleEmoteStop(uuid.toString())
+                //?}
+                //? if >= 1.21.1 || = 1.8.9 {
                 PetManager.despawn(uuid)
                 //?}
             }
@@ -139,6 +179,7 @@ object CosmeticSync : EarlyInitializable {
 
     fun refreshVisibleSubscriptions(): Result<Unit> {
         val mc = Minecraft.getInstance()
+        //? if > 1.8.9 {
         if (!mc.isSameThread) {
             mc.execute { refreshVisibleSubscriptions() }
             return Result.success(Unit)
@@ -156,6 +197,25 @@ object CosmeticSync : EarlyInitializable {
             normalizePlayerUuid(player.uuid.toString())?.let(visible::add)
         }
         for (uuid in mc.connection?.onlinePlayerIds ?: emptyList()) {
+        //?} else {
+        /*if (!mc.isOnSameThread) {
+            mc.tell { refreshVisibleSubscriptions() }
+            return Result.success(Unit)
+        }
+        val level = mc.world
+            ?: return Result.failure(IllegalStateException("No world is loaded"))
+
+        val visible = LinkedHashSet<String>()
+        val self = mc.player
+        val loaded = level.players.let { players ->
+            if (self == null) players else players.sortedBy { it.squaredDistanceTo(self) }
+        }
+        for (player in loaded) {
+            if (visible.size >= MAX_PLAYER_SUBSCRIPTIONS) break
+            normalizePlayerUuid(player.uuid.toString())?.let(visible::add)
+        }
+        for (uuid in mc.networkHandler?.onlinePlayers?.map { it.profile.id } ?: emptyList()) {
+        *///?}
             if (visible.size >= MAX_PLAYER_SUBSCRIPTIONS) break
             normalizePlayerUuid(uuid.toString())?.let(visible::add)
         }
@@ -194,9 +254,11 @@ object CosmeticSync : EarlyInitializable {
         for ((uuidString, color) in packet.particleColors) {
             CosmeticCatalog.setParticleColor(UUID.fromString(uuidString), color)
         }
+        //? if >= 1.21.1 || = 1.8.9 {
         for ((uuidString, emoteId) in packet.activeEmotes) {
             handleEmotePlay(uuidString, emoteId)
         }
+        //?}
         if (packet.users.isNotEmpty()) {
             LOGGER.info("PolyPlus presence snapshot: {} online user(s): {}", packet.users.size, packet.users)
         }
@@ -227,7 +289,7 @@ object CosmeticSync : EarlyInitializable {
         }
     }
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     private fun handleEmotePlay(playerUuid: String, emoteId: Int) {
         val uuid = UUID.fromString(playerUuid)
         PolyPlusClient.SCOPE.launch {
@@ -259,7 +321,10 @@ object CosmeticSync : EarlyInitializable {
         //? if >= 1.21.1 {
         reconcileAttachedCosmetics(player, uuid)
         reconcilePet(uuid)
-        //?}
+        //?} elif = 1.8.9 {
+        /*reconcileAttachedCosmetics(player, uuid)
+        reconcilePet(uuid)
+        *///?}
 
         for (id in cosmeticIds) {
             val definition = CosmeticCatalog.getDefinition(id) ?: continue
@@ -277,14 +342,14 @@ object CosmeticSync : EarlyInitializable {
                 CosmeticType.Shoulder,
                 CosmeticType.Pet -> Unit
                 CosmeticType.Unknown -> Unit
-                //? if >= 1.21.1 {
+                //? if >= 1.21.1 || = 1.8.9 {
                 CosmeticType.Emote -> applyEmote(player, id)
                 //?}
             }
         }
     }
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     private val ATTACHED_SLOTS = listOf(
         BodySlot.Backpack,
         BodySlot.Glasses,
@@ -297,17 +362,6 @@ object CosmeticSync : EarlyInitializable {
         BodySlot.Shoulder,
         BodySlot.Pet,
     )
-
-    private fun reconcileVisiblePlayers() {
-        val level = Minecraft.getInstance().level ?: return
-        for (player in level.players()) {
-            val uuid = player.uuid
-            if (!uuid.isRealPlayer()) continue
-            if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
-            reconcileAttachedCosmetics(player, uuid)
-            reconcilePet(uuid)
-        }
-    }
 
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
@@ -338,16 +392,34 @@ object CosmeticSync : EarlyInitializable {
             }
         }
     }
+    //?}
 
-    private fun reconcileCape(cosmeticId: Int?) {
-        if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
+    //? if >= 1.21.1 {
+    private fun reconcileVisiblePlayers() {
+        val level = Minecraft.getInstance().level ?: return
+        for (player in level.players()) {
+            val uuid = player.uuid
+            if (!uuid.isRealPlayer()) continue
+            if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
+            reconcileAttachedCosmetics(player, uuid)
+            reconcilePet(uuid)
+        }
+    }
+    //?}
+
+    //? if >= 1.21.1 || = 1.8.9 {
+    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
-                LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)
+            if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
+            val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@launch
+            ClientPlatform.runOnMain {
+                (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
             }
         }
     }
+    //?}
 
+    //? if >= 1.21.1 || = 1.8.9 {
     private fun reconcilePet(uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
         val desiredId = equipped[BodySlot.Pet]
@@ -371,18 +443,33 @@ object CosmeticSync : EarlyInitializable {
             }
         }
     }
+    //?}
 
-    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
+    private fun reconcileCape(cosmeticId: Int?) {
+        if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
-            val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@launch
-            ClientPlatform.runOnMain {
-                (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
+            if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
+                LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)
             }
         }
     }
-    //?}
 
+    //? if = 1.8.9 {
+    /*private var wasConnected = false
+
+    private fun reconcileVisiblePlayers() {
+        val level = Minecraft.getInstance().world ?: return
+        for (player in level.players) {
+            val uuid = player.uuid
+            if (!uuid.isRealPlayer()) continue
+            if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
+            reconcileAttachedCosmetics(player as? AbstractClientPlayer ?: continue, uuid)
+            reconcilePet(uuid)
+        }
+    }
+    *///?}
+
+    //? if > 1.8.9 {
     private fun processPlayerInfoAction(
         action: ClientboundPlayerInfoUpdatePacket.Action,
         entries: List<ClientboundPlayerInfoUpdatePacket.Entry>,
@@ -399,6 +486,7 @@ object CosmeticSync : EarlyInitializable {
             else -> return
         }
     }
+    //?}
 
     private fun subscribePlayers(players: Iterable<String>): Result<Unit> {
         val added = ArrayList<String>()
@@ -479,8 +567,13 @@ object CosmeticSync : EarlyInitializable {
     }
 
     private fun findPlayer(uuid: UUID): AbstractClientPlayer? {
+        //? if > 1.8.9 {
         val level = Minecraft.getInstance().level ?: return null
         return level.players().firstOrNull { it.uuid == uuid }
+        //?} else {
+        /*val level = Minecraft.getInstance().world ?: return null
+        return level.players.firstOrNull { it.uuid == uuid } as? AbstractClientPlayer
+        *///?}
     }
 
     private fun normalizePlayerUuid(uuidString: String): String? {

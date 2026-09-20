@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.CubeMap;
 import org.spongepowered.asm.mixin.Mixin;
 
@@ -28,3 +29,4 @@ public class MixinCubeMap {
     }
     //?}
 }
+//?}

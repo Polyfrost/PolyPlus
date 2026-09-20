@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.pets
 
+//? if > 1.8.9 {
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry
 import net.fabricmc.fabric.api.`object`.builder.v1.entity.FabricDefaultAttributeRegistry
 import net.minecraft.core.Registry
@@ -88,3 +89,21 @@ object PetEntities {
         LogManager.getLogger("PetEntities").info("Registered pet entity type + renderer")
     }
 }
+//?} else {
+/*import net.minecraft.client.Minecraft
+import org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor
+
+object PetEntities {
+    private var nextNetworkId = -0x50E7_0000
+
+    fun nextNetworkId(): Int = nextNetworkId--
+
+    fun register() {
+        val dispatcher = Minecraft.getInstance().entityRenderDispatcher
+        val renderers = (dispatcher as EntityRenderDispatcherAccessor).`polyplus$renderers`()
+        if (renderers[PetEntity::class.java] !is PetEntityRenderer) {
+            renderers[PetEntity::class.java] = PetEntityRenderer(dispatcher)
+        }
+    }
+}
+*///?}

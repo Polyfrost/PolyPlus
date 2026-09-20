@@ -40,11 +40,18 @@ private val JVM_ARGUMENT_STEPS = listOf(
 )
 
 class RamGuideScreen(private val advice: JvmAdvisor.Advice) : ComposeScreen(RenderMode.CONTINUOUS) {
+    //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = true
 
     override fun onClose() {
         Minecraft.getInstance().execute { super.onClose() }
     }
+    //?} else {
+    /*private fun onClose() {
+        val mc = Minecraft.getInstance()
+        mc.tell { mc.openScreen(null) }
+    }
+    *///?}
 
     @Composable
     override fun compose() {

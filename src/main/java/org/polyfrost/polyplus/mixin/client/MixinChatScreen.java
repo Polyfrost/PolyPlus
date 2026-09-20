@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -273,3 +274,180 @@ public abstract class MixinChatScreen {
         return original.call(mouseX, mouseY, deltaX, deltaY);
     }
 }
+//?} else {
+/*import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiElement;
+import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.render.TextRenderer;
+import org.lwjgl.input.Mouse;
+import com.mojang.blaze3d.platform.InputConstants;
+import org.polyfrost.oneconfig.internal.legacy.KeyCodes;
+import org.polyfrost.polyplus.client.emoji.EmojiChatPicker;
+import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
+import org.polyfrost.polyplus.client.emoji.PickerGraphics;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@Mixin(ChatScreen.class)
+public abstract class MixinChatScreen extends Screen {
+    @Shadow protected TextFieldWidget chatField;
+
+    @Unique private static final Pattern POLYPLUS_TOKEN = Pattern.compile("(?<![A-Za-z0-9_:/.+\\-]):([a-z0-9_+\\-]{2,})$");
+    @Unique private static final int POLYPLUS_MAX = 10;
+    @Unique private static final int POLYPLUS_LINE_H = 12;
+    @Unique private static final int POLYPLUS_CHAT_BACKGROUND = 0x80000000;
+
+    @Unique private final EmojiChatPicker polyplus$picker = new EmojiChatPicker();
+
+    @Unique private List<String> polyplus$suggestions = Collections.emptyList();
+    @Unique private int polyplus$selected = 0;
+    @Unique private int polyplus$tokenStart = -1;
+    @Unique private String polyplus$token = null;
+
+    @Unique
+    private void polyplus$layout() {
+        polyplus$picker.layout(chatField.x, chatField.y, chatField.getInnerWidth());
+    }
+
+    @Unique
+    private void polyplus$refresh() {
+        polyplus$suggestions = Collections.emptyList();
+        polyplus$tokenStart = -1;
+        if (chatField == null || !EmojiRegistry.enabled()) {
+            polyplus$token = null;
+            return;
+        }
+        String value = chatField.getText();
+        int cursor = Math.min(chatField.getCursor(), value.length());
+        Matcher m = POLYPLUS_TOKEN.matcher(value.substring(0, cursor));
+        if (!m.find()) {
+            polyplus$token = null;
+            return;
+        }
+        String prefix = m.group(1);
+        List<String> found = EmojiRegistry.completions(prefix, POLYPLUS_MAX);
+        if (found.isEmpty()) {
+            polyplus$token = null;
+            return;
+        }
+        if (!prefix.equals(polyplus$token)) {
+            polyplus$selected = 0;
+            polyplus$token = prefix;
+        }
+        polyplus$suggestions = found;
+        polyplus$tokenStart = m.start();
+        if (polyplus$selected >= found.size()) polyplus$selected = 0;
+    }
+
+    @Unique
+    private boolean polyplus$accept() {
+        if (polyplus$suggestions.isEmpty() || polyplus$tokenStart < 0) return false;
+        String alias = polyplus$suggestions.get(polyplus$selected);
+        String value = chatField.getText();
+        int cursor = Math.min(chatField.getCursor(), value.length());
+        String before = value.substring(0, polyplus$tokenStart);
+        String after = value.substring(cursor);
+        String insert = ":" + alias + ":";
+        chatField.setText(before + insert + after);
+        chatField.setCursor((before + insert).length());
+        polyplus$suggestions = Collections.emptyList();
+        polyplus$tokenStart = -1;
+        polyplus$token = null;
+        return true;
+    }
+
+    @Unique
+    private boolean polyplus$handleKey(int key, boolean shiftDown) {
+        if (polyplus$picker.handleKey(key, shiftDown, this::polyplus$insertEmoji)) return true;
+        if (polyplus$suggestions.isEmpty()) return false;
+        int n = polyplus$suggestions.size();
+        switch (key) {
+            case InputConstants.KEY_UP:
+                polyplus$selected = (polyplus$selected - 1 + n) % n;
+                return true;
+            case InputConstants.KEY_DOWN:
+                polyplus$selected = (polyplus$selected + 1) % n;
+                return true;
+            case InputConstants.KEY_TAB:
+            case InputConstants.KEY_RETURN:
+            case InputConstants.KEY_NUMPADENTER:
+                return polyplus$accept();
+            case InputConstants.KEY_ESCAPE:
+                polyplus$suggestions = Collections.emptyList();
+                polyplus$tokenStart = -1;
+                polyplus$token = null;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void polyplus$renderEmoji(int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        TextRenderer font = Minecraft.getInstance().textRenderer;
+        if (chatField != null && EmojiRegistry.enabled()) {
+            polyplus$layout();
+            polyplus$picker.render(PickerGraphics.INSTANCE, font, mouseX, mouseY);
+        }
+        polyplus$refresh();
+        if (polyplus$suggestions.isEmpty() || polyplus$picker.isOpen()) return;
+        int x = chatField.x;
+        int bottom = chatField.y - 2;
+        int top = bottom - polyplus$suggestions.size() * POLYPLUS_LINE_H;
+        int width = 0;
+        for (String a : polyplus$suggestions) width = Math.max(width, font.getWidth(EmojiRegistry.suggestionText(a)));
+        width += 6;
+        GuiElement.fill(x, top, x + width, bottom, POLYPLUS_CHAT_BACKGROUND);
+        for (int i = 0; i < polyplus$suggestions.size(); i++) {
+            int rowY = top + i * POLYPLUS_LINE_H;
+            if (i == polyplus$selected) GuiElement.fill(x, rowY, x + width, rowY + POLYPLUS_LINE_H, 0x40FFFFFF);
+            int color = i == polyplus$selected ? 0xFFFFFF00 : 0xFFAAAAAA;
+            font.drawWithShadow(EmojiRegistry.suggestionText(polyplus$suggestions.get(i)), x + 3, rowY + 2, color);
+        }
+    }
+
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    private void polyplus$keyPressed(char chr, int key, CallbackInfo ci) {
+        if (polyplus$handleKey(KeyCodes.fromLegacy(key).getValue(), Screen.isShiftDown())
+                || (chr >= ' ' && polyplus$picker.charTyped(chr))) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void polyplus$mouseClicked(int mouseX, int mouseY, int button, CallbackInfo ci) {
+        if (chatField == null || !EmojiRegistry.enabled()) return;
+        polyplus$layout();
+        if (polyplus$picker.mouseClicked(mouseX, mouseY, button, Screen.isShiftDown(), this::polyplus$insertEmoji)) ci.cancel();
+    }
+
+    @Inject(method = "handleMouse", at = @At("HEAD"), cancellable = true)
+    private void polyplus$mouseScrolled(CallbackInfo ci) {
+        int wheel = Mouse.getEventDWheel();
+        if (wheel == 0 || chatField == null || !EmojiRegistry.enabled()) return;
+        int mouseX = Mouse.getEventX() * this.width / this.minecraft.width;
+        int mouseY = this.height - Mouse.getEventY() * this.height / this.minecraft.height - 1;
+        polyplus$layout();
+        if (polyplus$picker.mouseScrolled(mouseX, mouseY, wheel)) ci.cancel();
+    }
+
+    @Unique
+    private void polyplus$insertEmoji(String alias) {
+        String value = chatField.getText();
+        int cursor = Math.min(chatField.getCursor(), value.length());
+        String insert = ":" + alias + ":";
+        chatField.setText(value.substring(0, cursor) + insert + value.substring(cursor));
+        chatField.setCursor(cursor + insert.length());
+    }
+}
+*///?}

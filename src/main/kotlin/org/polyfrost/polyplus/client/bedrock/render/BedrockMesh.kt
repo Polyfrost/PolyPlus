@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.bedrock.render
 
+//? if > 1.8.9 {
 import net.minecraft.core.Direction
+//?} else {
+/*import net.minecraft.util.math.Direction
+*///?}
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockBone
@@ -376,3 +380,7 @@ class BedrockMesh private constructor(
         private const val BILLBOARD_HALF_THICKNESS = 0.01f
     }
 }
+
+//? if = 1.8.9 {
+/*private fun Direction.step(): Vector3f = Vector3f(offsetX.toFloat(), offsetY.toFloat(), offsetZ.toFloat())
+*///?}

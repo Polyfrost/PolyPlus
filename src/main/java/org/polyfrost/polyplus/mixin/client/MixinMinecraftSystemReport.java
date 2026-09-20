@@ -4,8 +4,10 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.CrashReport;
 import net.minecraft.client.Minecraft;
+//? if > 1.8.9 {
 import net.minecraft.client.Options;
 import net.minecraft.client.resources.language.LanguageManager;
+//?}
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,6 +20,7 @@ public class MixinMinecraftSystemReport {
     @Unique
     private static final Logger POLYPLUS_LOGGER = LoggerFactory.getLogger("polyplus/crash-details");
 
+    //? if > 1.8.9 {
     @WrapMethod(
         method = "fillReport(Lnet/minecraft/client/Minecraft;Lnet/minecraft/client/resources/language/LanguageManager;Ljava/lang/String;Lnet/minecraft/client/Options;Lnet/minecraft/CrashReport;)V"
     )
@@ -36,6 +39,18 @@ public class MixinMinecraftSystemReport {
             report.addCategory("System Details Failure").setDetail("Error", polyplus$stackTrace(t));
         }
     }
+    //?} else {
+    /*@WrapMethod(method = "populateCrashReport(Lnet/minecraft/util/crash/CrashReport;)Lnet/minecraft/util/crash/CrashReport;")
+    private CrashReport polyplus$guardSystemDetails(CrashReport report, Operation<CrashReport> original) {
+        try {
+            return original.call(report);
+        } catch (Throwable t) {
+            POLYPLUS_LOGGER.error("Failed to collect client system details for the crash report", t);
+            report.addCategory("System Details Failure").add("Error", polyplus$stackTrace(t));
+            return report;
+        }
+    }
+    *///?}
 
     @Unique
     private static String polyplus$stackTrace(Throwable t) {

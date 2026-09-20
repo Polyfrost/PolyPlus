@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.Minecraft;
@@ -67,3 +68,19 @@ public class MixinChatComponent {
         return host.equals("hypixel.net") || host.endsWith(".hypixel.net");
     }
 }
+//?} else {
+/*import net.minecraft.client.gui.chat.ChatGui;
+import net.minecraft.text.Text;
+import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+
+@Mixin(ChatGui.class)
+public class MixinChatComponent {
+    @ModifyVariable(method = "addMessage(Lnet/minecraft/text/Text;I)V", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private Text polyplus$emojiMessage(Text original) {
+        return EmojiRegistry.transformLegacy(original);
+    }
+}
+*///?}

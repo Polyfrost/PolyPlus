@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.privacy;
 
+//? if > 1.8.9 {
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
@@ -46,3 +47,4 @@ public class MixinAbstractSignEditScreen {
         }
     }
 }
+//?}

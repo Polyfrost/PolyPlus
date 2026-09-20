@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics.render
 
+//? if > 1.8.9 {
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.renderer.entity.RenderLayerParent
 import net.minecraft.client.renderer.entity.layers.RenderLayer
@@ -146,3 +147,63 @@ private fun hiddenSlotsFor(player: AbstractClientPlayer): Set<BodySlot> {
     }
     return hidden
 }
+//?}
+
+//? if = 1.8.9 {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity
+import net.minecraft.client.render.entity.PlayerRenderer
+import net.minecraft.client.render.entity.layer.EntityRenderLayer
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.render.PlayerRenderContext
+import org.polyfrost.polyplus.client.render.PoseStack
+
+class CosmeticRenderLayer(private val renderer: PlayerRenderer) : EntityRenderLayer<ClientPlayerEntity> {
+    override fun render(
+        player: ClientPlayerEntity,
+        walkAnimationProgress: Float,
+        walkAnimationSpeed: Float,
+        tickDelta: Float,
+        bob: Float,
+        yaw: Float,
+        pitch: Float,
+        scale: Float,
+    ) {
+        val equipment = (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`()
+        if (equipment.equipped().isEmpty()) return
+        val renderContext = PlayerRenderContext.from(player, tickDelta, walkAnimationSpeed, bob)
+        val light = if (player.isOnFire) 0xF000F0 else player.getLightLevel(tickDelta)
+        CosmeticRenderer.render(
+            PoseStack(),
+            light,
+            renderContext,
+            renderer.getModel(),
+            equipment,
+            CosmeticCatalog.getParticleColor(player.uuid),
+            player.getArmor(CHEST) != null,
+            hiddenSlotsFor(player),
+        )
+    }
+
+    override fun colorsWhenDamaged(): Boolean = true
+
+    private fun hiddenSlotsFor(player: ClientPlayerEntity): Set<BodySlot> {
+        val hidden = mutableSetOf<BodySlot>()
+        if (PolyPlusCosmeticsConfig.hideHeadCosmeticsWithHelmet && player.getArmor(HEAD) != null) {
+            hidden += BodySlot.Hat
+        }
+        if (PolyPlusCosmeticsConfig.hideFeetCosmeticsWithBoots && player.getArmor(FEET) != null) {
+            hidden += BodySlot.Boots
+        }
+        return hidden
+    }
+
+    private companion object {
+        const val FEET = 0
+        const val CHEST = 2
+        const val HEAD = 3
+    }
+}
+*///?}

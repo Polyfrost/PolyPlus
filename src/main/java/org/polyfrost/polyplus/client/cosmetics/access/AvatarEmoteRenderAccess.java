@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.cosmetics.access;
 
+//? if > 1.8.9 {
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import java.util.Map;
@@ -14,3 +15,4 @@ public interface AvatarEmoteRenderAccess {
 
     void polyplus$setLastEmoteSample(Map<String, BoneTransform> sample);
 }
+//?}

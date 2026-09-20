@@ -117,14 +117,20 @@ import kotlin.math.sin
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
 
-//? if < 26.1 {
+//? if > 1.8.9 && < 26.1 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
 class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
 
+    //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = false
+    //?} else {
+    /*override fun keyPressed(chr: Char, key: Int) {
+        if (key != 1) super.keyPressed(chr, key)
+    }
+    *///?}
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
         val capture = OnboardingKeyCapture.pending ?: return false
@@ -132,7 +138,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             if (key == ESCAPE_KEY) {
                 null
             } else {
-                //? if >= 26.3 {
+                //? if >= 26.3 || = 1.8.9 {
                 InputConstants.Type.KEYBOARD.getOrCreate(key)
                 //?} else {
                 /*InputConstants.Type.KEYSYM.getOrCreate(key)
@@ -142,17 +148,22 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         return true
     }
 
-    //? if <26.1 {
+    //? if = 1.8.9 {
+    /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+        MenuBackgroundPass.enqueue(true)
+        super.render(mouseX, mouseY, tickDelta)
+    }
+    *///?} elif <26.1 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         MenuBackgroundPass.enqueue(true)
         renderPanorama(ctx, tickDelta)
         if (firstFrameDrawn) {
             val gameRenderer = Minecraft.getInstance().gameRenderer
             //? if <1.21.4 {
-            /*gameRenderer.processBlurEffect(tickDelta)
-            *///?} else {
-            gameRenderer.processBlurEffect()
-            //?}
+            gameRenderer.processBlurEffect(tickDelta)
+            //?} else {
+            /*gameRenderer.processBlurEffect()
+            *///?}
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
@@ -266,7 +277,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
         var guiScale by remember {
             mutableIntStateOf(
+                //? if > 1.8.9 {
                 Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+                //?} else {
+                /*Minecraft.getInstance().options.guiScale.coerceIn(0, maxGuiScale),
+                *///?}
             )
         }
         LaunchedEffect(lightTheme, uiStyle) {
@@ -352,8 +367,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             val mc = Minecraft.getInstance()
             //? if >= 26.2 {
             mc.gui.setScreen(PolyPlusMainMenuScreen())
-            //?} else {
+            //?} elif > 1.8.9 {
             /*mc.setScreen(PolyPlusMainMenuScreen())
+            *///?} else {
+            /*mc.openScreen(PolyPlusMainMenuScreen())
             *///?}
         }
 
@@ -2217,7 +2234,11 @@ internal object OnboardingKeyCapture {
     var pending: ((InputConstants.Key?) -> Unit)? = null
 }
 
+//? if > 1.8.9 {
 private const val ESCAPE_KEY = 256
+//?} else {
+/*private const val ESCAPE_KEY = InputConstants.KEY_ESCAPE
+*///?}
 
 private enum class ModGuide(
     val card: ModCard,

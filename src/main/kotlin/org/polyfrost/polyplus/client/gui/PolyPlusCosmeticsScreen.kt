@@ -2459,6 +2459,7 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
     if (bundleCosmeticIds.isEmpty()) return PlayerPreviewSource.LocalLive
 
     var loadTick by remember(bundleCosmeticIds) { mutableIntStateOf(0) }
+    //? if > 1.8.9 {
     LaunchedEffect(bundleCosmeticIds) {
         var changed = false
         for (id in bundleCosmeticIds) {
@@ -2481,6 +2482,29 @@ private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): Player
         val pet = bundleCosmeticIds.firstNotNullOfOrNull { CosmeticAssetCache.getPetDefinition(it) }
         PlayerPreviewSource.Override(equipment, pet = pet)
     }
+    //?} else {
+    /*val bundleCape = bundleCosmeticIds.firstOrNull { CosmeticCatalog.getDefinition(it)?.type == CosmeticType.Cape }
+    LaunchedEffect(bundleCosmeticIds) {
+        var changed = false
+        for (id in bundleCosmeticIds) {
+            val loaded = if (id == bundleCape) CosmeticAssetCache.isCapeLoaded(id)
+                else CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+            if (!loaded && CosmeticAssetCache.ensureCosmeticLoaded(id)) changed = true
+        }
+        if (changed) loadTick++
+    }
+    return remember(bundleCosmeticIds, loadTick) {
+        val equipment = CosmeticEquipment()
+        for (id in bundleCosmeticIds) {
+            CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
+        }
+        for (id in CosmeticCatalog.localEquipped().ids()) {
+            CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
+        }
+        val pet = bundleCosmeticIds.firstNotNullOfOrNull { CosmeticAssetCache.getPetDefinition(it) }
+        PlayerPreviewSource.Override(equipment, pet = pet, capeCosmeticId = bundleCape)
+    }
+    *///?}
 }
 
 @Composable

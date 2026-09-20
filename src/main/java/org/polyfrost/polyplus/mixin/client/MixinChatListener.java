@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.multiplayer.chat.ChatListener;
 import net.minecraft.network.chat.Component;
@@ -24,3 +25,4 @@ public class MixinChatListener {
                 .append(Component.translatable("polyplus.mmc.debugifyNote").withStyle(ChatFormatting.GREEN));
     }
 }
+//?}

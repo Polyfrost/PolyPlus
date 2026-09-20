@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.utils
 
+//? if > 1.8.9
 import com.mojang.blaze3d.vertex.PoseStack
+//? if = 1.8.9
+//import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.joml.Quaternionf
@@ -15,7 +18,7 @@ import java.util.concurrent.atomic.AtomicReference
 import net.minecraft.world.entity.player.PlayerModelType
 //?}
 
-//? if < 1.21.10 {
+//? if < 1.21.10 && > 1.8.9 {
 /*import net.minecraft.client.resources.PlayerSkin
 *///?}
 
@@ -97,11 +100,20 @@ object ClientPlatform {
     fun localSkinSlim(): Boolean =
         //? if >= 1.21.10 {
         Minecraft.getInstance().player?.skin?.model() == PlayerModelType.SLIM
-        //?} else {
+        //?} elif > 1.8.9 {
         /*Minecraft.getInstance().player?.skin?.model() == PlayerSkin.Model.SLIM
+        *///?} else {
+        /*Minecraft.getInstance().player?.modelType == "slim"
         *///?}
 }
 
+//? if = 1.8.9 {
+/*private val Minecraft.isSameThread: Boolean get() = isOnSameThread
+private fun Minecraft.execute(task: () -> Unit) { executeTask(Runnable(task)) }
+private fun Minecraft.setScreen(screen: Screen?) = openScreen(screen)
+*///?}
+
+//? if > 1.8.9 {
 fun PoseStack.rotateBy(rotation: Quaternionf) {
     //? if >= 26.3 {
     rotate(rotation)
@@ -109,3 +121,6 @@ fun PoseStack.rotateBy(rotation: Quaternionf) {
     /*mulPose(rotation)
     *///?}
 }
+//?} else {
+/*fun PoseStack.rotateBy(rotation: Quaternionf) = mulPose(rotation)
+*///?}

@@ -1,6 +1,8 @@
 package org.polyfrost.polyplus.client.cosmetics.render
 
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
+//?}
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.render.BedrockAttachedModelRenderer
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -19,7 +21,7 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState
 /*import net.minecraft.client.renderer.entity.state.PlayerRenderState
 *///?}
 
-//? if < 1.21.10 {
+//? if < 1.21.10 && > 1.8.9 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
 
@@ -67,7 +69,7 @@ object CosmeticRenderer {
         val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
     }
-    *///?} else {
+    *///?} elif > 1.8.9 {
     /*fun render(
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
@@ -84,6 +86,21 @@ object CosmeticRenderer {
         val overlay = LivingEntityRenderer.getOverlayCoords(player, 0f)
         val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws)
+    }
+    *///?} else {
+    /*fun render(
+        poseStack: PoseStack,
+        lightCoords: Int,
+        renderContext: PlayerRenderContext,
+        playerModel: PlayerModel,
+        equipment: CosmeticEquipment,
+        particleColor: Int?,
+        chestplateEquipped: Boolean,
+        hiddenSlots: Set<BodySlot>,
+    ) {
+        if (renderContext.isInvisible) return
+        val draws = draws(equipment, renderContext, particleColor, chestplateEquipped, hiddenSlots)
+        BedrockAttachedModelRenderer.render(poseStack, lightCoords, 0, playerModel, draws)
     }
     *///?}
 

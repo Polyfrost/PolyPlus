@@ -1,12 +1,17 @@
 package org.polyfrost.polyplus.client.bedrock.geometry
 
+//? if > 1.8.9 {
 import net.minecraft.client.model.geom.ModelPart
+//?} else {
+/*import net.minecraft.client.render.model.ModelPart
+import org.polyfrost.polyplus.client.render.translateAndRotate
+*///?}
 import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import org.polyfrost.polyplus.client.render.PoseStack
 
-//? if = 1.21.1 {
+//? if = 1.21.1 || = 1.8.9 {
 /*import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess
 *///?}
 
@@ -32,6 +37,12 @@ enum class PlayerModelBone(val serializedName: String) {
 
     fun translateAndRotateChain(model: PlayerModel, poseStack: PoseStack) {
         for (bone in attachmentChain()) {
+            //? if = 1.8.9 {
+            /*if (bone == ROOT) {
+                if (model.sneaking) poseStack.translate(0f, 0.2f, 0f)
+                continue
+            }
+            *///?}
             bone.resolve(model).translateAndRotate(poseStack)
         }
     }
@@ -44,7 +55,7 @@ enum class PlayerModelBone(val serializedName: String) {
         private val MODEL_PART_ACCESSOR = mapOf(
             //? if >= 1.21.4 {
             ROOT to { model: PlayerModel -> model.root() },
-            //?} else {
+            //?} elif = 1.21.1 || = 1.8.9 {
             /*ROOT to { model: PlayerModel -> (model as PlayerModelRootAccess).`polyplus$root`() },
             *///?}
             HEAD to { model: PlayerModel -> model.head },

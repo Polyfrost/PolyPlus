@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.mixin.client;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.GameRenderer;
+//?} else {
+/*import net.minecraft.client.render.GameRenderer;
+*///?}
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen;
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreenKt;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
@@ -29,6 +33,7 @@ public class MixinGameRenderer {
     @Unique
     private static final int POLYPLUS_PANORAMA_BLUR_RADIUS = 7;
 
+    //? if > 1.8.9 {
     @ModifyExpressionValue(
         //? if >= 26.1 {
         method = "extractOptions",
@@ -46,6 +51,7 @@ public class MixinGameRenderer {
         }
         return original;
     }
+    //?}
 
     //? if >= 26.1 {
     @Inject(method = "render", at = @At("HEAD"))

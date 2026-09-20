@@ -26,6 +26,9 @@ object SharedResourcePack {
 
     fun buildFromEquipped(): Result<List<Prepared>> = runCatching {
         val minecraft = Minecraft.getInstance()
+        //? if = 1.8.9 {
+        /*val selected = minecraft.resourcePacks?.applied?.map { "file/${it.name}" }
+        *///?} else
         val selected = minecraft.resourcePackRepository?.selectedIds
         checkNotNull(selected) { "Minecraft's resource pack repository isn't available yet" }
 
@@ -34,6 +37,9 @@ object SharedResourcePack {
             "None of your selected resource packs live in resourcepacks/ - packs bundled inside mods can't be shared"
         }
 
+        //? if = 1.8.9 {
+        /*val packsDir = minecraft.resourcePacks.directory
+        *///?} else
         val packsDir = File(minecraft.gameDirectory, "resourcepacks")
         val prepared = ArrayList<Prepared>()
         var totalBytes = 0L

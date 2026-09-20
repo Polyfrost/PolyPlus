@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.emotes.effects
 
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.RenderLayerParent
 import net.minecraft.client.renderer.entity.layers.RenderLayer
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController
@@ -91,5 +92,33 @@ private fun resolveController(state: Any): EmoteController? {
     if (player !is PlayerEmotesAccess) return null
     val controller = player.`polyplus$emoteController`()
     return controller.takeIf { it.isActive }
+}
+*///?}
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity
+import net.minecraft.client.render.entity.PlayerRenderer
+import net.minecraft.client.render.entity.layer.EntityRenderLayer
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.render.PoseStack
+
+class EmoteEffectRenderLayer(private val renderer: PlayerRenderer) : EntityRenderLayer<ClientPlayerEntity> {
+    override fun render(
+        player: ClientPlayerEntity,
+        walkAnimationProgress: Float,
+        walkAnimationSpeed: Float,
+        tickDelta: Float,
+        bob: Float,
+        yaw: Float,
+        pitch: Float,
+        scale: Float,
+    ) {
+        val controller = (player as PlayerEmotesAccess).`polyplus$emoteController`().takeIf { it.isActive } ?: return
+        val snapshot = controller.playbackSnapshot() ?: return
+        if (snapshot.emote.effects.isEmpty()) return
+        val light = if (player.isOnFire) 0xF000F0 else player.getLightLevel(tickDelta)
+        EmoteEffectRenderer.render(PoseStack(), light, player, renderer.getModel(), snapshot)
+    }
+
+    override fun colorsWhenDamaged(): Boolean = true
 }
 *///?}

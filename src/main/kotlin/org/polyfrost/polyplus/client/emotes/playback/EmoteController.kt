@@ -1,6 +1,11 @@
 package org.polyfrost.polyplus.client.emotes.playback
 
+//? if > 1.8.9 {
 import net.minecraft.client.player.AbstractClientPlayer
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity as AbstractClientPlayer
+import net.minecraft.client.Minecraft
+*///?}
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.LoopMode
 import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
@@ -15,8 +20,14 @@ import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import net.minecraft.util.Util
 //?}
 
-//? if < 1.21.11 {
+//? if < 1.21.11 && > 1.8.9 {
 /*import net.minecraft.Util
+*///?}
+
+//? if = 1.8.9 {
+/*private object Util {
+    fun getMillis(): Long = Minecraft.getTime()
+}
 *///?}
 
 private const val BLEND_MS = 140f

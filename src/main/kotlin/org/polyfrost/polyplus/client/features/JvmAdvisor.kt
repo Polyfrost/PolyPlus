@@ -9,9 +9,13 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.RamGuideScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+//? if > 1.8.9 {
 import oshi.SystemInfo
 import oshi.hardware.GlobalMemory
 import oshi.util.platform.mac.SysctlUtil
+//?} else {
+/*import com.sun.management.OperatingSystemMXBean
+*///?}
 import java.lang.management.ManagementFactory
 import java.lang.management.MemoryType
 import java.nio.file.Files
@@ -242,7 +246,11 @@ object JvmAdvisor {
     }
 
     private fun showGuide(advice: Advice) {
+        //? if > 1.8.9 {
         Minecraft.getInstance().execute { ClientPlatform.setScreen(RamGuideScreen(advice)) }
+        //?} else {
+        /*Minecraft.getInstance().tell { ClientPlatform.setScreen(RamGuideScreen(advice)) }
+        *///?}
     }
 
     private fun disable() {
@@ -289,6 +297,7 @@ object JvmAdvisor {
         }
     }
 
+    //? if > 1.8.9 {
     private fun hostMemory(): HostMemory? = runCatching {
         val mb = 1024L * 1024L
         val memory = SystemInfo().hardware.memory
@@ -318,6 +327,42 @@ object JvmAdvisor {
             }
         }.getOrDefault(PRESSURE_UNKNOWN)
     }
+    //?} else {
+    /*private fun hostMemory(): HostMemory? = runCatching {
+        val mb = 1024L * 1024L
+        val os = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
+        val totalMb = os.totalMemorySize / mb
+        val availableMb = linuxMemAvailableMb() ?: (os.freeMemorySize / mb)
+        HostMemory(
+            totalMb = totalMb,
+            availableMb = availableMb,
+            pressure = systemPressure(os, totalMb, availableMb),
+        )
+    }.onFailure { logger.warn("Could not read host memory", it) }.getOrNull()
+
+    private fun linuxMemAvailableMb(): Long? = runCatching {
+        Files.readAllLines(Paths.get("/proc/meminfo"))
+            .firstOrNull { it.startsWith("MemAvailable:") }
+            ?.split(Regex("\\s+"))?.get(1)?.toLong()?.div(1024L)
+    }.getOrNull()
+
+    private fun systemPressure(memory: OperatingSystemMXBean, totalMb: Long, availableMb: Long): Int {
+        val os = System.getProperty("os.name", "")
+        return runCatching {
+            when {
+                os.startsWith("Mac") -> ProcessBuilder("sysctl", "-n", MAC_PRESSURE_SYSCTL).start()
+                    .inputStream.bufferedReader().use { it.readText().trim().toInt() }
+                os.startsWith("Linux") -> linuxPressure(Files.readString(Paths.get(LINUX_PSI_PATH)))
+                os.startsWith("Windows") -> {
+                    val mb = 1024L * 1024L
+                    val swapTotal = memory.totalSwapSpaceSize / mb
+                    loadPressure(totalMb, availableMb, swapTotal - memory.freeSwapSpaceSize / mb, swapTotal)
+                }
+                else -> PRESSURE_UNKNOWN
+            }
+        }.getOrDefault(PRESSURE_UNKNOWN)
+    }
+    *///?}
 
     @JvmStatic
     fun linuxPressure(psi: String): Int {

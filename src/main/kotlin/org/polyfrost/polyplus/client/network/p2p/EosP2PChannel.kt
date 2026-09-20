@@ -221,6 +221,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     }
 
     internal fun updateCongestion(congested: Boolean) {
+        //? if > 1.8.9
         unsafe().outboundBuffer()?.setUserDefinedWritability(1, !congested)
     }
 

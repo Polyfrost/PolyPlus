@@ -12,34 +12,49 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+
+//? if = 1.8.9 {
+/*import com.mojang.brigadier.arguments.ArgumentType
+import com.mojang.brigadier.builder.RequiredArgumentBuilder
+*///?}
 
 //? if >= 26.1 {
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 *///?}
 
 object PolyPlusCommands {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
 
+    //? if > 1.8.9 {
     internal typealias commands =
         //? if >= 26.1 {
         ClientCommands
         //?} else {
         /*ClientCommandManager
         *///?}
+    //?} else {
+    /*internal object commands {
+        fun literal(name: String): LiteralArgumentBuilder<FabricClientCommandSource> = LiteralArgumentBuilder.literal(name)
+
+        fun <T> argument(name: String, type: ArgumentType<T>): RequiredArgumentBuilder<FabricClientCommandSource, T> =
+            RequiredArgumentBuilder.argument(name, type)
+    }
+    *///?}
 
     fun register() {
-        //? if fabric {
+        //? if fabric || ornithe {
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
             dispatcher.register(buildFabricRoot())
         }
         //?}
     }
 
-    //? if fabric {
+    //? if fabric || ornithe {
     private fun buildFabricRoot():
         LiteralArgumentBuilder
         <FabricClientCommandSource> {
@@ -76,6 +91,9 @@ object PolyPlusCommands {
                 Command.SINGLE_SUCCESS
             })
             .then(commands.literal("mainmenu").executes { _ ->
+                //? if = 1.8.9 {
+                /*Minecraft.getInstance().tell { ClientPlatform.setScreen(PolyPlusMainMenuScreen()) }
+                *///?} else {
                 val client = Minecraft.getInstance()
                 if (client.isSameThread) {
                     //? if >= 26.2 {
@@ -92,10 +110,11 @@ object PolyPlusCommands {
                         *///?}
                     }
                 }
+                //?}
                 Command.SINGLE_SUCCESS
             })
 
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         root = root.then(CosmeticCommands.build())
         root = root.then(ParticleCommands.build())
         //?}

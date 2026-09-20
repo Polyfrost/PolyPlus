@@ -2,7 +2,13 @@ package org.polyfrost.polyplus.client.emoji
 
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
+//? if > 1.8.9 {
 import net.minecraft.client.gui.Font
+//?} else {
+/*import net.minecraft.client.render.TextRenderer as Font
+import net.minecraft.client.gui.GuiElement
+import net.minecraft.client.render.platform.GlStateManager
+*///?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
@@ -13,14 +19,20 @@ import java.util.function.Consumer
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
 
-//? if < 26.1 {
+//? if > 1.8.9 && < 26.1 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
 //? if >= 26.1 {
 typealias PickerGraphics = GuiGraphicsExtractor
-//?} else {
+//?} elif > 1.8.9 {
 /*typealias PickerGraphics = GuiGraphics
+*///?} else {
+/*object PickerGraphics {
+    fun fill(x1: Int, y1: Int, x2: Int, y2: Int, color: Int) = GuiElement.fill(x1, y1, x2, y2, color)
+}
+
+private fun Font.width(text: String): Int = getWidth(text)
 *///?}
 
 class EmojiChatPicker {
@@ -257,6 +269,7 @@ class EmojiChatPicker {
         return (scrollRow + row) * columns + col
     }
 
+    //? if > 1.8.9 {
     private fun drawGlyph(graphics: PickerGraphics, font: Font, glyph: String, cellX: Int, cellY: Int, cell: Int = CELL) {
         val component = EmojiFont.glyph(glyph, Style.EMPTY)
         val seq = component.visualOrderText
@@ -297,6 +310,29 @@ class EmojiChatPicker {
         *///?}
     }
 
+    //?} else {
+    /*private fun drawGlyph(graphics: PickerGraphics, font: Font, glyph: String, cellX: Int, cellY: Int, cell: Int = CELL) {
+        val text = EmojiFont.legacyChar(glyph)
+        val scale = if (cell < CELL) (cell - GLYPH_INSET * 2).toFloat() / GLYPH else 1f
+        if (scale == 1f) {
+            drawString(graphics, font, text, cellX + (cell - font.width(text) + 1) / 2, cellY + (cell - GLYPH + 1) / 2, -1)
+            return
+        }
+        val inset = (cell - GLYPH * scale) / 2f
+        GlStateManager.pushMatrix()
+        GlStateManager.translatef(cellX + inset, cellY + inset + GLYPH_RISE * scale, 0f)
+        GlStateManager.scalef(scale, scale, 1f)
+        drawString(graphics, font, text, 0, 0, -1)
+        GlStateManager.popMatrix()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun drawString(graphics: PickerGraphics, font: Font, text: String, x: Int, y: Int, color: Int) {
+        font.drawWithShadow(text, x.toFloat(), y.toFloat(), color)
+    }
+
+    *///?}
+
     private fun defaultEntries(): List<EmojiRegistry.EmojiEntry> {
         val recents = EmojiRecents.entries()
         if (recents.isEmpty()) return EmojiRegistry.catalog
@@ -316,7 +352,11 @@ class EmojiChatPicker {
         return glyph
     }
 
+    //? if > 1.8.9 {
     private fun background(): Int = Minecraft.getInstance().options.getBackgroundColor(CHAT_BACKGROUND)
+    //?} else {
+    /*private fun background(): Int = CHAT_BACKGROUND
+    *///?}
 
     private fun maxScrollRow(): Int {
         val rows = (entries.size + columns - 1) / columns

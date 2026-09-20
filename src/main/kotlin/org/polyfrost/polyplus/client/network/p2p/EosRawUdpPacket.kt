@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.network.p2p
 
+//? if > 1.8.9 {
 import de.maxhenkel.voicechat.api.RawUdpPacket
 import java.net.SocketAddress
 
@@ -12,3 +13,4 @@ internal class EosRawUdpPacket(
     override fun getTimestamp(): Long = timestamp
     override fun getSocketAddress(): SocketAddress = address
 }
+//?}

@@ -14,13 +14,13 @@ import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama;
 import org.spongepowered.asm.mixin.injection.At;
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.renderer.PanoramaRenderer;
 *///?}
 
 //? if >= 26.1 {
 @Mixin(Panorama.class)
-//?} else {
+//?} elif > 1.8.9 {
 /*@Mixin(PanoramaRenderer.class)
 *///?}
 public class MixinPanorama {

@@ -1,11 +1,17 @@
 package org.polyfrost.polyplus.client.emotes.conditions
 
+//? if > 1.8.9 {
 import net.minecraft.client.player.AbstractClientPlayer
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity as AbstractClientPlayer
+import kotlin.math.sqrt
+*///?}
 
 object EmoteConditions {
     private const val WALK_THRESHOLD = 0.02f
     private const val FALL_THRESHOLD = -0.08
 
+    //? if > 1.8.9 {
     @JvmStatic
     fun allows(player: AbstractClientPlayer, rules: EmoteRules): Boolean {
         if (player.isSleeping
@@ -53,4 +59,38 @@ object EmoteConditions {
 
         return true
     }
+    //?} else {
+    /*@JvmStatic
+    fun allows(player: AbstractClientPlayer, rules: EmoteRules): Boolean {
+        if (player.isSleeping
+            || player.isSwordBlocking
+            || player.armSwinging
+            || player.getAttackAnimationProgress(1.0f) > 0f
+        ) {
+            return false
+        }
+
+        if (!rules.allowCrouching && player.isSneaking) {
+            return false
+        }
+
+        if (!rules.allowFalling && !player.onGround && player.y - player.lastY < FALL_THRESHOLD) {
+            return false
+        }
+
+        val dx = player.x - player.lastX
+        val dz = player.z - player.lastZ
+        val horizontalSpeed = sqrt(dx * dx + dz * dz)
+        if (horizontalSpeed > WALK_THRESHOLD) {
+            if (!rules.allowWalking) {
+                return false
+            }
+            if (!rules.allowSprinting && player.isSprinting) {
+                return false
+            }
+        }
+
+        return true
+    }
+    *///?}
 }

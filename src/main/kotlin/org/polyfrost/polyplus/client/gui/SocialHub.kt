@@ -54,6 +54,8 @@ import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
 import org.polyfrost.polyplus.client.social.SpecialChatResponses
+//? if = 1.8.9
+//import org.polyfrost.polyplus.client.social.singleplayerServer
 
 @Composable
 fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {

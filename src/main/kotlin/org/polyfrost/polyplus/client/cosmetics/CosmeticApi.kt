@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+//? if > 1.8.9 {
 import net.minecraft.client.player.AbstractClientPlayer
+//?} else {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity as AbstractClientPlayer
+*///?}
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess

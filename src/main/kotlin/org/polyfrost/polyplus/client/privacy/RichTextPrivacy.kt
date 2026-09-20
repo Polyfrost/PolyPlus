@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.privacy
 
+//? if > 1.8.9 {
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.ModContainer
 import net.minecraft.locale.Language
@@ -12,9 +13,10 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Optional
+//?}
 
 object RichTextPrivacy {
-
+    //? if > 1.8.9 {
     private val logger = LogManager.getLogger("PolyPlus/RichTextPrivacy")
 
     private val BLOCKED_MODS = listOf("debugify")
@@ -91,4 +93,7 @@ object RichTextPrivacy {
 
     private fun read(stream: InputStream, into: MutableSet<String>) =
         Language.loadFromJson(stream) { key, _ -> into.add(key) }
+    //?} else {
+    /*fun warmUp() = Unit
+    *///?}
 }

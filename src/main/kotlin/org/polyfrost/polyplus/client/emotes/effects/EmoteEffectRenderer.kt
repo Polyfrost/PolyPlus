@@ -1,10 +1,15 @@
 package org.polyfrost.polyplus.client.emotes.effects
 
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
+//?}
 import org.polyfrost.polyplus.client.bedrock.render.BedrockAttachedModelRenderer
 import org.polyfrost.polyplus.client.emotes.playback.EmotePlaybackSnapshot
 import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import org.polyfrost.polyplus.client.render.PoseStack
+
+//? if = 1.8.9
+//import net.minecraft.client.entity.living.player.ClientPlayerEntity
 
 //? if >= 1.21.10 {
 import net.minecraft.client.renderer.SubmitNodeCollector
@@ -19,7 +24,7 @@ import org.polyfrost.polyplus.client.render.PlayerRenderContext
 /*import net.minecraft.client.renderer.entity.state.PlayerRenderState
 *///?}
 
-//? if < 1.21.10 {
+//? if < 1.21.10 && > 1.8.9 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
 
@@ -56,7 +61,7 @@ object EmoteEffectRenderer {
         val overlay = LivingEntityRenderer.getOverlayCoords(state, 0f)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws(snapshot))
     }
-    *///?} else {
+    *///?} elif > 1.8.9 {
     /*fun render(
         poseStack: PoseStack,
         bufferSource: MultiBufferSource,
@@ -68,6 +73,17 @@ object EmoteEffectRenderer {
         if (player.isInvisible || snapshot.playerWeight <= 0f) return
         val overlay = LivingEntityRenderer.getOverlayCoords(player, 0f)
         BedrockAttachedModelRenderer.render(poseStack, bufferSource, lightCoords, overlay, playerModel, draws(snapshot))
+    }
+    *///?} else {
+    /*fun render(
+        poseStack: PoseStack,
+        lightCoords: Int,
+        player: ClientPlayerEntity,
+        playerModel: PlayerModel,
+        snapshot: EmotePlaybackSnapshot,
+    ) {
+        if (player.isInvisible || snapshot.playerWeight <= 0f) return
+        BedrockAttachedModelRenderer.render(poseStack, lightCoords, 0, playerModel, draws(snapshot))
     }
     *///?}
 

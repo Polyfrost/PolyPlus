@@ -4,6 +4,7 @@ pluginManagement {
         maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
         maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
         maven("https://maven.fabricmc.net/")
+        maven("https://maven.ornithemc.net/releases")
         maven("https://repo.polyfrost.org/releases")
         mavenCentral()
     }
@@ -44,6 +45,7 @@ stonecutter.create(rootProject) {
     // Per-version dependencies live in stonecutter.properties.toml
     val mcVersions = listOf("1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2", "26.3")
     versions(mcVersions.associateBy { "$it-fabric" })
+    version("1.8.9-ornithe", "1.8.9")
     vcsVersion = "26.3-fabric"
 }
 

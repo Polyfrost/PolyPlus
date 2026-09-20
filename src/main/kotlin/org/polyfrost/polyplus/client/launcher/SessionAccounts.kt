@@ -24,7 +24,11 @@ object SessionAccounts {
         }
         val id = runCatching { user.profileId }.getOrNull() ?: return
         val name = runCatching { user.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: return
+        //? if > 1.8.9 {
         val token = runCatching { user.accessToken }.getOrNull().orEmpty()
+        //?} else {
+        /*val token = runCatching { Minecraft.getInstance().session.accessToken }.getOrNull().orEmpty()
+        *///?}
 
         launchAccount = LauncherAccountStore.StoredAccount(
             id = id.toString(),

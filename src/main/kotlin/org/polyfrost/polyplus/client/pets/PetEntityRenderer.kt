@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.pets
 
+//? if > 1.8.9 {
 import com.mojang.math.Axis
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
@@ -46,6 +47,26 @@ import net.minecraft.util.Mth
 //? if < 1.21.10 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 *///?}
+//?} else {
+/*import net.minecraft.client.Minecraft
+import net.minecraft.client.render.Culler
+import net.minecraft.client.render.entity.EntityRenderDispatcher
+import net.minecraft.client.render.entity.EntityRenderer
+import net.minecraft.client.render.platform.GlStateManager
+import net.minecraft.resources.Identifier
+import org.joml.Quaternionf
+import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.bedrock.BedrockConstants
+import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
+import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
+import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
+import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
+import org.polyfrost.polyplus.client.cosmetics.PetDefinition
+import org.polyfrost.polyplus.client.render.PoseStack
+import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.utils.rotateBy
+import java.util.concurrent.ConcurrentHashMap
+*///?}
 
 private val FALLBACK_TEXTURE = Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "textures/pets/missing.png")
 
@@ -87,6 +108,7 @@ private fun samplePose(
 
 class PetPose(val from: Map<String, BoneTransform>, val to: Map<String, BoneTransform>, val blend: Float)
 
+//? if > 1.8.9 {
 //? if >= 1.21.10 {
 class PetRenderState : EntityRenderState() {
     var definition: PetDefinition? = null
@@ -334,6 +356,70 @@ class PetEntityRenderer(context: EntityRendererProvider.Context) :
         }
 
         poseStack.popPose()
+    }
+}
+*///?}
+//?} else {
+
+/*class PetEntityRenderer(dispatcher: EntityRenderDispatcher) : EntityRenderer<PetEntity>(dispatcher) {
+    private val modelCache = ConcurrentHashMap<Int, BedrockStandaloneModel>()
+    private val molangVariables = mutableMapOf<String, Float>()
+
+    override fun getTextureLocation(entity: PetEntity): Identifier =
+        entity.definition?.texture ?: FALLBACK_TEXTURE
+
+    override fun shouldRender(entity: PetEntity, view: Culler, cameraX: Double, cameraY: Double, cameraZ: Double): Boolean {
+        val mc = Minecraft.getInstance()
+        val isOwnPet = entity.ownerUuid == mc.player?.uuid
+        if (mc.options.perspective == 0 && isOwnPet) {
+            return false
+        }
+        if (!super.shouldRender(entity, view, cameraX, cameraY, cameraZ)) {
+            return false
+        }
+        if (!isOwnPet) {
+            val viewer = mc.player
+            val owner = entity.ownerEntity()
+            if (viewer == null || owner == null || !viewer.canSee(owner)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    override fun render(entity: PetEntity, dx: Double, dy: Double, dz: Double, yaw: Float, tickDelta: Float) {
+        val definition = entity.definition ?: return
+        val model = modelCache.getOrPut(definition.id) { BedrockStandaloneModel.build(definition.geometry) }
+
+        val poseStack = PoseStack()
+        poseStack.translate(dx.toFloat(), dy.toFloat(), dz.toFloat())
+        poseStack.scale(-definition.scale, -definition.scale, definition.scale)
+        poseStack.rotateBy(Quaternionf().rotationY(Math.toRadians(180.0 + yaw).toFloat()))
+
+        model.resetPose()
+        val pose = samplePose(entity, definition, tickDelta, molangVariables)
+        if (pose.to.isEmpty()) {
+            model.applyPose(pose.from, 1f)
+        } else {
+            model.applyPose(pose.from, 1f - pose.blend)
+            model.applyPose(pose.to, pose.blend)
+        }
+
+        val frameCount = definition.textureFrameCount
+        val vScale = 1f / frameCount
+        val vOffset = if (frameCount > 1) ((entity.tickCount / TICKS_PER_TEXTURE_FRAME) % frameCount).toFloat() / frameCount else 0f
+        val packedLight = if (entity.isOnFire) 0xF000F0 else entity.getLightLevel(tickDelta)
+
+        GlStateManager.disableCull()
+        GlStateManager.enableRescaleNormal()
+        GlStateManager.enableAlphaTest()
+        VertexConsumer.draw(definition.texture, false) { buffer ->
+            for (root in model.roots) {
+                root.render(poseStack, buffer, packedLight, 0, vScale = vScale, vOffset = vOffset)
+            }
+        }
+        GlStateManager.disableRescaleNormal()
+        GlStateManager.enableCull()
     }
 }
 *///?}

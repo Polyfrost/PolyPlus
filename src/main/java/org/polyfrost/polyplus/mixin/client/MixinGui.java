@@ -24,8 +24,10 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
 *///?}
 
-//? if < 26.2 {
+//? if < 26.2 && > 1.8.9 {
 /*import net.minecraft.client.gui.screens.ShareToLanScreen;
+*///?} elif = 1.8.9 {
+/*import net.minecraft.client.gui.screen.OpenToLanScreen;
 *///?}
 
 //? if >= 26.2 {
@@ -34,7 +36,11 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent;
 /*@Mixin(Minecraft.class)
 *///?}
 public class MixinGui {
+    //? if > 1.8.9 {
     @WrapMethod(method = "setScreen")
+    //?} else {
+    /*@WrapMethod(method = "openScreen")
+    *///?}
     private void polyplus$replaceScreen(Screen screen, Operation<Void> original) {
         // on 26.3+ the LAN controls live inside World Options, so MixinWorldOptionsScreen handles them instead
         //? if = 26.2 {
@@ -42,8 +48,13 @@ public class MixinGui {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }
-        *///?} elif < 26.2 {
+        *///?} elif < 26.2 && > 1.8.9 {
         /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof ShareToLanScreen) {
+            SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
+            return;
+        }
+        *///?} elif = 1.8.9 {
+        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof OpenToLanScreen) {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }

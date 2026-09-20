@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -91,3 +92,65 @@ public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, P
         );
     }
 }
+//?} else {
+/*import com.mojang.authlib.GameProfile;
+import net.minecraft.client.entity.living.player.ClientPlayerEntity;
+import net.minecraft.entity.living.player.PlayerEntity;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.World;
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache;
+import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
+import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(ClientPlayerEntity.class)
+public abstract class MixinAbstractClientPlayer extends PlayerEntity implements PlayerEmotesAccess, PlayerCosmeticsAccess {
+    @Unique
+    private EmoteController polyplus$emoteController;
+
+    @Unique
+    private CosmeticEquipment polyplus$cosmeticEquipment;
+
+    private MixinAbstractClientPlayer(World world, GameProfile profile) {
+        super(world, profile);
+    }
+
+    @Override
+    public EmoteController polyplus$emoteController() {
+        EmoteController controller = polyplus$emoteController;
+        if (controller == null) {
+            controller = new EmoteController();
+            polyplus$emoteController = controller;
+        }
+        return controller;
+    }
+
+    @Override
+    public CosmeticEquipment polyplus$cosmeticEquipment() {
+        CosmeticEquipment equipment = polyplus$cosmeticEquipment;
+        if (equipment == null) {
+            equipment = new CosmeticEquipment();
+            polyplus$cosmeticEquipment = equipment;
+        }
+        return equipment;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        polyplus$emoteController().tick((ClientPlayerEntity) (Object) this);
+    }
+
+    @Inject(method = "getCapeTextureLocation", at = @At("HEAD"), cancellable = true)
+    private void polyplus$replaceCapeTexture(CallbackInfoReturnable<Identifier> cir) {
+        Identifier cape = CosmeticAssetCache.getCapeTexture(((ClientPlayerEntity) (Object) this).getUuid());
+        if (cape != null) cir.setReturnValue(cape);
+    }
+}
+*///?}

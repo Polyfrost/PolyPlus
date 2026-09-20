@@ -7,6 +7,11 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.p2p.EosP2PAddress
 import java.net.SocketAddress
+//? if = 1.8.9 {
+/*import net.minecraft.text.Text
+import net.minecraft.text.TranslatableText
+import org.polyfrost.polyplus.client.social.execute
+*///?}
 
 object P2PPeerAlerts {
     private val LOGGER = LogManager.getLogger("PolyPlus/P2P")
@@ -14,10 +19,17 @@ object P2PPeerAlerts {
     private const val TIMEOUT_KEY = "disconnect.timeout"
 
     @JvmStatic
+    //? if = 1.8.9 {
+    /*fun onPlayerDisconnected(remoteAddress: SocketAddress?, playerName: String, reason: Text) {
+        if (remoteAddress !is EosP2PAddress) return
+
+        val key = (reason as? TranslatableText)?.key
+    *///?} else {
     fun onPlayerDisconnected(remoteAddress: SocketAddress?, playerName: String, reason: Component) {
         if (remoteAddress !is EosP2PAddress) return
 
         val key = (reason.contents as? TranslatableContents)?.key
+    //?}
         if (key != TIMEOUT_KEY) return
 
         LOGGER.warn("P2P guest {} timed out", playerName)
@@ -28,8 +40,10 @@ object P2PPeerAlerts {
             val player = minecraft.player ?: return@execute
             //? if >= 26.1 {
             player.sendSystemMessage(message)
-            //?} else {
+            //?} else if > 1.8.9 {
             /*player.displayClientMessage(message, false)
+            *///?} else {
+            /*player.addMessage(message)
             *///?}
         }
     }

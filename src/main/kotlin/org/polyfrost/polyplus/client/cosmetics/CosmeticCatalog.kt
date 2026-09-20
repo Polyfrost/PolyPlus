@@ -204,7 +204,7 @@ object CosmeticCatalog {
             }
         }
 
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         val owned = ownedDefs + player.emotes.map { it.asCosmeticDefinition() }
         val equippedIds = equippedKnown.values.toSet()
         val (equipped, rest) = owned.partition { it.id in equippedIds }

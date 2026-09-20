@@ -92,7 +92,11 @@ object LauncherAccountStore {
         authFile() ?: platformLauncherDirs().firstOrNull()?.let { File(it, AUTH_FILE) }
 
     private fun walkUpForAuth(): File? {
+        //? if > 1.8.9 {
         var dir: File? = Minecraft.getInstance().gameDirectory.absoluteFile
+        //?} else {
+        /*var dir: File? = Minecraft.getInstance().gameDir.absoluteFile
+        *///?}
         var depth = 0
         while (dir != null && depth <= MAX_WALK_UP) {
             val candidate = File(dir, AUTH_FILE)

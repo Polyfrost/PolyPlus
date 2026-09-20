@@ -3,9 +3,16 @@ package org.polyfrost.polyplus.client.launcher
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
+//? if > 1.8.9 {
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.TransferState
 import net.minecraft.client.multiplayer.resolver.ServerAddress
+//?} else {
+/*import net.minecraft.client.options.ServerListEntry as ServerData
+import net.minecraft.text.Text
+import net.minecraft.text.TranslatableText
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+*///?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.contents.TranslatableContents
 import org.apache.logging.log4j.LogManager
@@ -50,6 +57,7 @@ object SessionRefresh {
     @Volatile
     private var refreshProbe: CompletableDeferred<Unit>? = null
 
+    //? if > 1.8.9 {
     private class ConnectionAttempt(
         val parent: Screen,
         val address: ServerAddress,
@@ -57,6 +65,9 @@ object SessionRefresh {
         val quickPlay: Boolean,
         val transferState: TransferState?,
     )
+    //?} else {
+    /*private class ConnectionAttempt(val parent: Screen, val server: ServerData)
+    *///?}
 
     @Volatile
     private var lastAttempt: ConnectionAttempt? = null
@@ -71,6 +82,7 @@ object SessionRefresh {
     @Volatile
     private var invalidSessionPending = false
 
+    //? if > 1.8.9 {
     @JvmStatic
     fun onConnectStarted(
         parent: Screen?,
@@ -83,6 +95,14 @@ object SessionRefresh {
         if (parent != null && address != null && server != null) {
             lastAttempt = ConnectionAttempt(parent, address, server, quickPlay, transferState)
         }
+    //?} else {
+    /*@JvmStatic
+    fun onConnectStarted(parent: Screen?, server: ServerData?) {
+        invalidSessionPending = false
+        if (parent != null && server != null) {
+            lastAttempt = ConnectionAttempt(parent, server)
+        }
+    *///?}
         val wasReconnecting = reconnecting
         if (wasReconnecting) reconnecting = false else refreshedForAttempt = false
         if (!wasReconnecting) startRefreshIfExpired()
@@ -155,6 +175,7 @@ object SessionRefresh {
         invalidSessionPending = true
     }
 
+    //? if > 1.8.9 {
     @JvmStatic
     fun isInvalidSession(reason: Component): Boolean {
         val contents = reason.contents as? TranslatableContents ?: return false
@@ -163,6 +184,13 @@ object SessionRefresh {
             arg is Component && (arg.contents as? TranslatableContents)?.key == INVALID_SESSION_KEY
         }
     }
+    //?} else {
+    /*@JvmStatic
+    fun isInvalidSession(reason: Text): Boolean {
+        if (reason !is TranslatableText || reason.key != LOGIN_FAILED_KEY) return false
+        return reason.args.any { arg -> arg is TranslatableText && arg.key == INVALID_SESSION_KEY }
+    }
+    *///?}
 
     @JvmStatic
     fun createPrompt(): SessionRefreshPrompt? {
@@ -176,6 +204,7 @@ object SessionRefresh {
         val attempt = lastAttempt ?: return false
         reconnecting = true
         return runCatching {
+            //? if > 1.8.9 {
             ConnectScreen.startConnecting(
                 attempt.parent,
                 Minecraft.getInstance(),
@@ -184,6 +213,9 @@ object SessionRefresh {
                 attempt.quickPlay,
                 attempt.transferState,
             )
+            //?} else {
+            /*ClientPlatform.setScreen(ConnectScreen(attempt.parent, Minecraft.getInstance(), attempt.server))
+            *///?}
         }.onFailure {
             reconnecting = false
             LOGGER.error("Could not reconnect to {} after refreshing the session", attempt.server.ip, it)

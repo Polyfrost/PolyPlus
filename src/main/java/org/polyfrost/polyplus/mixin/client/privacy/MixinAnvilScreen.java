@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.privacy;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.gui.screens.inventory.AnvilScreen;
@@ -20,3 +21,4 @@ public class MixinAnvilScreen {
         return RichTextPrivacy.unresolved(hoverName);
     }
 }
+//?}

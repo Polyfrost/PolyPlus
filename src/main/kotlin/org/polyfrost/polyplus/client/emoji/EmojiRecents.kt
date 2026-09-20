@@ -11,7 +11,11 @@ object EmojiRecents {
     @Serializable
     private data class State(val recents: List<String> = emptyList())
 
+    //? if > 1.8.9 {
     private val file: File by lazy { File(Minecraft.getInstance().gameDirectory, "polyplus/emoji_recents.json") }
+    //?} else {
+    /*private val file: File by lazy { File(Minecraft.getInstance().gameDir, "polyplus/emoji_recents.json") }
+    *///?}
     private val recents = mutableListOf<String>()
     private var loaded = false
 

@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.client.features
 
 import net.fabricmc.loader.api.FabricLoader
+//? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
+//?} else {
+/*import net.minecraft.client.options.KeyBinding as KeyMapping
+*///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -309,8 +313,10 @@ object DefaultSettings {
         val minecraft = Minecraft.getInstance()
         //? if >= 26.2 {
         if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
-        //?} else
-        //if (minecraft.overlay != null || minecraft.screen == null) return
+        //?} elif > 1.8.9 {
+        /*if (minecraft.overlay != null || minecraft.screen == null) return
+        *///?} else
+        //if (minecraft.screen == null) return
 
         reported = true
         runCatching {
@@ -323,19 +329,36 @@ object DefaultSettings {
 
     private fun applyVanillaOptions() {
         val options = Minecraft.getInstance().options ?: return
+        //? if > 1.8.9 {
         options.enableVsync().set(false)
         options.framerateLimit().set(UNLIMITED_FRAMERATE)
         options.entityShadows().set(false)
+        //?} else {
+        /*options.vsync = false
+        options.fpsLimit = UNLIMITED_FRAMERATE
+        options.renderClouds = false // feather's name for the 1.8.9 entityShadows option
+        *///?}
         options.save()
     }
 
+    //? if > 1.8.9 {
     private fun keyMappings(): List<KeyMapping> =
         Minecraft.getInstance().options?.keyMappings?.asList().orEmpty()
+    //?} else {
+    /*private fun keyMappings(): List<KeyMapping> =
+        Minecraft.getInstance().options?.keyBindings?.asList().orEmpty()
+
+    private val KeyMapping.isUnbound: Boolean get() = keyCode == 0
+    *///?}
 
     private fun unbindMatching(matches: (String) -> Boolean) {
         val options = Minecraft.getInstance().options ?: return
         var changed = false
+        //? if > 1.8.9 {
         options.keyMappings.forEach { mapping ->
+        //?} else {
+        /*options.keyBindings.forEach { mapping ->
+        *///?}
             if (!matches(mapping.name) || mapping.isUnbound) return@forEach
             mapping.setKey(InputConstants.UNKNOWN)
             changed = true
@@ -515,6 +538,7 @@ object DefaultSettings {
         java.lang.Enum.valueOf(type as Class<out Enum<*>>, name)
 
     private fun disableAnimatiumResourcePacks() {
+        //? if > 1.8.9 {
         val minecraft = Minecraft.getInstance()
         val options = minecraft.options ?: return
         val removed = options.resourcePacks.removeAll(::isAnimatiumPack) or
@@ -531,6 +555,7 @@ object DefaultSettings {
             logger.info("Disabled Animatium resource packs")
         }
         if (wasSelected) minecraft.reloadResourcePacks()
+        //?}
     }
 
     private fun isAnimatiumPack(id: String): Boolean =

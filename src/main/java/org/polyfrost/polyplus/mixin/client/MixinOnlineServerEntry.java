@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
@@ -258,3 +259,59 @@ public abstract class MixinOnlineServerEntry {
             : savedServerCount;
     }
 }
+//?} else {
+/*import net.minecraft.client.gui.widget.ServerListEntryWidget;
+import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
+import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
+import org.polyfrost.polyplus.client.featured.FeaturedServerVanillaRenderer;
+import org.polyfrost.polyplus.client.featured.FeaturedServers;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(ServerListEntryWidget.class)
+public abstract class MixinOnlineServerEntry {
+    @Inject(method = "render", at = @At("HEAD"))
+    private void polyplus$beforeRender(
+        int index, int x, int y, int width, int height, int mouseX, int mouseY, boolean hovered, CallbackInfo ci
+    ) {
+        var row = FeaturedServerRowRegistry.get(this);
+        if (row != null) FeaturedServerVanillaRenderer.before(row, x, y, width, height);
+    }
+
+    @Inject(method = "render", at = @At("RETURN"))
+    private void polyplus$afterRender(
+        int index, int x, int y, int width, int height, int mouseX, int mouseY, boolean hovered, CallbackInfo ci
+    ) {
+        var row = FeaturedServerRowRegistry.get(this);
+        if (row != null) FeaturedServerVanillaRenderer.after(row, mouseX, mouseY);
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void polyplus$mouseClicked(
+        int index, int mouseX, int mouseY, int button, int entryMouseX, int entryMouseY,
+        CallbackInfoReturnable<Boolean> cir
+    ) {
+        var row = FeaturedServerRowRegistry.get(this);
+        if (row == null) return;
+        var access = (FeaturedServerListAccess) row.list();
+        if (row.dismissHit(mouseX, mouseY)) {
+            var campaign = row.server().getFeatured();
+            if (campaign != null) {
+                if (row.promoted()) FeaturedServers.dismissMultiplayer(campaign.getCampaignId(), false);
+                else FeaturedServers.restoreMultiplayer(campaign.getCampaignId());
+            }
+            access.polyplus$rebuildFeaturedServers();
+            cir.setReturnValue(true);
+            return;
+        }
+        if (entryMouseX > 16 && entryMouseX < 32) {
+            access.polyplus$saveFeaturedServer(row);
+            row.screen().connect();
+            cir.setReturnValue(true);
+        }
+    }
+}
+*///?}

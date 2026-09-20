@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
+//? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
@@ -74,6 +75,7 @@ public class MixinAvatarRenderer {
         }
         //?}
     }
+//?}
 
     //? if >= 1.21.4 {
     //? if >= 1.21.10 {
@@ -102,4 +104,37 @@ public class MixinAvatarRenderer {
         }
     }
     //?}
+//? if > 1.8.9
 }
+
+//? if = 1.8.9 {
+/*import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.entity.PlayerRenderer;
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
+import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
+import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(PlayerRenderer.class)
+public class MixinAvatarRenderer {
+    @Inject(method = "<init>(Lnet/minecraft/client/render/entity/EntityRenderDispatcher;Z)V", at = @At("RETURN"))
+    private void polyplus$addCosmeticLayer(EntityRenderDispatcher dispatcher, boolean thinArms, CallbackInfo ci) {
+        LivingEntityRendererInvoker invoker = (LivingEntityRendererInvoker) this;
+        invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer((PlayerRenderer) (Object) this));
+        invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer((PlayerRenderer) (Object) this));
+    }
+
+    @Inject(method = {"renderRightHand", "renderPlayerLeftHandModel"}, at = @At("HEAD"))
+    private void polyplus$enterFirstPersonHand(CallbackInfo ci) {
+        ModelPoseApplicator.firstPersonHand = true;
+    }
+
+    @Inject(method = {"renderRightHand", "renderPlayerLeftHandModel"}, at = @At("RETURN"))
+    private void polyplus$exitFirstPersonHand(CallbackInfo ci) {
+        ModelPoseApplicator.firstPersonHand = false;
+    }
+}
+*///?}

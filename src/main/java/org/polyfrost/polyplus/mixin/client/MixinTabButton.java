@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import net.minecraft.client.gui.components.TabButton;
 import org.spongepowered.asm.mixin.Mixin;
 
@@ -43,3 +44,4 @@ public class MixinTabButton {
     }
     *///?}
 }
+//?}

@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.launcher
 
+//? if > 1.8.9
 import net.minecraft.client.gui.components.Button
+//? if = 1.8.9
+//import net.minecraft.client.gui.widget.ButtonWidget as Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -55,7 +58,11 @@ class SessionRefreshPrompt internal constructor() {
 
     private fun update() {
         val button = button ?: return
+        //? if > 1.8.9 {
         button.message = label()
+        //?} else {
+        /*button.message = label().string
+        *///?}
         button.active = stage == Stage.IDLE || stage == Stage.FAILED
     }
 }

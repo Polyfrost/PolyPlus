@@ -9,9 +9,12 @@ import java.util.EnumMap
 import net.minecraft.util.Util
 //?}
 
-//? if < 1.21.11 {
+//? if < 1.21.11 && > 1.8.9 {
 /*import net.minecraft.Util
 *///?}
+
+//? if = 1.8.9
+//import net.minecraft.client.Minecraft
 
 class CosmeticEquipment {
     private val equipped = EnumMap<BodySlot, EquippedEntry>(BodySlot::class.java)
@@ -29,7 +32,11 @@ class CosmeticEquipment {
             return CosmeticEquipResult.SlotOccupied(cosmetic.slot, existing.cosmetic.id)
         }
 
+        //? if > 1.8.9 {
         equipped[cosmetic.slot] = EquippedEntry(cosmetic, Util.getMillis())
+        //?} else {
+        /*equipped[cosmetic.slot] = EquippedEntry(cosmetic, Minecraft.getTime())
+        *///?}
         return CosmeticEquipResult.Success
     }
 

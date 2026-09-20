@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2", "26.3"]
+        version: ["1.8.9", "1.21.1", "1.21.4", "1.21.5", "1.21.8", "1.21.10", "1.21.11", "26.1", "26.2", "26.3"]
 
     steps:
       - uses: actions/checkout@v6
@@ -47,12 +47,12 @@ jobs:
       - run: chmod +x ./gradlew
       - name: Build Stonecutter version
         run: |
-          ./gradlew ":${{ matrix.version }}-fabric:build"
+          ./gradlew ":${{ matrix.version }}-${{ matrix.version == '1.8.9' && 'ornithe' || 'fabric' }}:build"
 
       - name: Resolve built mod jar
         id: mod-jar
         run: |
-          mapfile -t jars < <(find "versions/${{ matrix.version }}-fabric/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
+          mapfile -t jars < <(find "versions/${{ matrix.version }}-${{ matrix.version == '1.8.9' && 'ornithe' || 'fabric' }}/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
 
           if [ "${#jars[@]}" -ne 1 ]; then
             printf 'Expected exactly one non-sources jar, found %s:\n' "${#jars[@]}"

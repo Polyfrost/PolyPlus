@@ -1,6 +1,11 @@
 package org.polyfrost.polyplus.client
 
+//? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+//?} else {
+/*import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
+*///?}
 import net.fabricmc.loader.api.FabricLoader
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
@@ -49,7 +54,9 @@ object CrashOutcomeTracker {
         if (!heartbeatInstalled.compareAndSet(false, true)) return
         //? if fabric {
         ClientTickEvents.END_CLIENT_TICK.register(ClientTickEvents.EndTick { ticks.incrementAndGet() })
-        //?}
+        //?} else {
+        /*eventHandler { _: TickEvent.End -> ticks.incrementAndGet() }.register()
+        *///?}
     }
 
     // Resolves on a watcher thread or on the shutdown hook if the game is already dying

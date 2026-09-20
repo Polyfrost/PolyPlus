@@ -91,13 +91,13 @@ object CosmeticService {
         CosmeticCatalog.refreshPlayer()
         val ids = CosmeticCatalog.localEquipped().ids()
         for (id in ids) {
-            //? if >= 1.21.1 {
+            //? if >= 1.21.1 || = 1.8.9 {
             CosmeticAssetCache.ensureCosmeticLoaded(id)
             //?}
         }
         ClientPlatform.runOnMain {
             CosmeticCatalog.applyRemoteEquipped(ClientPlatform.localPlayerUuid(), CosmeticCatalog.localEquipped().equipped)
-            //? if >= 1.21.1 {
+            //? if >= 1.21.1 || = 1.8.9 {
             CosmeticSync.applyLocalActiveFromCatalog()
             //?}
         }
