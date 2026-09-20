@@ -56,6 +56,4 @@ internal object AssetArchive {
             }
         }
     }
-
-    fun readBytes(path: Path): ByteArray = Files.readAllBytes(path)
 }

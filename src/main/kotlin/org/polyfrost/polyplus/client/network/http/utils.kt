@@ -31,13 +31,6 @@ suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuild
     return response
 }
 
-suspend inline fun HttpClient.requestAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-    return requestAuthorized {
-        this.url(url)
-        apply(block)
-    }
-}
-
 suspend inline fun <reified T> HttpResponse.bodyOrThrow(): T {
     if (!status.isSuccess()) {
         val text = bodyAsText()
@@ -48,13 +41,6 @@ suspend inline fun <reified T> HttpResponse.bodyOrThrow(): T {
         }
     }
     return body()
-}
-
-suspend inline fun <reified T> HttpClient.requestBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
-    return runCatching {
-        val response = requestAuthorized(url, block)
-        response.bodyOrThrow<T>()
-    }
 }
 
 suspend inline fun HttpClient.requestAuthorized(url: String, method: HttpMethod, noinline block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
@@ -70,10 +56,6 @@ suspend inline fun <reified T> HttpClient.requestBodyAuthorized(url: String, met
         val response = requestAuthorized(url, method, block)
         response.bodyOrThrow<T>()
     }
-}
-
-suspend inline fun HttpClient.getAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-    return requestAuthorized(url, HttpMethod.Get, block)
 }
 
 suspend inline fun <reified T> HttpClient.getBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
@@ -92,22 +74,10 @@ suspend inline fun HttpClient.putAuthorized(url: String, noinline block: HttpReq
     return requestAuthorized(url, HttpMethod.Put, block)
 }
 
-suspend inline fun <reified T> HttpClient.putBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
-    return requestBodyAuthorized<T>(url, HttpMethod.Put, block)
-}
-
-suspend inline fun HttpClient.patchAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-    return requestAuthorized(url, HttpMethod.Patch, block)
-}
-
 suspend inline fun <reified T> HttpClient.patchBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
     return requestBodyAuthorized<T>(url, HttpMethod.Patch, block)
 }
 
 suspend inline fun HttpClient.deleteAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
     return requestAuthorized(url, HttpMethod.Delete, block)
-}
-
-suspend inline fun <reified T> HttpClient.deleteBodyAuthorized(url: String, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
-    return requestBodyAuthorized<T>(url, HttpMethod.Delete, block)
 }

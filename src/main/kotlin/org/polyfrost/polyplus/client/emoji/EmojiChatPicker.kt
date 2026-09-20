@@ -1,11 +1,11 @@
 package org.polyfrost.polyplus.client.emoji
 
-import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
+import org.polyfrost.polyplus.client.render.InputConstants
 import org.polyfrost.polyplus.compat.ChattingButtonRow
 import java.util.function.Consumer
 
@@ -74,7 +74,8 @@ class EmojiChatPicker {
                 query = query.dropLast(1)
                 refresh()
             }
-            InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER, InputConstants.KEY_TAB -> entries.getOrNull(selected)?.let { pick(it, shiftDown, onPick) }
+            InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER, InputConstants.KEY_TAB ->
+                entries.getOrNull(selected)?.let { pick(it, shiftDown, onPick) }
             InputConstants.KEY_LEFT -> move(-1)
             InputConstants.KEY_RIGHT -> move(1)
             InputConstants.KEY_UP -> move(-columns)

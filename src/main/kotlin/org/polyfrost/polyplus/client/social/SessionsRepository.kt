@@ -9,14 +9,13 @@ import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-object SessionsRepository : EarlyInitializable {
+object SessionsRepository {
     private val LOGGER = LogManager.getLogger()
 
     private val _incomingInvites = MutableStateFlow<List<SessionInvite>>(emptyList())
@@ -26,7 +25,7 @@ object SessionsRepository : EarlyInitializable {
 
     val acceptedInvites = _acceptedInvites.asSharedFlow()
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
                 is ClientboundPacket.SessionInviteReceived -> {
@@ -91,7 +90,7 @@ object SessionsRepository : EarlyInitializable {
     private fun notifyInviteReceived(inviteId: Int, sender: String) {
         if (!NotificationDedup.shouldNotify("session_invite:$inviteId")) return
         PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        val name = PlayerNamesRepository.nameOr(sender)
         Notifications.info("PolyPlus", "$name invited you to their world")
     }
 }

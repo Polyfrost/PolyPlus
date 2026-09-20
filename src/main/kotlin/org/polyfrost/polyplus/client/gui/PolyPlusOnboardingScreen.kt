@@ -52,13 +52,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.LinearGradientShader
-import androidx.compose.ui.graphics.Shader
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -74,7 +68,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mojang.blaze3d.platform.InputConstants
@@ -89,13 +85,14 @@ import org.jetbrains.skia.Path
 import org.jetbrains.skia.Point
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.SamplingMode
+import org.joml.Matrix4f
+import org.joml.Vector3f
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
-import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
@@ -192,9 +189,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
         }
         val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
-        var guides by remember {
-            mutableStateOf(owedGuides)
-        }
+        var guides by remember { mutableStateOf(owedGuides) }
         val pages = remember(guides) {
             buildList {
                 if (needsTerms) add(OnboardingStep.Terms)
@@ -204,7 +199,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     offeredCards.chunked(MOD_CARDS_PER_PAGE).forEach { add(OnboardingStep.Mods(it)) }
                 }
                 if (needsBlurChoice) add(OnboardingStep.MotionBlur)
-                ModGuide.entries.filter { it in guides }.forEach { add(OnboardingStep.Guide(it)) }
+                guides.sortedBy { it.ordinal }.forEach { add(OnboardingStep.Guide(it)) }
                 if (needsSettings || needsModSettings) add(OnboardingStep.Done)
             }.ifEmpty { listOf(OnboardingStep.Done) }
         }
@@ -233,26 +228,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         // The notice runs without the mod cards, so it reads Animatium itself instead of the cards' values.
         fun itemValue(fromCards: Float?, live: () -> Float?, stored: Float): Float =
             fromCards ?: (if (ModGuide.ITEM in owedGuides) live() else null) ?: stored
-        var itemOffsetX by remember {
-            mutableStateOf(
-                itemValue(modReads.itemX, OnboardingFeatures::currentItemOffsetX, PolyPlusConfig.onboardingItemOffsetX),
-            )
-        }
-        var itemOffsetY by remember {
-            mutableStateOf(
-                itemValue(modReads.itemY, OnboardingFeatures::currentItemOffsetY, PolyPlusConfig.onboardingItemOffsetY),
-            )
-        }
-        var itemOffsetZ by remember {
-            mutableStateOf(
-                itemValue(modReads.itemZ, OnboardingFeatures::currentItemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ),
-            )
-        }
-        var itemScale by remember {
-            mutableStateOf(
-                itemValue(modReads.itemScale, OnboardingFeatures::currentItemScale, PolyPlusConfig.onboardingItemScale),
-            )
-        }
+        var itemOffsetX by remember { mutableStateOf(itemValue(modReads.itemX, OnboardingFeatures::currentItemOffsetX, PolyPlusConfig.onboardingItemOffsetX)) }
+        var itemOffsetY by remember { mutableStateOf(itemValue(modReads.itemY, OnboardingFeatures::currentItemOffsetY, PolyPlusConfig.onboardingItemOffsetY)) }
+        var itemOffsetZ by remember { mutableStateOf(itemValue(modReads.itemZ, OnboardingFeatures::currentItemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ)) }
+        var itemScale by remember { mutableStateOf(itemValue(modReads.itemScale, OnboardingFeatures::currentItemScale, PolyPlusConfig.onboardingItemScale)) }
         val touched = remember { mutableSetOf<ModCard>() }
         fun markTouched(card: ModCard) {
             touched += card
@@ -413,13 +392,13 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 .size(panelWidth.dp, panelHeight.dp)
                                 .shadow(
                                     elevation = 29.dp,
-                                    shape = PANEL_SHAPE,
+                                    shape = ButtonShape,
                                     ambientColor = ShadowColor,
                                     spotColor = ShadowColor,
                                 )
-                                .clip(PANEL_SHAPE)
+                                .clip(ButtonShape)
                                 .background(PageBackground.copy(alpha = 0.9f))
-                                .border(BorderWidth, LocalTheme.current.borderColor, PANEL_SHAPE),
+                                .border(SocialPanelBorderWidth, LocalTheme.current.borderColor, ButtonShape),
                         ) {
                             when (val step = pages[page]) {
                                 OnboardingStep.Terms ->
@@ -523,13 +502,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                         )
                                     }
                                 is OnboardingStep.Guide -> GuidePage(step.guide)
-                                OnboardingStep.Cosmetics -> CosmeticsPage(
-                                    onClaim = { PolyPlusClient.refreshCosmetics() },
-                                    onStore = {
-                                        finish()
-                                        PolyPlusOneConfigIntegration.openCosmetics()
-                                    },
-                                )
                                 OnboardingStep.Done -> DonePage()
                             }
                             val terms = pages[page] == OnboardingStep.Terms
@@ -612,66 +584,27 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
     fun valueToProgress(v: Int): Float = if (v <= 0) 1f else ((v - 1).toFloat() / steps).coerceIn(0f, 1f)
     fun indexToValue(index: Int): Int = if (index >= steps) 0 else index + 1
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), verticalAlignment = Alignment.CenterVertically) {
-        val thumbSize = 13.dp
-        var trackWidthPx by remember { mutableStateOf(0f) }
-        val progress by animateFloatAsState(
-            valueToProgress(guiScale),
-            animationSpec = spring(),
-        )
-        Box(
-            Modifier
-                .width(332.dp)
-                .height(13.dp)
-                .onSizeChanged { trackWidthPx = it.width.toFloat() }
-                .pointerInput(steps) {
-                    val thumbPx = thumbSize.toPx()
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        var pending = guiScale
-                        fun update(x: Float) {
-                            val usableWidth = (trackWidthPx - thumbPx).coerceAtLeast(1f)
-                            val p = ((x - thumbPx / 2f) / usableWidth).coerceIn(0f, 1f)
-                            pending = indexToValue((p * steps).roundToInt())
-                            onGuiScale(pending)
-                        }
-                        update(down.position.x)
-                        down.consume()
-                        do {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            update(change.position.x)
-                            change.consume()
-                        } while (change.pressed)
-                        OnboardingFeatures.applyGuiScale(pending, persist = false)
-                    }
-                },
-        ) {
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .width(332.dp)
-                    .height(7.dp)
-                    .clip(ppShape(4.dp))
-                    .background(ChoiceBackground)
-                    .border(1.dp, PanelBorderBrush, ppShape(4.dp)),
-            ) {
-                Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Accent))
-            }
-            Box(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
-                    .size(thumbSize)
-                    .clip(ppShape(7.dp))
-                    .background(TextPrimary),
-            )
+        var pending by remember { mutableIntStateOf(guiScale) }
+        OnboardingSlider(
+            progress = valueToProgress(guiScale),
+            width = 332f,
+            thumbSize = WIDE_SLIDER_THUMB,
+            trackHeight = WIDE_SLIDER_TRACK,
+            onRelease = { OnboardingFeatures.applyGuiScale(pending, persist = false) },
+        ) { p ->
+            pending = indexToValue((p * steps).roundToInt())
+            onGuiScale(pending)
         }
         Spacer(Modifier.width(18.dp))
-        Box(
-            Modifier.width(64.dp).height(26.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
-            contentAlignment = Alignment.CenterStart,
-        ) { OnboardingText(if (guiScale <= 0) "Auto" else guiScale.toString(), 12, Modifier.padding(start = 8.dp)) }
+        SliderValueBox(
+            if (guiScale <= 0) "Auto" else guiScale.toString(),
+            width = 64.dp,
+            height = 26.dp,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Normal,
+            alignment = Alignment.CenterStart,
+            textPadding = 8.dp,
+        )
     }
 }
 
@@ -698,24 +631,24 @@ private fun ModCardFrame(
             .size(CARD_WIDTH.dp, CARD_HEIGHT.dp)
             .clip(ButtonShape)
             .background(ChoiceBackground)
-            .border(BorderWidth, PanelBorderBrush, ButtonShape),
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ButtonShape),
     ) {
         Column(Modifier.fillMaxSize().padding(CARD_PADDING.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OnboardingIcon(icon, TextPrimary, Modifier.size(22.dp))
-                OnboardingText(title, 17, color = TextPrimary, weight = FontWeight.Medium)
+                Icon(icon, SocialTextPrimary, Modifier.size(22.dp))
+                SocialText(title, 17.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(CARD_TITLE_GAP.dp))
             preview()
             Spacer(Modifier.height(CARD_DESC_GAP.dp))
-            OnboardingText(
+            SocialText(
                 description,
-                12,
+                12.sp,
                 Modifier.width(CARD_CONTENT_WIDTH.dp),
-                TextSecondary,
+                SocialTextSecondary,
                 FontWeight.Light,
                 TextAlign.Start,
             )
@@ -731,11 +664,11 @@ private fun ModCardFrame(
 
 @Composable
 private fun CardLabel(label: String) {
-    OnboardingText(
+    SocialText(
         label,
-        12,
+        12.sp,
         Modifier.width(CARD_LABEL_WIDTH.dp),
-        TextSecondary,
+        SocialTextSecondary,
         FontWeight.Light,
         TextAlign.Start,
     )
@@ -746,13 +679,9 @@ private fun CardSlider(label: String, progress: Float, value: String, onProgress
     Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
         CardLabel(label)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        OnboardingSlider(progress, CARD_SLIDER_WIDTH, onProgress)
+        OnboardingSlider(progress, CARD_SLIDER_WIDTH, onProgress = onProgress)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        Box(
-            Modifier.width(CARD_VALUE_WIDTH.dp).height(CARD_ROW_HEIGHT.dp).clip(ppShape(6.dp))
-                .background(ChoiceBackground).border(1.dp, PanelBorderBrush, ppShape(6.dp)),
-            contentAlignment = Alignment.Center,
-        ) { OnboardingText(value, 12, color = TextPrimary, weight = FontWeight.Light) }
+        SliderValueBox(value, CARD_VALUE_WIDTH.dp, CARD_ROW_HEIGHT.dp, 12.sp)
     }
 }
 
@@ -763,12 +692,12 @@ private fun CardChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier
             .size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp)
             .clip(shape)
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, shape)
+            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, shape)
             .clickableWithSound { if (!selected) onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        OnboardingText(label, 12, color = TextPrimary, weight = if (selected) FontWeight.Medium else FontWeight.Light)
+        SocialText(label, 12.sp, color = SocialTextPrimary, fontWeight = if (selected) FontWeight.Medium else FontWeight.Light, textAlign = TextAlign.Center)
     }
 }
 
@@ -803,7 +732,7 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
                     .shadow(10.dp, shape, ambientColor = ShadowColor, spotColor = ShadowColor)
                     .clip(shape)
                     .background(MenuBackground)
-                    .border(BorderWidth, PanelBorderBrush, shape)
+                    .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape)
                     .padding(vertical = CARD_MENU_PADDING.dp),
             ) {
                 options.forEachIndexed { index, option ->
@@ -824,21 +753,21 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
                 Modifier
                     .size(CARD_DROPDOWN_WIDTH.dp, CARD_ROW_HEIGHT.dp)
                     .clip(shape)
-                    .background(if (expanded) Accent.asSelectedBackground else ChoiceBackground)
-                    .border(BorderWidth, if (expanded) SolidColor(Accent) else PanelBorderBrush, shape)
+                    .background(if (expanded) Accent.asSocialSelected else ChoiceBackground)
+                    .border(SocialPanelBorderWidth, if (expanded) SolidColor(Accent) else SocialPanelBorderBrush, shape)
                     .clickableWithSound { expanded = !expanded }
                     .padding(horizontal = CARD_MENU_INSET.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OnboardingText(
+                SocialText(
                     options.getOrElse(selected) { options.first() },
-                    12,
+                    12.sp,
                     Modifier.weight(1f),
-                    TextPrimary,
+                    SocialTextPrimary,
                     FontWeight.Medium,
                     TextAlign.Start,
                 )
-                OnboardingIcon(ONBOARDING_ASSETS + "chevron-selector.svg", TextSecondary, Modifier.size(13.dp))
+                Icon(ONBOARDING_ASSETS + "chevron-selector.svg", SocialTextSecondary, Modifier.size(13.dp))
             }
         }
     }
@@ -850,20 +779,20 @@ private fun CardMenuItem(label: String, selected: Boolean, onClick: () -> Unit) 
         Modifier
             .fillMaxWidth()
             .height(CARD_MENU_ITEM_HEIGHT.dp)
-            .background(if (selected) Accent.asSelectedBackground else Color.Transparent)
+            .background(if (selected) Accent.asSocialSelected else Color.Transparent)
             .clickableWithSound(onClick)
             .padding(horizontal = CARD_MENU_INSET.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OnboardingText(
+        SocialText(
             label,
-            12,
+            12.sp,
             Modifier.weight(1f),
-            TextPrimary,
+            SocialTextPrimary,
             if (selected) FontWeight.Medium else FontWeight.Light,
             TextAlign.Start,
         )
-        if (selected) OnboardingIcon(MAIN_MENU_ASSETS + "check.svg", Accent, Modifier.size(12.dp))
+        if (selected) Icon(MAIN_MENU_ASSETS + "check.svg", Accent, Modifier.size(12.dp))
     }
 }
 
@@ -875,12 +804,13 @@ private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit)
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        OnboardingText(
+        SocialText(
             "Turn sprinting into a toggle so you keep running after you let go of the key.",
-            13,
+            13.sp,
             Modifier.width(460.dp),
-            TextSecondary,
+            SocialTextSecondary,
             FontWeight.Light,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -1071,8 +1001,8 @@ private fun ToggleKeyButton() {
     val shape = ppShape(6.dp)
     Box(
         Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp).clip(shape)
-            .background(if (capturing) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (capturing) SolidColor(Accent) else PanelBorderBrush, shape)
+            .background(if (capturing) Accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (capturing) SolidColor(Accent) else SocialPanelBorderBrush, shape)
             .clickableWithSound {
                 if (capturing) return@clickableWithSound
                 capturing = true
@@ -1086,11 +1016,12 @@ private fun ToggleKeyButton() {
             },
         contentAlignment = Alignment.Center,
     ) {
-        OnboardingText(
+        SocialText(
             if (capturing) "Press a key" else label,
-            12,
-            color = TextPrimary,
-            weight = if (capturing) FontWeight.Medium else FontWeight.Light,
+            12.sp,
+            color = SocialTextPrimary,
+            fontWeight = if (capturing) FontWeight.Medium else FontWeight.Light,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1106,45 +1037,61 @@ private fun fireHeightLabel(height: Float): String =
 private fun snapTo(value: Float, step: Float): Float = (value / step).roundToInt() * step
 
 @Composable
-private fun OnboardingSlider(progress: Float, width: Float, onProgress: (Float) -> Unit) {
-    val thumbSize = 11.dp
+private fun OnboardingSlider(
+    progress: Float,
+    width: Float,
+    thumbSize: Dp = 11.dp,
+    trackHeight: Dp = 6.dp,
+    enabled: Boolean = true,
+    onRelease: () -> Unit = {},
+    onProgress: (Float) -> Unit,
+) {
     var trackWidthPx by remember { mutableStateOf(0f) }
     val currentOnProgress by rememberUpdatedState(onProgress)
+    val currentOnRelease by rememberUpdatedState(onRelease)
     val animated by animateFloatAsState(progress.coerceIn(0f, 1f), animationSpec = spring())
+    val trackShape = ppShape(trackHeight / 2)
     Box(
         Modifier
             .width(width.dp)
             .height(thumbSize)
             .onSizeChanged { trackWidthPx = it.width.toFloat() }
-            .pointerInput(Unit) {
-                val thumbPx = thumbSize.toPx()
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    fun update(x: Float) {
-                        val usable = (trackWidthPx - thumbPx).coerceAtLeast(1f)
-                        currentOnProgress(((x - thumbPx / 2f) / usable).coerceIn(0f, 1f))
+            .then(
+                if (!enabled) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        val thumbPx = thumbSize.toPx()
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            fun update(x: Float) {
+                                val usable = (trackWidthPx - thumbPx).coerceAtLeast(1f)
+                                currentOnProgress(((x - thumbPx / 2f) / usable).coerceIn(0f, 1f))
+                            }
+                            update(down.position.x)
+                            down.consume()
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                update(change.position.x)
+                                change.consume()
+                            } while (change.pressed)
+                            currentOnRelease()
+                        }
                     }
-                    update(down.position.x)
-                    down.consume()
-                    do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        update(change.position.x)
-                        change.consume()
-                    } while (change.pressed)
-                }
-            },
+                },
+            ),
     ) {
         Box(
             Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(ppShape(3.dp))
+                .height(trackHeight)
+                .clip(trackShape)
                 .background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, ppShape(3.dp)),
+                .border(1.dp, SocialPanelBorderBrush, trackShape),
         ) {
-            Box(Modifier.fillMaxWidth(animated).height(6.dp).background(Accent))
+            Box(Modifier.fillMaxWidth(animated).height(trackHeight).background(Accent))
         }
         Box(
             Modifier
@@ -1156,8 +1103,34 @@ private fun OnboardingSlider(progress: Float, width: Float, onProgress: (Float) 
                     )
                 }
                 .size(thumbSize)
-                .clip(ppShape(6.dp))
-                .background(TextPrimary),
+                .clip(ppShape(thumbSize / 2))
+                .background(SocialTextPrimary),
+        )
+    }
+}
+
+@Composable
+private fun SliderValueBox(
+    value: String,
+    width: Dp,
+    height: Dp = 24.dp,
+    fontSize: TextUnit = 11.sp,
+    fontWeight: FontWeight = FontWeight.Light,
+    alignment: Alignment = Alignment.Center,
+    textPadding: Dp = 0.dp,
+) {
+    Box(
+        Modifier.width(width).height(height).clip(ppShape(6.dp)).background(ChoiceBackground)
+            .border(1.dp, SocialPanelBorderBrush, ppShape(6.dp)),
+        contentAlignment = alignment,
+    ) {
+        SocialText(
+            value,
+            fontSize,
+            Modifier.padding(start = textPadding),
+            color = SocialTextPrimary,
+            fontWeight = fontWeight,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1177,16 +1150,17 @@ private fun OptimizingPage() {
             animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
             label = "spin",
         )
-        OnboardingIcon(MAIN_MENU_ASSETS + "loading-02.svg", Accent, Modifier.size(40.dp).rotate(angle))
+        Icon(MAIN_MENU_ASSETS + "loading-02.svg", Accent, Modifier.size(40.dp).rotate(angle))
         Spacer(Modifier.height(18.dp))
-        OnboardingText("Waiting to optimize game…", 16, Modifier.width(PANEL_WIDTH.dp), TextPrimary, FontWeight.Medium)
+        SocialText("Waiting to optimize game…", 16.sp, Modifier.width(PANEL_WIDTH.dp), SocialTextPrimary, FontWeight.Medium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))
-        OnboardingText(
+        SocialText(
             "Measuring your frame rate to pick the best motion blur settings.",
-            13,
+            13.sp,
             Modifier.width(460.dp),
-            TextSecondary,
+            SocialTextSecondary,
             FontWeight.Light,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1252,66 +1226,23 @@ private fun BlurStrengthSlider(motionBlur: Int, disabled: Boolean, onMotionBlur:
         Modifier.offset(232.dp, BLUR_SLIDER_Y.dp).alpha(if (disabled) 0.4f else 1f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val thumbSize = 13.dp
-        var trackWidthPx by remember { mutableStateOf(0f) }
-        val progress by animateFloatAsState(
-            ((motionBlur - MOTION_BLUR_MIN).toFloat() / steps).coerceIn(0f, 1f),
-            animationSpec = spring(),
-        )
-        Box(
-            Modifier
-                .width(332.dp)
-                .height(13.dp)
-                .onSizeChanged { trackWidthPx = it.width.toFloat() }
-                .then(
-                    if (disabled) Modifier
-                    else Modifier.pointerInput(steps) {
-                        val thumbPx = thumbSize.toPx()
-                        awaitEachGesture {
-                            val down = awaitFirstDown()
-                            fun update(x: Float) {
-                                val usableWidth = (trackWidthPx - thumbPx).coerceAtLeast(1f)
-                                val fraction = ((x - thumbPx / 2f) / usableWidth).coerceIn(0f, 1f)
-                                onMotionBlur(MOTION_BLUR_MIN + (fraction * steps).roundToInt())
-                            }
-                            update(down.position.x)
-                            down.consume()
-                            do {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull() ?: break
-                                update(change.position.x)
-                                change.consume()
-                            } while (change.pressed)
-                        }
-                    },
-                ),
-        ) {
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .width(332.dp)
-                    .height(7.dp)
-                    .clip(ppShape(4.dp))
-                    .background(ChoiceBackground)
-                    .border(1.dp, PanelBorderBrush, ppShape(4.dp)),
-            ) {
-                Box(Modifier.fillMaxWidth(progress).height(7.dp).background(Accent))
-            }
-            Box(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .offset { IntOffset((progress * (trackWidthPx - thumbSize.toPx())).roundToInt(), 0) }
-                    .size(thumbSize)
-                    .clip(ppShape(7.dp))
-                    .background(TextPrimary),
-            )
-        }
+        OnboardingSlider(
+            progress = ((motionBlur - MOTION_BLUR_MIN).toFloat() / steps).coerceIn(0f, 1f),
+            width = 332f,
+            thumbSize = WIDE_SLIDER_THUMB,
+            trackHeight = WIDE_SLIDER_TRACK,
+            enabled = !disabled,
+        ) { fraction -> onMotionBlur(MOTION_BLUR_MIN + (fraction * steps).roundToInt()) }
         Spacer(Modifier.width(18.dp))
-        Box(
-            Modifier.width(64.dp).height(26.dp).clip(ppShape(6.dp)).background(ChoiceBackground)
-                .border(1.dp, PanelBorderBrush, ppShape(6.dp)),
-            contentAlignment = Alignment.CenterStart,
-        ) { OnboardingText(if (disabled) "Off" else motionBlur.toString(), 12, Modifier.padding(start = 8.dp)) }
+        SliderValueBox(
+            if (disabled) "Off" else motionBlur.toString(),
+            width = 64.dp,
+            height = 26.dp,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Normal,
+            alignment = Alignment.CenterStart,
+            textPadding = 8.dp,
+        )
     }
 }
 
@@ -1330,8 +1261,8 @@ private fun MotionBlurModeCard(
         Modifier
             .size(MODE_CARD_WIDTH.dp, MODE_CARD_HEIGHT.dp)
             .clip(ButtonShape)
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
+            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         Column(
@@ -1341,15 +1272,15 @@ private fun MotionBlurModeCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OnboardingIcon(icon, if (selected) Accent else TextPrimary, Modifier.size(18.dp))
-                OnboardingText(title, 15, color = TextPrimary, weight = FontWeight.Medium)
+                Icon(icon, if (selected) Accent else SocialTextPrimary, Modifier.size(18.dp))
+                SocialText(title, 15.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(9.dp))
-            OnboardingText(
+            SocialText(
                 description,
-                12,
+                12.sp,
                 Modifier.width((MODE_CARD_WIDTH - 32f).dp).heightIn(min = MODE_CARD_DESC_HEIGHT.dp),
-                TextSecondary,
+                SocialTextSecondary,
                 FontWeight.Light,
                 TextAlign.Start,
             )
@@ -1358,12 +1289,13 @@ private fun MotionBlurModeCard(
             Spacer(Modifier.weight(1f))
         }
         if (recommended) {
-            OnboardingText(
+            SocialText(
                 "Recommended",
-                11,
+                11.sp,
                 Modifier.align(Alignment.BottomCenter).padding(14.dp),
                 Accent,
                 FontWeight.Medium,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -1378,7 +1310,7 @@ private fun FpsHud(fps: Int, color: Color, modifier: Modifier = Modifier) {
             .padding(HUD_PADDING.dp),
     ) {
         val style = TextStyle(fontSize = HUD_TEXT_SIZE.sp, fontFamily = MinecraftFontFamily)
-        BasicText("FPS: ", style = style.copy(color = TextPrimary))
+        BasicText("FPS: ", style = style.copy(color = SocialTextPrimary))
         BasicText(fps.toString(), style = style.copy(color = color))
     }
 }
@@ -1386,54 +1318,24 @@ private fun FpsHud(fps: Int, color: Color, modifier: Modifier = Modifier) {
 private val MinecraftFontFamily = FontFamily(Font("assets/oneconfig/fonts/minecraft/Minecraft-Regular.otf"))
 
 @Composable
-private fun CosmeticsPage(onClaim: () -> Unit, onStore: () -> Unit) {
-    Header("Level up your drip 🔥 with", "Cosmetics")
-    OnboardingText(
-        "We decided to give you some for free as a warm welcome gift.\nEnjoy them, and check out the store if you want to see more!",
-        15,
-        Modifier.offset(215.dp, 137.dp).width(450.dp),
-        TextPrimary,
-        FontWeight.Light,
-    )
-    Row(Modifier.offset(124.dp, 209.dp), horizontalArrangement = Arrangement.spacedBy(46.dp)) {
-        CosmeticCard("Starter Glasses")
-        CosmeticCard("Starter Cape")
-        CosmeticCard("Starter Bag")
-    }
-    ChoiceButton("Claim Free Cosmetics", ONBOARDING_ASSETS + "diamond.svg", true, 272f, Modifier.offset(304.dp, 445.dp), onClick = onClaim)
-    ChoiceButton("Check Out the Store", ONBOARDING_ASSETS + "shopping-bag.svg", false, 272f, Modifier.offset(304.dp, 493.dp), onClick = onStore)
-}
-
-@Composable
 private fun DonePage() {
-    OnboardingIcon(ONBOARDING_ASSETS + "check-verified.svg", TextPrimary, Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
-    OnboardingText("All Done!", 32, Modifier.offset(0.dp, 311.dp).width(PANEL_WIDTH.dp))
-    OnboardingText(
+    Icon(ONBOARDING_ASSETS + "check-verified.svg", SocialTextPrimary, Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
+    SocialText("All Done!", 32.sp, Modifier.offset(0.dp, 311.dp).width(PANEL_WIDTH.dp), textAlign = TextAlign.Center)
+    SocialText(
         "That’s all for now, thank you for choosing OneClient! We hope you have a nice experience using it.",
-        15,
+        15.sp,
         Modifier.offset(225.dp, 382.dp).width(430.dp),
-        TextPrimary,
+        SocialTextPrimary,
         FontWeight.Light,
+        textAlign = TextAlign.Center,
     )
 }
 
 @Composable
 private fun GuidePage(guide: ModGuide) {
     Header("Where to change this later", guide.feature)
-    OnboardingText(
-        guide.route,
-        15,
-        Modifier.offset(GUIDE_MARGIN.dp, GUIDE_TEXT_Y.dp).width(GUIDE_WIDTH.dp),
-        TextPrimary,
-        FontWeight.Light,
-    )
-    OnboardingText(
-        guide.options,
-        13,
-        Modifier.offset(GUIDE_MARGIN.dp, (GUIDE_TEXT_Y + 24f).dp).width(GUIDE_WIDTH.dp),
-        TextSecondary,
-        FontWeight.Light,
-    )
+    SocialText(guide.route, 15.sp, Modifier.offset(GUIDE_MARGIN.dp, GUIDE_TEXT_Y.dp).width(GUIDE_WIDTH.dp), SocialTextPrimary, FontWeight.Light)
+    SocialText(guide.options, 13.sp, Modifier.offset(GUIDE_MARGIN.dp, (GUIDE_TEXT_Y + 24f).dp).width(GUIDE_WIDTH.dp), SocialTextSecondary, FontWeight.Light)
     GuideShot(guide.path)
 }
 
@@ -1450,7 +1352,7 @@ private fun GuideShot(path: String) {
             Modifier
                 .size((shot.width * fit).dp, (shot.height * fit).dp)
                 .clip(shape)
-                .border(1.dp, PanelBorderBrush, shape),
+                .border(1.dp, SocialPanelBorderBrush, shape),
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 drawIntoCanvas { canvas -> canvas.skiaCanvas.drawCover(shot, size.width, size.height) }
@@ -1462,13 +1364,13 @@ private fun GuideShot(path: String) {
 @Composable
 private fun Header(kicker: String, title: String) {
     val width = LocalPanelWidth.current
-    OnboardingText(kicker, 15, Modifier.offset(0.dp, 35.dp).width(width.dp), TextPrimary, FontWeight.Normal)
-    OnboardingText(title, 32, Modifier.offset(0.dp, 66.dp).width(width.dp), TextPrimary, FontWeight.Normal)
+    SocialText(kicker, 15.sp, Modifier.offset(0.dp, 35.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
+    SocialText(title, 32.sp, Modifier.offset(0.dp, 66.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
 }
 
 @Composable
 private fun SectionLabel(label: String, y: Float) {
-    OnboardingText(label, 15, Modifier.offset(232.dp, y.dp).width(198.dp), TextPrimary, FontWeight.Normal, TextAlign.Start)
+    SocialText(label, 15.sp, Modifier.offset(232.dp, y.dp).width(198.dp), SocialTextPrimary, FontWeight.Normal, TextAlign.Start)
 }
 
 @Composable
@@ -1482,7 +1384,7 @@ private fun ChoiceButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (primary) Color.White else TextPrimary
+    val contentColor = if (primary) Color.White else SocialTextPrimary
     Row(
         modifier
             .width(width.dp)
@@ -1492,17 +1394,17 @@ private fun ChoiceButton(
             .background(
                 when {
                     primary -> Accent
-                    selected -> Accent.asSelectedBackground
+                    selected -> Accent.asSocialSelected
                     else -> ChoiceBackground
                 },
             )
-            .border(BorderWidth, if (selected || primary) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
+            .border(SocialPanelBorderWidth, if (selected || primary) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OnboardingIcon(icon, contentColor, Modifier.size(17.dp))
-        OnboardingText(label, 14, color = contentColor, weight = FontWeight.Medium)
+        Icon(icon, contentColor, Modifier.size(17.dp))
+        SocialText(label, 14.sp, color = contentColor, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
     }
 }
 
@@ -1510,12 +1412,12 @@ private fun ChoiceButton(
 private fun StyleCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(198.dp, 155.dp).clip(ButtonShape)
-            .background(if (selected) Accent.asSelectedBackground else ChoiceBackground)
-            .border(BorderWidth, if (selected) SolidColor(Accent) else PanelBorderBrush, ButtonShape)
+            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         UiPreview(Modifier.offset(13.dp, 12.dp), rounded)
-        OnboardingText(label, 14, Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), TextPrimary, FontWeight.Medium)
+        SocialText(label, 14.sp, Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), SocialTextPrimary, FontWeight.Medium, textAlign = TextAlign.Center)
     }
 }
 
@@ -1525,10 +1427,10 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
     Row(modifier.size(172.dp, 108.dp).clip(shape).border(1.dp, Color(0x1AFFFFFF), shape)) {
         Column(Modifier.width(44.dp).height(108.dp).background(Color(0xB3151C22)).padding(8.dp, 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Box(Modifier.size(29.dp, 7.dp).background(Accent))
-            repeat(3) { Box(Modifier.width(if (it == 0) 20.dp else 29.dp).height(4.dp).background(if (it == 0) TextSecondary else TextPrimary)) }
+            repeat(3) { Box(Modifier.width(if (it == 0) 20.dp else 29.dp).height(4.dp).background(if (it == 0) SocialTextSecondary else SocialTextPrimary)) }
         }
         Column(Modifier.width(128.dp).height(108.dp).background(Color(0xF211171C)).padding(8.dp, 7.dp)) {
-            Row { Box(Modifier.width(43.dp).height(7.dp).background(TextPrimary)); Spacer(Modifier.width(61.dp)); Box(Modifier.size(7.dp).background(TextPrimary)) }
+            Row { Box(Modifier.width(43.dp).height(7.dp).background(SocialTextPrimary)); Spacer(Modifier.width(61.dp)); Box(Modifier.size(7.dp).background(SocialTextPrimary)) }
             Spacer(Modifier.height(8.dp))
             repeat(3) {
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1536,34 +1438,6 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
                 }
                 Spacer(Modifier.height(5.dp))
             }
-        }
-    }
-}
-
-@Composable
-private fun CosmeticCard(label: String) {
-    Box(Modifier.size(180.dp, 202.dp).clip(ppShape(10.dp)).background(ChoiceBackground).border(BorderWidth, PanelBorderBrush, ppShape(10.dp))) {
-        Checkerboard(Modifier.offset(17.dp, 18.dp).size(146.dp, 146.dp).clip(ppShape(4.dp)))
-        OnboardingText(label, 14, Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp), TextPrimary, FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun Checkerboard(modifier: Modifier) {
-    Canvas(modifier) {
-        val cell = 12f
-        var y = 0f
-        var row = 0
-        while (y < size.height) {
-            var x = 0f
-            var col = 0
-            while (x < size.width) {
-                drawRect(if ((row + col) % 2 == 0) Color(0xFF666666) else Color(0xFF4A4A4A), Offset(x, y), Size(cell, cell))
-                x += cell
-                col++
-            }
-            y += cell
-            row++
         }
     }
 }
@@ -1600,13 +1474,13 @@ private fun BottomNavigation(
                 .size(SECONDARY_ACTION_WIDTH.dp, 32.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
-            OnboardingText(
+            SocialText(
                 secondaryLabel,
-                13,
+                13.sp,
                 Modifier.hoverable(interactionSource).clickableTextWithSound(onSecondary),
-                color = if (hovered) TextPrimary else TextSecondary,
-                weight = FontWeight.Light,
-                align = TextAlign.End,
+                color = if (hovered) SocialTextPrimary else SocialTextSecondary,
+                fontWeight = FontWeight.Light,
+                textAlign = TextAlign.End,
             )
         }
     }
@@ -1637,21 +1511,6 @@ private fun BottomNavigation(
 }
 
 @Composable
-private fun OnboardingText(
-    text: String,
-    size: Int,
-    modifier: Modifier = Modifier,
-    color: Color = TextPrimary,
-    weight: FontWeight = FontWeight.Normal,
-    align: TextAlign = TextAlign.Center,
-) {
-    BasicText(text, modifier, TextStyle(color = color, fontSize = size.sp, fontWeight = weight, fontFamily = LocalTheme.current.typography.family, textAlign = align))
-}
-
-@Composable
-private fun OnboardingIcon(path: String, color: Color, modifier: Modifier) = Icon(path, color, modifier)
-
-@Composable
 private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
     val image = remember { loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png") }
     val motion = UnityMotionBlur.maxSmear(strength)
@@ -1661,7 +1520,7 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
         modifier
             .clip(shape)
             .background(Color(0xFF273137))
-            .border(1.dp, PanelBorderBrush, shape),
+            .border(1.dp, SocialPanelBorderBrush, shape),
     ) {
         if (image != null) {
             Canvas(Modifier.fillMaxSize()) {
@@ -1711,7 +1570,7 @@ private fun PreviewFrame(
             .size(width.dp, height.dp)
             .clip(shape)
             .background(PreviewBackground)
-            .border(1.dp, PanelBorderBrush, shape),
+            .border(1.dp, SocialPanelBorderBrush, shape),
     ) {
         Canvas(Modifier.fillMaxSize(), draw)
     }
@@ -1923,7 +1782,7 @@ private class ItemFace(val pts: FloatArray, val color: Int)
 
 private fun drawItemFaces(
     canvas: SkiaCanvas,
-    pose: HeldItemPose,
+    pose: Matrix4f,
     faces: List<ItemFace>,
     width: Float,
     height: Float,
@@ -1961,14 +1820,15 @@ private fun drawItemFaces(
     }
 }
 
-private fun clipNear(pose: HeldItemPose, pts: FloatArray): FloatArray? {
+private fun clipNear(pose: Matrix4f, pts: FloatArray): FloatArray? {
     val n = pts.size / 3
     val view = FloatArray(n * 3)
+    val v = Vector3f()
     var behind = 0
     for (i in 0 until n) {
-        val v = pose.apply(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2])
-        view[i * 3] = v[0]; view[i * 3 + 1] = v[1]; view[i * 3 + 2] = v[2]
-        if (v[2] > -ITEM_NEAR) behind++
+        pose.transformPosition(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2], v)
+        view[i * 3] = v.x; view[i * 3 + 1] = v.y; view[i * 3 + 2] = v.z
+        if (v.z > -ITEM_NEAR) behind++
     }
     if (behind == 0) return view
     if (behind == n) return null
@@ -1999,74 +1859,33 @@ private fun signedArea(p: FloatArray): Float {
     return a
 }
 
-private fun heldItemPose(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float): HeldItemPose {
-    val p = HeldItemPose()
-    p.translate(0.56f, -0.52f, -0.72f)
-    p.scale(0.6f)
-    p.rotateY(275f)
-    p.rotateZ(25f)
+private fun heldItemPose(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float): Matrix4f {
     val rad = 0.4363323129985824
-    p.translate((-0.2 * sin(rad) + 0.4375).toFloat(), (-0.2 * cos(rad) + 0.4375).toFloat(), 0.03125f)
-    p.scale(1f / 0.68f)
-    p.rotateZ(-25f)
-    p.rotateY(90f)
-    p.translate(-1.13f * 0.0625f, -3.2f * 0.0625f, -1.13f * 0.0625f)
-    p.translate(offsetX * 0.05f, offsetY * 0.05f, offsetZ * 0.05f)
-    p.scale(scale)
-    p.translate(1.13f / 16f, 3.2f / 16f, 1.13f / 16f)
-    p.rotateY(-90f)
-    p.rotateZ(25f)
-    p.scale(0.68f)
-    p.translate(-0.5f, -0.5f, -0.5f)
-    return p
+    return Matrix4f()
+        .translate(0.56f, -0.52f, -0.72f)
+        .scale(0.6f)
+        .rotateY(radians(275f))
+        .rotateZ(radians(25f))
+        .translate((-0.2 * sin(rad) + 0.4375).toFloat(), (-0.2 * cos(rad) + 0.4375).toFloat(), 0.03125f)
+        .scale(1f / 0.68f)
+        .rotateZ(radians(-25f))
+        .rotateY(radians(90f))
+        .translate(-1.13f * 0.0625f, -3.2f * 0.0625f, -1.13f * 0.0625f)
+        .translate(offsetX * 0.05f, offsetY * 0.05f, offsetZ * 0.05f)
+        .scale(scale)
+        .translate(1.13f / 16f, 3.2f / 16f, 1.13f / 16f)
+        .rotateY(radians(-90f))
+        .rotateZ(radians(25f))
+        .scale(0.68f)
+        .translate(-0.5f, -0.5f, -0.5f)
 }
+
+private fun radians(degrees: Float): Float = degrees * PI.toFloat() / 180f
 
 private fun ndcToFrameX(v: FloatArray): Float = (PROJ_F / PROJ_ASPECT) * v[0] / -v[2] * 0.5f + 0.5f
 
 private fun ndcToFrameY(v: FloatArray): Float =
     (1f - (PROJ_F * v[1] / -v[2] * 0.5f + 0.5f)) * FRAME_Y_SCALE - FRAME_Y_OFFSET
-
-private class HeldItemPose {
-    private var m = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f)
-
-    private fun mul(o: FloatArray) {
-        val r = FloatArray(16)
-        for (i in 0 until 4) {
-            for (j in 0 until 4) {
-                var acc = 0f
-                for (k in 0 until 4) acc += m[i * 4 + k] * o[k * 4 + j]
-                r[i * 4 + j] = acc
-            }
-        }
-        m = r
-    }
-
-    fun translate(x: Float, y: Float, z: Float) =
-        mul(floatArrayOf(1f, 0f, 0f, x, 0f, 1f, 0f, y, 0f, 0f, 1f, z, 0f, 0f, 0f, 1f))
-
-    fun scale(s: Float) =
-        mul(floatArrayOf(s, 0f, 0f, 0f, 0f, s, 0f, 0f, 0f, 0f, s, 0f, 0f, 0f, 0f, 1f))
-
-    fun rotateY(degrees: Float) {
-        val a = degrees * PI.toFloat() / 180f
-        val c = cos(a)
-        val s = sin(a)
-        mul(floatArrayOf(c, 0f, s, 0f, 0f, 1f, 0f, 0f, -s, 0f, c, 0f, 0f, 0f, 0f, 1f))
-    }
-
-    fun rotateZ(degrees: Float) {
-        val a = degrees * PI.toFloat() / 180f
-        val c = cos(a)
-        val s = sin(a)
-        mul(floatArrayOf(c, -s, 0f, 0f, s, c, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f))
-    }
-
-    fun apply(x: Float, y: Float, z: Float): FloatArray = floatArrayOf(
-        m[0] * x + m[1] * y + m[2] * z + m[3],
-        m[4] * x + m[5] * y + m[6] * z + m[7],
-        m[8] * x + m[9] * y + m[10] * z + m[11],
-    )
-}
 
 private fun SkiaCanvas.drawPixelArt(
     image: SkiaImage,
@@ -2149,22 +1968,23 @@ private fun TermsPage(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OnboardingText("I agree to the", 15, weight = FontWeight.Normal)
+                    SocialText("I agree to the", 15.sp, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center)
                     TermsLink("Terms of Service") {
                         ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL)
                     }
-                    OnboardingText("and", 15, weight = FontWeight.Normal)
+                    SocialText("and", 15.sp, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center)
                     TermsLink("Privacy Policy") {
                         ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL)
                     }
                 }
             }
-            OnboardingText(
+            SocialText(
                 "Declining disables crash reporting and all online features.",
-                12,
+                12.sp,
                 Modifier.width(panelWidth.dp),
-                TextSecondary,
+                SocialTextSecondary,
                 FontWeight.Light,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -2193,7 +2013,7 @@ private fun CheckBox(checked: Boolean) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) OnboardingIcon("tick", theme.textColor, Modifier.size(26.dp))
+        if (checked) Icon("tick", theme.textColor, Modifier.size(26.dp))
     }
 }
 
@@ -2278,8 +2098,6 @@ private sealed interface OnboardingStep {
     data object MotionBlur : OnboardingStep
 
     data class Guide(val guide: ModGuide) : OnboardingStep
-
-    data object Cosmetics : OnboardingStep
     data object Done : OnboardingStep
 }
 
@@ -2363,6 +2181,8 @@ private const val UI_SCALE = DESIGN_WIDTH / 1240f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MIN = 1
+private val WIDE_SLIDER_THUMB = 13.dp
+private val WIDE_SLIDER_TRACK = 7.dp
 private const val MOTION_BLUR_MAX = 10
 
 private const val CONTENT_TOP = 140f
@@ -2465,16 +2285,10 @@ private const val GUIDE_HEIGHT = CONTENT_BOTTOM - GUIDE_SHOT_Y
 private const val GUIDE_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
 private const val GUIDE_MARGIN = CARD_MARGIN
 
-private val PANEL_SHAPE: Shape
-    @Composable
-    @ReadOnlyComposable
-    get() = ppShape(9.dp)
 private val ButtonShape: Shape
     @Composable
     @ReadOnlyComposable
     get() = ppShape(9.dp)
-private val BorderWidth = 1.5.dp
-private const val PanelBorderAngleDeg = 20.0
 
 private val PageBackground: Color
     @Composable get() = LocalTheme.current.pageBackground
@@ -2484,11 +2298,6 @@ private val ChoiceBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
 private val MenuBackground: Color
     @Composable get() = LocalTheme.current.componentBackground
-private val TextPrimary: Color
-    @Composable get() = LocalTheme.current.textColor
-private val TextSecondary: Color
-    @Composable get() = LocalTheme.current.textColorSecondary
-private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
 
 private const val HUD_TEXT_SIZE = 21f
 private const val HUD_PADDING = HUD_TEXT_SIZE * (4f / 9f)
@@ -2498,21 +2307,3 @@ private val ImpactGood = Color(0xFF6FD08C)
 private val ImpactWarn = Color(0xFFE7B85C)
 private val ImpactHeavy = Color(0xFFE8836B)
 
-private val PanelBorderBrush: Brush = object : ShaderBrush() {
-    override fun createShader(size: Size): Shader {
-        val radians = Math.toRadians(PanelBorderAngleDeg)
-        val ux = cos(radians).toFloat()
-        val uy = sin(radians).toFloat()
-        val len = size.width * ux + size.height * uy
-        return LinearGradientShader(
-            from = Offset.Zero,
-            to = Offset(ux * len, uy * len),
-            colors = listOf(
-                Color.White.copy(alpha = 0.5f),
-                Color.White.copy(alpha = 0.15f),
-                Color.White.copy(alpha = 0.5f),
-            ),
-            colorStops = listOf(0f, 0.5f, 1f),
-        )
-    }
-}

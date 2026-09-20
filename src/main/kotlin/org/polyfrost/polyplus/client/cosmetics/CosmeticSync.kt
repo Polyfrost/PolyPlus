@@ -22,16 +22,15 @@ import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.utils.Batcher
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.launch
 
-object CosmeticSync : EarlyInitializable {
+object CosmeticSync {
     private val LOGGER = LogManager.getLogger()
-    private val BATCHER = Batcher(Duration.ofMillis(200), HashSet<String>()) { players ->
+    private val BATCHER = Batcher(Duration.ofMillis(200)) { players ->
         subscribePlayers(players.toList())
     }
     private val subscribedPlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -54,7 +53,7 @@ object CosmeticSync : EarlyInitializable {
     private var resubscribeTicks = 0
     //?}
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         eventHandler<WorldEvent.Load> {
             PolyPlusClient.refreshCosmetics()
             refreshVisibleSubscriptions()
@@ -261,27 +260,12 @@ object CosmeticSync : EarlyInitializable {
         reconcilePet(uuid)
         //?}
 
+        // every other type is reconciled from the catalog above
+        //? if >= 1.21.1 {
         for (id in cosmeticIds) {
-            val definition = CosmeticCatalog.getDefinition(id) ?: continue
-            when (definition.type) {
-                CosmeticType.Cape -> Unit
-                // Backpack Glasses Wings and Glove are reconciled from the catalog above so
-                // unequips are handled even when no id is passed here
-                CosmeticType.Backpack,
-                CosmeticType.Glasses,
-                CosmeticType.Wings,
-                CosmeticType.Glove,
-                CosmeticType.Hat,
-                CosmeticType.Aura,
-                CosmeticType.Boots,
-                CosmeticType.Shoulder,
-                CosmeticType.Pet -> Unit
-                CosmeticType.Unknown -> Unit
-                //? if >= 1.21.1 {
-                CosmeticType.Emote -> applyEmote(player, id)
-                //?}
-            }
+            if (CosmeticCatalog.getDefinition(id)?.type == CosmeticType.Emote) applyEmote(player, id)
         }
+        //?}
     }
 
     //? if >= 1.21.1 {
@@ -361,7 +345,7 @@ object CosmeticSync : EarlyInitializable {
 
         LOGGER.info("reconcilePet: {} wants pet cosmetic {}, loading assets", uuid, desiredId)
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensurePetLoaded(desiredId)) {
+            if (!CosmeticAssetCache.ensureCosmeticLoaded(desiredId)) {
                 LOGGER.warn("reconcilePet: failed to load pet cosmetic {} for {}", desiredId, uuid)
                 return@launch
             }

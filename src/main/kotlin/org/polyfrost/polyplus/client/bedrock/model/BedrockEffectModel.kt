@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.bedrock.model
 
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
+import org.polyfrost.polyplus.client.bedrock.geometry.initialEffectPosition
 import org.polyfrost.polyplus.client.bedrock.geometry.renderableBoneNames
 import org.polyfrost.polyplus.client.bedrock.geometry.topLevelBoneName
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
@@ -28,7 +29,9 @@ class BedrockEffectModel private constructor(
 
     companion object {
         fun build(geometry: BedrockGeometry, playerGeometry: BedrockGeometry): BedrockEffectModel {
-            val boneTree = BedrockEffectBoneTreeBuilder(geometry, playerGeometry)
+            val boneTree = BedrockBoneTreeBuilder(geometry, propagateLightLevels = true) { bone ->
+                bone.initialEffectPosition(geometry.bones, playerGeometry)
+            }
             val attachments = buildEffectAttachments(geometry, boneTree::buildBone)
             return BedrockEffectModel(geometry, attachments, boneTree.bones)
         }

@@ -6,21 +6,12 @@ import org.joml.Vector3f
 data class BedrockGeometry(
     val description: BedrockGeometryDescription,
     val bones: Map<String, BedrockBone>,
-) {
-    val identifier: String get() = description.identifier
-}
+)
 
 data class BedrockGeometryDescription(
     val identifier: String,
     val textureWidth: Int,
     val textureHeight: Int,
-    val visibleBounds: BedrockVisibleBounds,
-)
-
-data class BedrockVisibleBounds(
-    val width: Float,
-    val height: Float,
-    val offset: Vector3f,
 )
 
 data class BedrockBone(

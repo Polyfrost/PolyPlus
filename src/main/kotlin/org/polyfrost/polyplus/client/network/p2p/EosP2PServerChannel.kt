@@ -2,9 +2,9 @@ package org.polyfrost.polyplus.client.network.p2p
 
 import io.netty.channel.AbstractServerChannel
 import io.netty.channel.ChannelMetadata
+import io.netty.channel.DefaultChannelConfig
 import io.netty.channel.EventLoop
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
@@ -17,12 +17,11 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
 
     private val bridgeOrNull: EosSdkBridge? get() = EosP2PChannel.Holder.bridge
 
-    private val config = EosP2PChannelConfig(this)
+    private val config = DefaultChannelConfig(this)
 
     @Volatile private var localSocket: EosP2PSocketId? = null
     @Volatile private var open = true
     @Volatile private var active = false
-    private var requestHandle: EosNotificationHandle? = null
 
     companion object {
         private val METADATA = ChannelMetadata(false)
@@ -47,7 +46,7 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
         require(localAddress is EosP2PAddress) { "EosP2PServerChannel can only bind to an EosP2PAddress, got $localAddress" }
 
         localSocket = localAddress.socket
-        requestHandle = bridge.addConnectionRequestHandler(localAddress.socket) { remote ->
+        bridge.addConnectionRequestHandler(localAddress.socket) { remote ->
             onConnectionRequest(localAddress.socket, remote)
         }
         active = true
@@ -58,7 +57,6 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
         open = false
         active = false
         val bridge = bridgeOrNull ?: return
-        requestHandle?.let(bridge::removeNotificationHandler)
         localSocket?.let { socket -> bridge.closeConnection(socket, null) }
     }
 

@@ -16,9 +16,6 @@ object SocialOverlay {
     @Volatile
     private var pendingAutoHostCurrentWorld = false
 
-    fun registerKeybind() {
-    }
-
     fun openHostCurrentWorld(from: Screen? = currentScreen()) {
         pendingAutoHostCurrentWorld = true
         open(from)

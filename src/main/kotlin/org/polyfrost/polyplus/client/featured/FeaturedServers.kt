@@ -9,7 +9,6 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,7 +28,6 @@ object FeaturedServers {
     private val logger = LogManager.getLogger("PolyPlus/FeaturedServers")
     private val lock = Any()
     private val refreshing = AtomicBoolean(false)
-    private val listeners = CopyOnWriteArrayList<Runnable>()
     private val _state = MutableStateFlow(FeaturedServersSnapshot())
     private var loaded = false
     private var revision = 0L
@@ -190,16 +188,6 @@ object FeaturedServers {
     @JvmStatic
     fun revision(): Long = snapshot().revision
 
-    @JvmStatic
-    fun addListener(listener: Runnable) {
-        listeners += listener
-    }
-
-    @JvmStatic
-    fun removeListener(listener: Runnable) {
-        listeners -= listener
-    }
-
     private fun ensureLoaded() {
         synchronized(lock) {
             if (loaded) return
@@ -255,9 +243,6 @@ object FeaturedServers {
             expiresAtMillis,
             revision,
         )
-        listeners.forEach { listener ->
-            runCatching(listener::run).onFailure { logger.warn("Featured-server listener failed", it) }
-        }
         expiryJob?.cancel()
         val delayMillis = expiresAtMillis - System.currentTimeMillis()
         if (servers.isNotEmpty() && delayMillis > 0) {

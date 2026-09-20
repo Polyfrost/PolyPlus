@@ -3,41 +3,19 @@ package org.polyfrost.polyplus.client.network.http.responses
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 
 @Serializable(with = GroupKind.Serializer::class)
-enum class GroupKind {
-    Dm,
-    Group,
-    Unknown;
+enum class GroupKind(val serializedName: String) {
+    Dm("dm"),
+    Group("group"),
+    Unknown("unknown");
 
-    val serializedName: String
-        get() = when (this) {
-            Dm -> "dm"
-            Group -> "group"
-            Unknown -> "unknown"
-        }
-
-    companion object {
-        fun fromSerializedName(name: String): GroupKind? =
-            entries.firstOrNull { it != Unknown && it.serializedName == name }
-    }
-
-    internal object Serializer : KSerializer<GroupKind> {
-        override val descriptor: SerialDescriptor =
-            PrimitiveSerialDescriptor("GroupKind", PrimitiveKind.STRING)
-
-        override fun serialize(encoder: Encoder, value: GroupKind) {
-            encoder.encodeString(value.serializedName)
-        }
-
-        override fun deserialize(decoder: Decoder): GroupKind =
-            fromSerializedName(decoder.decodeString()) ?: Unknown
-    }
+    internal object Serializer : KSerializer<GroupKind> by ApiEnumSerializer(
+        "GroupKind",
+        GroupKind.entries,
+        Unknown,
+        GroupKind::serializedName,
+    )
 }
 
 @Serializable

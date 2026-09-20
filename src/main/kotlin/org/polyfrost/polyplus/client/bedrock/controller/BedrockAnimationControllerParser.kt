@@ -4,11 +4,10 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.google.gson.JsonPrimitive
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
 import org.polyfrost.polyplus.client.bedrock.molang.MolangParser
-import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
+import org.polyfrost.polyplus.client.bedrock.molang.molangScripts
 import java.io.InputStream
 import java.io.InputStreamReader
 
@@ -17,8 +16,6 @@ object BedrockAnimationControllerParser {
         val root = JsonParser.parseReader(InputStreamReader(stream)).asJsonObject
         return BedrockAnimationControllerFile(parseControllers(root))
     }
-
-    fun parseJson(json: String): BedrockAnimationControllerFile = parseStream(json.byteInputStream())
 
     private fun parseControllers(root: JsonObject): Map<String, BedrockAnimationController> {
         if (!root.has("animation_controllers")) {
@@ -57,8 +54,8 @@ object BedrockAnimationControllerParser {
         return ControllerState(
             name = name,
             animations = parseAnimations(obj.getAsJsonArray("animations")),
-            onEntry = readMolangScripts(obj, "on_entry"),
-            onExit = readMolangScripts(obj, "on_exit"),
+            onEntry = obj.molangScripts("on_entry"),
+            onExit = obj.molangScripts("on_exit"),
             transitions = parseTransitions(obj.getAsJsonArray("transitions")),
         )
     }
@@ -115,24 +112,6 @@ object BedrockAnimationControllerParser {
             primitive.isNumber -> Number(primitive.asDouble)
             primitive.isBoolean -> Number(if (primitive.asBoolean) 1.0 else 0.0)
             else -> Number(0.0)
-        }
-    }
-
-    private fun readMolangScripts(obj: JsonObject, field: String): List<MolangStatement> {
-        if (!obj.has(field)) {
-            return emptyList()
-        }
-
-        return when (val element = obj.get(field)) {
-            is JsonPrimitive if element.isString -> MolangParser.parseStatementBlock(element.asString)
-            is JsonArray -> element.flatMap { item ->
-                if (item.isJsonPrimitive && item.asJsonPrimitive.isString) {
-                    MolangParser.parseStatementBlock(item.asString)
-                } else {
-                    emptyList()
-                }
-            }
-            else -> emptyList()
         }
     }
 }

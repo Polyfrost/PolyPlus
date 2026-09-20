@@ -37,6 +37,8 @@ object PlayerNamesRepository {
         lock.withLock { inFlight.removeAll(toFetch.toSet()) }
     }
 
+    fun nameOr(uuid: String): String = _names.value[uuid] ?: shortId(uuid)
+
     @Composable
     fun displayName(uuid: String): String {
         val resolvedNames by names.collectAsState()

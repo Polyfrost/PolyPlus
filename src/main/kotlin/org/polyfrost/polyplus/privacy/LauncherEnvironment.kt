@@ -1,5 +1,9 @@
 package org.polyfrost.polyplus.privacy
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import net.fabricmc.loader.api.FabricLoader
 import java.io.File
 
@@ -24,8 +28,10 @@ object LauncherEnvironment {
 
     fun launcherAcceptedTerms(): Boolean? {
         val settings = launcherDir?.let { File(it, "settings.json") }?.takeIf { it.isFile } ?: return null
-        val text = runCatching { settings.readText() }.getOrNull() ?: return null
-        val terms = intField(text, "accepted_tos_version") ?: return null
+        val terms = runCatching {
+            Json.parseToJsonElement(settings.readText())
+                .jsonObject["accepted_tos_version"]?.jsonPrimitive?.intOrNull
+        }.getOrNull() ?: return null
         return terms > 0
     }
 
@@ -54,7 +60,4 @@ object LauncherEnvironment {
         }
         return File(dir, "auth.json").isFile && File(dir, "clusters").isDirectory
     }
-
-    private fun intField(text: String, name: String): Int? =
-        Regex("\"$name\"\\s*:\\s*(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
 }

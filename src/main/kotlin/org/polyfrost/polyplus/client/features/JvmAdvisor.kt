@@ -30,7 +30,6 @@ object JvmAdvisor {
     const val HEAP_OVERSIZED_RATIO = 0.5
     const val HEAP_OVERSIZED_RATIO_SMALL = 0.35
     const val SMALL_HOST_MB = 8192L
-    const val GC_TIME_BUDGET = 0.02
     const val ZGC_MIN_CORES = 12
     const val ZGC_MIN_HEAP_MB = 8192L
     const val MIN_GC_SPIKE_RATIO = 0.5
@@ -50,9 +49,7 @@ object JvmAdvisor {
     private const val NOTIFICATION_TITLE = "OneClient RAM Analysis"
     private const val NOTIFICATION_DURATION_MS = 60_000f
 
-    enum class Collector { G1, ZGC, SHENANDOAH, PARALLEL, SERIAL, UNKNOWN }
-
-    enum class Kind { RAISE_HEAP, LOWER_HEAP, FREE_SYSTEM_MEMORY, SWITCH_TO_ZGC, SWITCH_TO_G1 }
+    enum class Kind { RAISE_HEAP, LOWER_HEAP, FREE_SYSTEM_MEMORY, SWITCH_TO_G1 }
 
     data class HostMemory(
         val totalMb: Long,
@@ -64,8 +61,7 @@ object JvmAdvisor {
         val maxHeapMb: Long,
         val liveSetMb: Long,
         val nonHeapMb: Long,
-        val gcTimeFraction: Double,
-        val collector: Collector,
+        val isZgc: Boolean,
         val cores: Int,
         val gcSpikeRatio: Double,
         val host: HostMemory?,
@@ -152,7 +148,7 @@ object JvmAdvisor {
             }
         }
 
-        if (s.collector == Collector.ZGC && (s.cores < ZGC_MIN_CORES || s.maxHeapMb < ZGC_MIN_HEAP_MB)) {
+        if (s.isZgc && (s.cores < ZGC_MIN_CORES || s.maxHeapMb < ZGC_MIN_HEAP_MB)) {
             return Advice(
                 Kind.SWITCH_TO_G1,
                 s.maxHeapMb,
@@ -173,7 +169,6 @@ object JvmAdvisor {
     private var lastGcMillis = -1L
     private var frames = 0L
     private var frameNanosSum = 0L
-    private var gcMillisSum = 0L
     private var spikes = 0L
     private var gcSpikes = 0L
     private var done = false
@@ -197,7 +192,6 @@ object JvmAdvisor {
             val frameNanos = now - lastFrameNanos
             frames++
             frameNanosSum += frameNanos
-            if (lastGcMillis >= 0) gcMillisSum += gcMillis - lastGcMillis
             if (frames > WARMUP_FRAMES) {
                 val meanNanos = frameNanosSum.toDouble() / frames
                 if (frameNanos > meanNanos * SPIKE_FACTOR) {
@@ -252,13 +246,11 @@ object JvmAdvisor {
 
     private fun snapshot(): Snapshot {
         val mb = 1024L * 1024L
-        val activeMillis = frameNanosSum / 1_000_000L
         return Snapshot(
             maxHeapMb = Runtime.getRuntime().maxMemory() / mb,
             liveSetMb = liveSetMb(),
             nonHeapMb = ManagementFactory.getMemoryMXBean().nonHeapMemoryUsage.used / mb,
-            gcTimeFraction = if (activeMillis > 0) gcMillisSum.toDouble() / activeMillis else 0.0,
-            collector = collector(),
+            isZgc = isZgc(),
             cores = Runtime.getRuntime().availableProcessors(),
             gcSpikeRatio = if (spikes > 0) gcSpikes.toDouble() / spikes else -1.0,
             host = hostMemory(),
@@ -277,17 +269,8 @@ object JvmAdvisor {
         return used / (1024L * 1024L)
     }
 
-    private fun collector(): Collector {
-        val names = ManagementFactory.getGarbageCollectorMXBeans().map { it.name }
-        return when {
-            names.any { it.startsWith("ZGC") } -> Collector.ZGC
-            names.any { it.startsWith("G1") } -> Collector.G1
-            names.any { it.startsWith("Shenandoah") } -> Collector.SHENANDOAH
-            names.any { it.startsWith("PS ") } -> Collector.PARALLEL
-            names.any { it == "Copy" || it == "MarkSweepCompact" } -> Collector.SERIAL
-            else -> Collector.UNKNOWN
-        }
-    }
+    private fun isZgc(): Boolean =
+        ManagementFactory.getGarbageCollectorMXBeans().any { it.name.startsWith("ZGC") }
 
     private fun hostMemory(): HostMemory? = runCatching {
         val mb = 1024L * 1024L

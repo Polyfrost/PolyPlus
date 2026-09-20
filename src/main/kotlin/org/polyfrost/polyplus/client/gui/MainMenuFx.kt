@@ -1,12 +1,5 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -16,32 +9,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
-
-@Composable
-fun rememberFxTime(): State<Float> {
-    val time = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val start = withFrameNanos { it }
-        while (true) {
-            withFrameNanos { now -> time.floatValue = (now - start) / 1_000_000_000f }
-        }
-    }
-    return time
-}
-
-@Composable
-fun rememberParallaxOffset(target: State<Offset>, ease: Float = 0.06f): State<Offset> {
-    val smooth = remember { mutableStateOf(target.value) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            withFrameNanos { }
-            val t = target.value
-            val s = smooth.value
-            smooth.value = Offset(s.x + (t.x - s.x) * ease, s.y + (t.y - s.y) * ease)
-        }
-    }
-    return smooth
-}
 
 private val GlowA = Color(0xFF1878F1)
 private val GlowB = Color(0xFF24D3EE)

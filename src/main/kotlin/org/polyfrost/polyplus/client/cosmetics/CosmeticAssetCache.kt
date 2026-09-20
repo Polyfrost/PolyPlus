@@ -6,7 +6,6 @@ import androidx.compose.runtime.setValue
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
-import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,10 +18,12 @@ import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
 import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
@@ -53,7 +54,7 @@ object CosmeticAssetCache {
     val baseDir: File = File("${PolyPlusConstants.NAME}/cosmetics")
 
     private val hashManager = HashManager(baseDir.resolve("hashes.json"))
-    private val capes = ConcurrentHashMap<Int, CachedCosmetic>()
+    private val capes = ConcurrentHashMap<Int, CachedCape>()
 
     @Volatile
     private var generation = 0
@@ -61,7 +62,6 @@ object CosmeticAssetCache {
     var installs by mutableIntStateOf(0)
         private set
     //? if >= 1.21.1 {
-    private val emotesByCosmeticId = ConcurrentHashMap<Int, List<Emote>>()
     private val emotesById = ConcurrentHashMap<Int, Emote>()
     private val attachedById = ConcurrentHashMap<Int, AttachedCosmetic>()
     private val petsById = ConcurrentHashMap<Int, PetDefinition>()
@@ -79,12 +79,10 @@ object CosmeticAssetCache {
 
     fun isCapeLoaded(id: Int): Boolean = capes.containsKey(id)
 
-    fun isCapeAnimated(id: Int): Boolean = (capes[id] as? CachedCosmetic.Cape)?.isAnimated == true
+    fun isCapeAnimated(id: Int): Boolean = capes[id]?.isAnimated == true
 
     //? if >= 1.21.1 {
     fun getEmote(emoteId: Int): Emote? = emotesById[emoteId]
-
-    fun getEmotesForCosmetic(emoteId: Int): List<Emote> = emotesByCosmeticId[emoteId].orEmpty()
 
     fun getAttachedCosmetic(id: Int): AttachedCosmetic? = attachedById[id]
 
@@ -98,12 +96,11 @@ object CosmeticAssetCache {
         val stale = capes.keys.toList().mapNotNull(capes::remove)
         if (stale.isNotEmpty()) {
             ClientPlatform.runOnMain {
-                for (cape in stale) (cape as? CachedCosmetic.Cape)?.release()
+                for (cape in stale) cape.release()
             }
         }
         parsedHashes.clear()
         //? if >= 1.21.1 {
-        emotesByCosmeticId.clear()
         emotesById.clear()
         attachedById.clear()
         petsById.clear()
@@ -124,7 +121,6 @@ object CosmeticAssetCache {
         trackProgress: Boolean = false,
     ) {
         withContext(Dispatchers.IO) {
-            hashManager.awaitHashes()
             if (!ensureBaseDir()) return@withContext
 
             try {
@@ -169,7 +165,7 @@ object CosmeticAssetCache {
                     if (trackProgress) CosmeticLoadProgress.stepAssets()
                 }
             } finally {
-                hashManager.saveHashes()
+                hashManager.save()
             }
         }
     }
@@ -183,11 +179,6 @@ object CosmeticAssetCache {
     private fun downloadLockFor(definition: CosmeticDefinition): Mutex =
         downloadLocks.computeIfAbsent(definition.cacheKey()) { Mutex() }
 
-    suspend fun ensureLoaded(id: Int): Boolean {
-        val definition = CosmeticCatalog.getDefinition(id) ?: return false
-        return ensureLoaded(definition)
-    }
-
     suspend fun ensureCosmeticLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return false
         return ensureLoaded(definition)
@@ -196,11 +187,6 @@ object CosmeticAssetCache {
     //? if >= 1.21.1 {
     suspend fun ensureEmoteLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getEmoteDefinition(id) ?: return false
-        return ensureLoaded(definition)
-    }
-
-    suspend fun ensurePetLoaded(id: Int): Boolean {
-        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return false
         return ensureLoaded(definition)
     }
     //?}
@@ -222,13 +208,12 @@ object CosmeticAssetCache {
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
         return withContext(Dispatchers.IO) {
             runCatching {
-                hashManager.awaitHashes()
                 if (isLoaded(definition) && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
                     return@runCatching true
                 }
                 downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
                 parseLock.withLock { loadCosmeticAssetsLocked(definition) }
-                hashManager.saveHashes()
+                hashManager.save()
                 true
             }.getOrElse {
                 LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
@@ -358,7 +343,7 @@ object CosmeticAssetCache {
 
         val source = sheet?.takeIf { frames > 1 } ?: image
         installOnMain(stamp) {
-            capes[id] = CachedCosmetic.Cape(
+            capes[id] = CachedCape(
                 id,
                 source,
                 frames,
@@ -368,8 +353,7 @@ object CosmeticAssetCache {
     }
 
     //? if >= 1.21.1 {
-    private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null) {
-        val stamp = generation
+    private fun playerGeometryOrNull(id: Int, dir: Path): BedrockGeometry? {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()
         if (!BedrockPlayerGeometryCache.isReady()) {
@@ -377,9 +361,14 @@ object CosmeticAssetCache {
         }
         if (!BedrockPlayerGeometryCache.isReady()) {
             LOGGER.warn("Skipping cosmetic {} until player geometry is available", id)
-            return
+            return null
         }
-        val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
+        return BedrockPlayerGeometryCache.getOrThrow()
+    }
+
+    private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null) {
+        val stamp = generation
+        val playerGeometry = playerGeometryOrNull(id, dir) ?: return
         val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return
 
         installOnMain(stamp) {
@@ -389,16 +378,7 @@ object CosmeticAssetCache {
 
     private fun loadEmote(id: Int, dir: Path) {
         val stamp = generation
-        BedrockPlayerGeometryCache.tryCaptureFrom(dir)
-        BedrockPlayerGeometryCache.ensureFromDisk()
-        if (!BedrockPlayerGeometryCache.isReady()) {
-            BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir)
-        }
-        if (!BedrockPlayerGeometryCache.isReady()) {
-            LOGGER.warn("Skipping emote cosmetic {} until player geometry is available", id)
-            return
-        }
-        val playerGeometry = BedrockPlayerGeometryCache.getOrThrow()
+        val playerGeometry = playerGeometryOrNull(id, dir) ?: return
         val parsed = EmoteAssetParser.parse(id, dir, playerGeometry)
         if (parsed.isEmpty()) {
             LOGGER.warn("No emotes parsed for cosmetic {}", id)
@@ -406,7 +386,6 @@ object CosmeticAssetCache {
         }
 
         installOnMain(stamp) {
-            emotesByCosmeticId[id] = parsed
             emotesById[id] = parsed.first()
         }
     }

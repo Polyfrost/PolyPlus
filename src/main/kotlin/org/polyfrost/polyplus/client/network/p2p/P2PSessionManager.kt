@@ -17,7 +17,6 @@ import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
-import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
 import org.polyfrost.polyplus.client.network.eos.EosTickHealth
 import org.polyfrost.polyplus.client.network.http.AccountApi
 import org.polyfrost.polyplus.client.network.http.SessionsApi
@@ -29,14 +28,12 @@ import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -46,11 +43,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-object P2PSessionManager : EarlyInitializable {
+object P2PSessionManager {
     private val LOGGER = LogManager.getLogger()
-
-    private const val INBOUND_QUEUE_BYTES = 16L * 1024 * 1024
-    private const val OUTBOUND_QUEUE_BYTES = 16L * 1024 * 1024
 
     // this is a placeholder IP we hand to MC
     // it leads to literally nothing
@@ -65,8 +59,6 @@ object P2PSessionManager : EarlyInitializable {
 
     private val _status = MutableStateFlow<EosStatus>(EosStatus.Connecting)
     val status = _status.asStateFlow()
-
-    private val _joinFailures = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
     @Volatile private var shutDownForConsent = false
 
@@ -87,7 +79,7 @@ object P2PSessionManager : EarlyInitializable {
 
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         val unsupported = EosNativeSupport.unsupportedReason
         if (unsupported == null) {
             applyConsent()
@@ -125,7 +117,7 @@ object P2PSessionManager : EarlyInitializable {
                 starting = true
                 _status.value = EosStatus.Connecting
                 PolyPlusClient.SCOPE.launch {
-                    val candidate = EosSdkBridgeImpl()
+                    val candidate = EosSdkBridge()
                     val started = runCatching {
                         withContext(Dispatchers.IO) {
                             if (candidate.initialize()) {
@@ -209,7 +201,6 @@ object P2PSessionManager : EarlyInitializable {
         EosP2PChannel.Holder.bridge = bridge
 
         bridge.setRelayControl(forceRelays = false)
-        bridge.setPacketQueueSize(INBOUND_QUEUE_BYTES, OUTBOUND_QUEUE_BYTES)
         bridge.setInboundPacketHandler { received ->
             if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
             if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
@@ -287,8 +278,7 @@ object P2PSessionManager : EarlyInitializable {
         stack.joinToString("\n\tat ", prefix = "$label:\n\tat ")
 
     private fun restartStalledEos(stalled: EosSdkBridge): Boolean {
-        if (stalled !is EosSdkBridgeImpl) return false
-        if (EosSdkBridgeImpl.isSdkRetired) return false
+        if (EosSdkBridge.isSdkRetired) return false
         if (!PrivacyConsent.allowsOnlineServices()) return false
         if (stallRecoveries >= MAX_STALL_RECOVERIES) {
             LOGGER.error("Not restarting EOS again after {} stall(s) this session", stallRecoveries)
@@ -316,7 +306,7 @@ object P2PSessionManager : EarlyInitializable {
                 EosP2PChannel.Holder.bridge = null
             }
 
-            val candidate = EosSdkBridgeImpl()
+            val candidate = EosSdkBridge()
             val started = runCatching {
                 withContext(Dispatchers.IO) { candidate.takeIf { it.initialize() } }
             }.onFailure { LOGGER.error("Could not restart EOS after a stall", it) }.getOrNull()
@@ -436,16 +426,10 @@ object P2PSessionManager : EarlyInitializable {
 
     private fun localProfileId(): UUID? = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
 
-    private fun unavailableReason(): String = EosNativeSupport.unsupportedReason
-        ?: CONSENT_REQUIRED.takeUnless { PrivacyConsent.allowsOnlineServices() }
-        ?: RESTART_REQUIRED.takeIf { shutDownForConsent }
-        ?: "Multiplayer services aren't ready yet - try again shortly"
-
     private suspend fun handleAcceptedInvite(invite: SessionInvite) {
         val bridge = this.bridge
         if (bridge == null) {
             LOGGER.error("Accepted session invite {} but the P2P transport isn't installed", invite.id)
-            _joinFailures.tryEmit(unavailableReason())
             return
         }
 
@@ -456,7 +440,6 @@ object P2PSessionManager : EarlyInitializable {
             }
             if (ready != EosStatus.Ready) {
                 LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join session {}", invite.sessionId)
-                _joinFailures.tryEmit(unavailableReason())
                 return
             }
         }
@@ -468,7 +451,6 @@ object P2PSessionManager : EarlyInitializable {
                     "EOS Connect login, which calls POST /account/link-puid); cannot join over P2P",
                 invite.sender,
             )
-            _joinFailures.tryEmit("Host hasn't finished connecting yet - try again shortly")
             return
         }
 
@@ -496,10 +478,9 @@ object P2PSessionManager : EarlyInitializable {
         LOGGER.error("The host never accepted our P2P connection on socket {} within {}ms", target.socket, JOIN_HANDSHAKE_TIMEOUT_MS)
         P2PConnectionContext.clearPendingJoin()
         bridge.closeConnection(target.socket, target.host)
-        _joinFailures.tryEmit("Couldn't establish a P2P connection with the host - check your network/firewall and try again")
     }
 
-    var onJoinTargetResolved: (JoinTarget) -> Unit = { target ->
+    private fun onJoinTargetResolved(target: JoinTarget) {
         P2PConnectionContext.setPendingJoin(target)
         PackHttpBridge.setPackSource(target.host)
 
@@ -521,6 +502,5 @@ object P2PSessionManager : EarlyInitializable {
                 null,
             )
         }
-
     }
 }

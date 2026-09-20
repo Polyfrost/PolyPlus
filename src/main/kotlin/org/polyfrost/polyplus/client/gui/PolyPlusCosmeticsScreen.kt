@@ -22,6 +22,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,7 +45,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -81,13 +81,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -110,7 +110,6 @@ import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.BillingService
-import org.polyfrost.polyplus.client.cosmetics.BundleCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -120,21 +119,19 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
-import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import java.awt.Color as AwtColor
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
-import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -202,7 +199,6 @@ fun NavGraphBuilder.polyPlusCosmeticsGraph() {
 private enum class PolyPlusTab {
     Wardrobe,
     Store,
-    Bundles,
     History,
 }
 
@@ -221,9 +217,6 @@ private data class CartEntry(
     val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 }
 
-private fun BundleInfo.toCartEntry(): CartEntry =
-    CartEntry("bundle-$id", name, description, basePrice, finalPrice, discountRate, storeProductId)
-
 private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProductId: String?): CartEntry =
     CartEntry(
         cosmeticCartKey(variant.id),
@@ -236,7 +229,6 @@ private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProdu
         coverAssetId,
     )
 
-private val BundleInfo.cartKey: String get() = "bundle-$id"
 private fun cosmeticCartKey(variantId: Int): String = "cosmetic-$variantId"
 
 private fun CosmeticStoreInfo.cartName(variant: CosmeticVariantUi): String =
@@ -379,12 +371,6 @@ private fun PolyPlusCosmeticsScreen() {
                 showCart = false
                 status = null
             },
-            onBundles = {
-                tab = PolyPlusTab.Bundles
-                tabResolved = true
-                showCart = false
-                status = null
-            },
             onHistory = {
                 tab = PolyPlusTab.History
                 tabResolved = true
@@ -514,20 +500,6 @@ private fun PolyPlusCosmeticsScreen() {
                 },
             )
 
-            PolyPlusTab.Bundles -> BundlesScreen(
-                cart = cart,
-                showCart = showCart,
-                status = status,
-                onAddToCart = { bundle ->
-                    if (cart.none { it.key == bundle.cartKey }) cart += bundle.toCartEntry()
-                    status = "${bundle.name} added to cart."
-                },
-                onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
-                onBackToBrowse = { showCart = false },
-                onCheckout = { checkout() },
-                onStatus = { status = it },
-            )
-
             PolyPlusTab.History -> HistoryScreen(refreshKey = refreshKey)
         }
     }
@@ -539,7 +511,6 @@ private fun Toolbar(
     cartSize: Int,
     onWardrobe: () -> Unit,
     onStore: () -> Unit,
-    onBundles: () -> Unit,
     onHistory: () -> Unit,
     onCart: () -> Unit,
     onRefresh: () -> Unit,
@@ -568,7 +539,7 @@ private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
-        GuiText(
+        SocialText(
             label,
             color = if (selected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
             fontSize = 14.sp,
@@ -596,7 +567,7 @@ private fun SmallButton(
     ) {
         Icon(iconPath, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(8.dp))
-        GuiText(label, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        SocialText(label, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -674,97 +645,6 @@ private fun WardrobeScreen(
 }
 
 @Composable
-private fun BundlesScreen(
-    cart: List<CartEntry>,
-    showCart: Boolean,
-    status: String?,
-    onAddToCart: (BundleInfo) -> Unit,
-    onRemoveFromCart: (String) -> Unit,
-    onBackToBrowse: () -> Unit,
-    onCheckout: () -> Unit,
-    onStatus: (String?) -> Unit,
-) {
-    var page by remember { mutableIntStateOf(1) }
-    var bundles by remember { mutableStateOf<List<BundleInfo>>(emptyList()) }
-    var totalPages by remember { mutableIntStateOf(1) }
-    var loading by remember { mutableStateOf(true) }
-    var loadError by remember { mutableStateOf<String?>(null) }
-    var selectedBundleId by remember { mutableStateOf<Int?>(null) }
-    var bundleView by remember { mutableStateOf<BundleViewResponse?>(null) }
-
-    LaunchedEffect(page) {
-        loading = true
-        loadError = null
-        BundleCatalog.search(page = page)
-            .onSuccess {
-                bundles = it.bundles
-                totalPages = it.pagination.totalPages.toInt().coerceAtLeast(1)
-                if (selectedBundleId == null) selectedBundleId = it.bundles.firstOrNull()?.id
-            }
-            .onFailure { loadError = "Couldn't load bundles: ${it.message}" }
-        loading = false
-    }
-
-    LaunchedEffect(selectedBundleId) {
-        val id = selectedBundleId
-        bundleView = null
-        if (id != null) {
-            BundleCatalog.view(id).onSuccess { bundleView = it }
-        }
-    }
-
-    val selectedBundle = bundles.firstOrNull { it.id == selectedBundleId }
-    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(25.dp)) {
-        Column(modifier = Modifier.width(596.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            when {
-                loading && bundles.isEmpty() -> CenteredNote("Loading bundles...")
-                loadError != null && bundles.isEmpty() -> CenteredNote(loadError!!)
-                bundles.isEmpty() -> CenteredNote("No bundles available yet.")
-                else -> BundleGrid(
-                    bundles = bundles,
-                    cartKeys = cart.map { it.key }.toSet(),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onSelect = { selectedBundleId = it.id },
-                    onAddToCart = onAddToCart,
-                )
-            }
-            if (totalPages > 1) {
-                PageNav(
-                    page = page,
-                    totalPages = totalPages,
-                    onPrev = { if (page > 1) page-- },
-                    onNext = { if (page < totalPages) page++ },
-                )
-            }
-        }
-
-        Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (showCart) {
-                SmallButton("Back to bundles", iconPath = "left-arrow", primary = false, onClick = onBackToBrowse)
-                CartPanel(
-                    items = cart,
-                    status = status,
-                    modifier = Modifier.fillMaxSize(),
-                    onRemove = onRemoveFromCart,
-                    onCheckout = onCheckout,
-                )
-            } else {
-                BundlePreviewPanel(
-                    bundleView = bundleView,
-                    modifier = Modifier.fillMaxWidth().height(300.dp),
-                )
-                BundleDetailPanel(
-                    bundle = selectedBundle,
-                    contents = bundleView,
-                    status = status,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun HistoryScreen(refreshKey: Int) {
     var transactions by remember { mutableStateOf<List<TransactionInfo>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -807,11 +687,11 @@ private fun TransactionRow(tx: TransactionInfo) {
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            GuiText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            GuiText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
-        tx.amount?.let { GuiText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
-        GuiText(
+        tx.amount?.let { SocialText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+        SocialText(
             tx.status.displayName,
             color = statusColor(tx.status),
             fontSize = 12.sp,
@@ -845,7 +725,7 @@ private fun CategoryRail(
                     .clickable { onSelect(type) },
                 contentAlignment = Alignment.Center,
             ) {
-                GuiText(
+                SocialText(
                     type.displayName,
                     color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
                     fontSize = 12.sp,
@@ -896,7 +776,13 @@ private fun CosmeticCard(
             .border(1.dp, border, ppShape(12.dp))
             .clickable(onClick = activate),
     ) {
-        CosmeticThumbnail(item, Modifier.offset(17.dp, 17.dp).size(144.dp))
+        val (source, loadTick) = rememberCosmeticPreviewSource(item)
+        CosmeticThumbnail(
+            source = source,
+            type = item.type,
+            previewKey = "card-${item.groupId}-$loadTick",
+            modifier = Modifier.offset(17.dp, 17.dp).size(144.dp),
+        )
         CardLabel(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         CardLabel(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
 
@@ -907,92 +793,7 @@ private fun CosmeticCard(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GuiText(if (item.equipped) "Equipped" else "Equip", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun BundleGrid(
-    bundles: List<BundleInfo>,
-    cartKeys: Set<String>,
-    modifier: Modifier,
-    onSelect: (BundleInfo) -> Unit,
-    onAddToCart: (BundleInfo) -> Unit,
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(19.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        items(bundles, key = { it.id }) { bundle ->
-            BundleCard(
-                bundle = bundle,
-                inCart = bundle.cartKey in cartKeys,
-                onSelect = { onSelect(bundle) },
-                onAddToCart = { onAddToCart(bundle) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun BundleCard(
-    bundle: BundleInfo,
-    inCart: Boolean,
-    onSelect: () -> Unit,
-    onAddToCart: () -> Unit,
-) {
-    val border = when {
-        inCart -> Accent
-        bundle.discounted -> Color(0xFF239A60)
-        else -> LocalTheme.current.borderColor
-    }
-    val purchasable = bundle.purchasable
-    val buttonColor = when {
-        !purchasable -> Color(0x66232D32)
-        inCart -> Accent
-        bundle.discounted -> Color(0xFF239A60)
-        else -> Color(0xB3232D32)
-    }
-
-    Box(
-        modifier = Modifier.size(180.dp, 258.dp)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, border, ppShape(12.dp))
-            .clickable(onClick = onSelect),
-    ) {
-        CheckerThumbnail(Modifier.offset(17.dp, 17.dp).size(144.dp))
-        CardLabel(bundle.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically) {
-            PriceLabel(bundle)
-        }
-
-        if (bundle.discounted) {
-            Box(
-                modifier = Modifier.align(Alignment.TopCenter).size(81.dp, 21.dp)
-                    .background(Color(0xFF239A60), ppShapeOf(bottomStart = 4.dp, bottomEnd = 4.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                GuiText("${bundle.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-
-        Row(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
-                .background(buttonColor)
-                .then(if (purchasable) Modifier.clickable(onClick = onAddToCart) else Modifier),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val label = when {
-                !purchasable -> "Unavailable"
-                inCart -> "In cart"
-                else -> "Add to cart"
-            }
-            GuiText(label, color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(if (item.equipped) "Equipped" else "Equip", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -1000,82 +801,22 @@ private fun BundleCard(
 @Composable
 private fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
     when {
-        finalPrice == null -> GuiText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
-        finalPrice <= 0f -> GuiText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        finalPrice == null -> SocialText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
+        finalPrice <= 0f -> SocialText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         discounted && basePrice != null -> {
-            GuiText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
+            SocialText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
             Spacer(Modifier.width(4.dp))
-            GuiText(money(finalPrice), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(money(finalPrice), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
-        else -> GuiText(money(finalPrice), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        else -> SocialText(money(finalPrice), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
-
-@Composable
-private fun PriceLabel(bundle: BundleInfo) = PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted)
 
 @Composable
 private fun PriceLabel(info: CosmeticStoreInfo) = PriceLabel(info.basePrice, info.finalPrice, info.discounted)
 
 @Composable
 private fun PriceLabel(entry: CartEntry) = PriceLabel(entry.basePrice, entry.finalPrice, entry.discounted)
-
-@Composable
-private fun BundleDetailPanel(
-    bundle: BundleInfo?,
-    contents: BundleViewResponse?,
-    status: String?,
-    modifier: Modifier,
-) {
-    Box(
-        modifier = modifier.clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
-    ) {
-        if (bundle == null) {
-            CenteredNote("Select a bundle to see what's inside.")
-        } else {
-            Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                GuiText(bundle.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(bundle) }
-                bundle.description?.takeIf { it.isNotBlank() }?.let {
-                    GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                }
-                GuiText("Includes", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                val names = contents?.let { view ->
-                    (view.cosmetics + view.emotes).map { id ->
-                        CosmeticCatalog.getDefinition(id)?.name ?: "Item #$id"
-                    }
-                }
-                when {
-                    names == null -> GuiText("Loading contents...", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    names.isEmpty() -> GuiText("This bundle lists no items.", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    else -> LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        items(names) { name ->
-                            GuiText("• $name", color = LocalTheme.current.textColor, fontSize = 12.sp)
-                        }
-                    }
-                }
-                if (status != null) {
-                    GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PageNav(page: Int, totalPages: Int, onPrev: () -> Unit, onNext: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(30.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SmallButton("Prev", iconPath = "left-arrow", primary = false, onClick = onPrev)
-        GuiText("Page $page / $totalPages", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-        SmallButton("Next", iconPath = "refresh", primary = false, onClick = onNext)
-    }
-}
 
 @Composable
 private fun PreviewPanel(
@@ -1107,12 +848,12 @@ private fun PreviewPanel(
         Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (selected != null) {
                 Column {
-                    GuiText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    GuiText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                    SocialText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    SocialText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                 }
             }
             if (status != null) {
-                GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
         val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
@@ -1247,7 +988,7 @@ private fun RowScope.VariantStrip(
                     .clickable { onSelect(variant.id) }
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             ) {
-                GuiText(
+                SocialText(
                     variant.name,
                     color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
                     fontSize = 12.sp,
@@ -1306,7 +1047,7 @@ private fun AuraSwatchRow(
             onClick = onToggleCustom,
         ) {
             if (!isCustom) {
-                GuiText("+", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
+                SocialText("+", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -1325,7 +1066,7 @@ private fun AuraDot(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        AlphaCheckerboard(Modifier.fillMaxSize())
+        Checkerboard(Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(color))
         Box(
             Modifier.fillMaxSize().border(
@@ -1346,7 +1087,7 @@ private fun VariantPicker(
     ownedVariantIds: Set<Int> = emptySet(),
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(220.dp)) {
-        GuiText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         for (row in variants.chunked(2)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (variant in row) {
@@ -1360,7 +1101,7 @@ private fun VariantPicker(
                             .clickable { onSelect(variant.id) }
                             .padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
-                        GuiText(
+                        SocialText(
                             variant.name,
                             color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
                             fontSize = 12.sp,
@@ -1397,38 +1138,13 @@ private const val DEFAULT_AURA_ARGB: Int = -1
 
 private val AURA_PRESETS: List<Int> = AURA_COLORS.filter { it != DEFAULT_AURA_ARGB }
 
-private fun argbToHsb(argb: Int): FloatArray {
-    val r = ((argb shr 16) and 0xFF) / 255f
-    val g = ((argb shr 8) and 0xFF) / 255f
-    val b = (argb and 0xFF) / 255f
-    val max = maxOf(r, g, b)
-    val min = minOf(r, g, b)
-    val delta = max - min
-    val saturation = if (max == 0f) 0f else delta / max
-    val hue = when {
-        delta == 0f -> 0f
-        max == r -> ((g - b) / delta).mod(6f) * 60f
-        max == g -> ((b - r) / delta + 2f) * 60f
-        else -> ((r - g) / delta + 4f) * 60f
-    }
-    return floatArrayOf(hue, saturation, max)
-}
+/** Converts an ARGB int to a HSB float array (hue in degrees, saturation and brightness as a float between 0 and 1). */
+private fun argbToHsb(argb: Int): FloatArray =
+    AwtColor.RGBtoHSB((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF, null)
+        .also { it[0] *= 360f }
 
-private fun hsbToColor(hue: Float, saturation: Float, brightness: Float): Color {
-    val h = hue / 60f
-    val c = brightness * saturation
-    val x = c * (1f - abs(h.mod(2f) - 1f))
-    val m = brightness - c
-    val (r, g, b) = when {
-        h < 1f -> Triple(c, x, 0f)
-        h < 2f -> Triple(x, c, 0f)
-        h < 3f -> Triple(0f, c, x)
-        h < 4f -> Triple(0f, x, c)
-        h < 5f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    return Color(r + m, g + m, b + m, 1f)
-}
+private fun hsbToColor(hue: Float, saturation: Float, brightness: Float): Color =
+    Color.hsv(hue, saturation, brightness)
 
 private fun argbHex(argb: Int): String =
     "%02X%02X%02X".format((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
@@ -1473,18 +1189,18 @@ private class AuraPickerState(argb: Int) {
 }
 
 @Composable
-private fun AlphaCheckerboard(modifier: Modifier) {
+private fun Checkerboard(modifier: Modifier, cell: Dp = 4.dp) {
     Box(
         modifier = modifier.drawBehind {
-            val cell = 4.dp.toPx()
-            val cols = ceil(size.width / cell).toInt()
-            val rows = ceil(size.height / cell).toInt()
+            val step = cell.toPx()
+            val cols = ceil(size.width / step).toInt()
+            val rows = ceil(size.height / step).toInt()
             for (x in 0..cols) {
                 for (y in 0..rows) {
                     drawRect(
                         color = if ((x + y) % 2 == 0) Color(0xFF5F6568) else Color(0xFF3D4245),
-                        topLeft = Offset(x * cell, y * cell),
-                        size = Size(cell, cell),
+                        topLeft = Offset(x * step, y * step),
+                        size = Size(step, step),
                     )
                 }
             }
@@ -1535,7 +1251,7 @@ private fun AuraCustomPopover(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        GuiText("Aura Color", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText("Aura Color", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
 
         var paneSize by remember { mutableStateOf(Size.Zero) }
         Box(
@@ -1651,7 +1367,7 @@ private fun AuraCustomPopover(
                     }
                 },
         ) {
-            AlphaCheckerboard(Modifier.fillMaxWidth().height(14.dp))
+            Checkerboard(Modifier.fillMaxWidth().height(14.dp))
             Box(
                 modifier = Modifier.fillMaxWidth().height(14.dp)
                     .drawWithCache {
@@ -1673,7 +1389,7 @@ private fun AuraCustomPopover(
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(modifier = Modifier.size(28.dp).clip(ppShape(5.dp))) {
-                AlphaCheckerboard(Modifier.fillMaxSize())
+                Checkerboard(Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
                 Box(Modifier.fillMaxSize().border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)))
             }
@@ -1703,7 +1419,7 @@ private fun AuraCustomPopover(
                     .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        GuiText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                         inner()
                     }
                 },
@@ -1744,7 +1460,7 @@ private fun CartPanel(
         }
         RowTotals("Total", if (total <= 0f) "FREE" else money(total), Color.White, large = true)
         if (status != null) {
-            GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
         SmallButton(
             label = "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
@@ -1768,15 +1484,15 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
     ) {
         CoverThumbnail(item.coverAssetId, Modifier.size(58.dp))
         Column(Modifier.weight(1f)) {
-            GuiText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             item.description?.takeIf { it.isNotBlank() }?.let {
-                GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
         Column(horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(item) }
-            if (item.discounted) GuiText("SAVE ${item.discountRate}%", color = Color(0xFF239A60), fontSize = 12.sp)
-            GuiText("Remove", color = Color(0xFFFF4444), fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRemove))
+            if (item.discounted) SocialText("SAVE ${item.discountRate}%", color = Color(0xFF239A60), fontSize = 12.sp)
+            SocialText("Remove", color = Color(0xFFFF4444), fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRemove))
         }
     }
 }
@@ -1784,22 +1500,26 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
 @Composable
 private fun RowTotals(label: String, value: String, color: Color, large: Boolean = false) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        GuiText(label, color = LocalTheme.current.textColor, fontSize = if (large) 18.sp else 12.sp, modifier = Modifier.weight(1f))
-        GuiText(value, color = color, fontSize = if (large) 22.sp else 12.sp, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Normal)
+        SocialText(label, color = LocalTheme.current.textColor, fontSize = if (large) 18.sp else 12.sp, modifier = Modifier.weight(1f))
+        SocialText(value, color = color, fontSize = if (large) 22.sp else 12.sp, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 
 @Composable
 private fun CenteredNote(text: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        GuiText(text, color = LocalTheme.current.textColorSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+        SocialText(text, color = LocalTheme.current.textColorSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
-    val (source, loadTick) = rememberCosmeticPreviewSource(item)
-    val framing = cosmeticPreviewFraming(item.type)
+private fun CosmeticThumbnail(
+    source: PlayerPreviewSource?,
+    type: CosmeticType,
+    previewKey: String,
+    modifier: Modifier,
+) {
+    val framing = cosmeticPreviewFraming(type)
     Box(modifier) {
         CheckerThumbnail(Modifier.fillMaxSize())
         if (source != null) {
@@ -1811,8 +1531,8 @@ private fun CosmeticThumbnail(item: CosmeticUiItem, modifier: Modifier) {
                 modelScale = framing.modelScale,
                 verticalAnchor = framing.verticalAnchor,
                 initialYaw = framing.yawDeg,
-                previewKey = "card-${item.groupId}-$loadTick",
-                live = needsLivePreview(item.type, source),
+                previewKey = previewKey,
+                live = needsLivePreview(type, source),
             )
         }
     }
@@ -1889,7 +1609,25 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
             }
         }
     }
+
     return source to loadTick
+}
+
+@Composable
+private fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier: Modifier) {
+    val label = when {
+        owned -> "OWNED"
+        isNewItem(createdAt) -> "NEW"
+        else -> return
+    }
+    Box(
+        modifier = modifier.align(Alignment.TopStart)
+            .clip(ppShape(4.dp))
+            .background(if (owned) Color(0xFF239A60) else Accent)
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        SocialText(label, color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    }
 }
 
 private fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
@@ -2096,7 +1834,7 @@ private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSub
                 Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         if (query.isEmpty()) {
-                            GuiText("Search cosmetics...", color = LocalTheme.current.textColorSecondary, fontSize = 13.sp)
+                            SocialText("Search cosmetics...", color = LocalTheme.current.textColorSecondary, fontSize = 13.sp)
                         }
                         inner()
                     }
@@ -2167,36 +1905,22 @@ private fun StoreCard(
             .border(1.dp, border, ppShape(12.dp))
             .clickable(onClick = onSelect),
     ) {
-        StoreThumbnail(info, variant.id, Modifier.offset(17.dp, 17.dp).size(144.dp))
+        val (source, loadTick) = rememberCosmeticPreviewSource(variant.id, info.type)
+        CosmeticThumbnail(
+            source = source,
+            type = info.type,
+            previewKey = "store-${variant.id}-$loadTick",
+            modifier = Modifier.offset(17.dp, 17.dp).size(144.dp),
+        )
         CardLabel(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
         Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PriceLabel(info)
             if (variantCount > 1) {
-                GuiText("$variantCount variants", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
+                SocialText("$variantCount variants", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
             }
         }
 
-        if (owned) {
-            Box(
-                modifier = Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 8.dp)
-                    .clip(ppShape(4.dp))
-                    .background(Color(0xFF239A60))
-                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                GuiText("OWNED", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-            }
-        } else if (isNewItem(info.createdAt)) {
-            Box(
-                modifier = Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 8.dp)
-                    .clip(ppShape(4.dp))
-                    .background(Accent)
-                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                GuiText("NEW", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-            }
-        }
+        OwnershipBadge(owned, info.createdAt, Modifier.offset(x = 8.dp, y = 8.dp))
 
         if (info.discounted && !owned) {
             Box(
@@ -2204,7 +1928,7 @@ private fun StoreCard(
                     .background(Color(0xFF239A60), ppShapeOf(bottomStart = 4.dp, topEnd = 12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                GuiText("${info.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                SocialText("${info.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -2221,29 +1945,7 @@ private fun StoreCard(
                 inCart -> "In cart"
                 else -> "Add to cart"
             }
-            GuiText(label, color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun StoreThumbnail(info: CosmeticStoreInfo, variantId: Int, modifier: Modifier) {
-    val (source, loadTick) = rememberCosmeticPreviewSource(variantId, info.type)
-    val framing = cosmeticPreviewFraming(info.type)
-    Box(modifier) {
-        CheckerThumbnail(Modifier.fillMaxSize())
-        if (source != null) {
-            PlayerPreview(
-                Modifier.fillMaxSize(),
-                source = source,
-                autoSpin = false,
-                allowDrag = false,
-                modelScale = framing.modelScale,
-                verticalAnchor = framing.verticalAnchor,
-                initialYaw = framing.yawDeg,
-                previewKey = "store-$variantId-$loadTick",
-                live = needsLivePreview(info.type, source),
-            )
+            SocialText(label, color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -2294,25 +1996,7 @@ private fun StoreDetailPanel(
                     previewKey = "store-detail-${variant.id}",
                     live = true,
                 )
-                if (variant.id in ownedIds) {
-                    Box(
-                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-                            .clip(ppShape(4.dp))
-                            .background(Color(0xFF239A60))
-                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                    ) {
-                        GuiText("OWNED", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                    }
-                } else if (isNewItem(info.createdAt)) {
-                    Box(
-                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-                            .clip(ppShape(4.dp))
-                            .background(Accent)
-                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                    ) {
-                        GuiText("NEW", color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
+                OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
             }
         }
 
@@ -2331,8 +2015,8 @@ private fun StoreDetailPanel(
                         modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        GuiText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        GuiText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        SocialText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
                         if (variants.size > 1) {
                             VariantPicker(
@@ -2351,20 +2035,20 @@ private fun StoreDetailPanel(
                                             .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
                                             .padding(horizontal = 8.dp, vertical = 3.dp),
                                     ) {
-                                        GuiText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
+                                        SocialText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
                                     }
                                 }
                             }
                         }
                         info.description?.takeIf { it.isNotBlank() }?.let {
-                            GuiText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                            SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                         }
                     }
                     if (status != null) {
-                        GuiText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                     }
                     if (variant.id in ownedIds) {
-                        GuiText(
+                        SocialText(
                             "You already own this cosmetic.",
                             color = LocalTheme.current.textColorSecondary,
                             fontSize = 12.sp,
@@ -2410,77 +2094,11 @@ private fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
 
 @Composable
 private fun CheckerThumbnail(modifier: Modifier) {
-    Box(
+    Checkerboard(
         modifier = modifier.clip(ppShape(5.dp))
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
-            .drawBehind {
-                val cell = 9.dp.toPx()
-                val cols = ceil(size.width / cell).toInt()
-                val rows = ceil(size.height / cell).toInt()
-                for (x in 0..cols) {
-                    for (y in 0..rows) {
-                        drawRect(
-                            color = if ((x + y) % 2 == 0) Color(0xFF5F6568) else Color(0xFF3D4245),
-                            topLeft = Offset(x * cell, y * cell),
-                            size = Size(cell, cell),
-                        )
-                    }
-                }
-            },
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)),
+        cell = 9.dp,
     )
-}
-
-@Composable
-private fun BundlePreviewPanel(
-    bundleView: BundleViewResponse?,
-    modifier: Modifier,
-) {
-    Box(
-        modifier = modifier.clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
-    ) {
-        val bundleSource = rememberBundlePreviewSource(bundleView)
-        val bundleHasHat = (bundleSource as? PlayerPreviewSource.Override)
-            ?.equipment?.get(BodySlot.Hat) != null
-        PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(300.dp),
-            source = bundleSource,
-            autoSpin = false,
-            verticalAnchor = if (bundleHasHat) 0.64f else 0.5f,
-            live = true,
-        )
-    }
-}
-
-@Composable
-private fun rememberBundlePreviewSource(bundleView: BundleViewResponse?): PlayerPreviewSource {
-    val bundleCosmeticIds = bundleView?.cosmetics ?: emptyList()
-    if (bundleCosmeticIds.isEmpty()) return PlayerPreviewSource.LocalLive
-
-    var loadTick by remember(bundleCosmeticIds) { mutableIntStateOf(0) }
-    LaunchedEffect(bundleCosmeticIds) {
-        var changed = false
-        for (id in bundleCosmeticIds) {
-            if (CosmeticAssetCache.getAttachedCosmetic(id) == null && CosmeticAssetCache.getPetDefinition(id) == null) {
-                CosmeticAssetCache.ensureCosmeticLoaded(id)
-                changed = true
-            }
-        }
-        if (changed) loadTick++
-    }
-
-    return remember(bundleCosmeticIds, loadTick) {
-        val equipment = CosmeticEquipment()
-        for (id in bundleCosmeticIds) {
-            CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
-        }
-        for (id in CosmeticCatalog.localEquipped().ids()) {
-            CosmeticAssetCache.getAttachedCosmetic(id)?.let { equipment.equip(it) }
-        }
-        val pet = bundleCosmeticIds.firstNotNullOfOrNull { CosmeticAssetCache.getPetDefinition(it) }
-        PlayerPreviewSource.Override(equipment, pet = pet)
-    }
 }
 
 @Composable
@@ -2494,21 +2112,21 @@ private fun CosmeticsLoadingScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
-        GuiText(
+        SocialText(
             if (failed) "Couldn't load cosmetics" else "Loading cosmetics",
-            LocalTheme.current.textColor,
-            16.sp,
+            color = LocalTheme.current.textColor,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
         )
-        GuiText(
+        SocialText(
             if (failed) {
                 "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
             } else {
                 state.label
             },
-            LocalTheme.current.textColorSecondary,
-            13.sp,
+            color = LocalTheme.current.textColorSecondary,
+            fontSize = 13.sp,
             modifier = Modifier.width(360.dp),
             textAlign = TextAlign.Center,
         )
@@ -2576,52 +2194,22 @@ private fun OnlineFeaturesDisabled() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        GuiText(
+        SocialText(
             "Cosmetics are unavailable",
-            LocalTheme.current.textColor,
-            16.sp,
+            color = LocalTheme.current.textColor,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
         )
-        GuiText(
+        SocialText(
             "The Terms of Service and Privacy Policy were declined, so PolyPlus does not contact its " +
                 "servers. Accept them under Privacy in the PolyPlus settings to use cosmetics.",
-            LocalTheme.current.textColorSecondary,
-            13.sp,
+            color = LocalTheme.current.textColorSecondary,
+            fontSize = 13.sp,
             modifier = Modifier.width(420.dp),
             textAlign = TextAlign.Center,
         )
     }
-}
-
-@Composable
-private fun GuiText(
-    text: String,
-    color: Color,
-    fontSize: TextUnit,
-    modifier: Modifier = Modifier,
-    fontWeight: FontWeight = FontWeight.Normal,
-    textAlign: TextAlign = TextAlign.Start,
-    textDecoration: TextDecoration? = null,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Clip,
-    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
-) {
-    BasicText(
-        text = text,
-        modifier = modifier,
-        style = TextStyle(
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            fontFamily = LocalTheme.current.typography.family,
-            textAlign = textAlign,
-            textDecoration = textDecoration,
-        ),
-        maxLines = maxLines,
-        overflow = overflow,
-        onTextLayout = onTextLayout,
-    )
 }
 
 @Composable
@@ -2637,12 +2225,13 @@ private fun CardLabel(
     val hovered by interaction.collectIsHoveredAsState()
 
     Box(modifier.hoverable(interaction)) {
-        GuiText(
+        SocialText(
             text,
             color = color,
             fontSize = fontSize,
             fontWeight = fontWeight,
             maxLines = 1,
+            softWrap = true,
             overflow = TextOverflow.Ellipsis,
             onTextLayout = { truncated = it.hasVisualOverflow },
         )
@@ -2681,7 +2270,7 @@ private fun TooltipPopup(text: String) {
                 .border(1.dp, LocalTheme.current.borderColor, ppShape(6.dp))
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) {
-            GuiText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
+            SocialText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
         }
     }
 }

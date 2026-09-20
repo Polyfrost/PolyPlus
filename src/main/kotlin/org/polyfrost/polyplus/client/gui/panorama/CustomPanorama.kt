@@ -28,6 +28,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
@@ -255,6 +256,6 @@ object CustomPanorama {
     }
 
     private fun sha1Hex(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(bytes))
     //?}
 }

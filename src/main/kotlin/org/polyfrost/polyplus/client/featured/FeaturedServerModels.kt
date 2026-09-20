@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.featured
 
 import org.apache.logging.log4j.LogManager
+import java.awt.Color
 import java.net.URI
 import java.time.Instant
 import java.util.Collections
@@ -237,6 +238,7 @@ object FeaturedServerCatalogCodec {
 }
 
 object FeaturedServerColors {
+    private const val SATURATION = 0.85f
     const val FALLBACK_ARGB: Int = 0xFFA0A0A0.toInt()
     const val RAINBOW_PERIOD_MILLIS: Long = 4_000L
 
@@ -250,30 +252,7 @@ object FeaturedServerColors {
     fun rainbowAt(perimeterFraction: Float, nowMillis: Long): Int {
         val time = Math.floorMod(nowMillis, RAINBOW_PERIOD_MILLIS).toFloat() / RAINBOW_PERIOD_MILLIS
         val hue = ((perimeterFraction % 1f) + 1f + time) % 1f
-        return hsv(hue)
-    }
-
-    private fun hsv(hue: Float): Int {
-        val h = hue * 6f
-        val sector = h.toInt().coerceIn(0, 5)
-        val fraction = h - sector
-        val saturation = 0.85f
-        val value = 1f
-        val p = value * (1f - saturation)
-        val q = value * (1f - saturation * fraction)
-        val t = value * (1f - saturation * (1f - fraction))
-        val (r, g, b) = when (sector) {
-            0 -> Triple(value, t, p)
-            1 -> Triple(q, value, p)
-            2 -> Triple(p, value, t)
-            3 -> Triple(p, q, value)
-            4 -> Triple(t, p, value)
-            else -> Triple(value, p, q)
-        }
-        return 0xFF000000.toInt() or
-            ((r * 255f).toInt() shl 16) or
-            ((g * 255f).toInt() shl 8) or
-            (b * 255f).toInt()
+        return Color.HSBtoRGB(hue, SATURATION, 1f)
     }
 }
 

@@ -2,8 +2,6 @@ package org.polyfrost.polyplus.client
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
-import org.polyfrost.oneconfig.api.config.v1.ConfigManager
-import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -40,15 +38,7 @@ object PolyPlusCosmeticsConfig : Config(
 
     private fun migrateFromLegacyConfig() {
         if (migratedFromLegacyConfig) return
-        runCatching {
-            Tree.beginFailureCollection()
-            try {
-                loadFrom(ConfigManager.active().folder.resolve("${PolyPlusConstants.ID}.json"))
-            } finally {
-                val failed = Tree.endFailureCollection()
-                if (failed.isNotEmpty()) LOGGER.warn("Left {} cosmetics option(s) at their default", failed)
-            }
-        }.onFailure { LOGGER.warn("Could not migrate cosmetics options from the legacy PolyPlus config", it) }
+        loadLegacyPolyPlusOptions("cosmetics", LOGGER, ::loadFrom)
         migratedFromLegacyConfig = true
         save()
     }

@@ -25,7 +25,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
-import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
@@ -49,10 +48,8 @@ import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
-import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -164,23 +161,17 @@ object PolyPlusClient {
         step("login gate") { MinecraftLoginGate.register() }
         step("featured servers") { FeaturedServers.warmUp() }
 
-        val earlyHooks: List<Pair<String, () -> EarlyInitializable>> = buildList {
-            //? if >= 1.21.1
-            add("CosmeticsInitializer" to { CosmeticsInitializer })
-            add("FriendsRepository" to { FriendsRepository })
-            add("GroupsRepository" to { GroupsRepository })
-            // Global chat is disabled for now.
-            // add("GlobalChatRepository" to { GlobalChatRepository })
-            add("SessionsRepository" to { SessionsRepository })
-            add("P2PSessionManager" to { P2PSessionManager })
-        }
-        earlyHooks.forEach { (name, hook) ->
-            step("early init $name") { hook().earlyInitialize() }
-        }
+        //? if >= 1.21.1
+        step("early init CosmeticSync") { CosmeticSync.earlyInitialize() }
+        step("early init FriendsRepository") { FriendsRepository.earlyInitialize() }
+        step("early init GroupsRepository") { GroupsRepository.earlyInitialize() }
+        // global chat is disabled for now
+        // step("early init GlobalChatRepository") { GlobalChatRepository.earlyInitialize() }
+        step("early init SessionsRepository") { SessionsRepository.earlyInitialize() }
+        step("early init P2PSessionManager") { P2PSessionManager.earlyInitialize() }
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
-        step("social overlay keybind") { SocialOverlay.registerKeybind() }
         step("vanilla menu button") { VanillaMenuButton.register() }
 
         step("websocket") {

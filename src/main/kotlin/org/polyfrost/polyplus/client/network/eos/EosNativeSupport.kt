@@ -57,8 +57,6 @@ object EosNativeSupport {
         }
     }
 
-    val isSupported: Boolean = unsupportedReason == null
-
     private fun missingX86Features(): List<String>? {
         val features = readCpuFeatures()
         if (features == null) {

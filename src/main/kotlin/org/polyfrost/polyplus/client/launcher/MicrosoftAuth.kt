@@ -17,20 +17,21 @@ import io.ktor.http.Parameters
 import io.ktor.http.contentType
 import io.ktor.http.formUrlEncode
 import io.ktor.http.isSuccess
+import io.ktor.http.parseQueryString
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.URLDecoder
 import java.nio.channels.UnresolvedAddressException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
 import java.util.Base64
-import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -39,7 +40,6 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -60,16 +60,6 @@ object MicrosoftAuth {
 
     private val HTTP get() = PolyPlusClient.HTTP
     private val B64URL = Base64.getUrlEncoder().withoutPadding()
-    private val ERR_JSON = Json { ignoreUnknownKeys = true }
-
-    class DeviceCode(
-        val userCode: String,
-        val verificationUri: String,
-        val deviceCode: String,
-        val expiresIn: Long,
-        val interval: Long,
-        val message: String,
-    )
 
     class MicrosoftLoginSession internal constructor(
         val browserAuthUrl: String,
@@ -210,15 +200,7 @@ object MicrosoftAuth {
         if (!response.status.isSuccess()) {
             throw MicrosoftAuthErrors.forStep(MsaAuthStep.DeviceCodeRequest)
         }
-        val body: DeviceCodeResponse = response.body()
-        return DeviceCode(
-            userCode = body.userCode,
-            verificationUri = body.verificationUri,
-            deviceCode = body.deviceCode,
-            expiresIn = body.expiresIn,
-            interval = body.interval,
-            message = body.message,
-        )
+        return response.body()
     }
 
     private suspend fun pollDeviceToken(device: DeviceCode): MsaToken {
@@ -247,7 +229,7 @@ object MicrosoftAuth {
                 return MsaToken(body.accessToken, body.refreshToken, body.expiresIn, Instant.now())
             }
             val error = runCatching {
-                ERR_JSON.decodeFromString(OAuthErrorResponse.serializer(), response.bodyAsText())
+                PolyPlusClient.JSON.decodeFromString(OAuthErrorResponse.serializer(), response.bodyAsText())
             }.getOrNull()
             when (error?.error) {
                 "authorization_pending" -> delay(intervalSeconds.seconds)
@@ -282,7 +264,8 @@ object MicrosoftAuth {
         expectedState: String,
         result: CompletableDeferred<String>,
     ) {
-        val query = exchange.requestURI.rawQuery?.let(::parseQuery).orEmpty()
+        val query = exchange.requestURI.rawQuery?.let(::parseQueryString) ?: Parameters.Empty
+        val code = query["code"]
         val page: RedirectPage = when {
             query["error"] != null -> {
                 result.completeExceptionally(
@@ -298,8 +281,8 @@ object MicrosoftAuth {
                 RedirectPage.FAILED
             }
             query["state"] != null && query["state"] != expectedState -> RedirectPage.FAILED
-            query["code"] != null -> {
-                result.complete(query.getValue("code"))
+            code != null -> {
+                result.complete(code)
                 RedirectPage.SUCCESS
             }
             else -> RedirectPage.WAITING
@@ -346,7 +329,7 @@ object MicrosoftAuth {
         val profile = minecraftProfile(mcToken)
 
         return LauncherAccountStore.StoredAccount(
-            id = normalizeUuid(profile.id).toString(),
+            id = Uuid.parse(profile.id).toJavaUuid().toString(),
             username = profile.name,
             accessToken = mcToken,
             refreshToken = msa.refreshToken,
@@ -396,10 +379,10 @@ object MicrosoftAuth {
     private suspend fun parseXboxResponse(response: HttpResponse, step: MsaAuthStep): XboxTokenResponse {
         val text = response.bodyAsText()
         if (response.status.isSuccess()) {
-            return ERR_JSON.decodeFromString(XboxTokenResponse.serializer(), text)
+            return PolyPlusClient.JSON.decodeFromString(XboxTokenResponse.serializer(), text)
         }
         val xerr = runCatching {
-            ERR_JSON.decodeFromString(XboxErrorResponse.serializer(), text).xErr
+            PolyPlusClient.JSON.decodeFromString(XboxErrorResponse.serializer(), text).xErr
         }.getOrNull()
         if (xerr != null && xerr != 0L) {
             throw MicrosoftAuthErrors.forXerr(xerr)
@@ -450,22 +433,6 @@ object MicrosoftAuth {
         val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(StandardCharsets.US_ASCII))
         return B64URL.encodeToString(digest)
     }
-
-    private fun normalizeUuid(id: String): UUID = runCatching { UUID.fromString(id) }.getOrElse {
-        val hex = id.replace("-", "")
-        UUID.fromString(
-            "${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-" +
-                "${hex.substring(16, 20)}-${hex.substring(20)}",
-        )
-    }
-
-    private fun parseQuery(raw: String): Map<String, String> = raw.split("&").mapNotNull { pair ->
-        val idx = pair.indexOf('=')
-        if (idx <= 0) return@mapNotNull null
-        val key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8)
-        val value = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8)
-        key to value
-    }.toMap()
 
     private enum class RedirectPage(val accent: String, val glyph: String, val heading: String, val detail: String) {
         WAITING(
@@ -549,13 +516,12 @@ object MicrosoftAuth {
     )
 
     @Serializable
-    private data class DeviceCodeResponse(
+    class DeviceCode(
         @SerialName("user_code") val userCode: String,
         @SerialName("device_code") val deviceCode: String,
         @SerialName("verification_uri") val verificationUri: String,
         @SerialName("expires_in") val expiresIn: Long = 900,
         @SerialName("interval") val interval: Long = 5,
-        @SerialName("message") val message: String = "",
     )
 
     @Serializable
@@ -580,8 +546,6 @@ object MicrosoftAuth {
     @Serializable
     private data class XboxErrorResponse(
         @SerialName("XErr") val xErr: Long = 0,
-        @SerialName("Message") val message: String = "",
-        @SerialName("Redirect") val redirect: String? = null,
     )
 
     @Serializable

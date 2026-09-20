@@ -15,8 +15,6 @@ import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.DataInputStream
-import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.math.abs
 
@@ -45,7 +43,7 @@ internal object AttachedCosmeticParser {
                     logger.warn("Cosmetic {} geometry {} has no cubes", cosmeticId, geometryAsset.relativePath)
                     return null
                 }
-                val textureFile = findTexture(root) ?: run {
+                val textureFile = DiskAssetReader.findTexture(root) ?: run {
                     logger.warn("Cosmetic {} bundle has no texture (.png)", cosmeticId)
                     return null
                 }
@@ -73,7 +71,6 @@ internal object AttachedCosmeticParser {
                 AttachedCosmetic(
                     id = attachedCosmeticId(cosmeticId),
                     slot = slot,
-                    geometry = geometry,
                     texture = RemoteTextures.register(textureId, textureFile),
                     model = BedrockEffectModel.build(geometry, playerGeometry),
                     animation = findAnimation(root, cosmeticId),
@@ -118,7 +115,7 @@ internal object AttachedCosmeticParser {
         textureFile: Path,
         cosmeticId: Int,
     ): BedrockGeometry {
-        val size = pngSize(textureFile) ?: return geometry
+        val size = DiskAssetReader.pngSize(textureFile) ?: return geometry
         val (width, height) = size
         val description = geometry.description
         if (width == description.textureWidth && height == description.textureHeight) {
@@ -134,7 +131,7 @@ internal object AttachedCosmeticParser {
     }
 
     private fun detectTextureFrameCount(geometry: BedrockGeometry, textureFile: Path): Int {
-        val (width, height) = pngSize(textureFile) ?: return 1
+        val (width, height) = DiskAssetReader.pngSize(textureFile) ?: return 1
         val description = geometry.description
         return detectVerticalTextureFrameCount(
             description.textureWidth,
@@ -162,18 +159,6 @@ internal object AttachedCosmeticParser {
             }
         }
         return extent
-    }
-
-    private fun pngSize(file: Path): Pair<Int, Int>? = try {
-        DataInputStream(Files.newInputStream(file)).use { input ->
-            input.skipBytes(16)
-            val width = input.readInt()
-            val height = input.readInt()
-            if (width > 0 && height > 0) width to height else null
-        }
-    } catch (ex: Exception) {
-        logger.warn("Failed to read texture dimensions from {}", file, ex)
-        null
     }
 
     private fun defaultAttachBone(slot: BodySlot): PlayerModelBone? = when (slot) {
@@ -304,13 +289,6 @@ internal object AttachedCosmeticParser {
             logger.warn("Cosmetic {} animation {} failed to parse", cosmeticId, asset.relativePath, ex)
             null
         }
-    }
-
-    private fun findTexture(root: Path): Path? {
-        val pngs = DiskAssetReader.walk(root) { it.endsWith(".png") }
-        if (pngs.isEmpty()) return null
-        val preferred = pngs.firstOrNull { it.relativePath.startsWith("textures/") }
-        return (preferred ?: pngs.first()).file
     }
 }
 

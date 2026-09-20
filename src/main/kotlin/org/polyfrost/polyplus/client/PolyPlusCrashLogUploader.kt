@@ -226,8 +226,8 @@ object PolyPlusCrashLogUploader {
 
     private fun summarize(body: String, isJvmFatal: Boolean): String {
         if (isJvmFatal) {
-            val signal = lineAfterMarker(body, "#  ", contains = "at pc=") ?: "unknown fault"
-            val frame = valueAfterLine(body, "# Problematic frame:") ?: "unknown frame"
+            val signal = valueAfter(body, "#  ", contains = "at pc=") ?: "unknown fault"
+            val frame = valueAfter(body, "# Problematic frame:") ?: "unknown frame"
             return "JVM fatal error: ${signal.trim()} in ${frame.removePrefix("#").trim()}"
         }
         val description = valueAfter(body, "Description:") ?: "Minecraft crash"
@@ -237,9 +237,9 @@ object PolyPlusCrashLogUploader {
 
     private fun fingerprint(body: String, isJvmFatal: Boolean): List<String> {
         if (isJvmFatal) {
-            val signal = lineAfterMarker(body, "#  ", contains = "at pc=")
+            val signal = valueAfter(body, "#  ", contains = "at pc=")
                 ?.substringBefore(" (")?.trim()?.removePrefix("#")?.trim()
-            val frame = valueAfterLine(body, "# Problematic frame:")
+            val frame = valueAfter(body, "# Problematic frame:")
                 ?.substringAfter('[', "")?.substringBefore('+')?.substringBefore(']')?.trim()
             return listOf("jvm-fatal", signal.orEmpty(), frame.orEmpty())
         }
@@ -317,22 +317,16 @@ object PolyPlusCrashLogUploader {
         }
     }
 
-    private fun valueAfter(text: String, prefix: String): String? = text.lineSequence()
-        .firstOrNull { it.startsWith(prefix) }
-        ?.removePrefix(prefix)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-    private fun lineAfterMarker(text: String, prefix: String, contains: String): String? = text.lineSequence()
-        .firstOrNull { it.startsWith(prefix) && it.contains(contains) }
-        ?.removePrefix(prefix)
-        ?.takeIf { it.isNotBlank() }
-
-    private fun valueAfterLine(text: String, marker: String): String? {
+    /**
+     * Returns the text following the prefix on the first matching line
+     * (falls back to the line after it when the prefix is the whole line).
+     */
+    private fun valueAfter(text: String, prefix: String, contains: String = ""): String? {
         val lines = text.lines()
-        val index = lines.indexOfFirst { it.trim() == marker }
+        val index = lines.indexOfFirst { it.startsWith(prefix) && contains in it }
         if (index < 0) return null
-        return lines.getOrNull(index + 1)?.takeIf { it.isNotBlank() }
+        val rest = lines[index].removePrefix(prefix).trim()
+        return rest.ifEmpty { lines.getOrNull(index + 1).orEmpty().trim() }.takeIf { it.isNotEmpty() }
     }
 
     private fun keyOf(file: File): String = "${file.name}:${file.lastModified()}"

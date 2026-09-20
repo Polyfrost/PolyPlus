@@ -2,30 +2,28 @@ package org.polyfrost.polyplus.utils
 
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.time.Duration
-import kotlinx.atomicfu.locks.ReentrantLock
-import kotlinx.atomicfu.locks.withLock
-import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class Batcher<T, C: MutableCollection<T>>(val delay: Duration, val set: C, val onBatch: suspend CoroutineScope.(C) -> Unit) {
+class Batcher(val delay: Duration, val onBatch: suspend (Set<String>) -> Unit) {
     private val lock = ReentrantLock()
+    private val pending = HashSet<String>()
     private var job: Job? = null
 
-    fun add(item: T) {
+    fun add(item: String) {
         if (job == null) {
             job = PolyPlusClient.SCOPE.launch {
                 kotlinx.coroutines.delay(delay.toMillis())
-                lock.withLock {
-                    onBatch(set)
-                    set.clear()
-                }
+                val batch = lock.withLock { pending.toSet().also { pending.clear() } }
+                onBatch(batch)
                 job = null
             }
         }
 
         lock.withLock {
-            set.add(item)
+            pending.add(item)
         }
     }
 }

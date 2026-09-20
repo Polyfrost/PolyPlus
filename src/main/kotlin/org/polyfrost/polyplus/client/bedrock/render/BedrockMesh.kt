@@ -7,6 +7,7 @@ import org.polyfrost.polyplus.client.bedrock.geometry.BedrockBone
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCube
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockCubeFace
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockFaceUv
+import org.polyfrost.polyplus.client.bedrock.geometry.bedrockPivotOffset
 import org.polyfrost.polyplus.client.bedrock.geometry.bedrockRotationRadians
 import org.polyfrost.polyplus.client.render.Pose
 import org.polyfrost.polyplus.client.render.VertexConsumer
@@ -48,16 +49,16 @@ class BedrockMesh private constructor(
         }
 
         fun fromCube(cube: BedrockCube, bone: BedrockBone, texW: Int, texH: Int, lightLevel: Int = -1): BedrockMesh {
-            val bounds = computeBounds(cube, bone)
+            val corners = CubeCorners(computeBounds(cube, bone))
             val mirror = cube.size.x < 0f
             val flipU = cube.mirror
             val rotation = cubeRotation(cube)
             val pivot = cubeRotationPivot(cube, bone)
 
             val quads = if (cube.uv.faces.isNotEmpty()) {
-                buildFaceQuads(bounds, cube.uv.faces, texW.toFloat(), texH.toFloat(), mirror, flipU, rotation, pivot)
+                buildFaceQuads(corners, cube.uv.faces, texW.toFloat(), texH.toFloat(), mirror, flipU, rotation, pivot)
             } else {
-                buildBoxQuads(cube, bounds, cube.uv.box, texW.toFloat(), texH.toFloat(), mirror, flipU, rotation, pivot)
+                buildBoxQuads(cube, corners, cube.uv.box, texW.toFloat(), texH.toFloat(), mirror, flipU, rotation, pivot)
             }
 
             return BedrockMesh(if (lightLevel < 0) quads else quads.map { it.copy(lightLevel = lightLevel) })
@@ -75,6 +76,17 @@ class BedrockMesh private constructor(
             val maxY: Float,
             val maxZ: Float,
         )
+
+        private class CubeCorners(bounds: CubeBounds) {
+            val north0 = corner(bounds.minX, bounds.minY, bounds.minZ)
+            val north1 = corner(bounds.maxX, bounds.minY, bounds.minZ)
+            val north2 = corner(bounds.maxX, bounds.maxY, bounds.minZ)
+            val north3 = corner(bounds.minX, bounds.maxY, bounds.minZ)
+            val south0 = corner(bounds.minX, bounds.minY, bounds.maxZ)
+            val south1 = corner(bounds.maxX, bounds.minY, bounds.maxZ)
+            val south2 = corner(bounds.maxX, bounds.maxY, bounds.maxZ)
+            val south3 = corner(bounds.minX, bounds.maxY, bounds.maxZ)
+        }
 
         private fun computeBounds(cube: BedrockCube, bone: BedrockBone): CubeBounds {
             val endX = cube.origin.x + cube.size.x
@@ -132,15 +144,7 @@ class BedrockMesh private constructor(
                     (cube.origin.z + endZ) * 0.5f,
                 )
             }
-            return bedrockPointToModel(pivot, bone.pivot)
-        }
-
-        private fun bedrockPointToModel(point: Vector3f, bonePivot: Vector3f): Vector3f {
-            return Vector3f(
-                point.x - bonePivot.x,
-                bonePivot.y - point.y,
-                point.z - bonePivot.z,
-            )
+            return bedrockPivotOffset(pivot, bone.pivot)
         }
 
         private fun transformCorners(
@@ -167,7 +171,7 @@ class BedrockMesh private constructor(
         }
 
         private fun buildFaceQuads(
-            bounds: CubeBounds,
+            corners: CubeCorners,
             faceUvs: Map<BedrockCubeFace, BedrockFaceUv>,
             texW: Float,
             texH: Float,
@@ -176,16 +180,6 @@ class BedrockMesh private constructor(
             rotation: Quaternionf?,
             pivot: Vector3f,
         ): List<BedrockQuad> {
-            val north0 = corner(bounds.minX, bounds.minY, bounds.minZ)
-            val north1 = corner(bounds.maxX, bounds.minY, bounds.minZ)
-            val north2 = corner(bounds.maxX, bounds.maxY, bounds.minZ)
-            val north3 = corner(bounds.minX, bounds.maxY, bounds.minZ)
-
-            val south0 = corner(bounds.minX, bounds.minY, bounds.maxZ)
-            val south1 = corner(bounds.maxX, bounds.minY, bounds.maxZ)
-            val south2 = corner(bounds.maxX, bounds.maxY, bounds.maxZ)
-            val south3 = corner(bounds.minX, bounds.maxY, bounds.maxZ)
-
             val quads = ArrayList<BedrockQuad>(faceUvs.size)
 
             for ((face, uv) in faceUvs) {
@@ -194,13 +188,13 @@ class BedrockMesh private constructor(
                 val u1 = u0 + uv.size.x
                 val v1 = v0 + uv.size.y
 
-                val corners = when (face) {
-                    BedrockCubeFace.NORTH -> arrayOf(north1, north0, north3, north2)
-                    BedrockCubeFace.SOUTH -> arrayOf(south0, south1, south2, south3)
-                    BedrockCubeFace.EAST -> arrayOf(south1, north1, north2, south2)
-                    BedrockCubeFace.WEST -> arrayOf(north0, south0, south3, north3)
-                    BedrockCubeFace.UP -> arrayOf(north2, north3, south3, south2)
-                    BedrockCubeFace.DOWN -> arrayOf(south1, south0, north0, north1)
+                val faceCorners = when (face) {
+                    BedrockCubeFace.NORTH -> arrayOf(corners.north1, corners.north0, corners.north3, corners.north2)
+                    BedrockCubeFace.SOUTH -> arrayOf(corners.south0, corners.south1, corners.south2, corners.south3)
+                    BedrockCubeFace.EAST -> arrayOf(corners.south1, corners.north1, corners.north2, corners.south2)
+                    BedrockCubeFace.WEST -> arrayOf(corners.north0, corners.south0, corners.south3, corners.north3)
+                    BedrockCubeFace.UP -> arrayOf(corners.north2, corners.north3, corners.south3, corners.south2)
+                    BedrockCubeFace.DOWN -> arrayOf(corners.south1, corners.south0, corners.north0, corners.north1)
                 }
 
                 val facing = when (face) {
@@ -212,9 +206,8 @@ class BedrockMesh private constructor(
                     BedrockCubeFace.DOWN -> Direction.DOWN
                 }
 
-                val copied = copyCorners(corners)
-                transformCorners(copied, rotation, pivot)
-                buildPolygon(copied, u0, v0, u1, v1, texW, texH, mirror, flipU, facing)?.let(quads::add)
+                buildPolygon(faceCorners, u0, v0, u1, v1, texW, texH, mirror, flipU, facing, rotation, pivot)
+                    ?.let(quads::add)
             }
 
             return quads
@@ -222,7 +215,7 @@ class BedrockMesh private constructor(
 
         private fun buildBoxQuads(
             cube: BedrockCube,
-            bounds: CubeBounds,
+            corners: CubeCorners,
             boxUv: List<Int>,
             texW: Float,
             texH: Float,
@@ -240,16 +233,6 @@ class BedrockMesh private constructor(
             val uvHeight = floor(height)
             val uvDepth = floor(depth)
 
-            val north0 = corner(bounds.minX, bounds.minY, bounds.minZ)
-            val north1 = corner(bounds.maxX, bounds.minY, bounds.minZ)
-            val north2 = corner(bounds.maxX, bounds.maxY, bounds.minZ)
-            val north3 = corner(bounds.minX, bounds.maxY, bounds.minZ)
-
-            val south0 = corner(bounds.minX, bounds.minY, bounds.maxZ)
-            val south1 = corner(bounds.maxX, bounds.minY, bounds.maxZ)
-            val south2 = corner(bounds.maxX, bounds.maxY, bounds.maxZ)
-            val south3 = corner(bounds.minX, bounds.maxY, bounds.maxZ)
-
             val u0 = (if (boxUv.size >= 2) boxUv[0] else 0).toFloat()
             val v0 = (if (boxUv.size >= 2) boxUv[1] else 0).toFloat()
             val u1 = u0 + uvDepth
@@ -263,26 +246,26 @@ class BedrockMesh private constructor(
             val quads = ArrayList<BedrockQuad>(6)
 
             fun addFace(
-                corners: Array<BedrockMeshVertex>,
+                faceCorners: Array<BedrockMeshVertex>,
                 faceU0: Float,
                 faceV0: Float,
                 faceU1: Float,
                 faceV1: Float,
                 facing: Direction,
             ) {
-                buildBoxPolygon(corners, faceU0, faceV0, faceU1, faceV1, texW, texH, mirror, flipU, facing, rotation, pivot)
+                buildPolygon(faceCorners, faceU0, faceV0, faceU1, faceV1, texW, texH, mirror, flipU, facing, rotation, pivot)
                     ?.let(quads::add)
             }
 
             if (depth < BILLBOARD_EPSILON) {
                 if (width >= BILLBOARD_EPSILON && height >= BILLBOARD_EPSILON) {
                     addFace(
-                        arrayOf(north1, north0, north3, north2),
+                        arrayOf(corners.north1, corners.north0, corners.north3, corners.north2),
                         u1, v1, u2, v2,
                         Direction.NORTH,
                     )
                     addFace(
-                        arrayOf(south0, south1, south2, south3),
+                        arrayOf(corners.south0, corners.south1, corners.south2, corners.south3),
                         u3, v1, u4, v2,
                         Direction.SOUTH,
                     )
@@ -290,32 +273,13 @@ class BedrockMesh private constructor(
                 return quads
             }
 
-            addFace(arrayOf(south1, south0, north0, north1), u1, v1, u2, v0, Direction.DOWN)
-            addFace(arrayOf(north2, north3, south3, south2), u2, v0, u22, v1, Direction.UP)
-            addFace(arrayOf(north0, south0, south3, north3), u0, v1, u1, v2, Direction.WEST)
-            addFace(arrayOf(north1, north0, north3, north2), u1, v1, u2, v2, Direction.NORTH)
-            addFace(arrayOf(south1, north1, north2, south2), u2, v1, u3, v2, Direction.EAST)
-            addFace(arrayOf(south0, south1, south2, south3), u3, v1, u4, v2, Direction.SOUTH)
+            addFace(arrayOf(corners.south1, corners.south0, corners.north0, corners.north1), u1, v1, u2, v0, Direction.DOWN)
+            addFace(arrayOf(corners.north2, corners.north3, corners.south3, corners.south2), u2, v0, u22, v1, Direction.UP)
+            addFace(arrayOf(corners.north0, corners.south0, corners.south3, corners.north3), u0, v1, u1, v2, Direction.WEST)
+            addFace(arrayOf(corners.north1, corners.north0, corners.north3, corners.north2), u1, v1, u2, v2, Direction.NORTH)
+            addFace(arrayOf(corners.south1, corners.north1, corners.north2, corners.south2), u2, v1, u3, v2, Direction.EAST)
+            addFace(arrayOf(corners.south0, corners.south1, corners.south2, corners.south3), u3, v1, u4, v2, Direction.SOUTH)
             return quads
-        }
-
-        private fun buildBoxPolygon(
-            corners: Array<BedrockMeshVertex>,
-            u0: Float,
-            v0: Float,
-            u1: Float,
-            v1: Float,
-            texW: Float,
-            texH: Float,
-            mirror: Boolean,
-            flipU: Boolean,
-            facing: Direction,
-            rotation: Quaternionf?,
-            pivot: Vector3f,
-        ): BedrockQuad? {
-            val copied = copyCorners(corners)
-            transformCorners(copied, rotation, pivot)
-            return buildPolygon(copied, u0, v0, u1, v1, texW, texH, mirror, flipU, facing)
         }
 
         private fun corner(x: Float, y: Float, z: Float): BedrockMeshVertex {
@@ -333,6 +297,8 @@ class BedrockMesh private constructor(
             mirror: Boolean,
             flipU: Boolean,
             facing: Direction,
+            rotation: Quaternionf?,
+            pivot: Vector3f,
         ): BedrockQuad? {
             // flipU mirrors the texture horizontally without touching geometry winding
             val u0 = if (flipU) u1In else u0In
@@ -344,13 +310,13 @@ class BedrockMesh private constructor(
             val normalFacing = if (mirror) mirrorFacing(facing) else facing
             val normal = normalFacing.step()
 
-            val us = 0f / texW
-            val vs = 0f / texH
+            val placed = copyCorners(corners)
+            transformCorners(placed, rotation, pivot)
             val mapped = arrayOf(
-                corners[0].copy(u = u1 / texW - us, v = v0 / texH + vs),
-                corners[1].copy(u = u0 / texW + us, v = v0 / texH + vs),
-                corners[2].copy(u = u0 / texW + us, v = v1 / texH - vs),
-                corners[3].copy(u = u1 / texW - us, v = v1 / texH - vs),
+                placed[0].copy(u = u1 / texW, v = v0 / texH),
+                placed[1].copy(u = u0 / texW, v = v0 / texH),
+                placed[2].copy(u = u0 / texW, v = v1 / texH),
+                placed[3].copy(u = u1 / texW, v = v1 / texH),
             )
 
             if (mirror) {

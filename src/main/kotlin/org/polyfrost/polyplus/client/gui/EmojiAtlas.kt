@@ -81,7 +81,7 @@ internal fun SocialEmojiText(
         segments.filterIsInstance<EmojiRegistry.Segment.Emoji>().map { it.glyph }.distinct()
     }
     if (glyphs.isEmpty() || EmojiAtlas.bitmap == null) {
-        SocialText(text, fontSize, modifier, color, fontWeight, maxLines)
+        SocialText(text, fontSize, modifier, color, fontWeight, maxLines = maxLines)
         return
     }
 

@@ -14,8 +14,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,20 +41,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
@@ -64,25 +67,81 @@ import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import java.util.UUID
 
 @Composable
+internal fun SocialModalScrim(onDismiss: () -> Unit, content: @Composable BoxScope.() -> Unit) {
+    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        SocialScrimBox(onDismiss, content)
+    }
+}
+
+@Composable
+internal fun SocialScrimBox(onDismiss: () -> Unit, content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(SocialScrim)
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
+@Composable
+internal fun Modifier.swallowClicks(): Modifier =
+    clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
+
+@Composable
+internal fun ModalPanel(
+    width: Dp,
+    height: Dp = Dp.Unspecified,
+    padding: PaddingValues = PaddingValues(20.dp),
+    spacing: Dp = 12.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(width)
+            .then(if (height == Dp.Unspecified) Modifier else Modifier.height(height))
+            .clip(SocialPanelShape)
+            .background(SocialPopupBackground)
+            .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
+            .swallowClicks()
+            .padding(padding),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        content = content,
+    )
+}
+
+@Composable
 internal fun SocialText(
     text: String,
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
     color: Color = SocialTextPrimary,
     fontWeight: FontWeight = FontWeight.Normal,
+    textAlign: TextAlign = TextAlign.Start,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    fontFamily: FontFamily = LocalTheme.current.typography.family,
+    textDecoration: TextDecoration? = null,
     maxLines: Int = Int.MAX_VALUE,
+    softWrap: Boolean = maxLines != 1,
+    overflow: TextOverflow = TextOverflow.Clip,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     BasicText(
         text = text,
         modifier = modifier,
         maxLines = maxLines,
-        softWrap = maxLines != 1,
+        softWrap = softWrap,
+        overflow = overflow,
+        onTextLayout = onTextLayout,
         style = TextStyle(
             color = color,
             fontSize = fontSize,
             fontWeight = fontWeight,
-            fontFamily = LocalTheme.current.typography.family,
-            textAlign = TextAlign.Start,
+            letterSpacing = letterSpacing,
+            fontFamily = fontFamily,
+            textAlign = textAlign,
+            textDecoration = textDecoration,
         ),
     )
 }
@@ -207,16 +266,12 @@ internal fun SocialIconButton(
     onClick: () -> Unit = {},
 ) {
     val (interaction, hovered) = rememberSocialHover()
-    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
-    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
-
     val resolvedBackground by animateColorAsState(background ?: if (hovered) SocialHoverOverlay else Color.Transparent)
+    val belowButton = with(LocalDensity.current) { SOCIAL_ICON_BUTTON_SIZE.roundToPx() } + 6
 
     Box(
         modifier = modifier
-            .size(34.dp)
-            .onSizeChanged { buttonSize = it }
-            .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
+            .size(SOCIAL_ICON_BUTTON_SIZE)
             .clip(SocialFieldShape)
             .background(resolvedBackground)
             .hoverable(interaction)
@@ -224,25 +279,10 @@ internal fun SocialIconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, tint, Modifier.size(16.dp))
-        if (tooltip != null && hovered && buttonSize.width > 0) {
-            val positionProvider = remember(buttonBounds) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        val gap = 6
-                        return IntOffset(
-                            buttonBounds.left.toInt(),
-                            (buttonBounds.bottom + gap).toInt(),
-                        )
-                    }
-                }
-            }
+        if (tooltip != null && hovered) {
             Popup(
-                popupPositionProvider = positionProvider,
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, belowButton),
                 properties = PopupProperties(focusable = false, clippingEnabled = false),
             ) {
                 SocialTooltipBubble(tooltip)
@@ -250,6 +290,8 @@ internal fun SocialIconButton(
         }
     }
 }
+
+private val SOCIAL_ICON_BUTTON_SIZE = 34.dp
 
 @Composable
 private fun SocialTooltipBubble(text: String) {
@@ -432,7 +474,12 @@ internal fun <T> SocialDropdown(
             ) {
                 SocialDropdownList(triggerSize.width) {
                     options.forEach { option ->
-                        SocialDropdownOption(labelFor(option), option == selected) { onSelect(option); expanded = false }
+                        SocialMenuItem(
+                            label = labelFor(option),
+                            color = if (option == selected) Accent else SocialTextPrimary,
+                            selected = option == selected,
+                            horizontalPadding = 10.dp,
+                        ) { onSelect(option); expanded = false }
                     }
                 }
             }
@@ -440,8 +487,17 @@ internal fun <T> SocialDropdown(
     }
 }
 
+/** A row that gets highlighted on hover, used by dropdowns and overflow menus. */
 @Composable
-private fun SocialDropdownOption(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun SocialMenuItem(
+    label: String,
+    icon: String? = null,
+    color: Color = SocialTextPrimary,
+    selected: Boolean = false,
+    height: Dp = 32.dp,
+    horizontalPadding: Dp = 8.dp,
+    onClick: () -> Unit,
+) {
     val (interaction, hovered) = rememberSocialHover()
     val background by animateColorAsState(
         when {
@@ -450,18 +506,20 @@ private fun SocialDropdownOption(label: String, selected: Boolean, onClick: () -
             else -> Color.Transparent
         },
     )
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp)
+            .height(height)
             .clip(SocialFieldShape)
             .background(background)
             .hoverable(interaction)
             .clickableWithSound(onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.CenterStart,
+            .padding(horizontal = horizontalPadding),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SocialText(label, fontSize = 13.sp, color = if (selected) Accent else SocialTextPrimary)
+        if (icon != null) Icon(icon, color, Modifier.size(15.dp))
+        SocialText(label, fontSize = 13.sp, color = color)
     }
 }
 

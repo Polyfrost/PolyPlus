@@ -30,7 +30,7 @@ object SessionAccounts {
             id = id.toString(),
             username = name,
             accessToken = token,
-            kind = if (id == offlineUuid(name)) "offline" else "microsoft",
+            kind = if (id == LauncherAccountStore.offlineUuid(name)) "offline" else "microsoft",
         )
         activeId = id.toString()
         LOGGER.info("Captured launch account {} ({})", name, id)
@@ -60,7 +60,4 @@ object SessionAccounts {
     fun markActive(id: String) {
         activeId = id
     }
-
-    private fun offlineUuid(username: String): UUID =
-        UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8))
 }

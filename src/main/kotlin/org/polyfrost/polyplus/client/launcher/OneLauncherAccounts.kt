@@ -120,7 +120,7 @@ object OneLauncherAccounts {
         }
 
         val account = LauncherAccountStore.StoredAccount(
-            id = offlineUuid(username).toString(),
+            id = LauncherAccountStore.offlineUuid(username).toString(),
             username = username,
             expires = Instant.now().plus(Duration.ofDays(3650)).toString(),
             kind = "offline",
@@ -136,9 +136,6 @@ object OneLauncherAccounts {
         val default = if (makeDefaultIfNone && store.defaultUser == null) account.id else store.defaultUser
         LauncherAccountStore.save(store.copy(users = users, defaultUser = default))
     }
-
-    private fun offlineUuid(username: String): UUID =
-        UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8))
 
     private fun LauncherAccountStore.StoredAccount.toAccount(active: Boolean) = Account(
         id = LauncherAccountStore.parseUuid(id) ?: UUID(0L, 0L),

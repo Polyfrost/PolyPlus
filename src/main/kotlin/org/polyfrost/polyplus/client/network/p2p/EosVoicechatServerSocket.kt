@@ -54,7 +54,7 @@ internal class EosVoicechatServerSocket(private val bridge: EosSdkBridge) : Voic
 
     override fun read(): RawUdpPacket {
         while (!closed) {
-            return inbound.poll(READ_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
+            return inbound.poll(EosVoicechatBridge.READ_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
         }
         throw IOException("Voice chat server socket was closed")
     }

@@ -3,13 +3,11 @@ package org.polyfrost.polyplus.client.gui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,16 +32,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
-import net.minecraft.world.Difficulty
 import net.minecraft.world.level.GameType
 import org.jetbrains.skia.Image
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
@@ -58,11 +52,7 @@ import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
 
-internal sealed class HostFlowStep {
-    object SelectWorld : HostFlowStep()
-    object Configure : HostFlowStep()
-    object InviteFriends : HostFlowStep()
-}
+internal enum class HostFlowStep { SelectWorld, Configure, InviteFriends }
 
 internal enum class HostMode {
     FRIENDS,
@@ -70,13 +60,12 @@ internal enum class HostMode {
 }
 
 private class HostFlowState(val hostingCurrent: Boolean) {
-    var step by mutableStateOf<HostFlowStep>(if (hostingCurrent) HostFlowStep.Configure else HostFlowStep.SelectWorld)
+    var step by mutableStateOf(if (hostingCurrent) HostFlowStep.Configure else HostFlowStep.SelectWorld)
     var hostMode by mutableStateOf(HostMode.FRIENDS)
     var port by mutableStateOf("")
     var worlds by mutableStateOf<List<HostWorldManager.HostWorldEntry>?>(null)
     var selected by mutableStateOf<HostWorldManager.HostWorldEntry?>(null)
     var gameMode by mutableStateOf(GameType.SURVIVAL)
-    var difficulty by mutableStateOf(Difficulty.NORMAL)
     var allowCheats by mutableStateOf(false)
     var privateRelay by mutableStateOf(true)
     var autoShareResourcePack by mutableStateOf(false)
@@ -109,62 +98,38 @@ internal fun HostWorldFlow(
         state.selected?.let { state.gameMode = it.gameMode }
     }
 
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SocialScrim)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
-            contentAlignment = Alignment.Center,
-        ) {
-            when (state.step) {
-                HostFlowStep.SelectWorld -> WorldSelectionModal(
-                    state = state,
-                    onCancel = onDismiss,
-                    onNext = { state.step = HostFlowStep.Configure },
-                )
-                HostFlowStep.Configure -> WorldConfigurationModal(
-                    state = state,
-                    screen = screen,
-                    onBack = { if (state.hostingCurrent) onDismiss() else state.step = HostFlowStep.SelectWorld },
-                    onNext = { state.step = HostFlowStep.InviteFriends },
-                    onHosted = onDismiss,
-                )
-                HostFlowStep.InviteFriends -> InviteFriendsModal(
-                    state = state,
-                    friends = friends,
-                    groups = groups,
-                    selfId = selfId,
-                    screen = screen,
-                    onBack = { state.step = HostFlowStep.Configure },
-                    onHosted = onDismiss,
-                )
-            }
+    SocialModalScrim(onDismiss) {
+        when (state.step) {
+            HostFlowStep.SelectWorld -> WorldSelectionModal(
+                state = state,
+                onCancel = onDismiss,
+                onNext = { state.step = HostFlowStep.Configure },
+            )
+            HostFlowStep.Configure -> WorldConfigurationModal(
+                state = state,
+                screen = screen,
+                onBack = { if (state.hostingCurrent) onDismiss() else state.step = HostFlowStep.SelectWorld },
+                onNext = { state.step = HostFlowStep.InviteFriends },
+                onHosted = onDismiss,
+            )
+            HostFlowStep.InviteFriends -> InviteFriendsModal(
+                state = state,
+                friends = friends,
+                groups = groups,
+                selfId = selfId,
+                screen = screen,
+                onBack = { state.step = HostFlowStep.Configure },
+                onHosted = onDismiss,
+            )
         }
     }
-}
-
-@Composable
-private fun ModalPanel(width: Dp, height: Dp, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .clip(SocialPanelShape)
-            .background(SocialPopupBackground)
-            .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        content = content,
-    )
 }
 
 @Composable
 private fun WorldSelectionModal(state: HostFlowState, onCancel: () -> Unit, onNext: () -> Unit) {
     var query by remember { mutableStateOf("") }
 
-    ModalPanel(width = 560.dp, height = 620.dp) {
+    ModalPanel(width = 560.dp, height = 620.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
         SocialText("Select world to host", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         SocialTextField(
             value = query,
@@ -274,7 +239,7 @@ private fun WorldConfigurationModal(
     val lan = state.hostMode == HostMode.LAN
     val portValid = state.port.isBlank() || state.port.trim().toIntOrNull()?.let { it in 1..65535 } == true
 
-    ModalPanel(width = 560.dp, height = 520.dp) {
+    ModalPanel(width = 560.dp, height = 520.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
         SocialText("Configure world settings", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         SocialText(
             "Choose how ${state.selected?.name ?: "this world"} will be hosted for your friends.",
@@ -300,16 +265,6 @@ private fun WorldConfigurationModal(
                 labelFor = { socialGameModeLabel(it) },
                 modifier = Modifier.width(220.dp),
                 onSelect = { state.gameMode = it },
-            )
-        }
-        FormRow("Difficulty") {
-            SocialDropdown(
-                label = "Difficulty",
-                options = listOf(Difficulty.PEACEFUL, Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD),
-                selected = state.difficulty,
-                labelFor = { socialDifficultyLabel(it) },
-                modifier = Modifier.width(220.dp),
-                onSelect = { state.difficulty = it },
             )
         }
         FormRow("Cheats") {
@@ -403,7 +358,7 @@ private fun InviteFriendsModal(
     val specialChatGroupId = SpecialChatRepository.status.collectAsState().value?.groupId
     val inviteableGroups = groups.filter { it.kind == GroupKind.Group && it.members.size > 1 && it.id != specialChatGroupId }
 
-    ModalPanel(width = 560.dp, height = 620.dp) {
+    ModalPanel(width = 560.dp, height = 620.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
         SocialText("Invite friends to world", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         SocialTextField(
             value = query,
@@ -577,13 +532,6 @@ private fun openSelectWorldScreen() {
 }
 
 private fun socialGameModeLabel(mode: GameType): String = mode.getName().replaceFirstChar { it.uppercase() }
-
-private fun socialDifficultyLabel(difficulty: Difficulty): String = when (difficulty) {
-    Difficulty.PEACEFUL -> "Peaceful"
-    Difficulty.EASY -> "Easy"
-    Difficulty.NORMAL -> "Normal"
-    Difficulty.HARD -> "Hard"
-}
 
 private fun socialCompatLabel(compat: HostWorldManager.Compat): String = when (compat) {
     HostWorldManager.Compat.CURRENT -> "Compatible"

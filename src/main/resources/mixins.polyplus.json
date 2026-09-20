@@ -49,6 +49,7 @@
     "client.access.OnlineServerEntryInvoker",
     "client.access.ScreenAccessor",
     "client.access.UserAccessor",
+    //? if <1.21.5
     "client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",
@@ -63,6 +64,7 @@
   "mixins": [
     "MixinCrashReport",
     "MixinSystemReport",
+    //? if <1.21.5
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",

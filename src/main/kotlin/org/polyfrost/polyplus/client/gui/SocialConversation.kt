@@ -1,10 +1,8 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -268,37 +266,16 @@ private fun GroupOverflowMenu(
             .padding(6.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        OverflowMenuItem(SOCIAL_ASSETS + "user-plus-01.svg", "Invite Friends", onClick = onInvite)
-        OverflowMenuItem(SOCIAL_ASSETS + "log-in-04.svg", "Invite Group to Session", onClick = onInviteToSession)
-        OverflowMenuItem(SOCIAL_ASSETS + "edit-02.svg", "Rename Group", onClick = onRename)
-        OverflowMenuItem(SOCIAL_ASSETS + "volume-x.svg", if (muted) "Unmute Group" else "Mute Group", onClick = onMute)
+        SocialMenuItem(icon = SOCIAL_ASSETS + "user-plus-01.svg", label = "Invite Friends", height = 34.dp, onClick = onInvite)
+        SocialMenuItem(icon = SOCIAL_ASSETS + "log-in-04.svg", label = "Invite Group to Session", height = 34.dp, onClick = onInviteToSession)
+        SocialMenuItem(icon = SOCIAL_ASSETS + "edit-02.svg", label = "Rename Group", height = 34.dp, onClick = onRename)
+        SocialMenuItem(icon = SOCIAL_ASSETS + "volume-x.svg", label = if (muted) "Unmute Group" else "Mute Group", height = 34.dp, onClick = onMute)
         if (canConvertToNormal) {
-            OverflowMenuItem(SOCIAL_ASSETS + "check.svg", "Convert to Normal Chat", onClick = onConvertToNormal)
+            SocialMenuItem(icon = SOCIAL_ASSETS + "check.svg", label = "Convert to Normal Chat", height = 34.dp, onClick = onConvertToNormal)
         }
         if (canLeave) {
-            OverflowMenuItem(SOCIAL_ASSETS + "x-close.svg", "Leave Group", color = SocialDangerColor, onClick = onLeave)
+            SocialMenuItem(icon = SOCIAL_ASSETS + "x-close.svg", label = "Leave Group", color = SocialDangerColor, height = 34.dp, onClick = onLeave)
         }
-    }
-}
-
-@Composable
-private fun OverflowMenuItem(icon: String, label: String, color: Color = SocialTextPrimary, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val background by animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .clip(SocialFieldShape)
-            .background(background)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(icon, color, Modifier.size(15.dp))
-        SocialText(label, fontSize = 13.sp, color = color)
     }
 }
 
@@ -518,16 +495,26 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
     }
 }
 
-@Composable
-internal fun conversationDisplayTitle(group: GroupSummary, selfId: String): String {
+internal inline fun conversationTitle(group: GroupSummary, selfId: String, nameOf: (String) -> String): String {
     if (group.kind == GroupKind.Group) {
-        group.name?.let { return it }
+        val name = group.name
+        if (name != null) return name
         val others = group.members.filterNot { it == selfId }
-        return if (others.isEmpty()) "Group" else others.map { PlayerNamesRepository.displayName(it) }.joinToString()
+        if (others.isEmpty()) return "Group"
+        val joined = StringBuilder()
+        for (id in others) {
+            if (joined.isNotEmpty()) joined.append(", ")
+            joined.append(nameOf(id))
+        }
+        return joined.toString()
     }
     val other = group.members.firstOrNull { it != selfId } ?: return "You"
-    return PlayerNamesRepository.displayName(other)
+    return nameOf(other)
 }
+
+@Composable
+internal fun conversationDisplayTitle(group: GroupSummary, selfId: String): String =
+    conversationTitle(group, selfId) { PlayerNamesRepository.displayName(it) }
 
 private fun dateSeparatorFor(sentAt: String): String = runCatching {
     val instant = Instant.parse(sentAt)

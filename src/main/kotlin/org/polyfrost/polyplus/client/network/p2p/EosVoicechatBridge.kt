@@ -9,6 +9,8 @@ internal object EosVoicechatBridge {
 
     val SOCKET_ID = EosP2PSocketId("polyplus-voicechat")
 
+    const val READ_POLL_TIMEOUT_MS = 500L
+
     @Volatile private var bridge: EosSdkBridge? = null
 
     @Volatile private var activeClientSocket: EosVoicechatClientSocket? = null

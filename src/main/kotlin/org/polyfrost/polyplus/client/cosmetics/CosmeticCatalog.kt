@@ -51,8 +51,6 @@ object CosmeticCatalog {
 
     fun allDefinitions(): Collection<CosmeticDefinition> = cosmeticDefinitions.values + emoteDefinitions.values
 
-    fun allCosmeticDefinitions(): Collection<CosmeticDefinition> = cosmeticDefinitions.values
-
     fun allEmoteDefinitions(): Collection<CosmeticDefinition> = emoteDefinitions.values
 
     fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[uuid]
@@ -78,9 +76,6 @@ object CosmeticCatalog {
     }
 
     fun getActiveId(uuid: UUID, slot: BodySlot): Int? =
-        remoteEquipped[uuid]?.get(slot)
-
-    fun getEquippedId(uuid: UUID, slot: BodySlot): Int? =
         remoteEquipped[uuid]?.get(slot)
 
     fun localEquipped(): EquippedCosmetics = localEquipped

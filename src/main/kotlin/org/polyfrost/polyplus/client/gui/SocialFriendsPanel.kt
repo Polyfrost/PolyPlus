@@ -3,9 +3,7 @@ package org.polyfrost.polyplus.client.gui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,59 +125,38 @@ internal fun FriendsManagementView(
 
 @Composable
 private fun BlockedPlayersDialog(blocked: List<BlockedPlayer>, onUnblock: (String) -> Unit, onDismiss: () -> Unit) {
-    Popup(
-        alignment = Alignment.Center,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SocialScrim)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(420.dp)
-                    .clip(SocialPanelShape)
-                    .background(SocialPopupBackground)
-                    .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SocialText("Blocked Players", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                if (blocked.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        SocialText("You haven't blocked anyone", fontSize = 13.sp, color = SocialTextSecondary)
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().height(280.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        blocked.forEach { entry ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clip(SocialPanelShape)
-                                    .background(SocialCardBackground)
-                                    .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-                                    .padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                SocialAvatar(entry.player, 28.dp)
-                                SocialText(PlayerNamesRepository.displayName(entry.player), fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                SocialButton("Unblock", onClick = { onUnblock(entry.player) })
-                            }
+    SocialModalScrim(onDismiss) {
+        ModalPanel(width = 420.dp) {
+            SocialText("Blocked Players", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            if (blocked.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                    SocialText("You haven't blocked anyone", fontSize = 13.sp, color = SocialTextSecondary)
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(280.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    blocked.forEach { entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .clip(SocialPanelShape)
+                                .background(SocialCardBackground)
+                                .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
+                                .padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            SocialAvatar(entry.player, 28.dp)
+                            SocialText(PlayerNamesRepository.displayName(entry.player), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            SocialButton("Unblock", onClick = { onUnblock(entry.player) })
                         }
                     }
                 }
-                SocialButton("Close", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onDismiss)
             }
+            SocialButton("Close", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onDismiss)
         }
     }
 }
@@ -239,8 +216,8 @@ private fun FriendCard(friend: Friend, onMessage: () -> Unit, onRemove: () -> Un
                             .padding(6.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        FriendMenuItem("Remove Friend") { menuOpen = false; onRemove() }
-                        FriendMenuItem("Block", color = SocialDangerColor) { menuOpen = false; onBlock() }
+                        SocialMenuItem("Remove Friend") { menuOpen = false; onRemove() }
+                        SocialMenuItem("Block", color = SocialDangerColor) { menuOpen = false; onBlock() }
                     }
                 }
             }
@@ -249,82 +226,42 @@ private fun FriendCard(friend: Friend, onMessage: () -> Unit, onRemove: () -> Un
 }
 
 @Composable
-private fun FriendMenuItem(label: String, color: Color = SocialTextPrimary, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val background by animateColorAsState(if (hovered) SocialHoverOverlay else Color.Transparent)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(32.dp)
-            .clip(SocialFieldShape)
-            .background(background)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 8.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        SocialText(label, fontSize = 13.sp, color = color)
-    }
-}
-
-@Composable
 internal fun InviteToGroupDialog(friends: List<Friend>, onInvite: (String) -> Unit, onDismiss: () -> Unit) {
     var invited by remember { mutableStateOf(setOf<String>()) }
-    Popup(
-        alignment = Alignment.Center,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SocialScrim)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(420.dp)
-                    .clip(SocialPanelShape)
-                    .background(SocialPopupBackground)
-                    .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SocialText("Invite Friends", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                if (friends.isEmpty()) {
-                    EmptyHint("All your friends are already in this group")
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().height(280.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        friends.forEach { friend ->
-                            val done = friend.player in invited
-                            Row(
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                SocialAvatar(friend.player, 30.dp)
-                                SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                SocialIconButton(
-                                    icon = if (done) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-                                    tint = if (done) Color.White else SocialTextPrimary,
-                                    onClick = {
-                                        if (!done) {
-                                            onInvite(friend.player)
-                                            invited = invited + friend.player
-                                        }
-                                    },
-                                )
-                            }
+    SocialModalScrim(onDismiss) {
+        ModalPanel(width = 420.dp) {
+            SocialText("Invite Friends", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            if (friends.isEmpty()) {
+                EmptyHint("All your friends are already in this group")
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(280.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    friends.forEach { friend ->
+                        val done = friend.player in invited
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            SocialAvatar(friend.player, 30.dp)
+                            SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            SocialIconButton(
+                                icon = if (done) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
+                                tint = if (done) Color.White else SocialTextPrimary,
+                                onClick = {
+                                    if (!done) {
+                                        onInvite(friend.player)
+                                        invited = invited + friend.player
+                                    }
+                                },
+                            )
                         }
                     }
                 }
-                SocialButton("Done", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onDismiss)
             }
+            SocialButton("Done", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onDismiss)
         }
     }
 }

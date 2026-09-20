@@ -10,16 +10,10 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object CosmeticService {
     private val LOGGER = LogManager.getLogger("polyplus/cosmetics")
-    suspend fun equipCape(cosmeticId: Int): Result<Unit> =
-        equip(cosmeticId, BodySlot.Cape)
-
     suspend fun equipEmote(emoteId: Int): Result<Unit> = runCatching {
         require(emoteId in CosmeticCatalog.ownedEmoteIds()) { "Emote #$emoteId is not in your locker" }
         CosmeticCatalog.setSelectedEmote(emoteId)
     }
-
-    suspend fun clearCape(): Result<Unit> =
-        clearSlot(BodySlot.Cape)
 
     suspend fun setParticleColor(color: Int?): Result<Unit> = runCatching {
         val uuid = ClientPlatform.localPlayerUuid()

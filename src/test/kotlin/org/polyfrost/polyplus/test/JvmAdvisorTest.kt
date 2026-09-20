@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.features.JvmAdvisor
-import org.polyfrost.polyplus.client.features.JvmAdvisor.Collector
 import org.polyfrost.polyplus.client.features.JvmAdvisor.HostMemory
 import org.polyfrost.polyplus.client.features.JvmAdvisor.Kind
 import org.polyfrost.polyplus.client.features.JvmAdvisor.Snapshot
@@ -15,12 +14,11 @@ class JvmAdvisorTest {
         maxHeapMb: Long = 4096,
         liveSetMb: Long = 1024,
         nonHeapMb: Long = 300,
-        gcTimeFraction: Double = 0.001,
-        collector: Collector = Collector.G1,
+        isZgc: Boolean = false,
         cores: Int = 16,
         gcSpikeRatio: Double = 1.0,
         host: HostMemory? = HostMemory(totalMb = 16384, availableMb = 9000, pressure = 1),
-    ) = Snapshot(maxHeapMb, liveSetMb, nonHeapMb, gcTimeFraction, collector, cores, gcSpikeRatio, host)
+    ) = Snapshot(maxHeapMb, liveSetMb, nonHeapMb, isZgc, cores, gcSpikeRatio, host)
 
     @Test
     fun `a healthy setup gets no advice`() {
@@ -106,36 +104,9 @@ class JvmAdvisorTest {
     }
 
     @Test
-    fun `costly G1 pauses on a big machine suggest nothing while ZGC advice is held back`() {
-        assertNull(
-            JvmAdvisor.evaluate(
-                snapshot(maxHeapMb = 8192, liveSetMb = 2000, gcTimeFraction = 0.025, cores = 16),
-            ),
-        )
-    }
-
-    @Test
-    fun `costly G1 pauses on a small CPU do not suggest ZGC`() {
-        assertNull(
-            JvmAdvisor.evaluate(
-                snapshot(maxHeapMb = 8192, liveSetMb = 2000, gcTimeFraction = 0.025, cores = 4),
-            ),
-        )
-    }
-
-    @Test
-    fun `costly G1 pauses on a small heap do not suggest ZGC`() {
-        assertNull(
-            JvmAdvisor.evaluate(
-                snapshot(maxHeapMb = 4096, liveSetMb = 2000, gcTimeFraction = 0.025, cores = 16),
-            ),
-        )
-    }
-
-    @Test
     fun `ZGC on an underprovisioned setup is sent back to G1`() {
         val advice = JvmAdvisor.evaluate(
-            snapshot(maxHeapMb = 4096, liveSetMb = 1000, collector = Collector.ZGC, cores = 8),
+            snapshot(maxHeapMb = 4096, liveSetMb = 1000, isZgc = true, cores = 8),
         )
         assertEquals(Kind.SWITCH_TO_G1, advice?.kind)
         assertTrue(advice!!.message.isNotBlank())

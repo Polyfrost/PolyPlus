@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import java.util.EnumMap
@@ -20,30 +19,18 @@ class CosmeticEquipment {
 
     fun get(slot: BodySlot): EquippedEntry? = equipped[slot]
 
-    fun findById(id: Identifier): EquippedEntry? =
-        equipped.values.firstOrNull { it.cosmetic.id == id }
-
-    fun equip(cosmetic: AttachedCosmetic): CosmeticEquipResult {
-        val existing = equipped[cosmetic.slot]
-        if (existing != null) {
-            return CosmeticEquipResult.SlotOccupied(cosmetic.slot, existing.cosmetic.id)
+    /** Equips into a free slot (returns false when the slot is already taken). */
+    fun equip(cosmetic: AttachedCosmetic): Boolean {
+        if (equipped.containsKey(cosmetic.slot)) {
+            return false
         }
 
         equipped[cosmetic.slot] = EquippedEntry(cosmetic, Util.getMillis())
-        return CosmeticEquipResult.Success
+        return true
     }
 
     fun unequip(slot: BodySlot): Boolean =
         equipped.remove(slot) != null
-
-    fun unequip(id: Identifier): Boolean {
-        val slot = equipped.entries.firstOrNull { it.value.cosmetic.id == id }?.key ?: return false
-        return equipped.remove(slot) != null
-    }
-
-    fun clear() {
-        equipped.clear()
-    }
 
     data class EquippedEntry(
         val cosmetic: AttachedCosmetic,

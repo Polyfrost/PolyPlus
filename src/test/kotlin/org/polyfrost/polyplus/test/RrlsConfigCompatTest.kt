@@ -210,4 +210,15 @@ class RrlsConfigCompatTest {
 
         assertTrue(converted.contains("""reloadText = "a\tb # \"c\" é""""))
     }
+
+    @Test
+    fun `writes astral escapes as characters, which the legacy parser can read`() {
+        val edited = MODERN_CONFIG.replace(
+            """reloadText = "Reloading # now"""",
+            """reloadText = "Loading \U0001F600"""",
+        )
+        val converted = RrlsConfigCompat.translate(edited, Format.LEGACY, "")
+
+        assertTrue(converted.contains("reloadText = \"Loading \uD83D\uDE00\""), converted)
+    }
 }

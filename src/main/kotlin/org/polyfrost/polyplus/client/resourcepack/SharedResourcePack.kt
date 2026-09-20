@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -105,5 +106,5 @@ object SharedResourcePack {
         else -> "$bytes bytes"
     }
 
-    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+    private fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
 }

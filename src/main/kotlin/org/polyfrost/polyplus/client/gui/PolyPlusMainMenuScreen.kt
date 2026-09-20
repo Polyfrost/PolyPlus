@@ -49,16 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.LinearGradientShader
-import androidx.compose.ui.graphics.Shader
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -83,7 +78,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -126,6 +120,7 @@ import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -146,9 +141,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -159,8 +152,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.polyfrost.polyplus.client.featured.FeaturedServer
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -235,7 +226,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     @Composable
     override fun compose() {
         val mc = Minecraft.getInstance()
-        var assetsReady by remember { mutableStateOf(false) }
         var servers by remember { mutableStateOf<List<ServerData>>(emptyList()) }
 
         LaunchedEffect(Unit) {
@@ -252,7 +242,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             }
             servers = serverLoad.await()
             assetLoad.await()
-            assetsReady = true
         }
 
         var pingTick by remember { mutableStateOf(0) }
@@ -319,7 +308,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 ),
                 servers = servers,
                 pingTick = pingTick,
-                assetsReady = assetsReady,
             )
         }
     }
@@ -366,8 +354,12 @@ private object MainMenuRasterAssets {
     ).map { ASSETS + it }
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
 
+    var ready by mutableStateOf(false)
+        private set
+
     fun preload() {
         paths.forEach { load(it) }
+        ready = true
     }
 
     fun cached(path: String): ImageBitmap? = cache[path]
@@ -503,21 +495,15 @@ private fun mojangSkinUrl(uuid: UUID): Result<String?> = runCatching {
             HEAD_LOG.debug("No Mojang profile for {} (offline, or not a premium account)", uuid)
             return Result.success(null)
         }
-    val root = PolyPlusClient.JSON.parseToJsonElement(body).jsonObject
-    val props = root["properties"]?.jsonArray ?: return Result.success(null)
-    val texturesValue = props.firstOrNull {
-        it.jsonObject["name"]?.jsonPrimitive?.content == "textures"
-    }?.jsonObject?.get("value")?.jsonPrimitive?.content ?: return Result.success(null)
-    val decoded = String(
-        Base64.getDecoder().decode(texturesValue),
-        StandardCharsets.UTF_8,
-    )
-    PolyPlusClient.JSON.parseToJsonElement(decoded)
-        .jsonObject["textures"]?.jsonObject
-        ?.get("SKIN")?.jsonObject
-        ?.get("url")?.jsonPrimitive?.content
+    val textures = PolyPlusClient.JSON.parseToJsonElement(body).jsonObject["properties"]?.jsonArray
+        ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "textures" }
+        ?.jsonObject?.get("value")?.jsonPrimitive?.content
+        ?: return Result.success(null)
+    PolyPlusClient.JSON.parseToJsonElement(String(Base64.getDecoder().decode(textures), StandardCharsets.UTF_8))
+        .jsonObject["textures"]?.jsonObject?.get("SKIN")?.jsonObject?.get("url")?.jsonPrimitive?.content
 }.onFailure { HEAD_LOG.debug("Failed to read Mojang profile for {}", uuid, it) }
 
+// NOTE: authlib's fetchProfile swallows connection errors and 5xx as "no profile"
 private fun httpGetString(url: String): String? {
     val conn = URI(url).toURL().openConnection() as HttpURLConnection
     return try {
@@ -576,46 +562,15 @@ private val PageBackground = Color(0xFF11171C)
 private val PreviewGradient = Color(0xFF0F1C33)
 private val PanelBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
-private const val PanelBorderAngleDeg = 20.0
-
-private val PanelBorderBrush: Brush = object : ShaderBrush() {
-    override fun createShader(size: Size): Shader {
-        val radians = Math.toRadians(PanelBorderAngleDeg)
-        val ux = cos(radians).toFloat()
-        val uy = sin(radians).toFloat()
-        val len = size.width * ux + size.height * uy
-        return LinearGradientShader(
-            from = Offset.Zero,
-            to = Offset(ux * len, uy * len),
-            colors = listOf(
-                Color.White.copy(alpha = 0.5f),
-                Color.White.copy(alpha = 0.15f),
-                Color.White.copy(alpha = 0.5f),
-            ),
-            colorStops = listOf(0f, 0.5f, 1f),
-        )
-    }
-}
 private val ServerIconBackground = Color(0x33FFFFFF)
 private val FeaturedCardBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.8f)
 private val CloseBackground = Color(0x80FF4444)
-private val Color.asSelectedBackground: Color get() = copy(alpha = 0.22f)
-
-private val Scrim = Color(0xB3000000)
-private val WarnColor = Color(0xFFF5A623)
-private val DangerColor = Color(0xFFFF5A5A)
-private val SuccessColor = Color(0xFF4ADE80)
-private val TextPrimary: Color
-    @Composable get() = LocalTheme.current.textColor
-private val TextSecondary: Color
-    @Composable get() = LocalTheme.current.textColorSecondary
 
 private val PanelShape: Shape
     @Composable
     @ReadOnlyComposable
     get() = ppShape(9.dp)
-private val BorderWidth = 1.5.dp
 
 private val Outfit: FontFamily by lazy {
     runCatching {
@@ -651,7 +606,6 @@ private fun MainMenu(
     actions: MenuActions,
     servers: List<ServerData>,
     pingTick: Int,
-    assetsReady: Boolean,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -676,7 +630,6 @@ private fun MainMenu(
                     CenterColumn(
                         Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding.dp),
                         actions,
-                        assetsReady,
                     )
                 }
                 if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
@@ -688,7 +641,6 @@ private fun MainMenu(
                         servers,
                         pingTick,
                         actions,
-                        assetsReady,
                     )
                 }
                 RightColumn(
@@ -697,13 +649,11 @@ private fun MainMenu(
                         .padding(end = 50.dp)
                         .guiScaled(scale, TransformOrigin(1f, 0.5f))
                         .onSizeChanged { rightColumnHeightPx = it.height },
-                    assetsReady,
                     screen,
                 )
                 WindowControls(
                     Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
                     actions,
-                    assetsReady,
                 )
                 if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
                     ModIntegrationBar(
@@ -711,7 +661,6 @@ private fun MainMenu(
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 18.dp)
                             .guiScaled(scale, TransformOrigin(0.5f, 1f)),
-                        assetsReady,
                         screen,
                     )
                 }
@@ -720,11 +669,10 @@ private fun MainMenu(
                         .align(Alignment.TopStart)
                         .padding(start = 50.dp, top = 50.dp)
                         .guiScaled(scale, TransformOrigin(0f, 0f)),
-                    assetsReady,
                     pingTick,
                     actions,
                 )
-                Footer(Modifier.fillMaxSize(), scale, assetsReady)
+                Footer(Modifier.fillMaxSize(), scale)
             }
         }
     }
@@ -734,34 +682,34 @@ private const val BASE_WIDTH = 1240f
 private const val BASE_HEIGHT = 720f
 
 @Composable
-private fun CenterColumn(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
+private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
     Column(modifier = modifier.width(440.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        MainLogo(assetsReady)
+        MainLogo()
         Spacer(Modifier.height(16.dp))
         Box(contentAlignment = Alignment.Center) {
-            MenuText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color(0x33000000), fontFamily = if (assetsReady) Outfit else FontFamily.Default, modifier = Modifier.offset(y = 3.dp))
-            MenuText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color.White, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
+            SocialText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color(0x33000000), fontFamily = Outfit, modifier = Modifier.offset(y = 3.dp), textAlign = TextAlign.Center)
+            SocialText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color.White, fontFamily = Outfit, textAlign = TextAlign.Center)
         }
         Spacer(Modifier.height(48.dp))
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            PillButton("Singleplayer", ASSETS + "user-01.svg", Modifier.fillMaxWidth(), assetsReady, actions.singleplayer)
-            PillButton("Multiplayer", ASSETS + "users-01.svg", Modifier.fillMaxWidth(), assetsReady, actions.multiplayer)
+            PillButton("Singleplayer", ASSETS + "user-01.svg", Modifier.fillMaxWidth(), actions.singleplayer)
+            PillButton("Multiplayer", ASSETS + "users-01.svg", Modifier.fillMaxWidth(), actions.multiplayer)
             actions.realms?.let { realms ->
-                PillButton("Realms", ASSETS + "globe-01.svg", Modifier.fillMaxWidth(), assetsReady, realms)
+                PillButton("Realms", ASSETS + "globe-01.svg", Modifier.fillMaxWidth(), realms)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
-                PillButton("Settings", ASSETS + "settings-02.svg", Modifier.weight(1f), assetsReady, actions.settings)
-                PillButton("Mods", ASSETS + "settings-04.svg", Modifier.weight(1f), assetsReady, actions.mods)
+                PillButton("Settings", ASSETS + "settings-02.svg", Modifier.weight(1f), actions.settings)
+                PillButton("Mods", ASSETS + "settings-04.svg", Modifier.weight(1f), actions.mods)
             }
         }
     }
 }
 
 @Composable
-private fun MainLogo(assetsReady: Boolean) {
+private fun MainLogo() {
     Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
-        MenuIcon(ASSETS + "logo.svg", Color(0x33000000), Modifier.size(96.dp).offset(y = 3.dp), assetsReady)
-        MenuIcon(ASSETS + "logo.svg", Color.White, Modifier.size(96.dp), assetsReady)
+        Icon(ASSETS + "logo.svg", Color(0x33000000), Modifier.size(96.dp).offset(y = 3.dp))
+        Icon(ASSETS + "logo.svg", Color.White, Modifier.size(96.dp))
     }
 }
 
@@ -771,7 +719,6 @@ private fun LeftColumn(
     servers: List<ServerData>,
     pingTick: Int,
     actions: MenuActions,
-    assetsReady: Boolean,
 ) {
     var expanded by remember { mutableStateOf(true) }
     Column(modifier = modifier.width(300.dp)) {
@@ -779,7 +726,6 @@ private fun LeftColumn(
             label = "Quickplay",
             leadingIcon = ASSETS + "log-in-04.svg",
             expanded = expanded,
-            assetsReady = assetsReady,
             onClick = { expanded = !expanded },
         )
         @Suppress("UNUSED_EXPRESSION") pingTick
@@ -796,7 +742,6 @@ private fun LeftColumn(
                         subtitle = serverStatusText(server),
                         favicon = rememberFavicon(server.iconBytes),
                         fallbackPng = ASSETS + if (server.ip.contains("hypixel", true)) "hypixel.png" else "server.png",
-                        assetsReady = assetsReady,
                         onClick = { actions.connect(server) },
                     )
                 }
@@ -814,7 +759,7 @@ private fun serverStatusText(server: ServerData): String {
 }
 
 @Composable
-private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen) {
+private fun RightColumn(modifier: Modifier, screen: Screen) {
     Column(
         modifier = modifier.width(300.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -828,28 +773,26 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen
         val previewScale = if (hasHeadCosmetic) 0.82f else 1.05f
         val previewFadeStart = if (hasHeadCosmetic) 0.784f else 0.72243f
         Box(modifier = Modifier.fillMaxWidth().height(previewHeight)) {
-            if (assetsReady) {
-                PlayerPreview(
-                    Modifier.fillMaxWidth().height(previewHeight),
-                    source = PlayerPreviewSource.LocalLive,
-                    bottomFade = Brush.verticalGradient(
-                        previewFadeStart to PreviewGradient.copy(alpha = 0f),
-                        1f to PreviewGradient.copy(alpha = 0.84f),
-                    ),
-                    modelScale = previewScale,
-                    verticalAnchor = 1.0f,
-                    initialYaw = 180f + 22.9f,
-                    live = true,
-                    bottomFadeFraction = 1f - previewFadeStart,
-                )
-            }
+            PlayerPreview(
+                Modifier.fillMaxWidth().height(previewHeight),
+                source = PlayerPreviewSource.LocalLive,
+                bottomFade = Brush.verticalGradient(
+                    previewFadeStart to PreviewGradient.copy(alpha = 0f),
+                    1f to PreviewGradient.copy(alpha = 0.84f),
+                ),
+                modelScale = previewScale,
+                verticalAnchor = 1.0f,
+                initialYaw = 180f + 22.9f,
+                live = true,
+                bottomFadeFraction = 1f - previewFadeStart,
+            )
         }
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
-            AccountPill(name = playerName(), assetsReady = assetsReady)
+            AccountPill(name = playerName())
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld && PrivacyConsent.allowsOnlineServices()) {
-            HostWorldButton(assetsReady, screen)
+            HostWorldButton(screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuSocial && PrivacyConsent.allowsOnlineServices()) {
             val groups by GroupsRepository.groups.collectAsState()
@@ -857,7 +800,6 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen
                 "Social",
                 ASSETS + "message-chat-circle.svg",
                 Modifier.fillMaxWidth(),
-                assetsReady,
                 onClick = { SocialOverlay.open(screen) },
                 badge = groups.any { it.unread },
             )
@@ -867,7 +809,6 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen
                 "Cosmetics",
                 ASSETS + "diamond-01.svg",
                 Modifier.fillMaxWidth(),
-                assetsReady,
                 onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
             )
         }
@@ -875,7 +816,7 @@ private fun RightColumn(modifier: Modifier, assetsReady: Boolean, screen: Screen
 }
 
 @Composable
-private fun HostWorldButton(assetsReady: Boolean, screen: Screen) {
+private fun HostWorldButton(screen: Screen) {
     var showFlow by remember { mutableStateOf(false) }
     var hostingCurrentWorld by remember { mutableStateOf(false) }
     val friends by FriendsRepository.friends.collectAsState()
@@ -889,7 +830,6 @@ private fun HostWorldButton(assetsReady: Boolean, screen: Screen) {
             label = "Host World",
             icon = ASSETS + "log-in-04.svg",
             modifier = Modifier.fillMaxWidth(),
-            assetsReady = assetsReady,
             onClick = {
                 hostingCurrentWorld = Minecraft.getInstance().singleplayerServer != null
                 FriendsRepository.refreshAll()
@@ -913,7 +853,6 @@ private fun HostWorldButton(assetsReady: Boolean, screen: Screen) {
 @Composable
 private fun ModIntegrationBar(
     modifier: Modifier,
-    assetsReady: Boolean,
     screen: Screen,
 ) {
     val buttons = ModIntegrationButtons.available()
@@ -922,7 +861,6 @@ private fun ModIntegrationBar(
         buttons.forEach { button ->
             IconButton(
                 icon = button.icon,
-                assetsReady = assetsReady,
                 tooltip = button.tooltip,
                 tooltipPlacement = TooltipPlacement.ABOVE_CENTER,
                 onClick = { button.onClick(screen) },
@@ -932,23 +870,22 @@ private fun ModIntegrationBar(
 }
 
 @Composable
-private fun WindowControls(modifier: Modifier, actions: MenuActions, assetsReady: Boolean) {
+private fun WindowControls(modifier: Modifier, actions: MenuActions) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        VanillaMenuButton(assetsReady)
-        ThemeToggleButton(assetsReady)
-        NotificationBell(assetsReady = assetsReady)
+        VanillaMenuButton()
+        ThemeToggleButton()
+        NotificationBell()
         if (!ClientPlatform.isMac) {
-            IconButton(ASSETS + "maximize-02.svg", assetsReady = assetsReady, tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
+            IconButton(ASSETS + "maximize-02.svg", tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
         }
-        IconButton(ASSETS + "x-close.svg", background = CloseBackground, assetsReady = assetsReady, tooltip = "Quit game", onClick = actions.quit)
+        IconButton(ASSETS + "x-close.svg", background = CloseBackground, tooltip = "Quit game", onClick = actions.quit)
     }
 }
 
 @Composable
-private fun VanillaMenuButton(assetsReady: Boolean) {
+private fun VanillaMenuButton() {
     IconButton(
         icon = ASSETS + "minecraft-block.svg",
-        assetsReady = assetsReady,
         tooltip = "Switch to vanilla main menu",
         onClick = {
             PolyPlusMainMenuConfig.useVanillaMainMenu = true
@@ -964,13 +901,12 @@ private fun VanillaMenuButton(assetsReady: Boolean) {
 }
 
 @Composable
-private fun ThemeToggleButton(assetsReady: Boolean) {
+private fun ThemeToggleButton() {
     val themeName = LocalTheme.current.name
     val light = themeName == PolyGlassLight.name || themeName == MinecraftLight.name
     val minecraftStyle = themeName == MinecraftDark.name || themeName == MinecraftLight.name
     IconButton(
         icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
-        assetsReady = assetsReady,
         tooltip = if (light) "Switch to dark theme" else "Switch to light theme",
         onClick = {
             PolyPlusConfig.onboardingLightTheme = !light
@@ -981,7 +917,7 @@ private fun ThemeToggleButton(assetsReady: Boolean) {
 }
 
 @Composable
-private fun FeaturedServerCard(modifier: Modifier, assetsReady: Boolean, pingTick: Int, actions: MenuActions) {
+private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuActions) {
     val snapshot by FeaturedServers.state.collectAsState()
     val server = MainMenuFeaturedServer.current(snapshot) ?: return
     val campaign = server.featured ?: return
@@ -998,22 +934,22 @@ private fun FeaturedServerCard(modifier: Modifier, assetsReady: Boolean, pingTic
             .width(300.dp)
             .clip(PanelShape)
             .background(FeaturedCardBackground)
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            CardText("SPONSORED", 11.sp, TextSecondary, FontWeight.Medium, letterSpacing = 0.8.sp)
+            SocialText("SPONSORED", 11.sp, color = SocialTextSecondary, fontWeight = FontWeight.Medium, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             if (MainMenuFeaturedServer.isDismissible(server)) {
-                DismissButton(assetsReady) { MainMenuFeaturedServer.dismiss(server) }
+                DismissButton { MainMenuFeaturedServer.dismiss(server) }
             }
         }
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CardThumbnail(catalogIcon ?: favicon, assetsReady)
+            CardThumbnail(catalogIcon ?: favicon)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                CardText(campaign.title, 16.sp)
-                CardText(campaign.description, 13.sp, TextSecondary, maxLines = 2)
+                SocialText(campaign.title, 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                SocialText(campaign.description, 13.sp, color = SocialTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         CallToActionButton(campaign.ctaLabel) { actions.connect(data) }
@@ -1021,7 +957,7 @@ private fun FeaturedServerCard(modifier: Modifier, assetsReady: Boolean, pingTic
 }
 
 @Composable
-private fun CardThumbnail(image: ImageBitmap?, assetsReady: Boolean) {
+private fun CardThumbnail(image: ImageBitmap?) {
     val modifier = Modifier.size(42.dp).clip(ppShape(6.dp))
     if (image != null) {
         Image(
@@ -1032,40 +968,15 @@ private fun CardThumbnail(image: ImageBitmap?, assetsReady: Boolean) {
             filterQuality = FilterQuality.Medium,
         )
     } else {
-        RasterImage(ASSETS + "server.png", modifier, assetsReady = assetsReady, contentScale = ContentScale.Crop)
+        RasterImage(ASSETS + "server.png", modifier, contentScale = ContentScale.Crop)
     }
 }
 
 @Composable
-private fun CardText(
-    text: String,
-    fontSize: TextUnit,
-    color: Color = TextPrimary,
-    fontWeight: FontWeight = FontWeight.Normal,
-    maxLines: Int = 1,
-    letterSpacing: TextUnit = TextUnit.Unspecified,
-) {
-    BasicText(
-        text = text,
-        maxLines = maxLines,
-        softWrap = maxLines != 1,
-        overflow = TextOverflow.Ellipsis,
-        style = TextStyle(
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            letterSpacing = letterSpacing,
-            fontFamily = LocalTheme.current.typography.family,
-            textAlign = TextAlign.Start,
-        ),
-    )
-}
-
-@Composable
-private fun DismissButton(assetsReady: Boolean, onClick: () -> Unit) {
+private fun DismissButton(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val color = if (hovered) TextPrimary else TextSecondary
+    val color = if (hovered) SocialTextPrimary else SocialTextSecondary
     Row(
         modifier = Modifier
             .clip(ppShape(4.dp))
@@ -1074,8 +985,8 @@ private fun DismissButton(assetsReady: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        CardText("Dismiss", 11.sp, color)
-        MenuIcon(ASSETS + "x-close.svg", color, Modifier.size(11.dp), assetsReady)
+        SocialText("Dismiss", 11.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(ASSETS + "x-close.svg", color, Modifier.size(11.dp))
     }
 }
 
@@ -1087,16 +998,16 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
             .height(34.dp)
             .clip(ppShape(6.dp))
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorderBrush, ppShape(6.dp))
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ppShape(6.dp))
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        MenuText(label, fontSize = 15.sp, color = TextPrimary, maxLines = 1)
+        SocialText(label, fontSize = 15.sp, color = SocialTextPrimary, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
+private fun Footer(modifier: Modifier, guiScale: Float) {
     Box(modifier) {
         Row(
             modifier = Modifier
@@ -1106,30 +1017,31 @@ private fun Footer(modifier: Modifier, guiScale: Float, assetsReady: Boolean) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MenuIcon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp), assetsReady)
-            FooterBrandText(platformLabel(), assetsReady)
+            Icon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp))
+            FooterBrandText(platformLabel())
         }
-        MenuText(
+        SocialText(
             "Copyright Mojang AB. Do not distribute!",
             fontSize = 13.sp,
-            color = TextSecondary,
+            color = SocialTextSecondary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 24.dp, bottom = 18.dp)
                 .guiScaled(guiScale, TransformOrigin(1f, 1f)),
+            textAlign = TextAlign.Center,
         )
     }
 }
 
 @Composable
-private fun FooterBrandText(platform: String, assetsReady: Boolean) {
+private fun FooterBrandText(platform: String) {
     val bodyFont = LocalTheme.current.typography.family
     val primary = Color.White
-    val secondary = TextSecondary
+    val secondary = SocialTextSecondary
 
     BasicText(
         text = buildAnnotatedString {
-            withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold, fontFamily = if (assetsReady) Outfit else FontFamily.Default)) {
+            withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold, fontFamily = Outfit)) {
                 append("ONECLIENT")
             }
             withStyle(SpanStyle(color = secondary, fontFamily = bodyFont)) {
@@ -1146,7 +1058,7 @@ private fun FooterBrandText(platform: String, assetsReady: Boolean) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, assetsReady: Boolean, onClick: () -> Unit = {}, borderBrush: Brush = PanelBorderBrush, badge: Boolean = false) {
+private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, borderBrush: Brush = SocialPanelBorderBrush, badge: Boolean = false) {
     Box(modifier) {
         Row(
             modifier = Modifier
@@ -1154,14 +1066,14 @@ private fun PillButton(label: String, icon: String, modifier: Modifier = Modifie
                 .height(45.dp)
                 .clip(PanelShape)
                 .background(PanelBackground)
-                .border(BorderWidth, borderBrush, PanelShape)
+                .border(SocialPanelBorderWidth, borderBrush, PanelShape)
                 .clickableWithSound(onClick)
                 .padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
-            MenuText(label, fontSize = 16.sp)
+            Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
+            SocialText(label, fontSize = 16.sp, textAlign = TextAlign.Center)
         }
         if (badge) {
             Box(
@@ -1176,26 +1088,25 @@ private fun PillButton(label: String, icon: String, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, assetsReady: Boolean, onClick: () -> Unit) {
+private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(45.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
-        MenuIcon(leadingIcon, TextPrimary, Modifier.align(Alignment.CenterStart).size(20.dp), assetsReady)
-        MenuText(label, fontSize = 16.sp)
-        MenuIcon(
+        Icon(leadingIcon, SocialTextPrimary, Modifier.align(Alignment.CenterStart).size(20.dp))
+        SocialText(label, fontSize = 16.sp, textAlign = TextAlign.Center)
+        Icon(
             ASSETS + "chevron-up.svg",
-            TextPrimary,
+            SocialTextPrimary,
             Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronAngle),
-            assetsReady,
         )
     }
 }
@@ -1206,7 +1117,6 @@ private fun ServerRow(
     subtitle: String,
     favicon: ImageBitmap?,
     fallbackPng: String,
-    assetsReady: Boolean,
     onClick: () -> Unit = {},
 ) {
     Row(
@@ -1215,7 +1125,7 @@ private fun ServerRow(
             .height(64.dp)
             .clip(PanelShape)
             .background(PanelBackground)
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1225,18 +1135,18 @@ private fun ServerRow(
         if (favicon != null) {
             Image(favicon, contentDescription = null, modifier = iconModifier, contentScale = ContentScale.Crop)
         } else {
-            RasterImage(fallbackPng, iconModifier, assetsReady = assetsReady, contentScale = ContentScale.Crop)
+            RasterImage(fallbackPng, iconModifier, contentScale = ContentScale.Crop)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            MenuText(title, fontSize = 16.sp)
-            MenuText(subtitle, fontSize = 13.sp, color = TextSecondary)
+            SocialText(title, fontSize = 16.sp, textAlign = TextAlign.Center)
+            SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
         }
-        MenuIcon(ASSETS + "chevron-right.svg", TextSecondary, Modifier.size(20.dp), assetsReady)
+        Icon(ASSETS + "chevron-right.svg", SocialTextSecondary, Modifier.size(20.dp))
     }
 }
 
 @Composable
-private fun AccountPill(name: String, assetsReady: Boolean) {
+private fun AccountPill(name: String) {
     val scope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
     var accounts by remember { mutableStateOf<List<OneLauncherAccounts.Account>?>(null) }
@@ -1374,7 +1284,7 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                 .height(45.dp)
                 .clip(PanelShape)
                 .background(PanelBackground)
-                .border(BorderWidth, PanelBorderBrush, PanelShape)
+                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .clickableWithSound { open = !open }
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center,
@@ -1384,14 +1294,13 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
             if (currentHead != null) {
                 Image(currentHead, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)
             } else {
-                RasterImage(ASSETS + "avatar.png", avatarModifier, assetsReady = assetsReady, contentScale = ContentScale.Crop)
+                RasterImage(ASSETS + "avatar.png", avatarModifier, contentScale = ContentScale.Crop)
             }
-            MenuText(activeName, fontSize = 16.sp)
-            MenuIcon(
+            SocialText(activeName, fontSize = 16.sp, textAlign = TextAlign.Center)
+            Icon(
                 ASSETS + "chevron-up.svg",
-                TextPrimary,
+                SocialTextPrimary,
                 Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronRotation),
-                assetsReady,
             )
         }
         if (open) {
@@ -1425,7 +1334,6 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                     panelWidth = with(LocalDensity.current) { pillSize.width.toDp() },
                     scale = totalScale,
                     accounts = accounts,
-                    assetsReady = assetsReady,
                     busy = busy,
                     error = error,
                     errorSteps = errorSteps,
@@ -1446,7 +1354,6 @@ private fun AccountPill(name: String, assetsReady: Boolean) {
                 verificationUri = session.verificationUri,
                 browserAuthUrl = session.browserAuthUrl,
                 status = busy,
-                assetsReady = assetsReady,
                 onCancel = onCancelLogin,
             )
         }
@@ -1458,7 +1365,6 @@ private fun AccountSwitcherPanel(
     panelWidth: Dp,
     scale: Float,
     accounts: List<OneLauncherAccounts.Account>?,
-    assetsReady: Boolean,
     busy: String?,
     error: String?,
     errorSteps: List<String>?,
@@ -1483,30 +1389,33 @@ private fun AccountSwitcherPanel(
             }
             .clip(PanelShape)
             .background(PageBackground.copy(alpha = 0.96f))
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        MenuText(
+        SocialText(
             "Accounts",
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.align(Alignment.Start),
+            textAlign = TextAlign.Center,
         )
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PanelBorderBrush))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SocialPanelBorderBrush))
 
         when {
-            accounts == null -> MenuText(
+            accounts == null -> SocialText(
                 "Loading…",
                 fontSize = 13.sp,
-                color = TextSecondary,
+                color = SocialTextSecondary,
                 modifier = Modifier.align(Alignment.Start),
+                textAlign = TextAlign.Center,
             )
-            accounts.isEmpty() -> MenuText(
+            accounts.isEmpty() -> SocialText(
                 "No accounts found in the launcher",
                 fontSize = 13.sp,
-                color = TextSecondary,
+                color = SocialTextSecondary,
                 modifier = Modifier.align(Alignment.Start),
+                textAlign = TextAlign.Center,
             )
             else -> Column(
                 modifier = Modifier
@@ -1518,7 +1427,6 @@ private fun AccountSwitcherPanel(
                 accounts.forEach { account ->
                     AccountRow(
                         account = account,
-                        assetsReady = assetsReady,
                         enabled = idle,
                         onClick = { onSwitch(account) },
                         onRemove = { onRemove(account) },
@@ -1528,7 +1436,7 @@ private fun AccountSwitcherPanel(
             }
         }
 
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PanelBorderBrush))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SocialPanelBorderBrush))
 
         if (offlineEntry) {
             OfflineAccountEntry(
@@ -1544,42 +1452,41 @@ private fun AccountSwitcherPanel(
                 icon = ASSETS + "log-in-04.svg",
                 text = "Add Microsoft account",
                 enabled = idle,
-                assetsReady = assetsReady,
                 onClick = onAddMicrosoft,
             )
             AddAccountButton(
                 icon = ASSETS + "user-01.svg",
                 text = "Add offline account",
                 enabled = idle,
-                assetsReady = assetsReady,
                 onClick = { offlineEntry = true },
             )
         }
 
         if (busy != null) {
-            MenuText(busy, fontSize = 12.sp, color = TextSecondary, modifier = Modifier.align(Alignment.Start))
+            SocialText(busy, fontSize = 12.sp, color = SocialTextSecondary, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
         }
         if (error != null) {
-            MenuText(error, fontSize = 12.sp, color = DangerColor, modifier = Modifier.align(Alignment.Start))
+            SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
         }
         if (!errorSteps.isNullOrEmpty()) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                MenuText(
+                SocialText(
                     "What you can do:",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.align(Alignment.Start),
+                    textAlign = TextAlign.Center,
                 )
                 errorSteps.forEach { step ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        MenuText("•", fontSize = 12.sp, color = TextSecondary)
-                        MenuText(step, fontSize = 12.sp, color = TextSecondary)
+                        SocialText("•", fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
+                        SocialText(step, fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -1590,7 +1497,6 @@ private fun AccountSwitcherPanel(
 @Composable
 private fun AccountRow(
     account: OneLauncherAccounts.Account,
-    assetsReady: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
@@ -1617,14 +1523,15 @@ private fun AccountRow(
         if (head != null) {
             Image(head, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)
         } else {
-            RasterImage(ASSETS + "avatar.png", avatarModifier, assetsReady = assetsReady, contentScale = ContentScale.Crop)
+            RasterImage(ASSETS + "avatar.png", avatarModifier, contentScale = ContentScale.Crop)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            MenuText(
+            SocialText(
                 account.username,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.Start),
+                textAlign = TextAlign.Center,
             )
             val subtitle = when {
                 confirmRemove -> "Remove this account?"
@@ -1633,32 +1540,33 @@ private fun AccountRow(
                 account.microsoft -> "Microsoft"
                 else -> "Offline"
             }
-            MenuText(
+            SocialText(
                 subtitle,
                 fontSize = 11.sp,
                 color = when {
-                    confirmRemove -> DangerColor
-                    account.expired -> WarnColor
-                    else -> TextSecondary
+                    confirmRemove -> SocialDangerColor
+                    account.expired -> SocialWarnColor
+                    else -> SocialTextSecondary
                 },
                 modifier = Modifier.align(Alignment.Start),
+                textAlign = TextAlign.Center,
             )
         }
         if (confirmRemove) {
-            AccountActionIcon(ASSETS + "check-circle.svg", DangerColor, enabled) {
+            AccountActionIcon(ASSETS + "check-circle.svg", SocialDangerColor, enabled) {
                 confirmRemove = false
                 onRemove()
             }
-            AccountActionIcon(ASSETS + "x-close.svg", TextSecondary, enabled) { confirmRemove = false }
+            AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
         } else {
             if (account.active) {
-                MenuIcon(ASSETS + "check-circle.svg", SuccessColor, Modifier.size(18.dp), assetsReady)
+                Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
             }
             if (account.expired) {
-                AccountActionIcon(ASSETS + "refresh-cw-01.svg", WarnColor, enabled, onRefresh)
+                AccountActionIcon(ASSETS + "refresh-cw-01.svg", SocialWarnColor, enabled, onRefresh)
             }
             if (hovered) {
-                AccountActionIcon(ASSETS + "trash-01.svg", TextSecondary, enabled) { confirmRemove = true }
+                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
             }
         }
     }
@@ -1669,7 +1577,6 @@ private fun AddAccountButton(
     icon: String,
     text: String,
     enabled: Boolean,
-    assetsReady: Boolean,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -1686,8 +1593,8 @@ private fun AddAccountButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        MenuIcon(icon, TextPrimary, Modifier.size(18.dp), assetsReady)
-        MenuText(text, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically))
+        Icon(icon, SocialTextPrimary, Modifier.size(18.dp))
+        SocialText(text, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically), textAlign = TextAlign.Center)
     }
 }
 
@@ -1712,7 +1619,7 @@ private fun OfflineAccountEntry(
                 .height(34.dp)
                 .clip(ppShape(6.dp))
                 .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
-                .border(BorderWidth, PanelBorderBrush, ppShape(6.dp))
+                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ppShape(6.dp))
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -1722,20 +1629,20 @@ private fun OfflineAccountEntry(
                 modifier = Modifier.trackTextInputFocus(),
                 singleLine = true,
                 enabled = enabled,
-                textStyle = TextStyle(color = TextPrimary, fontSize = 13.sp, fontFamily = bodyFont),
+                textStyle = TextStyle(color = SocialTextPrimary, fontSize = 13.sp, fontFamily = bodyFont),
                 cursorBrush = SolidColor(Accent),
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
-                        MenuText("Username", fontSize = 13.sp, color = TextSecondary)
+                        SocialText("Username", fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
                     }
                     inner()
                 },
             )
         }
-        AccountActionIcon(ASSETS + "check-circle.svg", SuccessColor, enabled && valid) {
+        AccountActionIcon(ASSETS + "check-circle.svg", SocialSuccessColor, enabled && valid) {
             if (valid) onSubmit(value.trim())
         }
-        AccountActionIcon(ASSETS + "x-close.svg", TextSecondary, enabled, onCancel)
+        AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled, onCancel)
     }
 }
 
@@ -1745,106 +1652,92 @@ private fun MicrosoftLoginPopup(
     verificationUri: String,
     browserAuthUrl: String,
     status: String?,
-    assetsReady: Boolean,
     onCancel: () -> Unit,
 ) {
     DisposableEffect(Unit) {
         PlayerPreviewSuppression.push()
         onDispose { PlayerPreviewSuppression.pop() }
     }
-    Popup(
-        alignment = Alignment.Center,
-        onDismissRequest = onCancel,
-        properties = PopupProperties(focusable = true),
-    ) {
-        Box(
+    SocialModalScrim(onCancel) {
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Scrim)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onCancel() },
-            contentAlignment = Alignment.Center,
+                .width(380.dp)
+                .clip(PanelShape)
+                .background(PageBackground.copy(alpha = 0.96f))
+                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
+                .swallowClicks()
+                .padding(horizontal = 22.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Column(
+            SocialText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
+            SocialText(
+                "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
+                fontSize = 13.sp,
+                color = SocialTextSecondary,
+                textAlign = TextAlign.Center,
+            )
+            LoginModalButton(
+                label = "Open in browser again",
+                icon = ASSETS + "link-external-01.svg",
+                filled = true,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { ClientPlatform.openUri(browserAuthUrl) },
+            )
+            OrDivider()
+            SocialText(
+                "Or enter this code at the Microsoft sign-in page:",
+                fontSize = 13.sp,
+                color = SocialTextSecondary,
+                textAlign = TextAlign.Center,
+            )
+            Box(
                 modifier = Modifier
-                    .width(380.dp)
-                    .clip(PanelShape)
-                    .background(PageBackground.copy(alpha = 0.96f))
-                    .border(BorderWidth, PanelBorderBrush, PanelShape)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
-                    .padding(horizontal = 22.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .fillMaxWidth()
+                    .clip(ppShape(8.dp))
+                    .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
+                    .border(SocialPanelBorderWidth, Accent, ppShape(8.dp))
+                    .padding(vertical = 20.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                MenuText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
-                MenuText(
-                    "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
+                SocialText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontFamily = Outfit, textAlign = TextAlign.Center)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LoginModalButton(
+                    label = "Copy code",
+                    icon = ASSETS + "copy-01.svg",
+                    filled = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        runCatching {
+                            Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                        }
+                    },
                 )
                 LoginModalButton(
-                    label = "Open in browser again",
+                    label = "Open in browser",
                     icon = ASSETS + "link-external-01.svg",
                     filled = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    assetsReady = assetsReady,
-                    onClick = { ClientPlatform.openUri(browserAuthUrl) },
+                    modifier = Modifier.weight(1f),
+                    onClick = { ClientPlatform.openUri(verificationUri) },
                 )
-                OrDivider()
-                MenuText(
-                    "Or enter this code at the Microsoft sign-in page:",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(ppShape(8.dp))
-                        .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
-                        .border(BorderWidth, Accent, ppShape(8.dp))
-                        .padding(vertical = 20.dp),
-                    contentAlignment = Alignment.Center,
+            }
+            if (status != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MenuText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontFamily = if (assetsReady) Outfit else FontFamily.Default)
+                    LoadingSpinner(Modifier.size(14.dp))
+                    SocialText(status, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    LoginModalButton(
-                        label = "Copy code",
-                        icon = ASSETS + "copy-01.svg",
-                        filled = false,
-                        modifier = Modifier.weight(1f),
-                        assetsReady = assetsReady,
-                        onClick = {
-                            runCatching {
-                                Minecraft.getInstance().keyboardHandler.setClipboard(code)
-                            }
-                        },
-                    )
-                    LoginModalButton(
-                        label = "Open in browser",
-                        icon = ASSETS + "link-external-01.svg",
-                        filled = true,
-                        modifier = Modifier.weight(1f),
-                        assetsReady = assetsReady,
-                        onClick = { ClientPlatform.openUri(verificationUri) },
-                    )
-                }
-                if (status != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        LoadingSpinner(Modifier.size(14.dp))
-                        MenuText(status, fontSize = 13.sp, color = TextSecondary)
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(ppShape(6.dp))
-                        .clickableWithSound(onCancel)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                ) {
-                    MenuText("Cancel", fontSize = 14.sp, color = TextPrimary)
-                }
+            }
+            Box(
+                modifier = Modifier
+                    .clip(ppShape(6.dp))
+                    .clickableWithSound(onCancel)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                SocialText("Cancel", fontSize = 14.sp, color = SocialTextPrimary, textAlign = TextAlign.Center)
             }
         }
     }
@@ -1856,23 +1749,22 @@ private fun LoginModalButton(
     icon: String,
     filled: Boolean,
     modifier: Modifier = Modifier,
-    assetsReady: Boolean,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (filled) Color.White else TextPrimary
+    val contentColor = if (filled) Color.White else SocialTextPrimary
     Row(
         modifier = modifier
             .height(44.dp)
             .clip(PanelShape)
             .background(if (filled) Accent else PanelBackground)
-            .border(BorderWidth, if (filled) SolidColor(Accent) else PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, if (filled) SolidColor(Accent) else SocialPanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MenuIcon(icon, contentColor, Modifier.size(16.dp), assetsReady)
-        MenuText(label, fontSize = 14.sp, color = contentColor, maxLines = 1)
+        Icon(icon, contentColor, Modifier.size(16.dp))
+        SocialText(label, fontSize = 14.sp, color = contentColor, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
 
@@ -1883,78 +1775,15 @@ private fun OrDivider() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.weight(1f).height(1.dp).background(PanelBorderBrush))
-        MenuText("or", fontSize = 12.sp, color = TextSecondary)
-        Box(Modifier.weight(1f).height(1.dp).background(PanelBorderBrush))
+        Box(Modifier.weight(1f).height(1.dp).background(SocialPanelBorderBrush))
+        SocialText("or", fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
+        Box(Modifier.weight(1f).height(1.dp).background(SocialPanelBorderBrush))
     }
 }
 
 @Composable
 private fun LoadingSpinner(modifier: Modifier) {
-    MenuIcon(ASSETS + "loading-02.svg", Accent, modifier, assetsReady = true)
-}
-
-@Composable
-private fun DeviceCodeCard(
-    code: String,
-    verificationUri: String,
-    assetsReady: Boolean,
-    onCancel: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        MenuText(
-            "We opened Microsoft sign-in in your browser. Finish there, or enter this code instead:",
-            fontSize = 12.sp,
-            color = TextSecondary,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(ppShape(8.dp))
-                .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
-                .border(BorderWidth, Accent, ppShape(8.dp))
-                .padding(vertical = 14.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            MenuText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-        }
-        MenuText(verificationUri, fontSize = 11.sp, color = TextSecondary)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AddAccountButton(
-                icon = ASSETS + "copy-01.svg",
-                text = "Copy code",
-                enabled = true,
-                assetsReady = assetsReady,
-                onClick = {
-                    runCatching {
-                        Minecraft.getInstance().keyboardHandler.setClipboard(code)
-                    }
-                },
-            )
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AddAccountButton(
-                icon = ASSETS + "link-external-01.svg",
-                text = "Open in browser",
-                enabled = true,
-                assetsReady = assetsReady,
-                onClick = { ClientPlatform.openUri(verificationUri) },
-            )
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AddAccountButton(
-                icon = ASSETS + "x-close.svg",
-                text = "Cancel",
-                enabled = true,
-                assetsReady = assetsReady,
-                onClick = onCancel,
-            )
-        }
-    }
+    Icon(ASSETS + "loading-02.svg", Accent, modifier)
 }
 
 @Composable
@@ -1967,7 +1796,7 @@ private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onCl
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        MenuIcon(icon, color, Modifier.size(18.dp), assetsReady = true)
+        Icon(icon, color, Modifier.size(18.dp))
     }
 }
 
@@ -1977,7 +1806,6 @@ private enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
 private fun IconButton(
     icon: String,
     background: Color = PanelBackground,
-    assetsReady: Boolean,
     modifier: Modifier = Modifier,
     tooltip: String? = null,
     tooltipPlacement: TooltipPlacement = TooltipPlacement.BELOW_END,
@@ -1994,12 +1822,12 @@ private fun IconButton(
             .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
             .clip(PanelShape)
             .background(background)
-            .border(BorderWidth, PanelBorderBrush, PanelShape)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .hoverable(interaction)
             .clickableWithSound(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        MenuIcon(icon, TextPrimary, Modifier.size(20.dp), assetsReady)
+        Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
         if (tooltip != null && hovered && buttonSize.width > 0) {
             val totalScale = buttonBounds.width / buttonSize.width
             val positionProvider = remember(buttonBounds, totalScale, tooltipPlacement) {
@@ -2046,22 +1874,21 @@ private fun TooltipBubble(text: String) {
         modifier = Modifier
             .clip(PanelShape)
             .background(LocalTheme.current.popupBackground)
-            .border(BorderWidth, LocalTheme.current.borderColor, PanelShape)
+            .border(SocialPanelBorderWidth, LocalTheme.current.borderColor, PanelShape)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        MenuText(text, fontSize = 13.sp, maxLines = 1)
+        SocialText(text, fontSize = 13.sp, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun NotificationBell(assetsReady: Boolean) {
+private fun NotificationBell() {
     var expanded by remember { mutableStateOf(false) }
     var bellSize by remember { mutableStateOf(IntSize.Zero) }
     Box {
         IconButton(
             ASSETS + "bell-01.svg",
-            assetsReady = assetsReady,
             modifier = Modifier.onSizeChanged { bellSize = it },
             tooltip = if (expanded) null else "Notifications",
             onClick = { expanded = !expanded },
@@ -2084,50 +1911,13 @@ private fun NotificationBell(assetsReady: Boolean) {
 }
 
 @Composable
-private fun MenuText(
-    text: String,
-    fontSize: TextUnit,
-    modifier: Modifier = Modifier,
-    color: Color = TextPrimary,
-    fontWeight: FontWeight = FontWeight.Normal,
-    letterSpacing: TextUnit = TextUnit.Unspecified,
-    fontFamily: FontFamily = LocalTheme.current.typography.family,
-    maxLines: Int = Int.MAX_VALUE,
-) {
-    BasicText(
-        text = text,
-        modifier = modifier,
-        maxLines = maxLines,
-        softWrap = maxLines != 1,
-        style = TextStyle(
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            letterSpacing = letterSpacing,
-            fontFamily = fontFamily,
-            textAlign = TextAlign.Center,
-        ),
-    )
-}
-
-@Composable
-private fun MenuIcon(path: String, color: Color, modifier: Modifier, assetsReady: Boolean) {
-    if (assetsReady) {
-        Icon(path, color, modifier)
-    } else {
-        Spacer(modifier)
-    }
-}
-
-@Composable
 private fun RasterImage(
     path: String,
     modifier: Modifier,
-    assetsReady: Boolean,
     contentScale: ContentScale = ContentScale.Fit,
     alignment: Alignment = Alignment.Center,
 ) {
-    val bitmap = if (assetsReady) rememberRaster(path) else null
+    val bitmap = rememberRaster(path)
     if (bitmap != null) {
         Image(bitmap, contentDescription = null, modifier = modifier, alignment = alignment, contentScale = contentScale)
     } else {
@@ -2142,9 +1932,8 @@ private fun rememberFavicon(bytes: ByteArray?): ImageBitmap? = remember(bytes) {
 }
 
 @Composable
-private fun rememberRaster(path: String): ImageBitmap? = remember(path) {
-    MainMenuRasterAssets.cached(path)
-}
+private fun rememberRaster(path: String): ImageBitmap? =
+    if (MainMenuRasterAssets.ready) MainMenuRasterAssets.cached(path) else null
 
 private fun playerName(): String = runCatching {
     Minecraft.getInstance().user.name

@@ -10,16 +10,6 @@ data class EquippedCosmetics(
         get() = equipped[BodySlot.Cape]
 
     fun ids(): List<Int> = equipped.values.toList()
-
-    fun with(slot: BodySlot, cosmeticId: Int?): EquippedCosmetics {
-        val next = equipped.toMutableMap()
-        if (cosmeticId == null) {
-            next.remove(slot)
-        } else {
-            next[slot] = cosmeticId
-        }
-        return EquippedCosmetics(next)
-    }
 }
 
 @Serializable

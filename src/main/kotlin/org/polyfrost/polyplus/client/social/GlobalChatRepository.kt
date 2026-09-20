@@ -7,13 +7,12 @@ import org.polyfrost.polyplus.client.network.http.GlobalChatApi
 import org.polyfrost.polyplus.client.network.http.responses.GlobalChatMessage
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-object GlobalChatRepository : EarlyInitializable {
+object GlobalChatRepository {
     private val LOGGER = LogManager.getLogger()
 
     private const val MAX_CACHED_MESSAGES = 500
@@ -21,7 +20,7 @@ object GlobalChatRepository : EarlyInitializable {
     private val _messages = MutableStateFlow<List<GlobalChatMessage>>(emptyList())
     val messages = _messages.asStateFlow()
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             val packet = event.packet as? ClientboundPacket.GlobalChatMessageReceived ?: return@eventHandler
             append(

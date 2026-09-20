@@ -36,13 +36,6 @@ object EmojiRecents {
 
     @JvmStatic
     @Synchronized
-    fun aliases(): List<String> {
-        ensureLoaded()
-        return recents.toList()
-    }
-
-    @JvmStatic
-    @Synchronized
     fun entries(): List<EmojiRegistry.EmojiEntry> {
         ensureLoaded()
         val byGlyph = EmojiRegistry.catalog.associateBy { it.glyph }

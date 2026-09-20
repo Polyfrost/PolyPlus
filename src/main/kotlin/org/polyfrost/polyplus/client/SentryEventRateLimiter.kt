@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client
 
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 
 internal class SentryEventRateLimiter(
     private val stateFile: File,
@@ -65,7 +66,7 @@ internal class SentryEventRateLimiter(
 
     private fun digest(key: String): String {
         val hash = MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
-        return hash.take(DIGEST_BYTES).joinToString("") { "%02x".format(it) }
+        return HexFormat.of().formatHex(hash, 0, DIGEST_BYTES)
     }
 
     private companion object {

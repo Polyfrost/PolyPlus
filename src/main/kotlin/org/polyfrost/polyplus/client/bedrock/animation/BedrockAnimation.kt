@@ -16,8 +16,6 @@ data class BedrockAnimation(
     val initialize: List<MolangStatement> = emptyList(),
     val preAnimation: List<MolangStatement> = emptyList(),
     val boneAnimations: Map<String, BoneAnimation>,
-    val bonePivots: Map<String, Vector3f>,
-    val boneParents: Map<String, String>,
 )
 
 enum class LoopMode {

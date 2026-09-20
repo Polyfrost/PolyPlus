@@ -223,10 +223,10 @@ class OnboardingFeaturesTest {
     fun `overlay tweaks legacy config handler remains supported`() {
         LegacyOverlayHandler.saved = false
 
-        val access = OnboardingFeatures.overlayTweaksAccess(LegacyOverlayConfig::class.java)
+        val (instance, save) = OnboardingFeatures.overlayTweaksAccess(LegacyOverlayConfig::class.java)
 
-        assertSame(LegacyOverlayHandler.instance, access.instance)
-        access.save()
+        assertSame(LegacyOverlayHandler.instance, instance)
+        save()
         assertTrue(LegacyOverlayHandler.saved)
     }
 
@@ -235,12 +235,12 @@ class OnboardingFeaturesTest {
         ModernOverlayConfig.saved = false
         ModernOverlayConfig.fireOverlayHeight = 0f
 
-        val access = OnboardingFeatures.overlayTweaksAccess(ModernOverlayConfig::class.java)
-        OnboardingFeatures.writeFloatingField(access.instance, "fireOverlayHeight", -0.25)
+        val (instance, save) = OnboardingFeatures.overlayTweaksAccess(ModernOverlayConfig::class.java)
+        OnboardingFeatures.writeFloatingField(instance, "fireOverlayHeight", -0.25)
 
-        assertSame(ModernOverlayConfig.INSTANCE, access.instance)
-        assertEquals(-0.25, OnboardingFeatures.readFloatingField(access.instance, "fireOverlayHeight"), 0.0001)
-        access.save()
+        assertSame(ModernOverlayConfig.INSTANCE, instance)
+        assertEquals(-0.25, OnboardingFeatures.readFloatingField(instance, "fireOverlayHeight"), 0.0001)
+        save()
         assertTrue(ModernOverlayConfig.saved)
     }
 }
