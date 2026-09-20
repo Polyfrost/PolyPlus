@@ -129,7 +129,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
         val capture = OnboardingKeyCapture.pending ?: return false
         capture(
-            if (key == ESCAPE_KEY) {
+            if (key == InputConstants.KEY_ESCAPE) {
                 null
             } else {
                 //? if >= 26.3 {
@@ -2216,8 +2216,6 @@ internal object OnboardingKeyCapture {
     @Volatile
     var pending: ((InputConstants.Key?) -> Unit)? = null
 }
-
-private const val ESCAPE_KEY = 256
 
 private enum class ModGuide(
     val card: ModCard,
