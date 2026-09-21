@@ -173,6 +173,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic
     @Switch(
+        title = "Disable Narrator While Muted",
+        description = "Skip the narrator entirely while Master or Voice/Speech volume is 0% to prevent lagspikes.",
+    )
+    var disableNarratorWhileMuted = true
+
+    @JvmStatic
+    @Switch(
         title = "Automatically Refresh Session",
         description = "Automatically refresh your Microsoft account session when it expires.",
     )
