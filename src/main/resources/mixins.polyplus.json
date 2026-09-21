@@ -81,8 +81,10 @@
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
     "compat.polytone.MixinPolytoneFabric",
-    //? if >= 26.2
+    //? if >= 26.2 {
     "compat.rrls.MixinOverlayHelper",
+    "compat.rrls.MixinRrlsAbstractTexture",
+    //?}
     "compat.sodium.MixinSodiumConfigBuilder",
     "compat.voicechat.MixinClientManager",
     "compat.waveycapes.MixinCustomCapeRenderer",

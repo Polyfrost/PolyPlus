@@ -48,6 +48,7 @@ val kotlinVersion = property("deps.kotlin") as String
 val ktorVersion = property("deps.ktor") as String
 val sentryVersion = property("deps.sentry") as String
 val mixinExtrasVersion = property("deps.mixin_extras") as String
+val mixinSquaredVersion = property("deps.mixin_squared") as String
 val devauthVersion = property("deps.devauth") as String
 val junitVersion = property("deps.junit") as String
 
@@ -95,6 +96,7 @@ repositories {
     strictMaven("https://maven.terraformersmc.com/releases/", "TerraformersMC", "com.terraformersmc")
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
+    strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
 }
 
@@ -193,6 +195,10 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
+    "com.github.bawnorton.mixinsquared:mixinsquared-fabric:$mixinSquaredVersion".let {
+        annotationProcessor(it)
+        implementation(include(it)!!)
+    }
 
     modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
 

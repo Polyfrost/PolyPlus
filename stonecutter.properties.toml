@@ -10,6 +10,7 @@ deps.kotlin = "2.4.10"
 deps.ktor = "3.5.2"
 deps.sentry = "7.22.6"
 deps.mixin_extras = "0.5.4"
+deps.mixin_squared = "0.3.7-beta.3"
 deps.devauth = "1.2.2"
 deps.junit = "6.1.3"
 
