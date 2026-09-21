@@ -28,12 +28,13 @@ object JvmAdvisor {
     const val HEAP_TIGHT_RATIO = 0.70
     const val HEAP_LOOSE_RATIO = 0.35
     const val HEAP_OVERSIZED_RATIO = 0.5
-    const val HEAP_OVERSIZED_RATIO_SMALL = 0.35
-    const val SMALL_HOST_MB = 8192L
+    const val MIN_HEAP_MB = 2048L
+    const val LIVE_SET_HEADROOM = 3L
     const val ZGC_MIN_CORES = 12
     const val ZGC_MIN_HEAP_MB = 8192L
     const val MIN_GC_SPIKE_RATIO = 0.5
     const val HEAP_STEP_MB = 2048L
+    const val HEAP_LOWER_STEP_MB = 1024L
     const val LINUX_PSI_PERCENT = 10.0
     const val WINDOWS_LOAD_WARN = 90
     const val WINDOWS_LOAD_CRITICAL = 95
@@ -82,8 +83,8 @@ object JvmAdvisor {
             val footprintMb = s.maxHeapMb + s.nonHeapMb
             val budgetMb = host.totalMb - RESERVED_SYSTEM_MB
             if (budgetMb > 0 && footprintMb > budgetMb) {
-                val suggested = (budgetMb - s.nonHeapMb).coerceAtLeast(0L)
-                if (s.liveSetMb <= 0 || suggested > s.liveSetMb) {
+                val suggested = budgetMb - s.nonHeapMb
+                if (suggested >= minHeapMb(s)) {
                     return Advice(
                         Kind.LOWER_HEAP,
                         s.maxHeapMb,
@@ -133,9 +134,9 @@ object JvmAdvisor {
         if (host != null &&
             s.liveSetMb > 0 &&
             s.liveSetMb < s.maxHeapMb * HEAP_LOOSE_RATIO &&
-            s.maxHeapMb > host.totalMb * oversizedRatio(host.totalMb)
+            s.maxHeapMb > host.totalMb * HEAP_OVERSIZED_RATIO
         ) {
-            val suggested = (s.maxHeapMb - HEAP_STEP_MB).coerceAtLeast(s.liveSetMb * 2)
+            val suggested = (s.maxHeapMb - HEAP_LOWER_STEP_MB).coerceAtLeast(minHeapMb(s))
             if (suggested < s.maxHeapMb) {
                 return Advice(
                     Kind.LOWER_HEAP,
@@ -161,9 +162,9 @@ object JvmAdvisor {
         return null
     }
 
+    // the live set is a single sample and grows over a session, so keep generous GC headroom above it
     @JvmStatic
-    fun oversizedRatio(totalMb: Long): Double =
-        if (totalMb <= SMALL_HOST_MB) HEAP_OVERSIZED_RATIO_SMALL else HEAP_OVERSIZED_RATIO
+    fun minHeapMb(s: Snapshot): Long = (s.liveSetMb * LIVE_SET_HEADROOM).coerceAtLeast(MIN_HEAP_MB)
 
     private var lastFrameNanos = 0L
     private var lastGcMillis = -1L

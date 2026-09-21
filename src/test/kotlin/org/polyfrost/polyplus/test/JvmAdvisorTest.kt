@@ -171,13 +171,29 @@ class JvmAdvisorTest {
     }
 
     @Test
-    fun `half of a small machine is an oversized heap`() {
-        assertEquals(JvmAdvisor.HEAP_OVERSIZED_RATIO_SMALL, JvmAdvisor.oversizedRatio(8192))
-        assertEquals(JvmAdvisor.HEAP_OVERSIZED_RATIO, JvmAdvisor.oversizedRatio(16384))
+    fun `a common 3 GB heap on an idle 8 GB box is left alone`() {
         val small = HostMemory(totalMb = 8154, availableMb = 3000, pressure = 1)
-        val advice = JvmAdvisor.evaluate(snapshot(maxHeapMb = 3072, liveSetMb = 605, host = small))
+        assertNull(JvmAdvisor.evaluate(snapshot(maxHeapMb = 3072, liveSetMb = 605, host = small)))
+    }
+
+    @Test
+    fun `an oversized heap is lowered one step at a time`() {
+        val small = HostMemory(totalMb = 8154, availableMb = 3000, pressure = 1)
+        val advice = JvmAdvisor.evaluate(snapshot(maxHeapMb = 6144, liveSetMb = 605, host = small))
         assertEquals(Kind.LOWER_HEAP, advice?.kind)
-        assertTrue(advice!!.suggestedMb >= 605, advice.message)
+        assertEquals(6144 - JvmAdvisor.HEAP_LOWER_STEP_MB, advice?.suggestedMb)
+    }
+
+    @Test
+    fun `a lowered heap keeps headroom above the live set and never drops below the floor`() {
+        assertEquals(JvmAdvisor.MIN_HEAP_MB, JvmAdvisor.minHeapMb(snapshot(liveSetMb = 605)))
+        assertEquals(JvmAdvisor.MIN_HEAP_MB, JvmAdvisor.minHeapMb(snapshot(liveSetMb = -1)))
+        assertEquals(3000 * JvmAdvisor.LIVE_SET_HEADROOM, JvmAdvisor.minHeapMb(snapshot(liveSetMb = 3000)))
+        val pressured = HostMemory(totalMb = 4096, availableMb = 100, pressure = 4)
+        val advice = JvmAdvisor.evaluate(
+            snapshot(maxHeapMb = 3072, liveSetMb = 700, nonHeapMb = 400, host = pressured),
+        )
+        assertEquals(Kind.FREE_SYSTEM_MEMORY, advice?.kind)
     }
 
     @Test
