@@ -48,21 +48,25 @@ mod.mc_compat = "1.21.11"
 mod.mc_releases = "1.21.11"
 deps.fabric_api = "0.141.6+1.21.11"
 deps.sodium = "mc1.21.11-0.8.13-fabric"
+deps.wwaypoints = "8hPTY1SS"
 
 ["26.1"]
 mod.mc_compat = "~26.1"
 mod.mc_releases = "26.1, 26.1.1, 26.1.2"
 deps.fabric_api = "0.155.2+26.1.2"
 deps.sodium = "mc26.1.2-0.9.1-fabric"
+deps.wwaypoints = "pX4mxVAv"
 
 ["26.2"]
 mod.mc_compat = "~26.2"
 mod.mc_releases = "26.2"
 deps.fabric_api = "0.157.0+26.2"
 deps.sodium = "mc26.2-0.9.1-fabric"
+deps.wwaypoints = "vudKzlxH"
 
 ["26.3"]
 mod.mc_compat = "~26.3"
 mod.mc_releases = "26.3"
 deps.fabric_api = "0.160.3+26.3"
 deps.sodium = "mc26.3r1-0.9.2-beta.2-fabric"
+deps.wwaypoints = "mgo409Pu"

@@ -76,10 +76,12 @@
     "compat.essential.MixinPartnerModConfig",
     "compat.euphoria.MixinSodiumConsole",
     "compat.mountopacity.MixinEntityHook",
+    "compat.oneconfig.MixinConfigScreenKt",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
+    "compat.oneconfig.MixinWWaypointsCompat",
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2 {
     "compat.rrls.MixinOverlayHelper",
@@ -89,6 +91,8 @@
     "compat.voicechat.MixinClientManager",
     "compat.waveycapes.MixinCustomCapeRenderer",
     "compat.waveycapes.MixinCustomCapeRenderLayer",
-    "compat.waveycapes.MixinPlayerWrapper"
+    "compat.waveycapes.MixinPlayerWrapper",
+    "compat.wwaypoints.MixinToggleSneakConfigScreen",
+    "compat.wwaypoints.MixinToggleSneakService"
   ]
 }

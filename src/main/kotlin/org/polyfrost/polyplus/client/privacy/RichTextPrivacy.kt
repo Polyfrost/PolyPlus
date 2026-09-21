@@ -17,7 +17,7 @@ object RichTextPrivacy {
 
     private val logger = LogManager.getLogger("PolyPlus/RichTextPrivacy")
 
-    private val BLOCKED_MODS = listOf("debugify")
+    private val BLOCKED_MODS = listOf("debugify", "wwaypoints")
 
     private val blockedKeys: Set<String> by lazy {
         ExploitPreventerCompat.block(BLOCKED_MODS)
