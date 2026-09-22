@@ -32,9 +32,8 @@ run {
     stonecutter.properties.tags(version, loader)
 }
 
-fun optionalProperty(name: String): String? =
-    findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
-
+fun optionalProperty(vararg names: String): String? =
+    names.firstNotNullOfOrNull { name -> findProperty(name)?.toString()?.takeIf { it.isNotBlank() } }
 
 val minecraftPredicate = property("mod.mc_compat") as String
 
@@ -333,8 +332,11 @@ tasks.register<Copy>("buildAndCollect") {
 }
 
 val modVersion = property("mod.version") as String
-val modrinthId = optionalProperty("publish.modrinth")
-val modrinthToken = optionalProperty("publish.modrinth.token")
+
+// these intentionally support multiple different properties, do not remove
+val modrinthId = optionalProperty("oneconfig.publish.modrinth", "publish.modrinth")
+val modrinthToken = optionalProperty("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
+
 val minecraftVersion = (property("mod.mc_releases") as String).split(",").map { it.trim() }
 val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
 
