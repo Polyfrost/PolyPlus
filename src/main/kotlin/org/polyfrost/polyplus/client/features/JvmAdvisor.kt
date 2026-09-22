@@ -258,8 +258,9 @@ object JvmAdvisor {
         )
     }
 
-    private fun totalGcMillis(): Long =
-        ManagementFactory.getGarbageCollectorMXBeans().sumOf { it.collectionTime.coerceAtLeast(0L) }
+    private val gcBeans by lazy { ManagementFactory.getGarbageCollectorMXBeans() }
+
+    private fun totalGcMillis(): Long = gcBeans.sumOf { it.collectionTime.coerceAtLeast(0L) }
 
     private fun liveSetMb(): Long {
         val pools = ManagementFactory.getMemoryPoolMXBeans()
