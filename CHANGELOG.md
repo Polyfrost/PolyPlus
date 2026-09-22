@@ -1,2 +1,2 @@
-## 1.2.31
-- Fixed the RAM advisor sometimes telling you to lower your RAM allocation too much
+## 1.2.32
+- Fixed the RAM advisor slightly negatively affecting performance
