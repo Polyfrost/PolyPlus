@@ -56,8 +56,6 @@ internal object AssetArchive {
             }
         }
     }
-
-    fun readBytes(path: Path): ByteArray = Files.readAllBytes(path)
 }
 
 private const val MIN_SHEET_FRAMES = 3

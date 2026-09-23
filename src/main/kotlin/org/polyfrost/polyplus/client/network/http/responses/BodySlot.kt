@@ -2,58 +2,21 @@ package org.polyfrost.polyplus.client.network.http.responses
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 
 @Serializable(with = BodySlot.Serializer::class)
-enum class BodySlot {
-    Cape,
-    Backpack,
-    Glasses,
-    Wings,
-    LeftHand,
-    RightHand,
-    Hat,
-    Aura,
-    Boots,
-    Shoulder,
-    Pet,
-    Unknown;
-
-    val serializedName: String
-        get() = when (this) {
-            Cape -> "cape"
-            Backpack -> "backpack"
-            Glasses -> "glasses"
-            Wings -> "wings"
-            LeftHand -> "left_hand"
-            RightHand -> "right_hand"
-            Hat -> "hat"
-            Aura -> "aura"
-            Boots -> "boots"
-            Shoulder -> "shoulder"
-            Pet -> "pet"
-            Unknown -> "unknown"
-        }
-
-    val displayName: String
-        get() = when (this) {
-            Cape -> "Cape"
-            Backpack -> "Back"
-            Glasses -> "Glasses"
-            Wings -> "Wings"
-            LeftHand -> "Left Hand"
-            RightHand -> "Right Hand"
-            Hat -> "Hat"
-            Aura -> "Aura"
-            Boots -> "Boots"
-            Shoulder -> "Shoulder"
-            Pet -> "Pet"
-            Unknown -> "Unknown"
-        }
+enum class BodySlot(val serializedName: String, val displayName: String) {
+    Cape("cape", "Cape"),
+    Backpack("backpack", "Back"),
+    Glasses("glasses", "Glasses"),
+    Wings("wings", "Wings"),
+    LeftHand("left_hand", "Left Hand"),
+    RightHand("right_hand", "Right Hand"),
+    Hat("hat", "Hat"),
+    Aura("aura", "Aura"),
+    Boots("boots", "Boots"),
+    Shoulder("shoulder", "Shoulder"),
+    Pet("pet", "Pet"),
+    Unknown("unknown", "Unknown");
 
     fun cosmeticType(): CosmeticType = when (this) {
         Cape -> CosmeticType.Cape
@@ -70,24 +33,15 @@ enum class BodySlot {
     }
 
     companion object {
-        val equippableSlots: List<BodySlot> =
-            listOf(Cape, Backpack, Glasses, Wings, LeftHand, RightHand, Hat, Aura, Boots, Shoulder, Pet)
-
-        fun fromSerializedName(name: String): BodySlot? =
-            entries.firstOrNull { it != Unknown && it.serializedName == name }
+        val equippableSlots: List<BodySlot> = entries - Unknown
 
         fun isEquippableSlot(slot: BodySlot): Boolean = slot in equippableSlots
     }
 
-    internal object Serializer : KSerializer<BodySlot> {
-        override val descriptor: SerialDescriptor =
-            PrimitiveSerialDescriptor("BodySlot", PrimitiveKind.STRING)
-
-        override fun serialize(encoder: Encoder, value: BodySlot) {
-            encoder.encodeString(value.serializedName)
-        }
-
-        override fun deserialize(decoder: Decoder): BodySlot =
-            fromSerializedName(decoder.decodeString()) ?: Unknown
-    }
+    internal object Serializer : KSerializer<BodySlot> by ApiEnumSerializer(
+        "BodySlot",
+        BodySlot.entries,
+        Unknown,
+        BodySlot::serializedName,
+    )
 }

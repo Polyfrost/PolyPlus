@@ -16,7 +16,6 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 object AdaptiveBlurDefaults {
     private val logger = LogManager.getLogger("PolyPlus/AdaptiveBlur")
 
-    private const val POLYBLUR_CONFIG = "org.polyfrost.polyblur.client.PolyBlurConfig"
     private const val POLYPLUS_PACKAGE = "org.polyfrost.polyplus."
     private const val FALLBACK_REFRESH_RATE = 60
     private const val WINDOW_MILLIS = 5_000L
@@ -116,24 +115,24 @@ object AdaptiveBlurDefaults {
         runCatching {
             when {
                 averageFps < refreshRate - LOW_FPS_MARGIN -> {
-                    setBoolean(instance, "setEnabled", false)
+                    OnboardingFeatures.setBoolean(instance, "setEnabled", false)
                     logger.info(
                         "Avg main-menu FPS {} below refresh {} - {}; disabling blur",
                         averageFps, refreshRate, LOW_FPS_MARGIN,
                     )
                 }
                 averageFps < refreshRate + HEADROOM_MARGIN -> {
-                    setBoolean(instance, "setEnabled", true)
-                    setInt(instance, "setBlurType", UNITY_BLUR_TYPE)
-                    setFloat(instance, "setMotionBlurSamples", REDUCED_SAMPLES)
-                    setBoolean(instance, "setBlurHand", false)
+                    OnboardingFeatures.setBoolean(instance, "setEnabled", true)
+                    OnboardingFeatures.setInt(instance, "setBlurType", UNITY_BLUR_TYPE)
+                    OnboardingFeatures.setFloat(instance, "setMotionBlurSamples", REDUCED_SAMPLES)
+                    OnboardingFeatures.setBoolean(instance, "setBlurHand", false)
                     logger.info(
                         "Avg main-menu FPS {} below refresh {} + {}; Unity blur, hand blur off, {} samples",
                         averageFps, refreshRate, HEADROOM_MARGIN, REDUCED_SAMPLES.toInt(),
                     )
                 }
                 averageFps < refreshRate + HEADROOM_MARGIN_HI -> {
-                    setFloat(instance, "setMotionBlurSamples", MEDIUM_SAMPLES)
+                    OnboardingFeatures.setFloat(instance, "setMotionBlurSamples", MEDIUM_SAMPLES)
                     logger.info(
                         "Avg main-menu FPS {} below refresh {} + {}; {} samples",
                         averageFps, refreshRate, HEADROOM_MARGIN_HI, MEDIUM_SAMPLES.toInt(),
@@ -156,23 +155,6 @@ object AdaptiveBlurDefaults {
     }.getOrDefault(FALLBACK_REFRESH_RATE)
 
     private fun polyBlurInstance(): Any? = runCatching {
-        Class.forName(POLYBLUR_CONFIG).getField("INSTANCE").get(null)
+        Class.forName(OnboardingFeatures.POLYBLUR_CONFIG).getField("INSTANCE").get(null)
     }.getOrNull()
-
-    private fun setBoolean(instance: Any, method: String, value: Boolean) {
-        val fn = runCatching { instance.javaClass.getMethod(method, Boolean::class.javaPrimitiveType) }.getOrNull()
-        if (fn == null) {
-            logger.debug("PolyBlur has no {}, skipping", method)
-            return
-        }
-        fn.invoke(instance, value)
-    }
-
-    private fun setInt(instance: Any, method: String, value: Int) {
-        instance.javaClass.getMethod(method, Int::class.javaPrimitiveType).invoke(instance, value)
-    }
-
-    private fun setFloat(instance: Any, method: String, value: Float) {
-        instance.javaClass.getMethod(method, Float::class.javaPrimitiveType).invoke(instance, value)
-    }
 }

@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.network.http.responses.Friend
@@ -33,7 +32,7 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 
-internal enum class SocialTab { Chat, Global, Friends, Special }
+internal enum class SocialTab { Chat, Friends, Special }
 
 @Composable
 internal fun SocialSidebar(
@@ -61,8 +60,6 @@ internal fun SocialSidebar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SidebarTabButton("Chat", tab == SocialTab.Chat, Modifier.weight(1f)) { onTabChange(SocialTab.Chat) }
-            // Global chat is disabled for now.
-            // SidebarTabButton("Global", tab == SocialTab.Global, Modifier.weight(1f)) { onTabChange(SocialTab.Global) }
             if (showSpecialTab) {
                 SidebarTabButton(
                     "Special",
@@ -93,7 +90,6 @@ internal fun SocialSidebar(
                 emptyMessage = "No Special Chat messages yet",
                 emptyAction = null,
             )
-            SocialTab.Global -> GlobalChatSidebarInfo()
             SocialTab.Friends -> FriendQuickList(friends, onSelectFriend, onAddFriend)
         }
     }
@@ -231,23 +227,6 @@ private fun SidebarEmptyState(message: String, actionLabel: String? = null, onAc
             Spacer(Modifier.height(10.dp))
             SocialButton(actionLabel, icon = SOCIAL_ASSETS + "user-plus-01.svg", filled = true, onClick = onAction)
         }
-    }
-}
-
-@Composable
-private fun GlobalChatSidebarInfo() {
-    Column(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(Modifier.size(44.dp).clip(LocalTheme.current.circleShape).background(SocialControlBackground), contentAlignment = Alignment.Center) {
-            Icon(SOCIAL_ASSETS + "image-01.svg", Accent, Modifier.size(20.dp))
-        }
-        Spacer(Modifier.height(10.dp))
-        SocialText("Global Chat", fontSize = 14.sp)
-        Spacer(Modifier.height(4.dp))
-        SocialText("A public channel visible to every Poly+ player online.", fontSize = 12.sp, color = SocialTextSecondary)
     }
 }
 

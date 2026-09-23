@@ -3,9 +3,7 @@ package org.polyfrost.polyplus.client
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
-import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import org.polyfrost.oneconfig.api.config.v1.Property.Display
-import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
@@ -186,15 +184,7 @@ object PolyPlusMainMenuConfig : Config(
 
     private fun migrateFromLegacyConfig() {
         if (migratedFromLegacyConfig) return
-        runCatching {
-            Tree.beginFailureCollection()
-            try {
-                loadFrom(ConfigManager.active().folder.resolve("${PolyPlusConstants.ID}.json"))
-            } finally {
-                val failed = Tree.endFailureCollection()
-                if (failed.isNotEmpty()) LOGGER.warn("Left {} main menu option(s) at their default", failed)
-            }
-        }.onFailure { LOGGER.warn("Could not migrate main menu options from the legacy PolyPlus config", it) }
+        loadLegacyPolyPlusOptions("main menu", LOGGER, ::loadFrom)
         migratedFromLegacyConfig = true
         save()
     }

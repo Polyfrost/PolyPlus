@@ -136,44 +136,35 @@ object PolyPlusSentry {
     private fun allowByRecentReports(event: SentryEvent): Boolean =
         runCatching { rateLimiter.allow(rateLimitKey(event)) }.getOrDefault(true)
 
+    // stops at a self-referencing cause
+    private fun causeChain(throwable: Throwable): Sequence<Throwable> =
+        generateSequence(throwable) { it.cause.takeIf { cause -> cause !== it } }
+
+    private fun isWrapper(throwable: Throwable): Boolean = when (throwable) {
+        is InvocationTargetException,
+        is ExecutionException,
+        is CompletionException,
+        is ExceptionInInitializerError,
+        is BootstrapMethodError,
+        -> true
+        is RuntimeException -> throwable.message?.let { m ->
+            m.startsWith("Could not execute entrypoint stage") ||
+                m.startsWith("Mixin transformation of")
+        } == true
+        else -> false
+    }
+
     private fun mostInformativeCause(throwable: Throwable): Throwable {
-        var cause: Throwable = throwable
-        var hops = 0
-        while (hops++ < MAX_UNWRAP_DEPTH) {
-            val next = cause.cause ?: break
-            if (next === cause) break // self-referencing chain
-            val isWrapper = when (cause) {
-                is InvocationTargetException,
-                is ExecutionException,
-                is CompletionException,
-                is ExceptionInInitializerError,
-                is BootstrapMethodError,
-                -> true
-                is RuntimeException -> cause.message?.let { m ->
-                    m.startsWith("Could not execute entrypoint stage") ||
-                        m.startsWith("Mixin transformation of")
-                } == true
-                else -> false
-            }
-            if (!isWrapper) break
-            cause = next
-        }
-        return cause
+        val chain = causeChain(throwable).take(MAX_UNWRAP_DEPTH + 1).toList()
+        val stop = chain.dropLast(1).indexOfFirst { !isWrapper(it) }
+        return if (stop < 0) chain.last() else chain[stop]
     }
 
     private fun entrypointModId(throwable: Throwable): String? = runCatching {
-        var cause: Throwable? = throwable
-        var hops = 0
-        while (cause != null && hops++ < MAX_UNWRAP_DEPTH) {
-            val message = cause.message
-            if (message != null && message.startsWith("Could not execute entrypoint stage")) {
-                return@runCatching ENTRYPOINT_MOD_ID.find(message)?.groupValues?.getOrNull(1)
-            }
-            val next = cause.cause
-            if (next === cause) break // self-referencing chain
-            cause = next
-        }
-        null
+        causeChain(throwable).take(MAX_UNWRAP_DEPTH)
+            .mapNotNull { it.message }
+            .firstOrNull { it.startsWith("Could not execute entrypoint stage") }
+            ?.let { ENTRYPOINT_MOD_ID.find(it)?.groupValues?.getOrNull(1) }
     }.getOrNull()
 
     private fun normalizeMessage(message: String): String =
@@ -342,141 +333,87 @@ object PolyPlusSentry {
         return status >= 500
     }
 
-    private fun isTransientNetworkFailure(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return true
-            if (cause.message?.contains("Ping timeout", ignoreCase = true) == true) return true
-            if (cause.message?.let { isTransientHandshakeStatus(it) } == true) return true
-            when (cause) {
-                is ServerResponseException,
-                is HttpRequestTimeoutException,
-                is ConnectTimeoutException,
-                is SocketTimeoutException,
-                is java.net.SocketTimeoutException,
-                is ConnectException,
-                is UnknownHostException,
-                is SocketException,
-                is UnresolvedAddressException,
-                is ClosedChannelException,
-                is EOFException,
-                is FileSystemException,
-                -> return true
-                is ClientRequestException ->
-                    if (cause.response.status == HttpStatusCode.Unauthorized) return true
-                is IllegalStateException ->
-                    // Truncated HTTP body
-                    if (cause.message?.contains("Content-Length", ignoreCase = true) == true) return true
-                is IOException ->
-                    cause.message?.let { m ->
-                        if (m.contains("No space left", ignoreCase = true) ||
-                            m.contains("not enough space", ignoreCase = true) ||
-                            m.contains("Content-Length", ignoreCase = true)
-                        ) {
-                            return true
-                        }
-                    }
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
+    private fun isTransientNetworkFailure(throwable: Throwable): Boolean = causeChain(throwable).any { cause ->
+        if (cause.javaClass.name.startsWith("com.mojang.authlib.exceptions.")) return@any true
+        if (cause.message?.contains("Ping timeout", ignoreCase = true) == true) return@any true
+        if (cause.message?.let { isTransientHandshakeStatus(it) } == true) return@any true
+        when (cause) {
+            is ServerResponseException,
+            is HttpRequestTimeoutException,
+            is ConnectTimeoutException,
+            is SocketTimeoutException,
+            is java.net.SocketTimeoutException,
+            is ConnectException,
+            is UnknownHostException,
+            is SocketException,
+            is UnresolvedAddressException,
+            is ClosedChannelException,
+            is EOFException,
+            is FileSystemException,
+            -> true
+            is ClientRequestException -> cause.response.status == HttpStatusCode.Unauthorized
+            // truncated HTTP body
+            is IllegalStateException -> cause.message?.contains("Content-Length", ignoreCase = true) == true
+            is IOException -> cause.message?.let { m ->
+                m.contains("No space left", ignoreCase = true) ||
+                    m.contains("not enough space", ignoreCase = true) ||
+                    m.contains("Content-Length", ignoreCase = true)
+            } == true
+            else -> false
         }
-        return false
     }
 
-    private fun isBenignCancellation(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            if (cause is CancellationException) return true
-            if (cause.message?.contains("The coroutine scope left the composition", ignoreCase = true) == true) {
-                return true
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
-        }
-        return false
+    private fun isBenignCancellation(throwable: Throwable): Boolean = causeChain(throwable).any { cause ->
+        cause is CancellationException ||
+            cause.message?.contains("The coroutine scope left the composition", ignoreCase = true) == true
     }
 
     private fun isReporterArtifact(throwable: Throwable): Boolean {
         if (isDeliberateCrash(throwable)) return true
 
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            if (cause is Error && cause.message?.startsWith("Watchdog") == true) return true
+        return causeChain(throwable).any { cause ->
+            if (cause is Error && cause.message?.startsWith("Watchdog") == true) return@any true
 
-            val top = cause.stackTrace.firstOrNull()
-            if (top != null) {
-                val cn = top.className
-                val mn = top.methodName
-                if ((cn == "net.minecraft.CrashReport" || cn == "net.minecraft.class_128") &&
-                    (mn == "preload" || mn == "method_24305")
-                ) {
-                    return true
-                }
-                if (cause is NullPointerException &&
+            val top = cause.stackTrace.firstOrNull() ?: return@any false
+            val cn = top.className
+            val mn = top.methodName
+            ((cn == "net.minecraft.CrashReport" || cn == "net.minecraft.class_128") &&
+                (mn == "preload" || mn == "method_24305")) ||
+                (cause is NullPointerException &&
                     (cn == "net.minecraft.CrashReportCategory" || cn == "net.minecraft.class_129") &&
-                    (mn == "validateStackTrace" || mn == "method_584")
-                ) {
-                    return true
-                }
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
+                    (mn == "validateStackTrace" || mn == "method_584"))
         }
-        return false
     }
 
-    private fun isForeignPacketNoise(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            val message = cause.message
-            if (message?.contains("Terminal message received in bundle", ignoreCase = true) == true &&
-                cause.stackTrace.any {
-                    it.className == "net.minecraft.network.PacketBundlePacker" || // mojmap
-                        it.className == "net.minecraft.class_8035"                  // intermediary
-                }
-            ) {
-                return true
-            }
-            if (message?.contains("Failed to decode packet", ignoreCase = true) == true &&
+    private fun isForeignPacketNoise(throwable: Throwable): Boolean = causeChain(throwable).any { cause ->
+        val message = cause.message
+        (message?.contains("Terminal message received in bundle", ignoreCase = true) == true &&
+            cause.stackTrace.any {
+                it.className == "net.minecraft.network.PacketBundlePacker" || // mojmap
+                    it.className == "net.minecraft.class_8035"                  // intermediary
+            }) ||
+            (message?.contains("Failed to decode packet", ignoreCase = true) == true &&
                 cause.stackTrace.any {
                     it.className == "net.minecraft.network.PacketDecoder" || // mojmap
                         it.className == "net.minecraft.class_2543"             // intermediary
-                }
-            ) {
-                return true
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
-        }
-        return false
+                })
     }
 
-    private fun isExpectedAccountState(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            val name = cause.javaClass.name
-            if (name.contains("UserBannedException")) return true
-            if (name.contains("AuthenticationUnavailable")) return true
-            if (name.startsWith(ESSENTIAL_AUTH_EXCEPTIONS)) return true
-            if (cause is ClientRequestException) {
-                when (cause.response.status) {
-                    HttpStatusCode.Forbidden, HttpStatusCode.Conflict -> return true
-                    else -> {}
-                }
+    private fun isExpectedAccountState(throwable: Throwable): Boolean = causeChain(throwable).any { cause ->
+        val name = cause.javaClass.name
+        if (name.contains("UserBannedException")) return@any true
+        if (name.contains("AuthenticationUnavailable")) return@any true
+        if (name.startsWith(ESSENTIAL_AUTH_EXCEPTIONS)) return@any true
+        if (cause is ClientRequestException) {
+            when (cause.response.status) {
+                HttpStatusCode.Forbidden, HttpStatusCode.Conflict -> return@any true
+                else -> {}
             }
-            cause.message?.let { m ->
-                if (m.contains("bad crack, try again.", ignoreCase = true)) return true
-                if (m.contains("expected status code 101 but was 401", ignoreCase = true)) return true
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
         }
-        return false
+        cause.message?.let { m ->
+            m.contains("bad crack, try again.", ignoreCase = true) ||
+                m.contains("expected status code 101 but was 401", ignoreCase = true)
+        } == true
     }
 
     // Vanilla's F3 + C crash
@@ -514,38 +451,17 @@ object PolyPlusSentry {
             OUT_OF_MEMORY.containsMatchIn(body)
     }
 
-    internal fun isDeliberateCrash(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            if (cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH) return true
-            if (cause.stackTrace.any {
-                    it.className.startsWith(SKYHANNI_CRASH_CLASS) || it.methodName.contains(CRASHPATCH_TRIGGER)
-                }
-            ) {
-                return true
-            }
-            if (cause.javaClass == Throwable::class.java &&
-                cause.stackTrace.firstOrNull()?.className in DEBUG_CRASH_CLASSES
-            ) {
-                return true
-            }
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
-        }
-        return false
+    internal fun isDeliberateCrash(throwable: Throwable): Boolean = causeChain(throwable).any { cause ->
+        cause.message == CRASHPATCH_CRASH || cause.message == DEBUG_CRASH ||
+            cause.stackTrace.any {
+                it.className.startsWith(SKYHANNI_CRASH_CLASS) || it.methodName.contains(CRASHPATCH_TRIGGER)
+            } ||
+            (cause.javaClass == Throwable::class.java &&
+                cause.stackTrace.firstOrNull()?.className in DEBUG_CRASH_CLASSES)
     }
 
-    private fun isMemoryExhaustion(throwable: Throwable): Boolean {
-        var cause: Throwable? = throwable
-        while (cause != null) {
-            if (cause is OutOfMemoryError) return true
-            val next = cause.cause
-            if (next === cause) break
-            cause = next
-        }
-        return false
-    }
+    private fun isMemoryExhaustion(throwable: Throwable): Boolean =
+        causeChain(throwable).any { it is OutOfMemoryError }
 
     private val locallyHandled = ThreadLocal.withInitial { 0 }
 

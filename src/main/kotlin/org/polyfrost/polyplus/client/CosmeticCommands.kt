@@ -65,18 +65,9 @@ object CosmeticCommands {
                     ),
             )
             .then(
-                commands.literal("clear")
-                    .then(commands.literal("cape").executes { clear(it.source, BodySlot.Cape) })
-                    .then(commands.literal("backpack").executes { clear(it.source, BodySlot.Backpack) })
-                    .then(commands.literal("glasses").executes { clear(it.source, BodySlot.Glasses) })
-                    .then(commands.literal("wings").executes { clear(it.source, BodySlot.Wings) })
-                    .then(commands.literal("left_hand").executes { clear(it.source, BodySlot.LeftHand) })
-                    .then(commands.literal("right_hand").executes { clear(it.source, BodySlot.RightHand) })
-                    .then(commands.literal("hat").executes { clear(it.source, BodySlot.Hat) })
-                    .then(commands.literal("aura").executes { clear(it.source, BodySlot.Aura) })
-                    .then(commands.literal("boots").executes { clear(it.source, BodySlot.Boots) })
-                    .then(commands.literal("shoulder").executes { clear(it.source, BodySlot.Shoulder) })
-                    .then(commands.literal("emote").executes { clearEmote(it.source) }),
+                BodySlot.equippableSlots.fold(commands.literal("clear")) { node, slot ->
+                    node.then(commands.literal(slot.serializedName).executes { clear(it.source, slot) })
+                }.then(commands.literal("emote").executes { clearEmote(it.source) }),
             )
             .then(
                 commands.literal("play")
@@ -219,23 +210,31 @@ object CosmeticCommands {
             if (def.groupName == def.variantName) def.groupName else "${def.groupName} — ${def.variantName}"
         } ?: "cosmetic #$targetId"
 
-        source.sendFeedback(
-            Component.literal("Equipping $label...").withStyle(ChatFormatting.GRAY),
-        )
+        return announce(source, "Equipping $label...", "Equipped $label.", "Failed to equip $label") {
+            CosmeticService.equip(targetId)
+        }
+    }
+
+    /** Reports progress and the outcome of the action on the main thread. */
+    private fun announce(
+        source: Source,
+        pending: String,
+        success: String,
+        failure: String,
+        action: suspend () -> Result<Unit>,
+    ): Int {
+        source.sendFeedback(Component.literal(pending).withStyle(ChatFormatting.GRAY))
 
         PolyPlusClient.SCOPE.launch {
-            val result = CosmeticService.equip(targetId)
+            val result = action()
             ClientPlatform.runOnMain {
                 result.fold(
                     onSuccess = {
-                        source.sendFeedback(
-                            Component.literal("Equipped $label.").withStyle(ChatFormatting.GREEN),
-                        )
+                        source.sendFeedback(Component.literal(success).withStyle(ChatFormatting.GREEN))
                     },
                     onFailure = { error ->
                         source.sendFeedback(
-                            Component.literal("Failed to equip $label: ${error.message}")
-                                .withStyle(ChatFormatting.RED),
+                            Component.literal("$failure: ${error.message}").withStyle(ChatFormatting.RED),
                         )
                     },
                 )
@@ -263,31 +262,14 @@ object CosmeticCommands {
 
     private fun clear(source: Source, slot: BodySlot): Int {
         val label = slot.displayName.lowercase()
-        source.sendFeedback(
-            Component.literal("Clearing active $label...")
-                .withStyle(ChatFormatting.GRAY),
-        )
-
-        PolyPlusClient.SCOPE.launch {
-            val result = CosmeticService.clearSlot(slot)
-            ClientPlatform.runOnMain {
-                result.fold(
-                    onSuccess = {
-                        source.sendFeedback(
-                            Component.literal("Cleared active $label.")
-                                .withStyle(ChatFormatting.GREEN),
-                        )
-                    },
-                    onFailure = { error ->
-                        source.sendFeedback(
-                            Component.literal("Failed to clear $label: ${error.message}")
-                                .withStyle(ChatFormatting.RED),
-                        )
-                    },
-                )
-            }
+        return announce(
+            source,
+            "Clearing active $label...",
+            "Cleared active $label.",
+            "Failed to clear $label",
+        ) {
+            CosmeticService.clearSlot(slot)
         }
-        return Command.SINGLE_SUCCESS
     }
 
     private fun clearEmote(source: Source): Int {

@@ -1,32 +1,15 @@
-package org.polyfrost.polyplus.utils
+package org.polyfrost.polyplus.client.utils
 
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 
-class HashManager(val file: File) {
-    @Volatile
-    private var hashes: ConcurrentHashMap<String, String>? = null
-
-    @Volatile
-    private var isUpToDate: Boolean = false
-
-    @Volatile
-    private var hashJob: Deferred<Unit> = CompletableDeferred()
-
-    init {
-        hashJob = PolyPlusClient.SCOPE.async(Dispatchers.IO) {
-            if (!file.exists()) {
-                file.parentFile?.mkdirs()
-                file.createNewFile()
-            }
-
-            val json = file.readText()
-            hashes = ConcurrentHashMap<String, String>().apply {
+class HashManager(private val file: File) {
+    // loaded on first use, which always happens off the main thread
+    private val hashes: ConcurrentHashMap<String, String> by lazy {
+        ConcurrentHashMap<String, String>().apply {
+            runCatching {
+                val json = file.takeIf { it.exists() }?.readText().orEmpty()
                 if (json.isNotBlank()) {
                     putAll(PolyPlusClient.JSON.decodeFromString<HashMap<String, String>>(json))
                 }
@@ -34,43 +17,28 @@ class HashManager(val file: File) {
         }
     }
 
-    suspend fun awaitHashes() {
-        if (hashJob.isActive || hashes == null) {
-            hashJob.await()
-        }
-    }
+    @Volatile
+    private var dirty = false
 
-    fun isCurrent(key: String, hash: String): Boolean = hashes?.get(key) == hash
+    fun isCurrent(key: String, hash: String): Boolean = hashes[key] == hash
 
     fun updateHash(key: String, hash: String): Boolean {
-        hashes?.let {
-            val existingHash = it[key]
-            if (existingHash != null && existingHash == hash) {
-                return false
-            }
-
-            it[key] = hash
-            isUpToDate = true
-            return true
+        if (hashes.put(key, hash) == hash) {
+            return false
         }
 
-        return false
+        dirty = true
+        return true
     }
 
-    fun saveHashes() {
-        if (!isUpToDate) {
+    fun save() {
+        if (!dirty) {
             return
         }
 
-        val snapshot = HashMap(hashes ?: return)
-        hashJob = PolyPlusClient.SCOPE.async(Dispatchers.IO)  {
-            if (!file.exists()) {
-                file.parentFile?.mkdirs()
-                file.createNewFile()
-            }
-
-            val json = PolyPlusClient.JSON.encodeToString(snapshot)
-            file.writeText(json)
+        runCatching {
+            file.parentFile?.mkdirs()
+            file.writeText(PolyPlusClient.JSON.encodeToString(HashMap(hashes)))
         }
     }
 }

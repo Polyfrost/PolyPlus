@@ -6,6 +6,7 @@ import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import java.nio.ByteBuffer
+import java.util.HexFormat
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -55,14 +56,12 @@ object P2PPackTransport {
 
     class Download internal constructor(
         val remote: EosProductUserId,
-        val sha1Hex: String,
         internal val requestId: Int,
     ) {
         private val chunks = LinkedBlockingQueue<ByteArray>()
         private val header = LinkedBlockingQueue<Int>()
 
         @Volatile internal var failed: String? = null
-        @Volatile private var finished = false
 
         internal fun onHeader(totalBytes: Int) {
             header.offer(totalBytes)
@@ -73,13 +72,11 @@ object P2PPackTransport {
         }
 
         internal fun onEnd() {
-            finished = true
             chunks.offer(EMPTY)
         }
 
         internal fun onFailed(reason: String) {
             failed = reason
-            finished = true
             header.offer(-1)
             chunks.offer(EMPTY)
         }
@@ -93,8 +90,6 @@ object P2PPackTransport {
             val chunk = chunks.poll(timeoutMs, TimeUnit.MILLISECONDS) ?: return null
             return if (chunk.isEmpty()) null else chunk
         }
-
-        fun isComplete(): Boolean = finished && failed == null
 
         fun close() {
             downloads.remove(remote, this)
@@ -116,7 +111,7 @@ object P2PPackTransport {
             return null
         }
 
-        val download = Download(remote, sha1Hex, nextRequestId.incrementAndGet())
+        val download = Download(remote, nextRequestId.incrementAndGet())
         downloads.put(remote, download)?.onFailed("Superseded by a newer request")
 
         bridge.acceptConnection(SOCKET_ID, remote)
@@ -203,7 +198,7 @@ object P2PPackTransport {
     private suspend fun awaitQueueDrain(bridge: EosSdkBridge, remote: EosProductUserId, index: Int, totalChunks: Int) {
         currentCoroutineContext().ensureActive()
         var waited = 0
-        while (bridge.outboundQueueBytes(SOCKET_ID) >= QUEUE_PACING_THRESHOLD_BYTES) {
+        while (bridge.outboundQueueBytes() >= QUEUE_PACING_THRESHOLD_BYTES) {
             delay(20)
             if (++waited > 3000) {
                 error("Outbound queue stayed full while sending chunk ${index + 1}/$totalChunks to $remote")
@@ -264,12 +259,8 @@ object P2PPackTransport {
             flip()
         }
 
-    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+    private fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
 
-    private fun String.fromHex(): ByteArray? {
-        if (length != SHA1_BYTES * 2) return null
-        return runCatching {
-            ByteArray(SHA1_BYTES) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
-        }.getOrNull()
-    }
+    private fun String.fromHex(): ByteArray? =
+        runCatching { HexFormat.of().parseHex(this) }.getOrNull()?.takeIf { it.size == SHA1_BYTES }
 }

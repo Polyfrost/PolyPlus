@@ -13,7 +13,6 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionI
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -22,7 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-object GroupsRepository : EarlyInitializable {
+object GroupsRepository {
     private val LOGGER = LogManager.getLogger()
 
     private val _groups = MutableStateFlow<List<GroupSummary>>(emptyList())
@@ -35,7 +34,7 @@ object GroupsRepository : EarlyInitializable {
 
     fun isPending(messageId: Long): Boolean = messageId >= PENDING_ID_BASE
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
                 is ClientboundPacket.GroupMessageReceived -> onMessageReceived(packet)
@@ -210,7 +209,7 @@ object GroupsRepository : EarlyInitializable {
         if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
 
         PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        val name = PlayerNamesRepository.nameOr(sender)
         val group = groups.value.firstOrNull { it.id == groupId }
         val title = group?.takeIf { it.kind == GroupKind.Group }?.name?.let { "[$it] $name" } ?: name
         val preview = if (content.length > 80) content.take(77) + "..." else content

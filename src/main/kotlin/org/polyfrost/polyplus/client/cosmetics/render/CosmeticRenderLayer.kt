@@ -94,32 +94,25 @@ class CosmeticRenderLayer(renderer: RenderLayerParent<AvatarRenderState, PlayerM
 *///?}
 
 //? if >= 1.21.4 {
+private fun playerFor(entityId: Int): AbstractClientPlayer? =
+    Minecraft.getInstance().level?.getEntity(entityId) as? AbstractClientPlayer
+
 private fun resolveEquipment(entityId: Int): CosmeticEquipment? {
     PlayerPreviewRenderer.previewEquipment(entityId)?.let { return it }
-    val level = Minecraft.getInstance().level ?: return null
-    val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return null
+    val entity = playerFor(entityId) ?: return null
     if (entity !is PlayerCosmeticsAccess) return null
     return entity.`polyplus$cosmeticEquipment`()
 }
 
-private fun resolveParticleColor(entityId: Int): Int? {
-    PlayerPreviewRenderer.previewParticleColor(entityId)?.let { return it }
-    val level = Minecraft.getInstance().level ?: return null
-    val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return null
-    return CosmeticCatalog.getParticleColor(entity.uuid)
-}
+private fun resolveParticleColor(entityId: Int): Int? =
+    PlayerPreviewRenderer.previewParticleColor(entityId)
+        ?: playerFor(entityId)?.let { CosmeticCatalog.getParticleColor(it.uuid) }
 
-private fun resolveChestplateEquipped(entityId: Int): Boolean {
-    val level = Minecraft.getInstance().level ?: return false
-    val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return false
-    return !entity.getItemBySlot(EquipmentSlot.CHEST).isEmpty
-}
+private fun resolveChestplateEquipped(entityId: Int): Boolean =
+    playerFor(entityId)?.getItemBySlot(EquipmentSlot.CHEST)?.isEmpty == false
 
-private fun resolveHiddenSlots(entityId: Int): Set<BodySlot> {
-    val level = Minecraft.getInstance().level ?: return emptySet()
-    val entity = level.getEntity(entityId) as? AbstractClientPlayer ?: return emptySet()
-    return hiddenSlotsFor(entity)
-}
+private fun resolveHiddenSlots(entityId: Int): Set<BodySlot> =
+    playerFor(entityId)?.let(::hiddenSlotsFor) ?: emptySet()
 //?} else {
 /*private fun resolveEquipment(player: AbstractClientPlayer): CosmeticEquipment? {
     PlayerPreviewRenderer.previewEquipment(player.id)?.let { return it }

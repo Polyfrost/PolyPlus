@@ -129,8 +129,20 @@ object OnboardingFeatures {
     internal fun completedModSettingsVersion(completedVersion: Int, available: List<ModCard>): Int =
         maxOf(completedVersion, available.maxOfOrNull { it.introducedIn } ?: completedVersion)
 
-    private fun ModCard.pendingApply(settled: Boolean): Boolean =
-        !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
+    private val ModCard.settled: Boolean
+        get() = when (this) {
+            ModCard.GRASS -> PolyPlusConfig.onboardingBetterGrassSettled
+            ModCard.FIRE_OVERLAY -> PolyPlusConfig.onboardingFireOverlaySettled
+            ModCard.SHIELD_HEIGHT -> PolyPlusConfig.onboardingShieldHeightSettled
+            ModCard.MOUNT -> PolyPlusConfig.onboardingMountOpacitySettled
+            ModCard.CAPES -> PolyPlusConfig.onboardingWaveyCapesSettled
+            ModCard.SKIN_LAYERS -> PolyPlusConfig.onboardingSkinLayersSettled
+            ModCard.ITEM -> PolyPlusConfig.onboardingItemPositionsSettled
+            ModCard.GAMMA -> PolyPlusConfig.onboardingGammaSettled
+        }
+
+    private val ModCard.pending: Boolean
+        get() = !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
 
     fun isDefaultItemScale(scale: Float): Boolean = abs(scale - ITEM_SCALE_DEFAULT) < 0.001f
 
@@ -142,14 +154,7 @@ object OnboardingFeatures {
         ModCard.ITEM,
     )
 
-    internal fun guideFlag(card: ModCard): Int = when (card) {
-        ModCard.GRASS -> 1
-        ModCard.FIRE_OVERLAY -> 2
-        ModCard.SHIELD_HEIGHT -> 4
-        ModCard.MOUNT -> 8
-        ModCard.ITEM -> 16
-        else -> 0
-    }
+    internal fun guideFlag(card: ModCard): Int = guidedCards.indexOf(card).let { if (it < 0) 0 else 1 shl it }
 
     @JvmStatic
     fun pendingGuides(): List<ModCard> {
@@ -171,14 +176,11 @@ object OnboardingFeatures {
         completedVersion: Int,
         available: Boolean,
         movedFromDefault: Boolean,
-    ): Boolean {
-        val flag = guideFlag(card)
-        return flag != 0 &&
-            shown and flag == 0 &&
-            available &&
-            completedVersion >= card.introducedIn &&
-            movedFromDefault
-    }
+    ): Boolean = card in guidedCards &&
+        shown and guideFlag(card) == 0 &&
+        available &&
+        completedVersion >= card.introducedIn &&
+        movedFromDefault
 
     @JvmStatic
     fun needsGuides(): Boolean = pendingGuides().isNotEmpty()
@@ -278,14 +280,14 @@ object OnboardingFeatures {
         if (!hasPendingModOptions()) return false
 
         var changed = false
-        if (ModCard.GRASS.pendingApply(PolyPlusConfig.onboardingBetterGrassSettled)) {
+        if (ModCard.GRASS.pending) {
             if (applyBetterGrass(PolyPlusConfig.onboardingBetterGrassMode)) {
                 PolyPlusConfig.onboardingBetterGrassSettled = true
                 changed = true
             }
         }
-        val fireOverlayPending = ModCard.FIRE_OVERLAY.pendingApply(PolyPlusConfig.onboardingFireOverlaySettled)
-        val shieldHeightPending = ModCard.SHIELD_HEIGHT.pendingApply(PolyPlusConfig.onboardingShieldHeightSettled)
+        val fireOverlayPending = ModCard.FIRE_OVERLAY.pending
+        val shieldHeightPending = ModCard.SHIELD_HEIGHT.pending
         if (fireOverlayPending || shieldHeightPending) {
             val applied = applyFireOverlay(
                 PolyPlusConfig.onboardingFireOverlayHeight,
@@ -300,25 +302,25 @@ object OnboardingFeatures {
                 changed = true
             }
         }
-        if (ModCard.MOUNT.pendingApply(PolyPlusConfig.onboardingMountOpacitySettled)) {
+        if (ModCard.MOUNT.pending) {
             if (applyHorseOpacity(PolyPlusConfig.onboardingHorseOpacity)) {
                 PolyPlusConfig.onboardingMountOpacitySettled = true
                 changed = true
             }
         }
-        if (ModCard.CAPES.pendingApply(PolyPlusConfig.onboardingWaveyCapesSettled)) {
+        if (ModCard.CAPES.pending) {
             if (applyWaveyCapes(PolyPlusConfig.onboardingWaveyCapes)) {
                 PolyPlusConfig.onboardingWaveyCapesSettled = true
                 changed = true
             }
         }
-        if (ModCard.SKIN_LAYERS.pendingApply(PolyPlusConfig.onboardingSkinLayersSettled)) {
+        if (ModCard.SKIN_LAYERS.pending) {
             if (applySkinLayers(PolyPlusConfig.onboardingSkinLayers)) {
                 PolyPlusConfig.onboardingSkinLayersSettled = true
                 changed = true
             }
         }
-        if (ModCard.GAMMA.pendingApply(PolyPlusConfig.onboardingGammaSettled)) {
+        if (ModCard.GAMMA.pending) {
             if (applyGamma(
                     PolyPlusConfig.onboardingGamma,
                     PolyPlusConfig.onboardingGammaToggled,
@@ -329,7 +331,7 @@ object OnboardingFeatures {
                 changed = true
             }
         }
-        if (ModCard.ITEM.pendingApply(PolyPlusConfig.onboardingItemPositionsSettled)) {
+        if (ModCard.ITEM.pending) {
             val applied = applyItemPosition(
                 PolyPlusConfig.onboardingItemOffsetX,
                 PolyPlusConfig.onboardingItemOffsetY,
@@ -356,15 +358,7 @@ object OnboardingFeatures {
         return changed
     }
 
-    private fun hasPendingModOptions(): Boolean =
-        ModCard.GRASS.pendingApply(PolyPlusConfig.onboardingBetterGrassSettled) ||
-            ModCard.FIRE_OVERLAY.pendingApply(PolyPlusConfig.onboardingFireOverlaySettled) ||
-            ModCard.SHIELD_HEIGHT.pendingApply(PolyPlusConfig.onboardingShieldHeightSettled) ||
-            ModCard.MOUNT.pendingApply(PolyPlusConfig.onboardingMountOpacitySettled) ||
-            ModCard.CAPES.pendingApply(PolyPlusConfig.onboardingWaveyCapesSettled) ||
-            ModCard.SKIN_LAYERS.pendingApply(PolyPlusConfig.onboardingSkinLayersSettled) ||
-            ModCard.GAMMA.pendingApply(PolyPlusConfig.onboardingGammaSettled) ||
-            ModCard.ITEM.pendingApply(PolyPlusConfig.onboardingItemPositionsSettled)
+    private fun hasPendingModOptions(): Boolean = ModCard.entries.any { it.pending }
 
     private fun logModApplyFailure(key: String, message: String, error: Throwable) {
         if (error is ClassNotFoundException) return
@@ -484,27 +478,24 @@ object OnboardingFeatures {
         logModApplyFailure("better-grass", "Could not apply the LambdaBetterGrass preference", it)
     }.getOrDefault(false)
 
-    internal class ConfigAccess internal constructor(
-        val instance: Any,
-        private val saveAction: () -> Unit,
-    ) {
-        fun save() = saveAction()
-    }
-
-    private fun handlerAccess(configClass: Class<*>): ConfigAccess {
+    private fun handlerAccess(configClass: Class<*>): Pair<Any, () -> Unit> {
         val handler = configClass.getField("CONFIG").get(null)
             ?: error("${configClass.simpleName} has no config handler")
         val instance = handler.javaClass.getMethod("instance").invoke(handler)
             ?: error("${configClass.simpleName} config is unavailable")
-        return ConfigAccess(instance) { handler.javaClass.getMethod("save").invoke(handler) }
+        val save: () -> Unit = { handler.javaClass.getMethod("save").invoke(handler) }
+        return instance to save
     }
 
-    internal fun overlayTweaksAccess(configClass: Class<*> = Class.forName(OVERLAY_TWEAKS_CONFIG)): ConfigAccess {
+    internal fun overlayTweaksAccess(
+        configClass: Class<*> = Class.forName(OVERLAY_TWEAKS_CONFIG),
+    ): Pair<Any, () -> Unit> {
         if (runCatching { configClass.getField("CONFIG") }.isSuccess) return handlerAccess(configClass)
 
         val instance = configClass.getField("INSTANCE").get(null)
             ?: error("Overlay Tweaks config is unavailable")
-        return ConfigAccess(instance) { configClass.getMethod("save").invoke(instance) }
+        val save: () -> Unit = { configClass.getMethod("save").invoke(instance) }
+        return instance to save
     }
 
     internal fun readFloatingField(instance: Any, name: String): Double {
@@ -522,17 +513,17 @@ object OnboardingFeatures {
     }
 
     fun currentFireOverlayHeight(): Double? = runCatching {
-        val instance = overlayTweaksAccess().instance
+        val instance = overlayTweaksAccess().first
         readFloatingField(instance, FIRE_OVERLAY_HEIGHT)
     }.getOrNull()
 
     fun currentFireOverlayOpacity(): Float? = runCatching {
-        val instance = overlayTweaksAccess().instance
+        val instance = overlayTweaksAccess().first
         readFloatingField(instance, FIRE_OVERLAY_OPACITY).toFloat()
     }.getOrNull()
 
     fun currentShieldHeight(): Float? = runCatching {
-        val instance = overlayTweaksAccess().instance
+        val instance = overlayTweaksAccess().first
         readFloatingField(instance, SHIELD_HEIGHT).toFloat()
     }.getOrNull()
 
@@ -543,8 +534,7 @@ object OnboardingFeatures {
         applyFireSettings: Boolean = true,
         applyShieldHeight: Boolean = true,
     ): Boolean = runCatching {
-        val access = overlayTweaksAccess()
-        val instance = access.instance
+        val (instance, save) = overlayTweaksAccess()
         if (applyFireSettings && fireOverlayAvailable) {
             writeFloatingField(instance, FIRE_OVERLAY_HEIGHT, height.coerceIn(FIRE_OVERLAY_MIN, FIRE_OVERLAY_MAX))
         }
@@ -562,22 +552,21 @@ object OnboardingFeatures {
                 shieldHeight.coerceIn(SHIELD_HEIGHT_MIN, SHIELD_HEIGHT_MAX).toDouble(),
             )
         }
-        access.save()
+        save()
         true
     }.onFailure {
         logModApplyFailure("overlay-tweaks", "Could not apply the Overlay Tweaks preference", it)
     }.getOrDefault(false)
 
-    private fun mountOpacityAccess(): ConfigAccess = handlerAccess(Class.forName(MOUNT_OPACITY_CONFIG))
+    private fun mountOpacityAccess(): Pair<Any, () -> Unit> = handlerAccess(Class.forName(MOUNT_OPACITY_CONFIG))
 
     fun currentHorseOpacity(): Float? = runCatching {
-        val instance = mountOpacityAccess().instance
+        val instance = mountOpacityAccess().first
         instance.javaClass.getField(HORSE_OPACITY).getFloat(instance)
     }.getOrNull()
 
     fun applyHorseOpacity(opacity: Float): Boolean = runCatching {
-        val access = mountOpacityAccess()
-        val instance = access.instance
+        val (instance, save) = mountOpacityAccess()
         val value = opacity.coerceIn(HORSE_OPACITY_MIN, HORSE_OPACITY_MAX)
         var applied = false
         for (field in MOUNT_OPACITY_FIELDS) {
@@ -585,7 +574,7 @@ object OnboardingFeatures {
                 .onSuccess { applied = true }
         }
         if (!applied) error("Mount Opacity has no opacity fields")
-        access.save()
+        save()
         true
     }.onFailure {
         logModApplyFailure("mount-opacity", "Could not apply the Mount Opacity preference", it)
@@ -758,7 +747,7 @@ object OnboardingFeatures {
             .onFailure { logger.warn("Could not reload Animatium after applying the preference", it) }
     }
 
-    private fun setBoolean(instance: Any, method: String, value: Boolean) {
+    internal fun setBoolean(instance: Any, method: String, value: Boolean) {
         val fn = runCatching { instance.javaClass.getMethod(method, Boolean::class.javaPrimitiveType) }.getOrNull()
         if (fn == null) {
             logger.debug("PolyBlur has no {}, skipping", method)
@@ -767,11 +756,11 @@ object OnboardingFeatures {
         fn.invoke(instance, value)
     }
 
-    private fun setInt(instance: Any, method: String, value: Int) {
+    internal fun setInt(instance: Any, method: String, value: Int) {
         instance.javaClass.getMethod(method, Int::class.javaPrimitiveType).invoke(instance, value)
     }
 
-    private fun setFloat(instance: Any, method: String, value: Float) {
+    internal fun setFloat(instance: Any, method: String, value: Float) {
         instance.javaClass.getMethod(method, Float::class.javaPrimitiveType).invoke(instance, value)
     }
 
@@ -799,7 +788,7 @@ object OnboardingFeatures {
     private const val PERFORMANCE_SAMPLES = 8f // motionBlurSamples slider range 4..32
     private const val QUALITY_SAMPLES = 16f
     private const val POLYSPRINT_CONFIG = "org.polyfrost.polysprint.client.PolySprintConfig"
-    private const val POLYBLUR_CONFIG = "org.polyfrost.polyblur.client.PolyBlurConfig"
+    internal const val POLYBLUR_CONFIG = "org.polyfrost.polyblur.client.PolyBlurConfig"
 
     private const val LBG_MOD = "dev.lambdaurora.lambdabettergrass.LambdaBetterGrass"
     private const val LBG_MODE = "dev.lambdaurora.lambdabettergrass.LBGMode"

@@ -98,6 +98,7 @@ import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.player.RemotePlayer
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.Collections
 import kotlinx.coroutines.launch
 //?}
@@ -303,8 +304,7 @@ object PlayerPreviewRenderer {
         val fadePx = w * EDGE_FADE_FRACTION
         for (x in 0 until w) {
             val d = minOf(x + 0.5f, w - 0.5f - x) // distance from nearest edge at pixel center
-            val t = if (fadePx <= 0f) 1f else (d / fadePx).coerceIn(0f, 1f)
-            cols[x] = t * t * t * (t * (t * 6f - 15f) + 10f)
+            cols[x] = if (fadePx <= 0f) 1f else smooth(d / fadePx)
         }
         return cols
     }
@@ -314,8 +314,7 @@ object PlayerPreviewRenderer {
         val fadePx = h * EDGE_FADE_FRACTION
         for (r in 0 until h) {
             val d = r + 0.5f // distance from top edge at pixel center
-            val t = if (fadePx <= 0f) 1f else (d / fadePx).coerceIn(0f, 1f)
-            rows[r] = t * t * t * (t * (t * 6f - 15f) + 10f)
+            rows[r] = if (fadePx <= 0f) 1f else smooth(d / fadePx)
         }
         return rows
     }
@@ -643,42 +642,26 @@ object PlayerPreviewRenderer {
         }
     }
 
-    //? if >= 1.21.10 {
-    private fun renderEntity(mc: Minecraft, level: ClientLevel, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
-        val player = dummy(mc, level) ?: run {
-            LOG.debug("[preview] skipping frame: preview avatar not built yet")
-            return
-        }
-        bindEquipment(player, source)
-        player.setYRot(0f); player.yRotO = 0f
-        player.yBodyRot = 0f; player.yBodyRotO = 0f
-        player.yHeadRot = 0f; player.yHeadRotO = 0f
-        player.setXRot(0f); player.xRotO = 0f
-        if (mc.entityRenderDispatcher.getRenderer(player) == null) return
-        val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
-        state.lightCoords = 0xF000F0
-        state.showCape = source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
-        capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
-        state.bodyRot = yawDeg
-        state.yRot = 0f
-        state.xRot = 0f
-        val bbH = state.boundingBoxHeight / state.scale
-        state.boundingBoxWidth /= state.scale
-        state.boundingBoxHeight = bbH
-        state.scale = 1f
-
+    private fun previewPose(w: Int, h: Int, modelScale: Float, verticalAnchor: Float, bbH: Float): PoseStack {
         val scale = h * modelScale
         val pose = PoseStack()
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
+        return pose
+    }
 
+    private fun setupUiLighting(mc: Minecraft) {
         //? if >= 26.2 {
         mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
         //?} else {
         /*mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
         *///?}
+    }
+
+    //? if >= 1.21.10 {
+    private fun submitPreviewFrame(mc: Minecraft, state: AvatarRenderState, source: PlayerPreviewSource, pose: PoseStack, yawDeg: Float) {
         val camera = CameraRenderState().apply {
             orientation = Quaternionf().rotateY(Math.PI.toFloat())
             pos = Vec3.ZERO
@@ -704,6 +687,36 @@ object PlayerPreviewRenderer {
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
         *///?}
+    }
+    //?}
+
+    //? if >= 1.21.10 {
+    private fun renderEntity(mc: Minecraft, level: ClientLevel, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
+        val player = dummy(mc, level) ?: run {
+            LOG.debug("[preview] skipping frame: preview avatar not built yet")
+            return
+        }
+        bindEquipment(player, source)
+        player.setYRot(0f); player.yRotO = 0f
+        player.yBodyRot = 0f; player.yBodyRotO = 0f
+        player.yHeadRot = 0f; player.yHeadRotO = 0f
+        player.setXRot(0f); player.xRotO = 0f
+        if (mc.entityRenderDispatcher.getRenderer(player) == null) return
+        val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
+        state.lightCoords = 0xF000F0
+        state.showCape = source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
+        capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
+        state.bodyRot = yawDeg
+        state.yRot = 0f
+        state.xRot = 0f
+        val bbH = state.boundingBoxHeight / state.scale
+        state.boundingBoxWidth /= state.scale
+        state.boundingBoxHeight = bbH
+        state.scale = 1f
+
+        val pose = previewPose(w, h, modelScale, verticalAnchor, bbH)
+        setupUiLighting(mc)
+        submitPreviewFrame(mc, state, source, pose, yawDeg)
     }
     //?}
 
@@ -739,44 +752,10 @@ object PlayerPreviewRenderer {
         state.scale = 1f
         val bbH = PLAYER_BB_HEIGHT
 
-        val scale = h * modelScale
-        val pose = PoseStack()
-        pose.translate(w / 2f, h * verticalAnchor, 0f)
-        pose.scale(scale, scale, -scale)
-        pose.translate(0f, bbH / 2f, 0f)
-        pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
-
-        //? if >= 26.2 {
-        mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
-        //?} else {
-        /*mc.gameRenderer.lighting.setupFor(Lighting.Entry.ENTITY_IN_UI)
-        *///?}
+        val pose = previewPose(w, h, modelScale, verticalAnchor, bbH)
+        setupUiLighting(mc)
         //? if >= 1.21.10 {
-        val camera = CameraRenderState().apply {
-            orientation = Quaternionf().rotateY(Math.PI.toFloat())
-            pos = Vec3.ZERO
-            //? if < 26.1 {
-            /*entityPos = Vec3.ZERO
-            *///?}
-        }
-        //? if >= 26.3 {
-        val submitStorage = SubmitNodeStorage()
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
-        renderFeatures(mc, submitStorage)
-        //?} elif >= 26.2 {
-        /*val features = mc.gameRenderer.featureRenderDispatcher()
-        val submitStorage = SubmitNodeStorage()
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
-        features.renderAllFeatures(submitStorage)
-        *///?} else {
-        /*val features = mc.gameRenderer.featureRenderDispatcher
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
-        features.renderAllFeatures()
-        mc.renderBuffers().bufferSource().endBatch()
-        *///?}
+        submitPreviewFrame(mc, state, source, pose, yawDeg)
         //?} else {
         /*val bufferSource = mc.renderBuffers().bufferSource()
         // render draws a ground shadow that dereferences mc.level and NPEs off-world
@@ -906,7 +885,7 @@ object PlayerPreviewRenderer {
                 equipment.equip(attached)
             } else if (loadAttempted.add(id)) {
                 PolyPlusClient.SCOPE.launch {
-                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                    runSuspendCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
                 }
             }
         }

@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object CosmeticCatalog {
     private val LOGGER = LogManager.getLogger()
@@ -50,8 +51,6 @@ object CosmeticCatalog {
     fun getEmoteDefinition(id: Int): CosmeticDefinition? = emoteDefinitions[id]
 
     fun allDefinitions(): Collection<CosmeticDefinition> = cosmeticDefinitions.values + emoteDefinitions.values
-
-    fun allCosmeticDefinitions(): Collection<CosmeticDefinition> = cosmeticDefinitions.values
 
     fun allEmoteDefinitions(): Collection<CosmeticDefinition> = emoteDefinitions.values
 
@@ -80,9 +79,6 @@ object CosmeticCatalog {
     fun getActiveId(uuid: UUID, slot: BodySlot): Int? =
         remoteEquipped[uuid]?.get(slot)
 
-    fun getEquippedId(uuid: UUID, slot: BodySlot): Int? =
-        remoteEquipped[uuid]?.get(slot)
-
     fun localEquipped(): EquippedCosmetics = localEquipped
 
     fun selectedEmoteId(): Int? = selectedEmoteId
@@ -98,7 +94,7 @@ object CosmeticCatalog {
     fun ownedEmoteIds(): Set<Int> = ownedEmoteIds
 
     suspend fun refreshCatalog() {
-        val cosmetics = runCatching {
+        val cosmetics = runSuspendCatching {
             PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics") {
                 expectSuccess = true
             }.bodyOrThrow<CosmeticList>()
@@ -213,18 +209,18 @@ object CosmeticCatalog {
         )
         PolyPlusClient.SCOPE.launch {
             try {
-                runCatching { CosmeticAssetCache.preloadDefinitions(equipped, trackProgress = true) }
+                runSuspendCatching { CosmeticAssetCache.preloadDefinitions(equipped, trackProgress = true) }
                     .onFailure { LOGGER.error("Failed to preload equipped cosmetic assets", it) }
             } finally {
                 CosmeticLoadProgress.onAssetsComplete(assetsToken)
             }
-            runCatching { CosmeticAssetCache.preloadDefinitions(rest) }
+            runSuspendCatching { CosmeticAssetCache.preloadDefinitions(rest) }
                 .onFailure { LOGGER.error("Failed to preload owned cosmetic assets", it) }
         }
         //?}
     }
 
-    suspend fun setEquipped(partial: PartialEquippedCosmetics): Result<Unit> = runCatching {
+    suspend fun setEquipped(partial: PartialEquippedCosmetics): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.putAuthorized("${PolyPlusConfig.apiUrl}/cosmetics/player") {
             contentType(ContentType.Application.Json)
             setBody(SetEquippedCosmeticsRequest(partial.equipped))

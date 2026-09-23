@@ -1,10 +1,28 @@
 package org.polyfrost.polyplus.privacy
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import net.fabricmc.loader.api.FabricLoader
 import java.io.File
 
 object PrivacyConsent {
     enum class State { UNSET, ACCEPTED, DECLINED }
+
+    // we cannot use PolyPlusClient's Json instance here because this is read during pre-launch
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    @Serializable
+    private data class Stored(
+        val state: String = "unset",
+        @SerialName("terms_version") val termsVersion: Int = 0,
+        @SerialName("privacy_version") val privacyVersion: Int = 0,
+        @SerialName("recorded_at") val recordedAt: Long = 0,
+    )
 
     private val lock = Any()
 
@@ -30,18 +48,6 @@ object PrivacyConsent {
     fun state(): State {
         if (!loaded) load()
         return state
-    }
-
-    @JvmStatic
-    fun acceptedTermsVersion(): Int {
-        if (!loaded) load()
-        return termsVersion
-    }
-
-    @JvmStatic
-    fun acceptedPrivacyVersion(): Int {
-        if (!loaded) load()
-        return privacyVersion
     }
 
     @JvmStatic
@@ -78,14 +84,16 @@ object PrivacyConsent {
         synchronized(lock) {
             if (loaded) return
             loaded = true
-            val text = runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull() ?: return
-            state = when (stringField(text, "state")?.lowercase()) {
+            val stored = runCatching {
+                file.takeIf { it.isFile }?.readText()?.let { json.decodeFromString<Stored>(it) }
+            }.getOrNull() ?: return
+            state = when (stored.state.lowercase()) {
                 "accepted" -> State.ACCEPTED
                 "declined" -> State.DECLINED
                 else -> State.UNSET
             }
-            termsVersion = intField(text, "terms_version") ?: 0
-            privacyVersion = intField(text, "privacy_version") ?: 0
+            termsVersion = stored.termsVersion
+            privacyVersion = stored.privacyVersion
         }
     }
 
@@ -94,21 +102,10 @@ object PrivacyConsent {
             val target = file
             target.parentFile?.mkdirs()
             target.writeText(
-                """
-                {
-                  "state": "${state.name.lowercase()}",
-                  "terms_version": $termsVersion,
-                  "privacy_version": $privacyVersion,
-                  "recorded_at": ${System.currentTimeMillis()}
-                }
-                """.trimIndent(),
+                json.encodeToString(
+                    Stored(state.name.lowercase(), termsVersion, privacyVersion, System.currentTimeMillis()),
+                ),
             )
         }
     }
-
-    private fun stringField(text: String, name: String): String? =
-        Regex("\"$name\"\\s*:\\s*\"([^\"]*)\"").find(text)?.groupValues?.getOrNull(1)
-
-    private fun intField(text: String, name: String): Int? =
-        Regex("\"$name\"\\s*:\\s*(\\d+)").find(text)?.groupValues?.getOrNull(1)?.toIntOrNull()
 }

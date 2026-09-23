@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.bedrock.playback
 
 import org.joml.Vector3f
+//? if > 1.8.9 {
+import net.minecraft.util.Mth
+//?}
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.BoneAnimation
@@ -91,15 +94,25 @@ object AnimationSampler {
         alpha: Float,
         easing: EasingMode,
     ): Vector3f {
-        if (easing == EasingMode.CATMULLROM) {
-            val p0 = previous ?: Vector3f(from)
-            val p1 = Vector3f(from)
-            val p2 = Vector3f(to)
-            val p3 = next ?: Vector3f(to)
-            return catmullRom(p0, p1, p2, p3, alpha.coerceIn(0f, 1f))
-        }
-
         val clamped = alpha.coerceIn(0f, 1f)
+
+        if (easing == EasingMode.CATMULLROM) {
+            val p0 = previous ?: from
+            val p3 = next ?: to
+            //? if > 1.8.9 {
+            return Vector3f(
+                Mth.catmullrom(clamped, p0.x, from.x, to.x, p3.x),
+                Mth.catmullrom(clamped, p0.y, from.y, to.y, p3.y),
+                Mth.catmullrom(clamped, p0.z, from.z, to.z, p3.z),
+            )
+            //?} else {
+            /*return Vector3f(
+                catmullRom(clamped, p0.x, from.x, to.x, p3.x),
+                catmullRom(clamped, p0.y, from.y, to.y, p3.y),
+                catmullRom(clamped, p0.z, from.z, to.z, p3.z),
+            )
+            *///?}
+        }
 
         val t = when (easing) {
             EasingMode.STEP -> if (clamped >= 1f) 1f else 0f
@@ -109,24 +122,13 @@ object AnimationSampler {
             EasingMode.LINEAR -> clamped
         }
 
-        return Vector3f(
-            from.x + (to.x - from.x) * t,
-            from.y + (to.y - from.y) * t,
-            from.z + (to.z - from.z) * t,
-        )
+        return Vector3f(from).lerp(to, t)
     }
 
-    private fun catmullRom(p0: Vector3f, p1: Vector3f, p2: Vector3f, p3: Vector3f, t: Float): Vector3f {
+    //? if = 1.8.9 {
+    /*private fun catmullRom(t: Float, p0: Float, p1: Float, p2: Float, p3: Float): Float {
         val t2 = t * t
         val t3 = t2 * t
-        return Vector3f(
-            catmullRomComponent(p0.x, p1.x, p2.x, p3.x, t, t2, t3),
-            catmullRomComponent(p0.y, p1.y, p2.y, p3.y, t, t2, t3),
-            catmullRomComponent(p0.z, p1.z, p2.z, p3.z, t, t2, t3),
-        )
-    }
-
-    private fun catmullRomComponent(p0: Float, p1: Float, p2: Float, p3: Float, t: Float, t2: Float, t3: Float): Float {
         return 0.5f * (
             (2f * p1) +
                 (-p0 + p2) * t +
@@ -134,4 +136,5 @@ object AnimationSampler {
                 (-p0 + 3f * p1 - 3f * p2 + p3) * t3
             )
     }
+    *///?}
 }

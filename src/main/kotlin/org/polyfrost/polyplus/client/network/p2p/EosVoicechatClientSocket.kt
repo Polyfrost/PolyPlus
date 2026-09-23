@@ -28,7 +28,7 @@ internal class EosVoicechatClientSocket(
 
     override fun read(): RawUdpPacket {
         while (!closed) {
-            val data = inbound.poll(READ_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
+            val data = inbound.poll(EosVoicechatBridge.READ_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
             return EosRawUdpPacket(data, System.currentTimeMillis(), EosVoicechatAddress(host))
         }
         throw IOException("Voice chat socket to $host was closed")

@@ -11,25 +11,14 @@ enum class MsaAuthStep {
 }
 
 class MicrosoftAuthException(
-    val whatHappened: String,
+    message: String,
     val stepsToFix: List<String>,
     cause: Throwable? = null,
-) : Exception(whatHappened, cause)
+) : Exception(message, cause)
 
 object MicrosoftAuthErrors {
-    fun friendlyXboxError(code: Long): String? = when (code) {
-        2_148_916_227L -> "This account has been banned or suspended from Xbox."
-        2_148_916_229L -> "This account is a child account that must be added to a Family group by an adult before signing in."
-        2_148_916_233L -> "This Microsoft account does not have an Xbox profile yet. Create one at xbox.com, then try again."
-        2_148_916_234L -> "This account has not accepted the Xbox Terms of Service. Sign in at xbox.com to accept them first."
-        2_148_916_235L -> "Xbox Live is not available in your country or region, so sign-in is blocked."
-        2_148_916_236L, 2_148_916_237L -> "This account requires adult verification (South Korea) before it can sign in."
-        2_148_916_238L -> "This is a child account. An adult must add it to a Microsoft Family group before it can sign in."
-        else -> null
-    }
-
     fun forXerr(code: Long, cause: Throwable? = null): MicrosoftAuthException = when (code) {
-        2_148_916_222L -> build(
+        2_148_916_222L -> MicrosoftAuthException(
             "This account requires age verification to comply with UK regulations before it can sign in.",
             listOf(
                 "Go to the Minecraft login page and sign in (https://www.minecraft.net/en-us/login)",
@@ -39,7 +28,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_227L -> build(
+        2_148_916_227L -> MicrosoftAuthException(
             "This account was suspended for violating Xbox Community Standards.",
             listOf(
                 "Visit Xbox Support and review the enforcement details (https://support.xbox.com)",
@@ -47,7 +36,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_229L -> build(
+        2_148_916_229L -> MicrosoftAuthException(
             "This account is restricted and does not have permission to play online.",
             listOf(
                 "Have a guardian sign in to Microsoft Family (https://account.microsoft.com/family/)",
@@ -56,7 +45,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_233L -> build(
+        2_148_916_233L -> MicrosoftAuthException(
             "This account does not have an Xbox profile set up, or does not own Minecraft.",
             listOf(
                 "Make sure Minecraft is purchased on this account",
@@ -66,7 +55,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_234L -> build(
+        2_148_916_234L -> MicrosoftAuthException(
             "This account has not accepted Xbox's Terms of Service.",
             listOf(
                 "Visit Xbox and sign in (https://www.xbox.com)",
@@ -75,7 +64,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_235L -> build(
+        2_148_916_235L -> MicrosoftAuthException(
             "Xbox Live is not available in your region, so sign-in is blocked.",
             listOf(
                 "Xbox services must be supported in your country before you can sign in",
@@ -83,7 +72,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_236L, 2_148_916_237L -> build(
+        2_148_916_236L, 2_148_916_237L -> MicrosoftAuthException(
             "This account requires adult verification under South Korean regulations.",
             listOf(
                 "Visit Xbox and sign in (https://www.xbox.com)",
@@ -92,7 +81,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        2_148_916_238L -> build(
+        2_148_916_238L -> MicrosoftAuthException(
             "This account is underage and not linked to a Microsoft family group.",
             listOf(
                 "Review the Minecraft Family Setup guide (https://help.minecraft.net/hc/en-us/articles/4408968616077)",
@@ -107,7 +96,7 @@ object MicrosoftAuthErrors {
     fun forService(step: MsaAuthStep, statusCode: Int, cause: Throwable? = null): MicrosoftAuthException {
         if (step == MsaAuthStep.MinecraftToken) {
             if (statusCode == 429) {
-                return build(
+                return MicrosoftAuthException(
                     "Microsoft or Minecraft temporarily blocked the sign-in because there were too many recent attempts.",
                     listOf(
                         "Wait about an hour before trying again",
@@ -119,7 +108,7 @@ object MicrosoftAuthErrors {
                 )
             }
             if (statusCode in 500..599) {
-                return build(
+                return MicrosoftAuthException(
                     "Minecraft's authentication service is returning a server error, so sign-in cannot finish right now.",
                     listOf(
                         "Wait a few minutes and try signing in again",
@@ -134,7 +123,7 @@ object MicrosoftAuthErrors {
         return forStep(step, cause)
     }
 
-    fun deviceExpired(cause: Throwable? = null): MicrosoftAuthException = build(
+    fun deviceExpired(cause: Throwable? = null): MicrosoftAuthException = MicrosoftAuthException(
         "The sign-in code expired before the Microsoft sign-in was finished.",
         listOf(
             "Start the sign-in again to get a fresh code",
@@ -144,7 +133,7 @@ object MicrosoftAuthErrors {
         cause,
     )
 
-    fun deviceFailed(message: String, cause: Throwable? = null): MicrosoftAuthException = build(
+    fun deviceFailed(message: String, cause: Throwable? = null): MicrosoftAuthException = MicrosoftAuthException(
         "The Microsoft sign-in could not be completed ($message).",
         listOf(
             "Start the sign-in again",
@@ -155,7 +144,7 @@ object MicrosoftAuthErrors {
     )
 
     fun forStep(step: MsaAuthStep, cause: Throwable? = null): MicrosoftAuthException = when (step) {
-        MsaAuthStep.DeviceCodeRequest -> build(
+        MsaAuthStep.DeviceCodeRequest -> MicrosoftAuthException(
             "PolyPlus could not start the Microsoft sign-in, so no sign-in code could be created.",
             listOf(
                 "Check that your internet connection is working",
@@ -165,7 +154,7 @@ object MicrosoftAuthErrors {
             cause,
         )
         MsaAuthStep.DeviceCodePoll -> deviceExpired(cause)
-        MsaAuthStep.AuthCodeExchange -> build(
+        MsaAuthStep.AuthCodeExchange -> MicrosoftAuthException(
             "Your saved Microsoft sign-in has expired or was revoked, so your Minecraft session could not be renewed.",
             listOf(
                 "Start the sign-in again",
@@ -174,7 +163,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        MsaAuthStep.XblAuthenticate -> build(
+        MsaAuthStep.XblAuthenticate -> MicrosoftAuthException(
             "Xbox rejected the first sign-in step. This is most often caused by your system clock or time zone being out of sync, or by a temporary Xbox block.",
             listOf(
                 "Open your system date and time settings",
@@ -185,7 +174,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        MsaAuthStep.XstsAuthorize -> build(
+        MsaAuthStep.XstsAuthorize -> MicrosoftAuthException(
             "Xbox rejected the request to authorize this account for Minecraft, but did not return a specific account restriction we recognise.",
             listOf(
                 "Sign in with the official Minecraft Launcher (https://www.minecraft.net/en-us/download)",
@@ -195,7 +184,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        MsaAuthStep.MinecraftProfile -> build(
+        MsaAuthStep.MinecraftProfile -> MicrosoftAuthException(
             "Minecraft services could not return a Java Edition profile for this account. This usually means the game was purchased recently, the Java profile is not finished being created, or the wrong Microsoft account is being used.",
             listOf(
                 "Sign in with the official Minecraft Launcher and launch Java Edition once (https://www.minecraft.net/en-us/download)",
@@ -205,7 +194,7 @@ object MicrosoftAuthErrors {
             ),
             cause,
         )
-        MsaAuthStep.MinecraftToken -> build(
+        MsaAuthStep.MinecraftToken -> MicrosoftAuthException(
             "Minecraft's authentication service could not finish signing you in.",
             listOf(
                 "Wait a few minutes and try signing in again",
@@ -215,7 +204,7 @@ object MicrosoftAuthErrors {
         )
     }
 
-    fun network(cause: Throwable? = null): MicrosoftAuthException = build(
+    fun network(cause: Throwable? = null): MicrosoftAuthException = MicrosoftAuthException(
         "PolyPlus could not connect to a Microsoft, Xbox, or Minecraft service needed for sign-in. This is usually a local network, DNS, proxy, firewall, hosts file, VPN, or antivirus issue.",
         listOf(
             "Check that your internet connection is working",
@@ -226,7 +215,4 @@ object MicrosoftAuthErrors {
         ),
         cause,
     )
-
-    private fun build(whatHappened: String, stepsToFix: List<String>, cause: Throwable?) =
-        MicrosoftAuthException(whatHappened, stepsToFix, cause)
 }

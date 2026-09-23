@@ -121,8 +121,6 @@ private fun PlayerPreviewLive(
         entry.opacity = overlayOpacity.coerceIn(0f, 1f)
     }
 
-    val holeModifier: Modifier = Modifier
-
     val dragModifier: Modifier =
         if (allowDrag) {
             Modifier.pointerInput(entry) {
@@ -131,9 +129,9 @@ private fun PlayerPreviewLive(
                     onDragEnd = { entry.dragging = false },
                     onDragCancel = { entry.dragging = false },
                 ) { change, drag ->
-                    entry.dragYaw -= drag.x * LIVE_DRAG_YAW_SENSITIVITY
-                    entry.dragPitch = (entry.dragPitch + drag.y * LIVE_DRAG_PITCH_SENSITIVITY)
-                        .coerceIn(-LIVE_MAX_PITCH, LIVE_MAX_PITCH)
+                    entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
+                    entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
+                        .coerceIn(-MAX_PITCH, MAX_PITCH)
                     change.consume()
                 }
             }
@@ -142,7 +140,7 @@ private fun PlayerPreviewLive(
         }
 
     Box(
-        modifier.then(holeModifier).then(dragModifier).onGloballyPositioned { coords ->
+        modifier.then(dragModifier).onGloballyPositioned { coords ->
             var root = coords
             while (true) { root = root.parentLayoutCoordinates ?: break }
             val rw = root.size.width.toFloat()
@@ -249,7 +247,3 @@ private const val AUTO_SPIN_DEG_PER_TICK = 0.6f
 private const val DRAG_YAW_SENSITIVITY = 0.5f
 private const val DRAG_PITCH_SENSITIVITY = 0.5f
 private const val MAX_PITCH = 45f
-
-private const val LIVE_DRAG_YAW_SENSITIVITY = 0.5f
-private const val LIVE_DRAG_PITCH_SENSITIVITY = 0.5f
-private const val LIVE_MAX_PITCH = 45f

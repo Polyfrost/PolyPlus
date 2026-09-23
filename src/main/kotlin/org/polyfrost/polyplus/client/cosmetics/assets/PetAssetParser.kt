@@ -17,49 +17,27 @@ import org.polyfrost.polyplus.client.utils.optionalString
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import javax.imageio.ImageIO
 
 internal object PetAssetParser {
     private val logger: Logger = LoggerFactory.getLogger("${PolyPlusConstants.ID}/pets")
 
-    fun peekArchetype(root: Path): PetArchetype? {
+    private fun peekManifest(root: Path): JsonObject? {
         val manifestAsset = DiskAssetReader.findFirst(root) { it == "pet.json" } ?: return null
         return try {
-            manifestAsset.open().use { stream ->
-                val manifest = JsonParser.parseReader(stream.reader()).asJsonObject
-                PetArchetype.fromSerializedName(manifest.optionalString("archetype"))
-            }
+            manifestAsset.open().use { JsonParser.parseReader(it.reader()).asJsonObject }
         } catch (ex: Exception) {
-            logger.warn("Failed to read pet manifest archetype at {}", manifestAsset.relativePath, ex)
+            logger.warn("Failed to read pet manifest at {}", manifestAsset.relativePath, ex)
             null
         }
     }
 
-    fun peekScale(root: Path): Float {
-        val manifestAsset = DiskAssetReader.findFirst(root) { it == "pet.json" } ?: return 1f
-        return try {
-            manifestAsset.open().use { stream ->
-                val manifest = JsonParser.parseReader(stream.reader()).asJsonObject
-                manifest.optionalFloat("scale", 1f)
-            }
-        } catch (ex: Exception) {
-            logger.warn("Failed to read pet manifest scale at {}", manifestAsset.relativePath, ex)
-            1f
-        }
-    }
+    fun peekArchetype(root: Path): PetArchetype? =
+        peekManifest(root)?.let { PetArchetype.fromSerializedName(it.optionalString("archetype")) }
 
-    fun peekAnchor(root: Path): PlayerModelBone? {
-        val manifestAsset = DiskAssetReader.findFirst(root) { it == "pet.json" } ?: return null
-        return try {
-            manifestAsset.open().use { stream ->
-                val manifest = JsonParser.parseReader(stream.reader()).asJsonObject
-                PlayerModelBone.fromBedrockNameOrNull(manifest.optionalString("anchor"))
-            }
-        } catch (ex: Exception) {
-            logger.warn("Failed to read pet manifest anchor at {}", manifestAsset.relativePath, ex)
-            null
-        }
-    }
+    fun peekScale(root: Path): Float = peekManifest(root)?.optionalFloat("scale", 1f) ?: 1f
+
+    fun peekAnchor(root: Path): PlayerModelBone? =
+        peekManifest(root)?.let { PlayerModelBone.fromBedrockNameOrNull(it.optionalString("anchor")) }
 
     fun parse(cosmeticId: Int, root: Path): PetDefinition? {
         val manifestAsset = DiskAssetReader.findFirst(root) { it == "pet.json" } ?: run {
@@ -87,7 +65,7 @@ internal object PetAssetParser {
             return null
         }
 
-        val textureFile = findTexture(root) ?: run {
+        val textureFile = DiskAssetReader.findTexture(root) ?: run {
             logger.warn("Pet cosmetic {} bundle has no texture (.png)", cosmeticId)
             return null
         }
@@ -111,7 +89,6 @@ internal object PetAssetParser {
                 controller = loadController(root, manifest.optionalString("controller")),
                 stateMap = readStateMap(manifest),
                 leashRadius = manifest.optionalFloat("leashRadius", 3f),
-                moveSpeed = manifest.optionalFloat("moveSpeed", 0.3f),
                 scale = manifest.optionalFloat("scale", 1f),
             )
         } catch (ex: Exception) {
@@ -176,16 +153,9 @@ internal object PetAssetParser {
         return result
     }
 
-    private fun findTexture(root: Path): Path? {
-        val pngs = DiskAssetReader.walk(root) { it.endsWith(".png") }
-        if (pngs.isEmpty()) return null
-        val preferred = pngs.firstOrNull { it.relativePath.startsWith("textures/") }
-        return (preferred ?: pngs.first()).file
-    }
-
     private fun detectFrameCount(textureFile: Path, declaredHeight: Int): Int {
         if (declaredHeight <= 0) return 1
-        val pixelHeight = runCatching { ImageIO.read(textureFile.toFile())?.height }.getOrNull() ?: return 1
+        val pixelHeight = DiskAssetReader.pngSize(textureFile)?.second ?: return 1
         if (pixelHeight <= declaredHeight || pixelHeight % declaredHeight != 0) return 1
         return pixelHeight / declaredHeight
     }

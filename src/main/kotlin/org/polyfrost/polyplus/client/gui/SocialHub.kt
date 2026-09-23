@@ -43,8 +43,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.polyplus.client.network.http.responses.GroupKind
-import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.FriendsRepository
@@ -93,7 +91,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                     !group.special || specialFilter == SpecialChatResponses.Filter.All ||
                         (group.id in respondedChats) == (specialFilter == SpecialChatResponses.Filter.Responded)
                     ) &&
-                (searchQuery.isBlank() || rawConversationTitle(group, selfId, names).contains(searchQuery, ignoreCase = true))
+                (searchQuery.isBlank() || conversationTitle(group, selfId) { names[it] ?: it.take(8) }.contains(searchQuery, ignoreCase = true))
         }
     }
 
@@ -236,7 +234,6 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
                                 )
                             }
                         }
-                        SocialTab.Global -> GlobalChatView(selfId = selfId)
                         SocialTab.Friends -> FriendsManagementView(
                             friends = friends,
                             incomingRequests = incomingRequests,
@@ -494,12 +491,3 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
 
 private fun localPlayerName(): String = runCatching { Minecraft.getInstance().user.name }.getOrDefault("Player")
 
-internal fun rawConversationTitle(group: GroupSummary, selfId: String, names: Map<String, String>): String {
-    if (group.kind == GroupKind.Group) {
-        group.name?.let { return it }
-        val others = group.members.filterNot { it == selfId }
-        return if (others.isEmpty()) "Group" else others.joinToString { names[it] ?: it.take(8) }
-    }
-    val other = group.members.firstOrNull { it != selfId } ?: return "You"
-    return names[other] ?: other.take(8)
-}

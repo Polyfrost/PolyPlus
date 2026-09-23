@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.bedrock.geometry
 
 import org.joml.Vector3f
+//? if > 1.8.9 {
+import net.minecraft.util.Mth
+//?}
 
 fun bedrockPivotOffset(pivot: Vector3f, reference: Vector3f): Vector3f = Vector3f(
     pivot.x - reference.x,
@@ -8,11 +11,15 @@ fun bedrockPivotOffset(pivot: Vector3f, reference: Vector3f): Vector3f = Vector3
     pivot.z - reference.z,
 )
 
-fun Vector3f.bedrockRotationRadians(): Vector3f = Vector3f(
+//? if > 1.8.9 {
+fun Vector3f.bedrockRotationRadians(): Vector3f = Vector3f(this).mul(Mth.DEG_TO_RAD)
+//?} else {
+/*fun Vector3f.bedrockRotationRadians(): Vector3f = Vector3f(
     Math.toRadians(x.toDouble()).toFloat(),
     Math.toRadians(y.toDouble()).toFloat(),
     Math.toRadians(z.toDouble()).toFloat(),
 )
+*///?}
 
 fun BedrockBone.initialEffectPosition(
     bones: Map<String, BedrockBone>,

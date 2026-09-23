@@ -11,7 +11,6 @@ import java.time.Instant
 import java.util.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 object LauncherAccountStore {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -19,11 +18,6 @@ object LauncherAccountStore {
     private const val MAX_WALK_UP = 5
 
     private const val EXPIRY_GRACE_SECONDS = 60L
-
-    private val WRITE_JSON = Json {
-        prettyPrint = true
-        encodeDefaults = true
-    }
 
     @Serializable
     data class StoredAccount(
@@ -59,7 +53,7 @@ object LauncherAccountStore {
         runCatching {
             file.parentFile?.mkdirs()
             val tmp = File(file.parentFile, "$AUTH_FILE.tmp")
-            tmp.writeText(WRITE_JSON.encodeToString(CredentialsStore.serializer(), store))
+            tmp.writeText(PolyPlusClient.JSON.encodeToString(CredentialsStore.serializer(), store))
             runCatching {
                 Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE)
             }.getOrElse {
@@ -78,6 +72,9 @@ object LauncherAccountStore {
     fun isRefreshable(account: StoredAccount): Boolean = isMicrosoft(account) && account.refreshToken.isNotBlank()
 
     fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
+
+    fun offlineUuid(username: String): UUID =
+        UUID.nameUUIDFromBytes("OfflinePlayer:$username".toByteArray(Charsets.UTF_8))
 
     private fun authFile(): File? {
         walkUpForAuth()?.let { return it }

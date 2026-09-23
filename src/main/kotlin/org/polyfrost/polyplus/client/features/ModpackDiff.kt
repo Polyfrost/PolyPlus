@@ -11,10 +11,14 @@ import net.fabricmc.loader.api.metadata.ModOrigin
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.ByteArrayInputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.DigestInputStream
 import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.zip.ZipInputStream
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object ModpackDiff {
     private val logger = LogManager.getLogger("PolyPlus/ModpackDiff")
@@ -39,7 +43,7 @@ object ModpackDiff {
 
     fun logAsync() {
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
-            runCatching { log() }.onFailure { logger.warn("Failed to compare mods against the OneClient modpack", it) }
+            runSuspendCatching { log() }.onFailure { logger.warn("Failed to compare mods against the OneClient modpack", it) }
         }
     }
 
@@ -92,30 +96,18 @@ object ModpackDiff {
 
     private suspend fun fetchPackMods(url: String): Map<String, String> {
         val bytes = PolyPlusClient.HTTP.get(url).body<ByteArray>()
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                if (entry.name != "modrinth.index.json") continue
-                val index = PolyPlusClient.JSON.decodeFromString<PackIndex>(zip.readBytes().decodeToString())
-                return index.files
-                    .filter { it.path.startsWith("mods/") && it.env?.get("client") != "unsupported" }
-                    .mapNotNull { file -> file.hashes["sha1"]?.let { it to file.path.removePrefix("mods/") } }
-                    .toMap()
-            }
+        return ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            generateSequence { zip.nextEntry }.firstOrNull { it.name == "modrinth.index.json" } ?: return emptyMap()
+            PolyPlusClient.JSON.decodeFromString<PackIndex>(zip.readBytes().decodeToString()).files
+                .filter { it.path.startsWith("mods/") && it.env?.get("client") != "unsupported" }
+                .mapNotNull { file -> file.hashes["sha1"]?.let { it to file.path.removePrefix("mods/") } }
+                .toMap()
         }
-        return emptyMap()
     }
 
     private fun sha1(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(path).use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        DigestInputStream(Files.newInputStream(path), digest).use { it.transferTo(OutputStream.nullOutputStream()) }
+        return HexFormat.of().formatHex(digest.digest())
     }
 }

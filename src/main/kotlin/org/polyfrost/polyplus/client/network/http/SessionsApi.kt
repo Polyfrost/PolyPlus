@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.client.network.http.responses.CreateSessionRequest
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.network.http.responses.UpdateSessionRequest
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object SessionsApi {
     suspend fun create(eosSessionId: String? = null): Result<SessionResponse> =
@@ -23,7 +24,7 @@ object SessionsApi {
             setBody(UpdateSessionRequest(eosSessionId))
         }
 
-    suspend fun close(sessionId: String): Result<Unit> = runCatching {
+    suspend fun close(sessionId: String): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.deleteAuthorized("${PolyPlusConfig.apiUrl}/sessions/$sessionId")
         Unit
     }
@@ -34,12 +35,12 @@ object SessionsApi {
     suspend fun incomingInvites(): Result<List<SessionInvite>> =
         PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/sessions/invites/incoming")
 
-    suspend fun acceptInvite(inviteId: Int): Result<Unit> = runCatching {
+    suspend fun acceptInvite(inviteId: Int): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/sessions/invites/$inviteId/accept")
         Unit
     }
 
-    suspend fun declineInvite(inviteId: Int): Result<Unit> = runCatching {
+    suspend fun declineInvite(inviteId: Int): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/sessions/invites/$inviteId/decline")
         Unit
     }

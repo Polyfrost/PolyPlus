@@ -10,6 +10,7 @@ import org.polyfrost.polyplus.client.network.http.responses.OidcAuthorizeRequest
 import org.polyfrost.polyplus.client.network.http.responses.OidcAuthorizeResponse
 import org.polyfrost.polyplus.client.network.http.responses.OidcTokenRequest
 import org.polyfrost.polyplus.client.network.http.responses.OidcTokenResponse
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object OidcApi {
     suspend fun authorize(clientId: String, redirectUri: String, codeChallenge: String): Result<OidcAuthorizeResponse> =
@@ -18,7 +19,7 @@ object OidcApi {
             setBody(OidcAuthorizeRequest(clientId, redirectUri, codeChallenge, "S256"))
         }
 
-    suspend fun token(clientId: String, redirectUri: String, code: String, codeVerifier: String): Result<OidcTokenResponse> = runCatching {
+    suspend fun token(clientId: String, redirectUri: String, code: String, codeVerifier: String): Result<OidcTokenResponse> = runSuspendCatching {
         PolyPlusClient.HTTP.post("${PolyPlusConfig.apiUrl}/oidc/token") {
             contentType(ContentType.Application.Json)
             setBody(OidcTokenRequest(code = code, clientId = clientId, redirectUri = redirectUri, codeVerifier = codeVerifier))

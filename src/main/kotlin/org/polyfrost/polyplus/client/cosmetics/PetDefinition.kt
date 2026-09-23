@@ -30,6 +30,5 @@ data class PetDefinition(
     val controller: BedrockAnimationController?,
     val stateMap: Map<String, String>,
     val leashRadius: Float,
-    val moveSpeed: Float,
     val scale: Float,
 )

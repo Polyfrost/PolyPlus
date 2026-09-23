@@ -8,7 +8,6 @@ import net.fabricmc.loader.api.FabricLoader
 //?}
 
 internal class ModIntegrationButton(
-    val id: String,
     val icon: String,
     val tooltip: String,
     val isPresent: () -> Boolean,
@@ -21,16 +20,14 @@ internal object ModIntegrationButtons {
     private val flashback = ParentScreenFactory("com.moulberry.flashback.screen.select_replay.SelectReplayScreen")
     private val modMenu = ParentScreenFactory("com.terraformersmc.modmenu.gui.ModsScreen")
 
-    val all: List<ModIntegrationButton> = listOf(
+    private val all: List<ModIntegrationButton> = listOf(
         ModIntegrationButton(
-            id = "flashback",
             icon = ASSETS + "video-recorder.svg",
             tooltip = "Flashback replays",
             isPresent = { modLoaded("flashback") && flashback.isUsable },
             onClick = { parent -> flashback.open(parent) },
         ),
         ModIntegrationButton(
-            id = "modmenu",
             icon = ASSETS + "package-01.svg",
             tooltip = "Fabric Mod Menu",
             isPresent = { modLoaded("modmenu") && modMenu.isUsable },

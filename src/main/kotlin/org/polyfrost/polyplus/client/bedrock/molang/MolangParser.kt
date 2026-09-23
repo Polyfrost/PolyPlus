@@ -1,5 +1,24 @@
 package org.polyfrost.polyplus.client.bedrock.molang
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
+
+/** Reads a Molang script field that may contain a single statement block or an array of them. */
+internal fun JsonObject.molangScripts(field: String): List<MolangStatement> =
+    when (val element = get(field)) {
+        is JsonPrimitive if element.isString -> MolangParser.parseStatementBlock(element.asString)
+        is JsonArray -> element.flatMap { item ->
+            if (item.isJsonPrimitive && item.asJsonPrimitive.isString) {
+                MolangParser.parseStatementBlock(item.asString)
+            } else {
+                emptyList()
+            }
+        }
+
+        else -> emptyList()
+    }
+
 object MolangParser {
     fun parseExpression(input: String): MolangExpr {
         return Parser(input.trim().trimEnd(';')).parseExpression()

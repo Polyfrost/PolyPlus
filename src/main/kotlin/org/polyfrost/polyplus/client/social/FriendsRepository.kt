@@ -10,12 +10,11 @@ import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.FriendRequest
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-object FriendsRepository : EarlyInitializable {
+object FriendsRepository {
     private val LOGGER = LogManager.getLogger()
 
     private val _friends = MutableStateFlow<List<Friend>>(emptyList())
@@ -33,7 +32,7 @@ object FriendsRepository : EarlyInitializable {
     @Volatile
     private var fetchedIncomingOnce = false
 
-    override fun earlyInitialize() {
+    fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
                 is ClientboundPacket.FriendRequestReceived -> {
@@ -150,7 +149,7 @@ object FriendsRepository : EarlyInitializable {
     private fun notifyFriendRequest(requestId: Int, sender: String) {
         if (!NotificationDedup.shouldNotify("friend_request:$requestId")) return
         PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.names.value[sender] ?: sender.take(8)
+        val name = PlayerNamesRepository.nameOr(sender)
         Notifications.info("PolyPlus", "$name sent you a friend request")
     }
 }

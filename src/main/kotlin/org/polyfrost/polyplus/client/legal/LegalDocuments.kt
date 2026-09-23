@@ -14,6 +14,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 @Serializable
 data class LegalDocument(
@@ -53,7 +54,7 @@ object LegalDocuments {
         get() = File(FabricLoader.getInstance().gameDir.toFile(), "polyplus/terms.json")
 
     suspend fun load(): Result<LegalDocument> {
-        val remote = runCatching {
+        val remote = runSuspendCatching {
             val body = client.get(DOCUMENT_URL).bodyAsText()
             val document = PolyPlusClient.JSON.decodeFromString(LegalDocument.serializer(), body)
             require(document.terms.isNotBlank()) { "Terms document has no body" }

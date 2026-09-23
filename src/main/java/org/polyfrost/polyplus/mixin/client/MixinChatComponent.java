@@ -11,25 +11,27 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import java.util.Locale;
+
+//? if < 1.21.11 {
+/*import net.minecraft.network.chat.FormattedText;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+*///?}
 
 @Mixin(ChatComponent.class)
 public class MixinChatComponent {
-    @ModifyVariable(
-        //? if >= 26.1 {
-        method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
-        //?} else {
-        /*method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",
-        *///?}
-        at = @At("HEAD"),
-        argsOnly = true,
-        ordinal = 0
+    //? if < 1.21.11 {
+    /*// emoji are applied to the display lines only, so the stored message stays comparable for chat compacting mods
+    @ModifyArg(
+        method = "addMessageToDisplayQueue",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/ComponentRenderUtils;wrapComponents(Lnet/minecraft/network/chat/FormattedText;ILnet/minecraft/client/gui/Font;)Ljava/util/List;"),
+        index = 0
     )
-    private Component polyplus$emojiMessage(Component original) {
-        return EmojiRegistry.transformForViewer(original);
+    private FormattedText emojiLines(FormattedText text) {
+        return EmojiRegistry.transformForViewer(text);
     }
+    *///?}
 
     @WrapMethod(
         //? if >= 26.1 {
@@ -38,7 +40,7 @@ public class MixinChatComponent {
         /*method = "addMessage(Lnet/minecraft/network/chat/Component;)V"
         *///?}
     )
-    private void polyplus$hideBobbyUpgradeMessage(Component message, Operation<Void> original) {
+    private void hideBobbyUpgradeMessage(Component message, Operation<Void> original) {
         if (polyplus$isBobbyUpgradeMessage(message) && polyplus$onHypixel()) {
             return;
         }

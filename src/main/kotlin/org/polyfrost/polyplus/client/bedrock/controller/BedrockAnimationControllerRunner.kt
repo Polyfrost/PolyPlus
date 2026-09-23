@@ -54,13 +54,6 @@ class BedrockAnimationControllerRunner(
         return result
     }
 
-    fun forceState(state: String) {
-        if (controller.states.containsKey(state) && state != currentState) {
-            currentState = state
-            timeInStateSeconds = 0f
-        }
-    }
-
     private fun evaluateTransitions(molangVariables: MutableMap<String, Float>, renderContext: PlayerRenderContext?) {
         val state = controller.states[currentState] ?: return
         if (state.transitions.isEmpty()) return
@@ -102,14 +95,8 @@ class BedrockAnimationControllerRunner(
     }
 
     private fun lerp(from: BoneTransform, to: BoneTransform, weight: Float): BoneTransform = BoneTransform(
-        position = lerpVec(from.position, to.position, weight),
-        rotation = lerpVec(from.rotation, to.rotation, weight),
-        scale = lerpVec(from.scale, to.scale, weight),
-    )
-
-    private fun lerpVec(from: Vector3f, to: Vector3f, weight: Float): Vector3f = Vector3f(
-        from.x + (to.x - from.x) * weight,
-        from.y + (to.y - from.y) * weight,
-        from.z + (to.z - from.z) * weight,
+        position = Vector3f(from.position).lerp(to.position, weight),
+        rotation = Vector3f(from.rotation).lerp(to.rotation, weight),
+        scale = Vector3f(from.scale).lerp(to.scale, weight),
     )
 }

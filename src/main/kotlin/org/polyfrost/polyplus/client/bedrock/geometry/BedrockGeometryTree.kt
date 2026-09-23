@@ -19,18 +19,3 @@ fun BedrockGeometry.renderableBoneNames(): Set<String> {
 
 fun BedrockGeometry.topLevelBoneName(): String? =
     bones.entries.firstOrNull { it.value.parent.isEmpty() }?.key ?: bones.keys.firstOrNull()
-
-fun BedrockGeometry.resolvePlayerAttachBone(): PlayerModelBone? {
-    for (bone in bones.values) {
-        PlayerModelBone.fromBedrockNameOrNull(bone.parent)?.let { return it }
-    }
-
-    var current = topLevelBoneName()
-    while (current != null) {
-        val bone = bones[current] ?: break
-        PlayerModelBone.fromBedrockNameOrNull(bone.parent)?.let { return it }
-        current = bone.parent.takeIf { bones.containsKey(it) }
-    }
-
-    return null
-}

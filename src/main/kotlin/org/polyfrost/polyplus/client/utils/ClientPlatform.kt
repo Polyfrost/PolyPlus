@@ -29,9 +29,6 @@ object ClientPlatform {
     val isMac: Boolean
         get() = System.getProperty("os.name").lowercase().contains("mac")
 
-    val isLinux: Boolean
-        get() = System.getProperty("os.name").lowercase().contains("linux")
-
     fun monitorRefreshRate(): Int =
         //? if >= 26.3 {
         Minecraft.getInstance().window.activeVideoMode?.refreshRate?.toInt() ?: 0

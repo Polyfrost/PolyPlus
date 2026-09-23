@@ -32,13 +32,13 @@ object JvmAdvisor {
     const val HEAP_TIGHT_RATIO = 0.70
     const val HEAP_LOOSE_RATIO = 0.35
     const val HEAP_OVERSIZED_RATIO = 0.5
-    const val HEAP_OVERSIZED_RATIO_SMALL = 0.35
-    const val SMALL_HOST_MB = 8192L
-    const val GC_TIME_BUDGET = 0.02
+    const val MIN_HEAP_MB = 2048L
+    const val LIVE_SET_HEADROOM = 3L
     const val ZGC_MIN_CORES = 12
     const val ZGC_MIN_HEAP_MB = 8192L
     const val MIN_GC_SPIKE_RATIO = 0.5
     const val HEAP_STEP_MB = 2048L
+    const val HEAP_LOWER_STEP_MB = 1024L
     const val LINUX_PSI_PERCENT = 10.0
     const val WINDOWS_LOAD_WARN = 90
     const val WINDOWS_LOAD_CRITICAL = 95
@@ -54,9 +54,7 @@ object JvmAdvisor {
     private const val NOTIFICATION_TITLE = "OneClient RAM Analysis"
     private const val NOTIFICATION_DURATION_MS = 60_000f
 
-    enum class Collector { G1, ZGC, SHENANDOAH, PARALLEL, SERIAL, UNKNOWN }
-
-    enum class Kind { RAISE_HEAP, LOWER_HEAP, FREE_SYSTEM_MEMORY, SWITCH_TO_ZGC, SWITCH_TO_G1 }
+    enum class Kind { RAISE_HEAP, LOWER_HEAP, FREE_SYSTEM_MEMORY, SWITCH_TO_G1 }
 
     data class HostMemory(
         val totalMb: Long,
@@ -68,8 +66,7 @@ object JvmAdvisor {
         val maxHeapMb: Long,
         val liveSetMb: Long,
         val nonHeapMb: Long,
-        val gcTimeFraction: Double,
-        val collector: Collector,
+        val isZgc: Boolean,
         val cores: Int,
         val gcSpikeRatio: Double,
         val host: HostMemory?,
@@ -90,8 +87,8 @@ object JvmAdvisor {
             val footprintMb = s.maxHeapMb + s.nonHeapMb
             val budgetMb = host.totalMb - RESERVED_SYSTEM_MB
             if (budgetMb > 0 && footprintMb > budgetMb) {
-                val suggested = (budgetMb - s.nonHeapMb).coerceAtLeast(0L)
-                if (s.liveSetMb <= 0 || suggested > s.liveSetMb) {
+                val suggested = budgetMb - s.nonHeapMb
+                if (suggested >= minHeapMb(s)) {
                     return Advice(
                         Kind.LOWER_HEAP,
                         s.maxHeapMb,
@@ -141,9 +138,9 @@ object JvmAdvisor {
         if (host != null &&
             s.liveSetMb > 0 &&
             s.liveSetMb < s.maxHeapMb * HEAP_LOOSE_RATIO &&
-            s.maxHeapMb > host.totalMb * oversizedRatio(host.totalMb)
+            s.maxHeapMb > host.totalMb * HEAP_OVERSIZED_RATIO
         ) {
-            val suggested = (s.maxHeapMb - HEAP_STEP_MB).coerceAtLeast(s.liveSetMb * 2)
+            val suggested = (s.maxHeapMb - HEAP_LOWER_STEP_MB).coerceAtLeast(minHeapMb(s))
             if (suggested < s.maxHeapMb) {
                 return Advice(
                     Kind.LOWER_HEAP,
@@ -156,7 +153,7 @@ object JvmAdvisor {
             }
         }
 
-        if (s.collector == Collector.ZGC && (s.cores < ZGC_MIN_CORES || s.maxHeapMb < ZGC_MIN_HEAP_MB)) {
+        if (s.isZgc && (s.cores < ZGC_MIN_CORES || s.maxHeapMb < ZGC_MIN_HEAP_MB)) {
             return Advice(
                 Kind.SWITCH_TO_G1,
                 s.maxHeapMb,
@@ -169,15 +166,14 @@ object JvmAdvisor {
         return null
     }
 
+    // the live set is a single sample and grows over a session, so keep generous GC headroom above it
     @JvmStatic
-    fun oversizedRatio(totalMb: Long): Double =
-        if (totalMb <= SMALL_HOST_MB) HEAP_OVERSIZED_RATIO_SMALL else HEAP_OVERSIZED_RATIO
+    fun minHeapMb(s: Snapshot): Long = (s.liveSetMb * LIVE_SET_HEADROOM).coerceAtLeast(MIN_HEAP_MB)
 
     private var lastFrameNanos = 0L
     private var lastGcMillis = -1L
     private var frames = 0L
     private var frameNanosSum = 0L
-    private var gcMillisSum = 0L
     private var spikes = 0L
     private var gcSpikes = 0L
     private var done = false
@@ -201,7 +197,6 @@ object JvmAdvisor {
             val frameNanos = now - lastFrameNanos
             frames++
             frameNanosSum += frameNanos
-            if (lastGcMillis >= 0) gcMillisSum += gcMillis - lastGcMillis
             if (frames > WARMUP_FRAMES) {
                 val meanNanos = frameNanosSum.toDouble() / frames
                 if (frameNanos > meanNanos * SPIKE_FACTOR) {
@@ -260,21 +255,20 @@ object JvmAdvisor {
 
     private fun snapshot(): Snapshot {
         val mb = 1024L * 1024L
-        val activeMillis = frameNanosSum / 1_000_000L
         return Snapshot(
             maxHeapMb = Runtime.getRuntime().maxMemory() / mb,
             liveSetMb = liveSetMb(),
             nonHeapMb = ManagementFactory.getMemoryMXBean().nonHeapMemoryUsage.used / mb,
-            gcTimeFraction = if (activeMillis > 0) gcMillisSum.toDouble() / activeMillis else 0.0,
-            collector = collector(),
+            isZgc = isZgc(),
             cores = Runtime.getRuntime().availableProcessors(),
             gcSpikeRatio = if (spikes > 0) gcSpikes.toDouble() / spikes else -1.0,
             host = hostMemory(),
         )
     }
 
-    private fun totalGcMillis(): Long =
-        ManagementFactory.getGarbageCollectorMXBeans().sumOf { it.collectionTime.coerceAtLeast(0L) }
+    private val gcBeans by lazy { ManagementFactory.getGarbageCollectorMXBeans() }
+
+    private fun totalGcMillis(): Long = gcBeans.sumOf { it.collectionTime.coerceAtLeast(0L) }
 
     private fun liveSetMb(): Long {
         val pools = ManagementFactory.getMemoryPoolMXBeans()
@@ -285,17 +279,8 @@ object JvmAdvisor {
         return used / (1024L * 1024L)
     }
 
-    private fun collector(): Collector {
-        val names = ManagementFactory.getGarbageCollectorMXBeans().map { it.name }
-        return when {
-            names.any { it.startsWith("ZGC") } -> Collector.ZGC
-            names.any { it.startsWith("G1") } -> Collector.G1
-            names.any { it.startsWith("Shenandoah") } -> Collector.SHENANDOAH
-            names.any { it.startsWith("PS ") } -> Collector.PARALLEL
-            names.any { it == "Copy" || it == "MarkSweepCompact" } -> Collector.SERIAL
-            else -> Collector.UNKNOWN
-        }
-    }
+    private fun isZgc(): Boolean =
+        ManagementFactory.getGarbageCollectorMXBeans().any { it.name.startsWith("ZGC") }
 
     //? if > 1.8.9 {
     private fun hostMemory(): HostMemory? = runCatching {

@@ -2,7 +2,10 @@ package org.polyfrost.polyplus.client
 
 import com.mojang.blaze3d.platform.InputConstants
 import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import org.polyfrost.oneconfig.api.config.v1.Config
+import org.polyfrost.oneconfig.api.config.v1.ConfigManager
+import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Keybind
@@ -15,6 +18,7 @@ import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import java.nio.file.Path
 
 object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConstants.NAME} (OneClient)", Category.OTHER) {
     @Transient
@@ -169,6 +173,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic
     @Switch(
+        title = "Disable Narrator While Muted",
+        description = "Skip the narrator entirely while Master or Voice/Speech volume is 0% to prevent lagspikes.",
+    )
+    var disableNarratorWhileMuted = true
+
+    @JvmStatic
+    @Switch(
         title = "Automatically Refresh Session",
         description = "Automatically refresh your Microsoft account session when it expires.",
     )
@@ -221,4 +232,17 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
             PolyPlusClient.refresh()
         }
     }
+}
+
+/** Folds the pre-split polyplus.json into one of the configs made out of it. */
+internal fun loadLegacyPolyPlusOptions(label: String, logger: Logger, load: (Path) -> Unit) {
+    runCatching {
+        Tree.beginFailureCollection()
+        try {
+            load(ConfigManager.active().folder.resolve("${PolyPlusConstants.ID}.json"))
+        } finally {
+            val failed = Tree.endFailureCollection()
+            if (failed.isNotEmpty()) logger.warn("Left {} $label option(s) at their default", failed)
+        }
+    }.onFailure { logger.warn("Could not migrate $label options from the legacy PolyPlus config", it) }
 }

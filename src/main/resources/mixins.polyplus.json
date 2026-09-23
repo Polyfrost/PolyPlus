@@ -24,8 +24,12 @@
     "client.MixinDisconnectedScreen",
     "client.MixinEntityRenderer",
     "client.MixinFramerateLimitTracker",
+    //? if > 1.8.9
+    "client.MixinGameNarrator",
     "client.MixinGameRenderer",
     "client.MixinGui",
+    //? if >= 1.21.11
+    "client.MixinGuiMessage",
     "client.MixinIntegratedServer",
     "client.MixinMinecraft",
     "client.MixinMinecraftSystemReport",
@@ -56,6 +60,7 @@
     "client.access.ScreenAccessor",
     //? if > 1.8.9
     "client.access.UserAccessor",
+    //? if <1.21.5
     "client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",
@@ -79,6 +84,7 @@
     "MixinCrashReport",
     //? if > 1.8.9
     "MixinSystemReport",
+    //? if <1.21.5
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
@@ -95,14 +101,19 @@
     "compat.euphoria.MixinSodiumConsole",
     //? if > 1.8.9
     "compat.mountopacity.MixinEntityHook",
+    "compat.oneconfig.MixinConfigScreenKt",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
     //? if > 1.8.9
+    "compat.oneconfig.MixinWWaypointsCompat",
+    //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
-    //? if >= 26.2
+    //? if >= 26.2 {
     "compat.rrls.MixinOverlayHelper",
+    "compat.rrls.MixinRrlsAbstractTexture",
+    //?}
     //? if > 1.8.9
     "compat.sodium.MixinSodiumConfigBuilder",
     //? if > 1.8.9
@@ -113,6 +124,10 @@
     "compat.waveycapes.MixinCustomCapeRenderLayer",
     //? if > 1.8.9
     "compat.waveycapes.MixinPlayerWrapper",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinToggleSneakConfigScreen",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinToggleSneakService",
     //? if = 1.8.9
     //"client.network.MixinPlayerManager",
     "client.network.ServerCommonPacketListenerAccessor"

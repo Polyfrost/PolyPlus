@@ -11,6 +11,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.IOException
@@ -145,7 +146,7 @@ object PolyConnection {
                         } else {
                             LOGGER.warn("PolyPlus WebSocket authentication failed (401); refreshing token before retry.")
                             tokenRefreshed = true
-                            runCatching { PolyAuthorization.reset() }
+                            runSuspendCatching { PolyAuthorization.reset() }
                         }
                         notifyDisconnected(null)
                     } else if (isTransientHandshakeFailure(e)) {
@@ -198,6 +199,8 @@ object PolyConnection {
                 for (message in _outgoing) {
                     try {
                         send(Frame.Text(message))
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         LOGGER.error("Failed to send WebSocket message", e)
                     }

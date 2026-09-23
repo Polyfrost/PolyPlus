@@ -135,8 +135,7 @@ object PackHttpBridge {
         }
     }
 
-               // receiving client reuse its cached download instead of pulling the pack again.
- private inline fun HttpExchange.handleSafely(block: () -> Unit) {
+    private inline fun HttpExchange.handleSafely(block: () -> Unit) {
         try {
             block()
         } catch (e: Throwable) {

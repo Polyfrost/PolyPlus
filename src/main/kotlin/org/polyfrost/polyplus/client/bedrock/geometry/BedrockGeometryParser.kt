@@ -74,15 +74,6 @@ object BedrockGeometryParser {
             identifier = description.optionalString("identifier", UNKNOWN_IDENTIFIER),
             textureWidth = description.optionalInt("texture_width", DEFAULT_TEXTURE_SIZE),
             textureHeight = description.optionalInt("texture_height", DEFAULT_TEXTURE_SIZE),
-            visibleBounds = parseVisibleBounds(description),
-        )
-    }
-
-    private fun parseVisibleBounds(description: JsonObject): BedrockVisibleBounds {
-        return BedrockVisibleBounds(
-            width = description.optionalFloat("visible_bounds_width", 0f),
-            height = description.optionalFloat("visible_bounds_height", 0f),
-            offset = description.optionalArray("visible_bounds_offset").toVec3(),
         )
     }
 

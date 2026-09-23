@@ -25,7 +25,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
-import org.polyfrost.polyplus.client.cosmetics.CosmeticsInitializer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
@@ -50,10 +49,9 @@ import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
-import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-import org.polyfrost.polyplus.utils.EarlyInitializable
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -125,7 +123,7 @@ object PolyPlusClient {
                 if (status == HttpStatusCode.Unauthorized) return@validateResponse
                 if (response.request.url.host != apiHost()) return@validateResponse
 
-                val text = runCatching { response.bodyAsText() }.getOrDefault("")
+                val text = runSuspendCatching { response.bodyAsText() }.getOrDefault("")
                 throw if (status.value >= 500) {
                     ServerResponseException(response, text)
                 } else {
@@ -165,23 +163,17 @@ object PolyPlusClient {
         step("login gate") { MinecraftLoginGate.register() }
         step("featured servers") { FeaturedServers.warmUp() }
 
-        val earlyHooks: List<Pair<String, () -> EarlyInitializable>> = buildList {
-            //? if >= 1.21.1 || = 1.8.9
-            add("CosmeticsInitializer" to { CosmeticsInitializer })
-            add("FriendsRepository" to { FriendsRepository })
-            add("GroupsRepository" to { GroupsRepository })
-            // Global chat is disabled for now.
-            // add("GlobalChatRepository" to { GlobalChatRepository })
-            add("SessionsRepository" to { SessionsRepository })
-            add("P2PSessionManager" to { P2PSessionManager })
-        }
-        earlyHooks.forEach { (name, hook) ->
-            step("early init $name") { hook().earlyInitialize() }
-        }
+        //? if >= 1.21.1 || = 1.8.9
+        step("early init CosmeticSync") { CosmeticSync.earlyInitialize() }
+        step("early init FriendsRepository") { FriendsRepository.earlyInitialize() }
+        step("early init GroupsRepository") { GroupsRepository.earlyInitialize() }
+        // global chat is disabled for now
+        // step("early init GlobalChatRepository") { GlobalChatRepository.earlyInitialize() }
+        step("early init SessionsRepository") { SessionsRepository.earlyInitialize() }
+        step("early init P2PSessionManager") { P2PSessionManager.earlyInitialize() }
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
-        step("social overlay keybind") { SocialOverlay.registerKeybind() }
         step("vanilla menu button") { VanillaMenuButton.register() }
 
         step("websocket") {
@@ -219,7 +211,7 @@ object PolyPlusClient {
         LOGGER.info("Refreshing PolyPlus Client...")
 
         SCOPE.launch {
-            runCatching { PolyAuthorization.reset() }
+            runSuspendCatching { PolyAuthorization.reset() }
 
             runCatching {
                 CosmeticCatalog.reset()
@@ -265,12 +257,12 @@ object PolyPlusClient {
         CosmeticLoadProgress.beginRefresh()
 
         try {
-            runCatching { CosmeticCatalog.refreshCatalog() }
+            runSuspendCatching { CosmeticCatalog.refreshCatalog() }
                 .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
-            runCatching { CosmeticCatalog.refreshPlayer() }
+            runSuspendCatching { CosmeticCatalog.refreshPlayer() }
                 .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
             //? if >= 1.21.1 {
-            runCatching { CosmeticService.syncLocalActive() }
+            runSuspendCatching { CosmeticService.syncLocalActive() }
                 .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
             /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }

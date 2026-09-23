@@ -53,7 +53,7 @@ internal object EmoteAssetParser {
                 for ((animationName, animation) in file.animations) {
                     val emoteId = resolveEmoteId(cosmeticId, asset.relativePath, animationName)
                     val rules = rulesByAnimation[animationName] ?: EmoteRules.DEFAULT
-                    target += Emote(emoteId, animation, playerGeometry, effects, rules)
+                    target += Emote(emoteId, animation, effects, rules)
                     logger.debug("Loaded emote {} from cosmetic {}", emoteId, cosmeticId)
                 }
             }
@@ -112,8 +112,6 @@ internal object EmoteAssetParser {
                 )
                 listOf(
                     EmoteEffect(
-                        id = geometry.identifier,
-                        geometry = geometry,
                         texture = RemoteTextures.register(textureId, textureFile),
                         model = BedrockEffectModel.build(geometry, playerGeometry),
                     ),

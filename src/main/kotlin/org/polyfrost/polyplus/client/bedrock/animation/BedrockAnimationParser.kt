@@ -13,8 +13,8 @@ import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
 import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
 import org.polyfrost.polyplus.client.bedrock.molang.MolangParser
-import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
 import org.polyfrost.polyplus.client.bedrock.molang.MolangVector3
+import org.polyfrost.polyplus.client.bedrock.molang.molangScripts
 import org.polyfrost.polyplus.client.utils.optionalString
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -27,12 +27,7 @@ object BedrockAnimationParser {
         return BedrockAnimationFile(parseAnimations(root))
     }
 
-    fun parseJson(json: String): BedrockAnimationFile = parseStream(json.byteInputStream())
-
     private fun parseAnimations(root: JsonObject): Map<String, BedrockAnimation> {
-        val parents = readParents(root)
-        val pivots = readModelPivots(root)
-
         val animationsObject = when {
             root.has("animations") -> root.getAsJsonObject("animations")
             root.has("animation_length") || root.has("bones") -> {
@@ -47,7 +42,7 @@ object BedrockAnimationParser {
         val result = LinkedHashMap<String, BedrockAnimation>()
         for ((name, element) in animationsObject.entrySet()) {
             runCatching {
-                result[name] = parseAnimation(name, element.asJsonObject, parents, pivots)
+                result[name] = parseAnimation(name, element.asJsonObject)
             }.onFailure { ex ->
                 LogManager.getLogger("BedrockAnimationParser")
                     .warn("Failed to parse animation {}", name, ex)
@@ -57,12 +52,7 @@ object BedrockAnimationParser {
         return result
     }
 
-    private fun parseAnimation(
-        name: String,
-        obj: JsonObject,
-        parents: Map<String, String>,
-        pivots: Map<String, Vector3f>,
-    ): BedrockAnimation {
+    private fun parseAnimation(name: String, obj: JsonObject): BedrockAnimation {
         val animationLength = obj.get("animation_length")
         val lengthTicks = if (animationLength != null)
             readDurationSeconds(animationLength) * TICKS_PER_SECOND
@@ -80,30 +70,10 @@ object BedrockAnimationParser {
             name = name,
             lengthTicks = resolvedLength,
             loop = readLoopMode(obj),
-            initialize = readMolangScripts(obj, "initialize"),
-            preAnimation = readMolangScripts(obj, "pre_animation"),
+            initialize = obj.molangScripts("initialize"),
+            preAnimation = obj.molangScripts("pre_animation"),
             boneAnimations = boneAnimations,
-            bonePivots = pivots,
-            boneParents = parents,
         )
-    }
-
-    private fun readMolangScripts(obj: JsonObject, field: String): List<MolangStatement> {
-        if (!obj.has(field)) {
-            return emptyList()
-        }
-
-        return when (val element = obj.get(field)) {
-            is JsonPrimitive if element.isString -> MolangParser.parseStatementBlock(element.asString)
-            is JsonArray -> element.flatMap { item ->
-                if (item.isJsonPrimitive && item.asJsonPrimitive.isString) {
-                    MolangParser.parseStatementBlock(item.asString)
-                } else {
-                    emptyList()
-                }
-            }
-            else -> emptyList()
-        }
     }
 
     private fun readLoopMode(obj: JsonObject): LoopMode {
@@ -325,36 +295,6 @@ object BedrockAnimationParser {
         }
 
         return 0f
-    }
-
-    private fun readParents(root: JsonObject): Map<String, String> {
-        if (!root.has("parents"))
-            return emptyMap()
-
-        val result = LinkedHashMap<String, String>()
-        for ((child, parentElement) in root.getAsJsonObject("parents").entrySet()) {
-            result[child] = parentElement.asString
-        }
-
-        return result
-    }
-
-    private fun readModelPivots(root: JsonObject): Map<String, Vector3f> {
-        if (!root.has("model"))
-            return emptyMap()
-
-        val result = LinkedHashMap<String, Vector3f>()
-
-        for ((name, element) in root.getAsJsonObject("model").entrySet()) {
-            val pivot = element.asJsonObject.getAsJsonArray("pivot")
-            result[name] = Vector3f(
-                pivot[0].asFloat,
-                pivot[1].asFloat,
-                pivot[2].asFloat,
-            )
-        }
-
-        return result
     }
 
     private fun calculateLength(bones: Map<String, BoneAnimation>): Float {

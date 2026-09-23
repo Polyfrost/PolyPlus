@@ -8,6 +8,7 @@ import io.netty.channel.ChannelConfig
 import io.netty.channel.ChannelMetadata
 import io.netty.channel.ChannelOutboundBuffer
 import io.netty.channel.ChannelPromise
+import io.netty.channel.DefaultChannelConfig
 import io.netty.channel.EventLoop
 import io.netty.handler.timeout.ReadTimeoutHandler
 import org.apache.logging.log4j.LogManager
@@ -32,7 +33,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
         @Volatile var bridge: EosSdkBridge? = null
     }
 
-    private val config = EosP2PChannelConfig(this)
+    private val config = DefaultChannelConfig(this)
 
     @Volatile private var localSocket: EosP2PSocketId? = null
     @Volatile private var remoteUser: EosProductUserId? = null

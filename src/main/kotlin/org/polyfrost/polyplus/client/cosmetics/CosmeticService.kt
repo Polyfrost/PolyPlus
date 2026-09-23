@@ -7,19 +7,14 @@ import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosme
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object CosmeticService {
     private val LOGGER = LogManager.getLogger("polyplus/cosmetics")
-    suspend fun equipCape(cosmeticId: Int): Result<Unit> =
-        equip(cosmeticId, BodySlot.Cape)
-
     suspend fun equipEmote(emoteId: Int): Result<Unit> = runCatching {
         require(emoteId in CosmeticCatalog.ownedEmoteIds()) { "Emote #$emoteId is not in your locker" }
         CosmeticCatalog.setSelectedEmote(emoteId)
     }
-
-    suspend fun clearCape(): Result<Unit> =
-        clearSlot(BodySlot.Cape)
 
     suspend fun setParticleColor(color: Int?): Result<Unit> = runCatching {
         val uuid = ClientPlatform.localPlayerUuid()
@@ -87,7 +82,7 @@ object CosmeticService {
         }
     }
 
-    suspend fun syncLocalActive(): Result<Unit> = runCatching {
+    suspend fun syncLocalActive(): Result<Unit> = runSuspendCatching {
         CosmeticCatalog.refreshPlayer()
         val ids = CosmeticCatalog.localEquipped().ids()
         for (id in ids) {

@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
-import org.polyfrost.polyplus.client.network.eos.EosSdkBridgeImpl
+import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 
@@ -12,7 +12,7 @@ class EosSdkBridgeShutdownTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     fun `a call made after shutdown fails instead of waiting for a tick thread that is gone`() {
-        val bridge = EosSdkBridgeImpl()
+        val bridge = EosSdkBridge()
         bridge.shutdown()
 
         val result = runBlocking { bridge.queryNatType() }
@@ -27,7 +27,7 @@ class EosSdkBridgeShutdownTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     fun `a bridge that was shut down refuses to start`() {
-        val bridge = EosSdkBridgeImpl()
+        val bridge = EosSdkBridge()
         bridge.shutdown()
 
         assertFalse(bridge.initialize(), "a shut-down bridge reported itself as usable")

@@ -15,7 +15,6 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.compose")
     kotlin("plugin.serialization")
-    id("org.jetbrains.kotlinx.atomicfu")
     id("com.gradleup.shadow")
     id("dev.kikugie.loom-back-compat")
     id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
@@ -52,15 +51,14 @@ run {
     stonecutter.properties.tags(version, loader)
 }
 
-fun optionalProperty(name: String): String? =
-    findProperty(name)?.toString()?.takeIf { it.isNotBlank() }
-
-val mcDependencyVersion: String = optionalProperty("deps.minecraft") ?: mcVersion
+fun optionalProperty(vararg names: String): String? =
+    names.firstNotNullOfOrNull { name -> findProperty(name)?.toString()?.takeIf { it.isNotBlank() } }
 
 val minecraftPredicate = property("mod.mc_compat") as String
 
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
+    put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -77,7 +75,6 @@ val ktorModules = listOf(
     "io.ktor:ktor-client-core",
     "io.ktor:ktor-client-cio",
     "io.ktor:ktor-client-content-negotiation",
-    "io.ktor:ktor-server-websockets",
     "io.ktor:ktor-serialization-kotlinx-json"
 ).map { "$it:$ktorVersion" }
 
@@ -115,10 +112,10 @@ repositories {
     maven("https://central.sonatype.com/repository/maven-snapshots") {
         content { includeGroup("net.kyori") }
     }
-    strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.terraformersmc.com/releases/", "TerraformersMC", "com.terraformersmc")
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
+    strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
 }
 
@@ -153,6 +150,8 @@ if (isOrnithe) {
     sourceSets.main {
         val excluded = listOf(
             "**/client/network/p2p/P2PVoicechatPlugin.kt",
+            "**/mixin/client/MixinGameNarrator.java",
+            "**/mixin/client/MixinGuiMessage.java",
             "**/client/network/p2p/EosVoicechat*.kt",
             "**/mixin/compat/animatium/**",
             "**/mixin/compat/essential/**",
@@ -163,6 +162,7 @@ if (isOrnithe) {
             "**/mixin/compat/sodium/**",
             "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",
+            "**/mixin/compat/wwaypoints/**",
         )
         java.exclude(excluded)
         kotlin.exclude(excluded)
@@ -231,7 +231,7 @@ tasks.jar {
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:$mcDependencyVersion")
+    minecraft("com.mojang:minecraft:$mcVersion")
 
     if (isOrnithe) {
         mappings(ploceus!!.layeredMappings {
@@ -247,9 +247,11 @@ dependencies {
     }
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
-    annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:$mixinSquaredVersion")
+    "com.github.bawnorton.mixinsquared:mixinsquared-fabric:$mixinSquaredVersion".let {
+        annotationProcessor(it)
+        implementation(include(it)!!)
+    }
 
     if (!isOrnithe) {
         modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
@@ -263,6 +265,10 @@ dependencies {
 
     optionalProperty("deps.sodium")?.let {
         modCompileOnly("maven.modrinth:sodium:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.wwaypoints")?.let {
+        modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
     }
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
@@ -382,14 +388,12 @@ tasks.register<Copy>("buildAndCollect") {
 }
 
 val modVersion = property("mod.version") as String
-val modrinthMinecraftVersionOverride = mapOf(
-    "26.1" to listOf("26.1", "26.1.1", "26.1.2"),
-)
-val modrinthId = listOf("oneconfig.publish.modrinth", "publish.modrinth")
-    .firstNotNullOfOrNull { findProperty(it) }?.toString()?.takeIf { it.isNotBlank() }
-val modrinthToken = listOf("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
-    .firstNotNullOfOrNull { findProperty(it) }?.toString()?.takeIf { it.isNotBlank() }
-val minecraftVersion = modrinthMinecraftVersionOverride[mcVersion] ?: listOf(mcDependencyVersion)
+
+// these intentionally support multiple different properties, do not remove
+val modrinthId = optionalProperty("oneconfig.publish.modrinth", "publish.modrinth")
+val modrinthToken = optionalProperty("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
+
+val minecraftVersion = (property("mod.mc_releases") as String).split(",").map { it.trim() }
 val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
 
 publishMods {
