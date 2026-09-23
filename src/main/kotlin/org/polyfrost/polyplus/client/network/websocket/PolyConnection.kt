@@ -11,12 +11,12 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
+import org.polyfrost.polyplus.client.network.reconnectDelay
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.IOException
 import java.nio.channels.UnresolvedAddressException
-import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -28,11 +28,6 @@ import kotlinx.serialization.serializer
 
 object PolyConnection {
     private val LOGGER = LogManager.getLogger()
-
-    private const val INITIAL_RECONNECT_DELAY_MS = 1_000L
-    private const val MAX_RECONNECT_DELAY_MS = 60_000L
-
-    private const val MAX_RECONNECT_ATTEMPTS = 12
 
     private const val TRANSIENT_FAILURES_BEFORE_NOTIFYING = 3
 
@@ -170,12 +165,6 @@ object PolyConnection {
                 }
 
                 attempt++
-                if (attempt >= MAX_RECONNECT_ATTEMPTS) {
-                    LOGGER.error("Giving up on the PolyPlus WebSocket after {} failed attempts.", attempt)
-                    notifyGaveUp()
-                    break
-                }
-
                 val backoff = reconnectDelay(attempt)
                 LOGGER.info("Reconnecting to PolyPlus WebSocket in {} ms (attempt {}).", backoff, attempt)
                 delay(backoff)
@@ -240,14 +229,6 @@ object PolyConnection {
         return false
     }
 
-    internal fun reconnectDelay(attempt: Int): Long {
-        val shift = (attempt - 1).coerceIn(0, 30)
-        val delayMs = INITIAL_RECONNECT_DELAY_MS shl shift
-        val capped = if (delayMs <= 0L) MAX_RECONNECT_DELAY_MS else delayMs.coerceAtMost(MAX_RECONNECT_DELAY_MS)
-        val half = capped / 2
-        return half + Random.nextLong(half + 1)
-    }
-
     private fun notifyDisconnected(error: Exception?) {
         if (disconnectNotified) return
         val now = System.currentTimeMillis()
@@ -262,17 +243,6 @@ object PolyConnection {
 
     internal fun outageIsWorthNotifying(since: Long, now: Long): Boolean {
         return now - since >= NOTIFY_AFTER_OUTAGE_MS
-    }
-
-    private fun notifyGaveUp() {
-        disconnectNotified = true
-        disconnectedSinceMs = 0L
-        runCatching {
-            Notifications.error(
-                "PolyPlus",
-                "Could not reconnect to PolyPlus. Run /polyplus refresh or restart the game to retry.",
-            )
-        }.onFailure { LOGGER.error("Failed to show reconnect-failed notification", it) }
     }
 
     private fun notifyReconnected() {

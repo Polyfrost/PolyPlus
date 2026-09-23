@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,8 @@ import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
+import org.polyfrost.polyplus.client.social.toUserMessage
+import kotlinx.coroutines.launch
 
 internal enum class HostFlowStep { SelectWorld, Configure, InviteFriends }
 
@@ -91,6 +94,7 @@ internal fun HostWorldFlow(
     }
 
     LaunchedEffect(Unit) {
+        P2PSessionManager.retryLoginNow()
         if (state.hostingCurrent) return@LaunchedEffect
         val loaded = HostWorldManager.loadWorlds()
         state.worlds = loaded
@@ -352,6 +356,7 @@ private fun InviteFriendsModal(
 ) {
     var query by remember { mutableStateOf("") }
     val eosStatus by P2PSessionManager.status.collectAsState()
+    val scope = rememberCoroutineScope()
     val filtered = friends.filter { PlayerNamesRepository.displayName(it.player).contains(query, ignoreCase = true) }
     val online = filtered.filter { it.online }
     val offline = filtered.filter { !it.online }
@@ -399,53 +404,34 @@ private fun InviteFriendsModal(
                 icon = SOCIAL_ASSETS + "log-in-04.svg",
                 modifier = Modifier.weight(1f),
                 filled = true,
-                enabled = (state.hostingCurrent || state.selected != null) && !state.hosting,
+                // P2P hosting fails outright until the login finishes, so leave only the LAN option until then
+                enabled = (state.hostingCurrent || state.selected != null) && !state.hosting && eosStatus != EosStatus.Connecting,
                 onClick = {
                     state.hosting = true
                     state.hostError = null
-                    if (state.hostingCurrent) {
-                        if (eosStatus is EosStatus.Failed) {
+                    if (eosStatus is EosStatus.Failed) {
+                        if (state.hostingCurrent) {
                             HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats)
-                            onHosted()
                         } else {
-                            HostWorldManager.hostCurrentWorldViaP2P(
-                                state.gameMode,
-                                state.allowCheats,
-                                state.privateRelay,
-                                state.autoShareResourcePack,
-                                onFailure = {
-                                    state.hosting = false
-                                    state.hostError = "Unable to start hosting: ${it.message}"
-                                },
-                                onHosted = { sessionId ->
-                                    state.invitees.forEach { player -> SessionsRepository.invite(sessionId, player) }
-                                },
-                            )
-                            onHosted()
+                            HostWorldManager.host(screen, state.selected ?: return@SocialButton, state.gameMode, state.allowCheats)
                         }
+                        onHosted()
                         return@SocialButton
                     }
-                    val entry = state.selected ?: return@SocialButton
-                    if (eosStatus is EosStatus.Failed) {
-                        HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats)
-                        onHosted()
-                    } else {
-                        HostWorldManager.hostViaP2P(
-                            screen,
-                            entry,
-                            state.gameMode,
-                            state.allowCheats,
-                            state.privateRelay,
-                            state.autoShareResourcePack,
-                            onFailure = {
+                    val invite = { sessionId: String -> state.invitees.forEach { player -> SessionsRepository.invite(sessionId, player) } }
+                    scope.launch {
+                        val result = if (state.hostingCurrent) {
+                            HostWorldManager.hostCurrentWorldViaP2P(state.gameMode, state.allowCheats, state.privateRelay, state.autoShareResourcePack, invite)
+                        } else {
+                            val entry = state.selected ?: return@launch
+                            HostWorldManager.hostViaP2P(screen, entry, state.gameMode, state.allowCheats, state.privateRelay, state.autoShareResourcePack, invite)
+                        }
+                        result
+                            .onSuccess { onHosted() }
+                            .onFailure {
                                 state.hosting = false
-                                state.hostError = "Unable to start hosting: ${it.message}"
-                            },
-                            onHosted = { sessionId ->
-                                state.invitees.forEach { player -> SessionsRepository.invite(sessionId, player) }
-                            },
-                        )
-                        onHosted()
+                                state.hostError = it.toUserMessage("Couldn't start hosting. Check your internet connection and try again.")
+                            }
                     }
                 },
             )

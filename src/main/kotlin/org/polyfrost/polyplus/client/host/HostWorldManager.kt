@@ -11,12 +11,13 @@ import org.apache.logging.log4j.LogManager
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 //? if fabric {
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 //?}
@@ -115,67 +116,54 @@ object HostWorldManager {
         }
     }
 
-    fun hostViaP2P(
+    suspend fun hostViaP2P(
         returnScreen: Screen,
         entry: HostWorldEntry,
         gameMode: GameType,
         allowCheats: Boolean,
         privateRelay: Boolean = true,
         autoShareResourcePack: Boolean = false,
-        onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
-    ) {
-        val mc = Minecraft.getInstance()
-
-        PolyPlusClient.SCOPE.launch {
-            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
-            result.onFailure {
-                LOGGER.error("Failed to create a P2P hosting session", it)
-                onFailure(it)
-            }
-            val session = result.getOrNull() ?: return@launch
-
-            mc.execute {
-                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
-                mc.createWorldOpenFlows().openWorld(entry.id) {
-                    //? if >= 26.2 {
-                    mc.gui.setScreen(returnScreen)
-                    //?} else {
-                    /*mc.setScreen(returnScreen)
-                    *///?}
-                }
-                LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
-            }
+    ): Result<Unit> = beginP2PSession(privateRelay, autoShareResourcePack) { mc, session ->
+        pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+        mc.createWorldOpenFlows().openWorld(entry.id) {
+            //? if >= 26.2 {
+            mc.gui.setScreen(returnScreen)
+            //?} else {
+            /*mc.setScreen(returnScreen)
+            *///?}
         }
+        LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)
     }
 
-    fun hostCurrentWorldViaP2P(
+    suspend fun hostCurrentWorldViaP2P(
         gameMode: GameType,
         allowCheats: Boolean,
         privateRelay: Boolean = true,
         autoShareResourcePack: Boolean = false,
-        onFailure: (Throwable) -> Unit = {},
         onHosted: (String) -> Unit = {},
-    ) {
-        val mc = Minecraft.getInstance()
-        if (mc.singleplayerServer == null) {
-            onFailure(IllegalStateException("Not currently in a singleplayer world"))
-            return
+    ): Result<Unit> {
+        if (Minecraft.getInstance().singleplayerServer == null) {
+            return Result.failure(IllegalStateException("Not currently in a singleplayer world"))
         }
-
-        PolyPlusClient.SCOPE.launch {
-            val result = P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
-            result.onFailure {
-                LOGGER.error("Failed to create a P2P hosting session", it)
-                onFailure(it)
-            }
-            val session = result.getOrNull() ?: return@launch
-
-            mc.execute {
-                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
-            }
+        return beginP2PSession(privateRelay, autoShareResourcePack) { _, session ->
+            pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
         }
     }
+
+    // runs in SCOPE so a caller cancelled midway can't leave a created session without its world
+    private suspend fun beginP2PSession(
+        privateRelay: Boolean,
+        autoShareResourcePack: Boolean,
+        onCreated: (Minecraft, SessionResponse) -> Unit,
+    ): Result<Unit> = PolyPlusClient.SCOPE.async {
+        P2PSessionManager.beginHostingSession(privateRelay, autoShareResourcePack)
+            .onFailure { LOGGER.error("Failed to create a P2P hosting session", it) }
+            .map { session ->
+                val mc = Minecraft.getInstance()
+                mc.execute { onCreated(mc, session) }
+            }
+    }.await()
 
     fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
         val mc = Minecraft.getInstance()

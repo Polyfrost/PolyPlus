@@ -22,6 +22,7 @@ import org.polyfrost.polyplus.client.network.http.AccountApi
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
+import org.polyfrost.polyplus.client.network.reconnectDelay
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
@@ -32,6 +33,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,12 +66,17 @@ object P2PSessionManager {
 
     @Volatile private var starting = false
 
+    // guarded by consentLock, like bridge, so it only ever runs for the current bridge
+    private var authJob: Job? = null
+
     private const val CONSENT_REQUIRED =
         "Poly+ multiplayer is off until you accept the Terms of Service and Privacy Policy."
     private const val RESTART_REQUIRED =
         "Restart your game to turn Poly+ multiplayer back on."
 
     private const val AUTH_READY_TIMEOUT_MS = 15_000L
+    // EOS Connect auth expires after an hour, and gg.sona.eos doesn't expose EOS_Connect_AddNotifyAuthExpiration
+    private const val AUTH_REFRESH_INTERVAL_MS = 50 * 60_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
     private const val CHANNEL_CLOSE_TIMEOUT_MS = 250L
     private const val MAX_STALL_RECOVERIES = 2
@@ -165,6 +172,7 @@ object P2PSessionManager {
                 }
                 LOGGER.info("Consent withdrawn; shutting EOS down.")
                 bridge = null
+                authJob?.cancel()
                 EosVoicechatBridge.uninstall()
                 P2PPackTransport.uninstall()
                 shutDownForConsent = true
@@ -212,17 +220,11 @@ object P2PSessionManager {
                 channel.deliverInbound(received.remote, received.data)
             }
         }
-        bridge.setLoginLostHandler {
-            PolyPlusClient.SCOPE.launch {
-                if (!isCurrent(bridge)) return@launch
-                _status.value = EosStatus.Connecting
-                authenticate(bridge, forceRelogin = true)
-            }
-        }
+        bridge.setLoginLostHandler { authenticate(bridge) }
         P2PPackTransport.install(bridge)
         EosVoicechatBridge.install(bridge)
 
-        PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = false) }
+        authenticate(bridge)
     }
 
     private var stallReported = false
@@ -245,7 +247,7 @@ object P2PSessionManager {
             if (stallReported) {
                 stallReported = false
                 LOGGER.info("The EOS tick thread is responding again")
-                if (bridge.isLoggedIn) _status.value = EosStatus.Ready
+                if (bridge.isLoggedIn) _status.value = EosStatus.Ready else authenticate(bridge)
             }
             return
         }
@@ -270,6 +272,8 @@ object P2PSessionManager {
         stuck?.let { (thread, stack) -> PolyPlusSentry.captureStalledThread(thread, stack, description, alsoInSdk) }
 
         if (!restartStalledEos(bridge)) {
+            // retrying logins would only time out and bury this message
+            synchronized(consentLock) { if (isCurrent(bridge)) authJob?.cancel() }
             _status.value = EosStatus.Failed(STALL_UNRECOVERABLE)
         }
     }
@@ -290,6 +294,7 @@ object P2PSessionManager {
             stallRecoveries++
             starting = true
             bridge = null
+            authJob?.cancel()
             stallReported = false
             EosVoicechatBridge.uninstall()
             P2PPackTransport.uninstall()
@@ -355,39 +360,73 @@ object P2PSessionManager {
     fun reconnect() {
         val bridge = this.bridge ?: return
         stopHosting()
-        _status.value = EosStatus.Connecting
-        PolyPlusClient.SCOPE.launch { authenticate(bridge, forceRelogin = true) }
+        authenticate(bridge)
+    }
+
+    // skips the remaining backoff of a failed login, since a stalled bridge would only time out
+    fun retryLoginNow() {
+        val bridge = this.bridge ?: return
+        if (_status.value is EosStatus.Failed && !bridge.isStalled()) authenticate(bridge)
     }
 
     private fun isCurrent(bridge: EosSdkBridge): Boolean = this.bridge === bridge
 
-    private suspend fun authenticate(bridge: EosSdkBridge, forceRelogin: Boolean) {
-        val user = (if (forceRelogin) EosConnectAuth.forceLogin(bridge) else EosConnectAuth.ensureLoggedIn(bridge))
-            .onFailure {
-                if (!isCurrent(bridge)) return
-                LOGGER.error("EOS Connect login failed; P2P hosting/joining is unavailable", it)
+    // logs in now, then keeps the login alive: retries with backoff on failure and refreshes it ahead of expiry
+    private fun authenticate(bridge: EosSdkBridge) {
+        synchronized(consentLock) {
+            if (!isCurrent(bridge)) return
+            _status.value = EosStatus.Connecting
+            authJob?.cancel()
+            authJob = PolyPlusClient.SCOPE.launch {
+                var failures = 0
+                while (isCurrent(bridge)) {
+                    if (authenticateOnce(bridge, failures)) {
+                        failures = 0
+                        delay(AUTH_REFRESH_INTERVAL_MS.milliseconds)
+                    } else {
+                        delay(reconnectDelay(++failures).milliseconds)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun authenticateOnce(bridge: EosSdkBridge, failures: Int): Boolean {
+        // a failed refresh shouldn't kill a login that is still valid
+        val refreshing = _status.value == EosStatus.Ready && bridge.isLoggedIn
+
+        fun fail(message: String, error: Throwable, reason: String): Boolean {
+            if (failures == 0) {
+                LOGGER.error(message, error)
+            } else {
+                LOGGER.warn("{} (retry {}): {}", message, failures, error.toString())
+            }
+            if (isCurrent(bridge) && !refreshing) _status.value = EosStatus.Failed(reason)
+            return false
+        }
+
+        val user = EosConnectAuth.login(bridge).getOrElse {
+            if (!isCurrent(bridge)) return false
+            if (failures == 0) {
                 EosFailureDiagnosis
                     .explain(EosFailureDiagnosis.openFileDescriptors(), PolyConnection.isConnected)
                     ?.let(LOGGER::error)
-                _status.value = EosStatus.Failed("Unable to connect to Poly+ multiplayer services.")
             }
-            .getOrNull()
+            return fail("EOS Connect login failed; P2P hosting/joining is unavailable", it, "Unable to connect to Poly+ multiplayer services.")
+        }
 
         if (!isCurrent(bridge)) {
             LOGGER.info("Discarding an EOS login that finished after the transport was detached")
-            return
+            return false
         }
 
-        if (user != null) {
-            AccountApi.linkPuid(user.raw)
-                .onSuccess { if (isCurrent(bridge)) _status.value = EosStatus.Ready }
-                .onFailure {
-                    LOGGER.error("Failed to link EOS ProductUserId with the backend", it)
-                    if (isCurrent(bridge)) _status.value = EosStatus.Failed("Unable to link your account for multiplayer sessions.")
-                }
-
-            bridge.queryNatType().onSuccess { LOGGER.info("EOS P2P NAT type: {}", it) }
+        AccountApi.linkPuid(user.raw).getOrElse {
+            return fail("Failed to link EOS ProductUserId with the backend", it, "Unable to link your account for multiplayer sessions.")
         }
+        if (isCurrent(bridge)) _status.value = EosStatus.Ready
+
+        bridge.queryNatType().onSuccess { LOGGER.info("EOS P2P NAT type: {}", it) }
+        return true
     }
 
     fun socketFor(sessionId: String): EosP2PSocketId = EosP2PSocketId(sessionId.replace("-", "").take(32))
@@ -434,6 +473,7 @@ object P2PSessionManager {
         }
 
         if (_status.value != EosStatus.Ready) {
+            retryLoginNow()
             LOGGER.info("Waiting for EOS Connect to be ready before joining session {}", invite.sessionId)
             val ready = withTimeoutOrNull(AUTH_READY_TIMEOUT_MS.milliseconds) {
                 status.first { it == EosStatus.Ready || it is EosStatus.Failed }
