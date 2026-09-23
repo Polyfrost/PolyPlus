@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object SessionRefresh {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -249,7 +250,7 @@ object SessionRefresh {
     }
 
     private suspend fun performRefresh(target: RefreshTarget): Result<Unit> {
-        return runCatching {
+        return runSuspendCatching {
             withTimeout(REFRESH_TIMEOUT_MS) { OneLauncherAccounts.refresh(target.id, refreshClient = false) }
             LOGGER.info("Refreshed the session for {}", target.account.username)
         }.onFailure { LOGGER.warn("Could not refresh the session for {}", target.account.username, it) }

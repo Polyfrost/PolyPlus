@@ -11,6 +11,7 @@ import org.polyfrost.polyplus.client.network.http.responses.EditGroupMessageRequ
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.http.responses.SendGroupMessageRequest
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object GroupsApi {
     suspend fun list(): Result<List<GroupSummary>> =
@@ -25,12 +26,12 @@ object GroupsApi {
             setBody(CreateGroupRequest(name, members))
         }
 
-    suspend fun addMember(groupId: Int, player: String): Result<Unit> = runCatching {
+    suspend fun addMember(groupId: Int, player: String): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/members/$player")
         Unit
     }
 
-    suspend fun removeMember(groupId: Int, player: String): Result<Unit> = runCatching {
+    suspend fun removeMember(groupId: Int, player: String): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.deleteAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/members/$player")
         Unit
     }
@@ -53,12 +54,12 @@ object GroupsApi {
             setBody(EditGroupMessageRequest(content))
         }
 
-    suspend fun deleteMessage(groupId: Int, messageId: Long): Result<Unit> = runCatching {
+    suspend fun deleteMessage(groupId: Int, messageId: Long): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.deleteAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/messages/$messageId")
         Unit
     }
 
-    suspend fun markRead(groupId: Int, messageId: Long): Result<Unit> = runCatching {
+    suspend fun markRead(groupId: Int, messageId: Long): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/read/$messageId")
         Unit
     }

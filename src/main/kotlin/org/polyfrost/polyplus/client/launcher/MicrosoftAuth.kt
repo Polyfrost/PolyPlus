@@ -45,6 +45,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object MicrosoftAuth {
     private val LOGGER = LogManager.getLogger("PolyPlus/Accounts")
@@ -120,12 +121,12 @@ object MicrosoftAuth {
 
     private suspend fun raceLogin(session: MicrosoftLoginSession): MsaToken = coroutineScope {
         val browser = async {
-            runCatching {
+            runSuspendCatching {
                 val code = session.codeResult.await()
                 exchangeAuthCode(code, session.redirectUri, session.verifier)
             }
         }
-        val device = async { runCatching { pollDeviceToken(session.device) } }
+        val device = async { runSuspendCatching { pollDeviceToken(session.device) } }
         try {
             var browserDone = false
             var deviceDone = false
@@ -228,7 +229,7 @@ object MicrosoftAuth {
                 val body: MsaTokenResponse = response.body()
                 return MsaToken(body.accessToken, body.refreshToken, body.expiresIn, Instant.now())
             }
-            val error = runCatching {
+            val error = runSuspendCatching {
                 PolyPlusClient.JSON.decodeFromString(OAuthErrorResponse.serializer(), response.bodyAsText())
             }.getOrNull()
             when (error?.error) {
@@ -404,7 +405,7 @@ object MicrosoftAuth {
     }
 
     private suspend fun minecraftEntitlements(token: String) {
-        runCatching {
+        runSuspendCatching {
             HTTP.get("https://api.minecraftservices.com/entitlements/mcstore") {
                 accept(ContentType.Application.Json)
                 header(HttpHeaders.Authorization, "Bearer $token")

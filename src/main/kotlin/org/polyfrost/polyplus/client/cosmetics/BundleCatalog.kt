@@ -8,6 +8,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.BundleSearchResponse
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object BundleCatalog {
     private val LOGGER = LogManager.getLogger()
@@ -18,7 +19,7 @@ object BundleCatalog {
         page: Int = 1,
         perPage: Int = 50,
         text: String? = null,
-    ): Result<BundleSearchResponse> = runCatching {
+    ): Result<BundleSearchResponse> = runSuspendCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/bundles/search") {
             parameter("page", page.coerceAtLeast(1))
             parameter("nb", perPage.coerceIn(1, MAX_PAGE_SIZE))
@@ -26,7 +27,7 @@ object BundleCatalog {
         }.body<BundleSearchResponse>()
     }.onFailure { LOGGER.error("Failed to search bundles", it) }
 
-    suspend fun view(id: Int): Result<BundleViewResponse> = runCatching {
+    suspend fun view(id: Int): Result<BundleViewResponse> = runSuspendCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/bundles/view/$id").body<BundleViewResponse>()
     }.onFailure { LOGGER.error("Failed to view bundle {}", id, it) }
 }

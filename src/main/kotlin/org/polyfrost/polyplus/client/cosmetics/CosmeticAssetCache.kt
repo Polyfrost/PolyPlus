@@ -36,6 +36,7 @@ import org.polyfrost.polyplus.client.emotes.Emote
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.utils.HashManager
 import java.io.File
 import java.nio.file.Path
@@ -131,7 +132,7 @@ object CosmeticAssetCache {
                         if (!outOfSpace.get()) {
                             gate.withPermit {
                                 downloadLockFor(definition).withLock {
-                                    runCatching { materializeCosmeticLocked(definition) }
+                                    runSuspendCatching { materializeCosmeticLocked(definition) }
                                         .onFailure { error ->
                                             if (error is OutOfDiskSpaceException) {
                                                 if (outOfSpace.compareAndSet(false, true)) {
@@ -207,9 +208,9 @@ object CosmeticAssetCache {
 
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
         return withContext(Dispatchers.IO) {
-            runCatching {
+            runSuspendCatching {
                 if (isLoaded(definition) && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
-                    return@runCatching true
+                    return@runSuspendCatching true
                 }
                 downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
                 parseLock.withLock { loadCosmeticAssetsLocked(definition) }

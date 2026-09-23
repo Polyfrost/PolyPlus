@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object CosmeticStore {
     private val LOGGER = LogManager.getLogger()
@@ -37,7 +38,7 @@ object CosmeticStore {
         tags: List<String> = emptyList(),
         collection: Int? = null,
         reportFailures: Boolean = true,
-    ): Result<CosmeticSearchResponse> = runCatching {
+    ): Result<CosmeticSearchResponse> = runSuspendCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics/search") {
             parameter("page", page.coerceAtLeast(1))
             parameter("nb", perPage.coerceIn(1, MAX_PAGE_SIZE))
@@ -78,7 +79,7 @@ object CosmeticStore {
         return stocked.also { cachedStockedTypes = it }
     }
 
-    suspend fun view(id: Int): Result<CosmeticStoreView> = runCatching {
+    suspend fun view(id: Int): Result<CosmeticStoreView> = runSuspendCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/cosmetics/view/$id").body<CosmeticStoreView>()
     }.onFailure { reportFailure("Failed to view cosmetic $id", it) }
 

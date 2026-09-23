@@ -36,6 +36,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 class EosSdkBridge {
     private val logger = LogManager.getLogger()
@@ -467,7 +468,7 @@ class EosSdkBridge {
         }
     }
 
-    suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId> = runCatching {
+    suspend fun connectLogin(openIdAccessToken: String): Result<EosProductUserId> = runSuspendCatching {
         if (platform == null) withContext(Dispatchers.IO) { awaitStartup() }
         check(platform != null) { "EOS SDK has not started yet" }
 
@@ -501,7 +502,7 @@ class EosSdkBridge {
         platform?.p2p?.setRelayControl(if (forceRelays) EosRelayControl.ForceRelays else EosRelayControl.AllowRelays)
     }
 
-    suspend fun queryNatType(): Result<NatType> = runCatching {
+    suspend fun queryNatType(): Result<NatType> = runSuspendCatching {
         val result = awaitOnTick("EOS::P2P::QueryNATType") { requireNotNull(platform).p2p.queryNATType() }.natType.toString()
         runCatching { NatType.valueOf(result) }.getOrDefault(NatType.Unknown)
     }

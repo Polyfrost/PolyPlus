@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object CoverImageCache {
     private val LOGGER = LogManager.getLogger()
@@ -27,7 +28,7 @@ object CoverImageCache {
         if (assetId in failed) return null
 
         return withContext(Dispatchers.IO) {
-            runCatching {
+            runSuspendCatching {
                 val bytes = PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/asset/$assetId").body<ByteArray>()
                 SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
             }.onFailure {
@@ -58,7 +59,7 @@ object RemoteImageCache {
         if (url in failed) return null
 
         return withContext(Dispatchers.IO) {
-            runCatching {
+            runSuspendCatching {
                 val bytes = PolyPlusClient.HTTP.get(url).body<ByteArray>()
                 require(bytes.size <= MAX_BYTES) { "image exceeds 2 MiB" }
                 SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()

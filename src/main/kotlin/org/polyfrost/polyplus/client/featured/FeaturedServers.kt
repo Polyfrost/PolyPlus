@@ -10,6 +10,7 @@ import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -96,6 +97,8 @@ object FeaturedServers {
                     )
                 }
                 persistCache(CacheEnvelope(fetchedAt, body))
+            } catch (e: CancellationException) {
+                throw e
             } catch (error: Exception) {
                 logger.warn("Could not refresh featured servers; retaining valid cache", error)
             } finally {

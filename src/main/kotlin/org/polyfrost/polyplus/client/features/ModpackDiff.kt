@@ -18,6 +18,7 @@ import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.zip.ZipInputStream
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object ModpackDiff {
     private val logger = LogManager.getLogger("PolyPlus/ModpackDiff")
@@ -42,7 +43,7 @@ object ModpackDiff {
 
     fun logAsync() {
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
-            runCatching { log() }.onFailure { logger.warn("Failed to compare mods against the OneClient modpack", it) }
+            runSuspendCatching { log() }.onFailure { logger.warn("Failed to compare mods against the OneClient modpack", it) }
         }
     }
 

@@ -14,6 +14,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuilder.() -> Unit): HttpResponse {
     val response = request {
@@ -52,7 +53,7 @@ suspend inline fun HttpClient.requestAuthorized(url: String, method: HttpMethod,
 }
 
 suspend inline fun <reified T> HttpClient.requestBodyAuthorized(url: String, method: HttpMethod, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> {
-    return runCatching {
+    return runSuspendCatching {
         val response = requestAuthorized(url, method, block)
         response.bodyOrThrow<T>()
     }

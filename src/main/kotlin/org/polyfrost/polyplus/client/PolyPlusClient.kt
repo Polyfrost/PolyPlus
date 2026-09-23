@@ -49,6 +49,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -121,7 +122,7 @@ object PolyPlusClient {
                 if (status == HttpStatusCode.Unauthorized) return@validateResponse
                 if (response.request.url.host != apiHost()) return@validateResponse
 
-                val text = runCatching { response.bodyAsText() }.getOrDefault("")
+                val text = runSuspendCatching { response.bodyAsText() }.getOrDefault("")
                 throw if (status.value >= 500) {
                     ServerResponseException(response, text)
                 } else {
@@ -209,7 +210,7 @@ object PolyPlusClient {
         LOGGER.info("Refreshing PolyPlus Client...")
 
         SCOPE.launch {
-            runCatching { PolyAuthorization.reset() }
+            runSuspendCatching { PolyAuthorization.reset() }
 
             runCatching {
                 CosmeticCatalog.reset()
@@ -255,12 +256,12 @@ object PolyPlusClient {
         CosmeticLoadProgress.beginRefresh()
 
         try {
-            runCatching { CosmeticCatalog.refreshCatalog() }
+            runSuspendCatching { CosmeticCatalog.refreshCatalog() }
                 .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
-            runCatching { CosmeticCatalog.refreshPlayer() }
+            runSuspendCatching { CosmeticCatalog.refreshPlayer() }
                 .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
             //? if >= 1.21.1 {
-            runCatching { CosmeticService.syncLocalActive() }
+            runSuspendCatching { CosmeticService.syncLocalActive() }
                 .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
             /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }

@@ -129,6 +129,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.awt.image.BufferedImage
 import java.io.IOException
@@ -1189,7 +1190,7 @@ private fun AccountPill(name: String) {
                 error = null
                 errorSteps = null
                 busy = "Starting Microsoft sign-in…"
-                val session = runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin() } }
+                val session = runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin() } }
                     .onFailure {
                         error = it.message ?: "Couldn't start sign-in"
                         errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
@@ -1203,7 +1204,7 @@ private fun AccountPill(name: String) {
                 loginSession = session
                 ClientPlatform.openUri(session.browserAuthUrl)
                 busy = "Waiting for you to finish signing in…"
-                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
+                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
                     .onFailure {
                         error = it.message ?: "Microsoft sign-in failed"
                         errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
@@ -1230,7 +1231,7 @@ private fun AccountPill(name: String) {
                 busy = "Refreshing session…"
                 error = null
                 errorSteps = null
-                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.refresh(account.id) } }
+                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.refresh(account.id) } }
                     .onFailure {
                         error = it.message ?: "Couldn't refresh that account"
                         errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
@@ -1246,7 +1247,7 @@ private fun AccountPill(name: String) {
                 busy = "Adding account…"
                 error = null
                 errorSteps = null
-                runCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addOffline(username) } }
+                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addOffline(username) } }
                     .onFailure { error = it.message ?: "Couldn't add that account" }
                 reload()
                 busy = null

@@ -97,6 +97,7 @@ import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.player.RemotePlayer
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.Collections
 import kotlinx.coroutines.launch
 //?}
@@ -884,7 +885,7 @@ object PlayerPreviewRenderer {
                 equipment.equip(attached)
             } else if (loadAttempted.add(id)) {
                 PolyPlusClient.SCOPE.launch {
-                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                    runSuspendCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
                 }
             }
         }
