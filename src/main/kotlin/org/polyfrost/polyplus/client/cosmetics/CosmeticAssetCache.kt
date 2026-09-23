@@ -36,7 +36,7 @@ import org.polyfrost.polyplus.client.emotes.Emote
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import org.polyfrost.polyplus.utils.HashManager
+import org.polyfrost.polyplus.client.utils.HashManager
 import java.io.File
 import java.nio.file.Path
 import java.util.UUID

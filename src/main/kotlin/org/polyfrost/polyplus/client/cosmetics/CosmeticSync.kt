@@ -19,9 +19,9 @@ import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.pets.PetManager
+import org.polyfrost.polyplus.client.utils.Batcher
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.events.WebSocketMessage
-import org.polyfrost.polyplus.utils.Batcher
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap

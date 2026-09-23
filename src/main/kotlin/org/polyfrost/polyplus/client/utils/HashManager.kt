@@ -1,4 +1,4 @@
-package org.polyfrost.polyplus.utils
+package org.polyfrost.polyplus.client.utils
 
 import org.polyfrost.polyplus.client.PolyPlusClient
 import java.io.File
