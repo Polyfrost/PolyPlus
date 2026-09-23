@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
+import java.io.IOException
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
@@ -202,11 +203,20 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                 val chunk = ByteBuffer.allocate(chunkSize)
                 buf.readBytes(chunk)
                 chunk.flip()
-                bridge.sendPacket(socket, remote, chunk)
+                bridge.sendPacket(socket, remote, chunk, onFailure = ::failStream)
                 remaining -= chunkSize
             }
 
             input.remove()
+        }
+    }
+
+    // a gap in the byte stream desyncs the peer's decoder, so the connection can't carry on
+    private fun failStream(reason: String) {
+        eventLoop().execute {
+            if (!isOpen) return@execute
+            pipeline().fireExceptionCaught(IOException("Couldn't send to the P2P peer: $reason"))
+            close()
         }
     }
 
