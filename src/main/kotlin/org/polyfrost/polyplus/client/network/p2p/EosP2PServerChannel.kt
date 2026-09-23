@@ -65,8 +65,6 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
     }
 
     private fun onConnectionRequest(socket: EosP2PSocketId, remote: EosProductUserId) {
-        bridge.acceptConnection(socket, remote)
-
         val child = EosP2PChannel(this)
         child.setupAccepted(socket, remote)
 

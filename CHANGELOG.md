@@ -5,3 +5,4 @@
 - Fixed world hosting and joining through Poly+ no longer working after about an hour or a brief connection drop until the game was restarted
 - Fixed Poly+ giving up on reconnecting after being offline for more than a few minutes
 - Fixed hosting a world for friends silently doing nothing when Poly+ couldn't start the session, such as while offline. The error is now shown instead.
+- Fixed friends sometimes failing to join a world you're hosting through Poly+ and timing out instead

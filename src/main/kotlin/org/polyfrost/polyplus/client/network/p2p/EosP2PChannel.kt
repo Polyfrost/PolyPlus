@@ -59,7 +59,6 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     internal fun setupAccepted(socket: EosP2PSocketId, remote: EosProductUserId) {
         localSocket = socket
         remoteUser = remote
-        activate()
     }
 
     override fun metadata(): ChannelMetadata = METADATA
@@ -134,6 +133,12 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
 
     override fun doRegister() {
         super.doRegister()
+        // inbound packets need an event loop to be handed to, so an accepted channel must not be
+        // reachable nor have its peer accepted before this point
+        if (parent() != null) {
+            activate()
+            bridge.acceptConnection(checkNotNull(localSocket), checkNotNull(remoteUser))
+        }
         eventLoop().execute { relaxReadTimeout(attempt = 1) }
     }
 
