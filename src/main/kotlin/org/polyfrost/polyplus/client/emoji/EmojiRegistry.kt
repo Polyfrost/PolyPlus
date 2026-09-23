@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.emoji
 
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.FormattedText
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.contents.PlainTextContents
@@ -98,8 +99,8 @@ object EmojiRegistry {
     fun enabled(): Boolean = PolyPlusConfig.showChatEmoji
 
     @JvmStatic
-    fun transformForViewer(component: Component?): Component? =
-        if (component == null || !enabled()) component else transform(component)
+    fun transformForViewer(text: FormattedText): FormattedText =
+        if (text is Component && enabled()) transform(text) else text
 
     fun transform(component: Component): Component {
         val contents = component.contents

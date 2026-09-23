@@ -25,6 +25,8 @@
     "client.MixinGameNarrator",
     "client.MixinGameRenderer",
     "client.MixinGui",
+    //? if >= 1.21.11
+    "client.MixinGuiMessage",
     "client.MixinIntegratedServer",
     "client.MixinMinecraft",
     "client.MixinMinecraftSystemReport",
