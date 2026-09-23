@@ -152,7 +152,7 @@ object PolyPlusMainMenuConfig : Config(
     /*@JvmStatic
     @Switch(
         title = "Modern In-Game Menus",
-        description = "Blur the world behind in-game menus and give lists the modern look instead of the dark gradient and dirt.",
+        description = "Use a flat darkened background behind in-game menus instead of the dark gradient and dirt.",
         subcategory = "Background",
     )
     var modernInGameMenus = true

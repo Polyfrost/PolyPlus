@@ -81,14 +81,11 @@ public class MixinScreen {
     }
 }
 //?} else {
-/*import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.minecraft.client.gui.GuiElement;
-import net.minecraft.client.gui.screens.Screen;
+/*import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screen.inventory.menu.InventoryMenuScreen;
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
-import org.polyfrost.polyplus.client.gui.LegacyMenuBlur;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
+import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -96,6 +93,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Screen.class)
 public class MixinScreen {
+    private static final int DARKEN_TOP = 0xC0101010;
+    private static final int DARKEN_BOTTOM = 0xD0101010;
+
     @Inject(method = "renderBackground(I)V", at = @At("HEAD"))
     private void polyplus$beginBackgroundPass(int offset, CallbackInfo ci) {
         MenuPanorama.beginPass();
@@ -106,23 +106,17 @@ public class MixinScreen {
         MenuPanorama.beginPass();
     }
 
-    @WrapOperation(
-        method = "renderBackground(I)V",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;fillGradient(IIIIII)V")
-    )
-    private void polyplus$modernInGameBackground(Screen self, int x1, int y1, int x2, int y2, int top, int bottom, Operation<Void> original) {
-        if (PolyPlusMainMenuConfig.getModernInGameMenus() && !(self instanceof InventoryMenuScreen)) {
-            LegacyMenuBlur.blur();
-            GuiElement.fill(x1, y1, x2, y2, 0x40000000);
-            return;
-        }
-        original.call(self, x1, y1, x2, y2, top, bottom);
-    }
-
     @Inject(method = "drawBackgroundTexture", at = @At("HEAD"), cancellable = true)
     private void polyplus$replaceMenuBackground(int offset, CallbackInfo ci) {
         Screen self = (Screen) (Object) this;
-        if (MenuPanorama.active(self) && MenuPanorama.drawBackdrop(self, false)) ci.cancel();
+        if (MenuPanorama.active(self) && MenuPanorama.drawBackdrop(self, false)) {
+            ci.cancel();
+            return;
+        }
+        if (PolyPlusMainMenuConfig.getModernInGameMenus() && !(self instanceof InventoryMenuScreen)) {
+            ((GuiElementInvoker) self).polyplus$fillGradient(0, 0, self.width, self.height, DARKEN_TOP, DARKEN_BOTTOM);
+            ci.cancel();
+        }
     }
 }
 *///?}
