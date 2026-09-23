@@ -26,6 +26,8 @@
     "client.MixinFramerateLimitTracker",
     //? if > 1.8.9
     "client.MixinGameNarrator",
+    //? if = 1.8.9
+    //"client.MixinGameOptions",
     "client.MixinGameRenderer",
     "client.MixinGui",
     //? if >= 1.21.11
@@ -36,6 +38,8 @@
     "client.MixinJoinMultiplayerScreen",
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
+    //? if = 1.8.9
+    //"client.MixinOptionsScreen",
     "client.MixinOnlineServerEntry",
     //? if > 1.8.9
     "client.MixinPanorama",
@@ -78,6 +82,8 @@
     //"client.MixinEmojiTextRenderer",
     //? if = 1.8.9
     //"client.access.TitleScreenInvoker",
+    //? if = 1.8.9
+    //"client.access.GuiElementInvoker",
     "client.network.MixinClientCommonPacketListenerImpl"
   ],
   "mixins": [
@@ -101,6 +107,8 @@
     "compat.euphoria.MixinSodiumConsole",
     //? if > 1.8.9
     "compat.mountopacity.MixinEntityHook",
+    //? if = 1.8.9
+    //"compat.oneconfig.MixinComposeScreen",
     "compat.oneconfig.MixinConfigScreenKt",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",

@@ -55,8 +55,9 @@ public class MixinScreen {
         *///?}
         float tickDelta, CallbackInfo ci
     ) {
-        if (MenuPanorama.panoramaBackdrop()) return;
-        MenuPanorama.drawBackdrop(graphics, (Screen) (Object) this, true);
+        Screen self = (Screen) (Object) this;
+        if (!MenuPanorama.panoramaPassNeedsBackdrop(self)) return;
+        MenuPanorama.drawBackdrop(graphics, self, true);
     }
 
     @WrapMethod(

@@ -16,6 +16,7 @@ import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.render.platform.GlStateManager
 import org.polyfrost.oneconfig.internal.legacy.LegacyPanoramaTracker
 import org.polyfrost.oneconfig.internal.ui.compose.opengl.StoredGLState
+import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker
 import org.polyfrost.polyplus.mixin.client.access.TitleScreenInvoker
 *///?}
 
@@ -70,6 +71,9 @@ object MenuPanorama {
 
     @JvmStatic
     fun active(screen: Screen): Boolean = menusActive(screen) && screen !is ComposeScreen
+
+    @JvmStatic
+    fun panoramaPassNeedsBackdrop(screen: Screen): Boolean = !panoramaBackdrop() || screen is ComposeScreen
 
     private fun backdropWanted(screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
@@ -139,6 +143,11 @@ object MenuPanorama {
         return drew
     }
 
+    private const val WASH_TOP = 0x80FFFFFF.toInt()
+    private const val WASH_BOTTOM = 0x00FFFFFF
+    private const val SHADE_TOP = 0x00000000
+    private const val SHADE_BOTTOM = 0x80000000.toInt()
+
     private val panoramaGlState = StoredGLState(330)
     private var lastPanoramaTick = 0L
 
@@ -168,6 +177,9 @@ object MenuPanorama {
             GlStateManager.disableAlphaTest()
             (title as TitleScreenInvoker).`polyplus$drawBackground`(0, 0, (now - lastPanoramaTick) / 50f)
             GlStateManager.enableAlphaTest()
+            val gradients = title as GuiElementInvoker
+            gradients.`polyplus$fillGradient`(0, 0, screen.width, screen.height, WASH_TOP, WASH_BOTTOM)
+            gradients.`polyplus$fillGradient`(0, 0, screen.width, screen.height, SHADE_TOP, SHADE_BOTTOM)
         } finally {
             panoramaGlState.restore()
         }
