@@ -13,6 +13,8 @@ object PetManager {
     private val LOGGER = LogManager.getLogger()
     private val activeByOwner = ConcurrentHashMap<UUID, PetEntity>()
     private val activeCosmeticId = ConcurrentHashMap<UUID, Int>()
+    //? if >= 26.2
+    private var nextEntityId = -1
 
     fun currentPetCosmeticId(owner: UUID): Int? = activeCosmeticId[owner]
 
@@ -36,6 +38,10 @@ object PetManager {
             despawn(owner)
 
             val entity = PetEntity(PetEntities.PET_ENTITY_TYPE, level)
+            //? if >= 26.2 {
+            // Client levels no longer assign entity IDs; negative ones can't collide with server entities.
+            entity.setId(nextEntityId--)
+            //?}
             entity.initialize(definition, owner)
             val angle = Math.toRadians(ownerEntity.yRot.toDouble()) + Math.PI
             val spawnX = ownerEntity.x + sin(angle) * 1.5
