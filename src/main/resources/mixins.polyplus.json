@@ -67,7 +67,7 @@
   "mixins": [
     "MixinCrashReport",
     "MixinSystemReport",
-    //? if <1.21.5
+    "client.access.HolderReferenceInvoker",
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
