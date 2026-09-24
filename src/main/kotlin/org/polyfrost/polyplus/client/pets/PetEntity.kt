@@ -160,11 +160,8 @@ class PetEntity(
         return level().players().firstOrNull { it.uuid == uuid }
     }
 
-    //? if >= 1.21.5 {
+    //~ if >= 1.21.5 'isControlledByLocalInstance' -> 'isLocalClientAuthoritative'
     override fun isLocalClientAuthoritative(): Boolean = true
-    //?} else {
-    /*override fun isEffectiveAi(): Boolean = true
-    *///?}
 
     override fun mobInteract(player: Player, hand: InteractionHand): InteractionResult = InteractionResult.PASS
 

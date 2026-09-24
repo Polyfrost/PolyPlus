@@ -8,3 +8,4 @@
 - Fixed friends sometimes failing to join a world you're hosting through Poly+ and timing out instead
 - Fixed a Poly+ hosted world connection carrying on after a packet was lost, which could desync players or kick them with confusing errors. They are now disconnected with the actual reason.
 - Fixed players without Poly+ being unable to join worlds hosted by a Poly+ user, such as through e4mc or Essential
+- Fixed pets crashing the game on Minecraft 1.21.4
