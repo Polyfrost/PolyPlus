@@ -512,7 +512,12 @@ object PolyPlusSentry {
         if (locallyHandled.get() > 0) return
         val crashed = Thread.currentThread()
         if (throwable is StackOverflowError && reportOnFreshStack { report(title, throwable, crashed) }) return
-        report(title, throwable, crashed)
+        // Runs inside CrashReport's constructor, where anything thrown replaces the crash being reported
+        try {
+            report(title, throwable, crashed)
+        } catch (reporterFailure: Throwable) {
+            throwable.addSuppressed(reporterFailure)
+        }
     }
 
     private fun reportOnFreshStack(block: () -> Unit): Boolean = runCatching {
