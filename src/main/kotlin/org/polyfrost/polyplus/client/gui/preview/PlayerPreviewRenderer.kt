@@ -308,16 +308,6 @@ object PlayerPreviewRenderer {
         return cols
     }
 
-    private fun topFadeRows(h: Int): FloatArray {
-        val rows = FloatArray(h)
-        val fadePx = h * EDGE_FADE_FRACTION
-        for (r in 0 until h) {
-            val d = r + 0.5f // distance from top edge at pixel center
-            rows[r] = if (fadePx <= 0f) 1f else smooth(d / fadePx)
-        }
-        return rows
-    }
-
     private fun scaleByte(v: Int, f: Float): Byte {
         val s = (v * f).toInt()
         return (if (s > 255) 255 else s).toByte()
@@ -336,7 +326,6 @@ object PlayerPreviewRenderer {
         if (fadeEdges) {
             val ef = EDGE_FADE_FRACTION
             a *= smooth(minOf(tx, 1f - tx) / ef)
-            a *= smooth(ty / ef)
         }
         if (bottomFade > 0f) a *= smooth((1f - ty) / bottomFade)
         return a
@@ -1041,16 +1030,14 @@ object PlayerPreviewRenderer {
     private fun toImageBitmap(data: ByteBuffer, w: Int, h: Int, pixelSize: Int): ImageBitmap {
         val out = ByteArray(w * h * 4)
         val fade = edgeFadeColumns(w)
-        val rowFade = topFadeRows(h)
         for (y in 0 until h) {
             val outRow = h - 1 - y
             val dstRow = outRow * w
             val srcRow = y * w
-            val rf = rowFade[outRow]
             for (x in 0 until w) {
                 val si = (srcRow + x) * pixelSize
                 val di = (dstRow + x) * 4
-                val f = fade[x] * rf
+                val f = fade[x]
                 out[di] = scaleByte(data.get(si + 2).toInt() and 0xFF, f)
                 out[di + 1] = scaleByte(data.get(si + 1).toInt() and 0xFF, f)
                 out[di + 2] = scaleByte(data.get(si).toInt() and 0xFF, f)
@@ -1468,11 +1455,9 @@ object PlayerPreviewRenderer {
         try {
             val out = ByteArray(w * h * 4)
             val fade = edgeFadeColumns(w)
-            val rowFade = topFadeRows(h)
             for (y in 0 until h) {
                 val outRow = h - 1 - y
                 val dstRow = outRow * w
-                val rf = rowFade[outRow]
                 for (x in 0 until w) {
                     //? if >= 1.21.4 {
                     val px = img.getPixel(x, y)
@@ -1481,7 +1466,7 @@ object PlayerPreviewRenderer {
                     /*val px = img.getPixelRGBA(x, y)
                     *///?}
                     val di = (dstRow + x) * 4
-                    val f = fade[x] * rf
+                    val f = fade[x]
                     out[di] = scaleByte((px ushr 16) and 0xFF, f)
                     out[di + 1] = scaleByte((px ushr 8) and 0xFF, f)
                     out[di + 2] = scaleByte(px and 0xFF, f)
