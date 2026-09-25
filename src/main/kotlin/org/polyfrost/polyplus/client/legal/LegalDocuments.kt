@@ -15,6 +15,7 @@ import java.io.File
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 @Serializable
 data class LegalDocument(
@@ -64,7 +65,7 @@ object LegalDocuments {
         remote.onFailure { LOGGER.warn("Could not fetch the Terms of Service document; trying the cache", it) }
         return remote.recoverCatching { error ->
             cached() ?: throw error
-        }
+        }.onSuccess { PrivacyConsent.publishedVersions(it.version, it.resolvedPrivacyVersion) }
     }
 
     private fun cache(body: String) {

@@ -38,20 +38,34 @@ object PrivacyConsent {
     @Volatile
     private var privacyVersion: Int = 0
 
+    @Volatile
+    private var latestTermsVersion: Int = 0
+
+    @Volatile
+    private var latestPrivacyVersion: Int = 0
+
     private val file: File
         get() = File(FabricLoader.getInstance().gameDir.toFile(), "polyplus/privacy.json")
 
     val managedByLauncher: Boolean
         get() = LauncherEnvironment.isOneClient && LauncherEnvironment.launcherAcceptedTerms() != false
 
-    @JvmStatic
     fun state(): State {
         if (!loaded) load()
         return state
     }
 
-    @JvmStatic
-    fun needsPrompt(): Boolean = !managedByLauncher && state() == State.UNSET
+    fun needsPrompt(): Boolean = !managedByLauncher && when (state()) {
+        State.UNSET -> true
+        State.ACCEPTED -> termsVersion < latestTermsVersion || privacyVersion < latestPrivacyVersion
+        State.DECLINED -> false
+    }
+
+    // records the newest published document versions so an older acceptance triggers a new prompt
+    fun publishedVersions(terms: Int, privacy: Int) {
+        latestTermsVersion = terms
+        latestPrivacyVersion = privacy
+    }
 
     @JvmStatic
     fun allowsOnlineServices(): Boolean = when (state()) {
@@ -60,8 +74,7 @@ object PrivacyConsent {
         State.UNSET -> managedByLauncher
     }
 
-    @JvmStatic
-    fun accept(terms: Int = 0, privacy: Int = 0) {
+    fun accept(terms: Int = latestTermsVersion, privacy: Int = latestPrivacyVersion) {
         if (!loaded) load()
         synchronized(lock) {
             state = State.ACCEPTED
@@ -71,7 +84,6 @@ object PrivacyConsent {
         }
     }
 
-    @JvmStatic
     fun decline() {
         if (!loaded) load()
         synchronized(lock) {

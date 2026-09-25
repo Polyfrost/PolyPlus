@@ -36,6 +36,7 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
+import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
@@ -149,6 +150,11 @@ object PolyPlusClient {
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
+        step("legal documents") {
+            if (PrivacyConsent.state() == PrivacyConsent.State.ACCEPTED && !PrivacyConsent.managedByLauncher) {
+                SCOPE.launch(Dispatchers.IO) { LegalDocuments.load() }
+            }
+        }
         step("rich text privacy") { RichTextPrivacy.warmUp() }
         step("default settings") { DefaultSettings.initialize() }
         step("default mod order") { DefaultModOrder.initialize() }
