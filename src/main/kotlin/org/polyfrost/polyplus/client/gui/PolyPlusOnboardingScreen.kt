@@ -75,18 +75,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
-import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.BlendMode
 import org.jetbrains.skia.Canvas as SkiaCanvas
 import org.jetbrains.skia.ColorFilter
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Path
-import org.jetbrains.skia.Point
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.SamplingMode
-import org.joml.Matrix4f
-import org.joml.Vector3f
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
@@ -105,10 +100,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Locale
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -225,13 +217,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             mutableStateOf((modReads.gammaToggled ?: PolyPlusConfig.onboardingGammaToggled).clampGamma())
         }
         var gammaSmooth by remember { mutableStateOf(modReads.gammaSmooth ?: PolyPlusConfig.onboardingGammaSmooth) }
-        // The notice runs without the mod cards, so it reads Animatium itself instead of the cards' values.
-        fun itemValue(fromCards: Float?, live: () -> Float?, stored: Float): Float =
-            fromCards ?: (if (ModGuide.ITEM in owedGuides) live() else null) ?: stored
-        var itemOffsetX by remember { mutableStateOf(itemValue(modReads.itemX, OnboardingFeatures::currentItemOffsetX, PolyPlusConfig.onboardingItemOffsetX)) }
-        var itemOffsetY by remember { mutableStateOf(itemValue(modReads.itemY, OnboardingFeatures::currentItemOffsetY, PolyPlusConfig.onboardingItemOffsetY)) }
-        var itemOffsetZ by remember { mutableStateOf(itemValue(modReads.itemZ, OnboardingFeatures::currentItemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ)) }
-        var itemScale by remember { mutableStateOf(itemValue(modReads.itemScale, OnboardingFeatures::currentItemScale, PolyPlusConfig.onboardingItemScale)) }
         val touched = remember { mutableSetOf<ModCard>() }
         fun markTouched(card: ModCard) {
             touched += card
@@ -281,14 +266,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     chosen(ModCard.GAMMA, gammaToggled, PolyPlusConfig.onboardingGammaToggled)
                 PolyPlusConfig.onboardingGammaSmooth =
                     chosen(ModCard.GAMMA, gammaSmooth, PolyPlusConfig.onboardingGammaSmooth)
-                PolyPlusConfig.onboardingItemOffsetX =
-                    chosen(ModCard.ITEM, itemOffsetX, PolyPlusConfig.onboardingItemOffsetX)
-                PolyPlusConfig.onboardingItemOffsetY =
-                    chosen(ModCard.ITEM, itemOffsetY, PolyPlusConfig.onboardingItemOffsetY)
-                PolyPlusConfig.onboardingItemOffsetZ =
-                    chosen(ModCard.ITEM, itemOffsetZ, PolyPlusConfig.onboardingItemOffsetZ)
-                PolyPlusConfig.onboardingItemScale =
-                    chosen(ModCard.ITEM, itemScale, PolyPlusConfig.onboardingItemScale)
                 val available = OnboardingFeatures.availableCards
                 fun settled(card: ModCard, current: Boolean) =
                     OnboardingFeatures.settledAfterRun(
@@ -308,8 +285,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     settled(ModCard.SKIN_LAYERS, PolyPlusConfig.onboardingSkinLayersSettled)
                 PolyPlusConfig.onboardingGammaSettled =
                     settled(ModCard.GAMMA, PolyPlusConfig.onboardingGammaSettled)
-                PolyPlusConfig.onboardingItemPositionsSettled =
-                    settled(ModCard.ITEM, PolyPlusConfig.onboardingItemPositionsSettled)
                 PolyPlusConfig.onboardingModSettingsVersion =
                     OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
             }
@@ -455,23 +430,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                                         touch(ModCard.SKIN_LAYERS, skinLayers, it)
                                                         skinLayers = it
                                                     }
-                                                ModCard.ITEM ->
-                                                    ItemPositionCard(
-                                                        itemOffsetX, itemOffsetY, itemOffsetZ,
-                                                        { x, y, z ->
-                                                            if (x != itemOffsetX ||
-                                                                y != itemOffsetY ||
-                                                                z != itemOffsetZ
-                                                            ) {
-                                                                markTouched(ModCard.ITEM)
-                                                            }
-                                                            itemOffsetX = x
-                                                            itemOffsetY = y
-                                                            itemOffsetZ = z
-                                                        },
-                                                        itemScale,
-                                                        { touch(ModCard.ITEM, itemScale, it); itemScale = it },
-                                                    )
                                                 ModCard.GAMMA ->
                                                     FullbrightCard(
                                                         gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
@@ -506,8 +464,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                             }
                             val terms = pages[page] == OnboardingStep.Terms
                             val guidePage = pages[page] as? OnboardingStep.Guide
-                            val resettableScale = guidePage?.guide == ModGuide.ITEM &&
-                                !OnboardingFeatures.isDefaultItemScale(itemScale)
                             val blurUnanswered = pages[page] == OnboardingStep.MotionBlur &&
                                 blurMode == OnboardingFeatures.MOTION_BLUR_UNSET
                             BottomNavigation(
@@ -523,20 +479,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                     guidePage != null -> "Got it"
                                     else -> null
                                 },
-                                secondaryLabel = when {
-                                    terms -> "Decline"
-                                    resettableScale -> "Reset"
-                                    else -> null
-                                },
-                                onSecondary = {
-                                    if (terms) {
-                                        answerTerms(false)
-                                    } else {
-                                        itemScale = OnboardingFeatures.ITEM_SCALE_DEFAULT
-                                        // A run that never offered the card writes nothing on finish, so write now.
-                                        if (ModCard.ITEM !in offeredCards) OnboardingFeatures.resetItemScale()
-                                    }
-                                },
+                                secondaryLabel = if (terms) "Decline" else null,
+                                onSecondary = { answerTerms(false) },
                             )
                         }
                     }
@@ -925,42 +869,6 @@ private fun SkinLayersCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun ItemPositionCard(
-    offsetX: Float,
-    offsetY: Float,
-    offsetZ: Float,
-    onOffset: (Float, Float, Float) -> Unit,
-    scale: Float,
-    onScale: (Float) -> Unit,
-) {
-    ModCardFrame(
-        "Item Position",
-        MAIN_MENU_ASSETS + "package-01.svg",
-        "Move the item in your hand out of the way, or pull it closer, without touching your FOV.",
-        { ItemPositionPreview(offsetX, offsetY, offsetZ, scale) },
-    ) {
-        CardOffsetSlider("Item Offset X", offsetX) { onOffset(it, offsetY, offsetZ) }
-        CardOffsetSlider("Item Offset Y", offsetY) { onOffset(offsetX, it, offsetZ) }
-        CardOffsetSlider("Item Offset Z", offsetZ) { onOffset(offsetX, offsetY, it) }
-        val scaleSpan = OnboardingFeatures.ITEM_SCALE_MAX - OnboardingFeatures.ITEM_SCALE_MIN
-        CardSlider(
-            // One slider drives Animatium's three Item Scale axes together.
-            "Item Scale",
-            (scale - OnboardingFeatures.ITEM_SCALE_MIN) / scaleSpan,
-            "%.1f".fmt(scale),
-        ) { onScale(snapTo(OnboardingFeatures.ITEM_SCALE_MIN + it * scaleSpan, ITEM_SCALE_STEP)) }
-    }
-}
-
-@Composable
-private fun CardOffsetSlider(label: String, value: Float, onValue: (Float) -> Unit) {
-    val span = OnboardingFeatures.ITEM_OFFSET_MAX - OnboardingFeatures.ITEM_OFFSET_MIN
-    CardSlider(label, (value - OnboardingFeatures.ITEM_OFFSET_MIN) / span, "%.1f".fmt(value)) {
-        onValue(snapTo(OnboardingFeatures.ITEM_OFFSET_MIN + it * span, ITEM_OFFSET_STEP))
-    }
-}
-
-@Composable
 private fun FullbrightCard(
     gamma: Float,
     onGamma: (Float) -> Unit,
@@ -1033,8 +941,6 @@ private fun Float.clampGamma(): Float =
 
 private fun fireHeightLabel(height: Float): String =
     if (height >= -0.001f) "Vanilla" else "%.2f".fmt(height)
-
-private fun snapTo(value: Float, step: Float): Float = (value / step).roundToInt() * step
 
 @Composable
 private fun OnboardingSlider(
@@ -1708,185 +1614,6 @@ private fun ShieldPreview(height: Float) {
     }
 }
 
-@Composable
-private fun ItemPositionPreview(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float) {
-    val scene = remember { loadOnboardingImage(ITEM_ASSETS + ITEM_SCENE) }
-    val faces = remember { VanillaTextures.load(VanillaTextures.SWORD)?.let(::buildItemFaces).orEmpty() }
-    val x by animateFloatAsState(offsetX, animationSpec = spring())
-    val y by animateFloatAsState(offsetY, animationSpec = spring())
-    val z by animateFloatAsState(offsetZ, animationSpec = spring())
-    val itemScale by animateFloatAsState(scale, animationSpec = spring())
-    PreviewFrame {
-        drawIntoCanvas { canvas ->
-            val skia = canvas.skiaCanvas
-            scene?.let { skia.drawCover(it, size.width, size.height) }
-            drawItemFaces(skia, heldItemPose(x, y, z, itemScale), faces, size.width, size.height)
-        }
-    }
-}
-
-private fun buildItemFaces(image: SkiaImage): List<ItemFace> {
-    val bitmap = runCatching { Bitmap.makeFromImage(image) }.getOrNull() ?: return emptyList()
-    return bitmap.use { buildItemFaces(it) }
-}
-
-private fun buildItemFaces(bitmap: Bitmap): List<ItemFace> {
-    val frameHeight = bitmap.height.coerceAtMost(bitmap.width)
-    val w = bitmap.width.coerceAtMost(MAX_ITEM_TEXELS)
-    val h = if (bitmap.width <= MAX_ITEM_TEXELS) {
-        frameHeight
-    } else {
-        (frameHeight.toLong() * w / bitmap.width).toInt().coerceAtLeast(1)
-    }
-    val texel = { u: Int, v: Int -> bitmap.getColor(u * bitmap.width / w, v * frameHeight / h) }
-    val opaque = { u: Int, v: Int ->
-        u in 0 until w && v in 0 until h && (texel(u, v) ushr 24) > 128
-    }
-    val faces = ArrayList<ItemFace>()
-    val zf = ITEM_FRONT_Z
-    val zb = ITEM_BACK_Z
-    for (v in 0 until h) {
-        for (u in 0 until w) {
-            if (!opaque(u, v)) continue
-            val rgb = texel(u, v)
-            val x0 = u.toFloat() / w
-            val x1 = (u + 1).toFloat() / w
-            val y1 = 1f - v.toFloat() / h
-            val y0 = 1f - (v + 1).toFloat() / h
-            faces += ItemFace(floatArrayOf(x0, y1, zf, x1, y1, zf, x1, y0, zf, x0, y0, zf), tint(rgb, SHADE_FLAT))
-            if (!opaque(u + 1, v)) {
-                faces += ItemFace(floatArrayOf(x1, y1, zf, x1, y1, zb, x1, y0, zb, x1, y0, zf), tint(rgb, SHADE_SIDE))
-            }
-            if (!opaque(u - 1, v)) {
-                faces += ItemFace(floatArrayOf(x0, y1, zb, x0, y1, zf, x0, y0, zf, x0, y0, zb), tint(rgb, SHADE_SIDE))
-            }
-            if (!opaque(u, v - 1)) {
-                faces += ItemFace(floatArrayOf(x0, y1, zb, x1, y1, zb, x1, y1, zf, x0, y1, zf), tint(rgb, SHADE_UP))
-            }
-            if (!opaque(u, v + 1)) {
-                faces += ItemFace(floatArrayOf(x0, y0, zf, x1, y0, zf, x1, y0, zb, x0, y0, zb), tint(rgb, SHADE_DOWN))
-            }
-        }
-    }
-    return faces
-}
-
-private fun tint(argb: Int, shade: Float): Int {
-    val r = ((argb ushr 16 and 0xFF) * shade).roundToInt().coerceIn(0, 255)
-    val g = ((argb ushr 8 and 0xFF) * shade).roundToInt().coerceIn(0, 255)
-    val b = ((argb and 0xFF) * shade).roundToInt().coerceIn(0, 255)
-    return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
-}
-
-private class ItemFace(val pts: FloatArray, val color: Int)
-
-private fun drawItemFaces(
-    canvas: SkiaCanvas,
-    pose: Matrix4f,
-    faces: List<ItemFace>,
-    width: Float,
-    height: Float,
-) {
-    if (faces.isEmpty()) return
-    val visible = ArrayList<Pair<Float, FloatArray>>(faces.size)
-    val colors = ArrayList<Int>(faces.size)
-    for (face in faces) {
-        val view = clipNear(pose, face.pts) ?: continue
-        val n = view.size / 3
-        val screen = FloatArray(n * 2)
-        var depth = 0f
-        for (i in 0 until n) {
-            val v = floatArrayOf(view[i * 3], view[i * 3 + 1], view[i * 3 + 2])
-            screen[i * 2] = ndcToFrameX(v) * width
-            screen[i * 2 + 1] = ndcToFrameY(v) * height
-            depth += v[2]
-        }
-        if (signedArea(screen) <= 0f) continue
-        visible += (depth / n) to screen
-        colors += face.color
-    }
-    if (visible.isEmpty()) return
-    val order = visible.indices.sortedBy { visible[it].first }
-    Paint().use { paint ->
-        paint.isAntiAlias = false
-        for (i in order) {
-            val pts = visible[i].second
-            paint.color = colors[i]
-            Path.Polygon(
-                Array(pts.size / 2) { Point(pts[it * 2], pts[it * 2 + 1]) },
-                isClosed = true,
-            ).use { canvas.drawPath(it, paint) }
-        }
-    }
-}
-
-private fun clipNear(pose: Matrix4f, pts: FloatArray): FloatArray? {
-    val n = pts.size / 3
-    val view = FloatArray(n * 3)
-    val v = Vector3f()
-    var behind = 0
-    for (i in 0 until n) {
-        pose.transformPosition(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2], v)
-        view[i * 3] = v.x; view[i * 3 + 1] = v.y; view[i * 3 + 2] = v.z
-        if (v.z > -ITEM_NEAR) behind++
-    }
-    if (behind == 0) return view
-    if (behind == n) return null
-    val out = ArrayList<Float>((n + 1) * 3)
-    for (i in 0 until n) {
-        val j = (i + 1) % n
-        val az = view[i * 3 + 2]
-        val bz = view[j * 3 + 2]
-        val aIn = az <= -ITEM_NEAR
-        if (aIn) {
-            out += view[i * 3]; out += view[i * 3 + 1]; out += az
-        }
-        if (aIn != (bz <= -ITEM_NEAR)) {
-            val t = (-ITEM_NEAR - az) / (bz - az)
-            for (k in 0 until 3) out += view[i * 3 + k] + t * (view[j * 3 + k] - view[i * 3 + k])
-        }
-    }
-    return if (out.size < 9) null else out.toFloatArray()
-}
-
-private fun signedArea(p: FloatArray): Float {
-    val n = p.size / 2
-    var a = 0f
-    for (i in 0 until n) {
-        val j = (i + 1) % n
-        a += p[i * 2] * p[j * 2 + 1] - p[j * 2] * p[i * 2 + 1]
-    }
-    return a
-}
-
-private fun heldItemPose(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float): Matrix4f {
-    val rad = 0.4363323129985824
-    return Matrix4f()
-        .translate(0.56f, -0.52f, -0.72f)
-        .scale(0.6f)
-        .rotateY(radians(275f))
-        .rotateZ(radians(25f))
-        .translate((-0.2 * sin(rad) + 0.4375).toFloat(), (-0.2 * cos(rad) + 0.4375).toFloat(), 0.03125f)
-        .scale(1f / 0.68f)
-        .rotateZ(radians(-25f))
-        .rotateY(radians(90f))
-        .translate(-1.13f * 0.0625f, -3.2f * 0.0625f, -1.13f * 0.0625f)
-        .translate(offsetX * 0.05f, offsetY * 0.05f, offsetZ * 0.05f)
-        .scale(scale)
-        .translate(1.13f / 16f, 3.2f / 16f, 1.13f / 16f)
-        .rotateY(radians(-90f))
-        .rotateZ(radians(25f))
-        .scale(0.68f)
-        .translate(-0.5f, -0.5f, -0.5f)
-}
-
-private fun radians(degrees: Float): Float = degrees * PI.toFloat() / 180f
-
-private fun ndcToFrameX(v: FloatArray): Float = (PROJ_F / PROJ_ASPECT) * v[0] / -v[2] * 0.5f + 0.5f
-
-private fun ndcToFrameY(v: FloatArray): Float =
-    (1f - (PROJ_F * v[1] / -v[2] * 0.5f + 0.5f)) * FRAME_Y_SCALE - FRAME_Y_OFFSET
-
 private fun SkiaCanvas.drawPixelArt(
     image: SkiaImage,
     dst: SkiaRect,
@@ -2072,13 +1799,6 @@ private enum class ModGuide(
         "One slider per mount you can ride",
         "mount-opacity.png",
     ),
-    ITEM(
-        ModCard.ITEM,
-        "Item Position",
-        "Mods \u2192 Animatium \u2192 Extras \u2192 Item Modifications",
-        "Item Scale X/Y/Z and Item Offset X/Y/Z",
-        "animatium.png",
-    ),
     ;
 
     val path: String get() = GUIDE_ASSETS + shot
@@ -2112,10 +1832,6 @@ private class ModReads(
     val gamma: Float?,
     val gammaToggled: Float?,
     val gammaSmooth: Boolean?,
-    val itemX: Float?,
-    val itemY: Float?,
-    val itemZ: Float?,
-    val itemScale: Float?,
 ) {
     val cards: List<ModCard> = buildList {
         if (grass != null) add(ModCard.GRASS)
@@ -2123,7 +1839,6 @@ private class ModReads(
             add(ModCard.FIRE_OVERLAY)
         }
         if (shield != null) add(ModCard.SHIELD_HEIGHT)
-        if (itemX != null && itemY != null && itemZ != null && itemScale != null) add(ModCard.ITEM)
         if (horse != null) add(ModCard.MOUNT)
         if (capes != null) add(ModCard.CAPES)
         if (layers != null) add(ModCard.SKIN_LAYERS)
@@ -2134,7 +1849,6 @@ private class ModReads(
         fun read(enabled: Boolean): ModReads {
             fun <T> ifAvailable(available: Boolean, read: () -> T?): T? =
                 if (enabled && available) read() else null
-            val items = enabled && OnboardingFeatures.itemPositionsAvailable
             return ModReads(
                 grass = ifAvailable(OnboardingFeatures.betterGrassAvailable) {
                     OnboardingFeatures.currentBetterGrassMode()
@@ -2166,10 +1880,6 @@ private class ModReads(
                 gammaSmooth = ifAvailable(OnboardingFeatures.gammaUtilsAvailable) {
                     OnboardingFeatures.currentGammaSmooth()
                 },
-                itemX = ifAvailable(items) { OnboardingFeatures.currentItemOffsetX() },
-                itemY = ifAvailable(items) { OnboardingFeatures.currentItemOffsetY() },
-                itemZ = ifAvailable(items) { OnboardingFeatures.currentItemOffsetZ() },
-                itemScale = ifAvailable(items) { OnboardingFeatures.currentItemScale() },
             )
         }
     }
@@ -2215,23 +1925,7 @@ private const val CARD_MENU_GAP = 6f
 private const val CARD_CHIP_GAP = 8f
 private const val CARD_CHIP_WIDTH =
     (CARD_CONTENT_WIDTH - CARD_LABEL_WIDTH - CARD_ROW_GUTTER - CARD_CHIP_GAP) / 2f
-private const val ITEM_OFFSET_STEP = 0.5f
-private const val ITEM_SCALE_STEP = 0.1f
 
-private const val ITEM_SCENE = "item-scene.png"
-private const val MAX_ITEM_TEXELS = 32
-private const val ITEM_FRONT_Z = 8.5f / 16f
-private const val ITEM_BACK_Z = 7.5f / 16f
-private const val ITEM_NEAR = 0.05f
-private const val ITEM_LIGHT = 0.785f
-private const val SHADE_FLAT = 0.8f * ITEM_LIGHT
-private const val SHADE_UP = 1.0f * ITEM_LIGHT
-private const val SHADE_DOWN = 0.5f * ITEM_LIGHT
-private const val SHADE_SIDE = 0.6f * ITEM_LIGHT
-private const val PROJ_F = 1.4281480f
-private const val PROJ_ASPECT = 3024f / 1898f
-private const val FRAME_Y_SCALE = 1898f / 1512f
-private const val FRAME_Y_OFFSET = 156f / 1512f
 private const val CAPE_WAVE_FRAMES = 8
 private const val CAPE_WAVE_LOOP_MS = 1080
 
@@ -2265,7 +1959,6 @@ private val LocalPanelWidth = compositionLocalOf { PANEL_WIDTH }
 private val LocalPanelHeight = compositionLocalOf { PANEL_HEIGHT }
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 private const val GRASS_ASSETS = "assets/polyplus/onboarding/bettergrass/"
-private const val ITEM_ASSETS = "assets/polyplus/onboarding/itemposition/"
 private const val MOUNT_ASSETS = "assets/polyplus/onboarding/mountopacity/"
 private const val MOUNT_SCENE = "mount-scene.png"
 private const val MOUNT_FULL = "mount-full.png"

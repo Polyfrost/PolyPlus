@@ -52,6 +52,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var adaptiveBlurApplied = false
 
     @JvmStatic @Include
+    var animatiumItemPositionReset = false
+
+    @JvmStatic @Include
     var jvmAdviceShownAt = 0L
 
     @JvmStatic
@@ -117,21 +120,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var onboardingSkinLayersSettled = false
-
-    @JvmStatic @Include
-    var onboardingItemOffsetX = 0f
-
-    @JvmStatic @Include
-    var onboardingItemOffsetY = 0f
-
-    @JvmStatic @Include
-    var onboardingItemOffsetZ = 0f
-
-    @JvmStatic @Include
-    var onboardingItemScale = 1f
-
-    @JvmStatic @Include
-    var onboardingItemPositionsSettled = false
 
     @JvmStatic @Include
     var onboardingGuidesShown = 0
