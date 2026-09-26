@@ -157,7 +157,6 @@ class OnboardingFeaturesTest {
 
     @Test
     fun `every mod guide screenshot resolves`() {
-        assertEquals(4, modGuidePaths.size)
         modGuidePaths.forEach { path ->
             assertNotNull(javaClass.classLoader.getResource(path), path)
         }

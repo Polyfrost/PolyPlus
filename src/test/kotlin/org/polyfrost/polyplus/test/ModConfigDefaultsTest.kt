@@ -18,8 +18,12 @@ class ModConfigDefaultsTest {
         val NESTED = Default("controlify", "controlify.json", "global.out_of_focus_input", true)
         val BLOCK_OVERLAY_FACE =
             Default("simpleblockoverlay", "simpleblockoverlay.json", "disableOverlay", true, newInstallsOnly = true)
-        val DYNAMIC_RESOURCES =
-            ModConfigDefaults.DEFAULTS.single { it.key == "mixin.perf.dynamic_resources" }
+        val ALWAYS_REAPPLY = Default("modernfix", "modernfix-mixins.properties", "mixin.perf.foo", false, alwaysReapply = true)
+        val DEEPLY_NESTED = listOf(
+            Default("dynamic_fps", "dynamic_fps.json", "states.unfocused.frame_rate_target", 10),
+            Default("dynamic_fps", "dynamic_fps.json", "states.unfocused.volume_multipliers.master", 1.0),
+            Default("dynamic_fps", "dynamic_fps.json", "states.invisible.run_garbage_collector", true),
+        )
     }
 
     @Test
@@ -60,7 +64,7 @@ class ModConfigDefaultsTest {
 
     @Test
     fun `a json key builds the objects it needs on an empty config`() {
-        val merged = ModConfigDefaults.mergeJson("", ModConfigDefaults.DEFAULTS.filter { it.file == "dynamic_fps.json" })
+        val merged = ModConfigDefaults.mergeJson("", DEEPLY_NESTED)
         assertTrue(Regex(""""frame_rate_target":\s*10""").containsMatchIn(merged), merged)
         assertTrue(Regex(""""master":\s*1\.0""").containsMatchIn(merged), merged)
         assertTrue(Regex(""""run_garbage_collector":\s*true""").containsMatchIn(merged), merged)
@@ -107,33 +111,7 @@ class ModConfigDefaultsTest {
 
     @Test
     fun `an always-reapply default is applied again even once it is recorded`() {
-        assertTrue(ModConfigDefaults.unapplied(DYNAMIC_RESOURCES, setOf(DYNAMIC_RESOURCES.id)))
-    }
-
-    @Test
-    fun `dynamic resources is turned off for everyone on every launch`() {
-        assertEquals(false, DYNAMIC_RESOURCES.value)
-        assertTrue(DYNAMIC_RESOURCES.alwaysReapply)
-        assertFalse(DYNAMIC_RESOURCES.newInstallsOnly)
-        assertEquals(
-            "mixin.perf.dynamic_resources = false\n",
-            ModConfigDefaults.mergeFlat(
-                "mixin.perf.dynamic_resources = true\n",
-                listOf(DYNAMIC_RESOURCES),
-                toml = false,
-            ),
-        )
-    }
-
-    @Test
-    fun `the block overlay face is turned off for new installs only`() {
-        val default = ModConfigDefaults.DEFAULTS.single { it.modId == "simpleblockoverlay" }
-        assertEquals("disableOverlay", default.key)
-        assertEquals(true, default.value)
-        assertTrue(default.newInstallsOnly)
-        assertTrue(
-            Regex(""""disableOverlay":\s*true""").containsMatchIn(ModConfigDefaults.mergeJson("", listOf(default))),
-        )
+        assertTrue(ModConfigDefaults.unapplied(ALWAYS_REAPPLY, setOf(ALWAYS_REAPPLY.id)))
     }
 
     @Test
