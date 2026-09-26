@@ -54,7 +54,9 @@ object ModpackDiff {
 
     private suspend fun log() {
         val loader = FabricLoader.getInstance()
-        val modsDir = loader.gameDir.resolve("mods").toAbsolutePath().normalize()
+        // OneClient points this at a per-instance directory outside the game directory
+        val modsDir = (System.getProperty("fabric.modsFolder")?.let(Path::of) ?: loader.gameDir.resolve("mods"))
+            .toAbsolutePath().normalize()
         val loaded = loader.allMods
             .filter { it.containingMod.isEmpty && it.origin.kind == ModOrigin.Kind.PATH }
             .flatMap { mod -> mod.origin.paths.map { mod to it.toAbsolutePath().normalize() } }
