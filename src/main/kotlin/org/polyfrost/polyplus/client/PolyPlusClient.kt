@@ -64,6 +64,9 @@ import kotlinx.serialization.json.Json
 //? if >= 26.2 {
 import org.polyfrost.polyplus.compat.RrlsCrashGuard
 //?}
+//? if wwaypoints {
+import org.polyfrost.polyplus.compat.WWaypointsCompat
+//?}
 
 //? if >= 1.21.11 {
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
@@ -167,6 +170,8 @@ object PolyPlusClient {
         step("modpack diff") { ModpackDiff.logAsync() }
         step("login gate") { MinecraftLoginGate.register() }
         step("featured servers") { FeaturedServers.warmUp() }
+        //? if wwaypoints
+        step("wwaypoints compat") { WWaypointsCompat.initialize() }
 
         //? if >= 1.21.1
         step("early init CosmeticSync") { CosmeticSync.earlyInitialize() }

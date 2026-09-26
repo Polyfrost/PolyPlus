@@ -96,6 +96,8 @@
     "compat.waveycapes.MixinCustomCapeRenderer",
     "compat.waveycapes.MixinCustomCapeRenderLayer",
     "compat.waveycapes.MixinPlayerWrapper",
+    "compat.wwaypoints.MixinConfigStorage",
+    "compat.wwaypoints.MixinServerFeaturePolicy",
     "compat.wwaypoints.MixinToggleSneakConfigScreen",
     "compat.wwaypoints.MixinToggleSneakService"
   ]
