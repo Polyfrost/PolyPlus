@@ -137,6 +137,12 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     @JvmStatic @Include
     var onboardingGammaSettled = false
 
+    @JvmStatic @Include
+    var onboardingBlockHighlightConfig = ""
+
+    @JvmStatic @Include
+    var onboardingBlockHighlightSettled = false
+
     @JvmStatic
     @Switch(
         title = "Replace Pause Menu LAN Button",

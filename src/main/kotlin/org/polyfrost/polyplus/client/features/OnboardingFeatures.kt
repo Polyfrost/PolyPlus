@@ -51,6 +51,7 @@ object OnboardingFeatures {
         CAPES(1),
         SKIN_LAYERS(1),
         GAMMA(2),
+        BLOCK_HIGHLIGHT(3),
     }
 
     val ModCard.available: Boolean
@@ -62,6 +63,7 @@ object OnboardingFeatures {
             ModCard.CAPES -> waveyCapesAvailable
             ModCard.SKIN_LAYERS -> skinLayersAvailable
             ModCard.GAMMA -> gammaUtilsAvailable && currentGamma() != null
+            ModCard.BLOCK_HIGHLIGHT -> BlockHighlightPresets.available
         }
 
     val modsPageAvailable: Boolean
@@ -106,6 +108,7 @@ object OnboardingFeatures {
             ModCard.CAPES -> PolyPlusConfig.onboardingWaveyCapesSettled
             ModCard.SKIN_LAYERS -> PolyPlusConfig.onboardingSkinLayersSettled
             ModCard.GAMMA -> PolyPlusConfig.onboardingGammaSettled
+            ModCard.BLOCK_HIGHLIGHT -> PolyPlusConfig.onboardingBlockHighlightSettled
         }
 
     private val ModCard.pending: Boolean
@@ -274,6 +277,12 @@ object OnboardingFeatures {
                 )
             ) {
                 PolyPlusConfig.onboardingGammaSettled = true
+                changed = true
+            }
+        }
+        if (ModCard.BLOCK_HIGHLIGHT.pending) {
+            if (applyBlockHighlight(PolyPlusConfig.onboardingBlockHighlightConfig)) {
+                PolyPlusConfig.onboardingBlockHighlightSettled = true
                 changed = true
             }
         }
@@ -612,6 +621,13 @@ object OnboardingFeatures {
         logModApplyFailure("gamma-utils", "Could not apply the Gamma Utils preference", it)
     }.getOrDefault(false)
 
+    fun applyBlockHighlight(json: String): Boolean = runCatching {
+        if (json.isNotBlank()) BlockHighlightPresets.applyJson(json)
+        true
+    }.onFailure {
+        logModApplyFailure("block-highlight", "Could not apply the Custom Block Highlight preset", it)
+    }.getOrDefault(false)
+
     private fun animatiumExtras(): Any {
         val configClass = Class.forName(ANIMATIUM_CONFIG)
         val instance = configClass.getMethod("instance").invoke(null) ?: error("Animatium config is unavailable")
@@ -659,7 +675,7 @@ object OnboardingFeatures {
         loadWithoutInit(className).getField(fieldName).type
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
-    const val MOD_SETTINGS_VERSION = 2
+    const val MOD_SETTINGS_VERSION = 3
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L

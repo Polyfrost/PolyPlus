@@ -63,6 +63,7 @@ object DefaultSettings {
     private const val BOBBY_ID = "bobby"
     private const val MODMENU_ID = "modmenu"
     private const val IQ_ID = "iqaddons"
+    private const val CBH_ID = "custom-block-highlight"
 
     private const val IQ_PHASE_THREE_CONFIG = "net.iqaddons.mod.config.categories.PhaseThreeConfig"
     private const val RESOURCEFUL_CONFIGURATIONS = "com.teamresourceful.resourcefulconfig.common.config.Configurations"
@@ -202,6 +203,15 @@ object DefaultSettings {
                 label = "IQ Addons",
                 isPresent = { modLoaded(IQ_ID) && findClass(IQ_PHASE_THREE_CONFIG) != null },
                 apply = ::disableIqBlockUselessPerks,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
+                id = "custom-block-highlight",
+                label = "Custom Block Highlight",
+                isPresent = { modLoaded(CBH_ID) && BlockHighlightPresets.available },
+                apply = ::applyCustomBlockHighlight,
                 coveredByLegacyFlag = false,
             ),
         )
@@ -390,6 +400,12 @@ object DefaultSettings {
 
         path.writeText(updated.joinToString("\n", postfix = "\n"))
         logger.info("Enabled Bobby dynamic multi-world")
+    }
+
+    private fun applyCustomBlockHighlight() {
+        if (BlockHighlightPresets.markerPath().exists()) return
+        BlockHighlightPresets.apply(BlockHighlightPresets.DEFAULT)
+        logger.info("Applied the Custom Block Highlight vanilla preset and skipped its first-open presets screen")
     }
 
     private fun applyModMenuModCount() {

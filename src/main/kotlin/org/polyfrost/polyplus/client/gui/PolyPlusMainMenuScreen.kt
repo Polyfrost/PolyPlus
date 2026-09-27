@@ -227,7 +227,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     @Composable
     override fun compose() {
         val mc = Minecraft.getInstance()
-        var servers by remember { mutableStateOf<List<ServerData>>(emptyList()) }
+        var servers by remember { mutableStateOf<List<ServerData>?>(null) }
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
@@ -247,7 +247,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         var pingTick by remember { mutableStateOf(0) }
         LaunchedEffect(servers) {
-            MainMenuServerPings.start(this, servers)
+            MainMenuServerPings.start(this, servers.orEmpty())
             while (true) {
                 MainMenuServerPings.tick()
                 pingTick++
@@ -605,7 +605,7 @@ private fun MainMenu(
     screen: Screen,
     guiScale: Int,
     actions: MenuActions,
-    servers: List<ServerData>,
+    servers: List<ServerData>?,
     pingTick: Int,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -717,7 +717,7 @@ private fun MainLogo() {
 @Composable
 private fun LeftColumn(
     modifier: Modifier,
-    servers: List<ServerData>,
+    servers: List<ServerData>?,
     pingTick: Int,
     actions: MenuActions,
 ) {
@@ -736,7 +736,17 @@ private fun LeftColumn(
             exit = shrinkVertically() + fadeOut(),
         ) {
             Column {
-                servers.forEach { server ->
+                if (servers?.isEmpty() == true) {
+                    Spacer(Modifier.height(12.dp))
+                    ServerRow(
+                        title = "No servers yet",
+                        subtitle = "Add one in Multiplayer",
+                        favicon = null,
+                        fallbackPng = ASSETS + "server.png",
+                        onClick = actions.multiplayer,
+                    )
+                }
+                servers?.forEach { server ->
                     Spacer(Modifier.height(12.dp))
                     ServerRow(
                         title = server.name,

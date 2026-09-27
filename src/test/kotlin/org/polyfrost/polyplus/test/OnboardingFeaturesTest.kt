@@ -23,7 +23,7 @@ class OnboardingFeaturesTest {
     @Test
     fun `a returning user only walks the cards added since they last finished`() {
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.GAMMA),
+            listOf(OnboardingFeatures.ModCard.GAMMA, OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
             OnboardingFeatures.newModCards(completedVersion = 1, available = everyCard),
         )
     }
@@ -67,9 +67,9 @@ class OnboardingFeaturesTest {
 
         val completed = OnboardingFeatures.completedModSettingsVersion(completedVersion = 0, available = olderCards)
 
-        assertEquals(1, completed)
+        assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.GAMMA),
+            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }
@@ -84,13 +84,13 @@ class OnboardingFeaturesTest {
 
     @Test
     fun `a newest card that is unavailable does not count as walked`() {
-        val withoutGamma = everyCard - OnboardingFeatures.ModCard.GAMMA
+        val withoutNewest = everyCard - OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT
 
-        val completed = OnboardingFeatures.completedModSettingsVersion(completedVersion = 0, available = withoutGamma)
+        val completed = OnboardingFeatures.completedModSettingsVersion(completedVersion = 0, available = withoutNewest)
 
-        assertEquals(1, completed)
+        assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.GAMMA),
+            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }
