@@ -1,2 +1,2 @@
-## 1.2.36
-- Add new mod icons
+## 1.2.37
+- Update mod order list
