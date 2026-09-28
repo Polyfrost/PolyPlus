@@ -1998,6 +1998,13 @@ private enum class ModGuide(
         "One slider per mount you can ride",
         "mount-opacity.png",
     ),
+    BLOCK_OUTLINE(
+        ModCard.BLOCK_HIGHLIGHT,
+        "Custom Block Highlight",
+        "Mods \u2192 Custom Block Highlight \u2192 Extras \u2192 Presets",
+        "Configure the outline or choose from presets",
+        "block-outline.png",
+    )
     ;
 
     val path: String get() = GUIDE_ASSETS + shot

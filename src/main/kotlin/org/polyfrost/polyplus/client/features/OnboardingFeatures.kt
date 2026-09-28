@@ -119,6 +119,7 @@ object OnboardingFeatures {
         ModCard.FIRE_OVERLAY,
         ModCard.SHIELD_HEIGHT,
         ModCard.MOUNT,
+        ModCard.BLOCK_HIGHLIGHT
     )
 
     internal fun guideFlag(card: ModCard): Int = guidedCards.indexOf(card).let { if (it < 0) 0 else 1 shl it }
