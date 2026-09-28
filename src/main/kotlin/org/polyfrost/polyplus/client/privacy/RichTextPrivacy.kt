@@ -33,7 +33,8 @@ object RichTextPrivacy {
     }
 
     @JvmStatic
-    fun unresolved(component: Component): String = unresolved(component, blockedKeys)
+    fun unresolved(component: Component): String =
+        if (ExploitPreventerCompat.filtersTranslations()) component.string else unresolved(component, blockedKeys)
 
     internal fun unresolved(component: Component, blocked: Set<String>): String =
         buildString { flatten(component, blocked, this) }
