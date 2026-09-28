@@ -11,9 +11,9 @@ import java.util.Set;
 public abstract class MixinTreeConfigData {
     private static final Set<String> POLYPLUS$MOD_ICONS = Set.of(
             "animatium", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
-            "droppeditemtweaks", "fastquit", "gammautils", "mountopacity", "numericalenchantments", "overlaytweaks",
-            "rendertweaks", "sciophobia", "shaketweaks", "simplenickhider", "smoothskies", "tooltipscroll",
-            "waveycapes", "zoomify"
+            "custom-block-highlight", "droppeditemtweaks", "fastquit", "fovchanger", "gammautils", "mountopacity",
+            "numericalenchantments", "overlaytweaks", "rendertweaks", "sciophobia", "scrolltweaks", "shaketweaks",
+            "simplenickhider", "smoothskies", "tooltipscroll", "waveycapes", "zoomify"
     );
 
     @ModifyReturnValue(method = "getIcon", at = @At("RETURN"), remap = false)
