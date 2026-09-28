@@ -19,6 +19,7 @@ public abstract class MixinTreeConfigData {
     @ModifyReturnValue(method = "getIcon", at = @At("RETURN"), remap = false)
     private String polyplus$modCardIcon(String original) {
         String id = ((TreeConfigData) (Object) this).getId().replaceFirst("(v\\d+)?\\.json$", "");
+        if (id.startsWith("polyplus")) return "assets/polyplus/modicons/polyplus.svg";
         return POLYPLUS$MOD_ICONS.contains(id) ? "assets/polyplus/modicons/" + id + ".svg" : original;
     }
 }
