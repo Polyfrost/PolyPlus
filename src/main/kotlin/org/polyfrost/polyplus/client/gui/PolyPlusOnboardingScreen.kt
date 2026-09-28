@@ -660,18 +660,18 @@ private fun CardLabel(label: String) {
 }
 
 @Composable
-private fun CardSlider(label: String, progress: Float, value: String, onProgress: (Float) -> Unit) {
+private fun CardSlider(label: String, progress: Float, value: String, interactive: Boolean = true, onProgress: (Float) -> Unit) {
     Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
         CardLabel(label)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        OnboardingSlider(progress, CARD_SLIDER_WIDTH, onProgress = onProgress)
+        OnboardingSlider(progress, CARD_SLIDER_WIDTH, enabled = interactive, onProgress = onProgress)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
         SliderValueBox(value, CARD_VALUE_WIDTH.dp, CARD_ROW_HEIGHT.dp, 12.sp)
     }
 }
 
 @Composable
-private fun CardChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun CardChip(label: String, selected: Boolean, interactive: Boolean = true, onClick: () -> Unit) {
     val shape = ppShape(6.dp)
     Box(
         Modifier
@@ -679,7 +679,7 @@ private fun CardChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(shape)
             .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
             .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, shape)
-            .clickableWithSound { if (!selected) onClick() },
+            .then(if (interactive) Modifier.clickableWithSound { if (!selected) onClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         SocialText(label, 12.sp, color = SocialTextPrimary, fontWeight = if (selected) FontWeight.Medium else FontWeight.Light, textAlign = TextAlign.Center)
@@ -687,13 +687,13 @@ private fun CardChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CardToggle(label: String, enabled: Boolean, onEnabled: (Boolean) -> Unit) {
+private fun CardToggle(label: String, enabled: Boolean, interactive: Boolean = true, onEnabled: (Boolean) -> Unit) {
     Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
         CardLabel(label)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        CardChip("On", enabled) { onEnabled(true) }
+        CardChip("On", enabled, interactive) { onEnabled(true) }
         Spacer(Modifier.width(CARD_CHIP_GAP.dp))
-        CardChip("Off", !enabled) { onEnabled(false) }
+        CardChip("Off", !enabled, interactive) { onEnabled(false) }
     }
 }
 
@@ -893,7 +893,7 @@ private fun WaveyCapesCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
         "Simulate your cape so it swings and settles as you move instead of staying a flat board.",
         { CapePreview(enabled) },
     ) {
-        CardToggle("Waving", enabled, onEnabled)
+        CardToggle("Waving", enabled, onEnabled = onEnabled)
     }
 }
 
@@ -905,7 +905,7 @@ private fun SkinLayersCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
         "Lift every outer layer of your skin off the model at once so hats and jackets have depth.",
         { SkinLayersPreview(enabled) },
     ) {
-        CardToggle("Depth", enabled, onEnabled)
+        CardToggle("Depth", enabled, onEnabled = onEnabled)
     }
 }
 
@@ -931,7 +931,7 @@ private fun FullbrightCard(
         CardSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(toggled)) {
             onToggled(OnboardingFeatures.GAMMA_MIN + it * span)
         }
-        CardToggle("Smooth", smooth, onSmooth)
+        CardToggle("Smooth", smooth, onEnabled = onSmooth)
         Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
             CardLabel("Toggle key")
             Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
@@ -989,12 +989,12 @@ private fun BlockHighlightPage(
             ) {
                 SwatchRow(
                     "Fill colour", draft.fillStart, draft.fillEnd, !draft.fillRainbow,
-                    { change { fillStart = it } }, { change { fillEnd = it } },
+                    { change { fillStart = it } }, { change { fillEnd = it } }, draft.fill,
                 )
-                CardSlider("Fill opacity", draft.fillOpacity, "%.0f%%".fmt(draft.fillOpacity * 100f)) {
+                CardSlider("Fill opacity", draft.fillOpacity, "%.0f%%".fmt(draft.fillOpacity * 100f), draft.fill) {
                     change { fillOpacity = it }
                 }
-                CardToggle("Fill rainbow", draft.fillRainbow) { change { fillRainbow = it } }
+                CardToggle("Fill rainbow", draft.fillRainbow, draft.fill) { change { fillRainbow = it } }
             }
             CardToggle("Animations", draft.animations) { change { animations = it } }
         }
@@ -1044,7 +1044,9 @@ private fun SwatchRow(
     enabled: Boolean,
     onStart: (Int) -> Unit,
     onEnd: (Int) -> Unit,
+    interactive: Boolean = true,
 ) {
+    val clickable = enabled && interactive
     var editingEnd by remember { mutableStateOf(false) }
     Row(
         Modifier.height(CARD_ROW_HEIGHT.dp).alpha(if (enabled) 1f else DISABLED_ALPHA),
@@ -1052,13 +1054,13 @@ private fun SwatchRow(
     ) {
         CardLabel(label)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        Swatch(start, selected = !editingEnd, enabled) { editingEnd = false }
+        Swatch(start, selected = !editingEnd, clickable) { editingEnd = false }
         Spacer(Modifier.width(SWATCH_GAP.dp))
-        Swatch(end, selected = editingEnd, enabled) { editingEnd = true }
+        Swatch(end, selected = editingEnd, clickable) { editingEnd = true }
         Spacer(Modifier.width(SWATCH_GROUP_GAP.dp))
         SWATCH_PALETTE.forEachIndexed { index, rgb ->
             if (index > 0) Spacer(Modifier.width(SWATCH_GAP.dp))
-            Swatch(rgb, selected = false, enabled) { if (editingEnd) onEnd(rgb) else onStart(rgb) }
+            Swatch(rgb, selected = false, clickable) { if (editingEnd) onEnd(rgb) else onStart(rgb) }
         }
     }
 }

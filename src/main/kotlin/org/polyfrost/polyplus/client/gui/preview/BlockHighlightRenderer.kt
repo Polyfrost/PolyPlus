@@ -164,11 +164,12 @@ object BlockHighlightRenderer {
             paint.isAntiAlias = true
             if (texture == null) {
                 paint.color = tint and 0xFF7F7F7F.toInt()
-                canvas.drawPath(parallelogram(tl, tr, bl), paint)
+                parallelogram(tl, tr, bl).use { canvas.drawPath(it, paint) }
                 return
             }
             val size = texture.width.toFloat()
-            paint.colorFilter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
+            val filter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
+            paint.colorFilter = filter
             canvas.save()
             canvas.concat(
                 Matrix33(
@@ -179,6 +180,7 @@ object BlockHighlightRenderer {
             )
             canvas.drawImageRect(texture, Rect.makeWH(size, size), Rect.makeWH(size, size), SamplingMode.DEFAULT, paint, true)
             canvas.restore()
+            filter.close()
         }
     }
 
@@ -191,14 +193,16 @@ object BlockHighlightRenderer {
         val corners = listOf(face.tl, face.tr, face.bl, face.tl xor face.tr xor face.bl)
         val low = corners.minBy(::gradientT)
         val high = corners.maxBy(::gradientT)
+        val shader = gradient(
+            view.project(low, s), view.project(high, s),
+            lerp(c1, c2, gradientT(low)), lerp(c1, c2, gradientT(high)), alpha,
+        )
         Paint().use { paint ->
             paint.isAntiAlias = true
-            paint.shader = gradient(
-                view.project(low, s), view.project(high, s),
-                lerp(c1, c2, gradientT(low)), lerp(c1, c2, gradientT(high)), alpha,
-            )
-            canvas.drawPath(parallelogram(tl, tr, bl), paint)
+            paint.shader = shader
+            parallelogram(tl, tr, bl).use { canvas.drawPath(it, paint) }
         }
+        shader.close()
     }
 
     private fun drawEdge(
@@ -245,18 +249,22 @@ object BlockHighlightRenderer {
         if (length < 0.01f || (wa <= 0f && wb <= 0f)) return
         val nx = -(b.y - a.y) / length
         val ny = (b.x - a.x) / length
-        val path = PathBuilder()
+        val path = PathBuilder().use { it
             .moveTo(a.x + nx * wa / 2f, a.y + ny * wa / 2f)
             .lineTo(b.x + nx * wb / 2f, b.y + ny * wb / 2f)
             .lineTo(b.x - nx * wb / 2f, b.y - ny * wb / 2f)
             .lineTo(a.x - nx * wa / 2f, a.y - ny * wa / 2f)
             .closePath()
             .detach()
+        }
+        val shader = gradient(a, b, ca, cb, alpha)
         Paint().use { paint ->
             paint.isAntiAlias = true
-            paint.shader = gradient(a, b, ca, cb, alpha)
+            paint.shader = shader
             canvas.drawPath(path, paint)
         }
+        shader.close()
+        path.close()
     }
 
     private fun gradient(a: Point, b: Point, ca: Int, cb: Int, alpha: Int): Shader {
@@ -266,13 +274,14 @@ object BlockHighlightRenderer {
         return Shader.makeLinearGradient(a, b, Gradient(Gradient.Colors(arrayOf(Color4f(argbA), Color4f(argbB)), null, FilterTileMode.CLAMP)))
     }
 
-    private fun parallelogram(tl: Point, tr: Point, bl: Point) = PathBuilder()
-        .moveTo(tl.x, tl.y)
-        .lineTo(tr.x, tr.y)
-        .lineTo(tr.x + bl.x - tl.x, tr.y + bl.y - tl.y)
-        .lineTo(bl.x, bl.y)
-        .closePath()
-        .detach()
+    private fun parallelogram(tl: Point, tr: Point, bl: Point) = PathBuilder().use {
+        it.moveTo(tl.x, tl.y)
+            .lineTo(tr.x, tr.y)
+            .lineTo(tr.x + bl.x - tl.x, tr.y + bl.y - tl.y)
+            .lineTo(bl.x, bl.y)
+            .closePath()
+            .detach()
+    }
 
     private fun lerp(a: Point, b: Point, t: Float) = Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
