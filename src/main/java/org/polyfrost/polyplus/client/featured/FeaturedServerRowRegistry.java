@@ -3,17 +3,12 @@ package org.polyfrost.polyplus.client.featured;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.multiplayer.ServerData;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 public final class FeaturedServerRowRegistry {
-    private static final Map<ServerSelectionList.OnlineServerEntry, Row> ROWS = new WeakHashMap<>();
-
     private FeaturedServerRowRegistry() {
     }
 
-    public static synchronized Row register(
+    public static Row register(
         ServerSelectionList.OnlineServerEntry entry,
         ServerSelectionList list,
         JoinMultiplayerScreen screen,
@@ -23,30 +18,26 @@ public final class FeaturedServerRowRegistry {
         boolean header
     ) {
         Row row = new Row(list, entry, screen, data, server, promoted, header);
-        ROWS.put(entry, row);
+        ((FeaturedServerEntryAccess) entry).polyplus$setFeaturedRow(row);
         return row;
     }
 
-    public static synchronized Row get(Object entry) {
-        return ROWS.get(entry);
+    public static Row get(Object entry) {
+        return entry instanceof FeaturedServerEntryAccess access ? access.polyplus$featuredRow() : null;
     }
 
-    public static synchronized int promotedCount(ServerSelectionList list) {
+    public static int promotedCount(ServerSelectionList list) {
         int count = 0;
-        for (var row : ROWS.values()) {
-            if (row.list() == list && row.promoted() && !row.header()) count++;
+        for (var entry : list.children()) {
+            var row = get(entry);
+            if (row != null && row.promoted() && !row.header()) count++;
         }
         return count;
     }
 
-    public static synchronized void release(ServerSelectionList list) {
-        var entries = new ArrayList<ServerSelectionList.OnlineServerEntry>();
-        for (var item : ROWS.entrySet()) {
-            if (item.getValue().list() == list) entries.add(item.getKey());
-        }
-        for (var entry : entries) {
-            ROWS.remove(entry);
-            entry.close();
+    public static void release(ServerSelectionList list) {
+        for (var entry : list.children()) {
+            if (get(entry) != null) entry.close();
         }
     }
 
