@@ -219,6 +219,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var horseOpacity by remember { mutableStateOf(modReads.horse ?: PolyPlusConfig.onboardingHorseOpacity) }
         var waveyCapes by remember { mutableStateOf(modReads.capes ?: PolyPlusConfig.onboardingWaveyCapes) }
         var skinLayers by remember { mutableStateOf(modReads.layers ?: PolyPlusConfig.onboardingSkinLayers) }
+        var dynamicLights by remember { mutableIntStateOf(PolyPlusConfig.onboardingDynamicLightsMode) }
         var gamma by remember {
             mutableStateOf((modReads.gamma ?: PolyPlusConfig.onboardingGamma).clampGamma())
         }
@@ -288,6 +289,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     chosen(ModCard.GAMMA, gammaToggled, PolyPlusConfig.onboardingGammaToggled)
                 PolyPlusConfig.onboardingGammaSmooth =
                     chosen(ModCard.GAMMA, gammaSmooth, PolyPlusConfig.onboardingGammaSmooth)
+                PolyPlusConfig.onboardingDynamicLightsMode =
+                    chosen(ModCard.DYNAMIC_LIGHTS, dynamicLights, PolyPlusConfig.onboardingDynamicLightsMode)
+                if (dynamicLights != modReads.dynamicLights) touched += ModCard.DYNAMIC_LIGHTS
                 PolyPlusConfig.onboardingBlockHighlightConfig = chosen(
                     ModCard.BLOCK_HIGHLIGHT,
                     blockHighlight,
@@ -314,6 +318,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     settled(ModCard.GAMMA, PolyPlusConfig.onboardingGammaSettled)
                 PolyPlusConfig.onboardingBlockHighlightSettled =
                     settled(ModCard.BLOCK_HIGHLIGHT, PolyPlusConfig.onboardingBlockHighlightSettled)
+                PolyPlusConfig.onboardingDynamicLightsSettled =
+                    settled(ModCard.DYNAMIC_LIGHTS, PolyPlusConfig.onboardingDynamicLightsSettled)
                 PolyPlusConfig.onboardingModSettingsVersion =
                     OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
             }
@@ -474,6 +480,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                                             gammaSmooth = it
                                                         },
                                                     )
+                                                ModCard.DYNAMIC_LIGHTS ->
+                                                    DynamicLightsCard(dynamicLights) {
+                                                        touch(ModCard.DYNAMIC_LIGHTS, dynamicLights, it)
+                                                        dynamicLights = it
+                                                    }
                                                 ModCard.BLOCK_HIGHLIGHT -> Unit
                                             }
                                         }
@@ -907,6 +918,18 @@ private fun SkinLayersCard(enabled: Boolean, onEnabled: (Boolean) -> Unit) {
         { SkinLayersPreview(enabled) },
     ) {
         CardToggle("Depth", enabled, onEnabled = onEnabled)
+    }
+}
+
+@Composable
+private fun DynamicLightsCard(mode: Int, onMode: (Int) -> Unit) {
+    ModCardFrame(
+        "Dynamic Lights",
+        MAIN_MENU_ASSETS + "moon-star.svg",
+        "Light up the area around held torches and glowing entities. Costs frame rate in busy scenes.",
+        { DynamicLightsPreview(mode) },
+    ) {
+        CardDropdown("Mode", listOf("Off", "Fastest", "Fast", "Fancy"), mode, onMode)
     }
 }
 
@@ -1696,6 +1719,39 @@ private fun SkinLayersPreview(enabled: Boolean) {
 }
 
 @Composable
+private fun DynamicLightsPreview(mode: Int) {
+    val on = remember { loadOnboardingImage(DYNAMIC_LIGHTS_ASSETS + "on.png") }
+    val off = remember { loadOnboardingImage(DYNAMIC_LIGHTS_ASSETS + "off.png") }
+    val shot = if (mode == OnboardingFeatures.DYNAMIC_LIGHTS_OFF) off else on
+    val (fps, color) = DYNAMIC_LIGHTS_FPS.getOrElse(mode) { DYNAMIC_LIGHTS_FPS.last() }
+    Box {
+        PreviewFrame {
+            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+        }
+        SocialText(
+            "$fps FPS",
+            12.sp,
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .clip(ppShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.6f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            color,
+            FontWeight.Medium,
+            TextAlign.Center,
+        )
+    }
+}
+
+private val DYNAMIC_LIGHTS_FPS = listOf(
+    400 to Color(0xFF4ADE80),
+    300 to Color(0xFFA3E635),
+    200 to Color(0xFFFBBF24),
+    100 to Color(0xFFF87171),
+)
+
+@Composable
 private fun GammaPreview(gamma: Float) {
     val (darkPath, brightPath) = gammaPreviewPaths
     val dark = remember { loadOnboardingImage(darkPath) }
@@ -2042,6 +2098,7 @@ private class ModReads(
     val gammaToggled: Float?,
     val gammaSmooth: Boolean?,
     val blockHighlight: String?,
+    val dynamicLights: Int?,
 ) {
     val cards: List<ModCard> = buildList {
         if (grass != null) add(ModCard.GRASS)
@@ -2054,6 +2111,7 @@ private class ModReads(
         if (layers != null) add(ModCard.SKIN_LAYERS)
         if (gamma != null) add(ModCard.GAMMA)
         if (blockHighlight != null) add(ModCard.BLOCK_HIGHLIGHT)
+        if (dynamicLights != null) add(ModCard.DYNAMIC_LIGHTS)
     }
 
     companion object {
@@ -2093,6 +2151,9 @@ private class ModReads(
                 },
                 blockHighlight = ifAvailable(BlockHighlightPresets.available) {
                     runCatching { BlockHighlightPresets.currentJson() }.getOrNull()
+                },
+                dynamicLights = ifAvailable(OnboardingFeatures.dynamicLightsAvailable) {
+                    OnboardingFeatures.currentDynamicLightsMode()
                 },
             )
         }
@@ -2192,6 +2253,7 @@ private const val MOUNT_ASSETS = "assets/polyplus/onboarding/mountopacity/"
 private const val MOUNT_SCENE = "mount-scene.png"
 private const val MOUNT_FULL = "mount-full.png"
 private const val WAVEY_ASSETS = "assets/polyplus/onboarding/waveycapes/"
+private const val DYNAMIC_LIGHTS_ASSETS = "assets/polyplus/onboarding/dynamiclights/"
 private const val SKINLAYERS_ASSETS = "assets/polyplus/onboarding/skinlayers/"
 private const val GAMMA_ASSETS = "assets/polyplus/onboarding/gamma/"
 private const val GAMMA_DARK = "gamma-dark.png"

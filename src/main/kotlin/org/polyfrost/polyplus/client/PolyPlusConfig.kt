@@ -122,6 +122,12 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingSkinLayersSettled = false
 
     @JvmStatic @Include
+    var onboardingDynamicLightsMode = 0
+
+    @JvmStatic @Include
+    var onboardingDynamicLightsSettled = false
+
+    @JvmStatic @Include
     var onboardingGuidesShown = 0
 
     /** Gamma Utils' brightness as the mod stores it, where 100 is vanilla maximum. */

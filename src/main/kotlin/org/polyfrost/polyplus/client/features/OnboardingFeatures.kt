@@ -39,6 +39,7 @@ object OnboardingFeatures {
     val waveyCapesAvailable: Boolean by lazy { classExists(WAVEY_MOD_BASE) }
     val skinLayersAvailable: Boolean by lazy { classExists(SKIN_LAYERS_MOD_BASE) }
     val gammaUtilsAvailable: Boolean by lazy { classExists(GAMMA_UTILS) }
+    val dynamicLightsAvailable: Boolean by lazy { classExists(LDL_MOD) }
     val shieldHeightAvailable: Boolean by lazy {
         hasFloatingField(OVERLAY_TWEAKS_CONFIG, SHIELD_HEIGHT)
     }
@@ -52,6 +53,7 @@ object OnboardingFeatures {
         SKIN_LAYERS(1),
         GAMMA(2),
         BLOCK_HIGHLIGHT(3),
+        DYNAMIC_LIGHTS(4),
     }
 
     val ModCard.available: Boolean
@@ -64,6 +66,7 @@ object OnboardingFeatures {
             ModCard.SKIN_LAYERS -> skinLayersAvailable
             ModCard.GAMMA -> gammaUtilsAvailable && currentGamma() != null
             ModCard.BLOCK_HIGHLIGHT -> BlockHighlightPresets.available
+            ModCard.DYNAMIC_LIGHTS -> dynamicLightsAvailable
         }
 
     val modsPageAvailable: Boolean
@@ -109,6 +112,7 @@ object OnboardingFeatures {
             ModCard.SKIN_LAYERS -> PolyPlusConfig.onboardingSkinLayersSettled
             ModCard.GAMMA -> PolyPlusConfig.onboardingGammaSettled
             ModCard.BLOCK_HIGHLIGHT -> PolyPlusConfig.onboardingBlockHighlightSettled
+            ModCard.DYNAMIC_LIGHTS -> PolyPlusConfig.onboardingDynamicLightsSettled
         }
 
     private val ModCard.pending: Boolean
@@ -284,6 +288,12 @@ object OnboardingFeatures {
         if (ModCard.BLOCK_HIGHLIGHT.pending) {
             if (applyBlockHighlight(PolyPlusConfig.onboardingBlockHighlightConfig)) {
                 PolyPlusConfig.onboardingBlockHighlightSettled = true
+                changed = true
+            }
+        }
+        if (ModCard.DYNAMIC_LIGHTS.pending) {
+            if (applyDynamicLights(PolyPlusConfig.onboardingDynamicLightsMode)) {
+                PolyPlusConfig.onboardingDynamicLightsSettled = true
                 changed = true
             }
         }
@@ -629,6 +639,29 @@ object OnboardingFeatures {
         logModApplyFailure("block-highlight", "Could not apply the Custom Block Highlight preset", it)
     }.getOrDefault(false)
 
+    private fun dynamicLightsConfig(): Any {
+        val mod = Class.forName(LDL_MOD).getMethod("get").invoke(null) ?: error("LambDynamicLights is not initialised yet")
+        return mod.javaClass.getField("config").get(mod) ?: error("LambDynamicLights has no config")
+    }
+
+    fun currentDynamicLightsMode(): Int? = runCatching {
+        val mode = dynamicLightsConfig().let { it.javaClass.getMethod("getDynamicLightsMode").invoke(it) } as Enum<*>
+        DYNAMIC_LIGHTS_MODES.indexOf(mode.name).takeIf { it >= 0 } ?: DYNAMIC_LIGHTS_FANCY
+    }.getOrNull()
+
+    fun applyDynamicLights(mode: Int): Boolean = runCatching {
+        val config = dynamicLightsConfig()
+        val modeClass = Class.forName(LDL_MODE)
+        val name = DYNAMIC_LIGHTS_MODES.getOrElse(mode) { DYNAMIC_LIGHTS_MODES[DYNAMIC_LIGHTS_OFF] }
+        @Suppress("UNCHECKED_CAST")
+        val constant = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, name)
+        config.javaClass.getMethod("setDynamicLightsMode", modeClass).invoke(config, constant)
+        config.javaClass.getMethod("save").invoke(config)
+        true
+    }.onFailure {
+        logModApplyFailure("dynamic-lights", "Could not apply the LambDynamicLights preference", it)
+    }.getOrDefault(false)
+
     private fun animatiumExtras(): Any {
         val configClass = Class.forName(ANIMATIUM_CONFIG)
         val instance = configClass.getMethod("instance").invoke(null) ?: error("Animatium config is unavailable")
@@ -676,7 +709,7 @@ object OnboardingFeatures {
         loadWithoutInit(className).getField(fieldName).type
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
-    const val MOD_SETTINGS_VERSION = 3
+    const val MOD_SETTINGS_VERSION = 4
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L
@@ -750,6 +783,12 @@ object OnboardingFeatures {
     private const val GAMMA_TOGGLE_KEY = "key.gammautils.gammaToggle"
     const val GAMMA_MIN = 100f
     const val GAMMA_MAX = 1500f
+
+    private const val LDL_MOD = "dev.lambdaurora.lambdynlights.LambDynLights"
+    private const val LDL_MODE = "dev.lambdaurora.lambdynlights.DynamicLightsMode"
+    val DYNAMIC_LIGHTS_MODES = listOf("OFF", "FASTEST", "FAST", "FANCY")
+    const val DYNAMIC_LIGHTS_OFF = 0
+    const val DYNAMIC_LIGHTS_FANCY = 3
 
     private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
     private val ITEM_DEFAULTS = listOf("X", "Y", "Z").flatMap {
