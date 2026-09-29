@@ -1,2 +1,4 @@
-## 1.2.40
-- The Epic Online Services (EOS) native library used for world hosting is now signed, which should reduce issues with Windows Smart App Control
+## 1.2.41
+- Turn RGSS off by default
+- Update mod order to include freelook and dynamic lights
+- Add dynamic lights to onboarding
