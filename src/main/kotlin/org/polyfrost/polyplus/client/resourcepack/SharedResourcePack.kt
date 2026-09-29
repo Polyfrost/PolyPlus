@@ -47,7 +47,7 @@ object SharedResourcePack {
                 continue
             }
 
-            // measured before reading so an oversized pack is never loaded; folders count their uncompressed files
+            // measured before reading so an oversized pack is never loaded
             val size = if (entry.isFile) entry.length() else entry.walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
             if (size == 0L) {
@@ -73,6 +73,11 @@ object SharedResourcePack {
             }
 
             val bytes = if (entry.isFile) entry.readBytes() else zipDirectory(entry)
+            // zip headers can take a folder just past the limits its files fit within
+            if (bytes.size > MAX_PACK_BYTES || totalBytes + bytes.size > MAX_TOTAL_BYTES) {
+                LOGGER.warn("'{}' is {} once zipped, over the sharing limit - skipping it", fileName, humanSize(bytes.size.toLong()))
+                continue
+            }
             val sha1 = MessageDigest.getInstance("SHA-1").digest(bytes)
             prepared += Prepared(fileName, bytes, sha1, sha1.toHex())
             totalBytes += bytes.size
