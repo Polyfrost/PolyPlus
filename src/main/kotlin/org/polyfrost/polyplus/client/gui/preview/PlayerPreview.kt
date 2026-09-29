@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -29,7 +30,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 //? if < 1.21.5 || >= 1.21.8 {
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -173,8 +173,9 @@ private fun PlayerPreviewBitmap(
     var dragging by remember { mutableStateOf(false) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
 
-    androidx.compose.runtime.DisposableEffect(previewKey) {
-        onDispose { PlayerPreviewRenderer.evict(previewKey) }
+    DisposableEffect(previewKey) {
+        PlayerPreviewRenderer.retain(previewKey)
+        onDispose { PlayerPreviewRenderer.release(previewKey) }
     }
 
     LaunchedEffect(autoSpin) {
