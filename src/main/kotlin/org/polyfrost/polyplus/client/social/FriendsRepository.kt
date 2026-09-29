@@ -13,12 +13,18 @@ import org.polyfrost.polyplus.events.WebSocketMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 object FriendsRepository {
     private val LOGGER = LogManager.getLogger()
 
     private val _friends = MutableStateFlow<List<Friend>>(emptyList())
     val friends = _friends.asStateFlow()
+
+    @Volatile
+    private var friendUuids: Set<UUID> = emptySet()
+
+    fun isFriend(uuid: UUID): Boolean = uuid in friendUuids
 
     private val _incomingRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     val incomingRequests = _incomingRequests.asStateFlow()
@@ -61,7 +67,12 @@ object FriendsRepository {
 
     private suspend fun refreshFriends() {
         SocialApi.friends()
-            .onSuccess { _friends.value = it }
+            .onSuccess {
+                _friends.value = it
+                friendUuids = it.mapNotNullTo(HashSet()) { friend ->
+                    runCatching { UUID.fromString(friend.player) }.getOrNull()
+                }
+            }
             .onFailure { LOGGER.error("Failed to refresh friends list", it) }
     }
 

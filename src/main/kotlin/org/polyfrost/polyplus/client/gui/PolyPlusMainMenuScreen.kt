@@ -689,7 +689,7 @@ private fun MainMenu(
                     pingTick,
                     actions,
                 )
-                Footer(Modifier.fillMaxSize(), scale)
+                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), scale)
             }
         }
     }

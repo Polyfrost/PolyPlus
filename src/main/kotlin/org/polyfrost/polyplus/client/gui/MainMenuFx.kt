@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
@@ -150,6 +151,7 @@ private val GlowMask = listOf(
 )
 
 fun DrawScope.drawPanoramaOverlay() {
+    if (PolyPlusMainMenuConfig.hidePanoramaOverlay) return
     drawPanoramaBlackBackground()
     drawPanoramaGlowMask()
 }

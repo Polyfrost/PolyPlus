@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
@@ -72,6 +73,7 @@ object CosmeticAssetCache {
 
     @JvmStatic
     fun getCapeTexture(uuid: UUID): Identifier? {
+        if (!PolyPlusCosmeticsConfig.isVisible(BodySlot.Cape, uuid)) return null
         val id = CosmeticCatalog.getActiveId(uuid, BodySlot.Cape) ?: return null
         return capes[id]?.asResource()
     }
