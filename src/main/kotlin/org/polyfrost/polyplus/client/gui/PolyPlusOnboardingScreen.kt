@@ -364,8 +364,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
-                val scale = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT) *
-                    guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
+                val containFit = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
+                    .takeIf { it.isFinite() && it > 0f } ?: 1f
+                val scale = containFit * guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
                 val compact = pages[page] == OnboardingStep.Terms
                 val panelWidth by animateFloatAsState(
                     if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
@@ -376,7 +377,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     animationSpec = spring(),
                 )
                 CompositionLocalProvider(
-                    LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
+                    LocalUiOversample provides (LocalUiOversample.current * scale).coerceIn(1f, MAX_OVERSAMPLE),
                     LocalPanelWidth provides panelWidth,
                     LocalPanelHeight provides panelHeight,
                 ) {
@@ -2101,6 +2102,7 @@ private class ModReads(
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
 private const val UI_SCALE = DESIGN_WIDTH / 1240f
+private const val MAX_OVERSAMPLE = 4f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MIN = 1
