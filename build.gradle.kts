@@ -245,7 +245,7 @@ dependencies {
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
     for (module in ktorModules) implementation(module)
 
-    implementation(include("gg.sona:eos:2.0.2")!!)
+    implementation(include("gg.sona:eos:2.2.0")!!)
 
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
