@@ -5,6 +5,7 @@ shaketweaks.json
 simpleblockoverlay.json
 custom-block-highlight
 betterscreens
+freelook.json
 behindyouv3.json
 crosshairtweaks
 scrolltweaks
@@ -21,6 +22,7 @@ colorsaturation.json
 droppeditemtweaks
 droppeditemtweaksv2.json
 confirmdisconnect
+lambdynlights
 lambdabettergrass
 betternightvision
 blur
@@ -80,7 +82,6 @@ bettercommandblockui
 nochatreports
 resourcify
 packed_packs
-lambdynlights
 continuity
 entity_texture_features
 entity_model_features
