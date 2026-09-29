@@ -132,6 +132,17 @@ object DefaultSettings {
 
     private val TICK_TASKS = buildList {
         add(Task("vanilla-options", "Minecraft options", { true }, ::applyVanillaOptions))
+        //? if >= 1.21.11 {
+        add(
+            Task(
+                id = "vanilla-texture-filtering",
+                label = "Minecraft texture filtering",
+                isPresent = { true },
+                apply = ::disableTextureFiltering,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        //?}
         UNBIND_ALL_NAMESPACES.forEach { namespace ->
             add(unbindTask(namespace) { key -> namespace in key.split('.') })
         }
@@ -338,6 +349,16 @@ object DefaultSettings {
         options.entityShadows().set(false)
         options.save()
     }
+
+    //? if >= 1.21.11 {
+    private fun disableTextureFiltering() {
+        val options = Minecraft.getInstance().options ?: return
+        if (options.textureFiltering().get() != net.minecraft.client.TextureFilteringMethod.RGSS) return
+        options.textureFiltering().set(net.minecraft.client.TextureFilteringMethod.NONE)
+        options.save()
+        logger.info("Turned off RGSS texture filtering")
+    }
+    //?}
 
     private fun keyMappings(): List<KeyMapping> =
         Minecraft.getInstance().options?.keyMappings?.asList().orEmpty()
