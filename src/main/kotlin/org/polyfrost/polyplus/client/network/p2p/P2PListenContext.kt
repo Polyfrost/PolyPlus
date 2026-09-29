@@ -12,6 +12,10 @@ object P2PListenContext {
         this.localUser = localUser
     }
 
+    fun clearPendingListen() {
+        pendingSocket = null
+    }
+
     @JvmStatic
     fun hasPendingListen(): Boolean = pendingSocket != null
 

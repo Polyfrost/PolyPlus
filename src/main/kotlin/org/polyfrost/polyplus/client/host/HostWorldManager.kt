@@ -127,6 +127,7 @@ object HostWorldManager {
     ): Result<Unit> = beginP2PSession(privateRelay, autoShareResourcePack) { mc, session ->
         pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
         mc.createWorldOpenFlows().openWorld(entry.id) {
+            abandonP2PHost()
             //? if >= 26.2 {
             mc.gui.setScreen(returnScreen)
             //?} else {
@@ -146,8 +147,13 @@ object HostWorldManager {
         if (Minecraft.getInstance().singleplayerServer == null) {
             return Result.failure(IllegalStateException("Not currently in a singleplayer world"))
         }
-        return beginP2PSession(privateRelay, autoShareResourcePack) { _, session ->
-            pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+        return beginP2PSession(privateRelay, autoShareResourcePack) { mc, session ->
+            // the world may have been left while the session was being created
+            if (mc.singleplayerServer == null) {
+                abandonP2PHost()
+            } else {
+                pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
+            }
         }
     }
 
@@ -164,6 +170,12 @@ object HostWorldManager {
                 mc.execute { onCreated(mc, session) }
             }
     }.await()
+
+    private fun abandonP2PHost() {
+        pending = null
+        P2PListenContext.clearPendingListen()
+        P2PSessionManager.stopHosting()
+    }
 
     fun hostCurrentWorldLan(gameMode: GameType, allowCheats: Boolean, port: Int? = null) {
         val mc = Minecraft.getInstance()
@@ -216,6 +228,7 @@ object HostWorldManager {
         } else {
             LOGGER.warn("publishServer returned false — world was not opened to LAN on port {}", port)
             announce(mc, Component.translatable("commands.publish.failed"))
+            abandonP2PHost()
         }
     }
 
