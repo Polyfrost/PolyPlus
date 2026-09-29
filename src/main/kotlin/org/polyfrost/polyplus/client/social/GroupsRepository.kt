@@ -42,7 +42,7 @@ object GroupsRepository {
                 is ClientboundPacket.GroupMessageDeleted -> onMessageDeleted(packet)
                 else -> Unit
             }
-        }.register()
+        }
     }
 
     /** Flow of loaded messages for a group. Empty until [loadMessages] has been called at least once. */
