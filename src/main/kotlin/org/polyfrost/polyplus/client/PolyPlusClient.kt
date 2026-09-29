@@ -34,6 +34,7 @@ import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.legal.LegalDocuments
@@ -184,6 +185,8 @@ object PolyPlusClient {
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
+        //? if = 1.21.1 || >= 1.21.8
+        step("player preview") { PlayerPreviewRenderer.initialize() }
         step("vanilla menu button") { VanillaMenuButton.register() }
 
         step("websocket") {

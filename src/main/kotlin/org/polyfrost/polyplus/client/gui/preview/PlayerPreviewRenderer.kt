@@ -95,6 +95,8 @@ import com.mojang.authlib.GameProfile
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.player.RemotePlayer
+import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
@@ -248,11 +250,25 @@ object PlayerPreviewRenderer {
         }
 
     private val latestByKey = ConcurrentHashMap<Any, ImageBitmap>()
+    // Readbacks land frames after capture, so only keys an on-screen preview still retains get cached
+    private val retainCounts = ConcurrentHashMap<Any, Int>()
 
     fun cached(key: Any): ImageBitmap? = latestByKey[key]
 
-    fun evict(key: Any) {
-        latestByKey.remove(key)
+    fun retain(key: Any) {
+        retainCounts.merge(key, 1, Int::plus)
+    }
+
+    fun release(key: Any) {
+        if (retainCounts.computeIfPresent(key) { _, n -> (n - 1).takeIf { it > 0 } } == null) latestByKey.remove(key)
+    }
+
+    private inline fun publish(key: Any, bitmap: () -> ImageBitmap) {
+        if (!retainCounts.containsKey(key)) return
+        val bmp = bitmap()
+        latestByKey[key] = bmp
+        // A release between the check above and the write would otherwise leave this entry behind for good
+        if (!retainCounts.containsKey(key)) latestByKey.remove(key, bmp)
     }
 
     fun capture(
@@ -295,6 +311,21 @@ object PlayerPreviewRenderer {
         if (t != null) ClientPlatform.runOnMain { runCatching { t.destroyBuffers() } }
         //?}
     }
+
+    //? if = 1.21.1 || >= 1.21.8 {
+    fun initialize() {
+        // The preview avatar pins the whole ClientLevel it was built in, so let go of it once that level is replaced
+        eventHandler<TickEvent.End> {
+            val level = Minecraft.getInstance().level
+            //? if >= 1.21.8 {
+            if (dummy?.level() !== level) dummy = null
+            //?} else {
+            /*val dummyLevel = legacyDummy?.level()
+            if (dummyLevel !== level && dummyLevel !== PreviewWorld.cached) legacyDummy = null
+            *///?}
+        }
+    }
+    //?}
 
     private const val EDGE_FADE_FRACTION = 0.18f
 
@@ -1018,7 +1049,7 @@ object PlayerPreviewRenderer {
                 /*val mapped = RenderSystem.getDevice().createCommandEncoder().mapBuffer(buffer, true, false)
                 *///?}
                 try {
-                    latestByKey[key] = toImageBitmap(mapped.data(), w, h, pixelSize)
+                    publish(key) { toImageBitmap(mapped.data(), w, h, pixelSize) }
                 } finally {
                     mapped.close()
                 }
@@ -1120,7 +1151,8 @@ object PlayerPreviewRenderer {
     }
 
     private object PreviewWorld {
-        private var cached: ClientLevel? = null
+        var cached: ClientLevel? = null
+            private set
         private var cachedCamera: Camera? = null
 
         fun level(): ClientLevel? {
@@ -1473,7 +1505,7 @@ object PlayerPreviewRenderer {
                     out[di + 3] = scaleByte((px ushr 24) and 0xFF, f)
                 }
             }
-            latestByKey[key] = SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap()
+            publish(key) { SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap() }
         } finally {
             img.close()
         }
