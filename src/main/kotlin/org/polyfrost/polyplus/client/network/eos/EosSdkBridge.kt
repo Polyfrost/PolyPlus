@@ -590,6 +590,10 @@ class EosSdkBridge {
     }
 
     fun closeConnection(socket: EosP2PSocketId, remote: EosProductUserId?) = post {
+        if (remote == null) {
+            requestHandlers.remove(socket.name)
+            stateHandlers.remove(socket.name)
+        }
         val local = localUser
         if (local == null) {
             logger.warn("Cannot close connection on '{}': not logged into EOS Connect yet", socket)
@@ -601,8 +605,6 @@ class EosSdkBridge {
             platform?.p2p?.closeConnection(sdkLocal, SdkProductUserId.fromString(remote.raw), sdkSocket)
         } else {
             platform?.p2p?.closeConnections(sdkLocal, sdkSocket)
-            requestHandlers.remove(socket.name)
-            stateHandlers.remove(socket.name)
         }
     }
 
@@ -610,14 +612,18 @@ class EosSdkBridge {
         socket: EosP2PSocketId,
         handler: (event: ConnectionStateEvent) -> Unit,
     ): EosNotificationHandle {
-        val handle = nextHandle.getAndIncrement()
-        stateHandlers.getOrPut(socket.name) { CopyOnWriteArrayList() }.add(StateHandlerEntry(handle, handler))
-        return EosNotificationHandle(handle)
+        val entry = StateHandlerEntry(nextHandle.getAndIncrement(), handler)
+        // not getOrPut: removeNotificationHandler may drop the list between the lookup and the add
+        stateHandlers.compute(socket.name) { _, list -> (list ?: CopyOnWriteArrayList()).apply { add(entry) } }
+        return EosNotificationHandle(entry.handle)
     }
 
     fun removeNotificationHandler(handle: EosNotificationHandle) {
-        for (list in stateHandlers.values) {
-            list.removeIf { it.handle == handle.raw }
+        for (socket in stateHandlers.keys) {
+            stateHandlers.computeIfPresent(socket) { _, list ->
+                list.removeIf { it.handle == handle.raw }
+                list.takeUnless { it.isEmpty() }
+            }
         }
     }
 
