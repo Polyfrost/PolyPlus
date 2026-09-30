@@ -58,6 +58,7 @@ object CosmeticSync {
     private var resubscribeTicks = 0
 
     private val loading: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    private val pendingEmotes = ConcurrentHashMap<Int, Int>()
 
     // gives a closed cosmetics screen's last preview captures time to finish first
     private const val TRIM_DELAY_TICKS = 20
@@ -246,11 +247,16 @@ object CosmeticSync {
     }
 
     //? if >= 1.21.1 {
-    private fun handleEmotePlay(playerUuid: String, emoteId: Int) {
-        val uuid = UUID.fromString(playerUuid)
+    private fun handleEmotePlay(playerUuid: String, emoteId: Int) = playEmoteWhenLoaded(UUID.fromString(playerUuid), emoteId)
+
+    private fun playEmoteWhenLoaded(uuid: UUID, emoteId: Int) {
+        // keeps a trim from evicting the emote between its install and this playback
+        pendingEmotes.merge(emoteId, 1, Int::plus)
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
+            val loaded = CosmeticAssetCache.ensureEmoteLoaded(emoteId)
             ClientPlatform.runOnMain {
+                pendingEmotes.computeIfPresent(emoteId) { _, count -> (count - 1).takeIf { it > 0 } }
+                if (!loaded) return@runOnMain
                 val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@runOnMain
                 val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
@@ -369,7 +375,8 @@ object CosmeticSync {
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog; closing it arms another trim
         if (ClientPlatform.currentScreen() is OneConfigUIScreen) return
-        val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() + CosmeticCatalog.remoteEquippedIds()
+        val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
+            CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
         val inUse = HashSet<Identifier>()
         Minecraft.getInstance().level?.entitiesForRendering()?.forEach { entity ->
             when (entity) {
@@ -384,17 +391,7 @@ object CosmeticSync {
         CosmeticAssetCache.trim(keep, inUse)
     }
 
-    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
-        val uuid = player.uuid
-        PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
-            ClientPlatform.runOnMain {
-                val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@runOnMain
-                val player = findPlayer(uuid) ?: return@runOnMain
-                (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
-            }
-        }
-    }
+    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) = playEmoteWhenLoaded(player.uuid, cosmeticId)
     //?}
 
     private fun processPlayerInfoAction(
