@@ -4,26 +4,28 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import java.time.Duration
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class Batcher(val delay: Duration, val onBatch: suspend (Set<String>) -> Unit) {
     private val lock = ReentrantLock()
     private val pending = HashSet<String>()
-    private var job: Job? = null
+    private var scheduled = false
 
     fun add(item: String) {
-        if (job == null) {
-            job = PolyPlusClient.SCOPE.launch {
-                kotlinx.coroutines.delay(delay.toMillis())
-                val batch = lock.withLock { pending.toSet().also { pending.clear() } }
-                onBatch(batch)
-                job = null
-            }
-        }
-
         lock.withLock {
             pending.add(item)
+            if (scheduled) return
+            scheduled = true
+        }
+
+        PolyPlusClient.SCOPE.launch {
+            kotlinx.coroutines.delay(delay.toMillis())
+            // Reset before onBatch rather than after, so a failing onBatch can't stall every later flush
+            val batch = lock.withLock {
+                scheduled = false
+                pending.toSet().also { pending.clear() }
+            }
+            onBatch(batch)
         }
     }
 }
