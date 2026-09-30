@@ -73,6 +73,7 @@
     "client.network.MixinServerConnectionListener",
     "client.network.MixinServerGamePacketListenerImpl",
     "client.network.ServerCommonPacketListenerAccessor",
+    "compat.animatium.MixinToastUtil",
     "compat.essential.MixinEssentialPartner",
     "compat.essential.MixinModalManager",
     "compat.essential.MixinPartnerModConfig",

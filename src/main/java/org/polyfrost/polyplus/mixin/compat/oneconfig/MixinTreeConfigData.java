@@ -10,7 +10,7 @@ import java.util.Set;
 @Mixin(value = TreeConfigData.class, remap = false)
 public abstract class MixinTreeConfigData {
     private static final Set<String> POLYPLUS$MOD_ICONS = Set.of(
-            "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
+            "animatium", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
             "custom-block-highlight", "droppeditemtweaks", "fastquit", "fovchanger", "freelook", "gammautils", "mountopacity",
             "numericalenchantments", "overlaytweaks", "rendertweaks", "sciophobia", "scrolltweaks", "shaketweaks",
             "simplenickhider", "smoothskies", "tooltipscroll", "waveycapes", "zoomify"
