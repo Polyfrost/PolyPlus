@@ -662,22 +662,18 @@ object OnboardingFeatures {
         logModApplyFailure("dynamic-lights", "Could not apply the LambDynamicLights preference", it)
     }.getOrDefault(false)
 
-    private fun animatiumExtras(): Any {
-        val configClass = Class.forName(ANIMATIUM_CONFIG)
-        val instance = configClass.getMethod("instance").invoke(null) ?: error("Animatium config is unavailable")
-        return instance.javaClass.getField("extras").get(instance) ?: error("Animatium has no extras category")
-    }
-
     private fun resetAnimatiumItemPosition() {
         runCatching {
-            val extras = animatiumExtras()
+            val config = Class.forName(OVERFLOW_ANIMATIONS_CONFIG).getMethod("instance").invoke(null)
+                ?: error("OverflowAnimations config is unavailable")
+            val items = config.javaClass.getField("items").get(config) ?: error("OverflowAnimations has no items category")
             ITEM_DEFAULTS.forEach { (name, value) ->
-                runCatching { extras.javaClass.getField(name) }.getOrNull()?.setFloat(extras, value)
+                runCatching { items.javaClass.getField(name) }.getOrNull()?.setFloat(items, value)
             }
-            Class.forName(ANIMATIUM_CONFIG).getMethod("save").invoke(null)
+            config.javaClass.getMethod("save").invoke(config)
         }.onFailure {
             if (it !is ClassNotFoundException) {
-                logModApplyFailure("animatium-item-reset", "Could not reset the Animatium item position", it)
+                logModApplyFailure("animatium-item-reset", "Could not reset the OverflowAnimations item position", it)
             }
         }
         PolyPlusConfig.animatiumItemPositionReset = true
@@ -790,7 +786,7 @@ object OnboardingFeatures {
     const val DYNAMIC_LIGHTS_OFF = 0
     const val DYNAMIC_LIGHTS_FANCY = 3
 
-    private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
+    private const val OVERFLOW_ANIMATIONS_CONFIG = "org.polyfrost.overflowanimations.config.OverflowAnimationsConfig"
     private val ITEM_DEFAULTS = listOf("X", "Y", "Z").flatMap {
         listOf("itemOffset$it" to 0f, "itemScale$it" to 1f, "itemRotation$it" to 0f)
     }
