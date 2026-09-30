@@ -21,7 +21,7 @@ object PlayerNamesRepository {
     private val inFlight = mutableSetOf<String>()
 
     // Far above what any social screen shows at once
-    private const val MAX_NAMES = 2048
+    private const val MAX_UNREFERENCED_NAMES = 2048
 
     private val _names = MutableStateFlow<Map<String, String>>(emptyMap())
     val names = _names.asStateFlow()
@@ -38,13 +38,26 @@ object PlayerNamesRepository {
             .onSuccess { resolved ->
                 _names.update { current ->
                     val merged = current + resolved
-                    // Map.plus keeps insertion order, so this drops the earliest resolved names
-                    if (merged.size <= MAX_NAMES) merged else merged.entries.drop(merged.size - MAX_NAMES).associate { it.toPair() }
+                    if (merged.size <= MAX_UNREFERENCED_NAMES) return@update merged
+                    // Names the social lists still reference are kept, as conversation search reads them without
+                    // resolving; of the rest, Map.plus keeps insertion order, so the earliest resolved go first
+                    val referenced = referencedIds()
+                    val evictable = merged.keys.filter { it !in referenced }
+                    if (evictable.size <= MAX_UNREFERENCED_NAMES) merged
+                    else merged - evictable.take(evictable.size - MAX_UNREFERENCED_NAMES).toSet()
                 }
             }
             .onFailure { LOGGER.error("Failed to resolve {} player name(s)", toFetch.size, it) }
 
         lock.withLock { inFlight.removeAll(toFetch.toSet()) }
+    }
+
+    private fun referencedIds(): Set<String> = buildSet {
+        FriendsRepository.friends.value.mapTo(this) { it.player }
+        FriendsRepository.incomingRequests.value.mapTo(this) { it.player }
+        FriendsRepository.outgoingRequests.value.mapTo(this) { it.player }
+        GroupsRepository.groups.value.forEach { addAll(it.members) }
+        SessionsRepository.incomingInvites.value.mapTo(this) { it.sender }
     }
 
     fun nameOr(uuid: String): String = _names.value[uuid] ?: shortId(uuid)
