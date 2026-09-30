@@ -1,4 +1,16 @@
-## 1.2.41
-- Turn RGSS off by default
-- Update mod order to include freelook and dynamic lights
-- Add dynamic lights to onboarding
+## Unreleased changes
+- Fixed the previous world staying in memory after leaving a server or changing dimension if the cosmetics preview had been opened in-game
+- Fixed pets disappearing after changing dimensions or switching lobbies, and pets lingering after their owner unequipped them out of view
+- Fixed every opened multiplayer screen staying in memory while featured servers were shown
+- Fixed a failed or cancelled friends-hosting attempt keeping shared resource packs in memory and auto-publishing the next singleplayer world to a stale session
+- Fixed cosmetics seen in the store or on other players staying in memory until disconnecting
+- Fixed the first world joined staying in memory for the whole session when Mount Opacity is installed
+- Fixed social and cosmetic events being processed twice, causing duplicate refreshes and extra network requests
+- Fixed Social chat message history using more and more memory over long sessions
+- Fixed the main menu using more memory each time it was opened and re-pinging the featured server every time
+- Fixed memory building up when the game repeatedly creates crash reports for errors it recovers from
+- Fixed Poly+ multiplayer connections dropping after switching Poly+ accounts or quickly rejoining a hosted world
+- Fixed several smaller memory and resource leaks around server connections, Microsoft sign-in, P2P voice chat, tab list badges, player names, store images, the social overlay and the main menu panorama
+- Fixed cosmetics on other players sometimes no longer updating after a failed request
+- Reduced stutter and memory churn from player previews in the cosmetics menu and main menu
+- Fixed the purchase history tab constantly reloading
