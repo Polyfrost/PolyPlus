@@ -441,9 +441,9 @@ object P2PSessionManager {
             ?: return Result.failure(IllegalStateException("Not logged into EOS Connect yet"))
 
         setPrivateRelay(privateRelay)
-        if (autoShareResourcePack) HostSharedPack.enable() else HostSharedPack.disable()
 
         return SessionsApi.create().onSuccess { session ->
+            if (autoShareResourcePack) HostSharedPack.enable() else HostSharedPack.disable()
             _currentSessionId.value = session.id
             sessionOwner = localProfileId()
             val socket = socketFor(session.id)
