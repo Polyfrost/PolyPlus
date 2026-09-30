@@ -62,6 +62,9 @@ object PlayerPreviewOverlay {
 
     fun unregister(id: Long) {
         entries.remove(id)
+        // Bitmap previews recreate targets on demand, so the pool only needs to outlive live previews
+        //? if < 1.21.5 || >= 1.21.8
+        if (entries.isEmpty()) PlayerPreviewRenderer.releaseTargets()
     }
 
     fun reportBounds(entry: Entry, fx: Float, fy: Float, fw: Float, fh: Float, visible: Boolean) {
