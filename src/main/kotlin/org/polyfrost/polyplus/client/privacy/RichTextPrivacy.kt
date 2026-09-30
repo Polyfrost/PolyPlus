@@ -19,7 +19,11 @@ object RichTextPrivacy {
     //? if > 1.8.9 {
     private val logger = LogManager.getLogger("PolyPlus/RichTextPrivacy")
 
-    private val BLOCKED_MODS = listOf("debugify", "wwaypoints")
+    private val BLOCKED_MODS = listOf(
+        "debugify",
+        //? if wwaypoints
+        "wwaypoints",
+    )
 
     private val blockedKeys: Set<String> by lazy {
         ExploitPreventerCompat.block(BLOCKED_MODS)
@@ -31,7 +35,8 @@ object RichTextPrivacy {
     }
 
     @JvmStatic
-    fun unresolved(component: Component): String = unresolved(component, blockedKeys)
+    fun unresolved(component: Component): String =
+        if (ExploitPreventerCompat.filtersTranslations()) component.string else unresolved(component, blockedKeys)
 
     internal fun unresolved(component: Component, blocked: Set<String>): String =
         buildString { flatten(component, blocked, this) }

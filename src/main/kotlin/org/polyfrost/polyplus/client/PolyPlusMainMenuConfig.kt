@@ -104,6 +104,14 @@ object PolyPlusMainMenuConfig : Config(
     var hideMainMenuModButtons = false
 
     @JvmStatic
+    @Switch(
+        title = "Hide Footer",
+        description = "Hide the footer row at the bottom of the PolyPlus main menu.",
+        subcategory = "Elements",
+    )
+    var hideMainMenuFooter = false
+
+    @JvmStatic
     @Dropdown(
         title = "Main Menu FPS Limit",
         description = "Choose how the PolyPlus main menu frame cap is selected.",
@@ -139,6 +147,14 @@ object PolyPlusMainMenuConfig : Config(
         subcategory = "Background",
     )
     var customPanorama = true
+
+    @JvmStatic
+    @Switch(
+        title = "Hide Panorama Overlay",
+        description = "Remove the blue glow and darkening drawn on top of the panorama.",
+        subcategory = "Background",
+    )
+    var hidePanoramaOverlay = false
 
     @JvmStatic
     @Switch(

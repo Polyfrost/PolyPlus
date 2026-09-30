@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.At;
 @Mixin(targets = "org.polyfrost.oneconfig.internal.compat.WWaypointsCompat", remap = false)
 public class MixinWWaypointsCompat {
     @ModifyReturnValue(method = "buildTree", at = @At("RETURN"), remap = false)
-    private Tree polyplus$lockStaySneaked(Tree tree) {
-        WWaypointsCompat.lockStaySneaked(tree);
+    private Tree lockDisabledOptions(Tree tree) {
+        WWaypointsCompat.lockDisabledOptions(tree);
         return tree;
     }
 }

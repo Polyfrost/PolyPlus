@@ -5,23 +5,25 @@ import net.minecraft.core.MappedRegistry;
 //?} else
 //import net.minecraft.util.registry.MappedRegistry;
 import org.spongepowered.asm.mixin.Mixin;
-
-//? if = 1.21.1 {
-/*import net.minecraft.core.Holder;
+//? if > 1.8.9 {
 import org.spongepowered.asm.mixin.gen.Accessor;
+
 import java.util.Map;
-*///?}
+//?}
 
 @Mixin(MappedRegistry.class)
-public interface MappedRegistryAccessor<T> {
-    //? if < 1.21.4 && > 1.8.9 {
-    /*@Accessor("frozen")
+public interface MappedRegistryAccessor {
+    //? if > 1.8.9 {
+    @Accessor("frozen")
+    boolean polyplus$isFrozen();
+
+    @Accessor("frozen")
     void polyplus$setFrozen(boolean frozen);
 
     @Accessor("unregisteredIntrusiveHolders")
-    Map<T, Holder.Reference<T>> polyplus$getIntrusiveHolders();
+    Map<?, ?> polyplus$getIntrusiveHolders();
 
     @Accessor("unregisteredIntrusiveHolders")
-    void polyplus$setIntrusiveHolders(Map<T, Holder.Reference<T>> holders);
-    *///?}
+    void polyplus$setIntrusiveHolders(Map<?, ?> holders);
+    //?}
 }

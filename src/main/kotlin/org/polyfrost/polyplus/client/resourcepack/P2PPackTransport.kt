@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -121,7 +122,7 @@ object P2PPackTransport {
             put(sha1)
             flip()
         }
-        bridge.sendPacket(SOCKET_ID, remote, frame)
+        bridge.sendPacket(SOCKET_ID, remote, frame) { download.onFailed("Couldn't send the request: $it") }
         LOGGER.info("Requested resource pack {} from {} (request {})", sha1Hex, remote, download.requestId)
         return download
     }
@@ -168,30 +169,37 @@ object P2PPackTransport {
             totalChunks,
         )
 
+        val sendFailure = AtomicReference<String>()
+        val onFailure: (String) -> Unit = { sendFailure.compareAndSet(null, it) }
+
         val head = ByteBuffer.allocate(1 + 4 + 4).apply {
             put(TYPE_HEAD)
             putInt(requestId)
             putInt(data.size)
             flip()
         }
-        bridge.sendPacket(SOCKET_ID, remote, head)
+        bridge.sendPacket(SOCKET_ID, remote, head, onFailure = onFailure)
 
-        for (index in 0 until totalChunks) {
-            awaitQueueDrain(bridge, remote, index, totalChunks)
+        // an aborted transfer still ends the stream, so the downloader gives up now rather than timing out
+        try {
+            for (index in 0 until totalChunks) {
+                awaitQueueDrain(bridge, remote, index, totalChunks)
+                sendFailure.get()?.let { error("A packet to $remote was dropped before chunk ${index + 1}/$totalChunks: $it") }
 
-            val start = index * CHUNK_SIZE
-            val end = minOf(start + CHUNK_SIZE, data.size)
-            val chunk = ByteBuffer.allocate(1 + 4 + 4 + (end - start)).apply {
-                put(TYPE_DATA)
-                putInt(requestId)
-                putInt(index)
-                put(data, start, end - start)
-                flip()
+                val start = index * CHUNK_SIZE
+                val end = minOf(start + CHUNK_SIZE, data.size)
+                val chunk = ByteBuffer.allocate(1 + 4 + 4 + (end - start)).apply {
+                    put(TYPE_DATA)
+                    putInt(requestId)
+                    putInt(index)
+                    put(data, start, end - start)
+                    flip()
+                }
+                bridge.sendPacket(SOCKET_ID, remote, chunk, onFailure = onFailure)
             }
-            bridge.sendPacket(SOCKET_ID, remote, chunk)
+        } finally {
+            bridge.sendPacket(SOCKET_ID, remote, frame(TYPE_END, requestId))
         }
-
-        bridge.sendPacket(SOCKET_ID, remote, frame(TYPE_END, requestId))
         LOGGER.info("Finished streaming '{}' to {}", prepared.name, remote)
     }
 

@@ -131,7 +131,7 @@ private fun resolveHiddenSlots(player: AbstractClientPlayer): Set<BodySlot> = hi
 *///?}
 
 private fun hiddenSlotsFor(player: AbstractClientPlayer): Set<BodySlot> {
-    val hidden = mutableSetOf<BodySlot>()
+    val hidden = BodySlot.entries.filterNotTo(mutableSetOf()) { PolyPlusCosmeticsConfig.isVisible(it, player.uuid) }
     if (PolyPlusCosmeticsConfig.hideHeadCosmeticsWithHelmet && !player.getItemBySlot(EquipmentSlot.HEAD).isEmpty) {
         hidden += BodySlot.Hat
     }

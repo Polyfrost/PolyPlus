@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
+import java.io.IOException
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
@@ -59,7 +60,6 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     internal fun setupAccepted(socket: EosP2PSocketId, remote: EosProductUserId) {
         localSocket = socket
         remoteUser = remote
-        activate()
     }
 
     override fun metadata(): ChannelMetadata = METADATA
@@ -134,6 +134,12 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
 
     override fun doRegister() {
         super.doRegister()
+        // inbound packets need an event loop to be handed to, so an accepted channel must not be
+        // reachable nor have its peer accepted before this point
+        if (parent() != null) {
+            activate()
+            bridge.acceptConnection(checkNotNull(localSocket), checkNotNull(remoteUser))
+        }
         eventLoop().execute { relaxReadTimeout(attempt = 1) }
     }
 
@@ -197,11 +203,20 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                 val chunk = ByteBuffer.allocate(chunkSize)
                 buf.readBytes(chunk)
                 chunk.flip()
-                bridge.sendPacket(socket, remote, chunk)
+                bridge.sendPacket(socket, remote, chunk, onFailure = ::failStream)
                 remaining -= chunkSize
             }
 
             input.remove()
+        }
+    }
+
+    // a gap in the byte stream desyncs the peer's decoder, so the connection can't carry on
+    private fun failStream(reason: String) {
+        eventLoop().execute {
+            if (!isOpen) return@execute
+            pipeline().fireExceptionCaught(IOException("Couldn't send to the P2P peer: $reason"))
+            close()
         }
     }
 

@@ -13,7 +13,6 @@ import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.render.InputConstants
-import java.lang.reflect.Modifier
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -46,27 +45,13 @@ object DefaultSettings {
 
     private val POST_LEGACY_UNBINDS = setOf("key.debug.noxesium", "Open Mod Configuration", "Reload Mod")
 
-    private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
-    private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
-
-    private val ANIMATIUM_STATE = listOf(
-        "org.visuals.legacy.animatium.util.config.GeneralConfigUtil",
-        "org.visuals.legacy.animatium.util.config.ConfigUtil",
-    )
-    private val ANIMATIUM_VERSION = listOf(
-        "org.visuals.legacy.animatium.util.config.PresetVersion",
-        "org.visuals.legacy.animatium.util.config.Version",
-    )
-
-    private val ANIMATIUM_PRESET = listOf("VANILLA", "MODERN")
-
-    private const val ANIMATIUM_ID = "animatium"
     private const val BETTER_SCREENS_ID = "betterscreens"
     private const val CONFIRM_DISCONNECT_ID = "confirmdisconnect"
     private const val CONTROLIFY_ID = "controlify"
     private const val BOBBY_ID = "bobby"
     private const val MODMENU_ID = "modmenu"
     private const val IQ_ID = "iqaddons"
+    private const val CBH_ID = "custom-block-highlight"
 
     private const val IQ_PHASE_THREE_CONFIG = "net.iqaddons.mod.config.categories.PhaseThreeConfig"
     private const val RESOURCEFUL_CONFIGURATIONS = "com.teamresourceful.resourcefulconfig.common.config.Configurations"
@@ -77,31 +62,6 @@ object DefaultSettings {
 
     private val BOBBY_DYNAMIC_MULTI_WORLD_LINE =
         Regex("""^(\s*)"?$BOBBY_DYNAMIC_MULTI_WORLD"?\s*([=:])\s*.*$""")
-
-    private class AnimatiumOption(vararg val names: String, val value: Any)
-
-    private val ANIMATIUM_OVERRIDES = mapOf(
-        "items" to listOf(
-            AnimatiumOption("itemPositions", value = true),
-            AnimatiumOption("itemPositionsInThirdPerson", value = true),
-            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
-            AnimatiumOption("itemUsageSwinging", value = true),
-            AnimatiumOption("disableSwingOnUse", value = false),
-            AnimatiumOption("itemPickupPosition", value = true),
-            AnimatiumOption("fishingRodVersion", value = "V1_7"),
-        ),
-        "other" to listOf(
-            AnimatiumOption("thirdPersonSwordBlockingPosition", value = true),
-            AnimatiumOption("damageTintArmor", "entityArmorHurtTint", value = true),
-        ),
-    )
-
-    private val ANIMATIUM_FIXUPS = mapOf(
-        "items" to listOf(
-            AnimatiumOption("disableSwingOnUse", value = false),
-            AnimatiumOption("strictItemPositionsInThirdPerson", value = true),
-        ),
-    )
 
     private const val MODMENU_MAIN = "com.terraformersmc.modmenu.ModMenu"
     private const val MODMENU_CONFIG = "com.terraformersmc.modmenu.config.ModMenuConfig"
@@ -124,17 +84,19 @@ object DefaultSettings {
         var attempts = 0
     }
 
-    private val INIT_TASKS = listOf(
-        Task(
-            id = "animatium-onboarding",
-            label = "Animatium onboarding",
-            isPresent = { modLoaded(ANIMATIUM_ID) && findFirstClass(ANIMATIUM_STATE) != null },
-            apply = ::markAnimatiumOnboardingSeen,
-        ),
-    )
-
     private val TICK_TASKS = buildList {
         add(Task("vanilla-options", "Minecraft options", { true }, ::applyVanillaOptions))
+        //? if >= 1.21.11 {
+        add(
+            Task(
+                id = "vanilla-texture-filtering",
+                label = "Minecraft texture filtering",
+                isPresent = { true },
+                apply = ::disableTextureFiltering,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        //?}
         UNBIND_ALL_NAMESPACES.forEach { namespace ->
             add(unbindTask(namespace) { key -> namespace in key.split('.') })
         }
@@ -162,23 +124,6 @@ object DefaultSettings {
                 isPresent = { modLoaded(CONTROLIFY_ID) && controlifyGlobalSettings() != null },
                 apply = ::applyControlifyKeyboardMovement,
                 retryable = true,
-            ),
-        )
-        add(
-            Task(
-                id = "animatium-config-2",
-                label = "Animatium",
-                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
-                apply = ::applyAnimatiumConfig,
-            ),
-        )
-        add(
-            Task(
-                id = "animatium-item-fixups",
-                label = "Animatium",
-                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
-                apply = ::applyAnimatiumFixups,
-                coveredByLegacyFlag = false,
             ),
         )
         add(
@@ -211,10 +156,11 @@ object DefaultSettings {
         )
         add(
             Task(
-                id = "animatium-packs",
-                label = "Animatium resource packs",
-                isPresent = { modLoaded(ANIMATIUM_ID) && findClass(ANIMATIUM_CONFIG) != null },
-                apply = ::disableAnimatiumResourcePacks,
+                id = "custom-block-highlight",
+                label = "Custom Block Highlight",
+                isPresent = { modLoaded(CBH_ID) && BlockHighlightPresets.available },
+                apply = ::applyCustomBlockHighlight,
+                coveredByLegacyFlag = false,
             ),
         )
     }
@@ -227,7 +173,7 @@ object DefaultSettings {
         coveredByLegacyFlag = id !in POST_LEGACY_UNBINDS,
     )
 
-    private val LEGACY_TASKS = (INIT_TASKS + TICK_TASKS).filter(Task::coveredByLegacyFlag)
+    private val LEGACY_TASKS = TICK_TASKS.filter(Task::coveredByLegacyFlag)
 
     private val pending = TICK_TASKS.toMutableList()
 
@@ -242,8 +188,6 @@ object DefaultSettings {
 
     fun initialize() {
         applied += PolyPlusConfig.appliedDefaults.split(',').filter(String::isNotEmpty)
-
-        if (!PolyPlusConfig.defaultSettingsApplied) runTasks(INIT_TASKS.toMutableList())
 
         eventHandler { _: TickEvent.End ->
             if (!done && ticks++ % TICK_SCAN_INTERVAL == 0) scan()
@@ -341,6 +285,16 @@ object DefaultSettings {
         options.save()
     }
 
+    //? if >= 1.21.11 {
+    private fun disableTextureFiltering() {
+        val options = Minecraft.getInstance().options ?: return
+        if (options.textureFiltering().get() != net.minecraft.client.TextureFilteringMethod.RGSS) return
+        options.textureFiltering().set(net.minecraft.client.TextureFilteringMethod.NONE)
+        options.save()
+        logger.info("Turned off RGSS texture filtering")
+    }
+    //?}
+
     //? if > 1.8.9 {
     private fun keyMappings(): List<KeyMapping> =
         Minecraft.getInstance().options?.keyMappings?.asList().orEmpty()
@@ -415,6 +369,12 @@ object DefaultSettings {
         logger.info("Enabled Bobby dynamic multi-world")
     }
 
+    private fun applyCustomBlockHighlight() {
+        if (BlockHighlightPresets.markerPath().exists()) return
+        BlockHighlightPresets.apply(BlockHighlightPresets.DEFAULT)
+        logger.info("Applied the Custom Block Highlight vanilla preset and skipped its first-open presets screen")
+    }
+
     private fun applyModMenuModCount() {
         val config = findClass(MODMENU_CONFIG) ?: error("$MODMENU_CONFIG is missing")
         MODMENU_COUNT_OPTIONS.forEach { name ->
@@ -454,119 +414,6 @@ object DefaultSettings {
         logger.info("Set {}#{} to {}", className.substringAfterLast('.'), fieldName, value)
     }
 
-    private fun markAnimatiumOnboardingSeen() {
-        val configUtil = findFirstClass(ANIMATIUM_STATE) ?: error("Animatium has none of $ANIMATIUM_STATE")
-        runCatching { configUtil.getMethod("load").invoke(null) }
-        configUtil.getMethod("put", String::class.java, Boolean::class.javaPrimitiveType)
-            .invoke(null, "onboarding", false)
-        logger.info("Marked Animatium onboarding as already viewed")
-    }
-
-    private fun applyAnimatiumConfig() {
-        val configClass = findClass(ANIMATIUM_CONFIG) ?: error("$ANIMATIUM_CONFIG is missing")
-        val instance = configClass.getMethod("instance").invoke(null)
-        applyAnimatiumPreset(configClass, instance)
-        applyAnimatiumOverrides(instance, ANIMATIUM_OVERRIDES)
-
-        configClass.getMethod("save").invoke(null)
-        reloadAnimatium()
-        logger.info("Applied the Animatium modern-animations preset with PolyPlus overrides")
-    }
-
-    private fun applyAnimatiumFixups() {
-        val configClass = findClass(ANIMATIUM_CONFIG) ?: error("$ANIMATIUM_CONFIG is missing")
-        val instance = configClass.getMethod("instance").invoke(null)
-        applyAnimatiumOverrides(instance, ANIMATIUM_FIXUPS)
-
-        configClass.getMethod("save").invoke(null)
-        reloadAnimatium()
-        logger.info("Corrected outdated Animatium PolyPlus overrides")
-    }
-
-    private fun applyAnimatiumOverrides(instance: Any, overrides: Map<String, List<AnimatiumOption>>) {
-        overrides.forEach { (name, options) ->
-            val category = runCatching { instance.javaClass.getField(name).get(instance) }.getOrNull()
-            if (category == null) {
-                logger.warn("Animatium has no config category '{}', skipping", name)
-                return@forEach
-            }
-            options.forEach { option -> setAnimatiumField(category, option) }
-        }
-    }
-
-    private fun applyAnimatiumPreset(configClass: Class<*>, config: Any) {
-        val versionClass = findFirstClass(ANIMATIUM_VERSION)
-            ?: error("Animatium has none of $ANIMATIUM_VERSION")
-        val preset = ANIMATIUM_PRESET.firstNotNullOfOrNull { name ->
-            runCatching { enumConstant(versionClass, name) }.getOrNull()
-        } ?: error("Animatium has none of the $ANIMATIUM_PRESET presets")
-
-        val apply = versionClass.methods.firstOrNull { it.name == "apply" && !Modifier.isStatic(it.modifiers) }
-            ?: error("Animatium ${versionClass.simpleName} has no apply method")
-        val arguments = apply.parameterTypes.map { type ->
-            when {
-                type.isAssignableFrom(configClass) -> config
-                type == Boolean::class.javaPrimitiveType -> false
-                else -> error("Animatium ${versionClass.simpleName}#apply takes an unknown ${type.name}")
-            }
-        }
-        apply.invoke(preset, *arguments.toTypedArray())
-    }
-
-    private fun reloadAnimatium() {
-        val mod = findClass(ANIMATIUM_MOD) ?: return
-        val reload = runCatching { mod.getMethod("reload") }.getOrNull() ?: return
-        runCatching { reload.invoke(null) }
-            .onFailure { logger.warn("Could not reload Animatium after applying defaults", it) }
-    }
-
-    private fun setAnimatiumField(category: Any, option: AnimatiumOption) {
-        val field = option.names.firstNotNullOfOrNull { name ->
-            runCatching { category.javaClass.getField(name) }.getOrNull()
-        }
-        if (field == null) {
-            logger.warn("Animatium option '{}' is not present in this version, skipping", option.names.first())
-            return
-        }
-
-        attempt("Animatium") {
-            val value = option.value
-            when {
-                value is Boolean -> field.setBoolean(category, value)
-                field.type.isEnum -> field.set(category, enumConstant(field.type, value as String))
-                else -> error("Unsupported option type for '${field.name}'")
-            }
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun enumConstant(type: Class<*>, name: String): Any =
-        java.lang.Enum.valueOf(type as Class<out Enum<*>>, name)
-
-    private fun disableAnimatiumResourcePacks() {
-        //? if > 1.8.9 {
-        val minecraft = Minecraft.getInstance()
-        val options = minecraft.options ?: return
-        val removed = options.resourcePacks.removeAll(::isAnimatiumPack) or
-            options.incompatibleResourcePacks.removeAll(::isAnimatiumPack)
-
-        val repository = minecraft.resourcePackRepository
-        val selected = repository.selectedIds
-        val kept = selected.filterNot(::isAnimatiumPack)
-        val wasSelected = kept.size != selected.size
-        if (wasSelected) repository.setSelected(kept)
-
-        if (removed || wasSelected) {
-            options.save()
-            logger.info("Disabled Animatium resource packs")
-        }
-        if (wasSelected) minecraft.reloadResourcePacks()
-        //?}
-    }
-
-    private fun isAnimatiumPack(id: String): Boolean =
-        id.substringBefore(':').substringBefore('/').equals(ANIMATIUM_ID, ignoreCase = true)
-
     private fun modLoaded(id: String): Boolean = FabricLoader.getInstance().isModLoaded(id)
 
     private fun findClass(name: String): Class<*>? {
@@ -575,6 +422,4 @@ object DefaultSettings {
         classCache[name] = type
         return type
     }
-
-    private fun findFirstClass(names: List<String>): Class<*>? = names.firstNotNullOfOrNull(::findClass)
 }

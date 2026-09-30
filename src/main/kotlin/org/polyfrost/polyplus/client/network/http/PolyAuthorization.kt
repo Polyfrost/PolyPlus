@@ -2,9 +2,17 @@ package org.polyfrost.polyplus.client.network.http
 
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import kotlinx.serialization.Serializable
+import net.fabricmc.loader.api.FabricLoader
+import net.fabricmc.loader.api.metadata.ModOrigin
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.BackendUrl
@@ -14,14 +22,18 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -41,6 +53,7 @@ object PolyAuthorization {
     private var cachedProfileId: UUID? = null
     private var currentJob: Deferred<Authorized>? = null
     private var currentJobProfileId: UUID? = null
+    private val modsReported = AtomicBoolean(false)
 
     suspend fun current(): String {
         requireOnlineServices()
@@ -180,7 +193,27 @@ object PolyAuthorization {
             }
             .bodyOrThrow<AuthResponse>()
         LOGGER.info("Successfully authorized as $playerName")
+        if (modsReported.compareAndSet(false, true)) {
+            PolyPlusClient.SCOPE.launch(Dispatchers.IO) { reportMods(response.token) }
+        }
         return Authorized(profileId, response)
+    }
+
+    @Serializable
+    private class ModsReport(val mods: Map<String, String>)
+
+    private suspend fun reportMods(token: String) {
+        val mods = FabricLoader.getInstance().allMods
+            .filter { it.containingMod.isEmpty && it.origin.kind == ModOrigin.Kind.PATH }
+            .associate { it.metadata.id to it.metadata.version.friendlyString }
+        runSuspendCatching {
+            PolyPlusClient.HTTP.put("${PolyPlusConfig.apiUrl}/account/mods") {
+                expectSuccess = true
+                bearerAuth(token)
+                contentType(ContentType.Application.Json)
+                setBody(ModsReport(mods))
+            }
+        }.onFailure { LOGGER.warn("Failed to report installed mods", it) }
     }
 
     private const val LOADER =

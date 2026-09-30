@@ -442,7 +442,10 @@ class EosSdkBridge {
             throw IllegalStateException("$what did not answer within ${EOS_CALL_TIMEOUT_SECONDS}s", e)
         }
 
-    private fun post(block: () -> Unit) {
+    private fun post(
+        abandon: () -> Unit = { logger.debug("Dropping a queued EOS call; the SDK is shutting down") },
+        block: () -> Unit,
+    ) {
         if (isOnTickThread) {
             runCatching(block).onFailure { logger.warn("A posted EOS call failed", it) }
             return
@@ -450,7 +453,7 @@ class EosSdkBridge {
         enqueue(
             PendingCall(
                 run = { runCatching(block).onFailure { logger.warn("A posted EOS call failed", it) } },
-                abandon = { logger.debug("Dropping a queued EOS call; the SDK is shutting down") },
+                abandon = abandon,
             ),
         )
     }
@@ -513,11 +516,16 @@ class EosSdkBridge {
         }.getOrDefault(0L)
     }
 
+    /**
+     * Queues [data] for sending on the tick thread. Nothing retries a dropped packet, so [onFailure] is called with
+     * the reason (on an arbitrary thread) whenever this one could not be handed to EOS.
+     */
     fun sendPacket(
         socket: EosP2PSocketId,
         remote: EosProductUserId,
         data: ByteBuffer,
         reliability: PacketReliability = PacketReliability.ReliableOrdered,
+        onFailure: (reason: String) -> Unit = {},
     ) {
         val bytes = ByteArray(data.remaining())
         data.get(bytes)
@@ -527,28 +535,22 @@ class EosSdkBridge {
             PacketReliability.ReliableOrdered -> EosPacketReliability.ReliableOrdered
         }
 
-        post {
-            val local = localUser
-            if (local == null) {
-                logger.warn(
-                    "Dropping outbound packet to {} on '{}': not logged into EOS Connect yet " +
-                        "(this packet is lost, nothing will retry it)",
-                    remote,
-                    socket,
-                )
-                return@post
-            }
-            val result = requireNotNull(platform).p2p.sendPacket(
-                localUserId = SdkProductUserId.fromString(local.raw),
-                remoteUserId = SdkProductUserId.fromString(remote.raw),
-                socketId = SdkSocketId(socket.name),
-                channel = 0,
-                data = bytes,
-                reliability = sdkReliability,
-            )
-            if (result != EosResult.Success) {
-                logger.warn("sendPacket to {} on '{}' -> {}", remote, socket, result)
-            }
+        post(abandon = { onFailure("the EOS SDK is shutting down") }) {
+            val failure = runCatching {
+                val local = localUser ?: return@runCatching "not logged into EOS Connect"
+                val platform = platform ?: return@runCatching "the EOS platform is gone"
+                platform.p2p.sendPacket(
+                    localUserId = SdkProductUserId.fromString(local.raw),
+                    remoteUserId = SdkProductUserId.fromString(remote.raw),
+                    socketId = SdkSocketId(socket.name),
+                    channel = 0,
+                    data = bytes,
+                    reliability = sdkReliability,
+                ).takeIf { it != EosResult.Success }?.toString()
+            }.getOrElse { it.toString() } ?: return@post
+
+            logger.warn("Dropped an outbound packet to {} on '{}': {}", remote, socket, failure)
+            onFailure(failure)
         }
     }
 

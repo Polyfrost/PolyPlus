@@ -129,6 +129,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
@@ -251,7 +252,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     @Composable
     override fun compose() {
         val mc = Minecraft.getInstance()
-        var servers by remember { mutableStateOf<List<ServerData>>(emptyList()) }
+        var quickplay by remember { mutableStateOf<List<QuickplayEntry>?>(null) }
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
@@ -259,19 +260,24 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             CustomPanorama.initialize()
             launch(Dispatchers.IO) { FeaturedServers.warmUp() }
             val serverLoad = async(Dispatchers.IO) {
-                PolyPlusRecentServers.displayServers()
+                PolyPlusRecentServers.displayServers().map { QuickplayEntry.Server(it, PolyPlusRecentServers.lastPlayed(it.ip)) }
+            }
+            val worldLoad = async {
+                HostWorldManager.loadWorlds()
+                    .filter { it.compat != HostWorldManager.Compat.INCOMPATIBLE && !it.requiresConversion }
+                    .map { QuickplayEntry.World(it) }
             }
             val assetLoad = async(Dispatchers.IO) {
                 MainMenuRasterAssets.preload()
                 Outfit
             }
-            servers = serverLoad.await()
+            quickplay = (serverLoad.await() + worldLoad.await()).sortedByDescending { it.lastPlayed }.take(QUICKPLAY_MAX)
             assetLoad.await()
         }
 
         var pingTick by remember { mutableStateOf(0) }
-        LaunchedEffect(servers) {
-            MainMenuServerPings.start(this, servers)
+        LaunchedEffect(quickplay) {
+            MainMenuServerPings.start(this, quickplay.orEmpty().filterIsInstance<QuickplayEntry.Server>().map { it.data })
             while (true) {
                 MainMenuServerPings.tick()
                 pingTick++
@@ -292,6 +298,19 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         *///?} else {
                         /*mc.openScreen(SelectWorldScreen(this))
                         *///?}
+                    },
+                    openWorld = { id ->
+                        //? if = 1.8.9 {
+                        /*HostWorldManager.openWorld(id)
+                        *///?} else {
+                        mc.createWorldOpenFlows().openWorld(id) {
+                            //? if >= 26.2 {
+                            mc.gui.setScreen(this)
+                            //?} else {
+                            /*mc.setScreen(this)
+                            *///?}
+                        }
+                        //?}
                     },
                     multiplayer = {
                         //? if >= 26.2 {
@@ -341,7 +360,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     quit = { mc.stop() },
                     connect = { server -> connectTo(mc, server) },
                 ),
-                servers = servers,
+                quickplay = quickplay,
                 pingTick = pingTick,
             )
         }
@@ -593,6 +612,7 @@ private fun buildFace(skin: BufferedImage): ImageBitmap {
 
 private class MenuActions(
     val singleplayer: () -> Unit,
+    val openWorld: (String) -> Unit,
     val multiplayer: () -> Unit,
     val realms: (() -> Unit)?,
     val settings: () -> Unit,
@@ -651,7 +671,7 @@ private fun MainMenu(
     screen: Screen,
     guiScale: Int,
     actions: MenuActions,
-    servers: List<ServerData>,
+    quickplay: List<QuickplayEntry>?,
     pingTick: Int,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -685,7 +705,7 @@ private fun MainMenu(
                             .align(Alignment.CenterStart)
                             .padding(start = 50.dp)
                             .guiScaled(scale, TransformOrigin(0f, 0.5f)),
-                        servers,
+                        quickplay,
                         pingTick,
                         actions,
                     )
@@ -719,13 +739,24 @@ private fun MainMenu(
                     pingTick,
                     actions,
                 )
-                Footer(Modifier.fillMaxSize(), scale)
+                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), scale)
             }
         }
     }
 }
 
 private const val BASE_WIDTH = 1240f
+private const val QUICKPLAY_MAX = 3
+
+private sealed interface QuickplayEntry {
+    val lastPlayed: Long
+
+    class Server(val data: ServerData, override val lastPlayed: Long) : QuickplayEntry
+
+    class World(val world: HostWorldManager.HostWorldEntry) : QuickplayEntry {
+        override val lastPlayed get() = world.lastPlayed
+    }
+}
 private const val BASE_HEIGHT = 720f
 
 @Composable
@@ -763,7 +794,7 @@ private fun MainLogo() {
 @Composable
 private fun LeftColumn(
     modifier: Modifier,
-    servers: List<ServerData>,
+    entries: List<QuickplayEntry>?,
     pingTick: Int,
     actions: MenuActions,
 ) {
@@ -782,19 +813,42 @@ private fun LeftColumn(
             exit = shrinkVertically() + fadeOut(),
         ) {
             Column {
-                servers.forEach { server ->
+                if (entries?.isEmpty() == true) {
                     Spacer(Modifier.height(12.dp))
                     ServerRow(
-                        title = server.name,
-                        subtitle = serverStatusText(server),
-                        //? if > 1.8.9 {
-                        favicon = rememberFavicon(server.iconBytes),
-                        //?} else {
-                        /*favicon = rememberFavicon(server.icon),
-                        *///?}
-                        fallbackPng = ASSETS + if (server.ip.contains("hypixel", true)) "hypixel.png" else "server.png",
-                        onClick = { actions.connect(server) },
+                        title = "Nothing played yet",
+                        subtitle = "Recent worlds and servers show here",
+                        favicon = null,
+                        fallbackPng = ASSETS + "server.png",
+                        onClick = actions.singleplayer,
                     )
+                }
+                entries?.forEach { entry ->
+                    Spacer(Modifier.height(12.dp))
+                    when (entry) {
+                        is QuickplayEntry.Server -> ServerRow(
+                            title = entry.data.name,
+                            subtitle = serverStatusText(entry.data),
+                            //? if > 1.8.9 {
+                            favicon = rememberFavicon(entry.data.iconBytes),
+                            //?} else {
+                            /*favicon = rememberFavicon(entry.data.icon),
+                            *///?}
+                            fallbackPng = ASSETS + if (entry.data.ip.contains("hypixel", true)) "hypixel.png" else "server.png",
+                            onClick = { actions.connect(entry.data) },
+                        )
+                        is QuickplayEntry.World -> ServerRow(
+                            title = entry.world.name,
+                            //? if > 1.8.9 {
+                            subtitle = "Singleplayer · " + entry.world.gameMode.shortDisplayName.string,
+                            //?} else {
+                            /*subtitle = "Singleplayer · " + entry.world.gameMode.key.replaceFirstChar { it.uppercase() },
+                            *///?}
+                            favicon = rememberFavicon(entry.world.iconBytes),
+                            fallbackPng = ASSETS + "server.png",
+                            onClick = { actions.openWorld(entry.world.id) },
+                        )
+                    }
                 }
             }
         }

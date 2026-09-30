@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.test
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.polyfrost.polyplus.client.network.reconnectDelay
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import java.io.EOFException
 import java.net.ConnectException
@@ -63,7 +64,7 @@ class WebSocketBackoffTest {
             val ceiling = (INITIAL_MS shl (attempt - 1).coerceIn(0, 30))
                 .takeIf { it > 0L }?.coerceAtMost(MAX_MS) ?: MAX_MS
             repeat(SAMPLES) {
-                val delay = PolyConnection.reconnectDelay(attempt)
+                val delay = reconnectDelay(attempt)
                 assertTrue(delay > 0L, "attempt $attempt produced $delay")
                 assertTrue(delay <= ceiling, "attempt $attempt produced $delay, over $ceiling")
                 assertTrue(delay >= ceiling / 2, "attempt $attempt produced $delay, under ${ceiling / 2}")
@@ -82,7 +83,7 @@ class WebSocketBackoffTest {
 
     @Test
     fun `backoff is jittered rather than fixed`() {
-        val seen = (1..SAMPLES).map { PolyConnection.reconnectDelay(10) }.toSet()
+        val seen = (1..SAMPLES).map { reconnectDelay(10) }.toSet()
         assertTrue(seen.size > 1, "expected jitter, every attempt returned ${seen.first()}")
     }
 }

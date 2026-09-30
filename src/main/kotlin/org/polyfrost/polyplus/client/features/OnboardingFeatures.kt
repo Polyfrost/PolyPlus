@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
-import net.fabricmc.loader.api.FabricLoader
 //? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
 //?} else {
@@ -19,7 +18,6 @@ import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 object OnboardingFeatures {
     private val logger = LogManager.getLogger("PolyPlus/Onboarding")
@@ -45,33 +43,10 @@ object OnboardingFeatures {
     val waveyCapesAvailable: Boolean by lazy { classExists(WAVEY_MOD_BASE) }
     val skinLayersAvailable: Boolean by lazy { classExists(SKIN_LAYERS_MOD_BASE) }
     val gammaUtilsAvailable: Boolean by lazy { classExists(GAMMA_UTILS) }
+    val dynamicLightsAvailable: Boolean by lazy { classExists(LDL_MOD) }
     val shieldHeightAvailable: Boolean by lazy {
         hasFloatingField(OVERLAY_TWEAKS_CONFIG, SHIELD_HEIGHT)
     }
-
-    val itemPositionsAvailable: Boolean by lazy {
-        animatiumSupportsItemPositions(modVersion(ANIMATIUM_ID)) &&
-            runCatching {
-                val extras = loadWithoutInit(ANIMATIUM_CONFIG).getField("extras").type
-                ITEM_POSITION_FIELDS.forEach { extras.getField(it) }
-            }.isSuccess
-    }
-
-    internal fun animatiumSupportsItemPositions(version: String?): Boolean {
-        val parts = version.orEmpty().trimStart('v', 'V')
-            .takeWhile { it.isDigit() || it == '.' }
-            .split('.')
-            .mapNotNull(String::toIntOrNull)
-        val major = parts.firstOrNull() ?: return true
-        val minor = parts.getOrNull(1) ?: 0
-        return major > ANIMATIUM_ITEM_POSITION_MAJOR ||
-            (major == ANIMATIUM_ITEM_POSITION_MAJOR && minor >= ANIMATIUM_ITEM_POSITION_MINOR)
-    }
-
-    private fun modVersion(id: String): String? =
-        runCatching {
-            FabricLoader.getInstance().getModContainer(id).orElse(null)?.metadata?.version?.friendlyString
-        }.getOrNull()
 
     enum class ModCard(val introducedIn: Int) {
         GRASS(1),
@@ -80,8 +55,9 @@ object OnboardingFeatures {
         MOUNT(1),
         CAPES(1),
         SKIN_LAYERS(1),
-        ITEM(1),
         GAMMA(2),
+        BLOCK_HIGHLIGHT(3),
+        DYNAMIC_LIGHTS(4),
     }
 
     val ModCard.available: Boolean
@@ -92,8 +68,9 @@ object OnboardingFeatures {
             ModCard.MOUNT -> mountOpacityAvailable
             ModCard.CAPES -> waveyCapesAvailable
             ModCard.SKIN_LAYERS -> skinLayersAvailable
-            ModCard.ITEM -> itemPositionsAvailable
             ModCard.GAMMA -> gammaUtilsAvailable && currentGamma() != null
+            ModCard.BLOCK_HIGHLIGHT -> BlockHighlightPresets.available
+            ModCard.DYNAMIC_LIGHTS -> dynamicLightsAvailable
         }
 
     val modsPageAvailable: Boolean
@@ -137,21 +114,20 @@ object OnboardingFeatures {
             ModCard.MOUNT -> PolyPlusConfig.onboardingMountOpacitySettled
             ModCard.CAPES -> PolyPlusConfig.onboardingWaveyCapesSettled
             ModCard.SKIN_LAYERS -> PolyPlusConfig.onboardingSkinLayersSettled
-            ModCard.ITEM -> PolyPlusConfig.onboardingItemPositionsSettled
             ModCard.GAMMA -> PolyPlusConfig.onboardingGammaSettled
+            ModCard.BLOCK_HIGHLIGHT -> PolyPlusConfig.onboardingBlockHighlightSettled
+            ModCard.DYNAMIC_LIGHTS -> PolyPlusConfig.onboardingDynamicLightsSettled
         }
 
     private val ModCard.pending: Boolean
         get() = !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
-
-    fun isDefaultItemScale(scale: Float): Boolean = abs(scale - ITEM_SCALE_DEFAULT) < 0.001f
 
     val guidedCards: List<ModCard> = listOf(
         ModCard.GRASS,
         ModCard.FIRE_OVERLAY,
         ModCard.SHIELD_HEIGHT,
         ModCard.MOUNT,
-        ModCard.ITEM,
+        ModCard.BLOCK_HIGHLIGHT
     )
 
     internal fun guideFlag(card: ModCard): Int = guidedCards.indexOf(card).let { if (it < 0) 0 else 1 shl it }
@@ -199,26 +175,7 @@ object OnboardingFeatures {
                 (currentFireOverlayOpacity() ?: FIRE_OPACITY_MAX) < FIRE_OPACITY_MAX - 0.001f
         ModCard.SHIELD_HEIGHT -> (currentShieldHeight() ?: SHIELD_HEIGHT_MAX) < SHIELD_HEIGHT_MAX - 0.001f
         ModCard.MOUNT -> (currentHorseOpacity() ?: HORSE_OPACITY_MAX) < HORSE_OPACITY_MAX - 0.001f
-        ModCard.ITEM -> !isDefaultItemScale(currentItemScale() ?: ITEM_SCALE_DEFAULT) || itemOffsetsMoved()
         else -> false
-    }
-
-    private fun itemOffsetsMoved(): Boolean =
-        listOf(currentItemOffsetX(), currentItemOffsetY(), currentItemOffsetZ())
-            .any { it != null && abs(it) > 0.001f }
-
-    fun resetItemScale(): Boolean {
-        val applied = applyItemPosition(
-            currentItemOffsetX() ?: PolyPlusConfig.onboardingItemOffsetX,
-            currentItemOffsetY() ?: PolyPlusConfig.onboardingItemOffsetY,
-            currentItemOffsetZ() ?: PolyPlusConfig.onboardingItemOffsetZ,
-            ITEM_SCALE_DEFAULT,
-        )
-        if (applied) {
-            PolyPlusConfig.onboardingItemScale = ITEM_SCALE_DEFAULT
-            PolyPlusConfig.save()
-        }
-        return applied
     }
 
     @JvmStatic
@@ -227,6 +184,7 @@ object OnboardingFeatures {
 
     fun initialize() {
         eventHandler { _: TickEvent.End ->
+            if (!PolyPlusConfig.animatiumItemPositionReset) resetAnimatiumItemPosition()
             if (!PolyPlusConfig.onboardingCompleted) return@eventHandler
             var changed = false
             if (!PolyPlusConfig.onboardingFeaturesApplied) {
@@ -331,15 +289,15 @@ object OnboardingFeatures {
                 changed = true
             }
         }
-        if (ModCard.ITEM.pending) {
-            val applied = applyItemPosition(
-                PolyPlusConfig.onboardingItemOffsetX,
-                PolyPlusConfig.onboardingItemOffsetY,
-                PolyPlusConfig.onboardingItemOffsetZ,
-                PolyPlusConfig.onboardingItemScale,
-            )
-            if (applied) {
-                PolyPlusConfig.onboardingItemPositionsSettled = true
+        if (ModCard.BLOCK_HIGHLIGHT.pending) {
+            if (applyBlockHighlight(PolyPlusConfig.onboardingBlockHighlightConfig)) {
+                PolyPlusConfig.onboardingBlockHighlightSettled = true
+                changed = true
+            }
+        }
+        if (ModCard.DYNAMIC_LIGHTS.pending) {
+            if (applyDynamicLights(PolyPlusConfig.onboardingDynamicLightsMode)) {
+                PolyPlusConfig.onboardingDynamicLightsSettled = true
                 changed = true
             }
         }
@@ -707,44 +665,52 @@ object OnboardingFeatures {
         logModApplyFailure("gamma-utils", "Could not apply the Gamma Utils preference", it)
     }.getOrDefault(false)
 
-    private fun animatiumExtras(): Any {
-        val configClass = Class.forName(ANIMATIUM_CONFIG)
-        val instance = configClass.getMethod("instance").invoke(null) ?: error("Animatium config is unavailable")
-        return instance.javaClass.getField("extras").get(instance) ?: error("Animatium has no extras category")
-    }
-
-    private fun animatiumFloat(name: String): Float? = runCatching {
-        val extras = animatiumExtras()
-        extras.javaClass.getField(name).getFloat(extras)
-    }.getOrNull()
-
-    fun currentItemOffsetX(): Float? = animatiumFloat(ITEM_OFFSET_X)
-
-    fun currentItemOffsetY(): Float? = animatiumFloat(ITEM_OFFSET_Y)
-
-    fun currentItemOffsetZ(): Float? = animatiumFloat(ITEM_OFFSET_Z)
-
-    fun currentItemScale(): Float? = animatiumFloat(ITEM_SCALE_AXES.first())
-
-    fun applyItemPosition(offsetX: Float, offsetY: Float, offsetZ: Float, scale: Float): Boolean = runCatching {
-        val extras = animatiumExtras()
-        fun set(name: String, value: Float) = extras.javaClass.getField(name).setFloat(extras, value)
-        set(ITEM_OFFSET_X, offsetX.coerceIn(ITEM_OFFSET_MIN, ITEM_OFFSET_MAX))
-        set(ITEM_OFFSET_Y, offsetY.coerceIn(ITEM_OFFSET_MIN, ITEM_OFFSET_MAX))
-        set(ITEM_OFFSET_Z, offsetZ.coerceIn(ITEM_OFFSET_MIN, ITEM_OFFSET_MAX))
-        ITEM_SCALE_AXES.forEach { set(it, scale.coerceIn(ITEM_SCALE_MIN, ITEM_SCALE_MAX)) }
-        Class.forName(ANIMATIUM_CONFIG).getMethod("save").invoke(null)
-        reloadAnimatium()
+    fun applyBlockHighlight(json: String): Boolean = runCatching {
+        if (json.isNotBlank()) BlockHighlightPresets.applyJson(json)
         true
     }.onFailure {
-        logModApplyFailure("animatium-item-position", "Could not apply the Animatium item position", it)
+        logModApplyFailure("block-highlight", "Could not apply the Custom Block Highlight preset", it)
     }.getOrDefault(false)
 
-    private fun reloadAnimatium() {
-        val mod = runCatching { Class.forName(ANIMATIUM_MOD) }.getOrNull() ?: return
-        val reload = runCatching { mod.getMethod("reload") }.getOrNull() ?: return
-        runCatching { reload.invoke(null) }
-            .onFailure { logger.warn("Could not reload Animatium after applying the preference", it) }
+    private fun dynamicLightsConfig(): Any {
+        val mod = Class.forName(LDL_MOD).getMethod("get").invoke(null) ?: error("LambDynamicLights is not initialised yet")
+        return mod.javaClass.getField("config").get(mod) ?: error("LambDynamicLights has no config")
+    }
+
+    fun currentDynamicLightsMode(): Int? = runCatching {
+        val mode = dynamicLightsConfig().let { it.javaClass.getMethod("getDynamicLightsMode").invoke(it) } as Enum<*>
+        DYNAMIC_LIGHTS_MODES.indexOf(mode.name).takeIf { it >= 0 } ?: DYNAMIC_LIGHTS_FANCY
+    }.getOrNull()
+
+    fun applyDynamicLights(mode: Int): Boolean = runCatching {
+        val config = dynamicLightsConfig()
+        val modeClass = Class.forName(LDL_MODE)
+        val name = DYNAMIC_LIGHTS_MODES.getOrElse(mode) { DYNAMIC_LIGHTS_MODES[DYNAMIC_LIGHTS_OFF] }
+        @Suppress("UNCHECKED_CAST")
+        val constant = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, name)
+        config.javaClass.getMethod("setDynamicLightsMode", modeClass).invoke(config, constant)
+        config.javaClass.getMethod("save").invoke(config)
+        true
+    }.onFailure {
+        logModApplyFailure("dynamic-lights", "Could not apply the LambDynamicLights preference", it)
+    }.getOrDefault(false)
+
+    private fun resetAnimatiumItemPosition() {
+        runCatching {
+            val config = Class.forName(OVERFLOW_ANIMATIONS_CONFIG).getMethod("instance").invoke(null)
+                ?: error("OverflowAnimations config is unavailable")
+            val items = config.javaClass.getField("items").get(config) ?: error("OverflowAnimations has no items category")
+            ITEM_DEFAULTS.forEach { (name, value) ->
+                runCatching { items.javaClass.getField(name) }.getOrNull()?.setFloat(items, value)
+            }
+            config.javaClass.getMethod("save").invoke(config)
+        }.onFailure {
+            if (it !is ClassNotFoundException) {
+                logModApplyFailure("animatium-item-reset", "Could not reset the OverflowAnimations item position", it)
+            }
+        }
+        PolyPlusConfig.animatiumItemPositionReset = true
+        PolyPlusConfig.save()
     }
 
     internal fun setBoolean(instance: Any, method: String, value: Boolean) {
@@ -772,7 +738,7 @@ object OnboardingFeatures {
         loadWithoutInit(className).getField(fieldName).type
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
-    const val MOD_SETTINGS_VERSION = 2
+    const val MOD_SETTINGS_VERSION = 4
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L
@@ -847,21 +813,14 @@ object OnboardingFeatures {
     const val GAMMA_MIN = 100f
     const val GAMMA_MAX = 1500f
 
-    private const val ANIMATIUM_ID = "animatium"
-    private const val ANIMATIUM_CONFIG = "org.visuals.legacy.animatium.config.AnimatiumConfig"
-    private const val ANIMATIUM_MOD = "org.visuals.legacy.animatium.Animatium"
-    private const val ANIMATIUM_ITEM_POSITION_MAJOR = 4
-    private const val ANIMATIUM_ITEM_POSITION_MINOR = 3
-    private const val ITEM_OFFSET_X = "itemOffsetX"
-    private const val ITEM_OFFSET_Y = "itemOffsetY"
-    private const val ITEM_OFFSET_Z = "itemOffsetZ"
-    private val ITEM_SCALE_AXES = listOf("itemScaleX", "itemScaleY", "itemScaleZ")
+    private const val LDL_MOD = "dev.lambdaurora.lambdynlights.LambDynLights"
+    private const val LDL_MODE = "dev.lambdaurora.lambdynlights.DynamicLightsMode"
+    val DYNAMIC_LIGHTS_MODES = listOf("OFF", "FASTEST", "FAST", "FANCY")
+    const val DYNAMIC_LIGHTS_OFF = 0
+    const val DYNAMIC_LIGHTS_FANCY = 3
 
-    private val ITEM_POSITION_FIELDS = listOf(ITEM_OFFSET_X, ITEM_OFFSET_Y, ITEM_OFFSET_Z) + ITEM_SCALE_AXES
-
-    const val ITEM_OFFSET_MIN = -10f
-    const val ITEM_OFFSET_MAX = 10f
-    const val ITEM_SCALE_DEFAULT = 1f
-    const val ITEM_SCALE_MIN = 0.5f
-    const val ITEM_SCALE_MAX = 2f
+    private const val OVERFLOW_ANIMATIONS_CONFIG = "org.polyfrost.overflowanimations.config.OverflowAnimationsConfig"
+    private val ITEM_DEFAULTS = listOf("X", "Y", "Z").flatMap {
+        listOf("itemOffset$it" to 0f, "itemScale$it" to 1f, "itemRotation$it" to 0f)
+    }
 }

@@ -90,13 +90,12 @@
     "MixinCrashReport",
     //? if > 1.8.9
     "MixinSystemReport",
-    //? if <1.21.5
+    //? if > 1.8.9
+    "client.access.HolderReferenceInvoker",
     "client.access.MappedRegistryAccessor",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
     "client.network.MixinServerGamePacketListenerImpl",
-    //? if > 1.8.9
-    "compat.animatium.MixinToastUtil",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
     //? if > 1.8.9
@@ -114,6 +113,7 @@
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
     "compat.oneconfig.MixinThemeRegistry",
+    "compat.oneconfig.MixinTreeConfigData",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",
     //? if > 1.8.9
@@ -132,6 +132,12 @@
     "compat.waveycapes.MixinCustomCapeRenderLayer",
     //? if > 1.8.9
     "compat.waveycapes.MixinPlayerWrapper",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinConfigStorage",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinEssentialSharingContextResolver",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinServerFeaturePolicy",
     //? if > 1.8.9
     "compat.wwaypoints.MixinToggleSneakConfigScreen",
     //? if > 1.8.9

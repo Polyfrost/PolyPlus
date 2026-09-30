@@ -12,7 +12,7 @@ import java.io.File
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RecentServer(val name: String, val ip: String)
+data class RecentServer(val name: String, val ip: String, val lastPlayed: Long = 0L)
 
 object PolyPlusRecentServers {
     private const val MAX = 3
@@ -60,7 +60,7 @@ object PolyPlusRecentServers {
         if (address.isEmpty()) return
         ensureLoaded()
 
-        val entry = RecentServer(name?.trim().takeUnless { it.isNullOrEmpty() } ?: address, address)
+        val entry = RecentServer(name?.trim().takeUnless { it.isNullOrEmpty() } ?: address, address, System.currentTimeMillis())
         recents.removeAll { it.ip.equals(address, ignoreCase = true) }
         recents.add(0, entry)
         while (recents.size > MAX) recents.removeAt(recents.lastIndex)
@@ -108,6 +108,13 @@ object PolyPlusRecentServers {
         lastDirect?.let { add(it.name, it.ip) }
 
         return out.values.toList().also { cachedDisplayServers = it }
+    }
+
+    @Synchronized
+    fun lastPlayed(ip: String): Long {
+        ensureLoaded()
+        return (recents.firstOrNull { it.ip.equals(ip, ignoreCase = true) } ?: lastDirect?.takeIf { it.ip.equals(ip, ignoreCase = true) })
+            ?.lastPlayed ?: 0L
     }
 
     private fun isSaved(ip: String): Boolean = runCatching {

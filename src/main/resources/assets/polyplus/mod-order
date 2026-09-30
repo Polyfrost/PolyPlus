@@ -1,8 +1,11 @@
 chatting.json
 overlaytweaks
 shaketweaks
+shaketweaks.json
 simpleblockoverlay.json
+custom-block-highlight
 betterscreens
+freelook.json
 behindyouv3.json
 crosshairtweaks
 scrolltweaks
@@ -17,7 +20,9 @@ polyweather.json
 damagetint.json
 colorsaturation.json
 droppeditemtweaks
+droppeditemtweaksv2.json
 confirmdisconnect
+lambdynlights
 lambdabettergrass
 betternightvision
 blur
@@ -35,8 +40,9 @@ waveycapes
 chattweaks.json
 viewmodel
 rendertweaks
+rendertweaksv2.json
 vignettetweaks.json
-animatium
+overflowanimations.json
 zoomify
 redaction.json
 gammautils
@@ -76,7 +82,6 @@ bettercommandblockui
 nochatreports
 resourcify
 packed_packs
-lambdynlights
 continuity
 entity_texture_features
 entity_model_features
@@ -85,6 +90,8 @@ e4mc
 hypixelautotip
 nbt_ac
 cwb
+cubes-without-borders
+polytone
 languagereload
 skinlayers3d
 noxesium
