@@ -51,6 +51,8 @@ object CosmeticSync {
 
     private const val RESUBSCRIBE_INTERVAL_TICKS = 600
     private var resubscribeTicks = 0
+
+    private val loading: MutableSet<Int> = ConcurrentHashMap.newKeySet()
     //?}
 
     fun earlyInitialize() {
@@ -231,8 +233,8 @@ object CosmeticSync {
         val uuid = UUID.fromString(playerUuid)
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
-            val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@launch
             ClientPlatform.runOnMain {
+                val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@runOnMain
                 val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
             }
@@ -293,6 +295,7 @@ object CosmeticSync {
         }
     }
 
+    // Loads run in the background, one per cosmetic at a time, and the next reconcile applies whatever has loaded
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
         reconcileCape(equipped[BodySlot.Cape])
@@ -305,31 +308,18 @@ object CosmeticSync {
                 continue
             }
 
-            PolyPlusClient.SCOPE.launch {
-                if (!CosmeticAssetCache.ensureCosmeticLoaded(desiredId)) return@launch
-                val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId) ?: return@launch
-                if (current != null &&
-                    current.cosmetic.id == CosmeticAssetCache.attachedCosmeticId(desiredId) &&
-                    current.cosmetic == attached
-                ) {
-                    return@launch
-                }
-                ClientPlatform.runOnMain {
-                    if (CosmeticCatalog.getActiveId(uuid, slot) != desiredId) return@runOnMain
-                    CosmeticApi.unequipSlot(player, slot)
-                    CosmeticApi.equipLocal(player, attached.copy(slot = slot))
-                }
-            }
+            // also picks up a new asset hash for one that is already loaded
+            loadInBackground(desiredId)
+            val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId)?.copy(slot = slot) ?: continue
+            if (current?.cosmetic == attached) continue
+            CosmeticApi.unequipSlot(player, slot)
+            CosmeticApi.equipLocal(player, attached)
         }
     }
 
     private fun reconcileCape(cosmeticId: Int?) {
         if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
-        PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)) {
-                LOGGER.warn("Failed to load cape cosmetic {}", cosmeticId)
-            }
-        }
+        loadInBackground(cosmeticId)
     }
 
     private fun reconcilePet(uuid: UUID) {
@@ -343,24 +333,29 @@ object CosmeticSync {
 
         if (PetManager.currentPetCosmeticId(uuid) == desiredId) return
 
-        LOGGER.info("reconcilePet: {} wants pet cosmetic {}, loading assets", uuid, desiredId)
+        loadInBackground(desiredId)
+        // shoulder pets load as attached cosmetics and are equipped like one instead
+        if (CosmeticAssetCache.getPetDefinition(desiredId) != null) PetManager.ensurePet(uuid, desiredId)
+    }
+
+    private fun loadInBackground(cosmeticId: Int) {
+        if (!loading.add(cosmeticId)) return
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureCosmeticLoaded(desiredId)) {
-                LOGGER.warn("reconcilePet: failed to load pet cosmetic {} for {}", desiredId, uuid)
-                return@launch
-            }
-            ClientPlatform.runOnMain {
-                if (CosmeticCatalog.getRemoteEquipped(uuid)?.get(BodySlot.Pet) != desiredId) return@runOnMain
-                PetManager.ensurePet(uuid, desiredId)
+            try {
+                CosmeticAssetCache.ensureCosmeticLoaded(cosmeticId)
+            } finally {
+                loading.remove(cosmeticId)
             }
         }
     }
 
     private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
+        val uuid = player.uuid
         PolyPlusClient.SCOPE.launch {
             if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
-            val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@launch
             ClientPlatform.runOnMain {
+                val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@runOnMain
+                val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
             }
         }
