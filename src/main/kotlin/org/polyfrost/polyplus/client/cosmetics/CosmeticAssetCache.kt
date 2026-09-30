@@ -125,24 +125,19 @@ object CosmeticAssetCache {
             evicted = true
         }
         //? if >= 1.21.1 {
-        val released = HashSet<Identifier>()
+        // a texture id belongs to one cosmetic id, whose entries are always kept or evicted together
         fun <T : Any> MutableMap<Int, T>.evict(textures: (T) -> List<Identifier>) {
             for ((id, asset) in this) {
                 val owned = textures(asset)
                 if (id in keep || owned.any(inUse::contains)) continue
                 remove(id)
-                released += owned
+                owned.forEach(RemoteTextures::release)
                 evicted = true
             }
         }
         attachedById.evict { listOf(it.texture) }
         petsById.evict { listOf(it.texture) }
         emotesById.evict { emote -> emote.effects.map { it.texture } }
-        // emote textures are named after their pack, so a kept cosmetic may share one
-        attachedById.values.forEach { released -= it.texture }
-        petsById.values.forEach { released -= it.texture }
-        emotesById.values.forEach { emote -> emote.effects.forEach { released -= it.texture } }
-        released.forEach(RemoteTextures::release)
         //?}
         // lets open previews notice what they lost
         if (evicted) installs++

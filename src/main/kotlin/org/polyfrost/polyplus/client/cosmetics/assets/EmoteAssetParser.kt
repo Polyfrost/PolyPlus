@@ -46,7 +46,7 @@ internal object EmoteAssetParser {
             asset.open().use { stream ->
                 val file = BedrockAnimationParser.parseStream(stream)
                 val (animationName, animation) = file.animations.entries.firstOrNull() ?: return null
-                val effects = loadPairedEffects(root, asset.relativePath, playerGeometry)
+                val effects = loadPairedEffects(cosmeticId, root, asset.relativePath, playerGeometry)
                 val rules = loadEmoteRules(root, asset.relativePath)[animationName] ?: EmoteRules.DEFAULT
                 val emoteId = resolveEmoteId(cosmeticId, asset.relativePath, animationName)
                 logger.debug("Loaded emote {} from cosmetic {}", emoteId, cosmeticId)
@@ -73,6 +73,7 @@ internal object EmoteAssetParser {
     }
 
     private fun loadPairedEffects(
+        cosmeticId: Int,
         root: Path,
         animationRelative: String,
         playerGeometry: BedrockGeometry,
@@ -103,7 +104,7 @@ internal object EmoteAssetParser {
 
                 val textureId = Identifier.fromNamespaceAndPath(
                     PolyPlusConstants.ID,
-                    "cosmetics/${pack.name}/texture",
+                    "cosmetics/$cosmeticId/${pack.name}/texture",
                 )
                 listOf(
                     EmoteEffect(
