@@ -27,12 +27,12 @@ internal class EosVoicechatServerSocket(private val bridge: EosSdkBridge) : Voic
             bindAddress,
             port,
         )
-        EosVoicechatBridge.registerServerSocket(this)
-
         val address = if (bindAddress.isBlank() || bindAddress == "*") InetAddress.getByName("0.0.0.0") else InetAddress.getByName(bindAddress)
         val socket = DatagramSocket(port, address)
         udpSocket = socket
         logger.info("Bound a real UDP voice chat socket on {}:{}.", address.hostAddress, socket.localPort)
+        // Only register once bound: Simple Voice Chat abandons a socket whose open() throws without closing it.
+        EosVoicechatBridge.registerServerSocket(this)
 
         Thread({
             val buffer = ByteArray(MAX_UDP_PACKET_BYTES)
