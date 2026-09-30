@@ -114,6 +114,40 @@ object CosmeticAssetCache {
         //?}
     }
 
+    // Main thread only, and never while a preview may be showing a cosmetic outside keep. Anything evicted
+    // reloads from the disk cache the next time it is asked for.
+    fun trim(keep: Set<Int>, inUse: Set<Identifier>) {
+        var evicted = false
+        for ((id, cape) in capes) {
+            if (id in keep) continue
+            capes.remove(id)
+            cape.release()
+            evicted = true
+        }
+        //? if >= 1.21.1 {
+        val released = HashSet<Identifier>()
+        fun <T : Any> MutableMap<Int, T>.evict(textures: (T) -> List<Identifier>) {
+            for ((id, asset) in this) {
+                val owned = textures(asset)
+                if (id in keep || owned.any(inUse::contains)) continue
+                remove(id)
+                released += owned
+                evicted = true
+            }
+        }
+        attachedById.evict { listOf(it.texture) }
+        petsById.evict { listOf(it.texture) }
+        emotesById.evict { emote -> emote.effects.map { it.texture } }
+        // emote textures are named after their pack, so a kept cosmetic may share one
+        attachedById.values.forEach { released -= it.texture }
+        petsById.values.forEach { released -= it.texture }
+        emotesById.values.forEach { emote -> emote.effects.forEach { released -= it.texture } }
+        released.forEach(RemoteTextures::release)
+        //?}
+        // lets open previews notice what they lost
+        if (evicted) installs++
+    }
+
     const val PRELOAD_STEPS_PER_DEFINITION = 2
 
     private const val MAX_PARALLEL_DOWNLOADS = 8
@@ -294,9 +328,11 @@ object CosmeticAssetCache {
         return false
     }
 
-    private fun installOnMain(stamp: Int, install: () -> Unit) {
+    private fun installOnMain(stamp: Int, vararg textures: Identifier, install: () -> Unit) {
         ClientPlatform.runOnMain {
             if (stamp != generation) return@runOnMain
+            // a trim that evicted an older copy of this cosmetic in the meantime also released its texture id
+            if (!textures.all(RemoteTextures::isRegistered)) return@runOnMain
             install()
             installs++
         }
@@ -381,7 +417,7 @@ object CosmeticAssetCache {
         val playerGeometry = playerGeometryOrNull(id, dir) ?: return false
         val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return false
 
-        installOnMain(stamp) {
+        installOnMain(stamp, attached.texture) {
             attachedById[id] = attached
         }
         return true
@@ -395,7 +431,7 @@ object CosmeticAssetCache {
             return false
         }
 
-        installOnMain(stamp) {
+        installOnMain(stamp, *emote.effects.map { it.texture }.toTypedArray()) {
             emotesById[id] = emote
         }
         return true
@@ -410,7 +446,7 @@ object CosmeticAssetCache {
                     LOGGER.warn("Failed to parse pet cosmetic {}", id)
                     return false
                 }
-                installOnMain(stamp) {
+                installOnMain(stamp, parsed.texture) {
                     petsById[id] = parsed
                 }
                 true
