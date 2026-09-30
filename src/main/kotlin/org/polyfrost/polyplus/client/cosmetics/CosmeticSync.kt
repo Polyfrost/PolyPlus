@@ -9,7 +9,6 @@ import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
-import org.polyfrost.oneconfig.api.event.v1.events.ScreenOpenEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
 import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
@@ -63,6 +62,7 @@ object CosmeticSync {
     // gives a closed cosmetics screen's last preview captures time to finish first
     private const val TRIM_DELAY_TICKS = 20
     private var trimCountdown = 0
+    private var configUiWasOpen = false
     //?}
 
     fun earlyInitialize() {
@@ -97,9 +97,12 @@ object CosmeticSync {
         }
 
         //? if >= 1.21.1 {
-        eventHandler<ScreenOpenEvent> { trimCountdown = TRIM_DELAY_TICKS }
         eventHandler<WorldEvent.Unload> { trimCountdown = TRIM_DELAY_TICKS }
         eventHandler<TickEvent.End> {
+            // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
+            val configUiOpen = ClientPlatform.currentScreen() is OneConfigUIScreen
+            if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
+            configUiWasOpen = configUiOpen
             if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
         }
         //?}
