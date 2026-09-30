@@ -275,7 +275,7 @@ object PlayerPreviewRenderer {
         }
         return latestByKey[key]
         //?} elif >= 1.21.5 {
-        /*return runCatching { testPattern(widthPx, heightPx, yawDeg) }.getOrNull()
+        /*return runCatching { testPattern(widthPx, heightPx) }.getOrNull()
         *///?} else {
         /*val w = widthPx.coerceAtMost(LEGACY_MAX_DIM)
         val h = heightPx.coerceAtMost(LEGACY_MAX_DIM)
@@ -1071,12 +1071,17 @@ object PlayerPreviewRenderer {
     //?}
 
     //? if >= 1.21.5 && < 1.21.8 {
-    /*private fun testPattern(w: Int, h: Int, yawDeg: Float): ImageBitmap {
+    /*@Volatile
+    private var testPatternCache: ImageBitmap? = null
+
+    private fun testPattern(w: Int, h: Int): ImageBitmap {
+        testPatternCache?.let { if (it.width == w && it.height == h) return it }
         val bytes = ByteArray(w * h * 4)
         for (i in bytes.indices step 4) {
             bytes[i] = 60; bytes[i + 1] = 40; bytes[i + 2] = 30; bytes[i + 3] = 0xFF.toByte()
         }
         return SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), bytes, w * 4).toComposeImageBitmap()
+            .also { testPatternCache = it }
     }*///?}
 
     //? if >= 1.21.1 && < 1.21.5 {
