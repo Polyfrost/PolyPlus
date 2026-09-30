@@ -382,14 +382,13 @@ object CosmeticAssetCache {
     private fun loadEmote(id: Int, dir: Path) {
         val stamp = generation
         val playerGeometry = playerGeometryOrNull(id, dir) ?: return
-        val parsed = EmoteAssetParser.parse(id, dir, playerGeometry)
-        if (parsed.isEmpty()) {
+        val emote = EmoteAssetParser.parse(id, dir, playerGeometry) ?: run {
             LOGGER.warn("No emotes parsed for cosmetic {}", id)
             return
         }
 
         installOnMain(stamp) {
-            emotesById[id] = parsed.first()
+            emotesById[id] = emote
         }
     }
 
