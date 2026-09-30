@@ -20,7 +20,11 @@ object MainMenuFeaturedServer {
         FeaturedServers.dismissMainMenu(campaign.campaignId)
     }
 
+    // Reused across menu displays so the card keeps its ping results instead of re-pinging every time.
+    private var cachedServerData: ServerData? = null
+
     @JvmStatic
     fun serverData(server: FeaturedServer): ServerData =
-        ServerData(server.name, server.address, ServerData.Type.OTHER)
+        cachedServerData?.takeIf { it.name == server.name && it.ip == server.address }
+            ?: ServerData(server.name, server.address, ServerData.Type.OTHER).also { cachedServerData = it }
 }
