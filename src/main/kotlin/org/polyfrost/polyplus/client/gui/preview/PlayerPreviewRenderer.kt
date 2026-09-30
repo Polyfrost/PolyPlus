@@ -291,7 +291,7 @@ object PlayerPreviewRenderer {
         }
         return latestByKey[key]
         //?} elif >= 1.21.5 {
-        /*return runCatching { testPattern(widthPx, heightPx, yawDeg) }.getOrNull()
+        /*return runCatching { testPattern(widthPx, heightPx) }.getOrNull()
         *///?} else {
         /*val w = widthPx.coerceAtMost(LEGACY_MAX_DIM)
         val h = heightPx.coerceAtMost(LEGACY_MAX_DIM)
@@ -301,15 +301,6 @@ object PlayerPreviewRenderer {
         }
         return latestByKey[key]
         *///?}
-    }
-
-    fun dispose() {
-        //? if >= 1.21.8 {
-        val t = target
-        target = null
-        latestByKey.clear()
-        if (t != null) ClientPlatform.runOnMain { runCatching { t.destroyBuffers() } }
-        //?}
     }
 
     //? if = 1.21.1 || >= 1.21.8 {
@@ -406,7 +397,6 @@ object PlayerPreviewRenderer {
         else LOG.debug("[preview] entity submit failed again ({}); skipping frame", signature)
     }
 
-    private var target: TextureTarget? = null
     //? if >= 26.3 {
     private var passColorView: GpuTextureView? = null
     private var passDepthView: GpuTextureView? = null
@@ -442,23 +432,6 @@ object PlayerPreviewRenderer {
     private fun orthoProjection(w: Int, h: Int): Projection =
         Projection().apply { setupOrtho(-1000f, 1000f, w.toFloat(), h.toFloat(), true) }
     //?}
-
-    private fun ensureTarget(w: Int, h: Int): TextureTarget {
-        val existing = target
-        if (existing != null && existing.width == w && existing.height == h) return existing
-        existing?.destroyBuffers()
-        //? if >= 26.3 {
-        return TextureTarget(
-            "polyplus_player_preview", w, h,
-            GpuFormat.RGBA8_UNORM,
-            GpuFormat.D32_FLOAT,
-        ).also { target = it }
-        //?} elif >= 26.2 {
-        /*return TextureTarget("polyplus_player_preview", w, h, true, GpuFormat.RGBA8_UNORM).also { target = it }
-        *///?} else {
-        /*return TextureTarget("polyplus_player_preview", w, h, true).also { target = it }
-        *///?}
-    }
 
     private fun renderAndReadback(source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
         val fbo = renderSceneIntoTarget(source, yawDeg, pitchDeg, w, h, modelScale, verticalAnchor) ?: return
@@ -1081,6 +1054,41 @@ object PlayerPreviewRenderer {
     //?}
 
     //? if < 1.21.5 || >= 1.21.8 {
+    private const val MAX_TARGETS = 4
+
+    // Previews of different sizes render in the same frame; one shared target would be reallocated on every switch
+    private val targets = LinkedHashMap<Long, TextureTarget>(MAX_TARGETS, 0.75f, true)
+
+    private fun ensureTarget(w: Int, h: Int): TextureTarget {
+        val sizeKey = (w.toLong() shl 32) or h.toLong()
+        targets[sizeKey]?.let { return it }
+        if (targets.size >= MAX_TARGETS) targets.remove(targets.keys.first())?.destroyBuffers()
+        //? if >= 26.3 {
+        val created = TextureTarget(
+            "polyplus_player_preview", w, h,
+            GpuFormat.RGBA8_UNORM,
+            GpuFormat.D32_FLOAT,
+        )
+        //?} elif >= 26.2 {
+        /*val created = TextureTarget("polyplus_player_preview", w, h, true, GpuFormat.RGBA8_UNORM)
+        *///?} elif >= 1.21.8 {
+        /*val created = TextureTarget("polyplus_player_preview", w, h, true)
+        *///?} elif >= 1.21.4 {
+        /*val created = TextureTarget(w, h, true)
+        *///?} else {
+        /*val created = TextureTarget(w, h, true, Minecraft.ON_OSX)
+        *///?}
+        targets[sizeKey] = created
+        return created
+    }
+
+    fun releaseTargets() {
+        ClientPlatform.runOnMain {
+            targets.values.forEach { it.destroyBuffers() }
+            targets.clear()
+        }
+    }
+
     private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override ->
             source.capeCosmeticId?.let {
@@ -1102,34 +1110,26 @@ object PlayerPreviewRenderer {
     //?}
 
     //? if >= 1.21.5 && < 1.21.8 {
-    /*private fun testPattern(w: Int, h: Int, yawDeg: Float): ImageBitmap {
+    /*@Volatile
+    private var testPatternCache: ImageBitmap? = null
+
+    private fun testPattern(w: Int, h: Int): ImageBitmap {
+        testPatternCache?.let { if (it.width == w && it.height == h) return it }
         val bytes = ByteArray(w * h * 4)
         for (i in bytes.indices step 4) {
             bytes[i] = 60; bytes[i + 1] = 40; bytes[i + 2] = 30; bytes[i + 3] = 0xFF.toByte()
         }
         return SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), bytes, w * 4).toComposeImageBitmap()
+            .also { testPatternCache = it }
     }*///?}
 
     //? if >= 1.21.1 && < 1.21.5 {
     /*private val LEGACY_LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val LEGACY_MAX_DIM = 512
     private const val LEGACY_PREVIEW_ENTITY_ID = Int.MIN_VALUE + 1
-    private var legacyTarget: TextureTarget? = null
     //? if < 1.21.4 {
     /*private var legacyDummy: PreviewRemotePlayer? = null
     *///?}
-
-    private fun ensureLegacyTarget(w: Int, h: Int): TextureTarget {
-        val existing = legacyTarget
-        if (existing != null && existing.width == w && existing.height == h) return existing
-        existing?.destroyBuffers()
-        //? if >= 1.21.4 {
-        return TextureTarget(w, h, true).also { legacyTarget = it }
-        //?}
-        //? if < 1.21.4 {
-        /*return TextureTarget(w, h, true, Minecraft.ON_OSX).also { legacyTarget = it }
-        *///?}
-    }
 
     //? if < 1.21.4 {
     /*// Rebuild when the backing level changes (live world <-> standalone preview level) so
@@ -1363,7 +1363,7 @@ object PlayerPreviewRenderer {
         player.xCloakO = 0.0; player.yCloakO = 0.0; player.zCloakO = 0.0
         *///?}
 
-        val fbo = ensureLegacyTarget(w, h)
+        val fbo = ensureTarget(w, h)
         fbo.setClearColor(0f, 0f, 0f, 0f)
         //? if >= 1.21.4 {
         fbo.clear()

@@ -71,14 +71,18 @@ fun PlayerPreview(
     live: Boolean = false,
     bottomFadeFraction: Float = 0f,
 ) {
-    val suppressed = PlayerPreviewSuppression.suppressed
     //? if < 1.21.5 || >= 1.21.8 {
+    val suppressed = PlayerPreviewSuppression.suppressed
     if (live && !suppressed) {
         PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction)
         return
     }
-    //?}
-    PlayerPreviewBitmap(modifier, source, autoSpin && !suppressed, allowDrag, bottomFade, modelScale, verticalAnchor, initialYaw, previewKey)
+    val spin = autoSpin && !suppressed
+    //?} else {
+    /*// The placeholder frame has no orientation, so spinning would only restart the capture every frame
+    val spin = false
+    *///?}
+    PlayerPreviewBitmap(modifier, source, spin, allowDrag, bottomFade, modelScale, verticalAnchor, initialYaw, previewKey)
 }
 
 //? if < 1.21.5 || >= 1.21.8 {
