@@ -1,14 +1,9 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
 //? if >= 1.21.11 {
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
-import io.ktor.http.userAgent
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
@@ -83,17 +78,13 @@ object CustomPanorama {
         )
         *///?}
 
-    private val http by lazy {
-        HttpClient(CIO) {
-            defaultRequest { userAgent("${PolyPlusConstants.NAME}/${PolyPlusConstants.VERSION}") }
-            install(HttpTimeout) {
-                connectTimeoutMillis = 15_000
-                socketTimeoutMillis = 30_000
-            }
-        }
-    }
-
     private val started = AtomicBoolean(false)
+
+    // Spaces out attempts after a failed download, since each one pulls the whole pack into memory again
+    private const val RETRY_DELAY_MS = 5 * 60_000L
+
+    @Volatile
+    private var retryAfterMs = 0L
 
     private val failedPacks = ConcurrentHashMap.newKeySet<String>()
 
@@ -115,6 +106,7 @@ object CustomPanorama {
         if (!PolyPlusMainMenuConfig.customPanorama) return
         if (cubeMapReady) return
         if (pack.cacheKey in failedPacks) return
+        if (System.currentTimeMillis() < retryAfterMs) return
         if (!started.compareAndSet(false, true)) return
 
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
@@ -124,6 +116,7 @@ object CustomPanorama {
                     LOGGER.warn("Not retrying main menu panorama pack {} again this session", pack.cacheKey)
                 }
             } catch (t: Throwable) {
+                retryAfterMs = System.currentTimeMillis() + RETRY_DELAY_MS
                 started.set(false)
                 if (t is CancellationException) throw t
                 LOGGER.warn("Failed to prepare the custom main menu panorama", t)
@@ -176,7 +169,7 @@ object CustomPanorama {
         val dir = cacheDir(pack)
         if (!isUnpacked(dir)) {
             LOGGER.info("Downloading main menu panorama pack {}", pack.cacheKey)
-            val bytes = http.get(pack.url) { timeout { requestTimeoutMillis = 300_000 } }.bodyAsBytes()
+            val bytes = PolyPlusClient.HTTP.get(pack.url) { timeout { requestTimeoutMillis = 300_000 } }.bodyAsBytes()
             val digest = sha1Hex(bytes)
             check(digest == pack.sha1) {
                 "Panorama pack ${pack.cacheKey} checksum mismatch (expected ${pack.sha1}, got $digest)"
@@ -222,8 +215,8 @@ object CustomPanorama {
 
     private fun register(dir: Path): Boolean {
         val loaded = ClientPlatform.runOnMainSync {
+            val textureManager = Minecraft.getInstance().textureManager
             runCatching {
-                val textureManager = Minecraft.getInstance().textureManager
                 textureManager.registerAndLoad(CUBE_MAP_ID, DiskCubeMapTexture(CUBE_MAP_ID, dir))
                 cubeMapReady = true
 
@@ -234,13 +227,15 @@ object CustomPanorama {
                     overlayReady = true
                 }
             }.onFailure {
+                // Cleared before the release, on this thread, so no frame looks the texture up again and re-registers it
+                cubeMapReady = false
+                overlayReady = false
+                textureManager.release(CUBE_MAP_ID)
                 LOGGER.warn("Discarding unusable main menu panorama pack at {}", dir, it)
             }.isSuccess
         }
 
         if (!loaded) {
-            cubeMapReady = false
-            overlayReady = false
             purge(dir)
             started.set(false)
             return false
