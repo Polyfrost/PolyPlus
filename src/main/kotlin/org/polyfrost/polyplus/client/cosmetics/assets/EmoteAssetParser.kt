@@ -19,10 +19,10 @@ import java.nio.file.Path
 internal object EmoteAssetParser {
     private val logger: Logger = LoggerFactory.getLogger("${PolyPlusConstants.ID}/emotes")
 
-    fun parse(cosmeticId: Int, root: Path, playerGeometry: BedrockGeometry): List<Emote> {
+    // Only a bundle's first animation is ever played, so nothing past it gets an Emote or a texture
+    fun parse(cosmeticId: Int, root: Path, playerGeometry: BedrockGeometry): Emote? {
         BedrockPlayerGeometryCache.tryCaptureFrom(root)
 
-        val emotes = mutableListOf<Emote>()
         val animationFiles = DiskAssetReader.walk(root) { path ->
             path.endsWith(".json") &&
                 !path.endsWith(".geo.json") &&
@@ -30,10 +30,10 @@ internal object EmoteAssetParser {
         }
 
         for (asset in animationFiles) {
-            loadAnimationFile(cosmeticId, asset, root, playerGeometry, emotes)
+            loadAnimationFile(cosmeticId, asset, root, playerGeometry)?.let { return it }
         }
 
-        return emotes
+        return null
     }
 
     private fun loadAnimationFile(
@@ -41,26 +41,21 @@ internal object EmoteAssetParser {
         asset: DiskAssetReader.Asset,
         root: Path,
         playerGeometry: BedrockGeometry,
-        target: MutableList<Emote>,
-    ) {
+    ): Emote? =
         try {
             asset.open().use { stream ->
                 val file = BedrockAnimationParser.parseStream(stream)
-                val animationFileId = syntheticId(cosmeticId, asset.relativePath)
-                val effects = loadPairedEffects(root, asset.relativePath, playerGeometry)
-                val rulesByAnimation = loadEmoteRules(root, asset.relativePath)
-
-                for ((animationName, animation) in file.animations) {
-                    val emoteId = resolveEmoteId(cosmeticId, asset.relativePath, animationName)
-                    val rules = rulesByAnimation[animationName] ?: EmoteRules.DEFAULT
-                    target += Emote(emoteId, animation, effects, rules)
-                    logger.debug("Loaded emote {} from cosmetic {}", emoteId, cosmeticId)
-                }
+                val (animationName, animation) = file.animations.entries.firstOrNull() ?: return null
+                val effects = loadPairedEffects(cosmeticId, root, asset.relativePath, playerGeometry)
+                val rules = loadEmoteRules(root, asset.relativePath)[animationName] ?: EmoteRules.DEFAULT
+                val emoteId = resolveEmoteId(cosmeticId, asset.relativePath, animationName)
+                logger.debug("Loaded emote {} from cosmetic {}", emoteId, cosmeticId)
+                Emote(emoteId, animation, effects, rules)
             }
         } catch (ex: Exception) {
             logger.error("Failed to load emote animation {} for cosmetic {}", asset.relativePath, cosmeticId, ex)
+            null
         }
-    }
 
     private fun loadEmoteRules(root: Path, animationRelative: String): Map<String, EmoteRules> {
         val manifestRelative = animationRelative
@@ -78,6 +73,7 @@ internal object EmoteAssetParser {
     }
 
     private fun loadPairedEffects(
+        cosmeticId: Int,
         root: Path,
         animationRelative: String,
         playerGeometry: BedrockGeometry,
@@ -108,7 +104,7 @@ internal object EmoteAssetParser {
 
                 val textureId = Identifier.fromNamespaceAndPath(
                     PolyPlusConstants.ID,
-                    "cosmetics/${pack.name}/texture",
+                    "cosmetics/$cosmeticId/${pack.name}/texture",
                 )
                 listOf(
                     EmoteEffect(
@@ -145,9 +141,6 @@ internal object EmoteAssetParser {
         val path = if (animationName == flatStem) flatStem else animationName
         return cosmeticEmoteId(cosmeticId, path)
     }
-
-    private fun syntheticId(cosmeticId: Int, relative: String): Identifier =
-        Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "cosmetics/$cosmeticId/$relative")
 
     private fun cosmeticEmoteId(cosmeticId: Int, suffix: String): Identifier =
         Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "cosmetics/$cosmeticId/emote/$suffix")
