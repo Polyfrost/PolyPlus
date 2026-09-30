@@ -53,10 +53,12 @@ object GroupsRepository {
         messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
 
     fun refreshGroups() = PolyPlusClient.SCOPE.launch {
+        // Conversations cached after the request started may be missing from its (then stale) response, so they're kept.
+        val cached = messagesByGroup.keys.toSet()
         GroupsApi.list()
             .onSuccess { summaries ->
                 _groups.value = summaries
-                messagesByGroup.keys.retainAll(summaries.mapTo(HashSet()) { it.id })
+                messagesByGroup.keys.removeAll(cached - summaries.mapTo(HashSet()) { it.id })
             }
             .onFailure { LOGGER.error("Failed to refresh groups", it) }
     }
