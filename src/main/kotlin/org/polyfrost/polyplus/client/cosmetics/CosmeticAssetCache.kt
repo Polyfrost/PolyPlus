@@ -318,7 +318,10 @@ object CosmeticAssetCache {
             /*CosmeticType.Pet -> skip("Pets require Minecraft 1.21.1+")*/
             //?}
         }
-        if (!parsed) failedParses[definition.cacheKey()] = definition.hash
+        // a download that died halfway may leave a partial bundle behind, which the next attempt replaces
+        if (!parsed && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
+            failedParses[definition.cacheKey()] = definition.hash
+        }
     }
 
     private fun CosmeticDefinition.failedToParse(): Boolean = failedParses[cacheKey()] == hash
