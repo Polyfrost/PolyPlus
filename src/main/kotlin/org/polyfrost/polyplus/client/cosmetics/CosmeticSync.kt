@@ -128,6 +128,12 @@ object CosmeticSync {
             unsubscribePlayers(removed)
             Unit
         }
+
+        //? if >= 1.21.1 {
+        // pets hold their level, so they must go before it's replaced
+        // reconcileVisiblePlayers respawns them in the new one
+        eventHandler<WorldEvent.Unload> { PetManager.despawnAll() }
+        //?}
     }
 
     fun applyLocalActiveFromCatalog() {
@@ -251,6 +257,10 @@ object CosmeticSync {
     private fun applyActiveToPlayer(uuid: UUID, cosmeticIds: List<Int>) = ClientPlatform.runOnMain {
         val player = findPlayer(uuid)
         if (player == null) {
+            //? if >= 1.21.1 {
+            // a pet stays in the level without its owner, and reconcileVisiblePlayers only sees loaded owners
+            if (CosmeticCatalog.getActiveId(uuid, BodySlot.Pet) == null) PetManager.despawn(uuid)
+            //?}
             LOGGER.debug("Deferred cosmetic apply for {} ({} id(s)) — player not loaded", uuid, cosmeticIds.size)
             return@runOnMain
         }
