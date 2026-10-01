@@ -5,57 +5,34 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-
-//? if < 1.21.5 || >= 1.21.8 {
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import org.polyfrost.oneconfig.internal.ui.LocalOneConfigContentAlpha
-//?}
-
-val LocalPlayerPreviewOpacity = compositionLocalOf { 1f }
-
-object PlayerPreviewSuppression {
-    var suppressed by mutableStateOf(false)
-        private set
-    private var depth = 0
-
-    fun push() {
-        depth++
-        suppressed = true
-    }
-
-    fun pop() {
-        depth--
-        if (depth <= 0) {
-            depth = 0
-            suppressed = false
-        }
-    }
-}
 
 @Composable
 fun PlayerPreview(
@@ -63,7 +40,6 @@ fun PlayerPreview(
     source: PlayerPreviewSource = PlayerPreviewSource.LocalLive,
     autoSpin: Boolean = true,
     allowDrag: Boolean = true,
-    bottomFade: Brush? = null,
     modelScale: Float = 0.5f,
     verticalAnchor: Float = 0.5f,
     initialYaw: Float = 0f,
@@ -71,17 +47,13 @@ fun PlayerPreview(
     live: Boolean = false,
     bottomFadeFraction: Float = 0f,
 ) {
-    val suppressed = PlayerPreviewSuppression.suppressed
-    //? if < 1.21.5 || >= 1.21.8 {
-    if (live && !suppressed) {
+    if (live) {
         PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction)
         return
     }
-    //?}
-    PlayerPreviewBitmap(modifier, source, autoSpin && !suppressed, allowDrag, bottomFade, modelScale, verticalAnchor, initialYaw, previewKey)
+    PlayerPreviewBitmap(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey)
 }
 
-//? if < 1.21.5 || >= 1.21.8 {
 @Composable
 private fun PlayerPreviewLive(
     modifier: Modifier,
@@ -94,14 +66,9 @@ private fun PlayerPreviewLive(
     previewKey: Any,
     bottomFadeFraction: Float,
 ) {
-    val entry = remember { PlayerPreviewOverlay.register() }
-    val overlayOpacity = LocalPlayerPreviewOpacity.current *
-        LocalOneConfigContentAlpha.current
+    val entry = remember { PlayerPreviewOffscreen.register() }
     DisposableEffect(entry) {
-        onDispose {
-            PlayerPreviewOverlay.reportBounds(entry, 0f, 0f, 0f, 0f, visible = false)
-            PlayerPreviewOverlay.unregister(entry.id)
-        }
+        onDispose { PlayerPreviewOffscreen.unregister(entry) }
     }
 
     remember(previewKey, initialYaw) {
@@ -115,11 +82,11 @@ private fun PlayerPreviewLive(
         entry.verticalAnchor = verticalAnchor
         entry.autoSpin = autoSpin
         entry.initialYaw = initialYaw
-        entry.previewKey = previewKey
-        entry.allowDrag = allowDrag
-        entry.bottomFade = bottomFadeFraction
-        entry.opacity = overlayOpacity.coerceIn(0f, 1f)
     }
+
+    val frameNanos by produceState(0L) { while (true) withFrameNanos { value = it } }
+    val edgeFade = remember { edgeFadeBrush() }
+    val bottomFade = remember(bottomFadeFraction) { bottomFadeBrush(bottomFadeFraction) }
 
     val dragModifier: Modifier =
         if (allowDrag) {
@@ -140,21 +107,46 @@ private fun PlayerPreviewLive(
         }
 
     Box(
-        modifier.then(dragModifier).onGloballyPositioned { coords ->
-            var root = coords
-            while (true) { root = root.parentLayoutCoordinates ?: break }
-            val rw = root.size.width.toFloat()
-            val rh = root.size.height.toFloat()
-            val b = coords.boundsInWindow()
-            if (rw > 0f && rh > 0f && b.width > 0f && b.height > 0f) {
-                PlayerPreviewOverlay.reportBounds(entry, b.left / rw, b.top / rh, b.width / rw, b.height / rh, visible = true)
-            } else {
-                PlayerPreviewOverlay.reportBounds(entry, 0f, 0f, 0f, 0f, visible = false)
+        modifier.then(dragModifier)
+            .onGloballyPositioned { coords ->
+                var root = coords
+                while (true) { root = root.parentLayoutCoordinates ?: break }
+                val rw = root.size.width.toFloat()
+                val rh = root.size.height.toFloat()
+                if (rw > 0f && rh > 0f) {
+                    entry.fw = coords.size.width / rw
+                    entry.fh = coords.size.height / rh
+                }
             }
-        },
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawBehind {
+                // reading frameNanos invalidates this draw every frame so the newest offscreen render shows
+                if (frameNanos == 0L) return@drawBehind
+                drawIntoCanvas { PlayerPreviewOffscreen.draw(entry, it.skiaCanvas, size.width, size.height) }
+                drawRect(edgeFade, blendMode = BlendMode.DstIn)
+                bottomFade?.let { drawRect(it, blendMode = BlendMode.DstIn) }
+            },
     )
 }
-//?}
+
+private const val FADE_STOPS = 12
+
+private fun fadeStop(position: Float, t: Float): Pair<Float, Color> =
+    position to Color.White.copy(alpha = PlayerPreviewRenderer.smooth(t))
+
+private fun edgeFadeBrush(): Brush {
+    val edge = PlayerPreviewRenderer.EDGE_FADE_FRACTION
+    val left = (0..FADE_STOPS).map { i -> (i / FADE_STOPS.toFloat()).let { fadeStop(it * edge, it) } }
+    val right = left.asReversed().map { (x, c) -> 1f - x to c }
+    return Brush.horizontalGradient(*(left + right).toTypedArray())
+}
+
+private fun bottomFadeBrush(fraction: Float): Brush? {
+    if (fraction <= 0f) return null
+    val f = fraction.coerceAtMost(1f)
+    val stops = (FADE_STOPS downTo 0).map { i -> (i / FADE_STOPS.toFloat()).let { fadeStop(1f - it * f, it) } }
+    return Brush.verticalGradient(*stops.toTypedArray())
+}
 
 @Composable
 private fun PlayerPreviewBitmap(
@@ -162,7 +154,6 @@ private fun PlayerPreviewBitmap(
     source: PlayerPreviewSource = PlayerPreviewSource.LocalLive,
     autoSpin: Boolean = true,
     allowDrag: Boolean = true,
-    bottomFade: Brush? = null,
     modelScale: Float = 0.5f,
     verticalAnchor: Float = 0.5f,
     initialYaw: Float = 0f,
@@ -173,8 +164,9 @@ private fun PlayerPreviewBitmap(
     var dragging by remember { mutableStateOf(false) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
 
-    androidx.compose.runtime.DisposableEffect(previewKey) {
-        onDispose { PlayerPreviewRenderer.evict(previewKey) }
+    DisposableEffect(previewKey) {
+        PlayerPreviewRenderer.retain(previewKey)
+        onDispose { PlayerPreviewRenderer.release(previewKey) }
     }
 
     LaunchedEffect(autoSpin) {
@@ -225,17 +217,7 @@ private fun PlayerPreviewBitmap(
     ) {
         val bmp = bitmap
         if (bmp != null) {
-            val imageModifier = if (bottomFade != null) {
-                Modifier.fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(bottomFade, blendMode = BlendMode.SrcAtop)
-                    }
-            } else {
-                Modifier.fillMaxSize()
-            }
-            Image(bmp, contentDescription = null, modifier = imageModifier, contentScale = ContentScale.Fit)
+            Image(bmp, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         }
     }
 }

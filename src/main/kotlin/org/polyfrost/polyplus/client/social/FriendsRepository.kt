@@ -54,7 +54,7 @@ object FriendsRepository {
                 else -> {}
             }
             Unit
-        }.register()
+        }
     }
 
     fun refreshAll() {

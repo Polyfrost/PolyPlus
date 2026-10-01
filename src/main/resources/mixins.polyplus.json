@@ -64,7 +64,7 @@
     "client.access.ScreenAccessor",
     //? if > 1.8.9
     "client.access.UserAccessor",
-    //? if <1.21.5
+    //? if <1.21.8
     "client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",

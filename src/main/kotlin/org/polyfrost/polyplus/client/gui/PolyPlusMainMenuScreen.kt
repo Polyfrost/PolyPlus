@@ -34,7 +34,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
@@ -127,7 +126,6 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -146,6 +144,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.Collections
 import java.util.UUID
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
@@ -372,12 +371,18 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 }
 
 private object MainMenuServerPings {
+    private const val REFRESH_AFTER_MILLIS = 5 * 60 * 1000L
     private val pinger = ServerStatusPinger()
-    private val started = Collections.newSetFromMap(ConcurrentHashMap<ServerData, Boolean>())
+    // weak so instances the menu no longer shows (e.g. after quickplay is rebuilt) aren't kept alive
+    // ServerData has no equals/hashCode, so this is keyed by identity
+    private val lastPinged = Collections.synchronizedMap(WeakHashMap<ServerData, Long>())
 
     fun start(scope: CoroutineScope, servers: List<ServerData>) {
+        val now = System.currentTimeMillis()
         servers.forEach { data ->
-            if (started.add(data)) {
+            val last = lastPinged[data]
+            if (last == null || now - last >= REFRESH_AFTER_MILLIS) {
+                lastPinged[data] = now
                 scope.launch(Dispatchers.IO) {
                     val ok = runCatching {
                         //? if >= 1.21.11 {
@@ -389,7 +394,7 @@ private object MainMenuServerPings {
                         /*pinger.add(data)
                         *///?}
                     }.isSuccess
-                    if (!ok) started.remove(data)
+                    if (!ok) lastPinged.remove(data)
                 }
             }
         }
@@ -621,7 +626,6 @@ private const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 private val PageBackground = Color(0xFF11171C)
-private val PreviewGradient = Color(0xFF0F1C33)
 private val PanelBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
 private val ServerIconBackground = Color(0x33FFFFFF)
@@ -870,10 +874,6 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
             PlayerPreview(
                 Modifier.fillMaxWidth().height(previewHeight),
                 source = PlayerPreviewSource.LocalLive,
-                bottomFade = Brush.verticalGradient(
-                    previewFadeStart to PreviewGradient.copy(alpha = 0f),
-                    1f to PreviewGradient.copy(alpha = 0.84f),
-                ),
                 modelScale = previewScale,
                 verticalAnchor = 1.0f,
                 initialYaw = 180f + 22.9f,
@@ -1290,25 +1290,34 @@ private fun AccountPill(name: String) {
                 error = null
                 errorSteps = null
                 busy = "Starting Microsoft sign-in…"
-                val session = runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin() } }
-                    .onFailure {
-                        error = it.message ?: "Couldn't start sign-in"
-                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                // cancellation can discard beginLogin's result or skip finishLogin entirely,
+                // so this job owns the session's server until it ends
+                var started: MicrosoftAuth.MicrosoftLoginSession? = null
+                try {
+                    val session = runSuspendCatching {
+                        withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin().also { started = it } }
                     }
-                    .getOrNull()
-                if (session == null) {
-                    busy = null
-                    loginJob = null
-                    return@launch
+                        .onFailure {
+                            error = it.message ?: "Couldn't start sign-in"
+                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                        }
+                        .getOrNull()
+                    if (session == null) {
+                        busy = null
+                        loginJob = null
+                        return@launch
+                    }
+                    loginSession = session
+                    ClientPlatform.openUri(session.browserAuthUrl)
+                    busy = "Waiting for you to finish signing in…"
+                    runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
+                        .onFailure {
+                            error = it.message ?: "Microsoft sign-in failed"
+                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                        }
+                } finally {
+                    started?.let { runCatching { OneLauncherAccounts.cancelLogin(it) } }
                 }
-                loginSession = session
-                ClientPlatform.openUri(session.browserAuthUrl)
-                busy = "Waiting for you to finish signing in…"
-                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
-                    .onFailure {
-                        error = it.message ?: "Microsoft sign-in failed"
-                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
-                    }
                 loginSession = null
                 loginJob = null
                 reload()
@@ -1414,10 +1423,6 @@ private fun AccountPill(name: String) {
                         popupContentSize: IntSize,
                     ): IntOffset = IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
                 }
-            }
-            DisposableEffect(Unit) {
-                PlayerPreviewSuppression.push()
-                onDispose { PlayerPreviewSuppression.pop() }
             }
             Popup(
                 popupPositionProvider = positionProvider,
@@ -1743,10 +1748,6 @@ private fun MicrosoftLoginPopup(
     status: String?,
     onCancel: () -> Unit,
 ) {
-    DisposableEffect(Unit) {
-        PlayerPreviewSuppression.push()
-        onDispose { PlayerPreviewSuppression.pop() }
-    }
     SocialModalScrim(onCancel) {
         Column(
             modifier = Modifier
@@ -1972,10 +1973,6 @@ private fun NotificationBell() {
             onClick = { expanded = !expanded },
         )
         if (expanded) {
-            DisposableEffect(Unit) {
-                PlayerPreviewSuppression.push()
-                onDispose { PlayerPreviewSuppression.pop() }
-            }
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, bellSize.height + with(LocalDensity.current) { 12.dp.roundToPx() }),

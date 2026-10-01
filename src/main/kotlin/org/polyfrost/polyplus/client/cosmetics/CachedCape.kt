@@ -23,10 +23,13 @@ private val LOGGER = LogManager.getLogger()
 
 class CachedCape(
     private val id: Int,
-    private val sheet: BufferedImage,
+    sheet: BufferedImage,
     private val frames: Int,
     private val millisPerFrame: Long = DEFAULT_MILLIS_PER_FRAME,
 ) {
+    // a static cape is uploaded once, so its decoded copy is dropped after that
+    private var sheet: BufferedImage? = sheet
+    private val width = sheet.width
     private val frameHeight = sheet.height / frames
     //? if > 1.8.9 {
     private var pixels: NativeImage? = null
@@ -41,25 +44,24 @@ class CachedCape(
     val isAnimated: Boolean get() = frames > 1
 
     private fun register() {
-        if (registerFailed) return
+        if (registerFailed || sheet == null) return
         //? if > 1.8.9 {
         var image: NativeImage? = null
         //?}
         runCatching {
             //? if > 1.8.9 {
-            val frame = NativeImage(sheet.width, frameHeight, true).also { image = it }
+            val frame = NativeImage(width, frameHeight, true).also { image = it }
             val dynamic = DynamicTexture(
                 //?if >= 1.21.5 {
                  { "polyplus:cape/$id" },
                 //?}
                 frame,
             )
-            val buffer = IntArray(sheet.width * frameHeight)
             Minecraft.getInstance().textureManager.register(texturePath(), dynamic)
             pixels = frame
-            frameBuffer = buffer
+            if (frames > 1) frameBuffer = IntArray(width * frameHeight)
             //?} else {
-            /*val dynamic = DynamicTexture(sheet.width, frameHeight)
+            /*val dynamic = DynamicTexture(width, frameHeight)
             Minecraft.getInstance().textureManager.register(texturePath(), dynamic)
             *///?}
             texture = dynamic
@@ -111,17 +113,20 @@ class CachedCape(
         //? if > 1.8.9 {
         if (!Minecraft.getInstance().isSameThread) return
         if (frame == shownFrame) return
+        val source = sheet ?: return
         val target = pixels ?: return
         val dynamic = texture ?: return
-        sheet.copyFrameInto(target, capeFrameOffset(frameHeight, frame), frameBuffer)
+        source.copyFrameInto(target, capeFrameOffset(frameHeight, frame), frameBuffer)
         //?} else {
         /*if (!Minecraft.getInstance().isOnSameThread) return
         if (frame == shownFrame) return
+        val source = sheet ?: return
         val dynamic = texture ?: return
-        sheet.getRGB(0, capeFrameOffset(frameHeight, frame), sheet.width, frameHeight, dynamic.pixels, 0, sheet.width)
+        source.getRGB(0, capeFrameOffset(frameHeight, frame), width, frameHeight, dynamic.pixels, 0, width)
         *///?}
         dynamic.upload()
         shownFrame = frame
+        if (frames == 1) sheet = null
     }
 
     private fun texturePath(): Identifier {

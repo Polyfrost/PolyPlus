@@ -170,8 +170,9 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
         connectionStateHandle?.let { handle -> bridge?.removeNotificationHandler(handle) }
         connectionStateHandle = null
         if (socket != null && remote != null) {
-            bridge?.closeConnection(socket, remote)
-            P2PChannelRegistry.unregister(socket, remote)
+            P2PChannelRegistry.unregister(socket, remote, this)
+            // a newer channel for the same peer (e.g. after a quick rejoin) is using this connection now
+            if (P2PChannelRegistry.get(socket, remote) == null) bridge?.closeConnection(socket, remote)
         }
     }
 

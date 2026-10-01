@@ -11,7 +11,6 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 object SocialOverlay {
     private val logger = LogManager.getLogger("polyplus/social-overlay")
-    private var previousScreen: Screen? = null
 
     @Volatile
     private var pendingAutoHostCurrentWorld = false
@@ -48,12 +47,11 @@ object SocialOverlay {
             logger.debug("Ignoring social overlay open: online services are disabled (ToS not accepted)")
             return
         }
-        previousScreen = from
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        mc.gui.setScreen(SocialOverlayScreen())
+        mc.gui.setScreen(SocialOverlayScreen(from))
         //?} else {
-        /*mc.setScreen(SocialOverlayScreen())
+        /*mc.setScreen(SocialOverlayScreen(from))
         *///?}
 
         SocialRefresh.refreshAll()
@@ -63,15 +61,15 @@ object SocialOverlay {
         val mc = Minecraft.getInstance()
         mc.execute {
             //? if >= 26.2 {
-            if (mc.gui.screen() is SocialOverlayScreen) mc.gui.setScreen(previousScreen)
+            (mc.gui.screen() as? SocialOverlayScreen)?.let { mc.gui.setScreen(it.previousScreen) }
             //?} else {
-            /*if (mc.screen is SocialOverlayScreen) mc.setScreen(previousScreen)
+            /*(mc.screen as? SocialOverlayScreen)?.let { mc.setScreen(it.previousScreen) }
             *///?}
         }
     }
 
     //? if = 1.8.9 {
-    /*fun restoreAfterEscape() {
+    /*fun restoreAfterEscape(previousScreen: Screen?) {
         val mc = Minecraft.getInstance()
         if (mc.screen == null || mc.screen is TitleScreen) mc.setScreen(previousScreen)
     }

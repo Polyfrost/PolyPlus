@@ -56,6 +56,8 @@ object CosmeticCatalog {
 
     fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[uuid]
 
+    fun remoteEquippedIds(): Set<Int> = remoteEquipped.values.flatMapTo(HashSet()) { it.values }
+
     fun getParticleColor(uuid: UUID): Int? = particleColors[uuid]
 
     fun setParticleColor(uuid: UUID, color: Int) {

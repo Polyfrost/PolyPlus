@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,7 +47,6 @@ import org.polyfrost.polyplus.client.social.setScreen
 *///?}
 import org.jetbrains.skia.Image
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -93,11 +91,6 @@ internal fun HostWorldFlow(
     onDismiss: () -> Unit,
 ) {
     val state = remember { HostFlowState(hostingCurrent) }
-
-    DisposableEffect(Unit) {
-        PlayerPreviewSuppression.push()
-        onDispose { PlayerPreviewSuppression.pop() }
-    }
 
     LaunchedEffect(Unit) {
         P2PSessionManager.retryLoginNow()

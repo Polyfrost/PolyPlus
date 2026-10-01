@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
@@ -25,7 +26,8 @@ import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 import org.lwjgl.input.Keyboard
 *///?}
 
-class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
+// holding the previous screen here instead of in SocialOverlay lets it go once the overlay is replaced by any screen
+class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
     private val openedAt = System.currentTimeMillis()
 
@@ -49,7 +51,7 @@ class SocialOverlayScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     override fun removed() {
         super.removed()
-        if (escaping) Minecraft.getInstance().tell { SocialOverlay.restoreAfterEscape() }
+        if (escaping) Minecraft.getInstance().tell { SocialOverlay.restoreAfterEscape(previousScreen) }
     }
 
     override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {

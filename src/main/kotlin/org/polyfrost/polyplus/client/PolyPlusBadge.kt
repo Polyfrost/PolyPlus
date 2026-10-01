@@ -72,12 +72,19 @@ object PolyPlusBadge {
     //?}
 
     //? if >= 1.21.1 || = 1.8.9 {
-    // Some servers (e.g. Hypixel SkyBlock) use placeholder profiles with fake
+    // some servers (e.g. Hypixel SkyBlock) use placeholder profiles with fake
     // UUIDs in the visible part of the tab list, so we match against the name
     // as a fallback
     private val NAME_TOKEN = Regex("[A-Za-z0-9_]{3,16}")
 
-    private val proxiedTabUuids = HashMap<UUID, ProxiedTabEntry>()
+    // lobby switches keep the connection, so this is capped rather than relying on the disconnect clear
+    // entries still rendered are refreshed every frame, so only profiles that left the tab list are evicted
+    private val proxiedTabUuids = object : LinkedHashMap<UUID, ProxiedTabEntry>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<UUID, ProxiedTabEntry>) = size > MAX_PROXIED_TAB_ENTRIES
+    }
+
+    // comfortably above the 80 entries the tab list can show at once
+    private const val MAX_PROXIED_TAB_ENTRIES = 256
 
     private class ProxiedTabEntry(val displayName: String, val resolved: UUID?)
 
