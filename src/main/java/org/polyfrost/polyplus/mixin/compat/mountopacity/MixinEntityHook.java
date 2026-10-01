@@ -25,4 +25,21 @@ public class MixinEntityHook {
     private static LocalPlayer polyplus$livePlayer(LocalPlayer cached) {
         return Minecraft.getInstance().player;
     }
+
+    // the static field would otherwise pin the first player, and with it that player's level, for the whole session
+    // its value is never used, since every read of it is replaced above
+    @ModifyExpressionValue(
+            method = "<clinit>",
+            at = @At(
+                    value = "FIELD",
+                    target = "Lnet/minecraft/client/Minecraft;player:Lnet/minecraft/client/player/LocalPlayer;",
+                    opcode = Opcodes.GETFIELD
+            ),
+            remap = true,
+            require = 0,
+            expect = 0
+    )
+    private static LocalPlayer polyplus$dropCapturedPlayer(LocalPlayer player) {
+        return null;
+    }
 }
