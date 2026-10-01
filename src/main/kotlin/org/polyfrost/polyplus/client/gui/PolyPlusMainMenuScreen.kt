@@ -49,19 +49,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
@@ -73,11 +68,13 @@ import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -111,7 +108,6 @@ import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
@@ -153,7 +149,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
-import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -659,12 +654,11 @@ internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI
 
 internal const val GUI_DENSITY_TRIM = 0.88f
 
-private fun Modifier.guiScaled(factor: Float, origin: TransformOrigin): Modifier =
-    graphicsLayer {
-        scaleX = factor
-        scaleY = factor
-        transformOrigin = origin
-    }
+@Composable
+internal fun scaledDensity(scale: Float): Density {
+    val density = LocalDensity.current
+    return remember(density, scale) { Density(density.density * scale, density.fontScale) }
+}
 
 @Composable
 private fun MainMenu(
@@ -678,24 +672,18 @@ private fun MainMenu(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
             val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
-            CompositionLocalProvider(
-                LocalUiOversample provides (LocalUiOversample.current * scale.coerceAtLeast(1f)),
-            ) {
-                val density = LocalDensity.current
+            val unscaled = { dp: Float -> (dp / scale).dp }
+            CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
                 var rightColumnHeightPx by remember { mutableStateOf(0) }
-                val rightColumnHeightDp = rightColumnHeightPx / density.density
-                val columnBottomPadding = ((BASE_HEIGHT - rightColumnHeightDp) / 2f).coerceAtLeast(0f)
+                val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
+                val columnBottomPadding = ((BASE_HEIGHT.dp - rightColumnHeight) / 2).coerceAtLeast(0.dp)
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        },
+                        .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
                 ) {
                     CenterColumn(
-                        Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding.dp),
+                        Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding),
                         actions,
                     )
                 }
@@ -703,8 +691,7 @@ private fun MainMenu(
                     LeftColumn(
                         Modifier
                             .align(Alignment.CenterStart)
-                            .padding(start = 50.dp)
-                            .guiScaled(scale, TransformOrigin(0f, 0.5f)),
+                            .padding(start = unscaled(50f)),
                         quickplay,
                         pingTick,
                         actions,
@@ -713,33 +700,30 @@ private fun MainMenu(
                 RightColumn(
                     Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 50.dp)
-                        .guiScaled(scale, TransformOrigin(1f, 0.5f))
+                        .padding(end = unscaled(50f))
                         .onSizeChanged { rightColumnHeightPx = it.height },
                     screen,
                 )
                 WindowControls(
-                    Modifier.align(Alignment.TopEnd).padding(16.dp).guiScaled(scale, TransformOrigin(1f, 0f)),
+                    Modifier.align(Alignment.TopEnd).padding(unscaled(16f)),
                     actions,
                 )
                 if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
                     ModIntegrationBar(
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 18.dp)
-                            .guiScaled(scale, TransformOrigin(0.5f, 1f)),
+                            .padding(bottom = unscaled(18f)),
                         screen,
                     )
                 }
                 FeaturedServerCard(
                     Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 50.dp, top = 50.dp)
-                        .guiScaled(scale, TransformOrigin(0f, 0f)),
+                        .padding(start = unscaled(50f), top = unscaled(50f)),
                     pingTick,
                     actions,
                 )
-                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), scale)
+                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), unscaled)
             }
         }
     }
@@ -1127,13 +1111,12 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Footer(modifier: Modifier, guiScale: Float) {
+private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
     Box(modifier) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 24.dp, bottom = 18.dp)
-                .guiScaled(guiScale, TransformOrigin(0f, 1f)),
+                .padding(start = unscaled(24f), bottom = unscaled(18f)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1146,8 +1129,7 @@ private fun Footer(modifier: Modifier, guiScale: Float) {
             color = SocialTextSecondary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 24.dp, bottom = 18.dp)
-                .guiScaled(guiScale, TransformOrigin(1f, 1f)),
+                .padding(end = unscaled(24f), bottom = unscaled(18f)),
             textAlign = TextAlign.Center,
         )
     }
@@ -1276,7 +1258,6 @@ private fun AccountPill(name: String) {
     var loginSession by remember { mutableStateOf<MicrosoftAuth.MicrosoftLoginSession?>(null) }
     var loginJob by remember { mutableStateOf<Job?>(null) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
-    var pillBounds by remember { mutableStateOf(Rect.Zero) }
 
     suspend fun reload() {
         accounts = withContext(Dispatchers.IO) { OneLauncherAccounts.list() }
@@ -1395,8 +1376,7 @@ private fun AccountPill(name: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .onSizeChanged { pillSize = it }
-            .onGloballyPositioned { pillBounds = it.boundsInWindow() },
+            .onSizeChanged { pillSize = it },
     ) {
         Box(
             modifier = Modifier
@@ -1424,21 +1404,15 @@ private fun AccountPill(name: String) {
             )
         }
         if (open) {
-            val totalScale = if (pillSize.width > 0) pillBounds.width / pillSize.width else 1f
-            val positionProvider = remember(pillBounds, totalScale) {
+            val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
+            val positionProvider = remember(gap) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect,
                         windowSize: IntSize,
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
-                    ): IntOffset {
-                        val gap = (8f * totalScale).roundToInt()
-                        return IntOffset(
-                            (pillBounds.right - popupContentSize.width).roundToInt(),
-                            (pillBounds.bottom + gap).roundToInt(),
-                        )
-                    }
+                    ): IntOffset = IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
                 }
             }
             DisposableEffect(Unit) {
@@ -1452,7 +1426,6 @@ private fun AccountPill(name: String) {
             ) {
                 AccountSwitcherPanel(
                     panelWidth = with(LocalDensity.current) { pillSize.width.toDp() },
-                    scale = totalScale,
                     accounts = accounts,
                     busy = busy,
                     error = error,
@@ -1483,7 +1456,6 @@ private fun AccountPill(name: String) {
 @Composable
 private fun AccountSwitcherPanel(
     panelWidth: Dp,
-    scale: Float,
     accounts: List<OneLauncherAccounts.Account>?,
     busy: String?,
     error: String?,
@@ -1502,11 +1474,6 @@ private fun AccountSwitcherPanel(
     Column(
         modifier = Modifier
             .width(panelWidth)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(1f, 0f)
-            }
             .clip(PanelShape)
             .background(PageBackground.copy(alpha = 0.96f))
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
@@ -1679,14 +1646,16 @@ private fun AccountRow(
             }
             AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
         } else {
+            if (hovered) {
+                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
+            }
             if (account.active) {
-                Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
+                Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                    Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
+                }
             }
             if (account.expired) {
                 AccountActionIcon(ASSETS + "refresh-cw-01.svg", SocialWarnColor, enabled, onRefresh)
-            }
-            if (hovered) {
-                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
             }
         }
     }
@@ -1937,13 +1906,9 @@ private fun IconButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
-    var buttonBounds by remember { mutableStateOf(Rect.Zero) }
     Box(
         modifier = modifier
             .size(45.dp)
-            .onSizeChanged { buttonSize = it }
-            .onGloballyPositioned { buttonBounds = it.boundsInWindow() }
             .clip(PanelShape)
             .background(background)
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
@@ -1952,41 +1917,30 @@ private fun IconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-        if (tooltip != null && hovered && buttonSize.width > 0) {
-            val totalScale = buttonBounds.width / buttonSize.width
-            val positionProvider = remember(buttonBounds, totalScale, tooltipPlacement) {
+        if (tooltip != null && hovered) {
+            val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
+            val positionProvider = remember(gap, tooltipPlacement) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect,
                         windowSize: IntSize,
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
-                    ): IntOffset {
-                        val gap = 8f * totalScale
-                        return when (tooltipPlacement) {
-                            TooltipPlacement.BELOW_END -> IntOffset(
-                                (buttonBounds.right - popupContentSize.width).roundToInt(),
-                                (buttonBounds.bottom + gap).roundToInt(),
-                            )
-                            TooltipPlacement.ABOVE_CENTER -> IntOffset(
-                                (buttonBounds.center.x - popupContentSize.width * totalScale / 2f).roundToInt(),
-                                (buttonBounds.top - gap - popupContentSize.height * totalScale).roundToInt(),
-                            )
-                        }
+                    ): IntOffset = when (tooltipPlacement) {
+                        TooltipPlacement.BELOW_END ->
+                            IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
+                        TooltipPlacement.ABOVE_CENTER -> IntOffset(
+                            anchorBounds.center.x - popupContentSize.width / 2,
+                            anchorBounds.top - gap - popupContentSize.height,
+                        )
                     }
                 }
-            }
-            val origin = when (tooltipPlacement) {
-                TooltipPlacement.BELOW_END -> TransformOrigin(1f, 0f)
-                TooltipPlacement.ABOVE_CENTER -> TransformOrigin(0f, 0f)
             }
             Popup(
                 popupPositionProvider = positionProvider,
                 properties = PopupProperties(focusable = false, clippingEnabled = false),
             ) {
-                Box(Modifier.guiScaled(totalScale, origin)) {
-                    TooltipBubble(tooltip)
-                }
+                TooltipBubble(tooltip)
             }
         }
     }
@@ -2024,7 +1978,7 @@ private fun NotificationBell() {
             }
             Popup(
                 alignment = Alignment.TopEnd,
-                offset = IntOffset(0, bellSize.height + 12),
+                offset = IntOffset(0, bellSize.height + with(LocalDensity.current) { 12.dp.roundToPx() }),
                 onDismissRequest = { expanded = false },
                 properties = PopupProperties(focusable = true),
             ) {
