@@ -11,6 +11,7 @@ import io.netty.channel.DefaultEventLoop
 *///?}
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
@@ -62,6 +63,32 @@ class EosP2PAcceptTest {
 
             assertArrayEquals(byteArrayOf(1, 2, 3), received.get(5, TimeUnit.SECONDS))
             child.close().sync()
+        } finally {
+            loop.shutdownGracefully(0, 0, TimeUnit.SECONDS)
+            EosP2PChannel.Holder.bridge = null
+            bridge.shutdown()
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    fun `a replaced channel closing late leaves its peer routed to the new one`() {
+        val rejoinSocket = EosP2PSocketId("polyplus-rejoin")
+        val bridge = EosSdkBridge()
+        EosP2PChannel.Holder.bridge = bridge
+        val loop = eventLoop()
+        try {
+            val server = EosP2PServerChannel()
+            val stale = EosP2PChannel(server).apply { setupAccepted(rejoinSocket, peer) }
+            loop.register(stale).sync()
+            val rejoined = EosP2PChannel(server).apply { setupAccepted(rejoinSocket, peer) }
+            loop.register(rejoined).sync()
+
+            stale.close().sync()
+            assertSame(rejoined, P2PChannelRegistry.get(rejoinSocket, peer), "the stale channel unregistered its replacement")
+
+            rejoined.close().sync()
+            assertNull(P2PChannelRegistry.get(rejoinSocket, peer), "the last channel for the peer stayed registered")
         } finally {
             loop.shutdownGracefully(0, 0, TimeUnit.SECONDS)
             EosP2PChannel.Holder.bridge = null

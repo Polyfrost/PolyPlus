@@ -13,8 +13,8 @@ internal object P2PChannelRegistry {
         channels[Key(socket, remote)] = channel
     }
 
-    fun unregister(socket: EosP2PSocketId, remote: EosProductUserId) {
-        channels.remove(Key(socket, remote))
+    fun unregister(socket: EosP2PSocketId, remote: EosProductUserId, channel: EosP2PChannel) {
+        channels.remove(Key(socket, remote), channel)
     }
 
     fun get(socket: EosP2PSocketId, remote: EosProductUserId): EosP2PChannel? = channels[Key(socket, remote)]

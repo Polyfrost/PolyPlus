@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 //? if >= 26.2 {
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOverlay;
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen;
 //?}
 
 @Mixin(value = Minecraft.class, priority = 1500)
@@ -38,11 +38,11 @@ public class MixinMinecraft {
             *///?}
         )
     )
-    private void polyplus$renderPreviewOverlay(CallbackInfo ci) {
+    private void polyplus$renderPlayerPreviews(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
         RenderTarget rt = mc.gameRenderer.mainRenderTarget();
-        if (rt != null) PlayerPreviewOverlay.renderAll(rt);
+        if (rt != null) PlayerPreviewOffscreen.renderAll(rt);
     }
     //?}
 }

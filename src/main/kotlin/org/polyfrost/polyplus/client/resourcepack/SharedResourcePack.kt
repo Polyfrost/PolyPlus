@@ -3,7 +3,9 @@ package org.polyfrost.polyplus.client.resourcepack
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.io.File
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.zip.ZipEntry
@@ -53,22 +55,24 @@ object SharedResourcePack {
                 continue
             }
 
-            val bytes = if (entry.isFile) entry.readBytes() else zipDirectory(entry)
+            // measured before reading so an oversized pack is never loaded
+            // a folder is zipped into a byte counter first
+            val size = if (entry.isFile) entry.length() else zipDirectory(entry, DataOutputStream(OutputStream.nullOutputStream())).size().toLong()
 
-            if (bytes.isEmpty()) {
+            if (size == 0L) {
                 LOGGER.warn("'{}' is empty - skipping it", fileName)
                 continue
             }
-            if (bytes.size > MAX_PACK_BYTES) {
+            if (size > MAX_PACK_BYTES) {
                 LOGGER.warn(
                     "'{}' is {}, over the {} per-pack limit - skipping it",
                     fileName,
-                    humanSize(bytes.size.toLong()),
+                    humanSize(size),
                     humanSize(MAX_PACK_BYTES),
                 )
                 continue
             }
-            if (totalBytes + bytes.size > MAX_TOTAL_BYTES) {
+            if (totalBytes + size > MAX_TOTAL_BYTES) {
                 LOGGER.warn(
                     "Reached the {} total sharing limit - not sharing '{}' or anything above it in the stack",
                     humanSize(MAX_TOTAL_BYTES),
@@ -77,6 +81,7 @@ object SharedResourcePack {
                 break
             }
 
+            val bytes = if (entry.isFile) entry.readBytes() else zipDirectory(entry, ByteArrayOutputStream()).toByteArray()
             val sha1 = MessageDigest.getInstance("SHA-1").digest(bytes)
             prepared += Prepared(fileName, bytes, sha1, sha1.toHex())
             totalBytes += bytes.size
@@ -88,22 +93,19 @@ object SharedResourcePack {
         prepared
     }.onFailure { LOGGER.warn("Couldn't prepare resource packs to share", it) }
 
-    private fun zipDirectory(dir: File): ByteArray {
-        val entries = LinkedHashMap<String, ByteArray>()
-        dir.walkTopDown().filter { it.isFile }.forEach { file ->
-            entries[file.relativeTo(dir).path.replace(File.separatorChar, '/')] = file.readBytes()
-        }
+    private fun <T : OutputStream> zipDirectory(dir: File, out: T): T {
+        val files = dir.walkTopDown().filter { it.isFile }
+            .associateBy { it.relativeTo(dir).path.replace(File.separatorChar, '/') }
+            .toSortedMap()
 
-        val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
-            entries.keys.sorted().forEach { path ->
+            files.forEach { (path, file) ->
                 zip.putNextEntry(ZipEntry(path).apply { time = STABLE_ENTRY_TIME })
-                zip.write(entries.getValue(path))
+                file.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()
             }
         }
-        LOGGER.info("Zipped {} file(s) from folder pack '{}'", entries.size, dir.name)
-        return out.toByteArray()
+        return out
     }
 
     fun humanSize(bytes: Long): String = when {
