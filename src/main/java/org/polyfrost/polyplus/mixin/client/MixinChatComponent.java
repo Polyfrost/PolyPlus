@@ -76,13 +76,18 @@ import net.minecraft.text.Text;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 @Mixin(ChatGui.class)
 public class MixinChatComponent {
-    @ModifyVariable(method = "addMessage(Lnet/minecraft/text/Text;I)V", at = @At("HEAD"), argsOnly = true, ordinal = 0)
-    private Text polyplus$emojiMessage(Text original) {
-        return EmojiRegistry.transformLegacy(original);
+    // emoji are applied to the display lines only, so the stored message stays comparable for chat compacting mods
+    @ModifyArg(
+        method = "addMessage(Lnet/minecraft/text/Text;IIZ)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/TextRenderUtils;wrapText(Lnet/minecraft/text/Text;ILnet/minecraft/client/render/TextRenderer;ZZ)Ljava/util/List;"),
+        index = 0
+    )
+    private Text emojiLines(Text text) {
+        return EmojiRegistry.transformLegacy(text);
     }
 }
 *///?}

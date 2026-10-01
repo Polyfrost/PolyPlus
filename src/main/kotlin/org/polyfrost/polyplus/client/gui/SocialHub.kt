@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -126,11 +125,7 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
         friendBaseline = currentIds
     }
 
-    val baseDensity = LocalDensity.current
-    val scaledDensity = remember(baseDensity) {
-        Density(density = baseDensity.density * SOCIAL_UI_SCALE, fontScale = baseDensity.fontScale)
-    }
-    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+    CompositionLocalProvider(LocalDensity provides scaledDensity(SOCIAL_UI_SCALE)) {
     Box(
         modifier = Modifier
             .fillMaxSize()
