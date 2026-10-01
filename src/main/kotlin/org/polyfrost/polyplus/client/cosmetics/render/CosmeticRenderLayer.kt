@@ -183,7 +183,7 @@ class CosmeticRenderLayer(private val renderer: PlayerRenderer) : EntityRenderLa
     override fun colorsWhenDamaged(): Boolean = true
 
     private fun hiddenSlotsFor(player: ClientPlayerEntity): Set<BodySlot> {
-        val hidden = mutableSetOf<BodySlot>()
+        val hidden = BodySlot.entries.filterNotTo(mutableSetOf()) { PolyPlusCosmeticsConfig.isVisible(it, player.uuid) }
         if (PolyPlusCosmeticsConfig.hideHeadCosmeticsWithHelmet && player.getArmor(HEAD) != null) {
             hidden += BodySlot.Hat
         }

@@ -1508,6 +1508,7 @@ import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.render.VertexConsumer
 import org.polyfrost.polyplus.client.utils.rotateBy
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -1628,7 +1629,6 @@ object PlayerPreviewRenderer {
         var a = 1f
         if (fadeEdges) {
             a *= smooth(minOf(tx, 1f - tx) / EDGE_FADE_FRACTION)
-            a *= smooth(ty / EDGE_FADE_FRACTION)
         }
         if (bottomFade > 0f) a *= smooth((1f - ty) / bottomFade)
         return a
@@ -1843,7 +1843,7 @@ object PlayerPreviewRenderer {
                 equipment.equip(attached)
             } else if (loadAttempted.add(id)) {
                 PolyPlusClient.SCOPE.launch {
-                    runCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
+                    runSuspendCatching { CosmeticAssetCache.ensureCosmeticLoaded(id) }
                 }
             }
         }
