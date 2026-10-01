@@ -1606,14 +1606,16 @@ private fun AccountRow(
             }
             AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
         } else {
+            if (hovered) {
+                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
+            }
             if (account.active) {
-                Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
+                Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                    Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
+                }
             }
             if (account.expired) {
                 AccountActionIcon(ASSETS + "refresh-cw-01.svg", SocialWarnColor, enabled, onRefresh)
-            }
-            if (hovered) {
-                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
             }
         }
     }
