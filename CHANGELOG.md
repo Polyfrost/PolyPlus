@@ -1,3 +1,2 @@
-## 1.2.43
-- Fix wWaypoints FPS issue whilst we wait for 0.8.1
-- Replace animatium references with OverflowAnimations
+## Unreleased changes
+- Fixed the main menu failing to load when a singleplayer world is corrupted

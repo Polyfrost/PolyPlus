@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.server.MinecraftServer
 import net.minecraft.util.HttpUtil
 import net.minecraft.world.level.GameType
+import net.minecraft.world.level.storage.LevelSummary
 import org.apache.logging.log4j.LogManager
 import java.nio.file.Files
 import java.nio.file.Path
@@ -75,7 +76,8 @@ object HostWorldManager {
 
         summaries
             .asSequence()
-            .filterNot { it.isDisabled }
+            // placeholders for corrupted/symlinked worlds aren't disabled but have no settings or version to read
+            .filterNot { it.isDisabled || it is LevelSummary.CorruptedLevelSummary || it is LevelSummary.SymlinkLevelSummary }
             .map { summary ->
                 val compat = when {
                     !summary.isCompatible -> Compat.INCOMPATIBLE
