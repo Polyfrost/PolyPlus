@@ -185,6 +185,7 @@ object OnboardingFeatures {
     fun initialize() {
         eventHandler { _: TickEvent.End ->
             if (!PolyPlusConfig.animatiumItemPositionReset) resetAnimatiumItemPosition()
+            if (!PolyPlusConfig.itemPhysicDefaultApplied) disableItemPhysicByDefault()
             if (!PolyPlusConfig.onboardingCompleted) return@eventHandler
             var changed = false
             if (!PolyPlusConfig.onboardingFeaturesApplied) {
@@ -713,6 +714,21 @@ object OnboardingFeatures {
         PolyPlusConfig.save()
     }
 
+    private fun disableItemPhysicByDefault() {
+        if (!PolyPlusConfig.onboardingCompleted) {
+            runCatching {
+                val toggled = Class.forName(ITEM_PHYSIC_CONFIG).getField("toggled").get(null)
+                toggled.javaClass.getMethod("set", Any::class.java).invoke(toggled, false) // OSL saves it on shutdown
+            }.onFailure {
+                if (it !is ClassNotFoundException) {
+                    logModApplyFailure("item-physic-default", "Could not disable ItemPhysicLite by default", it)
+                }
+            }
+        }
+        PolyPlusConfig.itemPhysicDefaultApplied = true
+        PolyPlusConfig.save()
+    }
+
     internal fun setBoolean(instance: Any, method: String, value: Boolean) {
         val fn = runCatching { instance.javaClass.getMethod(method, Boolean::class.javaPrimitiveType) }.getOrNull()
         if (fn == null) {
@@ -819,6 +835,7 @@ object OnboardingFeatures {
     const val DYNAMIC_LIGHTS_OFF = 0
     const val DYNAMIC_LIGHTS_FANCY = 3
 
+    private const val ITEM_PHYSIC_CONFIG = "xyz.tryfle.oitemphysic.config.OSLConfig"
     private const val OVERFLOW_ANIMATIONS_CONFIG = "org.polyfrost.overflowanimations.config.OverflowAnimationsConfig"
     private val ITEM_DEFAULTS = listOf("X", "Y", "Z").flatMap {
         listOf("itemOffset$it" to 0f, "itemScale$it" to 1f, "itemRotation$it" to 0f)

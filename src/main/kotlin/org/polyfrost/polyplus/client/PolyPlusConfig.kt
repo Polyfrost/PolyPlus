@@ -55,6 +55,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var animatiumItemPositionReset = false
 
     @JvmStatic @Include
+    var itemPhysicDefaultApplied = false
+
+    @JvmStatic @Include
     var jvmAdviceShownAt = 0L
 
     @JvmStatic
