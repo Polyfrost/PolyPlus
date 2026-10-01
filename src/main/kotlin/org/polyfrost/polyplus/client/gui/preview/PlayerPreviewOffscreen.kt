@@ -62,9 +62,14 @@ object PlayerPreviewOffscreen {
     }
 
     @JvmStatic
-    fun renderAll(main: RenderTarget) {
+    fun disposeReleased() {
         released.forEach { it.dispose() }
         released.clear()
+    }
+
+    @JvmStatic
+    fun renderAll(main: RenderTarget) {
+        disposeReleased()
         if (entries.isEmpty() || !SkiaCtx.isReady) return
         if (java.lang.Boolean.getBoolean("pp.preview.off")) return
         val composeScreen = ClientPlatform.currentScreen() is ComposeScreen
