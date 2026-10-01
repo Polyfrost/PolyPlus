@@ -47,6 +47,8 @@ internal object RemoteTextures {
         return candidates.firstOrNull { Files.isRegularFile(it) }
     }
 
+    fun isRegistered(textureId: Identifier): Boolean = textureId in registered
+
     fun releaseAll() {
         ClientPlatform.runOnMainSync {
             val client = Minecraft.getInstance()
@@ -57,7 +59,7 @@ internal object RemoteTextures {
         }
     }
 
-    private fun release(textureId: Identifier) {
+    fun release(textureId: Identifier) {
         if (!registered.containsKey(textureId)) {
             return
         }

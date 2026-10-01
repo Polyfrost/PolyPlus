@@ -5,19 +5,23 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket
+import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
+import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.pets.PetEntity
 import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.Batcher
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -53,6 +57,12 @@ object CosmeticSync {
     private var resubscribeTicks = 0
 
     private val loading: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    private val pendingEmotes = ConcurrentHashMap<Int, Int>()
+
+    // gives a closed cosmetics screen's last preview captures time to finish first
+    private const val TRIM_DELAY_TICKS = 20
+    private var trimCountdown = 0
+    private var configUiWasOpen = false
     //?}
 
     fun earlyInitialize() {
@@ -85,6 +95,17 @@ object CosmeticSync {
             PetManager.despawnAll()
             //?}
         }
+
+        //? if >= 1.21.1 {
+        eventHandler<WorldEvent.Unload> { trimCountdown = TRIM_DELAY_TICKS }
+        eventHandler<TickEvent.End> {
+            // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
+            val configUiOpen = ClientPlatform.currentScreen() is OneConfigUIScreen
+            if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
+            configUiWasOpen = configUiOpen
+            if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
+        }
+        //?}
 
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -235,11 +256,16 @@ object CosmeticSync {
     }
 
     //? if >= 1.21.1 {
-    private fun handleEmotePlay(playerUuid: String, emoteId: Int) {
-        val uuid = UUID.fromString(playerUuid)
+    private fun handleEmotePlay(playerUuid: String, emoteId: Int) = playEmoteWhenLoaded(UUID.fromString(playerUuid), emoteId)
+
+    private fun playEmoteWhenLoaded(uuid: UUID, emoteId: Int) {
+        // keeps a trim from evicting the emote between its install and this playback
+        pendingEmotes.merge(emoteId, 1, Int::plus)
         PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureEmoteLoaded(emoteId)) return@launch
+            val loaded = CosmeticAssetCache.ensureEmoteLoaded(emoteId)
             ClientPlatform.runOnMain {
+                pendingEmotes.computeIfPresent(emoteId) { _, count -> (count - 1).takeIf { it > 0 } }
+                if (!loaded) return@runOnMain
                 val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@runOnMain
                 val player = findPlayer(uuid) ?: return@runOnMain
                 (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
@@ -359,17 +385,26 @@ object CosmeticSync {
         }
     }
 
-    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) {
-        val uuid = player.uuid
-        PolyPlusClient.SCOPE.launch {
-            if (!CosmeticAssetCache.ensureEmoteLoaded(cosmeticId)) return@launch
-            ClientPlatform.runOnMain {
-                val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@runOnMain
-                val player = findPlayer(uuid) ?: return@runOnMain
-                (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
+    private fun trimAssets() {
+        // the cosmetics screen can preview anything in the catalog - closing it calls trim again
+        if (ClientPlatform.currentScreen() is OneConfigUIScreen) return
+        val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
+            CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
+        val inUse = HashSet<Identifier>()
+        Minecraft.getInstance().level?.entitiesForRendering()?.forEach { entity ->
+            when (entity) {
+                is AbstractClientPlayer -> {
+                    (entity as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped().mapTo(inUse) { it.cosmetic.texture }
+                    (entity as PlayerEmotesAccess).`polyplus$emoteController`().playbackSnapshot()
+                        ?.emote?.effects?.mapTo(inUse) { it.texture }
+                }
+                is PetEntity -> entity.definition?.let { inUse += it.texture }
             }
         }
+        CosmeticAssetCache.trim(keep, inUse)
     }
+
+    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) = playEmoteWhenLoaded(player.uuid, cosmeticId)
     //?}
 
     private fun processPlayerInfoAction(
