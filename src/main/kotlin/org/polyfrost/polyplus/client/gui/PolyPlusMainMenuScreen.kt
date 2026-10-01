@@ -134,6 +134,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.Collections
 import java.util.UUID
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
@@ -328,12 +329,18 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 }
 
 private object MainMenuServerPings {
+    private const val REFRESH_AFTER_MILLIS = 5 * 60 * 1000L
     private val pinger = ServerStatusPinger()
-    private val started = Collections.newSetFromMap(ConcurrentHashMap<ServerData, Boolean>())
+    // weak so instances the menu no longer shows (e.g. after quickplay is rebuilt) aren't kept alive
+    // ServerData has no equals/hashCode, so this is keyed by identity
+    private val lastPinged = Collections.synchronizedMap(WeakHashMap<ServerData, Long>())
 
     fun start(scope: CoroutineScope, servers: List<ServerData>) {
+        val now = System.currentTimeMillis()
         servers.forEach { data ->
-            if (started.add(data)) {
+            val last = lastPinged[data]
+            if (last == null || now - last >= REFRESH_AFTER_MILLIS) {
+                lastPinged[data] = now
                 scope.launch(Dispatchers.IO) {
                     val ok = runCatching {
                         //? if >= 1.21.11 {
@@ -343,7 +350,7 @@ private object MainMenuServerPings {
                         /*pinger.pingServer(data, Runnable {}, Runnable {})
                         *///?}
                     }.isSuccess
-                    if (!ok) started.remove(data)
+                    if (!ok) lastPinged.remove(data)
                 }
             }
         }
