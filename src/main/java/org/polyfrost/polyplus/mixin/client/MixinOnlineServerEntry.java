@@ -4,12 +4,14 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.network.chat.Component;
+import org.polyfrost.polyplus.client.featured.FeaturedServerEntryAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
 import org.polyfrost.polyplus.client.featured.FeaturedServerVanillaRenderer;
 import org.polyfrost.polyplus.client.featured.FeaturedServers;
 import org.polyfrost.polyplus.mixin.client.access.AbstractSelectionListAccessor;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -30,7 +32,19 @@ import net.minecraft.client.input.MouseButtonEvent;
 *///?}
 
 @Mixin(ServerSelectionList.OnlineServerEntry.class)
-public abstract class MixinOnlineServerEntry {
+public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAccess {
+    @Unique private FeaturedServerRowRegistry.Row polyplus$row;
+
+    @Override
+    public FeaturedServerRowRegistry.Row polyplus$featuredRow() {
+        return polyplus$row;
+    }
+
+    @Override
+    public void polyplus$setFeaturedRow(FeaturedServerRowRegistry.Row row) {
+        polyplus$row = row;
+    }
+
     //? if < 1.21.10 {
     /*@Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void polyplus$beforeRender(
