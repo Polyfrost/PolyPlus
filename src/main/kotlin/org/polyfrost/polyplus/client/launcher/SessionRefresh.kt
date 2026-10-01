@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.launcher
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
@@ -51,7 +52,7 @@ object SessionRefresh {
     @Volatile
     private var refreshProbe: CompletableDeferred<Unit>? = null
 
-    private class ConnectionAttempt(
+    internal class ConnectionAttempt(
         val parent: Screen,
         val address: ServerAddress,
         val server: ServerData,
@@ -71,6 +72,11 @@ object SessionRefresh {
 
     @Volatile
     private var invalidSessionPending = false
+
+    fun register() {
+        // past login - the join can no longer fail with an invalid session, so its parent screen doesn't need to stay pinned
+        ClientConfigurationConnectionEvents.INIT.register { _, _ -> lastAttempt = null }
+    }
 
     @JvmStatic
     fun onConnectStarted(
@@ -167,14 +173,16 @@ object SessionRefresh {
 
     @JvmStatic
     fun createPrompt(): SessionRefreshPrompt? {
+        // a disconnect screen ends the attempt either way, only its refresh prompt may still need it
+        val attempt = lastAttempt
+        lastAttempt = null
         if (!invalidSessionPending) return null
         invalidSessionPending = false
-        if (lastAttempt == null || refreshableActiveTarget() == null) return null
-        return SessionRefreshPrompt()
+        if (attempt == null || refreshableActiveTarget() == null) return null
+        return SessionRefreshPrompt(attempt)
     }
 
-    internal fun reconnect(): Boolean {
-        val attempt = lastAttempt ?: return false
+    internal fun reconnect(attempt: ConnectionAttempt): Boolean {
         reconnecting = true
         return runCatching {
             ConnectScreen.startConnecting(

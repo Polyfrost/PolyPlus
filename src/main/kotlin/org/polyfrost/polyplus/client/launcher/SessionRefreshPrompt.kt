@@ -8,7 +8,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class SessionRefreshPrompt internal constructor() {
+class SessionRefreshPrompt internal constructor(private val attempt: SessionRefresh.ConnectionAttempt) {
     private enum class Stage { IDLE, REFRESHING, RECONNECTING, FAILED }
 
     private var stage = Stage.IDLE
@@ -47,7 +47,7 @@ class SessionRefreshPrompt internal constructor() {
         if (ClientPlatform.currentScreen() !== screen) return
         stage = if (refreshed) Stage.RECONNECTING else Stage.FAILED
         update()
-        if (refreshed && !SessionRefresh.reconnect()) {
+        if (refreshed && !SessionRefresh.reconnect(attempt)) {
             stage = Stage.FAILED
             update()
         }

@@ -37,6 +37,7 @@ import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
+import org.polyfrost.polyplus.client.launcher.SessionRefresh
 import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
@@ -170,6 +171,7 @@ object PolyPlusClient {
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("modpack diff") { ModpackDiff.logAsync() }
         step("login gate") { MinecraftLoginGate.register() }
+        step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
