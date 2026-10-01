@@ -270,6 +270,8 @@ class EosSdkBridge {
         if (!loginWatchInstalled.compareAndSet(false, true)) return
         requireNotNull(platform).connect.addNotifyLoginStatusChanged { info ->
             if (info.currentStatus == EosLoginStatus.LoggedIn) return@addNotifyLoginStatusChanged
+            // accounts switched away from stay logged in until their auth expires
+            if (EosProductUserId(info.localUserId.toStringValue()) != localUser) return@addNotifyLoginStatusChanged
             logger.warn("EOS Connect login lost ({}), re-authenticating", info.currentStatus)
             localUser = null
             lastLoggedReceiveFailure = null
