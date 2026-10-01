@@ -230,31 +230,39 @@ class EosSdkBridge {
     }
 
     @Volatile private var hookedUser: EosProductUserId? = null
+    private var unhookP2P: (() -> Unit)? = null
     private val loginWatchInstalled = AtomicBoolean(false)
 
     private fun installP2PHooksOnce(local: SdkProductUserId) {
         val user = EosProductUserId(local.toStringValue())
         if (hookedUser == user) return
-        hookedUser = user
         val p2p = requireNotNull(platform).p2p
+        unhookP2P?.invoke()
+        hookedUser = user
 
         p2p.setPacketQueueSize(DEFAULT_QUEUE_BYTES, DEFAULT_QUEUE_BYTES)
 
-        p2p.addNotifyPeerConnectionRequest(local, null) { info ->
+        val request = p2p.addNotifyPeerConnectionRequest(local, null) { info ->
             requestHandlers[info.socketId.name]?.invoke(EosProductUserId(info.remoteUserId.toStringValue()))
         }
-        p2p.addNotifyPeerConnectionEstablished(local, null) { info ->
+        val established = p2p.addNotifyPeerConnectionEstablished(local, null) { info ->
             dispatchState(info.socketId.name, info.remoteUserId) {
                 ConnectionStateEvent.Established(it, info.networkType == EosNetworkConnectionType.DirectConnection)
             }
         }
-        p2p.addNotifyPeerConnectionInterrupted(local, null) { info ->
+        val interrupted = p2p.addNotifyPeerConnectionInterrupted(local, null) { info ->
             dispatchState(info.socketId.name, info.remoteUserId) { ConnectionStateEvent.Interrupted(it) }
         }
-        p2p.addNotifyPeerConnectionClosed(local, null) { info ->
+        val closed = p2p.addNotifyPeerConnectionClosed(local, null) { info ->
             dispatchState(info.socketId.name, info.remoteUserId) {
                 ConnectionStateEvent.Closed(it, info.reason.toString())
             }
+        }
+        unhookP2P = {
+            p2p.removeNotifyPeerConnectionRequest(request)
+            p2p.removeNotifyPeerConnectionEstablished(established)
+            p2p.removeNotifyPeerConnectionInterrupted(interrupted)
+            p2p.removeNotifyPeerConnectionClosed(closed)
         }
     }
 
@@ -374,6 +382,8 @@ class EosSdkBridge {
     private fun teardown(retireSdk: Boolean = true) {
         localUser = null
         hookedUser = null
+        // closing the platform below removes every notification along with it
+        unhookP2P = null
         loginWatchInstalled.set(false)
         lastLoggedReceiveFailure = null
 
