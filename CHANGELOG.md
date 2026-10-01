@@ -1,4 +1,4 @@
-## Unreleased changes
+## 1.2.44
 - Fixed the main menu failing to load when a singleplayer world is corrupted
 - Fixed the previous world staying in memory after leaving a server or changing dimension if the cosmetics preview had been opened in-game
 - Fixed pets disappearing after changing dimensions or switching lobbies, and pets lingering after their owner unequipped them out of view
