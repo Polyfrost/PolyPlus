@@ -27,7 +27,7 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent;
 //? if < 26.2 && > 1.8.9 {
 /*import net.minecraft.client.gui.screens.ShareToLanScreen;
 *///?} elif = 1.8.9 {
-/*import net.minecraft.client.gui.screen.OpenToLanScreen;
+/*import net.minecraft.client.gui.screen.menu.world.OpenToLanScreen;
 *///?}
 
 //? if >= 26.2 {

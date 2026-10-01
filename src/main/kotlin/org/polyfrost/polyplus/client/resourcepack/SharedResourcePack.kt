@@ -28,7 +28,7 @@ object SharedResourcePack {
     fun buildFromEquipped(): Result<List<Prepared>> = runCatching {
         val minecraft = Minecraft.getInstance()
         //? if = 1.8.9 {
-        /*val selected = minecraft.resourcePacks?.applied?.map { "file/${it.name}" }
+        /*val selected = minecraft.resourcePacks?.selectedPacks?.map { "file/${it.name}" }
         *///?} else
         val selected = minecraft.resourcePackRepository?.selectedIds
         checkNotNull(selected) { "Minecraft's resource pack repository isn't available yet" }

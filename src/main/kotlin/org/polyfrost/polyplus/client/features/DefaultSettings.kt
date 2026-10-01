@@ -280,7 +280,7 @@ object DefaultSettings {
         //?} else {
         /*options.vsync = false
         options.fpsLimit = UNLIMITED_FRAMERATE
-        options.renderClouds = false // feather's name for the 1.8.9 entityShadows option
+        options.entityShadows = false
         *///?}
         options.save()
     }

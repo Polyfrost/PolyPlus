@@ -277,7 +277,7 @@ public abstract class MixinChatScreen {
 //?} else {
 /*import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiElement;
-import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.game.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.render.TextRenderer;

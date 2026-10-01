@@ -98,9 +98,9 @@ import net.minecraft.client.multiplayer.ServerStatusPinger
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.DefaultPlayerSkin
 //?} else {
-/*import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen as JoinMultiplayerScreen
-import net.minecraft.client.gui.screen.options.OptionsScreen
-import net.minecraft.client.gui.screen.world.SelectWorldScreen
+/*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen as JoinMultiplayerScreen
+import net.minecraft.client.gui.screen.menu.options.OptionsScreen
+import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
 import net.minecraft.client.network.MultiplayerServerListPinger as ServerStatusPinger
 import net.minecraft.client.options.ServerListEntry as ServerData
 import net.minecraft.client.resource.skin.DefaultSkinUtils

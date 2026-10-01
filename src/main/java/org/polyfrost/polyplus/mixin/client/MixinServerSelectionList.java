@@ -155,8 +155,8 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
     }
 }
 //?} else {
-/*import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget;
+/*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerServerListWidget;
 import net.minecraft.client.gui.widget.EntryListWidget;
 import net.minecraft.client.gui.widget.LanServerEntry;
 import net.minecraft.client.gui.widget.ServerListEntryWidget;

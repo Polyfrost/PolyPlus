@@ -19,7 +19,7 @@ public interface OnlineServerEntryInvoker {
     }
 }
 //?} else {
-/*import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
+/*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.widget.ServerListEntryWidget;
 import net.minecraft.client.options.ServerListEntry;
 import org.spongepowered.asm.mixin.Mixin;

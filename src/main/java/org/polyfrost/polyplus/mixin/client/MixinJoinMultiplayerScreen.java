@@ -68,8 +68,8 @@ public abstract class MixinJoinMultiplayerScreen {
 }
 //?} else {
 /*import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget;
+import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerServerListWidget;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.EntryListWidget;
 import net.minecraft.client.gui.widget.ServerListEntryWidget;

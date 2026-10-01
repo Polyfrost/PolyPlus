@@ -10,7 +10,7 @@ import net.minecraft.client.gui.screens.GenericMessageScreen
 import net.minecraft.client.gui.screens.LevelLoadingScreen
 //?} else {
 /*import net.minecraft.client.gui.GuiElement
-import net.minecraft.client.gui.screen.DownloadingTerrainScreen
+import net.minecraft.client.gui.screen.menu.multiplayer.DownloadingTerrainScreen
 import net.minecraft.client.gui.screen.ProgressScreen
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.render.platform.GlStateManager

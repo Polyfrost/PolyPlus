@@ -82,7 +82,7 @@ public class MixinScreen {
 }
 //?} else {
 /*import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screen.inventory.menu.InventoryMenuScreen;
+import net.minecraft.client.gui.screen.game.inventory.InventoryMenuScreen;
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker;

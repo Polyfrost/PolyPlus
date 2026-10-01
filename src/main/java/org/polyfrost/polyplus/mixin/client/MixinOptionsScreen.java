@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.mixin.client;
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.options.OptionsScreen;
+import net.minecraft.client.gui.screen.menu.options.OptionsScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

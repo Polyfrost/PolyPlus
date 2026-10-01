@@ -42,7 +42,7 @@ import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.world.level.GameType
 //?} else {
-/*import net.minecraft.client.gui.screen.world.SelectWorldScreen
+/*import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
 import org.polyfrost.polyplus.client.host.GameType
 import org.polyfrost.polyplus.client.social.setScreen
 *///?}

@@ -127,12 +127,12 @@ public class MixinAvatarRenderer {
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer((PlayerRenderer) (Object) this));
     }
 
-    @Inject(method = {"renderRightHand", "renderPlayerLeftHandModel"}, at = @At("HEAD"))
+    @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("HEAD"))
     private void polyplus$enterFirstPersonHand(CallbackInfo ci) {
         ModelPoseApplicator.firstPersonHand = true;
     }
 
-    @Inject(method = {"renderRightHand", "renderPlayerLeftHandModel"}, at = @At("RETURN"))
+    @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("RETURN"))
     private void polyplus$exitFirstPersonHand(CallbackInfo ci) {
         ModelPoseApplicator.firstPersonHand = false;
     }

@@ -125,8 +125,8 @@ public final class FeaturedServerRowRegistry {
     }
 }
 //?} else {
-/*import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget;
+/*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen;
+import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerServerListWidget;
 import net.minecraft.client.gui.widget.EntryListWidget;
 import net.minecraft.client.gui.widget.ServerListEntryWidget;
 import net.minecraft.client.options.ServerListEntry;
