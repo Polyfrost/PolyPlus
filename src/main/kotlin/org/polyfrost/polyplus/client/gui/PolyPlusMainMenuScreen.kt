@@ -34,7 +34,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
@@ -117,7 +116,6 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
 import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -571,7 +569,6 @@ private const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 private val PageBackground = Color(0xFF11171C)
-private val PreviewGradient = Color(0xFF0F1C33)
 private val PanelBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
 private val ServerIconBackground = Color(0x33FFFFFF)
@@ -807,10 +804,6 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
             PlayerPreview(
                 Modifier.fillMaxWidth().height(previewHeight),
                 source = PlayerPreviewSource.LocalLive,
-                bottomFade = Brush.verticalGradient(
-                    previewFadeStart to PreviewGradient.copy(alpha = 0f),
-                    1f to PreviewGradient.copy(alpha = 0.84f),
-                ),
                 modelScale = previewScale,
                 verticalAnchor = 1.0f,
                 initialYaw = 180f + 22.9f,
@@ -1342,10 +1335,6 @@ private fun AccountPill(name: String) {
                     ): IntOffset = IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
                 }
             }
-            DisposableEffect(Unit) {
-                PlayerPreviewSuppression.push()
-                onDispose { PlayerPreviewSuppression.pop() }
-            }
             Popup(
                 popupPositionProvider = positionProvider,
                 onDismissRequest = { if (busy == null) open = false },
@@ -1670,10 +1659,6 @@ private fun MicrosoftLoginPopup(
     status: String?,
     onCancel: () -> Unit,
 ) {
-    DisposableEffect(Unit) {
-        PlayerPreviewSuppression.push()
-        onDispose { PlayerPreviewSuppression.pop() }
-    }
     SocialModalScrim(onCancel) {
         Column(
             modifier = Modifier
@@ -1895,10 +1880,6 @@ private fun NotificationBell() {
             onClick = { expanded = !expanded },
         )
         if (expanded) {
-            DisposableEffect(Unit) {
-                PlayerPreviewSuppression.push()
-                onDispose { PlayerPreviewSuppression.pop() }
-            }
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, bellSize.height + with(LocalDensity.current) { 12.dp.roundToPx() }),

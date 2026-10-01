@@ -17,7 +17,7 @@ import com.mojang.authlib.services.ProfileResult;
 /*import com.mojang.authlib.yggdrasil.ProfileResult;
 *///?}
 
-//? if < 1.21.5 {
+//? if < 1.21.8 {
 /*import com.mojang.blaze3d.pipeline.RenderTarget;
 *///?}
 
@@ -43,7 +43,7 @@ public interface MinecraftAccessor {
     @Accessor("profileKeyPairManager")
     void setProfileKeyPairManager(ProfileKeyPairManager profileKeyPairManager);
 
-    //? if < 1.21.5 {
+    //? if < 1.21.8 {
     /*@Mutable
     @Accessor("mainRenderTarget")
     void polyplus$setMainRenderTarget(RenderTarget target);
