@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -50,8 +49,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -117,10 +114,8 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
-import org.polyfrost.polyplus.client.gui.preview.LocalPlayerPreviewOpacity
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSuppression
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -186,13 +181,7 @@ object PolyPlusOneConfigIntegration {
 
 fun NavGraphBuilder.polyPlusCosmeticsGraph() {
     composable<PolyPlusCosmeticsRoute> {
-        val previewAlpha by transition.animateFloat(
-            transitionSpec = { tween(durationMillis = 250) },
-            label = "polyplus-preview-fade",
-        ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
-        CompositionLocalProvider(LocalPlayerPreviewOpacity provides previewAlpha) {
-            PolyPlusCosmeticsScreen()
-        }
+        PolyPlusCosmeticsScreen()
     }
 }
 
@@ -920,10 +909,6 @@ private fun PreviewPill(
             }
         }
         if (customOpen && showAuraColor) {
-            DisposableEffect(Unit) {
-                PlayerPreviewSuppression.push()
-                onDispose { PlayerPreviewSuppression.pop() }
-            }
             Popup(
                 alignment = Alignment.TopEnd,
                 offset = IntOffset(0, pillHeight + popoverGapPx),
@@ -1978,14 +1963,6 @@ private fun StoreDetailPanel(
                     Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
                     source = source ?: PlayerPreviewSource.LocalLive,
                     autoSpin = false,
-                    bottomFade = if (fades) {
-                        Brush.verticalGradient(
-                            1f - STORE_PREVIEW_FADE_FRACTION to Color.White,
-                            1f to Color.Transparent,
-                        )
-                    } else {
-                        null
-                    },
                     bottomFadeFraction = if (fades) STORE_PREVIEW_FADE_FRACTION else 0f,
                     verticalAnchor = when (info.type) {
                         CosmeticType.Hat -> 0.70f
