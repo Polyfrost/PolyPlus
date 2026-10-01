@@ -58,7 +58,7 @@ object CosmeticSync {
             PolyPlusClient.refreshCosmetics()
             refreshVisibleSubscriptions()
             Unit
-        }.register()
+        }
 
         //? if >= 1.21.1 {
         eventHandler<TickEvent.End> {
@@ -71,7 +71,7 @@ object CosmeticSync {
                 refreshVisibleSubscriptions()
             }
             Unit
-        }.register()
+        }
         //?}
 
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
@@ -104,7 +104,7 @@ object CosmeticSync {
                 //?}
                 else -> Unit
             }
-        }.register()
+        }
 
         eventHandler<PacketEvent.Receive> { event ->
             val packet = event.getPacket<Any>() as? ClientboundPlayerInfoUpdatePacket ?: return@eventHandler

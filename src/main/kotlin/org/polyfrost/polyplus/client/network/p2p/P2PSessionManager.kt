@@ -106,7 +106,7 @@ object P2PSessionManager {
             PackHttpBridge.setPackSource(null)
         }
 
-        if (unsupported == null) eventHandler<TickEvent.End> { checkForStalledEos() }.register()
+        if (unsupported == null) eventHandler<TickEvent.End> { checkForStalledEos() }
     }
 
     private val consentLock = Any()
