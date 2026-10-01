@@ -57,13 +57,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -85,7 +84,6 @@ import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.SamplingMode
 import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.components.LocalUiOversample
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
@@ -383,19 +381,14 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     animationSpec = spring(),
                 )
                 CompositionLocalProvider(
-                    LocalUiOversample provides (LocalUiOversample.current * scale).coerceIn(1f, MAX_OVERSAMPLE),
+                    LocalDensity provides scaledDensity(scale),
                     LocalPanelWidth provides panelWidth,
                     LocalPanelHeight provides panelHeight,
                 ) {
                     Box(
                         Modifier
                             .align(Alignment.Center)
-                            .requiredSize(DESIGN_WIDTH.dp, DESIGN_HEIGHT.dp)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                transformOrigin = TransformOrigin.Center
-                            },
+                            .requiredSize(DESIGN_WIDTH.dp, DESIGN_HEIGHT.dp),
                     ) {
                         Box(
                             Modifier
@@ -2163,7 +2156,6 @@ private class ModReads(
 private const val DESIGN_WIDTH = 1920f
 private const val DESIGN_HEIGHT = 1080f
 private const val UI_SCALE = DESIGN_WIDTH / 1240f
-private const val MAX_OVERSAMPLE = 4f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MIN = 1
