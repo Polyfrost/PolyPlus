@@ -305,6 +305,11 @@ object CosmeticAssetCache {
             LOGGER.warn("Failed to decode cape image for cosmetic {} from {}", id, png)
             return
         }
+        // a sheet's frames are always this size, so this also budgets animated capes
+        if (!capeFrameWithinBudget(image.width, image.height)) {
+            LOGGER.warn("Ignoring cape for cosmetic {}: a {}x{} cape is too big", id, image.width, image.height)
+            return
+        }
 
         val sheetFile = files.firstOrNull { it.extension.equals(CAPE_SHEET_EXTENSION, ignoreCase = true) }
         val sheet = sheetFile?.let { file ->
@@ -325,17 +330,6 @@ object CosmeticAssetCache {
                         id,
                         image.width,
                         image.height,
-                    )
-                    1
-                }
-
-                !capeFrameWithinBudget(sheet.width, sheet.height / detected) -> {
-                    LOGGER.warn(
-                        "Ignoring cape sheet {} for cosmetic {}: a {}x{} frame is too big to re-upload",
-                        sheetFile,
-                        id,
-                        sheet.width,
-                        sheet.height / detected,
                     )
                     1
                 }
