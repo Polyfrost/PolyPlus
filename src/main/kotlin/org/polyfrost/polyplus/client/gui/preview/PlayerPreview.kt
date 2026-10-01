@@ -165,7 +165,8 @@ private fun PlayerPreviewBitmap(
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
 
     DisposableEffect(previewKey) {
-        onDispose { PlayerPreviewRenderer.evict(previewKey) }
+        PlayerPreviewRenderer.retain(previewKey)
+        onDispose { PlayerPreviewRenderer.release(previewKey) }
     }
 
     LaunchedEffect(autoSpin) {
