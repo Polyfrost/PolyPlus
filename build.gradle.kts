@@ -118,6 +118,7 @@ repositories {
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
     strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
+    strictMaven("https://maven.taumc.org/releases", "TauMC", "org.embeddedt.celeritas")
 }
 
 val flkProvidedVersions: Map<String, String> = run {
@@ -245,6 +246,7 @@ dependencies {
         })
         testCompileOnly("net.ornithemc.osl-gen2:entrypoints:${property("deps.osl_entrypoints")}")
         include(implementation("org.joml:joml:1.10.8")!!)
+        compileOnly("org.embeddedt.celeritas:celeritas-common:2.5.0-pre.1") { isTransitive = false }
     } else {
         dependencies.extensions.getByType<LoomCompatDependencyExtension>().applyMojangMappings()
     }
@@ -350,6 +352,7 @@ loomExt.runs.configureEach {
 }
 loomExt.runs.named("client") {
     client()
+    if (isOrnithe && System.getProperty("os.name").startsWith("Mac")) vmArg("-XstartOnFirstThread")
 }
 
 tasks.test {

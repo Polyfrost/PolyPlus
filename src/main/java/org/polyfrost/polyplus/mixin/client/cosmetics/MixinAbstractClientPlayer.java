@@ -98,6 +98,7 @@ import net.minecraft.client.entity.living.player.ClientPlayerEntity;
 import net.minecraft.entity.living.player.PlayerEntity;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.World;
+import org.polyfrost.polyplus.client.PolyPlusConfig;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
@@ -151,6 +152,11 @@ public abstract class MixinAbstractClientPlayer extends PlayerEntity implements 
     private void polyplus$replaceCapeTexture(CallbackInfoReturnable<Identifier> cir) {
         Identifier cape = CosmeticAssetCache.getCapeTexture(((ClientPlayerEntity) (Object) this).getUuid());
         if (cape != null) cir.setReturnValue(cape);
+    }
+
+    @Inject(method = "getFovModifier", at = @At("HEAD"), cancellable = true)
+    private void polyplus$disableDynamicFov(CallbackInfoReturnable<Float> cir) {
+        if (!PolyPlusConfig.getDynamicFov()) cir.setReturnValue(1.0F);
     }
 }
 *///?}

@@ -68,6 +68,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var ramAdviceNotifications = true
 
     @JvmStatic @Include
+    var dynamicFov = true
+
+    @JvmStatic @Include
     var onboardingLightTheme = false
 
     @JvmStatic @Include

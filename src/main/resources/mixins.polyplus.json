@@ -99,6 +99,8 @@
     "client.network.MixinServerConnectionListener",
     "client.network.MixinServerGamePacketListenerImpl",
     //? if = 1.8.9
+    //"compat.argentum.MixinArgentumOptionPages",
+    //? if = 1.8.9
     //"compat.argentum.MixinTextBatcher",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
