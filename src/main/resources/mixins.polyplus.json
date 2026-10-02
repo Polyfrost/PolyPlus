@@ -108,6 +108,20 @@
     "compat.essential.MixinPartnerModConfig",
     //? if > 1.8.9
     "compat.euphoria.MixinSodiumConsole",
+    //? if >= 26.2 {
+    "compat.iris.MixinClientLevelData",
+    "compat.iris.MixinFogRenderer",
+    "compat.iris.MixinGlCommandEncoder",
+    "compat.iris.MixinHandRenderer",
+    "compat.iris.MixinIrisTimeUniforms",
+    "compat.iris.MixinLevelRenderer",
+    "compat.iris.MixinSkyRenderer",
+    "compat.iris.MixinSpriteContents",
+    "compat.iris.MixinVanillaRenderingPipeline",
+    //?}
+    //? if = 26.2 {
+    /*"compat.iris.MixinRenderRegion",
+    *///?}
     //? if > 1.8.9
     "compat.mountopacity.MixinEntityHook",
     //? if = 1.8.9
@@ -127,6 +141,10 @@
     "compat.rrls.MixinRrlsAbstractTexture",
     //?}
     //? if > 1.8.9
+    "compat.skyboxify.MixinEventManager",
+    //? if > 1.8.9
+    "compat.skyboxify.MixinSkyboxManager",
+    //? if > 1.8.9
     "compat.sodium.MixinSodiumConfigBuilder",
     //? if > 1.8.9
     "compat.voicechat.MixinClientManager",
@@ -137,9 +155,13 @@
     //? if > 1.8.9
     "compat.waveycapes.MixinPlayerWrapper",
     //? if > 1.8.9
+    "compat.wwaypoints.MixinClientDimensionUtils",
+    //? if > 1.8.9
     "compat.wwaypoints.MixinConfigStorage",
     //? if > 1.8.9
     "compat.wwaypoints.MixinEssentialSharingContextResolver",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinHideWaypointCycle",
     //? if > 1.8.9
     "compat.wwaypoints.MixinServerFeaturePolicy",
     //? if > 1.8.9
