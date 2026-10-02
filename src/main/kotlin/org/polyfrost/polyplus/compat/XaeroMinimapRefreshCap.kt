@@ -4,20 +4,20 @@ package org.polyfrost.polyplus.compat
 import org.polyfrost.polyplus.client.PolyPlusConfig
 
 class XaeroMinimapRefreshCap {
-    private var lastRender = 0L
+    private var nextRender = 0L
     private var lastKey = 0
 
     fun reuse(key: Int): Boolean {
         if (!PolyPlusConfig.xaeroMinimapRefreshCap) return false
-        val now = System.currentTimeMillis()
-        if (key == lastKey && now - lastRender < FRAME_MILLIS) return true
+        val now = System.nanoTime()
+        if (key == lastKey && now - nextRender < 0) return true
+        nextRender = if (key == lastKey && now - nextRender < FRAME_NANOS) nextRender + FRAME_NANOS else now + FRAME_NANOS
         lastKey = key
-        lastRender = now
         return false
     }
 
     private companion object {
-        const val FRAME_MILLIS = 16L
+        const val FRAME_NANOS = 1_000_000_000L / 60
     }
 }
 //?}
