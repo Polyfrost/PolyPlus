@@ -38,7 +38,7 @@ object SessionsRepository {
                 else -> {}
             }
             Unit
-        }.register()
+        }
     }
 
     fun refreshIncoming() = PolyPlusClient.SCOPE.launch {

@@ -15,18 +15,25 @@ internal object RemoteTextures {
 
     fun register(textureId: Identifier, pngFile: Path): Identifier {
         val nativeImage = Files.newInputStream(pngFile).use(NativeImage::read)
-        return ClientPlatform.runOnMainSync {
-            release(textureId)
-            val dynamicTexture = DynamicTexture(
-                //? if >= 1.21.5 {
-                { textureId.toString() },
-                //?}
-                nativeImage,
-            )
-            Minecraft.getInstance().textureManager.register(textureId, dynamicTexture)
-            registered[textureId] = dynamicTexture
-            logger.debug("Registered remote texture {}", textureId)
-            textureId
+        var adopted = false
+        try {
+            return ClientPlatform.runOnMainSync {
+                release(textureId)
+                val dynamicTexture = DynamicTexture(
+                    //? if >= 1.21.5 {
+                    { textureId.toString() },
+                    //?}
+                    nativeImage,
+                )
+                adopted = true
+                Minecraft.getInstance().textureManager.register(textureId, dynamicTexture)
+                registered[textureId] = dynamicTexture
+                logger.debug("Registered remote texture {}", textureId)
+                textureId
+            }
+        } finally {
+            // the texture closes the image once it has one, until then nothing else will
+            if (!adopted) nativeImage.close()
         }
     }
 
@@ -40,6 +47,8 @@ internal object RemoteTextures {
         return candidates.firstOrNull { Files.isRegularFile(it) }
     }
 
+    fun isRegistered(textureId: Identifier): Boolean = textureId in registered
+
     fun releaseAll() {
         ClientPlatform.runOnMainSync {
             val client = Minecraft.getInstance()
@@ -50,7 +59,7 @@ internal object RemoteTextures {
         }
     }
 
-    private fun release(textureId: Identifier) {
+    fun release(textureId: Identifier) {
         if (!registered.containsKey(textureId)) {
             return
         }

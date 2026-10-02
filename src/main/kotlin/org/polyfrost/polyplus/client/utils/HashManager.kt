@@ -31,14 +31,17 @@ class HashManager(private val file: File) {
         return true
     }
 
+    @Synchronized
     fun save() {
         if (!dirty) {
             return
         }
 
+        // cleared before the snapshot so a hash updated mid-write marks the file dirty again
+        dirty = false
         runCatching {
             file.parentFile?.mkdirs()
             file.writeText(PolyPlusClient.JSON.encodeToString(HashMap(hashes)))
-        }
+        }.onFailure { dirty = true }
     }
 }

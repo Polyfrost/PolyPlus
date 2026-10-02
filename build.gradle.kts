@@ -247,6 +247,8 @@ dependencies {
 
     implementation(include("gg.sona:eos:2.2.0")!!)
 
+    implementation(include("com.moulberry:mixinconstraints:1.1.0")!!)
+
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
 }

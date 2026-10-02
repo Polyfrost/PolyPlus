@@ -54,7 +54,7 @@
     "client.access.OnlineServerEntryInvoker",
     "client.access.ScreenAccessor",
     "client.access.UserAccessor",
-    //? if <1.21.5
+    //? if <1.21.8
     "client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",

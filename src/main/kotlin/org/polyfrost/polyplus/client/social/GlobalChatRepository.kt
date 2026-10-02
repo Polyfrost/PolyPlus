@@ -31,7 +31,7 @@ object GlobalChatRepository {
                     sentAt = Instant.now().toString(),
                 ),
             )
-        }.register()
+        }
     }
 
     fun refreshHistory(limit: Long? = null) = PolyPlusClient.SCOPE.launch {
