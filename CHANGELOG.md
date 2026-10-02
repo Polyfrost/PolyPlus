@@ -1,3 +1,2 @@
-## 1.2.46
-- 1.8.9: Added Dynamic FOV and View Bobbing to Video Settings
-- 1.8.9: Disable ItemPhysicLite by default
+## 1.2.47
+- Fix crash with Iris
