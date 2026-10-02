@@ -41,6 +41,7 @@ public class XaeroMixinPlugin implements IMixinConfigPlugin {
             if (method(state, getter) == null) return false;
         }
         if (method(node("xaero.common.minimap.MinimapProcessor"), "updateZoom") == null) return false;
+        if (method(target, "textureIsReadyToBlit") != null) return false;
         //? if >= 26.3 {
         MethodNode prepare = method(target, "prepare");
         if (prepare == null || !invokes(prepare, "xaero_mm_prepareTexturesAndProjection") || !invokes(prepare, "renderToTexture")) return false;
