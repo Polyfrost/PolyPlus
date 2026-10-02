@@ -178,6 +178,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var disableNarratorWhileMuted = true
 
+    //? if xaerominimap {
+    @JvmStatic
+    @Switch(
+        title = "Cap Xaero's Minimap Refresh Rate",
+        description = "Redraw Xaero's Minimap at most 60 times per second and reuse the last frame in between, instead of redrawing it every frame.",
+    )
+    var xaeroMinimapRefreshCap = true
+    //?}
+
     @JvmStatic
     @Switch(
         title = "Automatically Refresh Session",

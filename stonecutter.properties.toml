@@ -22,26 +22,31 @@ publish.modrinth = "Iw9mZi4a"
 mod.mc_compat = "1.21.1"
 mod.mc_releases = "1.21.1"
 deps.fabric_api = "0.116.15+1.21.1"
+deps.xaerominimap = "ZD6hK4GV"
 
 ["1.21.4"]
 mod.mc_compat = "1.21.4"
 mod.mc_releases = "1.21.4"
 deps.fabric_api = "0.119.4+1.21.4"
+deps.xaerominimap = "XsKw9RY8"
 
 ["1.21.5"]
 mod.mc_compat = "1.21.5"
 mod.mc_releases = "1.21.5"
 deps.fabric_api = "0.128.2+1.21.5"
+deps.xaerominimap = "UiyvcqIl"
 
 ["1.21.8"]
 mod.mc_compat = "1.21.8"
 mod.mc_releases = "1.21.8"
 deps.fabric_api = "0.136.1+1.21.8"
+deps.xaerominimap = "bSWbd7fk"
 
 ["1.21.10"]
 mod.mc_compat = "1.21.10"
 mod.mc_releases = "1.21.10"
 deps.fabric_api = "0.138.4+1.21.10"
+deps.xaerominimap = "F8LrvYl9"
 
 ["1.21.11"]
 mod.mc_compat = "1.21.11"
@@ -49,6 +54,7 @@ mod.mc_releases = "1.21.11"
 deps.fabric_api = "0.141.6+1.21.11"
 deps.sodium = "mc1.21.11-0.8.13-fabric"
 deps.wwaypoints = "8hPTY1SS"
+deps.xaerominimap = "VNYP3B0c"
 
 ["26.1"]
 mod.mc_compat = "~26.1"
@@ -56,6 +62,7 @@ mod.mc_releases = "26.1, 26.1.1, 26.1.2"
 deps.fabric_api = "0.155.2+26.1.2"
 deps.sodium = "mc26.1.2-0.9.1-fabric"
 deps.wwaypoints = "pX4mxVAv"
+deps.xaerominimap = "kWf58HtH"
 
 ["26.2"]
 mod.mc_compat = "~26.2"
@@ -63,6 +70,7 @@ mod.mc_releases = "26.2"
 deps.fabric_api = "0.157.0+26.2"
 deps.sodium = "mc26.2-0.9.1-fabric"
 deps.wwaypoints = "vudKzlxH"
+deps.xaerominimap = "VlMbRW2O"
 
 ["26.3"]
 mod.mc_compat = "~26.3"
@@ -70,3 +78,4 @@ mod.mc_releases = "26.3"
 deps.fabric_api = "0.160.3+26.3"
 deps.sodium = "mc26.3r1-0.9.2-beta.2-fabric"
 deps.wwaypoints = "mgo409Pu"
+deps.xaerominimap = "YPkAliDt"

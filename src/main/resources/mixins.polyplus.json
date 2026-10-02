@@ -10,6 +10,7 @@
     "requireAnnotations": true
   },
   "minVersion": "0.8",
+  "plugin": "org.polyfrost.polyplus.compat.XaeroMixinPlugin",
   "client": [
     "client.MixinAbstractSelectionList",
     "client.MixinChatComponent",
@@ -64,6 +65,10 @@
     "client.cosmetics.MixinPlayerModel",
     "client.network.MixinClientCommonPacketListenerImpl",
     "client.privacy.MixinAbstractSignEditScreen",
+    //? if xaerominimap && < 1.21.6
+    //"compat.xaero.MixinMinimapFBORenderer",
+    //? if xaerominimap && >= 1.21.6
+    "compat.xaero.MixinMinimapPipRenderer",
     "client.privacy.MixinAnvilScreen"
   ],
   "mixins": [
