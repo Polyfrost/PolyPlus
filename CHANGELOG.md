@@ -1,6 +1,3 @@
-## 1.2.45
-- Add various performance boosts
-  - Optimizes vanilla's GpuBufferPool on 26.2+
-  - Fixes wWaypoints memory allocations
-  - Optimizes Iris, especially when no shaders are on
-- Fix wrongly flipped players and swapped color channels
+## 1.2.46
+- 1.8.9: Added Dynamic FOV and View Bobbing to Video Settings
+- 1.8.9: Disable ItemPhysicLite by default
