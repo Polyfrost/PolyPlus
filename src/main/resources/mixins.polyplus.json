@@ -64,6 +64,10 @@
     "client.cosmetics.MixinPlayerModel",
     "client.network.MixinClientCommonPacketListenerImpl",
     "client.privacy.MixinAbstractSignEditScreen",
+    //? if xaerominimap && < 1.21.6
+    //"compat.xaero.MixinMinimapFBORenderer",
+    //? if xaerominimap && >= 1.21.6
+    "compat.xaero.MixinMinimapPipRenderer",
     "client.privacy.MixinAnvilScreen"
   ],
   "mixins": [
