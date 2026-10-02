@@ -1513,6 +1513,9 @@ object PlayerPreviewRenderer {
         Model.copyRotation(model.rightArm, model.rightSleeve)
         Model.copyRotation(model.body, model.jacket)
 
+        // keep translucent overlays from overwriting the base layer's alpha
+        GlStateManager.enableBlend()
+        GlStateManager.blendFuncSeparate(770, 771, 1, 771)
         mc.textureManager.bind(skin)
         for (part in listOf(
             model.head, model.body, model.rightArm, model.leftArm, model.rightLeg, model.leftLeg,
@@ -1530,6 +1533,7 @@ object PlayerPreviewRenderer {
             model.renderCape(MODEL_SCALE)
             GlStateManager.popMatrix()
         }
+        GlStateManager.disableBlend()
 
         val equipment = equipmentFor(source)
         if (equipment.equipped().isNotEmpty()) {
