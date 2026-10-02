@@ -28,6 +28,7 @@ object GroupsRepository {
     val groups = _groups.asStateFlow()
 
     private val messagesByGroup = ConcurrentHashMap<Int, MutableStateFlow<List<GroupMessage>>>()
+    private const val MAX_CACHED_MESSAGES = 200
 
     private const val PENDING_ID_BASE = Long.MAX_VALUE - 1_000_000L
     private val pendingIdCounter = AtomicLong(0)
@@ -42,16 +43,23 @@ object GroupsRepository {
                 is ClientboundPacket.GroupMessageDeleted -> onMessageDeleted(packet)
                 else -> Unit
             }
-        }.register()
+        }
     }
 
     /** Flow of loaded messages for a group. Empty until [loadMessages] has been called at least once. */
     fun messagesFlow(groupId: Int): StateFlow<List<GroupMessage>> =
-        messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }.asStateFlow()
+        // no asStateFlow() wrapper: a fresh instance per call makes collectAsState resubscribe on every
+        // recomposition, briefly dropping the subscription appendOrReplace uses to detect an open conversation
+        messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
 
     fun refreshGroups() = PolyPlusClient.SCOPE.launch {
+        // conversations cached after the request started may be missing from its (then stale) response, so they're kept
+        val cached = messagesByGroup.keys.toSet()
         GroupsApi.list()
-            .onSuccess { _groups.value = it }
+            .onSuccess { summaries ->
+                _groups.value = summaries
+                messagesByGroup.keys.removeAll(cached - summaries.mapTo(HashSet()) { it.id })
+            }
             .onFailure { LOGGER.error("Failed to refresh groups", it) }
     }
 
@@ -160,8 +168,20 @@ object GroupsRepository {
 
     private fun appendOrReplace(groupId: Int, message: GroupMessage) {
         val flow = messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
-        flow.value = (flow.value.filterNot { it.id == message.id } + message).sortedBy { it.id }
+        // an open conversation is left untrimmed so older pages the user scrolled back to stay loaded
+        // it's cut back to the recent window on the first message after it closes
+        val limit = if (flow.subscriptionCount.value > 0) Int.MAX_VALUE else MAX_CACHED_MESSAGES
+        flow.value = withMessage(flow.value, message, limit)
         touchGroupSummary(groupId, message)
+    }
+
+    internal fun withMessage(messages: List<GroupMessage>, message: GroupMessage, limit: Int): List<GroupMessage> {
+        val merged = if (messages.isEmpty() || messages.last().id < message.id) {
+            messages + message
+        } else {
+            (messages.filterNot { it.id == message.id } + message).sortedBy { it.id }
+        }
+        return if (merged.size > limit) merged.takeLast(limit) else merged
     }
 
     private fun touchGroupSummary(groupId: Int, message: GroupMessage) {

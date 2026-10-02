@@ -299,6 +299,7 @@ private fun PolyPlusCosmeticsScreen() {
     var tabResolved by remember { mutableStateOf(false) }
     var showCart by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var manualRefreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
     val cart = remember { mutableStateListOf<CartEntry>() }
     val allItems = rememberCosmeticItems(refreshKey)
@@ -373,6 +374,7 @@ private fun PolyPlusCosmeticsScreen() {
             onRefresh = {
                 PolyPlusClient.refreshCosmetics()
                 refreshKey++
+                manualRefreshKey++
                 status = "Refreshing cosmetic data..."
             },
         )
@@ -489,7 +491,7 @@ private fun PolyPlusCosmeticsScreen() {
                 },
             )
 
-            PolyPlusTab.History -> HistoryScreen(refreshKey = refreshKey)
+            PolyPlusTab.History -> HistoryScreen(ownedIds = ownedIds, reloadKey = manualRefreshKey)
         }
     }
 }
@@ -634,12 +636,13 @@ private fun WardrobeScreen(
 }
 
 @Composable
-private fun HistoryScreen(refreshKey: Int) {
+private fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
     var transactions by remember { mutableStateOf<List<TransactionInfo>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(refreshKey) {
+    // keyed on ownership rather than the catalog poll so transactions only refetch when a purchase lands
+    LaunchedEffect(ownedIds, reloadKey) {
         loading = true
         loadError = null
         BillingService.fetchTransactions()
@@ -1560,17 +1563,16 @@ private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): 
     val isPet = type == CosmeticType.Pet
 
     var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
-    LaunchedEffect(cosmeticId) {
+    val loaded = CosmeticAssetCache.installs.let { isPreviewAssetLoaded(previewId, isCape, isPet) }
+    // a trim can evict a preview's assets while the screen is closed, so it reloads them when shown again
+    LaunchedEffect(cosmeticId, loaded) {
         val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
         val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
         previewId = id
         if (!isPreviewAssetLoaded(id, isCape, isPet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
     }
 
-    val loadTick = CosmeticAssetCache.installs.let {
-        (if (isPreviewAssetLoaded(previewId, isCape, isPet)) 1 else 0) +
-            (if (isCape && CosmeticAssetCache.isCapeAnimated(previewId)) 2 else 0)
-    }
+    val loadTick = (if (loaded) 1 else 0) + (if (isCape && CosmeticAssetCache.isCapeAnimated(previewId)) 2 else 0)
 
     val source = remember(previewId, loadTick, isCape, isPet) {
         when {

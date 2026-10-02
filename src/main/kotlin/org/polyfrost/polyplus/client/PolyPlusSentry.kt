@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client
 
+import com.google.common.collect.MapMaker
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.ClientRequestException
@@ -28,7 +29,6 @@ import java.nio.channels.ClosedChannelException
 import java.nio.channels.UnresolvedAddressException
 import java.nio.file.FileSystemException
 import java.util.Collections
-import java.util.IdentityHashMap
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
@@ -97,7 +97,7 @@ object PolyPlusSentry {
     @Volatile
     private var gameThread: Thread? = null
 
-    private val seen: MutableSet<Throwable> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
+    private val seen: MutableSet<Throwable> = Collections.newSetFromMap(MapMaker().weakKeys().makeMap())
 
     private val signatureCounts = ConcurrentHashMap<String, AtomicInteger>()
 

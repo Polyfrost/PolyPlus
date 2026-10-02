@@ -71,6 +71,10 @@ object CosmeticAssetCache {
 
     private val parsedHashes = ConcurrentHashMap<Int, String>()
 
+    // cache key to the asset hash whose bundle failed to parse
+    // the same bundle would only fail again
+    private val failedParses = ConcurrentHashMap<String, String>()
+
     @JvmStatic
     fun getCapeTexture(uuid: UUID): Identifier? {
         if (!PolyPlusCosmeticsConfig.isVisible(BodySlot.Cape, uuid)) return null
@@ -89,8 +93,6 @@ object CosmeticAssetCache {
 
     fun getAttachedCosmetic(id: Int): AttachedCosmetic? = attachedById[id]
 
-    fun attachedCosmeticId(id: Int): Identifier = AttachedCosmeticParser.attachedCosmeticId(id)
-
     fun getPetDefinition(id: Int): PetDefinition? = petsById[id]
     //?}
 
@@ -103,6 +105,7 @@ object CosmeticAssetCache {
             }
         }
         parsedHashes.clear()
+        failedParses.clear()
         //? if >= 1.21.1 {
         emotesById.clear()
         attachedById.clear()
@@ -110,6 +113,35 @@ object CosmeticAssetCache {
         RemoteTextures.releaseAll()
         BedrockPlayerGeometryCache.reset()
         //?}
+    }
+
+    // main thread only, and never while a preview may be showing a cosmetic outside `keep`
+    // anything evicted reloads from the disk cache the next time it is needed
+    fun trim(keep: Set<Int>, inUse: Set<Identifier>) {
+        var evicted = false
+        for ((id, cape) in capes) {
+            if (id in keep) continue
+            capes.remove(id)
+            cape.release()
+            evicted = true
+        }
+        //? if >= 1.21.1 {
+        // a texture id belongs to one cosmetic id, whose entries are always kept or evicted together
+        fun <T : Any> MutableMap<Int, T>.evict(textures: (T) -> List<Identifier>) {
+            for ((id, asset) in this) {
+                val owned = textures(asset)
+                if (id in keep || owned.any(inUse::contains)) continue
+                remove(id)
+                owned.forEach(RemoteTextures::release)
+                evicted = true
+            }
+        }
+        attachedById.evict { listOf(it.texture) }
+        petsById.evict { listOf(it.texture) }
+        emotesById.evict { emote -> emote.effects.map { it.texture } }
+        //?}
+        // lets open previews notice what they lost
+        if (evicted) installs++
     }
 
     const val PRELOAD_STEPS_PER_DEFINITION = 2
@@ -214,10 +246,11 @@ object CosmeticAssetCache {
                 if (isLoaded(definition) && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
                     return@runSuspendCatching true
                 }
+                if (definition.failedToParse()) return@runSuspendCatching false
                 downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
                 parseLock.withLock { loadCosmeticAssetsLocked(definition) }
                 hashManager.save()
-                true
+                !definition.failedToParse()
             }.getOrElse {
                 LOGGER.error("Failed to ensure cosmetic {} is loaded", definition.id, it)
                 false
@@ -254,9 +287,10 @@ object CosmeticAssetCache {
         val cosmeticDir = baseDir.resolve(definition.cacheKey()).toPath()
         if (!cosmeticDir.toFile().exists()) return
         if (isLoaded(definition) && parsedHashes[definition.id] == definition.hash) return
+        if (definition.failedToParse()) return
 
         parsedHashes[definition.id] = definition.hash
-        when (definition.type) {
+        val parsed = when (definition.type) {
             CosmeticType.Cape -> loadCape(definition.id, cosmeticDir)
             CosmeticType.Backpack,
             CosmeticType.Glasses,
@@ -269,28 +303,41 @@ object CosmeticAssetCache {
                 //? if >= 1.21.1 {
                 loadAttachedCosmetic(definition.id, cosmeticDir, definition.preferredSlot() ?: return)
                 //?} else {
-                /*LOGGER.warn("Attached cosmetics require Minecraft 1.21.1+")*/
+                /*skip("Attached cosmetics require Minecraft 1.21.1+")*/
                 //?}
-            CosmeticType.Unknown -> LOGGER.warn("Ignoring cosmetic {} with unknown type/slot", definition.id)
+            CosmeticType.Unknown -> skip("Ignoring cosmetic ${definition.id} with unknown type/slot")
             //? if >= 1.21.1 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
             CosmeticType.Pet -> loadPet(definition.id, cosmeticDir)
             //?} else {
-            /*CosmeticType.Emote -> LOGGER.warn("Emotes require Minecraft 1.21.1+")*/
-            /*CosmeticType.Pet -> LOGGER.warn("Pets require Minecraft 1.21.1+")*/
+            /*CosmeticType.Emote -> skip("Emotes require Minecraft 1.21.1+")*/
+            /*CosmeticType.Pet -> skip("Pets require Minecraft 1.21.1+")*/
             //?}
+        }
+        // a download that died halfway may leave a partial bundle behind, which the next attempt replaces
+        if (!parsed && hashManager.isCurrent(definition.cacheKey(), definition.hash)) {
+            failedParses[definition.cacheKey()] = definition.hash
         }
     }
 
-    private fun installOnMain(stamp: Int, install: () -> Unit) {
+    private fun CosmeticDefinition.failedToParse(): Boolean = failedParses[cacheKey()] == hash
+
+    private fun skip(reason: String): Boolean {
+        LOGGER.warn(reason)
+        return false
+    }
+
+    private fun installOnMain(stamp: Int, vararg textures: Identifier, install: () -> Unit) {
         ClientPlatform.runOnMain {
             if (stamp != generation) return@runOnMain
+            // a trim that evicted an older copy of this cosmetic in the meantime also released its texture id
+            if (!textures.all(RemoteTextures::isRegistered)) return@runOnMain
             install()
             installs++
         }
     }
 
-    private fun loadCape(id: Int, dir: Path) {
+    private fun loadCape(id: Int, dir: Path): Boolean {
         val stamp = generation
         val files = dir.toFile().walkTopDown()
             .filter { it.isFile && !it.name.startsWith(APPLE_DOUBLE_PREFIX) }
@@ -298,12 +345,17 @@ object CosmeticAssetCache {
             .toList()
         val png = files.firstOrNull { it.extension.equals("png", ignoreCase = true) }
             ?: dir.resolve("asset.bin").toFile().takeIf { it.exists() }
-            ?: return
+            ?: return false
 
         val image = runCatching { ImageIO.read(png) }.getOrNull()
         if (image == null) {
             LOGGER.warn("Failed to decode cape image for cosmetic {} from {}", id, png)
-            return
+            return false
+        }
+        // a sheet's frames are always this size, so this also budgets animated capes
+        if (!capeFrameWithinBudget(image.width, image.height)) {
+            LOGGER.warn("Ignoring cape for cosmetic {}: a {}x{} cape is too big", id, image.width, image.height)
+            return false
         }
 
         val sheetFile = files.firstOrNull { it.extension.equals(CAPE_SHEET_EXTENSION, ignoreCase = true) }
@@ -329,17 +381,6 @@ object CosmeticAssetCache {
                     1
                 }
 
-                !capeFrameWithinBudget(sheet.width, sheet.height / detected) -> {
-                    LOGGER.warn(
-                        "Ignoring cape sheet {} for cosmetic {}: a {}x{} frame is too big to re-upload",
-                        sheetFile,
-                        id,
-                        sheet.width,
-                        sheet.height / detected,
-                    )
-                    1
-                }
-
                 else -> detected
             }
         }
@@ -353,6 +394,7 @@ object CosmeticAssetCache {
                 if (frames > 1 && sheetFile != null) capeMillisPerFrameFromName(sheetFile.name) else DEFAULT_MILLIS_PER_FRAME,
             )
         }
+        return true
     }
 
     //? if >= 1.21.1 {
@@ -369,44 +411,46 @@ object CosmeticAssetCache {
         return BedrockPlayerGeometryCache.getOrThrow()
     }
 
-    private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null) {
+    private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null): Boolean {
         val stamp = generation
-        val playerGeometry = playerGeometryOrNull(id, dir) ?: return
-        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return
+        val playerGeometry = playerGeometryOrNull(id, dir) ?: return false
+        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return false
 
-        installOnMain(stamp) {
+        installOnMain(stamp, attached.texture) {
             attachedById[id] = attached
         }
+        return true
     }
 
-    private fun loadEmote(id: Int, dir: Path) {
+    private fun loadEmote(id: Int, dir: Path): Boolean {
         val stamp = generation
-        val playerGeometry = playerGeometryOrNull(id, dir) ?: return
-        val parsed = EmoteAssetParser.parse(id, dir, playerGeometry)
-        if (parsed.isEmpty()) {
+        val playerGeometry = playerGeometryOrNull(id, dir) ?: return false
+        val emote = EmoteAssetParser.parse(id, dir, playerGeometry) ?: run {
             LOGGER.warn("No emotes parsed for cosmetic {}", id)
-            return
+            return false
         }
 
-        installOnMain(stamp) {
-            emotesById[id] = parsed.first()
+        installOnMain(stamp, *emote.effects.map { it.texture }.toTypedArray()) {
+            emotesById[id] = emote
         }
+        return true
     }
 
-    private fun loadPet(id: Int, dir: Path) {
+    private fun loadPet(id: Int, dir: Path): Boolean {
         val stamp = generation
-        when (PetAssetParser.peekArchetype(dir)) {
+        return when (PetAssetParser.peekArchetype(dir)) {
             PetArchetype.Shoulder -> loadAttachedCosmetic(id, dir, BodySlot.Pet, PetAssetParser.peekScale(dir), PetAssetParser.peekAnchor(dir))
             PetArchetype.Flying, PetArchetype.Walking -> {
                 val parsed = PetAssetParser.parse(id, dir) ?: run {
                     LOGGER.warn("Failed to parse pet cosmetic {}", id)
-                    return
+                    return false
                 }
-                installOnMain(stamp) {
+                installOnMain(stamp, parsed.texture) {
                     petsById[id] = parsed
                 }
+                true
             }
-            null -> LOGGER.warn("Pet cosmetic {} has no valid manifest", id)
+            null -> skip("Pet cosmetic $id has no valid manifest")
         }
     }
     //?}

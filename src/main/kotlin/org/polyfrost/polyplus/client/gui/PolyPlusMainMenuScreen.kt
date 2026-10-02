@@ -134,6 +134,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.Collections
 import java.util.UUID
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
@@ -328,12 +329,18 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 }
 
 private object MainMenuServerPings {
+    private const val REFRESH_AFTER_MILLIS = 5 * 60 * 1000L
     private val pinger = ServerStatusPinger()
-    private val started = Collections.newSetFromMap(ConcurrentHashMap<ServerData, Boolean>())
+    // weak so instances the menu no longer shows (e.g. after quickplay is rebuilt) aren't kept alive
+    // ServerData has no equals/hashCode, so this is keyed by identity
+    private val lastPinged = Collections.synchronizedMap(WeakHashMap<ServerData, Long>())
 
     fun start(scope: CoroutineScope, servers: List<ServerData>) {
+        val now = System.currentTimeMillis()
         servers.forEach { data ->
-            if (started.add(data)) {
+            val last = lastPinged[data]
+            if (last == null || now - last >= REFRESH_AFTER_MILLIS) {
+                lastPinged[data] = now
                 scope.launch(Dispatchers.IO) {
                     val ok = runCatching {
                         //? if >= 1.21.11 {
@@ -343,7 +350,7 @@ private object MainMenuServerPings {
                         /*pinger.pingServer(data, Runnable {}, Runnable {})
                         *///?}
                     }.isSuccess
-                    if (!ok) started.remove(data)
+                    if (!ok) lastPinged.remove(data)
                 }
             }
         }
@@ -1210,25 +1217,34 @@ private fun AccountPill(name: String) {
                 error = null
                 errorSteps = null
                 busy = "Starting Microsoft sign-in…"
-                val session = runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin() } }
-                    .onFailure {
-                        error = it.message ?: "Couldn't start sign-in"
-                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                // cancellation can discard beginLogin's result or skip finishLogin entirely,
+                // so this job owns the session's server until it ends
+                var started: MicrosoftAuth.MicrosoftLoginSession? = null
+                try {
+                    val session = runSuspendCatching {
+                        withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin().also { started = it } }
                     }
-                    .getOrNull()
-                if (session == null) {
-                    busy = null
-                    loginJob = null
-                    return@launch
+                        .onFailure {
+                            error = it.message ?: "Couldn't start sign-in"
+                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                        }
+                        .getOrNull()
+                    if (session == null) {
+                        busy = null
+                        loginJob = null
+                        return@launch
+                    }
+                    loginSession = session
+                    ClientPlatform.openUri(session.browserAuthUrl)
+                    busy = "Waiting for you to finish signing in…"
+                    runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
+                        .onFailure {
+                            error = it.message ?: "Microsoft sign-in failed"
+                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
+                        }
+                } finally {
+                    started?.let { runCatching { OneLauncherAccounts.cancelLogin(it) } }
                 }
-                loginSession = session
-                ClientPlatform.openUri(session.browserAuthUrl)
-                busy = "Waiting for you to finish signing in…"
-                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
-                    .onFailure {
-                        error = it.message ?: "Microsoft sign-in failed"
-                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
-                    }
                 loginSession = null
                 loginJob = null
                 reload()

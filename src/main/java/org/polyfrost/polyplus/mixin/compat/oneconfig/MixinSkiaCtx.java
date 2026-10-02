@@ -14,7 +14,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx", remap = false)
 public class MixinSkiaCtx {
     //? if < 26.1 {
-    /*@Inject(method = "draw", at = @At("TAIL"), remap = false)
+    /*// draw() returns before its TAIL on frames without Skia work, so released previews are disposed from its HEAD too
+    @Inject(method = "draw", at = @At("HEAD"), remap = false)
+    private void polyplus$disposeReleasedPreviews(CallbackInfo ci) {
+        PlayerPreviewOffscreen.disposeReleased();
+    }
+
+    @Inject(method = "draw", at = @At("TAIL"), remap = false)
     private void polyplus$renderPlayerPreviews(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
