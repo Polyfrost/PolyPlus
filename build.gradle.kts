@@ -40,6 +40,7 @@ val minecraftPredicate = property("mod.mc_compat") as String
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
     put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
+    put("skyboxify", optionalProperty("deps.skyboxify") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -214,6 +215,14 @@ dependencies {
 
     optionalProperty("deps.wwaypoints")?.let {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.skyboxify")?.let {
+        modCompileOnly("maven.modrinth:skyboxify:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.iris")?.let {
+        modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
     }
 
     modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }

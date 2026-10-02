@@ -20,6 +20,12 @@
         ],
         "debugify": [
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
+        ],
+        "mixinsquared": [
+            "org.polyfrost.polyplus.compat.IrisMixinTweaks"
+        ],
+        "mixinsquared-adjuster": [
+            "org.polyfrost.polyplus.compat.IrisMixinTweaks"
         ]
     },
     "languageAdapters": {

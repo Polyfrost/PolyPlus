@@ -79,6 +79,20 @@
     "compat.essential.MixinModalManager",
     "compat.essential.MixinPartnerModConfig",
     "compat.euphoria.MixinSodiumConsole",
+    //? if >= 26.2 {
+    "compat.iris.MixinClientLevelData",
+    "compat.iris.MixinFogRenderer",
+    "compat.iris.MixinGlCommandEncoder",
+    "compat.iris.MixinHandRenderer",
+    "compat.iris.MixinIrisTimeUniforms",
+    "compat.iris.MixinLevelRenderer",
+    "compat.iris.MixinSkyRenderer",
+    "compat.iris.MixinSpriteContents",
+    "compat.iris.MixinVanillaRenderingPipeline",
+    //?}
+    //? if = 26.2 {
+    /*"compat.iris.MixinRenderRegion",
+    *///?}
     "compat.mountopacity.MixinEntityHook",
     "compat.oneconfig.MixinConfigScreenKt",
     "compat.oneconfig.MixinNavigationKt",
@@ -92,6 +106,8 @@
     "compat.rrls.MixinOverlayHelper",
     "compat.rrls.MixinRrlsAbstractTexture",
     //?}
+    "compat.skyboxify.MixinEventManager",
+    "compat.skyboxify.MixinSkyboxManager",
     "compat.sodium.MixinSodiumConfigBuilder",
     "compat.voicechat.MixinClientManager",
     "compat.waveycapes.MixinCustomCapeRenderer",
