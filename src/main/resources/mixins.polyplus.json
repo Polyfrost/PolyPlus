@@ -97,8 +97,10 @@
     "compat.waveycapes.MixinCustomCapeRenderer",
     "compat.waveycapes.MixinCustomCapeRenderLayer",
     "compat.waveycapes.MixinPlayerWrapper",
+    "compat.wwaypoints.MixinClientDimensionUtils",
     "compat.wwaypoints.MixinConfigStorage",
     "compat.wwaypoints.MixinEssentialSharingContextResolver",
+    "compat.wwaypoints.MixinHideWaypointCycle",
     "compat.wwaypoints.MixinServerFeaturePolicy",
     "compat.wwaypoints.MixinToggleSneakConfigScreen",
     "compat.wwaypoints.MixinToggleSneakService"
