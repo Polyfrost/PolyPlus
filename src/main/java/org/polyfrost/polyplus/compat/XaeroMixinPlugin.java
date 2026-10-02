@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.compat;
 
+import net.fabricmc.loader.api.FabricLoader;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -20,6 +21,8 @@ public class XaeroMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (!mixinClassName.contains(".compat.xaero.")) return true;
+        FabricLoader loader = FabricLoader.getInstance();
+        if (!loader.isModLoaded("xaerominimap") && !loader.isModLoaded("xaerominimapfair")) return false;
         boolean compatible;
         try {
             compatible = isCompatible(node(targetClassName));
@@ -34,7 +37,8 @@ public class XaeroMixinPlugin implements IMixinConfigPlugin {
         //? if < 1.21.6 {
         /*MethodNode render = method(target, "renderChunksToFBO");
         return render != null && target.fields.stream().anyMatch(f -> f.name.equals("rotationFramebuffer"))
-            && count(render, Type.INT_TYPE) >= 3 && count(render, Type.BOOLEAN_TYPE) >= 3;
+            && count(render, Type.INT_TYPE) >= 3 && count(render, Type.BOOLEAN_TYPE) >= 3
+            && method(node("xaero.hud.compat.mods.ImmediatelyFastHelper"), "triggerBatchingBuffersFlush") != null;
         *///?} else {
         ClassNode state = node("xaero.hud.minimap.render.MinimapPipRenderState");
         for (String getter : List.of("getWidth", "getHeight", "getScale", "getMinimapScale", "getSize", "getBoxSize")) {
