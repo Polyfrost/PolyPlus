@@ -49,6 +49,8 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
+    //? if >= 26.2
+    "client.MixinStagedVertexBufferPool",
     //? if > 1.8.9
     "client.MixinTabButton",
     "client.MixinTitleScreen",

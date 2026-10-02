@@ -153,6 +153,10 @@ import com.mojang.blaze3d.buffers.BufferUsage
 /*import com.mojang.blaze3d.platform.NativeImage
 *///?}
 
+//? if = 1.21.4 {
+/*import net.minecraft.util.ARGB
+*///?}
+
 //? if = 1.21.1 {
 /*import com.mojang.blaze3d.vertex.VertexSorting
 import com.mojang.serialization.Lifecycle
@@ -612,11 +616,7 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(state) == null) return
         state.id = PREVIEW_ENTITY_ID
         if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
-        //? if >= 1.21.10 {
         state.bodyRot = yawDeg
-        //?} else {
-        /*state.bodyRot = yawDeg + 180f // no CameraRenderState flip here so turn the body to the camera
-        *///?}
         state.boundingBoxWidth = PLAYER_BB_WIDTH
         state.boundingBoxHeight = PLAYER_BB_HEIGHT
         state.scale = 1f
@@ -1137,7 +1137,7 @@ object PlayerPreviewRenderer {
         showRightPants = true
         showCape = true
         id = LEGACY_PREVIEW_ENTITY_ID
-        bodyRot = yawDeg + 180f
+        bodyRot = yawDeg
         yRot = 0f
         xRot = 0f
         scale = 1f
@@ -1284,7 +1284,7 @@ object PlayerPreviewRenderer {
                 val dstRow = outRow * w
                 for (x in 0 until w) {
                     //? if >= 1.21.4 {
-                    val px = img.getPixel(x, y)
+                    val px = ARGB.toABGR(img.getPixel(x, y))
                     //?} else
                     //val px = img.getPixelRGBA(x, y)
                     val di = (dstRow + x) * 4
