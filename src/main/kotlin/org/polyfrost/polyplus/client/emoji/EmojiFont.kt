@@ -10,6 +10,7 @@ import net.minecraft.network.chat.FontDescription
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.Minecraft
+import net.minecraft.client.render.platform.GlStateManager
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 *///?}
@@ -49,6 +50,8 @@ object EmojiFont {
 
     @JvmStatic
     fun drawLegacy(index: Int, x: Float, y: Float, alpha: Float) {
+        // restored afterwards so Argentum don't flush their glyphs with the atlas bound
+        val previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
         Minecraft.getInstance().textureManager.bind(ATLAS)
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
         GL11.glGetFloatv(GL11.GL_CURRENT_COLOR, colorBuffer)
@@ -64,6 +67,7 @@ object EmojiFont {
         GL11.glTexCoord2f(u + du, v + dv); GL11.glVertex3f(x + 9, y + 8, 0f)
         GL11.glEnd()
         GL11.glColor4f(colorBuffer.get(0), colorBuffer.get(1), colorBuffer.get(2), colorBuffer.get(3))
+        GlStateManager.bindTexture(previousTexture)
     }
     *///?}
 }

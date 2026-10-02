@@ -114,12 +114,16 @@ public class MixinPlayerTabOverlay {
     }
 }
 //?} else {
-/*import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+/*import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import java.util.Arrays;
 import net.minecraft.client.gui.overlay.PlayerTabOverlay;
 import net.minecraft.client.network.PlayerInfo;
 import net.minecraft.client.render.TextRenderer;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.scoreboard.ScoreboardObjective;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -144,8 +148,36 @@ public class MixinPlayerTabOverlay {
     )
     private int polyplus$tabBadge(TextRenderer font, String text, float x, float y, int color, Operation<Integer> original, @Local PlayerInfo info) {
         int offset = polyplus$badgeOffset(info);
-        if (offset != 0) PolyPlusBadge.blitTab((int) x, (int) y);
+        if (offset != 0) polyplus$queueBadge((int) x, (int) y);
         return original.call(font, text, x + offset, y, color);
+    }
+
+    // argentum batches the backgrounds until render returns, so draw badges after its wrapper
+    @WrapMethod(method = "render", order = 2000)
+    private void polyplus$drawBadges(int width, Scoreboard scoreboard, ScoreboardObjective objective, Operation<Void> original) {
+        polyplus$badgeCount = 0;
+        try {
+            original.call(width, scoreboard, objective);
+        } finally {
+            for (int i = 0; i < polyplus$badgeCount; i++) {
+                PolyPlusBadge.blitTab(polyplus$badges[i * 2], polyplus$badges[i * 2 + 1]);
+            }
+            polyplus$badgeCount = 0;
+        }
+    }
+
+    @Unique
+    private int[] polyplus$badges = new int[32];
+
+    @Unique
+    private int polyplus$badgeCount;
+
+    @Unique
+    private void polyplus$queueBadge(int x, int y) {
+        int index = polyplus$badgeCount++ * 2;
+        if (index + 1 >= polyplus$badges.length) polyplus$badges = Arrays.copyOf(polyplus$badges, polyplus$badges.length * 2);
+        polyplus$badges[index] = x;
+        polyplus$badges[index + 1] = y;
     }
 
     @Unique
