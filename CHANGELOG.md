@@ -1,2 +1,6 @@
-## 1.2.44
-- Port to 1.8.9
+## 1.2.45
+- Add various performance boosts
+  - Optimizes vanilla's GpuBufferPool on 26.2+
+  - Fixes wWaypoints memory allocations
+  - Optimizes Iris, especially when no shaders are on
+- Fix wrongly flipped players and swapped color channels
