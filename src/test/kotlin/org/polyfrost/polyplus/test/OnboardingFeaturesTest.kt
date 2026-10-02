@@ -73,7 +73,7 @@ class OnboardingFeaturesTest {
 
         assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.DYNAMIC_LIGHTS),
+            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }
@@ -88,13 +88,13 @@ class OnboardingFeaturesTest {
 
     @Test
     fun `a newest card that is unavailable does not count as walked`() {
-        val withoutNewest = everyCard - OnboardingFeatures.ModCard.DYNAMIC_LIGHTS
+        val withoutNewest = everyCard - OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT
 
         val completed = OnboardingFeatures.completedModSettingsVersion(completedVersion = 0, available = withoutNewest)
 
         assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.DYNAMIC_LIGHTS),
+            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }

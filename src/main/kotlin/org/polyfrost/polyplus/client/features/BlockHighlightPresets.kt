@@ -39,6 +39,9 @@ object BlockHighlightPresets {
 
     fun currentJson(): String = gson().toJson(config().getField("ACTIVE_INSTANCE").get(null))
 
+    fun isModDefault(): Boolean =
+        JsonParser.parseString(currentJson()) == JsonParser.parseString(gson().toJson(config().getConstructor().newInstance()))
+
     fun presetJsons(): Map<String, String> = NAMES.mapNotNull { name ->
         runCatching { name to presetJson(name) }.getOrNull()
     }.toMap()

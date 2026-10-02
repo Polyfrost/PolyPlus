@@ -56,7 +56,8 @@ object OnboardingFeatures {
         CAPES(1),
         SKIN_LAYERS(1),
         GAMMA(2),
-        BLOCK_HIGHLIGHT(3),
+        // 5: re-offered, onboarding used to seed it with CBH's own defaults instead of vanilla
+        BLOCK_HIGHLIGHT(5),
         DYNAMIC_LIGHTS(4),
     }
 
@@ -754,7 +755,7 @@ object OnboardingFeatures {
         loadWithoutInit(className).getField(fieldName).type
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
-    const val MOD_SETTINGS_VERSION = 4
+    const val MOD_SETTINGS_VERSION = 5
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L

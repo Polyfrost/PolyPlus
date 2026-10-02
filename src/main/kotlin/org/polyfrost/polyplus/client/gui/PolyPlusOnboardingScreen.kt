@@ -104,6 +104,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Locale
+import kotlin.io.path.exists
 import kotlin.math.roundToInt
 
 //? if >= 26.1 {
@@ -2165,7 +2166,15 @@ private class ModReads(
                     OnboardingFeatures.currentGammaSmooth()
                 },
                 blockHighlight = ifAvailable(BlockHighlightPresets.available) {
-                    runCatching { BlockHighlightPresets.currentJson() }.getOrNull()
+                    // The title screen can compose before DefaultSettings' first tick (1.8.9 reloads
+                    // resources synchronously), so show the vanilla preset those tasks are about to apply.
+                    runCatching {
+                        if (BlockHighlightPresets.markerPath().exists() && !BlockHighlightPresets.isModDefault()) {
+                            BlockHighlightPresets.currentJson()
+                        } else {
+                            BlockHighlightPresets.presetJson(BlockHighlightPresets.DEFAULT)
+                        }
+                    }.getOrNull()
                 },
                 dynamicLights = ifAvailable(OnboardingFeatures.dynamicLightsAvailable) {
                     OnboardingFeatures.currentDynamicLightsMode()

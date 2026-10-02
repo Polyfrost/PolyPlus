@@ -178,6 +178,15 @@ object DefaultSettings {
                 coveredByLegacyFlag = false,
             ),
         )
+        add(
+            Task(
+                id = "custom-block-highlight-stale-onboarding",
+                label = "Custom Block Highlight",
+                isPresent = { modLoaded(CBH_ID) && BlockHighlightPresets.available },
+                apply = ::repairCustomBlockHighlight,
+                coveredByLegacyFlag = false,
+            ),
+        )
     }
 
     private fun unbindTask(id: String, matches: (String) -> Boolean) = Task(
@@ -388,6 +397,16 @@ object DefaultSettings {
         if (BlockHighlightPresets.markerPath().exists()) return
         BlockHighlightPresets.apply(BlockHighlightPresets.DEFAULT)
         logger.info("Applied the Custom Block Highlight vanilla preset and skipped its first-open presets screen")
+    }
+
+    // Onboarding could snapshot CBH before the vanilla task ran (1.8.9 builds the title screen before
+    // the first tick) and save the mod's own defaults back. No preset or onboarding edit produces
+    // exactly those, so treat them as that bug and redo the vanilla preset once.
+    private fun repairCustomBlockHighlight() {
+        if (!BlockHighlightPresets.isModDefault()) return
+        BlockHighlightPresets.apply(BlockHighlightPresets.DEFAULT)
+        PolyPlusConfig.onboardingBlockHighlightConfig = BlockHighlightPresets.currentJson()
+        logger.info("Replaced Custom Block Highlight's built-in defaults left by onboarding with the vanilla preset")
     }
 
     private fun applyModMenuModCount() {
