@@ -132,8 +132,8 @@
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
-    "compat.oneconfig.MixinThemeRegistry",
     "compat.oneconfig.MixinTreeConfigData",
+    "compat.oneconfig.MixinUITheme",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",
     //? if > 1.8.9
