@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.features
 
+//? if wwaypoints
+import com.wwaypoints.WaypointsClient
 import net.fabricmc.loader.api.FabricLoader
 //? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
@@ -53,6 +55,7 @@ object DefaultSettings {
     private const val IQ_ID = "iqaddons"
     private const val CBH_ID = "custom-block-highlight"
     private const val ITEM_PHYSIC_ID = "itemphysiclite"
+    private const val WWAYPOINTS_ID = "wwaypoints"
 
     private const val IQ_PHASE_THREE_CONFIG = "net.iqaddons.mod.config.categories.PhaseThreeConfig"
     private const val RESOURCEFUL_CONFIGURATIONS = "com.teamresourceful.resourcefulconfig.common.config.Configurations"
@@ -107,6 +110,17 @@ object DefaultSettings {
             add(unbindTask(namespace) { key -> namespace in key.split('.') })
         }
         UNBIND_KEYS.forEach { key -> add(unbindTask(key) { it == key }) }
+        //? if wwaypoints {
+        add(
+            Task(
+                id = "unbind:wwaypoints-create-waypoint",
+                label = "keybinds",
+                isPresent = { modLoaded(WWAYPOINTS_ID) },
+                apply = ::unbindWWaypointsCreateKeys,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        //?}
         add(
             Task(
                 id = "better-screens",
@@ -193,7 +207,7 @@ object DefaultSettings {
         id = "unbind:$id",
         label = "keybinds",
         isPresent = { keyMappings().any { matches(it.name) } },
-        apply = { unbindMatching(matches) },
+        apply = { unbindMatching { matches(it.name) } },
         coveredByLegacyFlag = id !in POST_LEGACY_UNBINDS,
     )
 
@@ -330,7 +344,7 @@ object DefaultSettings {
     private val KeyMapping.isUnbound: Boolean get() = keyCode == 0
     *///?}
 
-    private fun unbindMatching(matches: (String) -> Boolean) {
+    private fun unbindMatching(matches: (KeyMapping) -> Boolean) {
         val options = Minecraft.getInstance().options ?: return
         var changed = false
         //? if > 1.8.9 {
@@ -338,7 +352,7 @@ object DefaultSettings {
         //?} else {
         /*options.keyBindings.forEach { mapping ->
         *///?}
-            if (!matches(mapping.name) || mapping.isUnbound) return@forEach
+            if (!matches(mapping) || mapping.isUnbound) return@forEach
             mapping.setKey(InputConstants.UNKNOWN)
             changed = true
             logger.info("Unbound keybind {}", mapping.name)
@@ -348,6 +362,14 @@ object DefaultSettings {
             options.save()
         }
     }
+
+    //? if wwaypoints {
+    // wWaypoints registers a create key per label preset and only binds the default preset's out of the box
+    private fun unbindWWaypointsCreateKeys() {
+        val createKeys = WaypointsClient.getPresetCreateWaypointKeys().map { it.value }
+        unbindMatching { it in createKeys && it.isDefault }
+    }
+    //?}
 
     private fun applyBetterScreens() {
         setYaclField(BETTER_SCREENS_CONFIG, "preventClosingScreens", true)
