@@ -12,7 +12,6 @@ import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
 import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
 import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.ThemeBrandingUtil
 import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
@@ -358,7 +357,7 @@ object OnboardingFeatures {
             light -> PolyGlassLight
             else -> PolyGlassDark
         }
-        ThemeRegistry.activate(ThemeBrandingUtil.branded(theme))
+        ThemeRegistry.activate(theme)
     }
 
     private fun applyToggleSprint(enabled: Boolean) {

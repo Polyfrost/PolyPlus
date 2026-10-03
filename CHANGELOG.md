@@ -1,2 +1,2 @@
-## 1.2.48
-- Fixed block highlight onboarding showing CBH defaults instead of vanilla on 1.8.9
+## Unreleased changes
+- Fixed the onboarding screen and OneConfig menus breaking with OneConfig 1.2.14

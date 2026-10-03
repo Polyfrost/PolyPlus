@@ -98,8 +98,8 @@
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
-    "compat.oneconfig.MixinThemeRegistry",
     "compat.oneconfig.MixinTreeConfigData",
+    "compat.oneconfig.MixinUITheme",
     "compat.oneconfig.MixinWWaypointsCompat",
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2 {
