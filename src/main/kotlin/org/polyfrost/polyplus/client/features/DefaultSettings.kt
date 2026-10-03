@@ -303,6 +303,7 @@ object DefaultSettings {
         options.entityShadows().set(false)
         //?} else {
         /*options.vsync = false
+        org.lwjgl.opengl.Display.setVSyncEnabled(false)
         options.fpsLimit = UNLIMITED_FRAMERATE
         options.entityShadows = false
         *///?}
