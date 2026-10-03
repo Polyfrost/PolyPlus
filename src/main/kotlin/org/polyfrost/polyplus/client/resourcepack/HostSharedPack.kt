@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.resourcepack
 
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
+//? if > 1.8.9
 import net.minecraft.server.MinecraftServer
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -17,6 +18,10 @@ import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents
 import net.minecraft.server.network.config.ServerResourcePackConfigurationTask
 import org.polyfrost.polyplus.mixin.client.network.ServerCommonPacketListenerAccessor
 //?}
+//? if = 1.8.9 {
+/*import net.minecraft.network.Connection
+import net.minecraft.server.entity.living.player.ServerPlayerEntity
+*///?}
 
 object HostSharedPack {
     private val LOGGER = LogManager.getLogger("PolyPlus/SharedPack")
@@ -52,6 +57,17 @@ object HostSharedPack {
     fun packFor(sha1: ByteArray): SharedResourcePack.Prepared? =
         prepared.firstOrNull { it.sha1.contentEquals(sha1) }
 
+    //? if = 1.8.9 {
+    /*@JvmStatic
+    fun offerTo(connection: Connection, player: ServerPlayerEntity) {
+        val pack = prepared.lastOrNull() ?: return
+        if (connection.address !is EosP2PAddress) return
+
+        LOGGER.info("Offering shared resource pack '{}' to a joining P2P guest", pack.name)
+        player.sendMessage(Component.literal("${hostName()} is sharing their resource pack with you."))
+        player.sendResourcePack(PackHttpBridge.placeholderUrl(pack.sha1Hex), pack.sha1Hex)
+    }
+    *///?} else {
     private fun packInfo(pack: SharedResourcePack.Prepared, first: Boolean): MinecraftServer.ServerResourcePackInfo =
         MinecraftServer.ServerResourcePackInfo(
             UUID.nameUUIDFromBytes(pack.sha1),
@@ -60,6 +76,7 @@ object HostSharedPack {
             false,
             if (first) Component.literal("${hostName()} is sharing their resource packs with you.") else null,
         )
+    //?}
 
     private fun hostName(): String = runCatching { Minecraft.getInstance().user.name }.getOrNull() ?: "The host"
 

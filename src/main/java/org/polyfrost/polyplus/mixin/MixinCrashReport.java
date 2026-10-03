@@ -19,7 +19,11 @@ public class MixinCrashReport {
     }
 
     @ModifyReturnValue(
+            //? if > 1.8.9 {
             method = "getFriendlyReport(Lnet/minecraft/ReportType;Ljava/util/List;)Ljava/lang/String;",
+            //?} else {
+            /*method = "build()Ljava/lang/String;",
+            *///?}
             at = @At("RETURN")
     )
     private String polyplus$addNoAiNotice(String original) {

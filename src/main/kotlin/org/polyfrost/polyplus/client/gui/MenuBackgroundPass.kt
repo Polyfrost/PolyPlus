@@ -14,9 +14,12 @@ import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
+
+//? if = 1.8.9
+//import org.lwjgl.input.Mouse
 
 object MenuBackgroundPass {
     private const val PARALLAX_EASE = 0.02f
@@ -45,7 +48,7 @@ object MenuBackgroundPass {
         }
         return true
     }
-    //?} else {
+    //?} elif > 1.8.9 {
     /*@JvmStatic
     fun renderInline(ctx: GuiGraphics, panorama: Boolean, screen: Any): Boolean {
         if (!SkiaCtx.isReady) return false
@@ -56,6 +59,15 @@ object MenuBackgroundPass {
         } else {
             SkiaCtx.drawComposeBlit(ctx) { render(panorama) }
         }
+        return true
+    }
+    *///?} else {
+    /*@JvmStatic
+    fun renderInline(panorama: Boolean, screen: Any): Boolean {
+        if (!SkiaCtx.isReady) return false
+        SkiaCtx.queueHudDraw { render(panorama) }
+        SkiaCtx.drawNow()
+        SkiaCtx.blitHud()
         return true
     }
     *///?}
@@ -72,8 +84,13 @@ object MenuBackgroundPass {
 
         val screenW = mc.window.screenWidth.coerceAtLeast(1)
         val screenH = mc.window.screenHeight.coerceAtLeast(1)
+        //? if > 1.8.9 {
         val targetX = (mc.mouseHandler.xpos() / screenW).toFloat().coerceIn(0f, 1f)
         val targetY = (mc.mouseHandler.ypos() / screenH).toFloat().coerceIn(0f, 1f)
+        //?} else {
+        /*val targetX = (Mouse.getX().toFloat() / w).coerceIn(0f, 1f)
+        val targetY = ((h - Mouse.getY()).toFloat() / h).coerceIn(0f, 1f)
+        *///?}
         easedX += (targetX - easedX) * PARALLAX_EASE
         easedY += (targetY - easedY) * PARALLAX_EASE
         val mouse = Offset(easedX, easedY)

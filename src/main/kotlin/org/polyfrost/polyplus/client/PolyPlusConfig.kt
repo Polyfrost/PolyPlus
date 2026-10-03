@@ -55,6 +55,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var animatiumItemPositionReset = false
 
     @JvmStatic @Include
+    var itemPhysicDefaultApplied = false
+
+    @JvmStatic @Include
     var jvmAdviceShownAt = 0L
 
     @JvmStatic
@@ -63,6 +66,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         description = "Check how much memory this pack actually needs and suggest a change when the current allocation is hurting performance. Shown at most once every two days.",
     )
     var ramAdviceNotifications = true
+
+    @JvmStatic @Include
+    var dynamicFov = true
 
     @JvmStatic @Include
     var onboardingLightTheme = false

@@ -4,17 +4,17 @@ import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.compat.ModConfigDefaults
 import org.polyfrost.polyplus.compat.RrlsConfigCompat
 
-//? if fabric {
+//? if fabric || ornithe {
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint
 //?}
 
 class PolyPlusPreLaunch
-//? if fabric {
+//? if fabric || ornithe {
     : PreLaunchEntrypoint
 //?}
 {
 
-    //? if fabric {
+    //? if fabric || ornithe {
     override
     //?}
     fun onPreLaunch() {

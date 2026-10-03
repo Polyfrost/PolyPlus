@@ -44,6 +44,7 @@ import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+//? if > 1.8.9
 import org.polyfrost.polyplus.client.pets.PetEntities
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.privacy.PrivacyGate
@@ -176,7 +177,7 @@ object PolyPlusClient {
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
 
-        //? if >= 1.21.1
+        //? if >= 1.21.1 || = 1.8.9
         step("early init CosmeticSync") { CosmeticSync.earlyInitialize() }
         step("early init FriendsRepository") { FriendsRepository.earlyInitialize() }
         step("early init GroupsRepository") { GroupsRepository.earlyInitialize() }
@@ -197,7 +198,7 @@ object PolyPlusClient {
 
                 SCOPE.launch {
                     PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
-                    //? if >= 1.21.1
+                    //? if >= 1.21.1 || = 1.8.9
                     CosmeticSync.resubscribeVisiblePlayers()
                     if (Minecraft.getInstance().player != null) {
                         refreshCosmetics()
@@ -281,8 +282,8 @@ object PolyPlusClient {
                 .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
             /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
-                .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }*/
-            //?}
+                .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }
+            *///?}
         } finally {
             CosmeticLoadProgress.onMetadataComplete()
         }

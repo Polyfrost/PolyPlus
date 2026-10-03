@@ -11,7 +11,11 @@ import net.minecraft.sounds.SoundEvents
 
 fun playButtonClickSound() {
     val minecraft = Minecraft.getInstance()
+    //? if > 1.8.9 {
     minecraft.soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f))
+    //?} else {
+    /*minecraft.soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f, 1.0f))
+    *///?}
 }
 
 fun Modifier.clickableWithSound(onClick: () -> Unit): Modifier = clickable {

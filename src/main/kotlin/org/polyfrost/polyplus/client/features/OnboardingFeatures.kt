@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
+//? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
+//?} else {
+/*import net.minecraft.client.options.KeyBinding as KeyMapping
+*///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -182,6 +186,7 @@ object OnboardingFeatures {
     fun initialize() {
         eventHandler { _: TickEvent.End ->
             if (!PolyPlusConfig.animatiumItemPositionReset) resetAnimatiumItemPosition()
+            if (!PolyPlusConfig.itemPhysicDefaultApplied) disableItemPhysicByDefault()
             if (!PolyPlusConfig.onboardingCompleted) return@eventHandler
             var changed = false
             if (!PolyPlusConfig.onboardingFeaturesApplied) {
@@ -336,19 +341,33 @@ object OnboardingFeatures {
     fun applyGuiScale(value: Int, persist: Boolean = true) {
         runCatching {
             val mc = Minecraft.getInstance()
+            //? if > 1.8.9 {
             mc.options.guiScale().set(value.coerceAtLeast(0))
+            //?} else {
+            /*mc.options.guiScale = value.coerceAtLeast(0)
+            *///?}
             if (persist) mc.options.save()
             //? if >= 26.1 {
             mc.resizeGui()
-            //?} else {
+            //?} elif > 1.8.9 {
             /*mc.resizeDisplay()
+            *///?} else {
+            /*val window = net.minecraft.client.render.Window(mc)
+            mc.screen?.init(mc, window.width, window.height)
             *///?}
         }.onFailure { logger.warn("Could not apply GUI scale preference", it) }
     }
 
     fun maxGuiScale(): Int = runCatching {
         val mc = Minecraft.getInstance()
+        //? if > 1.8.9 {
         mc.window.calculateScale(0, mc.isEnforceUnicode)
+        //?} else {
+        /*var scale = 1
+        while (mc.width / (scale + 1) >= 320 && mc.height / (scale + 1) >= 240) scale++
+        if (mc.isUnicode && scale % 2 != 0 && scale != 1) scale--
+        scale
+        *///?}
     }.getOrDefault(4).coerceAtLeast(1)
 
     fun applyTheme(light: Boolean, style: Int) {
@@ -363,8 +382,15 @@ object OnboardingFeatures {
 
     private fun applyToggleSprint(enabled: Boolean) {
         runCatching {
+            //? if > 1.8.9 {
             Minecraft.getInstance().options.toggleSprint().set(enabled)
             Minecraft.getInstance().options.save()
+            //?} else {
+            /*val config = Class.forName(POLYSPRINT_CONFIG)
+            val instance = config.getField("INSTANCE").get(null)
+            setBoolean(instance, "setToggleSprint", enabled)
+            config.getMethod("save").invoke(instance)
+            *///?}
         }.onFailure { logger.warn("Could not apply toggle sprint preference", it) }
     }
 
@@ -598,11 +624,19 @@ object OnboardingFeatures {
     }.getOrNull()
 
     fun gammaToggleKey(): KeyMapping? = runCatching {
+        //? if > 1.8.9 {
         Minecraft.getInstance().options.keyMappings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
+        //?} else {
+        /*Minecraft.getInstance().options.keyBindings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
+        *///?}
     }.getOrNull()
 
     fun gammaToggleKeyLabel(): String? = runCatching {
+        //? if > 1.8.9 {
         gammaToggleKey()?.translatedKeyMessage?.string
+        //?} else {
+        /*gammaToggleKey()?.let { net.minecraft.client.options.GameOptions.getKeyName(it.keyCode) }
+        *///?}
     }.getOrNull()
 
     fun bindGammaToggleKey(key: InputConstants.Key): Boolean = runCatching {
@@ -678,6 +712,21 @@ object OnboardingFeatures {
             }
         }
         PolyPlusConfig.animatiumItemPositionReset = true
+        PolyPlusConfig.save()
+    }
+
+    private fun disableItemPhysicByDefault() {
+        if (!PolyPlusConfig.onboardingCompleted) {
+            runCatching {
+                val toggled = Class.forName(ITEM_PHYSIC_CONFIG).getField("toggled").get(null)
+                toggled.javaClass.getMethod("set", Any::class.java).invoke(toggled, false) // OSL saves it on shutdown
+            }.onFailure {
+                if (it !is ClassNotFoundException) {
+                    logModApplyFailure("item-physic-default", "Could not disable ItemPhysicLite by default", it)
+                }
+            }
+        }
+        PolyPlusConfig.itemPhysicDefaultApplied = true
         PolyPlusConfig.save()
     }
 
@@ -787,6 +836,7 @@ object OnboardingFeatures {
     const val DYNAMIC_LIGHTS_OFF = 0
     const val DYNAMIC_LIGHTS_FANCY = 3
 
+    private const val ITEM_PHYSIC_CONFIG = "xyz.tryfle.oitemphysic.config.OSLConfig"
     private const val OVERFLOW_ANIMATIONS_CONFIG = "org.polyfrost.overflowanimations.config.OverflowAnimationsConfig"
     private val ITEM_DEFAULTS = listOf("X", "Y", "Z").flatMap {
         listOf("itemOffset$it" to 0f, "itemScale$it" to 1f, "itemRotation$it" to 0f)

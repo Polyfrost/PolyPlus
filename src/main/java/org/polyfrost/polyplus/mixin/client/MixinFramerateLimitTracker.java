@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import com.mojang.blaze3d.platform.FramerateLimitTracker;
 //?}
 
-//? if = 1.21.1 {
+//? if = 1.21.1 || = 1.8.9 {
 /*import net.minecraft.client.Minecraft;
 *///?}
 
@@ -26,7 +26,11 @@ public class MixinFramerateLimitTracker {
     @Unique
     private static final int POLYPLUS_UNCAPPED = 260;
 
+    //? if > 1.8.9 {
     @ModifyReturnValue(method = "getFramerateLimit", at = @At("RETURN"))
+    //?} else {
+    /*@ModifyReturnValue(method = "getMaxFramerate", at = @At("RETURN"))
+    *///?}
     private int polyplus$mainMenuFpsLimit(int original) {
         if (AdaptiveBlurDefaults.isSampling()) {
             return POLYPLUS_UNCAPPED;

@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.Minecraft;
@@ -69,3 +70,24 @@ public class MixinChatComponent {
         return host.equals("hypixel.net") || host.endsWith(".hypixel.net");
     }
 }
+//?} else {
+/*import net.minecraft.client.gui.chat.ChatGui;
+import net.minecraft.text.Text;
+import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+
+@Mixin(ChatGui.class)
+public class MixinChatComponent {
+    // emoji are applied to the display lines only, so the stored message stays comparable for chat compacting mods
+    @ModifyArg(
+        method = "addMessage(Lnet/minecraft/text/Text;IIZ)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/TextRenderUtils;wrapText(Lnet/minecraft/text/Text;ILnet/minecraft/client/render/TextRenderer;ZZ)Ljava/util/List;"),
+        index = 0
+    )
+    private Text emojiLines(Text text) {
+        return EmojiRegistry.transformLegacy(text);
+    }
+}
+*///?}

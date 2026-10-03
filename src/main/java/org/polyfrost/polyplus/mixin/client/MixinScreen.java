@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.gui.screens.Screen;
@@ -54,8 +55,9 @@ public class MixinScreen {
         *///?}
         float tickDelta, CallbackInfo ci
     ) {
-        if (MenuPanorama.panoramaBackdrop()) return;
-        MenuPanorama.drawBackdrop(graphics, (Screen) (Object) this, true);
+        Screen self = (Screen) (Object) this;
+        if (!MenuPanorama.panoramaPassNeedsBackdrop(self)) return;
+        MenuPanorama.drawBackdrop(graphics, self, true);
     }
 
     @WrapMethod(
@@ -78,3 +80,43 @@ public class MixinScreen {
         original.call(graphics, x, y, width, height);
     }
 }
+//?} else {
+/*import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screen.game.inventory.InventoryMenuScreen;
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
+import org.polyfrost.polyplus.client.gui.MenuPanorama;
+import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(Screen.class)
+public class MixinScreen {
+    private static final int DARKEN_TOP = 0xC0101010;
+    private static final int DARKEN_BOTTOM = 0xD0101010;
+
+    @Inject(method = "renderBackground(I)V", at = @At("HEAD"))
+    private void polyplus$beginBackgroundPass(int offset, CallbackInfo ci) {
+        MenuPanorama.beginPass();
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void polyplus$endBackgroundPass(int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
+        MenuPanorama.beginPass();
+    }
+
+    @Inject(method = "drawBackgroundTexture", at = @At("HEAD"), cancellable = true)
+    private void polyplus$replaceMenuBackground(int offset, CallbackInfo ci) {
+        Screen self = (Screen) (Object) this;
+        if (MenuPanorama.active(self) && MenuPanorama.drawBackdrop(self, false)) {
+            ci.cancel();
+            return;
+        }
+        if (PolyPlusMainMenuConfig.getModernInGameMenus() && !(self instanceof InventoryMenuScreen)) {
+            ((GuiElementInvoker) self).polyplus$fillGradient(0, 0, self.width, self.height, DARKEN_TOP, DARKEN_BOTTOM);
+            ci.cancel();
+        }
+    }
+}
+*///?}

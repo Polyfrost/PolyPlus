@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.gui.preview
 
+//? if > 1.8.9 {
 import com.mojang.blaze3d.pipeline.RenderTarget
+//?} else {
+/*import net.minecraft.client.render.pipeline.RenderTarget
+*///?}
 import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.ContentChangeMode
 import org.jetbrains.skia.Paint
@@ -114,7 +118,7 @@ object PlayerPreviewOffscreen {
                     e.hasContent = false
                     return@runCatching
                 }
-                //? if < 1.21.10
+                //? if < 1.21.10 && > 1.8.9
                 //offscreen.ensureSubmitted()
                 e.contentWidth = w
                 e.contentHeight = h

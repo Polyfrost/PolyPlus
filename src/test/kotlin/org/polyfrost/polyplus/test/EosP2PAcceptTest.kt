@@ -3,7 +3,12 @@ package org.polyfrost.polyplus.test
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.EventLoop
+//? if > 1.8.9 {
 import io.netty.channel.DefaultEventLoop
+//?} else {
+/*import io.netty.channel.local.LocalEventLoopGroup
+*///?}
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
@@ -23,12 +28,20 @@ class EosP2PAcceptTest {
     private val socket = EosP2PSocketId("polyplus-session")
     private val peer = EosProductUserId("0002eac")
 
+    // a Stonecutter comment placed after a backtick name containing an apostrophe is not toggled,
+    // so the version split has to live above the test methods
+    //? if > 1.8.9 {
+    private fun eventLoop(): EventLoop = DefaultEventLoop()
+    //?} else {
+    /*private fun eventLoop(): EventLoop = LocalEventLoopGroup(1).next()
+    *///?}
+
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     fun `an accepted peer's packets are only routed once the channel can take them`() {
         val bridge = EosSdkBridge()
         EosP2PChannel.Holder.bridge = bridge
-        val loop = DefaultEventLoop()
+        val loop = eventLoop()
         try {
             val child = EosP2PChannel(EosP2PServerChannel())
             val received = CompletableFuture<ByteArray>()
@@ -63,7 +76,7 @@ class EosP2PAcceptTest {
         val rejoinSocket = EosP2PSocketId("polyplus-rejoin")
         val bridge = EosSdkBridge()
         EosP2PChannel.Holder.bridge = bridge
-        val loop = DefaultEventLoop()
+        val loop = eventLoop()
         try {
             val server = EosP2PServerChannel()
             val stale = EosP2PChannel(server).apply { setupAccepted(rejoinSocket, peer) }

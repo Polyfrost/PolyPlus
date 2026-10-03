@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
+//? if > 1.8.9 {
 import net.minecraft.client.Camera;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
@@ -10,3 +11,4 @@ public interface CameraAccessor {
     @Accessor("position")
     void polyplus$setPosition(Vec3 position);
 }
+//?}

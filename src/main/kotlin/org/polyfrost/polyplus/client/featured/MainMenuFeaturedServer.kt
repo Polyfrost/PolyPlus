@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.featured
 
+//? if > 1.8.9 {
 import net.minecraft.client.multiplayer.ServerData
+//?} else {
+/*import net.minecraft.client.options.ServerListEntry as ServerData
+*///?}
 
 object MainMenuFeaturedServer {
     @JvmStatic
@@ -22,9 +26,19 @@ object MainMenuFeaturedServer {
 
     // reused across menu displays so the card keeps its ping results instead of re-pinging every time
     private var cachedServerData: ServerData? = null
+    private var cachedKey: Pair<String, String>? = null
 
     @JvmStatic
-    fun serverData(server: FeaturedServer): ServerData =
-        cachedServerData?.takeIf { it.name == server.name && it.ip == server.address }
-            ?: ServerData(server.name, server.address, ServerData.Type.OTHER).also { cachedServerData = it }
+    fun serverData(server: FeaturedServer): ServerData {
+        val key = server.name to server.address
+        cachedServerData?.takeIf { cachedKey == key }?.let { return it }
+        //? if > 1.8.9 {
+        val data = ServerData(server.name, server.address, ServerData.Type.OTHER)
+        //?} else {
+        /*val data = ServerData(server.name, server.address, false)
+        *///?}
+        cachedServerData = data
+        cachedKey = key
+        return data
+    }
 }

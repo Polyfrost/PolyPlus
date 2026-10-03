@@ -1,10 +1,12 @@
 package org.polyfrost.polyplus.client.network.http
 
+//? if > 1.8.9 {
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.mixin.client.access.ClientCommonPacketListenerAccessor
 import org.polyfrost.polyplus.mixin.client.access.ClientHandshakePacketListenerAccessor
+//?}
+import org.apache.logging.log4j.LogManager
 import java.util.IdentityHashMap
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -43,6 +45,7 @@ object MinecraftLoginGate {
     val failOpenGeneration: Int
         get() = failOpen.get()
 
+    //? if > 1.8.9 {
     fun register() {
         ClientConfigurationConnectionEvents.INIT.register { handler, _ ->
             loginSettled((handler as ClientCommonPacketListenerAccessor).`polyplus$getConnection`())
@@ -51,6 +54,12 @@ object MinecraftLoginGate {
             loginSettled((handler as ClientHandshakePacketListenerAccessor).`polyplus$getConnection`())
         }
     }
+    //?} else {
+    /*fun register() = Unit
+
+    @JvmStatic
+    fun onLoginSettled(connection: Any) = loginSettled(connection)
+    *///?}
 
     @JvmStatic
     fun begin(connection: Any): Boolean {

@@ -1,7 +1,9 @@
 package org.polyfrost.polyplus.client.bedrock.playback
 
-import net.minecraft.util.Mth
 import org.joml.Vector3f
+//? if > 1.8.9 {
+import net.minecraft.util.Mth
+//?}
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.BoneAnimation
@@ -97,11 +99,19 @@ object AnimationSampler {
         if (easing == EasingMode.CATMULLROM) {
             val p0 = previous ?: from
             val p3 = next ?: to
+            //? if > 1.8.9 {
             return Vector3f(
                 Mth.catmullrom(clamped, p0.x, from.x, to.x, p3.x),
                 Mth.catmullrom(clamped, p0.y, from.y, to.y, p3.y),
                 Mth.catmullrom(clamped, p0.z, from.z, to.z, p3.z),
             )
+            //?} else {
+            /*return Vector3f(
+                catmullRom(clamped, p0.x, from.x, to.x, p3.x),
+                catmullRom(clamped, p0.y, from.y, to.y, p3.y),
+                catmullRom(clamped, p0.z, from.z, to.z, p3.z),
+            )
+            *///?}
         }
 
         val t = when (easing) {
@@ -114,4 +124,17 @@ object AnimationSampler {
 
         return Vector3f(from).lerp(to, t)
     }
+
+    //? if = 1.8.9 {
+    /*private fun catmullRom(t: Float, p0: Float, p1: Float, p2: Float, p3: Float): Float {
+        val t2 = t * t
+        val t3 = t2 * t
+        return 0.5f * (
+            (2f * p1) +
+                (-p0 + p2) * t +
+                (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+                (-p0 + 3f * p1 - 3f * p2 + p3) * t3
+            )
+    }
+    *///?}
 }

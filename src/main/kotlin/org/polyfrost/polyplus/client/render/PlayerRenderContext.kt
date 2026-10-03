@@ -8,6 +8,10 @@ import net.minecraft.client.renderer.entity.state.HumanoidRenderState
 /*import net.minecraft.client.player.AbstractClientPlayer
 *///?}
 
+//? if = 1.8.9 {
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity
+*///?}
+
 data class PlayerRenderContext(
     val ageInTicks: Float,
     val walkAnimationSpeed: Float,
@@ -28,7 +32,7 @@ data class PlayerRenderContext(
             swimAmount = state.swimAmount,
             isInvisible = state.isInvisible,
         )
-        //?} else {
+        //?} elif = 1.21.1 {
         /*fun from(
             player: AbstractClientPlayer,
             partialTicks: Float,
@@ -41,6 +45,22 @@ data class PlayerRenderContext(
             isOnGround = player.onGround(),
             isInWater = player.isInWater,
             swimAmount = player.getSwimAmount(partialTicks),
+            isInvisible = player.isInvisible,
+        )
+        *///?} else {
+        /*@JvmStatic
+        fun from(
+            player: ClientPlayerEntity,
+            @Suppress("UNUSED_PARAMETER") partialTicks: Float,
+            limbSwingAmount: Float,
+            ageInTicks: Float,
+        ): PlayerRenderContext = PlayerRenderContext(
+            ageInTicks = ageInTicks,
+            walkAnimationSpeed = limbSwingAmount,
+            isCrouching = player.isSneaking,
+            isOnGround = player.onGround,
+            isInWater = player.isInWater,
+            swimAmount = 0f,
             isInvisible = player.isInvisible,
         )
         *///?}

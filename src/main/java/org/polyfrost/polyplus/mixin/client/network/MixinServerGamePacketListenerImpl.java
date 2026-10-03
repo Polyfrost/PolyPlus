@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.network;
 
+//? if > 1.8.9 {
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -24,3 +25,31 @@ public abstract class MixinServerGamePacketListenerImpl {
         );
     }
 }
+//?} else {
+/*import net.minecraft.network.Connection;
+import net.minecraft.server.entity.living.player.ServerPlayerEntity;
+import net.minecraft.server.network.handler.ServerPlayNetworkHandler;
+import net.minecraft.text.Text;
+import org.polyfrost.polyplus.client.host.P2PPeerAlerts;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(ServerPlayNetworkHandler.class)
+public abstract class MixinServerGamePacketListenerImpl {
+    @Shadow
+    public ServerPlayerEntity player;
+
+    @Shadow
+    @Final
+    public Connection connection;
+
+    @Inject(method = "onDisconnect", at = @At("HEAD"))
+    private void polyplus$alertHostOnTimeout(Text reason, CallbackInfo ci) {
+        P2PPeerAlerts.onPlayerDisconnected(this.connection.getAddress(), this.player.getName(), reason);
+    }
+}
+*///?}

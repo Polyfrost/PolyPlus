@@ -164,6 +164,16 @@ object PolyPlusMainMenuConfig : Config(
     )
     var panoramaInAllMenus = true
 
+    //? if = 1.8.9 {
+    /*@JvmStatic
+    @Switch(
+        title = "Modern In-Game Menus",
+        description = "Use a flat darkened background behind in-game menus instead of the dark gradient and dirt.",
+        subcategory = "Background",
+    )
+    var modernInGameMenus = true
+    *///?}
+
     init {
         preload()
         migrateFromLegacyConfig()
@@ -205,7 +215,11 @@ object PolyPlusMainMenuConfig : Config(
 
     @JvmStatic
     fun realmsSupported(): Boolean =
+        //? if > 1.8.9 {
         runCatching { Minecraft.getInstance().allowsRealms() }.getOrDefault(false)
+        //?} else {
+        /*false // Realms isn't usable on 1.8.9
+        *///?}
 
     @JvmStatic
     fun defaultMainMenuFpsLimit(): Int {

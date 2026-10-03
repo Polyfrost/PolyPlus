@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.test
 
+//? if > 1.8.9 {
 import net.minecraft.SharedConstants
 import net.minecraft.network.chat.Component
 import net.minecraft.server.Bootstrap
@@ -72,3 +73,4 @@ class RichTextPrivacyTest {
         assertEquals("hello Done!", RichTextPrivacy.unresolved(component))
     }
 }
+//?}

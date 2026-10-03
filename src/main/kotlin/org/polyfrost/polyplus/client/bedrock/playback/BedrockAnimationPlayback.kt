@@ -10,9 +10,12 @@ import kotlin.math.min
 import net.minecraft.util.Util
 //?}
 
-//? if < 1.21.11 {
+//? if < 1.21.11 && > 1.8.9 {
 /*import net.minecraft.Util
 *///?}
+
+//? if = 1.8.9
+//import net.minecraft.client.Minecraft
 
 object BedrockAnimationPlayback {
     fun resolveTimeTicks(
@@ -28,7 +31,11 @@ object BedrockAnimationPlayback {
     }
 
     fun elapsedTicksSince(startTimeMs: Long): Float {
+        //? if > 1.8.9 {
         return (Util.getMillis() - startTimeMs) / BedrockConstants.MS_PER_TICK
+        //?} else {
+        /*return (Minecraft.getTime() - startTimeMs) / BedrockConstants.MS_PER_TICK
+        *///?}
     }
 
     fun sampleTimed(

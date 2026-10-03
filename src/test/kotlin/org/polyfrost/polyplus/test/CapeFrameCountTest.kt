@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.test
 
-import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.polyplus.client.render.NativeImage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

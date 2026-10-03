@@ -1,7 +1,11 @@
 package org.polyfrost.polyplus.client.features
 
 import net.fabricmc.loader.api.FabricLoader
+//? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
+//?} else {
+/*import net.minecraft.client.options.KeyBinding as KeyMapping
+*///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
@@ -48,6 +52,7 @@ object DefaultSettings {
     private const val MODMENU_ID = "modmenu"
     private const val IQ_ID = "iqaddons"
     private const val CBH_ID = "custom-block-highlight"
+    private const val ITEM_PHYSIC_ID = "itemphysiclite"
 
     private const val IQ_PHASE_THREE_CONFIG = "net.iqaddons.mod.config.categories.PhaseThreeConfig"
     private const val RESOURCEFUL_CONFIGURATIONS = "com.teamresourceful.resourcefulconfig.common.config.Configurations"
@@ -58,6 +63,11 @@ object DefaultSettings {
 
     private val BOBBY_DYNAMIC_MULTI_WORLD_LINE =
         Regex("""^(\s*)"?$BOBBY_DYNAMIC_MULTI_WORLD"?\s*([=:])\s*.*$""")
+
+    private const val ITEM_PHYSIC_CONFIG = "xyz.tryfle.oitemphysic.config.OSLConfig"
+    private const val OSL_CONFIG = "net.ornithemc.osl.config.api.config.Config"
+    private const val OSL_CONFIG_MANAGER = "net.ornithemc.osl.config.api.ConfigManager"
+    private const val OSL_CONFIG_MANAGER_IMPL = "net.ornithemc.osl.config.impl.ConfigManagerImpl"
 
     private const val MODMENU_MAIN = "com.terraformersmc.modmenu.ModMenu"
     private const val MODMENU_CONFIG = "com.terraformersmc.modmenu.config.ModMenuConfig"
@@ -156,6 +166,15 @@ object DefaultSettings {
                 label = "Custom Block Highlight",
                 isPresent = { modLoaded(CBH_ID) && BlockHighlightPresets.available },
                 apply = ::applyCustomBlockHighlight,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        add(
+            Task(
+                id = "item-physic-lite",
+                label = "ItemPhysicLite",
+                isPresent = { modLoaded(ITEM_PHYSIC_ID) && findClass(ITEM_PHYSIC_CONFIG) != null },
+                apply = ::disableItemPhysic,
                 coveredByLegacyFlag = false,
             ),
         )
@@ -262,8 +281,10 @@ object DefaultSettings {
         val minecraft = Minecraft.getInstance()
         //? if >= 26.2 {
         if (minecraft.gui.overlay() != null || minecraft.gui.screen() == null) return
-        //?} else
-        //if (minecraft.overlay != null || minecraft.screen == null) return
+        //?} elif > 1.8.9 {
+        /*if (minecraft.overlay != null || minecraft.screen == null) return
+        *///?} else
+        //if (minecraft.screen == null) return
 
         reported = true
         runCatching {
@@ -276,9 +297,15 @@ object DefaultSettings {
 
     private fun applyVanillaOptions() {
         val options = Minecraft.getInstance().options ?: return
+        //? if > 1.8.9 {
         options.enableVsync().set(false)
         options.framerateLimit().set(UNLIMITED_FRAMERATE)
         options.entityShadows().set(false)
+        //?} else {
+        /*options.vsync = false
+        options.fpsLimit = UNLIMITED_FRAMERATE
+        options.entityShadows = false
+        *///?}
         options.save()
     }
 
@@ -292,13 +319,24 @@ object DefaultSettings {
     }
     //?}
 
+    //? if > 1.8.9 {
     private fun keyMappings(): List<KeyMapping> =
         Minecraft.getInstance().options?.keyMappings?.asList().orEmpty()
+    //?} else {
+    /*private fun keyMappings(): List<KeyMapping> =
+        Minecraft.getInstance().options?.keyBindings?.asList().orEmpty()
+
+    private val KeyMapping.isUnbound: Boolean get() = keyCode == 0
+    *///?}
 
     private fun unbindMatching(matches: (String) -> Boolean) {
         val options = Minecraft.getInstance().options ?: return
         var changed = false
+        //? if > 1.8.9 {
         options.keyMappings.forEach { mapping ->
+        //?} else {
+        /*options.keyBindings.forEach { mapping ->
+        *///?}
             if (!matches(mapping.name) || mapping.isUnbound) return@forEach
             mapping.setKey(InputConstants.UNKNOWN)
             changed = true
@@ -395,12 +433,32 @@ object DefaultSettings {
         logger.info("Disabled IQ Addons Block Useless Perks")
     }
 
+    private fun disableItemPhysic() {
+        val type = findClass(ITEM_PHYSIC_CONFIG) ?: error("$ITEM_PHYSIC_CONFIG is missing")
+        val toggled = type.getField("toggled").get(null)
+        toggled.javaClass.getMethod("set", Any::class.java).invoke(toggled, false)
+
+        val managers = findClass(OSL_CONFIG_MANAGER_IMPL)?.getDeclaredField("MANAGERS")
+            ?.apply { isAccessible = true }?.get(null) as? Map<*, *> ?: error("$OSL_CONFIG_MANAGER_IMPL is missing")
+        val config = managers.values.filterNotNull().firstNotNullOfOrNull { manager ->
+            (manager.javaClass.getMethod("getConfigs").invoke(manager) as Collection<*>).firstOrNull(type::isInstance)
+        } ?: error("ItemPhysicLite has not registered its config")
+        findClass(OSL_CONFIG_MANAGER)!!.getMethod("save", findClass(OSL_CONFIG)).invoke(null, config)
+        logger.info("Disabled ItemPhysicLite")
+    }
+
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
         val type = findClass(className) ?: error("$className is missing")
+        //? if > 1.8.9 {
         val handler = type.getField("CONFIG").get(null)
         val instance = handler.javaClass.getMethod("instance").invoke(handler)
         instance.javaClass.getField(fieldName).setBoolean(instance, value)
         handler.javaClass.getMethod("save").invoke(handler)
+        //?} else {
+        /*val instance = type.getField("INSTANCE").get(null)
+        type.getField(fieldName).setBoolean(null, value)
+        instance.javaClass.getMethod("save").invoke(instance)
+        *///?}
         logger.info("Set {}#{} to {}", className.substringAfterLast('.'), fieldName, value)
     }
 

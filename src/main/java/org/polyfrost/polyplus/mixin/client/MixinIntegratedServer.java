@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9 {
 import net.minecraft.client.server.IntegratedServer;
+//?} else
+//import net.minecraft.server.integrated.IntegratedServer;
 import org.spongepowered.asm.mixin.Mixin;
 
 //? if = 26.2 {

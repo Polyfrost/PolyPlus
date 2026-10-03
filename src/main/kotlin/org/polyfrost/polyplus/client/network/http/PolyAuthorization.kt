@@ -131,7 +131,11 @@ object PolyAuthorization {
         val playerName = user.name
         val serverId = generateServerId()
         if (PolyPlusConfig.apiUrl != BackendUrl.LOCAL) {
+            //? if > 1.8.9 {
             if (authorizeSessionService(serverId, profileId, user.accessToken)) joined()
+            //?} else {
+            /*if (authorizeSessionService(serverId, profileId, Minecraft.getInstance().session.accessToken)) joined()
+            *///?}
         }
         try {
             login(serverId, profileId, playerName)
@@ -213,7 +217,7 @@ object PolyAuthorization {
     }
 
     private const val LOADER =
-        //? if fabric {
+        //? if fabric || ornithe {
         "fabric"
     //?} else {
     /*"neoforge"
@@ -229,6 +233,7 @@ object PolyAuthorization {
 
     private fun authorizeSessionService(serverId: String, profileId: UUID, accessToken: String): Boolean {
         try {
+            //? if > 1.8.9 {
             Minecraft.getInstance().
                 //?if >= 1.21.10 {
              services().sessionService
@@ -236,6 +241,10 @@ object PolyAuthorization {
                 /*minecraftSessionService
             *///?}
                 .joinServer(profileId, accessToken, serverId)
+            //?} else {
+            /*val mc = Minecraft.getInstance()
+            mc.sessionService.joinServer(mc.session.profile, accessToken, serverId)
+            *///?}
         } catch (e: Exception) {
             LOGGER.error("Failed to authenticate with Mojang", e)
             return false

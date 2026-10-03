@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
@@ -79,6 +79,7 @@ private data class WheelSlot(val id: Int, val name: String)
 class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private val logger = LogManager.getLogger("polyplus/emote-wheel")
 
+    //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = true
 
     //? if <26.1 {
@@ -90,6 +91,7 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun onClose() {
         Minecraft.getInstance().execute { super.onClose() }
     }
+    //?}
 
     @Composable
     override fun compose() {
@@ -112,12 +114,18 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     private fun closeWheel() {
+        //? if > 1.8.9 {
         Minecraft.getInstance().execute {
+        //?} else {
+        /*Minecraft.getInstance().tell {
+        *///?}
             val mc = Minecraft.getInstance()
             //? if >= 26.2 {
             if (mc.gui.screen() === this) mc.gui.setScreen(null)
-            //?} else {
+            //?} elif > 1.8.9 {
             /*if (mc.screen === this) mc.setScreen(null)
+            *///?} else {
+            /*if (mc.screen === this) mc.openScreen(null)
             *///?}
         }
     }

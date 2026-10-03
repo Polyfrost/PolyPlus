@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
+//? if > 1.8.9 {
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -18,3 +19,4 @@ public interface AbstractSelectionListAccessor {
     int polyplus$entryHeight();
     //?}
 }
+//?}

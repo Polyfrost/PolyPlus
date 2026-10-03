@@ -1,8 +1,13 @@
 package org.polyfrost.polyplus.client
 
 import net.minecraft.client.Minecraft
+//? if > 1.8.9 {
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.ServerList
+//?} else {
+/*import net.minecraft.client.options.ServerListEntry as ServerData
+import net.minecraft.client.options.ServerList
+*///?}
 import java.io.File
 import kotlinx.serialization.Serializable
 
@@ -18,7 +23,11 @@ object PolyPlusRecentServers {
         val lastDirect: RecentServer? = null,
     )
 
+    //? if > 1.8.9 {
     private val file: File by lazy { File(Minecraft.getInstance().gameDirectory, "polyplus/recent_servers.json") }
+    //?} else {
+    /*private val file: File by lazy { File(Minecraft.getInstance().gameDir, "polyplus/recent_servers.json") }
+    *///?}
     private val recents = mutableListOf<RecentServer>()
     private var lastDirect: RecentServer? = null
     private var loaded = false
@@ -80,7 +89,11 @@ object PolyPlusRecentServers {
         fun add(name: String, ip: String) {
             val key = ip.lowercase()
             if (key in out || out.size >= MAX) return
+            //? if > 1.8.9 {
             out[key] = savedByIp[key] ?: ServerData(name, ip, ServerData.Type.OTHER)
+            //?} else {
+            /*out[key] = savedByIp[key] ?: ServerData(name, ip, false)
+            *///?}
         }
 
         recents.forEach { add(it.name, it.ip) }

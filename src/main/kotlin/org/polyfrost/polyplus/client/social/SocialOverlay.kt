@@ -68,6 +68,13 @@ object SocialOverlay {
         }
     }
 
+    //? if = 1.8.9 {
+    /*fun restoreAfterEscape(previousScreen: Screen?) {
+        val mc = Minecraft.getInstance()
+        if (mc.screen == null || mc.screen is TitleScreen) mc.setScreen(previousScreen)
+    }
+    *///?}
+
     private fun currentScreen(): Screen? {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {

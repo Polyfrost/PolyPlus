@@ -79,12 +79,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.mojang.realmsclient.RealmsMainScreen
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
+//? if > 1.8.9 {
+import com.mojang.realmsclient.RealmsMainScreen
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
@@ -92,6 +93,15 @@ import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.ServerStatusPinger
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.DefaultPlayerSkin
+//?} else {
+/*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen as JoinMultiplayerScreen
+import net.minecraft.client.gui.screen.menu.options.OptionsScreen
+import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
+import net.minecraft.client.network.MultiplayerServerListPinger as ServerStatusPinger
+import net.minecraft.client.options.ServerListEntry as ServerData
+import net.minecraft.client.resource.skin.DefaultSkinUtils
+import net.minecraft.realms.RealmsBridge
+*///?}
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
@@ -158,7 +168,7 @@ import net.minecraft.server.network.EventLoopGroupHolder
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
@@ -172,9 +182,23 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         if (gs != menuGuiScale) menuGuiScale = gs
     }
 
+    //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = false
+    //?} else {
+    /*override fun init() {
+        MenuPanorama.legacyPanorama()
+        super.init()
+    }
 
-    //? if <26.1 {
+    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+        syncGuiScaleState()
+        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
+        super.render(mouseX, mouseY, tickDelta)
+        firstFrameDrawn = true
+    }
+    *///?}
+
+    //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
@@ -183,16 +207,16 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             if (firstFrameDrawn) {
                 val gameRenderer = Minecraft.getInstance().gameRenderer
                 //? if <1.21.4 {
-                /*gameRenderer.processBlurEffect(tickDelta)
-                *///?} else {
-                gameRenderer.processBlurEffect()
-                //?}
+                gameRenderer.processBlurEffect(tickDelta)
+                //?} else {
+                /^gameRenderer.processBlurEffect()
+                ^///?}
             }
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
     }
-    *///?} else {
+    *///?} elif >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
@@ -211,10 +235,10 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
     //?}
 
-    //? if <26.1 {
+    //? if <26.1 && > 1.8.9 {
     /*override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
-    *///?} else {
+    *///?} elif >= 26.1 {
     override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
     //?}
@@ -263,11 +287,16 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     singleplayer = {
                         //? if >= 26.2 {
                         mc.gui.setScreen(SelectWorldScreen(this))
-                        //?} else {
+                        //?} elif > 1.8.9 {
                         /*mc.setScreen(SelectWorldScreen(this))
+                        *///?} else {
+                        /*mc.openScreen(SelectWorldScreen(this))
                         *///?}
                     },
                     openWorld = { id ->
+                        //? if = 1.8.9 {
+                        /*HostWorldManager.openWorld(id)
+                        *///?} else {
                         mc.createWorldOpenFlows().openWorld(id) {
                             //? if >= 26.2 {
                             mc.gui.setScreen(this)
@@ -275,20 +304,25 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                             /*mc.setScreen(this)
                             *///?}
                         }
+                        //?}
                     },
                     multiplayer = {
                         //? if >= 26.2 {
                         mc.gui.setScreen(JoinMultiplayerScreen(this))
-                        //?} else {
+                        //?} elif > 1.8.9 {
                         /*mc.setScreen(JoinMultiplayerScreen(this))
+                        *///?} else {
+                        /*mc.openScreen(JoinMultiplayerScreen(this))
                         *///?}
                     },
                     realms = if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
                         {
                             //? if >= 26.2 {
                             mc.gui.setScreen(RealmsMainScreen(this))
-                            //?} else {
+                            //?} elif > 1.8.9 {
                             /*mc.setScreen(RealmsMainScreen(this))
+                            *///?} else {
+                            /*RealmsBridge().createMainMenuScreen(this)
                             *///?}
                         }
                     } else null,
@@ -299,8 +333,10 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         /*mc.gui.setScreen(OptionsScreen(this, mc.options, false))
                         *///?} elif >= 26.1 {
                         /*mc.setScreen(OptionsScreen(this, mc.options, false))
-                        *///?} else {
+                        *///?} elif > 1.8.9 {
                         /*mc.setScreen(OptionsScreen(this, mc.options))
+                        *///?} else {
+                        /*mc.openScreen(OptionsScreen(this, mc.options))
                         *///?}
                     },
                     mods = { PolyPlusOneConfigIntegration.openMods() },
@@ -310,8 +346,10 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         mc.options.fullscreen().set(!mc.options.fullscreen().get())
                         mc.options.save()
                     },
-                    //?} else {
+                    //?} elif > 1.8.9 {
                     /*fullscreen = { mc.window.toggleFullScreen() },
+                    *///?} else {
+                    /*fullscreen = { mc.toggleFullscreen() },
                     *///?}
                     quit = { mc.stop() },
                     connect = { server -> connectTo(mc, server) },
@@ -323,8 +361,12 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     private fun connectTo(mc: Minecraft, server: ServerData) {
+        //? if > 1.8.9 {
         val address = ServerAddress.parseString(server.ip)
         ConnectScreen.startConnecting(this, mc, address, server, false, null)
+        //?} else {
+        /*mc.openScreen(ConnectScreen(this, mc, server))
+        *///?}
     }
 }
 
@@ -346,8 +388,10 @@ private object MainMenuServerPings {
                         //? if >= 1.21.11 {
                         val elg = EventLoopGroupHolder.remote(false)
                         pinger.pingServer(data, Runnable {}, Runnable {}, elg)
-                        //?} else {
+                        //?} elif > 1.8.9 {
                         /*pinger.pingServer(data, Runnable {}, Runnable {})
+                        *///?} else {
+                        /*pinger.add(data)
                         *///?}
                     }.isSuccess
                     if (!ok) lastPinged.remove(data)
@@ -492,6 +536,7 @@ private fun loadFaceByUuid(uuid: UUID): Result<ImageBitmap?> {
 }
 
 private fun defaultSkinFace(uuid: UUID): ImageBitmap? = runCatching {
+    //? if > 1.8.9 {
     val skinAsset = DefaultPlayerSkin.get(uuid)
     //? if >= 1.21.10 {
     val location = skinAsset.body().texturePath()
@@ -501,6 +546,11 @@ private fun defaultSkinFace(uuid: UUID): ImageBitmap? = runCatching {
     val manager = Minecraft.getInstance().resourceManager
     val resource = manager.getResource(location).orElse(null) ?: return null
     val skin = resource.open().use { ImageIO.read(it) } ?: return null
+    //?} else {
+    /*val location = DefaultSkinUtils.getDefaultSkin(uuid)
+    val resource = Minecraft.getInstance().resourceManager.getResource(location)
+    val skin = resource.asStream().use { ImageIO.read(it) } ?: return null
+    *///?}
     buildFace(skin)
 }.getOrNull()
 
@@ -767,13 +817,21 @@ private fun LeftColumn(
                         is QuickplayEntry.Server -> ServerRow(
                             title = entry.data.name,
                             subtitle = serverStatusText(entry.data),
+                            //? if > 1.8.9 {
                             favicon = rememberFavicon(entry.data.iconBytes),
+                            //?} else {
+                            /*favicon = rememberFavicon(entry.data.icon),
+                            *///?}
                             fallbackPng = ASSETS + if (entry.data.ip.contains("hypixel", true)) "hypixel.png" else "server.png",
                             onClick = { actions.connect(entry.data) },
                         )
                         is QuickplayEntry.World -> ServerRow(
                             title = entry.world.name,
+                            //? if > 1.8.9 {
                             subtitle = "Singleplayer · " + entry.world.gameMode.shortDisplayName.string,
+                            //?} else {
+                            /*subtitle = "Singleplayer · " + entry.world.gameMode.key.replaceFirstChar { it.uppercase() },
+                            *///?}
                             favicon = rememberFavicon(entry.world.iconBytes),
                             fallbackPng = ASSETS + "server.png",
                             onClick = { actions.openWorld(entry.world.id) },
@@ -786,11 +844,16 @@ private fun LeftColumn(
 }
 
 private fun serverStatusText(server: ServerData): String {
+    //? if > 1.8.9 {
     val players = server.players
     return when {
         players != null -> "%,d players online".format(players.online())
         else -> server.ip
     }
+    //?} else {
+    /*val online = server.onlinePlayers?.replace(Regex("\u00a7."), "")?.substringBefore('/')?.trim()?.toIntOrNull()
+    return if (online != null) "%,d players online".format(online) else server.ip
+    *///?}
 }
 
 @Composable
@@ -862,7 +925,11 @@ private fun HostWorldButton(screen: Screen) {
             icon = ASSETS + "log-in-04.svg",
             modifier = Modifier.fillMaxWidth(),
             onClick = {
+                //? if > 1.8.9 {
                 hostingCurrentWorld = Minecraft.getInstance().singleplayerServer != null
+                //?} else {
+                /*hostingCurrentWorld = Minecraft.getInstance().server != null
+                *///?}
                 FriendsRepository.refreshAll()
                 GroupsRepository.refreshGroups()
                 showFlow = true
@@ -924,8 +991,10 @@ private fun VanillaMenuButton() {
             val mc = Minecraft.getInstance()
             //? if >= 26.2 {
             mc.gui.setScreen(TitleScreen())
-            //?} else {
+            //?} elif > 1.8.9 {
             /*mc.setScreen(TitleScreen())
+            *///?} else {
+            /*mc.openScreen(TitleScreen())
             *///?}
         },
     )
@@ -958,7 +1027,11 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
     @Suppress("UNUSED_EXPRESSION") pingTick
 
     val catalogIcon = rememberRemoteImage(campaign.imageUrl ?: FeaturedServers.iconUrl(server.id))
+    //? if > 1.8.9 {
     val favicon = rememberFavicon(data.iconBytes)
+    //?} else {
+    /*val favicon = rememberFavicon(data.icon)
+    *///?}
 
     Column(
         modifier = modifier
@@ -1727,7 +1800,11 @@ private fun MicrosoftLoginPopup(
                     modifier = Modifier.weight(1f),
                     onClick = {
                         runCatching {
+                            //? if > 1.8.9 {
                             Minecraft.getInstance().keyboardHandler.setClipboard(code)
+                            //?} else {
+                            /*Screen.setClipboard(code)
+                            *///?}
                         }
                     },
                 )
@@ -1929,6 +2006,14 @@ private fun rememberFavicon(bytes: ByteArray?): ImageBitmap? = remember(bytes) {
     else runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
 }
 
+//? if = 1.8.9 {
+/*@Composable
+private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
+    if (icon.isNullOrEmpty()) null
+    else runCatching { SkiaImage.makeFromEncoded(Base64.getDecoder().decode(icon)).toComposeImageBitmap() }.getOrNull()
+}
+*///?}
+
 @Composable
 private fun rememberRaster(path: String): ImageBitmap? =
     if (MainMenuRasterAssets.ready) MainMenuRasterAssets.cached(path) else null
@@ -1938,7 +2023,7 @@ private fun playerName(): String = runCatching {
 }.getOrDefault("Player")
 
 private fun platformLabel(): String = runCatching {
-    //? if fabric {
+    //? if fabric || ornithe {
     val loaderName = "Fabric"
     val mcVersion = FabricLoader.getInstance()
         .getModContainer("minecraft").map { it.metadata.version.friendlyString }.orElse("")

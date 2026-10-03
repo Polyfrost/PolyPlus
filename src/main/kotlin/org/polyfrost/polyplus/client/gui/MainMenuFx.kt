@@ -44,6 +44,17 @@ private val Blobs = listOf(
     Blob(0.900f, 0.85f, 0.45f, 0.10f, 0.08f, 0.12f, 5.0f, 2.6f, 0.05f, 0.06f, 0.80f, 0.0110f),
 )
 
+private const val GLOW_STEPS = 12
+
+private fun softRadial(color: Color, alpha: Float, center: Offset, radius: Float): Brush {
+    val stops = Array(GLOW_STEPS + 1) { i ->
+        val t = i.toFloat() / GLOW_STEPS
+        val s = 1f - t
+        t to color.copy(alpha = alpha * s * s * (3f - 2f * s))
+    }
+    return Brush.radialGradient(colorStops = stops, center = center, radius = radius)
+}
+
 fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
     drawRect(FxPageBackground)
     val mdx = (mouse.x - 0.5f) * size.width
@@ -55,15 +66,7 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
         val alpha = (b.baseAlpha * (0.75f + 0.25f * sin(time * 0.9f + b.psi))).coerceIn(0f, 1f)
         val color = coolGlowColor(time * 0.05f + b.hueOffset)
         val center = Offset(cx, cy)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(color.copy(alpha = alpha), Color.Transparent),
-                center = center,
-                radius = radius,
-            ),
-            radius = radius,
-            center = center,
-        )
+        drawCircle(brush = softRadial(color, alpha, center, radius), radius = radius, center = center)
     }
     drawAurora(time)
     drawParticles(time, mouse)
@@ -120,15 +123,7 @@ private fun DrawScope.drawParticles(time: Float, mouse: Offset) {
         val par = p.size * 0.0006f
         val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
         val r = p.size * 3f
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color.White.copy(alpha = alpha), Color.Transparent),
-                center = center,
-                radius = r,
-            ),
-            radius = r,
-            center = center,
-        )
+        drawCircle(brush = softRadial(Color.White, alpha, center, r), radius = r, center = center)
     }
 }
 
@@ -172,23 +167,20 @@ private fun DrawScope.drawPanoramaGlowMask() {
     for (g in GlowMask) {
         val center = Offset(size.width * g.ax, size.height * g.ay)
         val radius = size.width * g.radiusF
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(PanoramaGlowBlue.copy(alpha = g.alpha), Color.Transparent),
-                center = center,
-                radius = radius,
-            ),
-            radius = radius,
-            center = center,
-        )
+        drawCircle(brush = softRadial(PanoramaGlowBlue, g.alpha, center, radius), radius = radius, center = center)
     }
 }
 
 private fun DrawScope.drawVignette(time: Float) {
     val radius = size.maxDimension * (0.78f + 0.02f * sin(time * 0.5f))
+    val stops = Array(GLOW_STEPS + 1) { i ->
+        val t = i.toFloat() / GLOW_STEPS
+        val s = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
+        t to FxPageBackground.copy(alpha = 0.55f * s * s * (3f - 2f * s))
+    }
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(Color.Transparent, Color.Transparent, FxPageBackground.copy(alpha = 0.55f)),
+            colorStops = stops,
             center = Offset(size.width / 2f, size.height / 2f),
             radius = radius,
         ),

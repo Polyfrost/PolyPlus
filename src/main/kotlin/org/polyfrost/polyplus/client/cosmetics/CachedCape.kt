@@ -1,13 +1,18 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import java.awt.image.BufferedImage
+
+//? if > 1.8.9 {
+import net.minecraft.client.renderer.texture.DynamicTexture
 import org.polyfrost.polyplus.client.render.NativeImage
 import org.polyfrost.polyplus.client.utils.copyFrameInto
-import java.awt.image.BufferedImage
+//?} else {
+/*import net.minecraft.client.render.texture.DynamicTexture
+*///?}
 
 internal const val DEFAULT_MILLIS_PER_FRAME = 100L
 
@@ -26,8 +31,10 @@ class CachedCape(
     private var sheet: BufferedImage? = sheet
     private val width = sheet.width
     private val frameHeight = sheet.height / frames
+    //? if > 1.8.9 {
     private var pixels: NativeImage? = null
     private var frameBuffer: IntArray? = null
+    //?}
     private var texture: DynamicTexture? = null
     @Volatile
     private var location: Identifier? = null
@@ -38,8 +45,11 @@ class CachedCape(
 
     private fun register() {
         if (registerFailed || sheet == null) return
+        //? if > 1.8.9 {
         var image: NativeImage? = null
+        //?}
         runCatching {
+            //? if > 1.8.9 {
             val frame = NativeImage(width, frameHeight, true).also { image = it }
             val dynamic = DynamicTexture(
                 //?if >= 1.21.5 {
@@ -50,6 +60,10 @@ class CachedCape(
             Minecraft.getInstance().textureManager.register(texturePath(), dynamic)
             pixels = frame
             if (frames > 1) frameBuffer = IntArray(width * frameHeight)
+            //?} else {
+            /*val dynamic = DynamicTexture(width, frameHeight)
+            Minecraft.getInstance().textureManager.register(texturePath(), dynamic)
+            *///?}
             texture = dynamic
             location = Identifier.fromNamespaceAndPath(
                 PolyPlusConstants.ID,
@@ -57,7 +71,9 @@ class CachedCape(
             )
         }.onFailure {
             registerFailed = true
+            //? if > 1.8.9 {
             runCatching { image?.close() }
+            //?}
             LOGGER.error("Failed to register cape texture for cosmetic {}", id, it)
             return
         }
@@ -66,17 +82,25 @@ class CachedCape(
 
     fun release() {
         if (texture == null) return
+        //? if > 1.8.9 {
         Minecraft.getInstance().textureManager.release(texturePath())
-        texture = null
         pixels = null
         frameBuffer = null
+        //?} else {
+        /*Minecraft.getInstance().textureManager.close(texturePath())
+        *///?}
+        texture = null
         location = null
         shownFrame = -1
     }
 
     fun asResource(): Identifier? {
         if (location == null) {
+            //? if > 1.8.9 {
             if (!Minecraft.getInstance().isSameThread) return null
+            //?} else {
+            /*if (!Minecraft.getInstance().isOnSameThread) return null
+            *///?}
             register()
         }
         if (frames > 1) {
@@ -86,12 +110,20 @@ class CachedCape(
     }
 
     private fun drawFrame(frame: Int) {
+        //? if > 1.8.9 {
         if (!Minecraft.getInstance().isSameThread) return
         if (frame == shownFrame) return
         val source = sheet ?: return
         val target = pixels ?: return
         val dynamic = texture ?: return
         source.copyFrameInto(target, capeFrameOffset(frameHeight, frame), frameBuffer)
+        //?} else {
+        /*if (!Minecraft.getInstance().isOnSameThread) return
+        if (frame == shownFrame) return
+        val source = sheet ?: return
+        val dynamic = texture ?: return
+        source.getRGB(0, capeFrameOffset(frameHeight, frame), width, frameHeight, dynamic.pixels, 0, width)
+        *///?}
         dynamic.upload()
         shownFrame = frame
         if (frames == 1) sheet = null

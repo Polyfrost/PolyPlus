@@ -1,11 +1,18 @@
 package org.polyfrost.polyplus.client.network.p2p
 
+//? if > 1.8.9
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.TitleScreen
+//? if > 1.8.9 {
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
+//?} else {
+/*import net.minecraft.client.options.ServerListEntry
+import org.polyfrost.polyplus.client.social.execute
+import org.polyfrost.polyplus.client.social.setScreen
+*///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
@@ -101,13 +108,23 @@ object P2PSessionManager {
 
         HostSharedPack.registerConfigurationHook()
 
+        //? if > 1.8.9 {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             stopHosting()
             PackHttpBridge.setPackSource(null)
         }
+        //?}
 
         if (unsupported == null) eventHandler<TickEvent.End> { checkForStalledEos() }
     }
+
+    //? if = 1.8.9 {
+    /*@JvmStatic
+    fun onClientDisconnected() {
+        stopHosting()
+        PackHttpBridge.setPackSource(null)
+    }
+    *///?}
 
     private val consentLock = Any()
 
@@ -173,6 +190,7 @@ object P2PSessionManager {
                 LOGGER.info("Consent withdrawn; shutting EOS down.")
                 bridge = null
                 authJob?.cancel()
+                //? if > 1.8.9
                 EosVoicechatBridge.uninstall()
                 P2PPackTransport.uninstall()
                 shutDownForConsent = true
@@ -211,6 +229,7 @@ object P2PSessionManager {
         bridge.setRelayControl(forceRelays = false)
         bridge.setInboundPacketHandler { received ->
             if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
+            //? if > 1.8.9
             if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
 
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
@@ -222,6 +241,7 @@ object P2PSessionManager {
         }
         bridge.setLoginLostHandler { authenticate(bridge) }
         P2PPackTransport.install(bridge)
+        //? if > 1.8.9
         EosVoicechatBridge.install(bridge)
 
         authenticate(bridge)
@@ -296,6 +316,7 @@ object P2PSessionManager {
             bridge = null
             authJob?.cancel()
             stallReported = false
+            //? if > 1.8.9
             EosVoicechatBridge.uninstall()
             P2PPackTransport.uninstall()
             _status.value = EosStatus.Connecting
@@ -525,6 +546,13 @@ object P2PSessionManager {
         PackHttpBridge.setPackSource(target.host)
 
         val minecraft = Minecraft.getInstance()
+        //? if = 1.8.9 {
+        /*minecraft.execute {
+            val screen = ConnectScreen(TitleScreen(), minecraft, P2P_PLACEHOLDER_IP, 2)
+            minecraft.setCurrentServerEntry(ServerListEntry("PolyPlus P2P session", P2P_PLACEHOLDER_IP, false))
+            minecraft.setScreen(screen)
+        }
+        *///?} else {
         val address = ServerAddress.parseString("$P2P_PLACEHOLDER_IP:2")
         val serverData = ServerData(
             "PolyPlus P2P session",
@@ -542,5 +570,7 @@ object P2PSessionManager {
                 null,
             )
         }
+        //?}
+
     }
 }

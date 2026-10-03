@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.network.p2p
 
+import java.net.SocketAddress
+
 object P2PConnectionContext {
     @Volatile private var pendingTarget: P2PSessionManager.JoinTarget? = null
 
@@ -21,4 +23,8 @@ object P2PConnectionContext {
         pendingTarget = null
         return EosP2PAddress(target.host, target.socket)
     }
+
+    @JvmStatic
+    fun resolveTarget(remote: SocketAddress?): EosP2PAddress? =
+        remote as? EosP2PAddress ?: consumeAddressOverride()
 }

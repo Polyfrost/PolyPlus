@@ -3,7 +3,7 @@ package org.polyfrost.polyplus.client.gui
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
-//? if fabric {
+//? if fabric || ornithe {
 import net.fabricmc.loader.api.FabricLoader
 //?}
 
@@ -38,7 +38,7 @@ internal object ModIntegrationButtons {
     fun available(): List<ModIntegrationButton> = all.filter { runCatching { it.isPresent() }.getOrDefault(false) }
 
     private fun modLoaded(id: String): Boolean {
-        //? if fabric {
+        //? if fabric || ornithe {
         return FabricLoader.getInstance().isModLoaded(id)
         //?} else {
         /*return false
@@ -62,8 +62,10 @@ private class ParentScreenFactory(private val className: String) {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
         mc.gui.setScreen(screen)
-        //?} else {
+        //?} elif > 1.8.9 {
         /*mc.setScreen(screen)
+        *///?} else {
+        /*mc.openScreen(screen)
         *///?}
     }
 }

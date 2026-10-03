@@ -1,21 +1,24 @@
 package org.polyfrost.polyplus.client.gui
 
+//? if > 1.8.9 {
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
 import net.fabricmc.fabric.api.event.Event
-import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.Tooltip
-import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.PolyPlusBadge
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
+//?}
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.TitleScreen
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 
 object VanillaMenuButton {
     private const val SIZE = 20
     private const val MARGIN = 4
 
+    //? if > 1.8.9 {
     private val LATE_PHASE: Identifier = Identifier.fromNamespaceAndPath("polyplus", "late_screen_widgets")
 
     fun register() {
@@ -31,6 +34,19 @@ object VanillaMenuButton {
             .tooltip(Tooltip.create(Component.translatable("polyplus.mainmenu.switchToOneClient")))
             .bounds(screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE)
             .build()
+    //?} else {
+    /*const val LEGACY_BUTTON_ID = 0x504C5553
+
+    fun register() {}
+
+    @JvmStatic
+    fun legacyButton(screenWidth: Int): net.minecraft.client.gui.widget.ButtonWidget? =
+        if (!PolyPlusMainMenuConfig.useVanillaMainMenu) null
+        else net.minecraft.client.gui.widget.ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "P+")
+
+    @JvmStatic
+    fun onLegacyButton() = openPolyPlusMenu()
+    *///?}
 
     private fun openPolyPlusMenu() {
         PolyPlusMainMenuConfig.useVanillaMainMenu = false
@@ -38,8 +54,10 @@ object VanillaMenuButton {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
         mc.gui.setScreen(TitleScreen())
-        //?} else {
+        //?} elif > 1.8.9 {
         /*mc.setScreen(TitleScreen())
+        *///?} else {
+        /*mc.openScreen(TitleScreen())
         *///?}
     }
 }

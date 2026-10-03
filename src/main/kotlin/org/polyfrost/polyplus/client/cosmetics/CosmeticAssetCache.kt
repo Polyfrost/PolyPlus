@@ -25,7 +25,7 @@ import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-//? if >= 1.21.1 {
+//? if >= 1.21.1 || = 1.8.9 {
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
 import org.polyfrost.polyplus.client.cosmetics.assets.AttachedCosmeticParser
 import org.polyfrost.polyplus.client.cosmetics.assets.BedrockPlayerGeometryCache
@@ -63,7 +63,7 @@ object CosmeticAssetCache {
 
     var installs by mutableIntStateOf(0)
         private set
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     private val emotesById = ConcurrentHashMap<Int, Emote>()
     private val attachedById = ConcurrentHashMap<Int, AttachedCosmetic>()
     private val petsById = ConcurrentHashMap<Int, PetDefinition>()
@@ -88,7 +88,7 @@ object CosmeticAssetCache {
 
     fun isCapeAnimated(id: Int): Boolean = capes[id]?.isAnimated == true
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     fun getEmote(emoteId: Int): Emote? = emotesById[emoteId]
 
     fun getAttachedCosmetic(id: Int): AttachedCosmetic? = attachedById[id]
@@ -106,7 +106,7 @@ object CosmeticAssetCache {
         }
         parsedHashes.clear()
         failedParses.clear()
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         emotesById.clear()
         attachedById.clear()
         petsById.clear()
@@ -125,7 +125,7 @@ object CosmeticAssetCache {
             cape.release()
             evicted = true
         }
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         // a texture id belongs to one cosmetic id, whose entries are always kept or evicted together
         fun <T : Any> MutableMap<Int, T>.evict(textures: (T) -> List<Identifier>) {
             for ((id, asset) in this) {
@@ -188,7 +188,7 @@ object CosmeticAssetCache {
                     return@withContext
                 }
 
-                //? if >= 1.21.1 {
+                //? if >= 1.21.1 || = 1.8.9 {
                 parseLock.withLock { BedrockPlayerGeometryCache.scanCosmeticDirs(baseDir) }
                 //?}
 
@@ -219,7 +219,7 @@ object CosmeticAssetCache {
         return ensureLoaded(definition)
     }
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     suspend fun ensureEmoteLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getEmoteDefinition(id) ?: return false
         return ensureLoaded(definition)
@@ -228,16 +228,14 @@ object CosmeticAssetCache {
 
     private fun isLoaded(definition: CosmeticDefinition): Boolean {
         if (definition.type == CosmeticType.Cape) return capes.containsKey(definition.id)
-        //? if >= 1.21.1 {
+        //? if >= 1.21.1 || = 1.8.9 {
         return when (definition.type) {
             CosmeticType.Emote -> emotesById.containsKey(definition.id)
             CosmeticType.Pet -> petsById.containsKey(definition.id) || attachedById.containsKey(definition.id)
             CosmeticType.Unknown -> false
             else -> attachedById.containsKey(definition.id)
         }
-        //?} else {
-        /*return false
-        *///?}
+        //?}
     }
 
     private suspend fun ensureLoaded(definition: CosmeticDefinition): Boolean {
@@ -300,13 +298,13 @@ object CosmeticAssetCache {
             CosmeticType.Aura,
             CosmeticType.Boots,
             CosmeticType.Shoulder ->
-                //? if >= 1.21.1 {
+                //? if >= 1.21.1 || = 1.8.9 {
                 loadAttachedCosmetic(definition.id, cosmeticDir, definition.preferredSlot() ?: return)
                 //?} else {
                 /*skip("Attached cosmetics require Minecraft 1.21.1+")*/
                 //?}
             CosmeticType.Unknown -> skip("Ignoring cosmetic ${definition.id} with unknown type/slot")
-            //? if >= 1.21.1 {
+            //? if >= 1.21.1 || = 1.8.9 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
             CosmeticType.Pet -> loadPet(definition.id, cosmeticDir)
             //?} else {
@@ -397,7 +395,7 @@ object CosmeticAssetCache {
         return true
     }
 
-    //? if >= 1.21.1 {
+    //? if >= 1.21.1 || = 1.8.9 {
     private fun playerGeometryOrNull(id: Int, dir: Path): BedrockGeometry? {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
         BedrockPlayerGeometryCache.ensureFromDisk()

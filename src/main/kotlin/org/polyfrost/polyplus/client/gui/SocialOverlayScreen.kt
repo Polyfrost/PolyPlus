@@ -17,8 +17,13 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 //?}
 
-//? if < 26.1 {
+//? if < 26.1 && > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
+//? if = 1.8.9 {
+/*import org.polyfrost.polyplus.client.social.execute
+import org.lwjgl.input.Keyboard
 *///?}
 
 // holding the previous screen here instead of in SocialOverlay lets it go once the overlay is replaced by any screen
@@ -26,9 +31,34 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
     private var firstFrameDrawn = false
     private val openedAt = System.currentTimeMillis()
 
+    //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = true
 
     private fun inGame(): Boolean = Minecraft.getInstance().level != null
+    //?} else {
+    /*private fun inGame(): Boolean = Minecraft.getInstance().world != null
+
+    private var escaping = false
+
+    override fun handleKeyboard() {
+        escaping = Keyboard.getEventKeyState() && Keyboard.getEventKey() == Keyboard.KEY_ESCAPE
+        try {
+            super.handleKeyboard()
+        } finally {
+            escaping = false
+        }
+    }
+
+    override fun removed() {
+        super.removed()
+        if (escaping) Minecraft.getInstance().tell { SocialOverlay.restoreAfterEscape(previousScreen) }
+    }
+
+    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (inGame() && OneConfigConfig.enableBackgroundBlur) BlurRenderer.drawBlur(worldBlurRadius())
+        super.render(mouseX, mouseY, tickDelta)
+    }
+    *///?}
 
     /** Mirrors OneConfig's own fullscreen blur fade-in (see OneConfigUIScreen). */
     private fun worldBlurRadius(): Float {
@@ -41,7 +71,7 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
         private const val OPEN_ANIMATION_MS = 250L
     }
 
-    //? if <26.1 {
+    //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
             MenuBackgroundPass.enqueue(true)
@@ -49,19 +79,19 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
             if (firstFrameDrawn) {
                 val gameRenderer = Minecraft.getInstance().gameRenderer
                 //? if <1.21.4 {
-                /*gameRenderer.processBlurEffect(tickDelta)
-                *///?} else {
-                gameRenderer.processBlurEffect()
-                //?}
+                gameRenderer.processBlurEffect(tickDelta)
+                //?} else {
+                /^gameRenderer.processBlurEffect()
+                ^///?}
             }
         } else if (OneConfigConfig.enableBackgroundBlur) {
             //? if >= 1.21.10 {
-            if (SkiaCtx.isDeferredComposeBackend) {
+            /^if (SkiaCtx.isDeferredComposeBackend) {
                 ctx.nextStratum()
                 ctx.blurBeforeThisStratum()
                 SkiaCtx.requestBlurSnapshot()
             }
-            //?}
+            ^///?}
             BlurRenderer.drawBlur(worldBlurRadius())
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
@@ -72,7 +102,7 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
         if (!inGame()) return
         super.renderBackground(ctx, mouseX, mouseY, tickDelta)
     }
-    *///?} else {
+    *///?} else if > 1.8.9 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
             MenuBackgroundPass.enqueue(true)
@@ -102,9 +132,11 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
     }
     //?}
 
+    //? if > 1.8.9 {
     override fun onClose() {
         Minecraft.getInstance().execute { SocialOverlay.close() }
     }
+    //?}
 
     @Composable
     override fun compose() {

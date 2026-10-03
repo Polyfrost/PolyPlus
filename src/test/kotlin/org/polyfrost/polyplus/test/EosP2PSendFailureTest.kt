@@ -3,7 +3,12 @@ package org.polyfrost.polyplus.test
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.EventLoop
+//? if > 1.8.9 {
 import io.netty.channel.DefaultEventLoop
+//?} else {
+/*import io.netty.channel.local.LocalEventLoopGroup
+*///?}
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -16,13 +21,21 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 class EosP2PSendFailureTest {
+    // a Stonecutter comment placed after a backtick name containing an apostrophe is not toggled,
+    // so the version split has to live above the test methods
+    //? if > 1.8.9 {
+    private fun eventLoop(): EventLoop = DefaultEventLoop()
+    //?} else {
+    /*private fun eventLoop(): EventLoop = LocalEventLoopGroup(1).next()
+    *///?}
+
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     fun `a packet EOS couldn't send closes the channel instead of leaving a gap in the stream`() {
         // a shut-down bridge refuses every send, like one whose login or platform went away mid-session
         val bridge = EosSdkBridge().apply { shutdown() }
         EosP2PChannel.Holder.bridge = bridge
-        val loop = DefaultEventLoop()
+        val loop = eventLoop()
         try {
             val channel = EosP2PChannel()
             val caught = CompletableFuture<Throwable>()
