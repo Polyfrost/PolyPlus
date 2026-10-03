@@ -346,7 +346,8 @@ val modOutputGroup = sourceSets.main.get().output
 
 loomExt.runs.configureEach {
     ideConfigGenerated(true)
-    runDir("../../run") // Shares the run directory between versions
+    // Shares the run directory between modern versions; 1.8.9 rewrites options.txt in a format they can't read
+    runDir(if (isOrnithe) "../../run/ornithe" else "../../run")
     vmArg("-Dpolyplus.badge.debug=true")
     vmArg("-Dfabric.classPathGroups=$modOutputGroup")
 }
