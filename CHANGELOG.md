@@ -1,2 +1,2 @@
-## 1.2.50
-- 1.8: fix async being on until next restart
+## Unreleased changes
+- Detect the OneClient SkyBlock modpack when comparing installed mods, instead of listing its SkyBlock mods as external mods

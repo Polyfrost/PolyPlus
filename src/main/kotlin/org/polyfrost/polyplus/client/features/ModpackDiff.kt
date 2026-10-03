@@ -23,7 +23,11 @@ import org.polyfrost.polyplus.client.utils.runSuspendCatching
 object ModpackDiff {
     private val logger = LogManager.getLogger("PolyPlus/ModpackDiff")
 
-    private const val VERSIONS_URL = "https://api.modrinth.com/v2/project/oneclient-modpack/version"
+    // Modrinth slug to display name - on a tie, earlier packs win
+    private val PACKS = listOf(
+        "oneclient-modpack" to "OneClient modpack",
+        "oneclient-skyblock" to "OneClient SkyBlock modpack",
+    )
 
     private const val MAX_VERSIONS_CHECKED = 10
 
@@ -39,7 +43,11 @@ object ModpackDiff {
     @Serializable
     private data class IndexFile(val path: String, val hashes: Map<String, String>, val env: Map<String, String>? = null)
 
-    data class Diff(val removed: List<String>, val added: List<String>)
+    data class Diff(val removed: List<String>, val added: List<String>) {
+        val size: Int get() = removed.size + added.size
+    }
+
+    private data class Match(val pack: String, val version: String, val diff: Diff)
 
     fun logAsync() {
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
@@ -64,31 +72,30 @@ object ModpackDiff {
             .associate { (mod, path) -> sha1(path) to "${mod.metadata.id} ${mod.metadata.version.friendlyString} (${path.fileName})" }
 
         val mcVersion = loader.getModContainer("minecraft").get().metadata.version.friendlyString
-        val versions = PolyPlusClient.HTTP.get(VERSIONS_URL) {
-            parameter("game_versions", "[\"$mcVersion\"]")
-            parameter("loaders", "[\"fabric\"]")
-            parameter("include_changelog", "false")
-        }.body<List<PackVersion>>()
+        var best: Match? = null
+        for ((slug, name) in PACKS) {
+            val versions = PolyPlusClient.HTTP.get("https://api.modrinth.com/v2/project/$slug/version") {
+                parameter("game_versions", "[\"$mcVersion\"]")
+                parameter("loaders", "[\"fabric\"]")
+                parameter("include_changelog", "false")
+            }.body<List<PackVersion>>()
 
-        var best: Pair<String, Diff>? = null
-        for (version in versions.take(MAX_VERSIONS_CHECKED)) {
-            val file = version.files.firstOrNull { it.primary } ?: version.files.firstOrNull() ?: continue
-            val pack = fetchPackMods(file.url)
-            val diff = diff(pack, loaded)
-            if (best == null || diff.removed.size + diff.added.size < best.second.removed.size + best.second.added.size) {
-                best = version.version_number to diff
+            for (version in versions.take(MAX_VERSIONS_CHECKED)) {
+                val file = version.files.firstOrNull { it.primary } ?: version.files.firstOrNull() ?: continue
+                val diff = diff(fetchPackMods(file.url), loaded)
+                if (best == null || diff.size < best.diff.size) best = Match(name, version.version_number, diff)
+                if (diff.removed.isEmpty()) break
             }
-            if (diff.removed.isEmpty()) break
         }
 
         if (best == null) {
             logger.info("No OneClient modpack found for Minecraft {}", mcVersion)
             return
         }
-        val (version, diff) = best
+        val (pack, version, diff) = best
         logger.info(buildString {
-            append("OneClient modpack ").append(version).append(" (Minecraft ").append(mcVersion).append(")")
-            if (diff.removed.isEmpty() && diff.added.isEmpty()) append(": exact match")
+            append(pack).append(' ').append(version).append(" (Minecraft ").append(mcVersion).append(")")
+            if (diff.size == 0) append(": exact match")
             append("\nRemoved mods (").append(diff.removed.size).append("):")
             diff.removed.forEach { append("\n\t").append(it) }
             append("\nExternal mods (").append(diff.added.size).append("):")
