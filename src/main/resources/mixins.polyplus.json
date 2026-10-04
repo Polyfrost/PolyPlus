@@ -19,6 +19,8 @@
     "client.MixinClientHandshakePacketListenerImpl",
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
+    //? if = 1.8.9
+    //"client.MixinControlsOptionsScreen",
     //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
