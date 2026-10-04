@@ -151,6 +151,7 @@ import com.mojang.blaze3d.buffers.BufferUsage
 
 //? if < 1.21.5 {
 /*import com.mojang.blaze3d.platform.NativeImage
+import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
 *///?}
 
 //? if = 1.21.4 {
@@ -1181,6 +1182,10 @@ object PlayerPreviewRenderer {
         player.xCloakO = 0.0; player.yCloakO = 0.0; player.zCloakO = 0.0
         *///?}
 
+        //? if < 1.21.5 {
+        /*// live previews render right before the buffer swap, which presents nothing on macOS unless framebuffer 0 is still bound
+        val boundTarget = RenderTargetFbo.saveBoundTarget()
+        *///?}
         //? if >= 1.21.5 {
         val colorTex = fbo.colorTexture ?: return false
         val depthTex = fbo.depthTexture ?: return false
@@ -1244,8 +1249,7 @@ object PlayerPreviewRenderer {
             *///?}
             RenderSystem.restoreProjectionMatrix()
             //? if < 1.21.5 {
-            /*fbo.unbindWrite()
-            mc.mainRenderTarget.bindWrite(true)
+            /*RenderTargetFbo.restoreBoundTarget(boundTarget)
             *///?}
         }
 
