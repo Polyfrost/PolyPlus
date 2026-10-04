@@ -372,6 +372,7 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("modName", modName)
     inputs.property("modVersion", modVersion)
     inputs.property("minorMcVersion", minecraftPredicate)
+    inputs.property("oneconfigVersion", oneconfigVersion)
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
             line.takeUnless { "\"fabric-api\"" in it }?.replace("\"java\": \">=21\"", "\"java\": \">=25\"")
@@ -383,6 +384,7 @@ tasks.withType<ProcessResources>().configureEach {
                 "mod_version" to modVersion,
                 "mod_description" to "Various expansions for the OneClient 'modpack'",
                 "minor_mc_version" to minecraftPredicate,
+                "oneconfig_version" to oneconfigVersion,
             ),
         )
     }
