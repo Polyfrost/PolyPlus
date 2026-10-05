@@ -34,8 +34,12 @@ object RichTextPrivacy {
     }
 
     @JvmStatic
-    fun unresolved(component: Component): String =
-        if (ExploitPreventerCompat.filtersTranslations()) component.string else unresolved(component, blockedKeys)
+    fun unresolved(component: Component, resolved: String): String =
+        if (ExploitPreventerCompat.filtersTranslations()) resolved else unresolved(component, resolved, blockedKeys)
+
+    // other mods may have adjusted the resolved text too, so it is only replaced if it would reveal a blocked key
+    internal fun unresolved(component: Component, resolved: String, blocked: Set<String>): String =
+        unresolved(component, blocked).takeIf { it != component.string } ?: resolved
 
     internal fun unresolved(component: Component, blocked: Set<String>): String =
         buildString { flatten(component, blocked, this) }

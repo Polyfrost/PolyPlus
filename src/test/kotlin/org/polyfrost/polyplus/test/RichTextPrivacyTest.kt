@@ -24,18 +24,20 @@ class RichTextPrivacyTest {
 
     @Test
     fun `vanilla translations still resolve`() {
-        assertEquals("Done", RichTextPrivacy.unresolved(Component.translatable("gui.done")))
+        val component = Component.translatable("gui.done")
+        assertEquals("Done", RichTextPrivacy.unresolved(component, component.string))
     }
 
     @Test
     fun `non-Debugify mod translations still resolve`() {
         val probe = Component.translatableWithFallback("shulkerboxtooltip.config.title", "[NO_SHULKERBOXTOOLTIP_CONFIG]")
-        assertEquals("[NO_SHULKERBOXTOOLTIP_CONFIG]", RichTextPrivacy.unresolved(probe))
+        assertEquals("[NO_SHULKERBOXTOOLTIP_CONFIG]", RichTextPrivacy.unresolved(probe, probe.string))
     }
 
     @Test
     fun `an allowed key with plain args still formats normally`() {
-        assertEquals("<bob> hello", RichTextPrivacy.unresolved(Component.translatable("chat.type.text", "bob", "hello")))
+        val component = Component.translatable("chat.type.text", "bob", "hello")
+        assertEquals("<bob> hello", RichTextPrivacy.unresolved(component, component.string))
     }
 
     @Test
@@ -70,7 +72,17 @@ class RichTextPrivacyTest {
         val component = Component.literal("hello ")
             .append(Component.translatable("gui.done"))
             .append(Component.literal("!"))
-        assertEquals("hello Done!", RichTextPrivacy.unresolved(component))
+        assertEquals("hello Done!", RichTextPrivacy.unresolved(component, component.string))
+    }
+
+    @Test
+    fun `another mod's take on the text survives when nothing is blocked`() {
+        assertEquals("[adjusted]", RichTextPrivacy.unresolved(Component.translatable("gui.done"), "[adjusted]", DEBUGIFY))
+    }
+
+    @Test
+    fun `a blocked key overrides another mod's take on the text`() {
+        assertEquals("gui.done", RichTextPrivacy.unresolved(Component.translatable("gui.done"), "[adjusted]", setOf("gui.done")))
     }
 }
 //?}

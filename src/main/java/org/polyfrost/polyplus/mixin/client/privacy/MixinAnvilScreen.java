@@ -18,7 +18,7 @@ public class MixinAnvilScreen {
             require = 2
     )
     private String polyplus$dontResolveItemName(Component hoverName, Operation<String> original) {
-        return RichTextPrivacy.unresolved(hoverName);
+        return RichTextPrivacy.unresolved(hoverName, original.call(hoverName));
     }
 }
 //?}

@@ -40,9 +40,9 @@ public class MixinAbstractSignEditScreen {
     *///?}
         for (int i = 0; i < this.messages.length; i++) {
             //? if >= 26.3 {
-            this.messages[i] = RichTextPrivacy.unresolved(text.getMessages(filtered).get(i));
+            this.messages[i] = RichTextPrivacy.unresolved(text.getMessages(filtered).get(i), this.messages[i]);
             //?} else {
-            /*this.messages[i] = RichTextPrivacy.unresolved(text.getMessage(i, filtered));
+            /*this.messages[i] = RichTextPrivacy.unresolved(text.getMessage(i, filtered), this.messages[i]);
             *///?}
         }
     }
