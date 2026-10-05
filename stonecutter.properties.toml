@@ -28,29 +28,34 @@ deps.osl_entrypoints = "0.6.1+mc13w16a-mc1.14.4"
 mod.mc_compat = "1.21.1"
 mod.mc_releases = "1.21.1"
 deps.fabric_api = "0.116.15+1.21.1"
+deps.wwaypoints = "K8KJ2B1N"
 
 ["1.21.4"]
 mod.mc_compat = "1.21.4"
 mod.mc_releases = "1.21.4"
 deps.fabric_api = "0.119.4+1.21.4"
 deps.skyboxify = "dNqmsXMW"
+deps.wwaypoints = "Az59rwVy"
 
 ["1.21.5"]
 mod.mc_compat = "1.21.5"
 mod.mc_releases = "1.21.5"
 deps.fabric_api = "0.128.2+1.21.5"
+deps.wwaypoints = "tLwAVa8Y"
 
 ["1.21.8"]
 mod.mc_compat = "1.21.8"
 mod.mc_releases = "1.21.8"
 deps.fabric_api = "0.136.1+1.21.8"
 deps.skyboxify = "amGtgssn"
+deps.wwaypoints = "XZlafW7N"
 
 ["1.21.10"]
 mod.mc_compat = "1.21.10"
 mod.mc_releases = "1.21.10"
 deps.fabric_api = "0.138.4+1.21.10"
 deps.skyboxify = "uCGJogDJ"
+deps.wwaypoints = "9JBCPOwC"
 
 ["1.21.11"]
 mod.mc_compat = "1.21.11"

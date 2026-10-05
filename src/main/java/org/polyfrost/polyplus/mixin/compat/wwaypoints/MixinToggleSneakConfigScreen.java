@@ -22,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "com.wwaypoints.client.screen.ToggleSneakConfigScreen", remap = false)
 public class MixinToggleSneakConfigScreen {
     //? if wwaypoints {
+    //? if >= 1.21.6 {
     @Unique
     private int polyplus$rawMouseX;
     @Unique
@@ -32,6 +33,7 @@ public class MixinToggleSneakConfigScreen {
         polyplus$rawMouseX = mouseX;
         polyplus$rawMouseY = mouseY;
     }
+    //?}
 
     // 0.8.1 only greys out the toggle and indicator controls when the server disables the whole mod
     @IfModLoaded(value = "wwaypoints", minVersion = "0.8.1")
@@ -44,7 +46,11 @@ public class MixinToggleSneakConfigScreen {
     private void renderDisabledReason(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         for (GuiEventListener child : ((Screen) (Object) this).children()) {
             if (child instanceof AbstractWidget widget && !widget.active && widget.isHovered()) {
+                //? if >= 1.21.6 {
                 guiGraphics.setTooltipForNextFrame(Component.literal(WWaypointsCompat.DISABLED_REASON), polyplus$rawMouseX, polyplus$rawMouseY);
+                //?} else {
+                /*((Screen) (Object) this).setTooltipForNextRenderPass(Component.literal(WWaypointsCompat.DISABLED_REASON));
+                *///?}
                 return;
             }
         }
