@@ -21,7 +21,6 @@ object RichTextPrivacy {
 
     private val BLOCKED_MODS = listOf(
         "debugify",
-        //? if wwaypoints
         "wwaypoints",
     )
 
