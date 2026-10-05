@@ -82,6 +82,8 @@
     //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",
     //? if > 1.8.9
+    "client.privacy.MixinClientLanguage",
+    //? if > 1.8.9
     "client.privacy.MixinAnvilScreen",
     //? if = 1.8.9
     //"client.MixinEmojiTextRenderer",

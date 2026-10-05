@@ -2,12 +2,16 @@ package org.polyfrost.polyplus.test
 
 //? if > 1.8.9 {
 import net.minecraft.SharedConstants
+import net.minecraft.locale.Language
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.FormattedText
 import net.minecraft.server.Bootstrap
+import net.minecraft.util.FormattedCharSequence
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
+import org.polyfrost.polyplus.client.privacy.UnblockedTranslationsAccess
 
 class RichTextPrivacyTest {
 
@@ -58,6 +62,25 @@ class RichTextPrivacyTest {
             val probe = Component.translatableWithFallback("debugify.name", fallback, *args)
             val untranslated = Component.translatableWithFallback("polyplus.test.untranslated", fallback, *args)
             assertEquals(untranslated.string, RichTextPrivacy.unresolved(probe, DEBUGIFY), fallback)
+        }
+    }
+
+    @Test
+    fun `a Debugify key answers with the translation other packs give it`() {
+        val previous = Language.getInstance()
+        Language.inject(object : Language(), UnblockedTranslationsAccess {
+            override fun getOrDefault(key: String, fallback: String): String = previous.getOrDefault(key, fallback)
+            override fun has(key: String) = previous.has(key)
+            override fun isDefaultRightToLeft() = previous.isDefaultRightToLeft
+            override fun getVisualOrder(text: FormattedText): FormattedCharSequence = previous.getVisualOrder(text)
+            override fun `polyplus$unblockedTranslation`(key: String) = if (key == "debugify.name") "[PACK %s]" else null
+        })
+        try {
+            val probe = Component.translatableWithFallback("debugify.name", "[NO %s]", "a")
+            assertEquals("[PACK a]", RichTextPrivacy.unresolved(probe, DEBUGIFY))
+            assertEquals("[PACK %s]", RichTextPrivacy.unresolved(Component.keybind("debugify.name"), DEBUGIFY))
+        } finally {
+            Language.inject(previous)
         }
     }
 
