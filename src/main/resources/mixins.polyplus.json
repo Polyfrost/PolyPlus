@@ -98,6 +98,8 @@
     //? if > 1.8.9
     "client.access.HolderReferenceInvoker",
     "client.access.MappedRegistryAccessor",
+    //? if > 1.8.9
+    "client.access.TranslatableContentsInvoker",
     "client.network.MixinConnection",
     "client.network.MixinServerConnectionListener",
     "client.network.MixinServerGamePacketListenerImpl",

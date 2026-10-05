@@ -8,7 +8,9 @@ import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.FormattedText
 import net.minecraft.network.chat.contents.KeybindContents
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.network.chat.contents.TranslatableFormatException
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.mixin.client.access.TranslatableContentsInvoker
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -56,9 +58,21 @@ object RichTextPrivacy {
     }
 
     private fun translate(contents: TranslatableContents, blocked: Set<String>): String {
-        if (contents.key in blocked) return contents.fallback ?: contents.key
-        val args = contents.args.map { if (it is Component) unresolved(it, blocked) else it }
-        return Component.translatableWithFallback(contents.key, contents.fallback, *args.toTypedArray()).string
+        val args = contents.args.map { if (it is Component) unresolved(it, blocked) else it }.toTypedArray()
+        if (contents.key !in blocked) return Component.translatableWithFallback(contents.key, contents.fallback, *args).string
+        return formatMissing(TranslatableContents(contents.key, contents.fallback, args))
+    }
+
+    // formats the fallback the way vanilla does when the key isn't translated, so the args still fill it in
+    private fun formatMissing(contents: TranslatableContents): String {
+        val template = contents.fallback ?: contents.key
+        val out = StringBuilder()
+        return try {
+            (contents as TranslatableContentsInvoker).`polyplus$decomposeTemplate`(template) { out.append(it.string) }
+            out.toString()
+        } catch (_: TranslatableFormatException) {
+            template
+        }
     }
 
     private fun consumer(out: StringBuilder) = FormattedText.ContentConsumer<Unit> { text ->

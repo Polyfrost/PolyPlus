@@ -52,6 +52,16 @@ class RichTextPrivacyTest {
     }
 
     @Test
+    fun `a Debugify fallback formats its args exactly like a client without it`() {
+        val args = arrayOf<Any>("a", Component.literal("b"))
+        for (fallback in listOf("[NO %s %2\$s%%]", "[NO %3\$s]", "[NO %d]")) {
+            val probe = Component.translatableWithFallback("debugify.name", fallback, *args)
+            val untranslated = Component.translatableWithFallback("polyplus.test.untranslated", fallback, *args)
+            assertEquals(untranslated.string, RichTextPrivacy.unresolved(probe, DEBUGIFY), fallback)
+        }
+    }
+
+    @Test
     fun `a Debugify keybind does not resolve`() {
         assertEquals("debugify.name", RichTextPrivacy.unresolved(Component.keybind("debugify.name"), DEBUGIFY))
     }
@@ -76,12 +86,12 @@ class RichTextPrivacyTest {
     }
 
     @Test
-    fun `another mod's take on the text survives when nothing is blocked`() {
+    fun `text adjusted by another mod survives when nothing is blocked`() {
         assertEquals("[adjusted]", RichTextPrivacy.unresolved(Component.translatable("gui.done"), "[adjusted]", DEBUGIFY))
     }
 
     @Test
-    fun `a blocked key overrides another mod's take on the text`() {
+    fun `a blocked key overrides text adjusted by another mod`() {
         assertEquals("gui.done", RichTextPrivacy.unresolved(Component.translatable("gui.done"), "[adjusted]", setOf("gui.done")))
     }
 }
