@@ -10,6 +10,7 @@
     "requireAnnotations": true
   },
   "minVersion": "0.8",
+  "plugin": "com.moulberry.mixinconstraints.ConstraintsMixinPlugin",
   "client": [
     "client.MixinAbstractSelectionList",
     "client.MixinChatComponent",
