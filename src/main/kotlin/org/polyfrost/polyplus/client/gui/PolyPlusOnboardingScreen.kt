@@ -1829,7 +1829,7 @@ private fun FireOverlayPreview(height: Double, opacity: Float) {
 @Composable
 private fun BlockHighlightPreview(json: String, block: String, width: Float, height: Float) {
     val style = remember(json) { runCatching { BlockHighlightStyle.parse(json) }.getOrNull() }
-    val textures = remember(block) { BlockHighlightRenderer.faceTextures(block).map(VanillaTextures::load) }
+    val textures = remember(block) { BlockHighlightRenderer.faces(block) }
     var millis by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()

@@ -14,6 +14,7 @@ import org.jetbrains.skia.Point
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.Shader
+import org.jetbrains.skia.Surface
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle.Depth
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle.Faces
@@ -23,7 +24,11 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 object BlockHighlightRenderer {
-    fun faceTextures(preset: String): List<String> {
+    fun faces(preset: String, load: (String) -> Image? = VanillaTextures::load): List<Image?> =
+        presetTextures(preset)?.map(load) ?: grassBlock(load)
+
+    private fun presetTextures(preset: String): List<String>? {
+        //? if > 1.8.9 {
         fun block(name: String) = "textures/block/$name.png"
         return when (preset) {
             "classic" -> List(6) { block("oak_planks") }
@@ -34,7 +39,41 @@ object BlockHighlightRenderer {
                 "smithing_table_side", "smithing_table_side",
             ).map(::block)
             "trans" -> List(6) { block("amethyst_block") }
-            else -> List(6) { block("cobblestone") }
+            else -> null
+        }
+        //?} else {
+        /*return null
+        *///?}
+    }
+
+    private fun grassBlock(load: (String) -> Image?): List<Image?> {
+        //? if > 1.8.9 {
+        fun grass(name: String) = "textures/block/grass_block_$name.png"
+        val dirt = "textures/block/dirt.png"
+        //?} else {
+        /*fun grass(name: String) = "textures/blocks/grass_$name.png"
+        val dirt = "textures/blocks/dirt.png"
+        *///?}
+        val side = layered(load, grass("side") to WHITE, grass("side_overlay") to GRASS_TINT)
+        return listOf(layered(load, grass("top") to GRASS_TINT), load(dirt)) + List(4) { side }
+    }
+
+    private fun layered(load: (String) -> Image?, vararg layers: Pair<String, Int>): Image? {
+        val images = layers.map { (path, tint) -> (load(path) ?: return null) to tint }
+        val size = images.first().first.width
+        val bounds = Rect.makeWH(size.toFloat(), size.toFloat())
+        return Surface.makeRasterN32Premul(size, size).use { surface ->
+            images.forEach { (image, tint) ->
+                val frame = Rect.makeWH(image.width.toFloat(), image.width.toFloat())
+                val filter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
+                Paint().use { paint ->
+                    paint.colorFilter = filter
+                    surface.canvas.drawImageRect(image, frame, bounds, SamplingMode.DEFAULT, paint, true)
+                }
+                filter.close()
+                image.close()
+            }
+            surface.makeImageSnapshot()
         }
     }
 
@@ -292,5 +331,7 @@ object BlockHighlightRenderer {
         return (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
 
-    private const val LINE_WIDTH_UNIT = 80f
+    private const val LINE_WIDTH_UNIT = 230f
+    private const val WHITE = -1
+    private const val GRASS_TINT = 0xFF91BD59.toInt() // plains grass colour
 }
