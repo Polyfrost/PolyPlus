@@ -40,7 +40,9 @@ object OnboardingFeatures {
     }
     val mountOpacityAvailable: Boolean by lazy { classExists(MOUNT_OPACITY_CONFIG) }
     val waveyCapesAvailable: Boolean by lazy { classExists(WAVEY_MOD_BASE) }
-    val skinLayersAvailable: Boolean by lazy { classExists(SKIN_LAYERS_MOD_BASE) }
+    val skinLayersAvailable: Boolean by lazy {
+        classExists(SKIN_LAYERS_MOD_BASE) || classExists(LEGACY_SKIN_LAYERS_CONFIG)
+    }
     val gammaUtilsAvailable: Boolean by lazy { classExists(GAMMA_UTILS) }
     val dynamicLightsAvailable: Boolean by lazy { classExists(LDL_MOD) }
     val shieldHeightAvailable: Boolean by lazy {
@@ -582,12 +584,30 @@ object OnboardingFeatures {
         Class.forName(SKIN_LAYERS_MOD_BASE).getField("config").get(null)
             ?: error("3D Skin Layers is not initialised yet")
 
+    private fun legacySkinLayersConfig(): Any? =
+        runCatching { loadWithoutInit(LEGACY_SKIN_LAYERS_CONFIG) }.getOrNull()?.getField("INSTANCE")?.get(null)
+
+    private fun legacySkinLayerOptions(config: Any): List<Any> = SKIN_LAYERS.map {
+        config.javaClass.getMethod("get" + it.replaceFirstChar(Char::uppercaseChar)).invoke(config)
+    }
+
     fun currentSkinLayers(): Boolean? = runCatching {
+        legacySkinLayersConfig()?.let { legacy ->
+            val option = legacySkinLayerOptions(legacy).first()
+            return@runCatching option.javaClass.getMethod("get").invoke(option) as Boolean
+        }
         val config = skinLayersConfig()
         config.javaClass.getField(SKIN_LAYERS.first()).getBoolean(config)
     }.getOrNull()
 
     fun applySkinLayers(enabled: Boolean): Boolean = runCatching {
+        legacySkinLayersConfig()?.let { legacy ->
+            legacySkinLayerOptions(legacy).forEach {
+                it.javaClass.getMethod("set", Any::class.java).invoke(it, enabled)
+            }
+            Class.forName(OSL_CONFIG_MANAGER).getMethod("save", Class.forName(OSL_CONFIG)).invoke(null, legacy)
+            return@runCatching true
+        }
         val config = skinLayersConfig()
         SKIN_LAYERS.forEach { config.javaClass.getField(it).setBoolean(config, enabled) }
         val base = Class.forName(SKIN_LAYERS_MOD_BASE)
@@ -814,6 +834,9 @@ object OnboardingFeatures {
     private const val CAPE_MOVEMENT_WAVEY = "BASIC_SIMULATION_3D"
 
     private const val SKIN_LAYERS_MOD_BASE = "dev.tr7zw.skinlayers.SkinLayersModBase"
+    private const val LEGACY_SKIN_LAYERS_CONFIG = "org.polyfrost.skinlayers.config.SkinLayersConfig"
+    private const val OSL_CONFIG_MANAGER = "net.ornithemc.osl.config.api.ConfigManager"
+    private const val OSL_CONFIG = "net.ornithemc.osl.config.api.config.Config"
     private val SKIN_LAYERS = listOf(
         "enableHat",
         "enableJacket",
