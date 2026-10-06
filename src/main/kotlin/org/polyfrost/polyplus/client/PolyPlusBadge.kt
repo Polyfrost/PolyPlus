@@ -30,6 +30,7 @@ import net.minecraft.network.chat.Style
 /*import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.network.PlayerInfo
 import net.minecraft.client.render.platform.GlStateManager
+import org.polyfrost.polyplus.client.emoji.EmojiFont
 *///?}
 
 //? if >= 1.21.4 && < 1.21.8 {
@@ -56,7 +57,7 @@ object PolyPlusBadge {
         *///?}
 
     @JvmField
-    val badgeGlyph: Component = Component.literal(GLYPH).setStyle(BADGE_STYLE)
+    val badgeGlyph: Component = Component.literal(GLYPH).setStyle(BADGE_STYLE.withColor(0xFFFFFF))
 
     @JvmField
     val badgeIcon: Component = Component.literal(GLYPH.substring(0, 1)).setStyle(BADGE_STYLE)
@@ -209,6 +210,15 @@ object PolyPlusBadge {
         GlStateManager.blendFuncSeparate(770, 771, 1, 0)
         GlStateManager.color4f(1f, 1f, 1f, 1f)
         GuiElement.drawTexture(x, y, 0f, 0f, TEX_W, TEX_H, BADGE_W, BADGE_H, TEX_W.toFloat(), TEX_H.toFloat())
+    }
+
+    const val LEGACY_CHAR = '\uE000'
+
+    @JvmStatic
+    fun drawInline(x: Float, y: Float, alpha: Float) {
+        val bx = x + PAD_LEFT
+        val by = y + BADGE_Y_OFFSET
+        EmojiFont.drawLegacyQuad(BADGE_TEXTURE, bx, by, bx + BADGE_W, by + BADGE_H, 0f, 0f, 1f, 1f, alpha)
     }
 
     @JvmStatic

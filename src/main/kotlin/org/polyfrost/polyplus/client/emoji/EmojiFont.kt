@@ -50,21 +50,24 @@ object EmojiFont {
 
     @JvmStatic
     fun drawLegacy(index: Int, x: Float, y: Float, alpha: Float) {
+        val u = (index % 32) / 32f
+        val v = (index / 32) / 24f
+        drawLegacyQuad(ATLAS, x, y - 1, x + 9, y + 8, u, v, u + 1 / 32f, v + 1 / 24f, alpha)
+    }
+
+    @JvmStatic
+    fun drawLegacyQuad(texture: Identifier, x0: Float, y0: Float, x1: Float, y1: Float, u0: Float, v0: Float, u1: Float, v1: Float, alpha: Float) {
         // restored afterwards so Argentum don't flush their glyphs with the atlas bound
         val previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
-        Minecraft.getInstance().textureManager.bind(ATLAS)
+        Minecraft.getInstance().textureManager.bind(texture)
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
         GL11.glGetFloatv(GL11.GL_CURRENT_COLOR, colorBuffer)
         GL11.glColor4f(1f, 1f, 1f, alpha)
-        val u = (index % 32) / 32f
-        val v = (index / 32) / 24f
-        val du = 1 / 32f
-        val dv = 1 / 24f
         GL11.glBegin(GL11.GL_TRIANGLE_STRIP)
-        GL11.glTexCoord2f(u, v); GL11.glVertex3f(x, y - 1, 0f)
-        GL11.glTexCoord2f(u, v + dv); GL11.glVertex3f(x, y + 8, 0f)
-        GL11.glTexCoord2f(u + du, v); GL11.glVertex3f(x + 9, y - 1, 0f)
-        GL11.glTexCoord2f(u + du, v + dv); GL11.glVertex3f(x + 9, y + 8, 0f)
+        GL11.glTexCoord2f(u0, v0); GL11.glVertex3f(x0, y0, 0f)
+        GL11.glTexCoord2f(u0, v1); GL11.glVertex3f(x0, y1, 0f)
+        GL11.glTexCoord2f(u1, v0); GL11.glVertex3f(x1, y0, 0f)
+        GL11.glTexCoord2f(u1, v1); GL11.glVertex3f(x1, y1, 0f)
         GL11.glEnd()
         GL11.glColor4f(colorBuffer.get(0), colorBuffer.get(1), colorBuffer.get(2), colorBuffer.get(3))
         GlStateManager.bindTexture(previousTexture)

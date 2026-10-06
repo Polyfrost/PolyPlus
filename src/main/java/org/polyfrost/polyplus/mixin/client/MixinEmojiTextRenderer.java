@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.mixin.client;
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.render.TextRenderer;
+import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.polyfrost.polyplus.client.emoji.EmojiFont;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -26,6 +27,11 @@ public abstract class MixinEmojiTextRenderer {
 
     @Inject(method = "drawGlyph", at = @At("HEAD"), cancellable = true)
     private void polyplus$drawEmoji(char chr, boolean italic, CallbackInfoReturnable<Float> cir) {
+        if (chr == PolyPlusBadge.LEGACY_CHAR) {
+            if (!polyplus$shadowLayer) PolyPlusBadge.drawInline(x, y, a);
+            cir.setReturnValue((float) PolyPlusBadge.BADGE_ADVANCE);
+            return;
+        }
         int index = EmojiFont.legacyIndex(chr);
         if (index < 0) return;
         if (!polyplus$shadowLayer) EmojiFont.drawLegacy(index, x, y, a);
@@ -34,7 +40,8 @@ public abstract class MixinEmojiTextRenderer {
 
     @Inject(method = "getWidth(C)I", at = @At("HEAD"), cancellable = true)
     private void polyplus$emojiWidth(char chr, CallbackInfoReturnable<Integer> cir) {
-        if (EmojiFont.legacyIndex(chr) >= 0) cir.setReturnValue((int) EmojiFont.LEGACY_ADVANCE);
+        if (chr == PolyPlusBadge.LEGACY_CHAR) cir.setReturnValue(PolyPlusBadge.BADGE_ADVANCE);
+        else if (EmojiFont.legacyIndex(chr) >= 0) cir.setReturnValue((int) EmojiFont.LEGACY_ADVANCE);
     }
 }
 *///?}
