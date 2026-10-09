@@ -57,10 +57,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -69,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
@@ -85,6 +88,7 @@ import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.SamplingMode
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.screens.ModCard as OneConfigModCard
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
@@ -93,6 +97,7 @@ import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.BlockHighlightDraft
 import org.polyfrost.polyplus.client.features.BlockHighlightPresets
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle
+import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.features.OnboardingFeatures.ModCard
 import org.polyfrost.polyplus.client.gui.preview.BlockHighlightRenderer
@@ -207,6 +212,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             buildList {
                 if (needsTerms) add(OnboardingStep.Terms)
                 if (needsSettings) add(OnboardingStep.LookAndFeel)
+                if (needsSettings) add(OnboardingStep.ModOrder)
                 if (showsModSettings) {
                     if (sprintStep) add(OnboardingStep.Sprint)
                     offeredCards.filter { it != ModCard.BLOCK_HIGHLIGHT }
@@ -225,6 +231,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
+        var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
         var grassMode by remember { mutableIntStateOf(modReads.grass ?: PolyPlusConfig.onboardingBetterGrassMode) }
         var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
         var fireOpacity by remember {
@@ -284,6 +291,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 PolyPlusConfig.onboardingUiStyle = uiStyle
                 PolyPlusConfig.onboardingGuiScale = guiScale
                 PolyPlusConfig.onboardingToggleSprint = toggleSprint
+                if (alphabeticalMods != PolyPlusConfig.alphabeticalModOrder) {
+                    PolyPlusConfig.alphabeticalModOrder = alphabeticalMods
+                    DefaultModOrder.apply()
+                }
             }
             if (showsModSettings) {
                 val startedAtVersion = PolyPlusConfig.onboardingModSettingsVersion
@@ -441,6 +452,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                         uiStyle, { uiStyle = it },
                                         guiScale, maxGuiScale, { guiScale = it },
                                     )
+                                OnboardingStep.ModOrder -> ModOrderPage(alphabeticalMods) { alphabeticalMods = it }
                                 OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
                                 is OnboardingStep.Mods -> {
                                     Header("Continuing with", "Mods")
@@ -830,6 +842,78 @@ private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit)
             ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f) { onToggleSprint(true) }
             ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f) { onToggleSprint(false) }
         }
+    }
+}
+
+@Composable
+private fun ModOrderPage(alphabetical: Boolean, onAlphabetical: (Boolean) -> Unit) {
+    Header("Continuing with", "Mod Sorting")
+    Column(
+        Modifier.fillMaxSize().padding(top = CONTENT_TOP.dp, bottom = (PANEL_HEIGHT - CONTENT_BOTTOM).dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        SocialText(
+            "Choose how the mods list is sorted. Recommended puts the mods you are most likely to tweak first.",
+            13.sp,
+            Modifier.width(460.dp),
+            SocialTextSecondary,
+            FontWeight.Light,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            ModOrderCard("Recommended", alphabetical = false, selected = !alphabetical) { onAlphabetical(false) }
+            ModOrderCard("Alphabetical", alphabetical = true, selected = alphabetical) { onAlphabetical(true) }
+        }
+    }
+}
+
+@Composable
+private fun ModOrderCard(label: String, alphabetical: Boolean, selected: Boolean, onClick: () -> Unit) {
+    val mods = remember(alphabetical) {
+        DefaultModOrder.preview(alphabetical).take(MOD_ORDER_PREVIEW_COLUMNS * MOD_ORDER_PREVIEW_ROWS)
+    }
+    Box(
+        Modifier.width(MOD_ORDER_CARD_WIDTH.dp).clip(ButtonShape)
+            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape),
+    ) {
+        Column(
+            Modifier.padding(MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Column(
+                Modifier
+                    .layout { measurable, _ ->
+                        val grid = measurable.measure(Constraints())
+                        layout(
+                            (grid.width * MOD_ORDER_PREVIEW_SCALE).roundToInt(),
+                            (grid.height * MOD_ORDER_PREVIEW_SCALE).roundToInt(),
+                        ) {
+                            grid.placeWithLayer(0, 0) {
+                                scaleX = MOD_ORDER_PREVIEW_SCALE
+                                scaleY = MOD_ORDER_PREVIEW_SCALE
+                                transformOrigin = TransformOrigin(0f, 0f)
+                            }
+                        }
+                    }
+                    .size(
+                        (MOD_GRID_CARD_WIDTH * MOD_ORDER_PREVIEW_COLUMNS + MOD_GRID_GAP * (MOD_ORDER_PREVIEW_COLUMNS - 1)).dp,
+                        (MOD_GRID_CARD_HEIGHT * MOD_ORDER_PREVIEW_ROWS + MOD_GRID_GAP * (MOD_ORDER_PREVIEW_ROWS - 1)).dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(MOD_GRID_GAP.dp),
+            ) {
+                mods.chunked(MOD_ORDER_PREVIEW_COLUMNS).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(MOD_GRID_GAP.dp)) {
+                        row.forEach { OneConfigModCard(it, Modifier.width(MOD_GRID_CARD_WIDTH.dp)) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            SocialText(label, 14.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        }
+        Box(Modifier.matchParentSize().clickableWithSound(onClick))
     }
 }
 
@@ -2090,6 +2174,7 @@ private enum class ModGuide(
 private sealed interface OnboardingStep {
     data object Terms : OnboardingStep
     data object LookAndFeel : OnboardingStep
+    data object ModOrder : OnboardingStep
     data object Sprint : OnboardingStep
 
     data class Mods(val cards: List<ModCard>) : OnboardingStep
@@ -2199,6 +2284,16 @@ private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
 private const val LABEL_HEIGHT = 32f
 private const val MOD_CARDS_PER_PAGE = 2
+private const val MOD_ORDER_PREVIEW_ROWS = 2
+private const val MOD_ORDER_PREVIEW_COLUMNS = 4
+private const val MOD_ORDER_CARD_WIDTH = 380f
+private const val MOD_ORDER_CARD_PADDING = 14f
+private const val MOD_GRID_CARD_WIDTH = 190f
+private const val MOD_GRID_CARD_HEIGHT = 140f
+private const val MOD_GRID_GAP = 19f
+private const val MOD_ORDER_PREVIEW_SCALE =
+    (MOD_ORDER_CARD_WIDTH - MOD_ORDER_CARD_PADDING * 2f) /
+        (MOD_GRID_CARD_WIDTH * MOD_ORDER_PREVIEW_COLUMNS + MOD_GRID_GAP * (MOD_ORDER_PREVIEW_COLUMNS - 1))
 private const val CARD_MARGIN = 48f
 private const val CARD_GAP = 24f
 private const val CARD_WIDTH = (PANEL_WIDTH - CARD_MARGIN * 2f - CARD_GAP) / MOD_CARDS_PER_PAGE

@@ -136,6 +136,7 @@
     //? if = 1.8.9
     //"compat.oneconfig.MixinComposeScreen",
     "compat.oneconfig.MixinConfigScreenKt",
+    "compat.oneconfig.MixinModsKt",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
