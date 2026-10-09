@@ -1,15 +1,14 @@
 package org.polyfrost.polyplus.mixin.client;
 
 //? if = 1.8.9 {
-/*import net.minecraft.client.gui.screen.Screen;
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.menu.options.OptionsScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(OptionsScreen.class)
@@ -35,7 +34,7 @@ public abstract class MixinOptionsScreen extends Screen {
     @Unique
     private static final int polyplus$TOP_ROW_Y = polyplus$TITLE_Y + 9 + 8;
 
-    @ModifyConstant(method = "render", constant = @Constant(intValue = 15))
+    @ModifyExpressionValue(method = "render", at = @At(value = "CONSTANT", args = "intValue=15"))
     private int polyplus$modernTitleY(int y) {
         return polyplus$TITLE_Y;
     }
