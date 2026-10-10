@@ -17,6 +17,8 @@
     //? if > 1.8.9
     "client.MixinChatListener",
     "client.MixinChatScreen",
+    //? if = 1.8.9
+    //"client.MixinClientBrandRetriever",
     "client.MixinClientHandshakePacketListenerImpl",
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
