@@ -49,6 +49,8 @@
     //? if <26.3
     //"client.MixinPauseScreen",
     "client.MixinPlayerTabOverlay",
+    //? if = 1.8.9
+    //"client.MixinProgressRenderer",
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
