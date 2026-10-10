@@ -51,6 +51,8 @@
     //? if <26.3
     //"client.MixinPauseScreen",
     "client.MixinPlayerTabOverlay",
+    //? if = 1.8.9
+    //"client.MixinProgressRenderer",
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
@@ -138,6 +140,7 @@
     //? if = 1.8.9
     //"compat.oneconfig.MixinComposeScreen",
     "compat.oneconfig.MixinConfigScreenKt",
+    "compat.oneconfig.MixinModsKt",
     "compat.oneconfig.MixinNavigationKt",
     "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",

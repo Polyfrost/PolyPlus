@@ -34,6 +34,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var modOrderSeed = ""
 
     @JvmStatic @Include
+    var alphabeticalModOrder = false
+
+    @JvmStatic @Include
     var onboardingCompleted = false
 
     @JvmStatic @Include

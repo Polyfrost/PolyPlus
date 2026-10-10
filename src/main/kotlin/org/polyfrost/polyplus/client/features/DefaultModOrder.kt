@@ -1,7 +1,13 @@
 package org.polyfrost.polyplus.client.features
 
+import androidx.compose.runtime.MutableIntState
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
+import org.polyfrost.oneconfig.internal.ui.api.ConfigData
+import org.polyfrost.oneconfig.internal.ui.api.ConfigRegistry
+import org.polyfrost.oneconfig.internal.ui.api.ModFavorites
+import org.polyfrost.oneconfig.internal.ui.api.modCardGroupRank
+import org.polyfrost.oneconfig.internal.ui.components.asRenderText
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -14,7 +20,44 @@ object DefaultModOrder {
     private const val RESOURCE = "/assets/polyplus/mod-order"
     private const val FILE_NAME = "mod-order"
 
+    private const val ORDER_SEED = "239252252"
+
+    private const val ONECONFIG_ORDER = "org.polyfrost.oneconfig.internal.ui.api.ModOrder"
+    private const val HUD_CARD_PREFIX = "oneconfig.hud:"
+
+    fun preview(alphabetical: Boolean): List<ConfigData> {
+        val order = if (alphabetical) emptyList() else bundledOrder()
+        return ConfigRegistry.modCardConfigs.sortedWith(
+            compareBy<ConfigData> { modCardGroupRank(it.id) }
+                .thenByDescending { ModFavorites.isFavorite(it.id) }
+                .thenBy { order.indexOf(it.id) }
+                .thenBy { it.id.startsWith(HUD_CARD_PREFIX) }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title.asRenderText() },
+        )
+    }
+
+    fun apply() {
+        val path = orderFile()
+        runCatching { Files.deleteIfExists(path) }.onFailure { logger.error("Could not delete {}", path, it) }
+        initialize()
+        refreshOneConfig()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun refreshOneConfig() {
+        runCatching {
+            val type = Class.forName(ONECONFIG_ORDER)
+            fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }.get(null)
+            val order = field("order") as MutableList<String>
+            order.clear()
+            order.addAll(readOrder(orderFile()))
+            (field("revision\$delegate") as MutableIntState).intValue++
+        }.onFailure { logger.warn("Could not refresh OneConfig's mod order, it applies after a restart", it) }
+    }
+
     fun initialize() {
+        if (PolyPlusConfig.alphabeticalModOrder) return
+
         val defaults = bundledOrder()
         if (defaults.isEmpty()) {
             logger.warn("Bundled mod order is missing or empty, leaving OneConfig's order alone")
@@ -23,12 +66,11 @@ object DefaultModOrder {
 
         val path = orderFile()
         val current = readOrder(path)
-        val seed = defaults.joinToString("\n").hashCode().toString()
-        val reseed = PolyPlusConfig.modOrderSeed != seed
+        val reseed = PolyPlusConfig.modOrderSeed != ORDER_SEED
         val merged = merge(current, defaults).let { if (reseed) realign(it, defaults) else it }
 
         if (reseed) {
-            PolyPlusConfig.modOrderSeed = seed
+            PolyPlusConfig.modOrderSeed = ORDER_SEED
             PolyPlusConfig.save()
         }
         if (merged == current) return

@@ -134,13 +134,22 @@ object MenuPanorama {
     fun drawBackdrop(screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
-        if (!panoramaBackdrop() || !drawLegacyPanorama(screen)) {
+        if (!panoramaBackdrop() || !drawLegacyPanorama(screen.width, screen.height)) {
             GuiElement.fill(0, 0, screen.width, screen.height, BASE_COLOR)
             filledThisFrame = true
         }
         val drew = MenuBackgroundPass.renderInline(panoramaBackdrop(), screen)
         if (drew) drawnThisPass = true
         return drew
+    }
+
+    @JvmStatic
+    fun drawLoadingBackdrop(width: Int, height: Int) {
+        if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return
+        if (!panoramaBackdrop() || !drawLegacyPanorama(width, height)) {
+            GuiElement.fill(0, 0, width, height, BASE_COLOR)
+        }
+        MenuBackgroundPass.renderInline(panoramaBackdrop(), this)
     }
 
     private const val WASH_TOP = 0x80FFFFFF.toInt()
@@ -162,7 +171,7 @@ object MenuPanorama {
         return title
     }
 
-    private fun drawLegacyPanorama(screen: Screen): Boolean {
+    private fun drawLegacyPanorama(width: Int, height: Int): Boolean {
         val title = legacyPanorama() ?: return false
         val now = System.currentTimeMillis()
         if (now - lastPanoramaTick > 1000L) lastPanoramaTick = now
@@ -170,16 +179,16 @@ object MenuPanorama {
             title.tick()
             lastPanoramaTick += 50L
         }
-        title.width = screen.width
-        title.height = screen.height
+        title.width = width
+        title.height = height
         panoramaGlState.capture()
         try {
             GlStateManager.disableAlphaTest()
             (title as TitleScreenInvoker).`polyplus$drawBackground`(0, 0, (now - lastPanoramaTick) / 50f)
             GlStateManager.enableAlphaTest()
             val gradients = title as GuiElementInvoker
-            gradients.`polyplus$fillGradient`(0, 0, screen.width, screen.height, WASH_TOP, WASH_BOTTOM)
-            gradients.`polyplus$fillGradient`(0, 0, screen.width, screen.height, SHADE_TOP, SHADE_BOTTOM)
+            gradients.`polyplus$fillGradient`(0, 0, width, height, WASH_TOP, WASH_BOTTOM)
+            gradients.`polyplus$fillGradient`(0, 0, width, height, SHADE_TOP, SHADE_BOTTOM)
         } finally {
             panoramaGlState.restore()
         }

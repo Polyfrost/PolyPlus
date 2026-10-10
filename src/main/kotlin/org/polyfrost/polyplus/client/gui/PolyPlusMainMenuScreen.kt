@@ -805,7 +805,7 @@ private fun LeftColumn(
                     Spacer(Modifier.height(12.dp))
                     ServerRow(
                         title = "Nothing played yet",
-                        subtitle = "Recent worlds and servers show here",
+                        subtitle = "Recents show up here",
                         favicon = null,
                         fallbackPng = ASSETS + "server.png",
                         onClick = actions.singleplayer,
@@ -1240,8 +1240,8 @@ private fun ServerRow(
             RasterImage(fallbackPng, iconModifier, contentScale = ContentScale.Crop)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            SocialText(title, fontSize = 16.sp, textAlign = TextAlign.Center)
-            SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
+            SocialText(title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Icon(ASSETS + "chevron-right.svg", SocialTextSecondary, Modifier.size(20.dp))
     }
