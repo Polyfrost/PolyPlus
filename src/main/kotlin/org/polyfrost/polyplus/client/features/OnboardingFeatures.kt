@@ -39,7 +39,9 @@ object OnboardingFeatures {
         hasFloatingField(OVERLAY_TWEAKS_CONFIG, FIRE_OVERLAY_OPACITY)
     }
     val mountOpacityAvailable: Boolean by lazy { classExists(MOUNT_OPACITY_CONFIG) }
-    val waveyCapesAvailable: Boolean by lazy { classExists(WAVEY_MOD_BASE) }
+    val waveyCapesAvailable: Boolean by lazy {
+        classExists(WAVEY_MOD_BASE) || classExists(LEGACY_WAVEY_CONFIG)
+    }
     val skinLayersAvailable: Boolean by lazy {
         classExists(SKIN_LAYERS_MOD_BASE) || classExists(LEGACY_SKIN_LAYERS_CONFIG)
     }
@@ -569,13 +571,32 @@ object OnboardingFeatures {
         base.getMethod("writeConfig").invoke(instance)
     }
 
+    private fun legacyWaveyMovementOption(): Any? =
+        runCatching { loadWithoutInit(LEGACY_WAVEY_CONFIG) }.getOrNull()?.getField("INSTANCE")?.get(null)
+            ?.let { it.javaClass.getMethod("getCapeMovement").invoke(it) }
+
+    private fun legacyWaveyMovement(option: Any): String =
+        (option.javaClass.getMethod("get").invoke(option) as Enum<*>).name
+
     fun currentWaveyCapes(): Boolean? = runCatching {
+        legacyWaveyMovementOption()?.let {
+            if (modToggledOff(LEGACY_WAVEY_ID)) return false
+            return@runCatching legacyWaveyMovement(it) != CAPE_MOVEMENT_VANILLA
+        }
         if (modToggledOff(WAVEY_ID)) return false
         val movement = waveyConfig().let { it.javaClass.getField(CAPE_MOVEMENT).get(it) } as Enum<*>
         movement.name != CAPE_MOVEMENT_VANILLA
     }.getOrNull()
 
     fun applyWaveyCapes(enabled: Boolean): Boolean = runCatching {
+        legacyWaveyMovementOption()?.let { option ->
+            if (setModToggle(LEGACY_WAVEY_ID, enabled) && !enabled) return true
+            waveyCapeMovementWrite(enabled, legacyWaveyMovement(option))
+                ?.let { option.javaClass.getMethod("setByName", String::class.java).invoke(option, it) }
+            val config = loadWithoutInit(LEGACY_WAVEY_CONFIG).getField("INSTANCE").get(null)
+            Class.forName(OSL_CONFIG_MANAGER).getMethod("save", Class.forName(OSL_CONFIG)).invoke(null, config)
+            return@runCatching true
+        }
         if (setModToggle(WAVEY_ID, enabled) && !enabled) return true
         val config = waveyConfig()
         waveyCapeMovementWrite(enabled, currentEnumName(config, CAPE_MOVEMENT))
@@ -614,6 +635,7 @@ object OnboardingFeatures {
 
     fun currentSkinLayers(): Boolean? = runCatching {
         legacySkinLayersConfig()?.let { legacy ->
+            if (modToggledOff(LEGACY_SKIN_LAYERS_ID)) return false
             val option = legacySkinLayerOptions(legacy).first()
             return@runCatching option.javaClass.getMethod("get").invoke(option) as Boolean
         }
@@ -624,6 +646,7 @@ object OnboardingFeatures {
 
     fun applySkinLayers(enabled: Boolean): Boolean = runCatching {
         legacySkinLayersConfig()?.let { legacy ->
+            if (setModToggle(LEGACY_SKIN_LAYERS_ID, enabled) && !enabled) return true
             legacySkinLayerOptions(legacy).forEach {
                 it.javaClass.getMethod("set", Any::class.java).invoke(it, enabled)
             }
@@ -820,6 +843,8 @@ object OnboardingFeatures {
     private const val LBG_ID = "lambdabettergrass"
     private const val WAVEY_ID = "waveycapes"
     private const val SKIN_LAYERS_ID = "skinlayers3d"
+    private const val LEGACY_WAVEY_ID = "legacy-waveycapes"
+    private const val LEGACY_SKIN_LAYERS_ID = "legacy-skin-layers"
     private const val LBG_MOD = "dev.lambdaurora.lambdabettergrass.LambdaBetterGrass"
     private const val LBG_MODE = "dev.lambdaurora.lambdabettergrass.LBGMode"
     val BETTER_GRASS_MODES = listOf("OFF", "FASTEST", "FAST", "FANCY")
@@ -856,6 +881,7 @@ object OnboardingFeatures {
     const val HORSE_OPACITY_MAX = 100f
 
     private const val WAVEY_MOD_BASE = "dev.tr7zw.waveycapes.versionless.ModBase"
+    private const val LEGACY_WAVEY_CONFIG = "org.polyfrost.waveycapes.config.WaveyCapesConfig"
     private const val CAPE_MOVEMENT = "capeMovement"
     private const val CAPE_MOVEMENT_ENUM = "dev.tr7zw.waveycapes.versionless.CapeMovement"
     private const val CAPE_MOVEMENT_VANILLA = "VANILLA"
