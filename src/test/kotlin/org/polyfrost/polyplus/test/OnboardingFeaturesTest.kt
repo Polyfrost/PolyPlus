@@ -14,6 +14,7 @@ import org.polyfrost.polyplus.client.gui.modGuidePaths
 
 class OnboardingFeaturesTest {
     private val everyCard = OnboardingFeatures.ModCard.entries.toList()
+    private val newestCards = listOf(OnboardingFeatures.ModCard.CAPES, OnboardingFeatures.ModCard.SKIN_LAYERS)
 
     @Test
     fun `a first run is offered every card its mods support`() {
@@ -24,6 +25,8 @@ class OnboardingFeaturesTest {
     fun `a returning user only walks the cards added since they last finished`() {
         assertEquals(
             listOf(
+                OnboardingFeatures.ModCard.CAPES,
+                OnboardingFeatures.ModCard.SKIN_LAYERS,
                 OnboardingFeatures.ModCard.GAMMA,
                 OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT,
                 OnboardingFeatures.ModCard.DYNAMIC_LIGHTS,
@@ -73,7 +76,7 @@ class OnboardingFeaturesTest {
 
         assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
+            newestCards,
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }
@@ -88,13 +91,13 @@ class OnboardingFeaturesTest {
 
     @Test
     fun `a newest card that is unavailable does not count as walked`() {
-        val withoutNewest = everyCard - OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT
+        val withoutNewest = everyCard - newestCards.toSet()
 
         val completed = OnboardingFeatures.completedModSettingsVersion(completedVersion = 0, available = withoutNewest)
 
         assertEquals(OnboardingFeatures.MOD_SETTINGS_VERSION - 1, completed)
         assertEquals(
-            listOf(OnboardingFeatures.ModCard.BLOCK_HIGHLIGHT),
+            newestCards,
             OnboardingFeatures.newModCards(completed, available = everyCard),
         )
     }

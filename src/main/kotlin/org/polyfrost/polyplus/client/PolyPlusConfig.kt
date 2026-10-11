@@ -119,13 +119,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingMountOpacitySettled = false
 
     @JvmStatic @Include
-    var onboardingWaveyCapes = true
+    var onboardingWaveyCapes = false
 
     @JvmStatic @Include
     var onboardingWaveyCapesSettled = false
 
     @JvmStatic @Include
-    var onboardingSkinLayers = true
+    var onboardingSkinLayers = false
 
     @JvmStatic @Include
     var onboardingSkinLayersSettled = false

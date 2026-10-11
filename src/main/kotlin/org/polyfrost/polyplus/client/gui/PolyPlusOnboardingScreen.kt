@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -239,8 +240,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
         var shieldHeight by remember { mutableStateOf(modReads.shield ?: PolyPlusConfig.onboardingShieldHeight) }
         var horseOpacity by remember { mutableStateOf(modReads.horse ?: PolyPlusConfig.onboardingHorseOpacity) }
-        var waveyCapes by remember { mutableStateOf(modReads.capes ?: PolyPlusConfig.onboardingWaveyCapes) }
-        var skinLayers by remember { mutableStateOf(modReads.layers ?: PolyPlusConfig.onboardingSkinLayers) }
+        var waveyCapes by remember { mutableStateOf(false) }
+        var skinLayers by remember { mutableStateOf(false) }
         var dynamicLights by remember { mutableIntStateOf(PolyPlusConfig.onboardingDynamicLightsMode) }
         var gamma by remember {
             mutableStateOf((modReads.gamma ?: PolyPlusConfig.onboardingGamma).clampGamma())
@@ -313,6 +314,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     chosen(ModCard.CAPES, waveyCapes, PolyPlusConfig.onboardingWaveyCapes)
                 PolyPlusConfig.onboardingSkinLayers =
                     chosen(ModCard.SKIN_LAYERS, skinLayers, PolyPlusConfig.onboardingSkinLayers)
+                if (waveyCapes != modReads.capes) touched += ModCard.CAPES
+                if (skinLayers != modReads.layers) touched += ModCard.SKIN_LAYERS
                 PolyPlusConfig.onboardingGamma =
                     chosen(ModCard.GAMMA, gamma, PolyPlusConfig.onboardingGamma)
                 PolyPlusConfig.onboardingGammaToggled =
@@ -1803,8 +1806,11 @@ private fun CapePreview(enabled: Boolean) {
     } else {
         still
     }
-    PreviewFrame {
-        drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+    Box {
+        PreviewFrame {
+            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+        }
+        FpsBadge(if (enabled) TOGGLE_ON_FPS else PREVIEW_FPS[0])
     }
 }
 
@@ -1813,8 +1819,11 @@ private fun SkinLayersPreview(enabled: Boolean) {
     val on = remember { loadOnboardingImage(SKINLAYERS_ASSETS + "on.png") }
     val off = remember { loadOnboardingImage(SKINLAYERS_ASSETS + "off.png") }
     val shot = if (enabled) on else off
-    PreviewFrame {
-        drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+    Box {
+        PreviewFrame {
+            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+        }
+        FpsBadge(if (enabled) TOGGLE_ON_FPS else PREVIEW_FPS[0])
     }
 }
 
@@ -1823,33 +1832,40 @@ private fun DynamicLightsPreview(mode: Int) {
     val on = remember { loadOnboardingImage(DYNAMIC_LIGHTS_ASSETS + "on.png") }
     val off = remember { loadOnboardingImage(DYNAMIC_LIGHTS_ASSETS + "off.png") }
     val shot = if (mode == OnboardingFeatures.DYNAMIC_LIGHTS_OFF) off else on
-    val (fps, color) = DYNAMIC_LIGHTS_FPS.getOrElse(mode) { DYNAMIC_LIGHTS_FPS.last() }
     Box {
         PreviewFrame {
             drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
         }
-        SocialText(
-            "$fps FPS",
-            12.sp,
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .clip(ppShape(4.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            color,
-            FontWeight.Medium,
-            TextAlign.Center,
-        )
+        FpsBadge(PREVIEW_FPS.getOrElse(mode) { PREVIEW_FPS.last() })
     }
 }
 
-private val DYNAMIC_LIGHTS_FPS = listOf(
+@Composable
+private fun BoxScope.FpsBadge(tier: Pair<Int, Color>) {
+    val (fps, color) = tier
+    SocialText(
+        "$fps FPS",
+        12.sp,
+        Modifier
+            .align(Alignment.TopEnd)
+            .padding(8.dp)
+            .clip(ppShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.6f))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        color,
+        FontWeight.Medium,
+        TextAlign.Center,
+    )
+}
+
+private val PREVIEW_FPS = listOf(
     400 to Color(0xFF4ADE80),
     300 to Color(0xFFA3E635),
     200 to Color(0xFFFBBF24),
     100 to Color(0xFFF87171),
 )
+
+private val TOGGLE_ON_FPS = 200 to Color(0xFFF87171)
 
 @Composable
 private fun GammaPreview(gamma: Float) {
