@@ -472,16 +472,16 @@ object DefaultSettings {
 
     private fun setYaclField(className: String, fieldName: String, value: Boolean) {
         val type = findClass(className) ?: error("$className is missing")
-        //? if > 1.8.9 {
-        val handler = type.getField("CONFIG").get(null)
-        val instance = handler.javaClass.getMethod("instance").invoke(handler)
-        instance.javaClass.getField(fieldName).setBoolean(instance, value)
-        handler.javaClass.getMethod("save").invoke(handler)
-        //?} else {
-        /*val instance = type.getField("INSTANCE").get(null)
-        type.getField(fieldName).setBoolean(null, value)
-        instance.javaClass.getMethod("save").invoke(instance)
-        *///?}
+        val handler = runCatching { type.getField("CONFIG").get(null) }.getOrNull()
+        if (handler != null) {
+            val instance = handler.javaClass.getMethod("instance").invoke(handler)
+            instance.javaClass.getField(fieldName).setBoolean(instance, value)
+            handler.javaClass.getMethod("save").invoke(handler)
+        } else {
+            val instance = type.getField("INSTANCE").get(null)
+            type.getField(fieldName).setBoolean(null, value)
+            instance.javaClass.getMethod("save").invoke(instance)
+        }
         logger.info("Set {}#{} to {}", className.substringAfterLast('.'), fieldName, value)
     }
 

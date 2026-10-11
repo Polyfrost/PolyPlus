@@ -1,9 +1,11 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.platform.registerSkikoComposeImplementation
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import net.minecraft.client.Minecraft
@@ -21,10 +23,15 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //? if = 1.8.9
 //import org.lwjgl.input.Mouse
 
+@OptIn(InternalComposeUiApi::class)
 object MenuBackgroundPass {
     private const val PARALLAX_EASE = 0.02f
 
     private val drawScope = CanvasDrawScope()
+
+    init {
+        registerSkikoComposeImplementation()
+    }
 
     private var startNanos = 0L
     private var easedX = 0.5f

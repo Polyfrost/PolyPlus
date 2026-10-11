@@ -103,6 +103,9 @@ repositories {
     google()
     maven("https://repo.polyfrost.org/releases")
     maven("https://repo.polyfrost.org/snapshots")
+    maven("https://redirector.kotlinlang.org/maven/compose-dev") {
+        content { includeGroupAndSubgroups("org.jetbrains") }
+    }
     maven("https://maven.cloverclient.com/releases")
     maven("https://jitpack.io") {
         content { includeGroupAndSubgroups("com.github") }

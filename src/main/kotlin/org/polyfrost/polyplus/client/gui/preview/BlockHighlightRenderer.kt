@@ -70,7 +70,7 @@ object BlockHighlightRenderer {
                     paint.colorFilter = filter
                     surface.canvas.drawImageRect(image, frame, bounds, SamplingMode.DEFAULT, paint, true)
                 }
-                filter.close()
+                filter?.close()
                 image.close()
             }
             surface.makeImageSnapshot()
@@ -219,7 +219,7 @@ object BlockHighlightRenderer {
             )
             canvas.drawImageRect(texture, Rect.makeWH(size, size), Rect.makeWH(size, size), SamplingMode.DEFAULT, paint, true)
             canvas.restore()
-            filter.close()
+            filter?.close()
         }
     }
 
