@@ -50,6 +50,8 @@ detailab
 jade
 evergreenhud.json
 waveycapes
+skinlayers3d
+legacy_skin_layers
 chattweaks.json
 viewmodel
 rendertweaks
@@ -127,8 +129,6 @@ cwb
 cubes-without-borders
 polytone
 languagereload
-skinlayers3d
-legacy_skin_layers
 noxesium
 entityculling
 modernfix

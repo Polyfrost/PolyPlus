@@ -421,19 +421,38 @@ object OnboardingFeatures {
         return modClass.getField("config").get(mod) ?: error("LambdaBetterGrass has no config")
     }
 
+    private fun modToggle(modId: String): Any? = runCatching {
+        Class.forName(MOD_TOGGLES).getMethod("toggleFor", String::class.java).invoke(null, modId)
+    }.getOrNull()
+
+    private fun modToggledOff(modId: String): Boolean = runCatching {
+        modToggle(modId)?.let { Class.forName(MOD_TOGGLE).getMethod("isEnabled").invoke(it) } == false
+    }.getOrDefault(false)
+
+    private fun setModToggle(modId: String, enabled: Boolean): Boolean = runCatching {
+        val toggle = modToggle(modId) ?: return false
+        Class.forName(MOD_TOGGLE).getMethod("setEnabled", Boolean::class.javaPrimitiveType).invoke(toggle, enabled)
+        true
+    }.getOrDefault(false)
+
     fun currentBetterGrassMode(): Int? = runCatching {
+        if (modToggledOff(LBG_ID)) return BETTER_GRASS_OFF
         val mode = betterGrassConfig().let { it.javaClass.getMethod("getMode").invoke(it) } as Enum<*>
         BETTER_GRASS_MODES.indexOf(mode.name).takeIf { it >= 0 } ?: BETTER_GRASS_FANCY
     }.getOrNull()
 
     fun applyBetterGrass(mode: Int): Boolean = runCatching {
+        val on = mode != BETTER_GRASS_OFF
+        if (!on && setModToggle(LBG_ID, false)) return true
         val config = betterGrassConfig()
         val modeClass = Class.forName(LBG_MODE)
         val name = BETTER_GRASS_MODES.getOrElse(mode) { BETTER_GRASS_MODES[BETTER_GRASS_FANCY] }
         @Suppress("UNCHECKED_CAST")
         val constant = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, name)
         config.javaClass.getMethod("setMode", modeClass).invoke(config, constant)
+        config.javaClass.getMethod("setBetterLayer", Boolean::class.javaPrimitiveType).invoke(config, on)
         config.javaClass.getMethod("save").invoke(config)
+        if (on) setModToggle(LBG_ID, true)
         true
     }.onFailure {
         logModApplyFailure("better-grass", "Could not apply the LambdaBetterGrass preference", it)
@@ -551,11 +570,13 @@ object OnboardingFeatures {
     }
 
     fun currentWaveyCapes(): Boolean? = runCatching {
+        if (modToggledOff(WAVEY_ID)) return false
         val movement = waveyConfig().let { it.javaClass.getField(CAPE_MOVEMENT).get(it) } as Enum<*>
         movement.name != CAPE_MOVEMENT_VANILLA
     }.getOrNull()
 
     fun applyWaveyCapes(enabled: Boolean): Boolean = runCatching {
+        if (setModToggle(WAVEY_ID, enabled) && !enabled) return true
         val config = waveyConfig()
         waveyCapeMovementWrite(enabled, currentEnumName(config, CAPE_MOVEMENT))
             ?.let { setEnum(config, CAPE_MOVEMENT, CAPE_MOVEMENT_ENUM, it) }
@@ -596,6 +617,7 @@ object OnboardingFeatures {
             val option = legacySkinLayerOptions(legacy).first()
             return@runCatching option.javaClass.getMethod("get").invoke(option) as Boolean
         }
+        if (modToggledOff(SKIN_LAYERS_ID)) return false
         val config = skinLayersConfig()
         config.javaClass.getField(SKIN_LAYERS.first()).getBoolean(config)
     }.getOrNull()
@@ -608,6 +630,7 @@ object OnboardingFeatures {
             Class.forName(OSL_CONFIG_MANAGER).getMethod("save", Class.forName(OSL_CONFIG)).invoke(null, legacy)
             return@runCatching true
         }
+        if (setModToggle(SKIN_LAYERS_ID, enabled) && !enabled) return true
         val config = skinLayersConfig()
         SKIN_LAYERS.forEach { config.javaClass.getField(it).setBoolean(config, enabled) }
         val base = Class.forName(SKIN_LAYERS_MOD_BASE)
@@ -792,6 +815,11 @@ object OnboardingFeatures {
     private const val POLYSPRINT_CONFIG = "org.polyfrost.polysprint.client.PolySprintConfig"
     internal const val POLYBLUR_CONFIG = "org.polyfrost.polyblur.client.PolyBlurConfig"
 
+    private const val MOD_TOGGLES = "org.polyfrost.oneconfig.api.ui.v1.ModToggles"
+    private const val MOD_TOGGLE = "org.polyfrost.oneconfig.api.ui.v1.ModToggle"
+    private const val LBG_ID = "lambdabettergrass"
+    private const val WAVEY_ID = "waveycapes"
+    private const val SKIN_LAYERS_ID = "skinlayers3d"
     private const val LBG_MOD = "dev.lambdaurora.lambdabettergrass.LambdaBetterGrass"
     private const val LBG_MODE = "dev.lambdaurora.lambdabettergrass.LBGMode"
     val BETTER_GRASS_MODES = listOf("OFF", "FASTEST", "FAST", "FANCY")
