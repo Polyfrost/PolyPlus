@@ -233,7 +233,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
         var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
         var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
-        var grassMode by remember { mutableIntStateOf(modReads.grass ?: PolyPlusConfig.onboardingBetterGrassMode) }
+        var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
         var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
         var fireOpacity by remember {
             mutableStateOf(modReads.fireOpacity ?: PolyPlusConfig.onboardingFireOverlayOpacity)
@@ -314,6 +314,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     chosen(ModCard.CAPES, waveyCapes, PolyPlusConfig.onboardingWaveyCapes)
                 PolyPlusConfig.onboardingSkinLayers =
                     chosen(ModCard.SKIN_LAYERS, skinLayers, PolyPlusConfig.onboardingSkinLayers)
+                if (grassMode != modReads.grass) touched += ModCard.GRASS
                 if (waveyCapes != modReads.capes) touched += ModCard.CAPES
                 if (skinLayers != modReads.layers) touched += ModCard.SKIN_LAYERS
                 PolyPlusConfig.onboardingGamma =
@@ -1896,8 +1897,11 @@ private fun BetterGrassPreview(mode: Int) {
         OnboardingFeatures.BETTER_GRASS_MODES.map { loadOnboardingImage(betterGrassPreviewPath(it)) }
     }
     val shot = shots.getOrNull(mode)
-    PreviewFrame {
-        drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+    Box {
+        PreviewFrame {
+            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+        }
+        FpsBadge(PREVIEW_FPS.getOrElse(mode) { PREVIEW_FPS.last() })
     }
 }
 

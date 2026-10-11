@@ -92,7 +92,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingGuiScale = 0
 
     @JvmStatic @Include
-    var onboardingBetterGrassMode = 3
+    var onboardingBetterGrassMode = 0
 
     @JvmStatic @Include
     var onboardingBetterGrassSettled = false

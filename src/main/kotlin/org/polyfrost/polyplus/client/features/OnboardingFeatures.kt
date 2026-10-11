@@ -50,7 +50,7 @@ object OnboardingFeatures {
     }
 
     enum class ModCard(val introducedIn: Int) {
-        GRASS(1),
+        GRASS(6),
         FIRE_OVERLAY(1),
         SHIELD_HEIGHT(1),
         MOUNT(1),

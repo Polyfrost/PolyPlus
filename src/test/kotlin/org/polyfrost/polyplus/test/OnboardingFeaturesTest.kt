@@ -14,7 +14,11 @@ import org.polyfrost.polyplus.client.gui.modGuidePaths
 
 class OnboardingFeaturesTest {
     private val everyCard = OnboardingFeatures.ModCard.entries.toList()
-    private val newestCards = listOf(OnboardingFeatures.ModCard.CAPES, OnboardingFeatures.ModCard.SKIN_LAYERS)
+    private val newestCards = listOf(
+        OnboardingFeatures.ModCard.GRASS,
+        OnboardingFeatures.ModCard.CAPES,
+        OnboardingFeatures.ModCard.SKIN_LAYERS,
+    )
 
     @Test
     fun `a first run is offered every card its mods support`() {
@@ -25,6 +29,7 @@ class OnboardingFeaturesTest {
     fun `a returning user only walks the cards added since they last finished`() {
         assertEquals(
             listOf(
+                OnboardingFeatures.ModCard.GRASS,
                 OnboardingFeatures.ModCard.CAPES,
                 OnboardingFeatures.ModCard.SKIN_LAYERS,
                 OnboardingFeatures.ModCard.GAMMA,
