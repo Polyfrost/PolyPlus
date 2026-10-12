@@ -59,7 +59,6 @@ val minecraftPredicate = property("mod.mc_compat") as String
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
     put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
-    put("skyboxify", optionalProperty("deps.skyboxify") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -165,7 +164,6 @@ if (isOrnithe) {
             "**/mixin/compat/mountopacity/**",
             "**/mixin/compat/polytone/**",
             "**/mixin/compat/rrls/**",
-            "**/mixin/compat/skyboxify/**",
             "**/mixin/compat/sodium/**",
             "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",
@@ -278,14 +276,6 @@ dependencies {
 
     optionalProperty("deps.wwaypoints")?.let {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
-    }
-
-    optionalProperty("deps.skyboxify")?.let {
-        modCompileOnly("maven.modrinth:skyboxify:$it") { isTransitive = false }
-    }
-
-    optionalProperty("deps.iris")?.let {
-        modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
     }
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
