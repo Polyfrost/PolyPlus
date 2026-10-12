@@ -179,7 +179,11 @@ object JvmAdvisor {
     private var done = false
 
     fun initialize() {
-        eventHandler { _: FramebufferRenderEvent.End -> onFrame() }
+        val sampler: (FramebufferRenderEvent.End) -> Boolean = {
+            onFrame()
+            done
+        }
+        eventHandler(sampler)
     }
 
     private fun onFrame() {
