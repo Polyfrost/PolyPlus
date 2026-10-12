@@ -20,6 +20,7 @@ public abstract class MixinTreeConfigData {
     private String polyplus$modCardIcon(String original) {
         String id = ((TreeConfigData) (Object) this).getId().replaceFirst("(v\\d+)?\\.(json|toml)$", "");
         if (id.equals("fullbright") || id.equals("polyfullbright")) id = "gammautils";
+        if (id.equals("legacy_skin_layers") || id.equals("legacy-skin-layers")) return null;
         if (id.startsWith("polyplus")) return "assets/polyplus/modicons/polyplus.svg";
         return POLYPLUS$MOD_ICONS.contains(id) ? "assets/polyplus/modicons/" + id + ".svg" : original;
     }
