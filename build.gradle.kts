@@ -414,6 +414,8 @@ val modVersion = property("mod.version") as String
 // these intentionally support multiple different properties, do not remove
 val modrinthId = optionalProperty("oneconfig.publish.modrinth", "publish.modrinth")
 val modrinthToken = optionalProperty("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
+val curseforgeId = optionalProperty("oneconfig.publish.curseforge", "publish.curseforge")
+val curseforgeToken = optionalProperty("oneconfig.publish.curseforge.token", "publish.curseforge.token", "curseforge.token")
 
 val minecraftVersion = (property("mod.mc_releases") as String).split(",").map { it.trim() }
 val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
@@ -428,7 +430,7 @@ publishMods {
 
     modLoaders.add(loader)
 
-    dryRun = modrinthId == null || modrinthToken == null
+    dryRun = modrinthId == null || modrinthToken == null || (curseforgeId != null && curseforgeToken == null)
 
     if (modrinthId != null) {
         modrinth {
@@ -436,6 +438,19 @@ publishMods {
             accessToken = modrinthToken.orEmpty()
 
             minecraftVersions.addAll(minecraftVersion)
+
+            requires("oneconfig")
+            requires("fabric-language-kotlin")
+        }
+    }
+
+    if (curseforgeId != null && !isOrnithe) {
+        curseforge {
+            projectId = curseforgeId
+            accessToken = curseforgeToken.orEmpty()
+
+            minecraftVersions.addAll(minecraftVersion)
+            client = true
 
             requires("oneconfig")
             requires("fabric-language-kotlin")
