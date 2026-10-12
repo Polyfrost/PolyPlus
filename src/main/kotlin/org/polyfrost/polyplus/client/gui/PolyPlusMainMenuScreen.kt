@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -165,6 +166,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //? if >= 1.21.11 {
 import net.minecraft.server.network.EventLoopGroupHolder
+import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
@@ -622,10 +624,9 @@ private class MenuActions(
     val connect: (ServerData) -> Unit,
 )
 
-private const val ASSETS = "assets/polyplus/mainmenu/"
+const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
-private val PageBackground = Color(0xFF11171C)
 private val PanelBackground: Color
     @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
 private val ServerIconBackground = Color(0x33FFFFFF)
@@ -883,7 +884,7 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
         }
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
-            AccountPill(name = playerName())
+            AccountPill(name = playerName(), screen = screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld && PrivacyConsent.allowsOnlineServices()) {
             HostWorldButton(screen)
@@ -1248,7 +1249,7 @@ private fun ServerRow(
 }
 
 @Composable
-private fun AccountPill(name: String) {
+private fun AccountPill(name: String, screen: Screen) {
     val scope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
     var accounts by remember { mutableStateOf<List<OneLauncherAccounts.Account>?>(null) }
@@ -1442,6 +1443,7 @@ private fun AccountPill(name: String) {
                     onAddMicrosoft = onAddMicrosoft,
                     onCancelLogin = onCancelLogin,
                     onAddOffline = onAddOffline,
+                    screen = screen
                 )
             }
         }
@@ -1472,6 +1474,7 @@ private fun AccountSwitcherPanel(
     onAddMicrosoft: () -> Unit,
     onCancelLogin: () -> Unit,
     onAddOffline: (String) -> Unit,
+    screen: Screen
 ) {
     var offlineEntry by remember { mutableStateOf(false) }
     val idle = busy == null
@@ -1480,7 +1483,7 @@ private fun AccountSwitcherPanel(
         modifier = Modifier
             .width(panelWidth)
             .clip(PanelShape)
-            .background(PageBackground.copy(alpha = 0.96f))
+            .background(LocalTheme.current.pageBackground.copy(alpha = 0.8f))
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1540,18 +1543,22 @@ private fun AccountSwitcherPanel(
                 onCancel = { offlineEntry = false },
             )
         } else {
-            AddAccountButton(
-                icon = ASSETS + "log-in-04.svg",
-                text = "Add Microsoft account",
+            AddAccountButton(icon = ASSETS + "users-01.svg",
+                text = "Manage accounts",
                 enabled = idle,
-                onClick = onAddMicrosoft,
-            )
-            AddAccountButton(
-                icon = ASSETS + "user-01.svg",
-                text = "Add offline account",
-                enabled = idle,
-                onClick = { offlineEntry = true },
-            )
+                onClick = { AccountSwitcherOverlay.open(screen) })
+//            AddAccountButton(
+//                icon = ASSETS + "log-in-04.svg",
+//                text = "Add Microsoft account",
+//                enabled = idle,
+//                onClick = onAddMicrosoft,
+//            )
+//            AddAccountButton(
+//                icon = ASSETS + "user-01.svg",
+//                text = "Add offline account",
+//                enabled = idle,
+//                onClick = { offlineEntry = true },
+//            )
         }
 
         if (busy != null) {
@@ -1667,7 +1674,7 @@ private fun AccountRow(
 }
 
 @Composable
-private fun AddAccountButton(
+fun AddAccountButton(
     icon: String,
     text: String,
     enabled: Boolean,
@@ -1677,12 +1684,12 @@ private fun AddAccountButton(
     val hovered by interaction.collectIsHoveredAsState()
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .clip(ppShape(8.dp))
             .background(if (hovered && enabled) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
             .alpha(if (enabled) 1f else 0.5f)
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1753,7 +1760,7 @@ private fun MicrosoftLoginPopup(
             modifier = Modifier
                 .width(380.dp)
                 .clip(PanelShape)
-                .background(PageBackground.copy(alpha = 0.96f))
+                .background(LocalTheme.current.pageBackground.copy(alpha = 0.8f))
                 .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .swallowClicks()
                 .padding(horizontal = 22.dp, vertical = 24.dp),
@@ -2018,7 +2025,7 @@ private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
 private fun rememberRaster(path: String): ImageBitmap? =
     if (MainMenuRasterAssets.ready) MainMenuRasterAssets.cached(path) else null
 
-private fun playerName(): String = runCatching {
+fun playerName(): String = runCatching {
     Minecraft.getInstance().user.name
 }.getOrDefault("Player")
 
