@@ -10,7 +10,7 @@ import java.util.Set;
 @Mixin(value = TreeConfigData.class, remap = false)
 public abstract class MixinTreeConfigData {
     private static final Set<String> POLYPLUS$MOD_ICONS = Set.of(
-            "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
+            "betterhurtcam", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
             "custom-block-highlight", "droppeditemtweaks", "fastquit", "fovchanger", "freelook", "gammautils", "mountopacity",
             "numericalenchantments", "overlaytweaks", "rendertweaks", "sciophobia", "scrolltweaks", "shaketweaks",
             "simplenickhider", "smoothskies", "tooltipscroll", "waveycapes", "zoomify"
@@ -18,7 +18,8 @@ public abstract class MixinTreeConfigData {
 
     @ModifyReturnValue(method = "getIcon", at = @At("RETURN"), remap = false)
     private String polyplus$modCardIcon(String original) {
-        String id = ((TreeConfigData) (Object) this).getId().replaceFirst("(v\\d+)?\\.json$", "");
+        String id = ((TreeConfigData) (Object) this).getId().replaceFirst("(v\\d+)?\\.(json|toml)$", "");
+        if (id.equals("fullbright") || id.equals("polyfullbright")) id = "gammautils";
         if (id.startsWith("polyplus")) return "assets/polyplus/modicons/polyplus.svg";
         return POLYPLUS$MOD_ICONS.contains(id) ? "assets/polyplus/modicons/" + id + ".svg" : original;
     }
