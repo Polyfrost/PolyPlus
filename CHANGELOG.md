@@ -1,4 +1,3 @@
-## 1.2.60
-- ~20% FPS improvements
-- Add icons for BetterHurtCam and PolyFullbright
-- Strip away Legacy 3D Skin Layers mod icon
+## 1.3.0
+- ~20% FPS improvements with Polydium beta
+- Put Polydium in mod list
