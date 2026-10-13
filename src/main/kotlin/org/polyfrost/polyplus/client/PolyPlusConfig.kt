@@ -101,7 +101,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingFireOverlayHeight = 0.0
 
     @JvmStatic @Include
-    var onboardingFireOverlayOpacity = 100f
+    var onboardingFireOverlayOpacity = org.polyfrost.polyplus.client.features.OnboardingFeatures.FIRE_OPACITY_VANILLA
 
     @JvmStatic @Include
     var onboardingShieldHeight = 0f

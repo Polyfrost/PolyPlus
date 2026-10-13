@@ -961,7 +961,7 @@ private fun FireOverlayCard(
             CardSlider(
                 "Fade",
                 (opacity - OnboardingFeatures.FIRE_OPACITY_MIN) / opacitySpan,
-                "%.0f%%".fmt(opacity),
+                if (opacity.roundToInt() == OnboardingFeatures.FIRE_OPACITY_VANILLA.toInt()) "Vanilla" else "%.0f%%".fmt(opacity),
             ) { onOpacity(OnboardingFeatures.FIRE_OPACITY_MIN + it * opacitySpan) }
         }
     }
