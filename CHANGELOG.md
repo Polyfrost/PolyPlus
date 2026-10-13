@@ -1,2 +1,2 @@
-## 1.3.1
-- Fix graphical glitches with Iris (26.2) and textures (1.21.8-.11)
+## 1.3.2
+- Fixed crash on launch with VulkanMod
