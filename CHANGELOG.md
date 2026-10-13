@@ -1,3 +1,2 @@
-## 1.3.0
-- ~20% FPS improvements with Polydium beta
-- Put Polydium in mod list
+## 1.3.1
+- Fix graphical glitches with Iris (26.2) and textures (1.21.8-.11)
