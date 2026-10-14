@@ -1,2 +1,2 @@
-## 1.3.3
-- Fixed random crash when reloading resources on Minecraft 26.3
+## 1.3.4
+- Fix account switcher saving at wrong location
