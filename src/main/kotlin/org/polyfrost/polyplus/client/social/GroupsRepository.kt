@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.social
 
-import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
@@ -63,6 +62,12 @@ object GroupsRepository {
             .onFailure { LOGGER.error("Failed to refresh groups", it) }
     }
 
+    fun reset() {
+        messagesByGroup.clear()
+        _groups.value = emptyList()
+        refreshGroups()
+    }
+
     fun openDirectMessage(player: String, onResult: (Result<GroupSummary>) -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         val result = GroupsApi.openDirectMessage(player)
         result.onSuccess { summary -> upsertGroup(summary) }
@@ -113,7 +118,7 @@ object GroupsRepository {
     }
 
     fun sendMessage(groupId: Int, content: String, idempotencyKey: String? = null) = PolyPlusClient.SCOPE.launch {
-        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = ChatIdentity.selfId()
         val tempId = PENDING_ID_BASE + pendingIdCounter.getAndIncrement()
         appendOrReplace(
             groupId,
@@ -193,7 +198,7 @@ object GroupsRepository {
             refreshGroups()
             return
         }
-        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = ChatIdentity.selfId()
         val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
         _groups.value = _groups.value.map {
             if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || message.sender != selfId) else it
@@ -224,7 +229,7 @@ object GroupsRepository {
     }
 
     private fun notifyMessageReceived(groupId: Int, messageId: Long, sender: String, content: String) {
-        val selfId = runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
+        val selfId = ChatIdentity.selfId()
         if (sender == selfId) return
         if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
 
