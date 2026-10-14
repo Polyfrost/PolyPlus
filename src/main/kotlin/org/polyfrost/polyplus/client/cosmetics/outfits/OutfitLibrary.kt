@@ -75,7 +75,7 @@ object OutfitLibrary {
                 OutfitApi.send<OutfitResponse>(HttpMethod.Post, "/outfits", body)
                     .map { it.toInfo() }
                     .onSuccess { created ->
-                        outfits = listOf(created) + outfits.filter { it.id != created.id }
+                        outfits = outfits.filter { it.id != created.id } + created
                         activeOutfitId = created.id
                         refreshLocked()
                     }
@@ -179,6 +179,9 @@ object OutfitLibrary {
                 limit = response.limit
                 loadedFor = owner
                 state = LibraryState.Loaded
+                activeOutfit()?.takeIf { it.blank }?.let { blank ->
+                    PolyPlusClient.SCOPE.launch { adoptCurrentLook(blank) }
+                }
             }
             .onFailure { error ->
                 LOGGER.error("Failed to fetch outfits", error)
@@ -197,6 +200,9 @@ object OutfitLibrary {
         response.skin?.let { skin -> SkinLibrary.remember(skin.toInfo()) }
 
         val problems = mutableListOf<String>()
+        if (outfit.blank) {
+            adoptCurrentLook(outfit)
+        }
         response.skin?.toInfo()?.let { skin ->
             val current = MojangSkinService.activeSkin().getOrNull()
             if (current == null || current.textureHash != skin.hash || current.model != skin.model) {
@@ -207,8 +213,10 @@ object OutfitLibrary {
                     }
             }
         }
-        applyMojangCape(outfit.mojangCapeId).onFailure {
-            problems += "your Minecraft cape wasn't changed (${MojangCapeService.failureMessage(it)})"
+        if (!outfit.blank) {
+            applyMojangCape(outfit.mojangCapeId).onFailure {
+                problems += "your Minecraft cape wasn't changed (${MojangCapeService.failureMessage(it)})"
+            }
         }
 
         CosmeticService.syncLocalActive().onFailure { LOGGER.warn("Failed to resync cosmetics after applying outfit {}", id, it) }
@@ -226,6 +234,19 @@ object OutfitLibrary {
         val message = "Outfit applied, but " + problems.joinToString(" and ") + "."
         LOGGER.warn("Outfit {} applied with problems: {}", id, message)
         return Result.failure(OutfitException(message))
+    }
+
+    private suspend fun adoptCurrentLook(outfit: OutfitInfo) {
+        val skinId = SkinLibrary.recordCurrent()
+            .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
+            .getOrElse { return }?.id
+        MojangCapeService.refreshIfNeeded()
+        if (MojangCapeService.state !is MojangCapeState.Loaded) return
+        val capeId = MojangCapeService.activeCape()?.id
+        patch(outfit.id, buildJsonObject {
+            if (skinId != null) put("skin_id", skinId)
+            put("mojang_cape_id", capeId)
+        })
     }
 
     private suspend fun applyMojangCape(capeId: String?): Result<Unit> = runSuspendCatching {
@@ -247,7 +268,7 @@ object OutfitLibrary {
         outfits = if (existing.any { it.id == outfit.id }) {
             existing.map { if (it.id == outfit.id) outfit else it }
         } else {
-            listOf(outfit) + existing
+            existing + outfit
         }
     }
 

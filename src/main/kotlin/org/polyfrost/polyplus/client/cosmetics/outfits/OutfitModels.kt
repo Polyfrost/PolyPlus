@@ -34,6 +34,7 @@ data class OutfitInfo(
     val equipped: Map<BodySlot, Int>,
     val createdAt: String,
     val updatedAt: String,
+    val blank: Boolean = false,
 )
 
 sealed interface LibraryState {
@@ -74,6 +75,7 @@ internal data class OutfitResponse(
     @SerialName("skin_id") val skinId: Int? = null,
     @SerialName("mojang_cape_id") val mojangCapeId: String? = null,
     @SerialName("particle_color") val particleColor: Int? = null,
+    val blank: Boolean = false,
     val equipped: Map<BodySlot, Int> = emptyMap(),
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
@@ -88,6 +90,7 @@ internal data class OutfitResponse(
         equipped = equipped.filterKeys { it != BodySlot.Unknown },
         createdAt = createdAt,
         updatedAt = updatedAt,
+        blank = blank,
     )
 }
 
