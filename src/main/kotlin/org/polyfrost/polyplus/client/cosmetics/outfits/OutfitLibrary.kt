@@ -4,7 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -116,7 +118,10 @@ object OutfitLibrary {
                 outfits = outfits.filter { it.id != id }
                 if (activeOutfitId == id) activeOutfitId = null
             }
-            .onFailure { LOGGER.error("Failed to delete outfit {}", id, it) }
+            .onFailure {
+                LOGGER.error("Failed to delete outfit {}", id, it)
+                forgetIfMissing(id, it)
+            }
     }
 
     fun failureMessage(error: Throwable): String = OutfitApi.failureMessage(
@@ -160,7 +165,10 @@ object OutfitLibrary {
         return OutfitApi.send<OutfitResponse>(HttpMethod.Patch, "/outfits/$id", body)
             .map { it.toInfo() }
             .onSuccess(::replace)
-            .onFailure { LOGGER.error("Failed to update outfit {}", id, it) }
+            .onFailure {
+                LOGGER.error("Failed to update outfit {}", id, it)
+                forgetIfMissing(id, it)
+            }
     }
 
     private suspend fun refreshLocked(): Result<Unit> {
@@ -192,7 +200,10 @@ object OutfitLibrary {
 
     private suspend fun applyLocked(id: Int): Result<OutfitInfo> {
         val response = OutfitApi.send<ApplyOutfitResponse>(HttpMethod.Post, "/outfits/$id/apply")
-            .onFailure { LOGGER.error("Failed to apply outfit {}", id, it) }
+            .onFailure {
+                LOGGER.error("Failed to apply outfit {}", id, it)
+                forgetIfMissing(id, it)
+            }
             .getOrElse { return Result.failure(it) }
         val outfit = response.outfit.toInfo()
         replace(outfit)
@@ -261,6 +272,12 @@ object OutfitLibrary {
             MojangCapeService.select(capeId).getOrThrow()
         }
         Unit
+    }
+
+    private fun forgetIfMissing(id: Int, error: Throwable) {
+        if ((error as? ClientRequestException)?.response?.status != HttpStatusCode.NotFound) return
+        outfits = outfits.filter { it.id != id }
+        if (activeOutfitId == id) activeOutfitId = null
     }
 
     private fun replace(outfit: OutfitInfo) {
