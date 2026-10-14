@@ -977,6 +977,9 @@ object PlayerPreviewRenderer {
         override fun isModelPartShown(part: PlayerModelPart): Boolean = true
     }
 
+    private fun withoutCape(skin: PlayerSkin): PlayerSkin =
+        PlayerSkin(skin.texture(), skin.textureUrl(), null, skin.elytraTexture(), skin.model(), skin.secure())
+
     private object PreviewWorld {
         var cached: ClientLevel? = null
             private set
@@ -1169,6 +1172,7 @@ object PlayerPreviewRenderer {
         }
         equipmentByEntityId[LEGACY_PREVIEW_ENTITY_ID] = equipment
         val state = legacyState(skin, yawDeg)
+        if (hidesCape(source)) state.showCape = false
         val renderer = legacyPlayerRenderer(mc, skin) ?: return false
         //?}
         //? if < 1.21.4 {
@@ -1178,7 +1182,7 @@ object PlayerPreviewRenderer {
         val player = legacyDummy(mc, level) ?: return false
         val cape = capeOverride(source)
             ?: CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
-        player.skinOverride = cape?.let { withCape(skin, it) } ?: skin
+        player.skinOverride = if (hidesCape(source)) withoutCape(skin) else cape?.let { withCape(skin, it) } ?: skin
         bindLegacyEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = yawDeg; player.yBodyRotO = yawDeg
