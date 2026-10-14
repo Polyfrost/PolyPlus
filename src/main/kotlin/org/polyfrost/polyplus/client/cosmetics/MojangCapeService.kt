@@ -31,6 +31,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.nio.file.Files
@@ -126,7 +127,10 @@ object MojangCapeService {
         requestLock.withLock {
             busy = true
             try {
-                request(call).onSuccess { changedThisSession = true }
+                request(call).onSuccess { capes ->
+                    changedThisSession = true
+                    OutfitLibrary.onMojangCapeChanged(capes.firstOrNull { it.active }?.id)
+                }
             } finally {
                 busy = false
             }
