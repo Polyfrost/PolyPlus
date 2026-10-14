@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -52,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -106,7 +108,9 @@ import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.BillingService
+import org.polyfrost.polyplus.client.cosmetics.CapeResolver
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -114,6 +118,9 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
+import org.polyfrost.polyplus.client.cosmetics.MojangCape
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
@@ -145,8 +152,6 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun navigationGroups(original: List<NavigationGroup>): List<NavigationGroup> {
-        if (!PrivacyConsent.allowsOnlineServices()) return original
-
         if (original.any { group -> group.routes.any { it.route == PolyPlusCosmeticsRoute } }) {
             return original
         }
@@ -164,7 +169,6 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun addRoutes(builder: NavGraphBuilder) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
         builder.polyPlusCosmeticsGraph()
     }
 
@@ -273,7 +277,7 @@ private data class CosmeticUiItem(
 @Composable
 private fun PolyPlusCosmeticsScreen() {
     if (!PrivacyConsent.allowsOnlineServices()) {
-        OnlineFeaturesDisabled()
+        MinecraftCapesOnlyScreen()
         return
     }
     var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }
@@ -373,6 +377,7 @@ private fun PolyPlusCosmeticsScreen() {
             },
             onRefresh = {
                 PolyPlusClient.refreshCosmetics()
+                PolyPlusClient.SCOPE.launch { MojangCapeService.refresh() }
                 refreshKey++
                 manualRefreshKey++
                 status = "Refreshing cosmetic data..."
@@ -432,6 +437,13 @@ private fun PolyPlusCosmeticsScreen() {
                             status = it
                         }
                     }
+                },
+                onSelectMojangCape = { cape -> toggleMojangCape(cape) { status = it } },
+                onOpenStore = {
+                    tab = PolyPlusTab.Store
+                    tabResolved = true
+                    showCart = false
+                    status = null
                 },
             )
 
@@ -574,19 +586,23 @@ private fun WardrobeScreen(
     onSelect: (CosmeticUiItem) -> Unit,
     onSelectVariant: (Int, Int) -> Unit,
     onEquip: (CosmeticUiItem) -> Unit,
+    onSelectMojangCape: (MojangCape) -> Unit,
+    onOpenStore: () -> Unit,
+    polyPlusAvailable: Boolean = true,
 ) {
     var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
     var stockedTypes by remember {
         mutableStateOf(CosmeticType.entries.filter { it != CosmeticType.Unknown })
     }
     LaunchedEffect(Unit) {
-        stockedTypes = CosmeticStore.stockedTypes()
+        if (polyPlusAvailable) stockedTypes = CosmeticStore.stockedTypes()
     }
 
-    val railTypes = remember(stockedTypes, items) {
+    val railTypes = remember(stockedTypes, items, polyPlusAvailable) {
         val owned = items.mapTo(mutableSetOf()) { it.type }
         CosmeticType.entries.filter {
-            it != CosmeticType.Unknown && (it in stockedTypes || it in owned)
+            it != CosmeticType.Unknown &&
+                (it == CosmeticType.Cape || (polyPlusAvailable && (it in stockedTypes || it in owned)))
         }
     }
 
@@ -606,6 +622,15 @@ private fun WardrobeScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        MojangCapeService.refreshIfNeeded()
+    }
+    var selectedMojangCapeId by remember { mutableStateOf<String?>(null) }
+    val mojangState = MojangCapeService.state
+    val selectedMojangCape = (mojangState as? MojangCapeState.Loaded)?.capes
+        ?.firstOrNull { it.id == selectedMojangCapeId }
+        ?.takeIf { selectedType == CosmeticType.Cape }
+
     val previewItem = selected?.takeIf { it.type == selectedType } ?: displayItems.firstOrNull()
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(19.dp)) {
         CategoryRail(
@@ -613,24 +638,212 @@ private fun WardrobeScreen(
             onSelect = { selectedType = it },
             types = railTypes,
         )
-        CosmeticGrid(
-            items = displayItems,
-            modifier = Modifier.width(596.dp).fillMaxHeight(),
-            onSelect = onSelect,
-            onEquip = onEquip,
-        )
+        if (selectedType == CosmeticType.Cape) {
+            CapeGrid(
+                polyPlusCapes = displayItems,
+                mojangState = mojangState,
+                mojangBusy = MojangCapeService.busy,
+                modifier = Modifier.width(596.dp).fillMaxHeight(),
+                onSelectMojangCape = { cape ->
+                    selectedMojangCapeId = cape.id
+                    onSelectMojangCape(cape)
+                },
+                onSelect = {
+                    selectedMojangCapeId = null
+                    onSelect(it)
+                },
+                onEquip = onEquip,
+                onOpenStore = onOpenStore,
+                polyPlusAvailable = polyPlusAvailable,
+            )
+        } else {
+            CosmeticGrid(
+                items = displayItems,
+                modifier = Modifier.width(596.dp).fillMaxHeight(),
+                onSelect = onSelect,
+                onEquip = onEquip,
+            )
+        }
         PreviewPanel(
-            selected = previewItem,
+            selected = previewItem?.takeIf { selectedMojangCape == null },
+            heading = selectedMojangCape?.let { it.name to MOJANG_CAPE_COLLECTION },
             status = status,
             selectedVariantId = previewItem?.let { selectedVariantId(it, variantPicks) },
             onSelectVariant = { variantId ->
                 previewItem?.let { onSelectVariant(it.groupId, variantId) }
             },
+            showBack = selectedType == CosmeticType.Cape,
             showAuraColor = selectedType == CosmeticType.Aura,
             auraColor = auraColor,
             onPreviewAuraColor = onPreviewAuraColor,
             onSelectAuraColor = onSelectAuraColor,
             modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+}
+
+private const val MOJANG_CAPE_COLLECTION = "Minecraft cape"
+
+@Composable
+private fun CapeGrid(
+    polyPlusCapes: List<CosmeticUiItem>,
+    mojangState: MojangCapeState,
+    mojangBusy: Boolean,
+    modifier: Modifier,
+    onSelectMojangCape: (MojangCape) -> Unit,
+    onSelect: (CosmeticUiItem) -> Unit,
+    onEquip: (CosmeticUiItem) -> Unit,
+    onOpenStore: () -> Unit,
+    polyPlusAvailable: Boolean,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(19.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item(key = "force-capes", span = { GridItemSpan(maxLineSpan) }) {
+            ForceCapesControl()
+        }
+        item(key = "mojang-header", span = { GridItemSpan(maxLineSpan) }) {
+            CapeSectionHeader(
+                title = "Minecraft capes",
+                note = "Everyone sees this cape, including players without PolyPlus.",
+            )
+        }
+        when (mojangState) {
+            MojangCapeState.Idle, MojangCapeState.Loading ->
+                item(key = "mojang-note", span = { GridItemSpan(maxLineSpan) }) {
+                    CapeSectionNote("Loading your Minecraft capes...")
+                }
+            is MojangCapeState.Unavailable ->
+                item(key = "mojang-note", span = { GridItemSpan(maxLineSpan) }) {
+                    CapeSectionNote(mojangState.reason)
+                }
+            is MojangCapeState.Loaded ->
+                if (mojangState.capes.isEmpty()) {
+                    item(key = "mojang-note", span = { GridItemSpan(maxLineSpan) }) {
+                        CapeSectionNote("You don't own any Minecraft capes.")
+                    }
+                } else {
+                    items(mojangState.capes, key = { "mojang-${it.id}" }) { cape ->
+                        MojangCapeCard(cape, enabled = !mojangBusy, onClick = { onSelectMojangCape(cape) })
+                    }
+                }
+        }
+        item(key = "polyplus-header", span = { GridItemSpan(maxLineSpan) }) {
+            CapeSectionHeader(
+                title = "PolyPlus capes",
+                note = "Players with PolyPlus see this cape instead of your Minecraft cape.",
+                action = "Get more".takeIf { polyPlusAvailable },
+                onAction = onOpenStore,
+            )
+        }
+        if (!polyPlusAvailable) {
+            item(key = "polyplus-note", span = { GridItemSpan(maxLineSpan) }) {
+                CapeSectionNote(
+                    "PolyPlus capes need the Terms of Service and Privacy Policy. " +
+                        "Accept them under Privacy in the PolyPlus settings.",
+                )
+            }
+        } else if (polyPlusCapes.isEmpty()) {
+            item(key = "polyplus-note", span = { GridItemSpan(maxLineSpan) }) {
+                CapeSectionNote("You don't own any PolyPlus capes yet.")
+            }
+        } else {
+            items(polyPlusCapes, key = { "polyplus-${it.groupId}" }) { item ->
+                CosmeticCard(
+                    item = item,
+                    onSelect = { onSelect(item) },
+                    onEquip = { onEquip(item) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForceCapesControl() {
+    var forced by remember { mutableStateOf(PolyPlusCosmeticsConfig.forcePolyPlusCapes) }
+    val modName = CapeResolver.localOverrideModName
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        SocialToggle("Force PolyPlus capes", checked = forced) {
+            forced = !forced
+            PolyPlusCosmeticsConfig.forcePolyPlusCapes = forced
+            PolyPlusCosmeticsConfig.save()
+        }
+        val note = when {
+            modName == null -> "When another mod sets its own cape, that cape is shown unless this is on."
+            forced -> "$modName sets its own cape, but the capes picked here are shown instead."
+            else -> "Your cape is set by $modName. Turn this on to show the capes picked here."
+        }
+        SocialText(note, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun CapeSectionHeader(
+    title: String,
+    note: String,
+    action: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            SocialText(title, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(note, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        }
+        if (action != null) {
+            Box(
+                modifier = Modifier.height(28.dp)
+                    .clip(ppShape(7.dp))
+                    .background(LocalTheme.current.chipBackground)
+                    .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SocialText(action, color = LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapeSectionNote(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(57.dp)
+            .clip(ppShape(12.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        SocialText(text, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun MojangCapeCard(cape: MojangCape, enabled: Boolean, onClick: () -> Unit) {
+    WardrobeCard(
+        name = cape.name,
+        collection = MOJANG_CAPE_COLLECTION,
+        equipped = cape.active,
+        enabled = enabled,
+        onClick = onClick,
+    ) { modifier ->
+        val textureVersion = MojangCapeService.textureVersion
+        val texture = remember(cape.textureHash, textureVersion) { MojangCapeService.texture(cape) }
+        val source = remember(texture) {
+            texture?.let { PlayerPreviewSource.Override(CosmeticEquipment(), mojangCape = it) }
+        }
+        CosmeticThumbnail(
+            source = source,
+            type = CosmeticType.Cape,
+            previewKey = "mojang-${cape.textureHash}-${texture != null}",
+            modifier = modifier,
         )
     }
 }
@@ -757,35 +970,54 @@ private fun CosmeticCard(
     onSelect: () -> Unit,
     onEquip: () -> Unit,
 ) {
-    val border = if (item.equipped) Accent else LocalTheme.current.borderColor
-    val buttonColor = if (item.equipped) Accent else Color(0xB3232D32)
-    val activate = { onSelect(); onEquip() }
-
-    Box(
-        modifier = Modifier.size(180.dp, 258.dp)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, border, ppShape(12.dp))
-            .clickable(onClick = activate),
-    ) {
+    WardrobeCard(
+        name = item.name,
+        collection = item.collection,
+        equipped = item.equipped,
+        onClick = { onSelect(); onEquip() },
+    ) { modifier ->
         val (source, loadTick) = rememberCosmeticPreviewSource(item)
         CosmeticThumbnail(
             source = source,
             type = item.type,
             previewKey = "card-${item.groupId}-$loadTick",
-            modifier = Modifier.offset(17.dp, 17.dp).size(144.dp),
+            modifier = modifier,
         )
-        CardLabel(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        CardLabel(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
+    }
+}
+
+@Composable
+private fun WardrobeCard(
+    name: String,
+    collection: String,
+    equipped: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    thumbnail: @Composable (Modifier) -> Unit,
+) {
+    val border = if (equipped) Accent else LocalTheme.current.borderColor
+    val buttonColor = if (equipped) Accent else Color(0xB3232D32)
+
+    Box(
+        modifier = Modifier.size(180.dp, 258.dp)
+            .alpha(if (enabled) 1f else 0.6f)
+            .clip(ppShape(12.dp))
+            .background(cardBrush())
+            .border(1.dp, border, ppShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        thumbnail(Modifier.offset(17.dp, 17.dp).size(144.dp))
+        CardLabel(name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
+        CardLabel(collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
 
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
                 .background(buttonColor)
-                .clickable(onClick = activate),
+                .clickable(enabled = enabled, onClick = onClick),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SocialText(if (item.equipped) "Equipped" else "Equip", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(if (equipped) "Equipped" else "Equip", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -815,8 +1047,10 @@ private fun PreviewPanel(
     selected: CosmeticUiItem?,
     status: String?,
     modifier: Modifier,
+    heading: Pair<String, String>? = null,
     selectedVariantId: Int? = null,
     onSelectVariant: (Int) -> Unit = {},
+    showBack: Boolean = false,
     showAuraColor: Boolean = false,
     auraColor: Int? = null,
     onPreviewAuraColor: (Int) -> Unit = {},
@@ -829,19 +1063,22 @@ private fun PreviewPanel(
     ) {
         val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
             .containsKey(BodySlot.Hat)
-        PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-            source = PlayerPreviewSource.LocalLive,
-            autoSpin = false,
-            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
-            initialYaw = FRONT_YAW_DEG,
-            live = true,
-        )
+        key(showBack) {
+            PlayerPreview(
+                Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+                source = PlayerPreviewSource.LocalLive,
+                autoSpin = false,
+                verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+                initialYaw = if (showBack) BACK_YAW_DEG else FRONT_YAW_DEG,
+                live = true,
+            )
+        }
         Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (selected != null) {
+            val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
+            if (title != null) {
                 Column {
-                    SocialText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    SocialText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                    SocialText(title, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    subtitle?.let { SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp) }
                 }
             }
             if (status != null) {
@@ -2167,27 +2404,38 @@ private fun ProgressBar(fraction: Float?, modifier: Modifier) {
 }
 
 @Composable
-private fun OnlineFeaturesDisabled() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-    ) {
-        SocialText(
-            "Cosmetics are unavailable",
-            color = LocalTheme.current.textColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        SocialText(
-            "The Terms of Service and Privacy Policy were declined, so PolyPlus does not contact its " +
-                "servers. Accept them under Privacy in the PolyPlus settings to use cosmetics.",
-            color = LocalTheme.current.textColorSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(420.dp),
-            textAlign = TextAlign.Center,
-        )
+private fun MinecraftCapesOnlyScreen() {
+    var status by remember { mutableStateOf<String?>(null) }
+    WardrobeScreen(
+        items = emptyList(),
+        selected = null,
+        status = status,
+        variantPicks = emptyMap(),
+        auraColor = null,
+        onPreviewAuraColor = {},
+        onSelectAuraColor = {},
+        onSelect = {},
+        onSelectVariant = { _, _ -> },
+        onEquip = {},
+        onSelectMojangCape = { cape -> toggleMojangCape(cape) { status = it } },
+        onOpenStore = {},
+        polyPlusAvailable = false,
+    )
+}
+
+private fun toggleMojangCape(cape: MojangCape, onStatus: (String) -> Unit) {
+    if (MojangCapeService.busy) return
+    onStatus(if (cape.active) "Removing ${cape.name}..." else "Equipping ${cape.name}...")
+    PolyPlusClient.SCOPE.launch {
+        val result = if (cape.active) MojangCapeService.clear() else MojangCapeService.select(cape.id)
+        ClientPlatform.runOnMain {
+            onStatus(
+                result.fold(
+                    onSuccess = { if (cape.active) "Removed ${cape.name}." else "Equipped ${cape.name}." },
+                    onFailure = MojangCapeService::failureMessage,
+                ),
+            )
+        }
     }
 }
 
