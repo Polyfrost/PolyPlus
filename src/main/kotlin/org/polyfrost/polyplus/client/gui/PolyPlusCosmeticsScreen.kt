@@ -51,7 +51,7 @@ data object PolyPlusCosmeticsRoute
 
 object PolyPlusOneConfigIntegration {
     private val cosmeticsRoute = NavigationRoute(
-        id = "cosmetics",
+        id = "wardrobe",
         icon = "assets/polyplus/ico/stars.svg",
         route = PolyPlusCosmeticsRoute,
     )
@@ -98,7 +98,7 @@ fun NavGraphBuilder.polyPlusCosmeticsGraph() {
 @Composable
 private fun PolyPlusCosmeticsScreen() {
     DisposableEffect(Unit) {
-        ShellState.title = "Cosmetics"
+        ShellState.title = "Wardrobe"
         onDispose { }
     }
     if (!PrivacyConsent.allowsOnlineServices()) {

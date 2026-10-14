@@ -15,6 +15,7 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -221,6 +222,18 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var emoteWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
         EmoteWheelKeybind.onKeybindState(state)
+        true
+    }
+
+    @Keybind(
+        title = "Open Wardrobe",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus wardrobe",
+    )
+    var wardrobeKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) {
+            PolyPlusOneConfigIntegration.openCosmetics()
+        }
         true
     }
 

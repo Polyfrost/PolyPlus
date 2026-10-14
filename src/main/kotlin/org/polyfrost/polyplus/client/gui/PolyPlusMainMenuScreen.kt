@@ -900,7 +900,7 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics) {
             PillButton(
-                "Cosmetics",
+                "Wardrobe",
                 ASSETS + "diamond-01.svg",
                 Modifier.fillMaxWidth(),
                 onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
