@@ -1688,7 +1688,8 @@ object PlayerPreviewRenderer {
                 if (type == MinecraftProfileTexture.Type.SKIN) fetchedSkin = location to (texture.getMetadata("model") == "slim")
             }, false)
         }
-        return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
+        val id = ClientPlatform.localPlayerUuid()
+        return DefaultSkinUtils.getDefaultSkin(id) to (DefaultSkinUtils.getDefaultModelType(id) == "slim")
     }
 
     private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {

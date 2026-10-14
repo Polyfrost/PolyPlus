@@ -90,7 +90,20 @@ object ClientPlatform {
         Multithreading.submit { DesktopHelper.browse(URI(uri)) }
     }
 
-    fun localPlayerUuid(): UUID = Minecraft.getInstance().user.profileId
+    @Volatile
+    private var offlineUuid: Pair<String, UUID>? = null
+
+    fun localPlayerUuid(): UUID {
+        val user = Minecraft.getInstance().user
+        val id: UUID? = user.profileId
+        return id ?: offlineUuidFor(user.name)
+    }
+
+    private fun offlineUuidFor(name: String): UUID {
+        offlineUuid?.let { (cachedName, uuid) -> if (cachedName == name) return uuid }
+        return UUID.nameUUIDFromBytes("OfflinePlayer:$name".toByteArray(Charsets.UTF_8))
+            .also { offlineUuid = name to it }
+    }
 
     fun localPlayerName(): String = Minecraft.getInstance().user.name
 
