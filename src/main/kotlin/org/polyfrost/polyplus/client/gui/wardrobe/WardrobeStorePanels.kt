@@ -35,6 +35,7 @@ import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -146,6 +147,7 @@ internal fun StoreDetailPanel(
     onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     modifier: Modifier,
+    rotation: PreviewRotation? = null,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
@@ -172,6 +174,7 @@ internal fun StoreDetailPanel(
                     initialYaw = FRONT_YAW_DEG,
                     previewKey = "store-detail-${variant.id}",
                     live = true,
+                    rotation = rotation,
                 )
                 OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
             }

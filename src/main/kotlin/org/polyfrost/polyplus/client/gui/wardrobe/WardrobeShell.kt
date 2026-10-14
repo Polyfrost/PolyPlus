@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,21 +17,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.oneconfig.internal.ui.shell.ShellState
+import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
-import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.emotes.EmoteWheels
+import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -64,19 +68,29 @@ internal fun WardrobeShell(
     val sections = if (polyPlusAvailable) WardrobeSection.entries else listOf(WardrobeSection.Cosmetics)
     var section by remember { mutableStateOf(sections.first()) }
     val query = ShellState.searchQuery
-    var sort by remember { mutableStateOf(WardrobeSort.Newest) }
+    var sort by remember { mutableStateOf(WardrobeSort.Popular) }
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
     var showCart by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var wheelMode by remember { mutableStateOf(false) }
     var wheelSlot by remember { mutableStateOf<Int?>(null) }
+    var returnPoint by remember { mutableStateOf<WardrobeReturnPoint?>(null) }
+    var pendingScroll by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val storeVariantPicks = remember { mutableStateMapOf<Int, Int>() }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val mojangState = MojangCapeService.state
 
-    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort) {
-        buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable)
+    val emoteKeybindWarning = remember(section) {
+        when {
+            section != WardrobeSection.Emotes || !polyPlusAvailable -> null
+            !EmoteWheelKeybind.isBound() -> "The emote wheel has no keybind yet, so it can't be opened in game."
+            else -> EmoteWheelKeybind.conflictingKeybindNames().takeIf { it.isNotEmpty() }
+                ?.let { "The emote wheel keybind is also used by ${it.joinToString()}." }
+        }
+    }
+    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort, emoteKeybindWarning) {
+        buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
     }
     val anchors = remember(entries) {
         entries.mapIndexedNotNull { index, entry ->
@@ -84,7 +98,9 @@ internal fun WardrobeShell(
         }
     }
     LaunchedEffect(section) {
-        gridState.scrollToItem(0)
+        val target = pendingScroll
+        pendingScroll = null
+        if (target != null) gridState.scrollToItem(target.first, target.second) else gridState.scrollToItem(0)
     }
 
     val selectedOwned = (selection as? WardrobeSelection.Owned)?.let { sel -> items.firstOrNull { it.groupId == sel.groupId && it.type == sel.type } }
@@ -93,6 +109,19 @@ internal fun WardrobeShell(
         (mojangState as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.id == sel.capeId }
     }
     val selectedBundle = (selection as? WardrobeSelection.Bundle)?.let { sel -> store.bundles.firstOrNull { it.id == sel.bundleId } }
+    val previewRotation = remember { PreviewRotation(FRONT_YAW_DEG) }
+    val showBack = selectedMojang != null ||
+        selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
+        selectedShop?.type?.let { it in BACK_VIEW_TYPES } == true ||
+        (selection == null && section == WardrobeSection.Cosmetics)
+    LaunchedEffect(showBack) {
+        if (previewRotation.userRotated) return@LaunchedEffect
+        val target = if (showBack) BACK_YAW_DEG else FRONT_YAW_DEG
+        val delta = ((target - previewRotation.yaw) % 360f + 540f) % 360f - 180f
+        animate(previewRotation.yaw, previewRotation.yaw + delta, animationSpec = tween(300)) { value, _ ->
+            if (!previewRotation.userRotated) previewRotation.yaw = value
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         WardrobeRail(
@@ -104,7 +133,7 @@ internal fun WardrobeShell(
                 section = it
                 showHistory = false
             },
-            onAnchor = { index -> scope.launch { gridState.animateScrollToItem(index) } },
+            onAnchor = { index -> scope.launch { gridState.scrollToItem(index) } },
         )
 
         Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -131,6 +160,7 @@ internal fun WardrobeShell(
                     ownedIds = ownedIds,
                     cartKeys = cart.map { it.key }.toSet(),
                     selection = selection,
+                    variantPicks = variantPicks,
                     storeVariantPicks = storeVariantPicks,
                     mojangBusy = MojangCapeService.busy,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -161,12 +191,19 @@ internal fun WardrobeShell(
                             onEquip(item)
                         }
                     },
+                    onPreviewOwned = { item ->
+                        selection = WardrobeSelection.Owned(item.groupId, item.type)
+                        showCart = false
+                    },
+                    onSelectVariant = onSelectVariant,
                     onShop = { info ->
                         val ownedItem = items.firstOrNull { item -> item.owned && info.variantList.any { v -> item.variants.any { it.id == v.id } } }
                         selection = if (ownedItem != null) WardrobeSelection.Owned(ownedItem.groupId, ownedItem.type) else WardrobeSelection.Shop(info.id)
                         showCart = false
                     },
+                    onPickStoreVariant = { infoId, variantId -> storeVariantPicks[infoId] = variantId },
                     onAddToCart = onAddToCart,
+                    onBuyNow = onBuyNow,
                     onMojang = { cape ->
                         selection = WardrobeSelection.Mojang(cape.id)
                         showCart = false
@@ -176,6 +213,7 @@ internal fun WardrobeShell(
                         selection = WardrobeSelection.Bundle(bundle.id)
                         showCart = false
                     },
+                    onBuyBundle = onBuyBundle,
                     onOpenStore = { section = WardrobeSection.Featured },
                 )
             }
@@ -186,12 +224,31 @@ internal fun WardrobeShell(
                 PreviewModeToggle(
                     wheelMode = wheelMode,
                     onChange = { wheel ->
+                        if (wheel == wheelMode) return@PreviewModeToggle
                         wheelMode = wheel
                         wheelSlot = null
                         if (wheel) {
+                            returnPoint = WardrobeReturnPoint(
+                                section = section,
+                                showHistory = showHistory,
+                                scrollIndex = gridState.firstVisibleItemIndex,
+                                scrollOffset = gridState.firstVisibleItemScrollOffset,
+                            )
                             section = WardrobeSection.Emotes
                             showHistory = false
                             showCart = false
+                        } else {
+                            val back = returnPoint
+                            returnPoint = null
+                            if (back != null && section == WardrobeSection.Emotes) {
+                                showHistory = back.showHistory
+                                if (back.section == section) {
+                                    scope.launch { gridState.scrollToItem(back.scrollIndex, back.scrollOffset) }
+                                } else {
+                                    pendingScroll = back.scrollIndex to back.scrollOffset
+                                    section = back.section
+                                }
+                            }
                         }
                     },
                 )
@@ -205,6 +262,12 @@ internal fun WardrobeShell(
                         onRemove = onRemoveFromCart,
                         onCheckout = onCheckout,
                     )
+                    wheelMode -> EmoteWheelEditor(
+                        selectedSlot = wheelSlot,
+                        coverForEmote = { id -> store.all.firstOrNull { info -> info.variantList.any { it.id == id } }?.coverAssetId },
+                        onSelectSlot = { wheelSlot = it },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                     selectedShop != null -> {
                         val variant = selectedStoreVariant(selectedShop, storeVariantPicks, ownedIds)
                         StoreDetailPanel(
@@ -217,14 +280,9 @@ internal fun WardrobeShell(
                             onAddToCart = onAddToCart,
                             onBuyNow = onBuyNow,
                             modifier = Modifier.fillMaxSize(),
+                            rotation = previewRotation,
                         )
                     }
-                    wheelMode -> EmoteWheelEditor(
-                        selectedSlot = wheelSlot,
-                        coverForEmote = { id -> store.all.firstOrNull { info -> info.variantList.any { it.id == id } }?.coverAssetId },
-                        onSelectSlot = { wheelSlot = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
                     selectedBundle != null -> BundleDetailPanel(
                         bundle = selectedBundle,
                         status = status,
@@ -232,15 +290,13 @@ internal fun WardrobeShell(
                         modifier = Modifier.fillMaxSize(),
                     )
                     else -> {
-                        val showBack = selectedMojang != null || selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
-                            (selection == null && section == WardrobeSection.Cosmetics)
                         PreviewPanel(
                             selected = selectedOwned?.takeIf { selectedMojang == null },
                             heading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION },
                             status = status,
                             selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
                             onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },
-                            showBack = showBack,
+                            rotation = previewRotation,
                             showAuraColor = selectedOwned?.type == CosmeticType.Aura,
                             auraColor = auraColor,
                             onPreviewAuraColor = onPreviewAuraColor,
@@ -279,3 +335,10 @@ internal fun MinecraftCapesOnlyScreen() {
         polyPlusAvailable = false,
     )
 }
+
+private data class WardrobeReturnPoint(
+    val section: WardrobeSection,
+    val showHistory: Boolean,
+    val scrollIndex: Int,
+    val scrollOffset: Int,
+)

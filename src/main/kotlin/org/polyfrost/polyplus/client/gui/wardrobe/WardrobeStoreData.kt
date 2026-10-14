@@ -33,6 +33,7 @@ internal class WardrobeStoreData {
                 async {
                     type to CosmeticStore.search(
                         perPage = CosmeticStore.MAX_PAGE_SIZE,
+                        sort = CosmeticStore.Sort.Popularity,
                         types = listOf(type.serializedName),
                         reportFailures = false,
                     ).getOrNull()
@@ -64,6 +65,7 @@ internal fun buildWardrobeEntries(
     query: String,
     sort: WardrobeSort,
     polyPlusAvailable: Boolean,
+    emoteKeybindWarning: String? = null,
 ): List<WardrobeEntry> {
     val needle = query.trim()
     fun matches(name: String) = needle.isEmpty() || name.contains(needle, ignoreCase = true)
@@ -109,6 +111,9 @@ internal fun buildWardrobeEntries(
             entries += WardrobeEntry.Note("skins", "The skin library isn't available yet.")
 
         WardrobeSection.Emotes -> {
+            if (emoteKeybindWarning != null) {
+                entries += WardrobeEntry.Banner("emote-keybind", emoteKeybindWarning, "View keybinds")
+            }
             val ownedEmotes = owned(CosmeticType.Emote)
             if (ownedEmotes.isNotEmpty()) {
                 entries += WardrobeEntry.Divider("Your emotes", anchor = true)

@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +50,7 @@ import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 
 @Composable
@@ -61,7 +61,7 @@ internal fun PreviewPanel(
     heading: Pair<String, String>? = null,
     selectedVariantId: Int? = null,
     onSelectVariant: (Int) -> Unit = {},
-    showBack: Boolean = false,
+    rotation: PreviewRotation? = null,
     showAuraColor: Boolean = false,
     auraColor: Int? = null,
     onPreviewAuraColor: (Int) -> Unit = {},
@@ -74,16 +74,15 @@ internal fun PreviewPanel(
     ) {
         val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
             .containsKey(BodySlot.Hat)
-        key(showBack) {
-            PlayerPreview(
-                Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-                source = PlayerPreviewSource.LocalLive,
-                autoSpin = false,
-                verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
-                initialYaw = if (showBack) BACK_YAW_DEG else FRONT_YAW_DEG,
-                live = true,
-            )
-        }
+        PlayerPreview(
+            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+            source = PlayerPreviewSource.LocalLive,
+            autoSpin = false,
+            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+            initialYaw = FRONT_YAW_DEG,
+            live = true,
+            rotation = rotation,
+        )
         Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
             if (title != null) {

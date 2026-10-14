@@ -101,6 +101,7 @@ internal enum class WardrobeSection(val label: String, val icon: String) {
 }
 
 internal enum class WardrobeSort(val label: String) {
+    Popular("Popular"),
     Newest("Newest"),
     PriceLow("Lowest price"),
     PriceHigh("Highest price"),
@@ -123,6 +124,11 @@ internal sealed interface WardrobeEntry {
 
     data class Note(val id: String, val text: String) : WardrobeEntry {
         override val key: String get() = "note-$id"
+        override val fullSpan: Boolean get() = true
+    }
+
+    data class Banner(val id: String, val text: String, val action: String) : WardrobeEntry {
+        override val key: String get() = "banner-$id"
         override val fullSpan: Boolean get() = true
     }
 
@@ -161,6 +167,7 @@ internal val WARDROBE_COSMETIC_TYPES: List<CosmeticType> =
 internal fun CosmeticStoreInfo.anyOwned(ownedIds: Set<Int>): Boolean = variantList.any { it.id in ownedIds }
 
 internal fun List<CosmeticStoreInfo>.sortedFor(sort: WardrobeSort): List<CosmeticStoreInfo> = when (sort) {
+    WardrobeSort.Popular -> this
     WardrobeSort.Newest -> sortedByDescending { it.createdAt }
     WardrobeSort.PriceLow -> sortedBy { it.finalPrice ?: 0f }
     WardrobeSort.PriceHigh -> sortedByDescending { it.finalPrice ?: 0f }
