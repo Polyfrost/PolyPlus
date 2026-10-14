@@ -193,17 +193,21 @@ private fun WheelSlotCell(
 }
 
 @Composable
-private fun WheelIconButton(iconPath: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String? = null, onClick: () -> Unit) {
     val theme = LocalTheme.current
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier = Modifier.size(28.dp)
             .alpha(if (enabled) 1f else 0.4f)
             .clip(ppShape(8.dp))
             .background(theme.chipBackground)
             .border(1.dp, theme.borderColor, ppShape(8.dp))
+            .hoverable(interaction)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
+        if (tooltip != null && hovered) TooltipPopup(tooltip)
     }
 }

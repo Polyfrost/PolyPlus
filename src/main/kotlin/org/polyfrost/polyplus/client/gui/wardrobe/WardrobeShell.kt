@@ -31,6 +31,8 @@ import org.polyfrost.oneconfig.internal.ui.shell.ShellState
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
@@ -72,6 +74,7 @@ internal fun WardrobeShell(
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
     var showCart by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    var addingSkin by remember { mutableStateOf(false) }
     var wheelMode by remember { mutableStateOf(false) }
     var wheelSlot by remember { mutableStateOf<Int?>(null) }
     var returnPoint by remember { mutableStateOf<WardrobeReturnPoint?>(null) }
@@ -89,7 +92,20 @@ internal fun WardrobeShell(
                 ?.let { "The emote wheel keybind is also used by ${it.joinToString()}." }
         }
     }
-    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort, emoteKeybindWarning) {
+    LaunchedEffect(section) {
+        if (!polyPlusAvailable) return@LaunchedEffect
+        when (section) {
+            WardrobeSection.Outfits -> OutfitLibrary.refreshIfNeeded()
+            WardrobeSection.Skins -> {
+                SkinLibrary.refreshIfNeeded()
+                OutfitLibrary.refreshIfNeeded()
+            }
+            else -> Unit
+        }
+    }
+    val outfitKey = listOf(OutfitLibrary.outfits, OutfitLibrary.activeOutfitId, OutfitLibrary.state)
+    val skinKey = listOf(SkinLibrary.skins, SkinLibrary.state, SkinLibrary.wornSkinId())
+    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
         buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
     }
     val anchors = remember(entries) {
@@ -109,6 +125,11 @@ internal fun WardrobeShell(
         (mojangState as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.id == sel.capeId }
     }
     val selectedBundle = (selection as? WardrobeSelection.Bundle)?.let { sel -> store.bundles.firstOrNull { it.id == sel.bundleId } }
+    val selectedOutfit = (selection as? WardrobeSelection.Outfit)?.let { sel -> OutfitLibrary.outfits.firstOrNull { it.id == sel.outfitId } }
+    val selectedSkin = (selection as? WardrobeSelection.Skin)?.let { sel -> SkinLibrary.skins.firstOrNull { it.id == sel.skinId } }
+    val previewHeading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION }
+        ?: selectedOutfit?.let { it.name to "Outfit" }
+        ?: selectedSkin?.let { it.name to "${it.model.label} skin" }
     val previewRotation = remember { PreviewRotation(FRONT_YAW_DEG) }
     val showBack = selectedMojang != null ||
         selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
@@ -132,13 +153,19 @@ internal fun WardrobeShell(
             onSelect = {
                 section = it
                 showHistory = false
+                addingSkin = false
             },
             onAnchor = { index -> scope.launch { gridState.scrollToItem(index) } },
         )
 
         Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             WardrobeHeader(
-                title = if (showHistory) "History" else section.label,
+                title = when {
+                    showHistory -> "History"
+                    section == WardrobeSection.Outfits -> "Outfits (${OutfitLibrary.outfits.size}/${OutfitLibrary.limit})"
+                    section == WardrobeSection.Skins -> "Skins (${SkinLibrary.skins.size}/${SkinLibrary.limit})"
+                    else -> section.label
+                },
                 sort = sort,
                 cartSize = cart.size,
                 showingHistory = showHistory,
@@ -148,6 +175,15 @@ internal fun WardrobeShell(
                 onRefresh = {
                     onRefresh()
                     storeReloadKey++
+                    if (polyPlusAvailable && section == WardrobeSection.Outfits) {
+                        scope.launch { OutfitLibrary.refresh() }
+                    }
+                    if (polyPlusAvailable && section == WardrobeSection.Skins) {
+                        scope.launch {
+                            SkinLibrary.refresh()
+                            OutfitLibrary.refresh()
+                        }
+                    }
                 },
                 onCart = { showCart = !showCart },
             )
@@ -215,6 +251,21 @@ internal fun WardrobeShell(
                     },
                     onBuyBundle = onBuyBundle,
                     onOpenStore = { section = WardrobeSection.Featured },
+                    onLibraryAction = { target ->
+                        if (target == WardrobeSection.Skins) {
+                            addingSkin = true
+                            showCart = false
+                        }
+                    },
+                    onSelectOutfit = { outfit ->
+                        selection = WardrobeSelection.Outfit(outfit.id)
+                        showCart = false
+                    },
+                    onSelectSkin = { skin ->
+                        selection = WardrobeSelection.Skin(skin.id)
+                        showCart = false
+                    },
+                    onStatus = onStatus,
                 )
             }
         }
@@ -237,6 +288,7 @@ internal fun WardrobeShell(
                             section = WardrobeSection.Emotes
                             showHistory = false
                             showCart = false
+                            addingSkin = false
                         } else {
                             val back = returnPoint
                             returnPoint = null
@@ -252,6 +304,9 @@ internal fun WardrobeShell(
                         }
                     },
                 )
+                if (!wheelMode) {
+                    OutfitSwitcher(onStatus = onStatus)
+                }
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
@@ -261,6 +316,11 @@ internal fun WardrobeShell(
                         onClose = { showCart = false },
                         onRemove = onRemoveFromCart,
                         onCheckout = onCheckout,
+                    )
+                    addingSkin && polyPlusAvailable -> AddSkinPanel(
+                        onClose = { addingSkin = false },
+                        onStatus = onStatus,
+                        modifier = Modifier.fillMaxSize(),
                     )
                     wheelMode -> EmoteWheelEditor(
                         selectedSlot = wheelSlot,
@@ -291,8 +351,8 @@ internal fun WardrobeShell(
                     )
                     else -> {
                         PreviewPanel(
-                            selected = selectedOwned?.takeIf { selectedMojang == null },
-                            heading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION },
+                            selected = selectedOwned?.takeIf { previewHeading == null },
+                            heading = previewHeading,
                             status = status,
                             selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
                             onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },

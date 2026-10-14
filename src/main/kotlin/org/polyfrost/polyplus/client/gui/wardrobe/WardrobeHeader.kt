@@ -96,7 +96,7 @@ internal fun PreviewModeToggle(wheelMode: Boolean, onChange: (Boolean) -> Unit) 
 }
 
 @Composable
-private fun PreviewModeOption(label: String, iconPath: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun PreviewModeOption(label: String, iconPath: String?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val theme = LocalTheme.current
@@ -111,7 +111,7 @@ private fun PreviewModeOption(label: String, iconPath: String, selected: Boolean
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(iconPath, color = color, modifier = Modifier.size(14.dp))
+        if (iconPath != null) Icon(iconPath, color = color, modifier = Modifier.size(14.dp))
         SocialText(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }

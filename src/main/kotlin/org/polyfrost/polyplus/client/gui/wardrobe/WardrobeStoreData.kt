@@ -11,6 +11,9 @@ import kotlinx.coroutines.coroutineScope
 import org.polyfrost.polyplus.client.cosmetics.BundleCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
+import org.polyfrost.polyplus.client.cosmetics.outfits.LibraryState
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -104,11 +107,58 @@ internal fun buildWardrobeEntries(
             }
         }
 
-        WardrobeSection.Outfits ->
-            entries += WardrobeEntry.Note("outfits", "Saved outfits aren't available yet.")
+        WardrobeSection.Outfits -> {
+            val library = OutfitLibrary.outfits
+            entries += WardrobeEntry.LibraryHeader(
+                WardrobeSection.Outfits,
+                "Save your look and switch between outfits.",
+            )
+            when (val state = OutfitLibrary.state) {
+                LibraryState.Idle, LibraryState.Loading ->
+                    entries += WardrobeEntry.Note("outfits", "Loading your outfits...")
+                is LibraryState.Unavailable ->
+                    entries += WardrobeEntry.Note("outfits", state.reason)
+                LibraryState.Loaded -> {
+                    val activeId = OutfitLibrary.activeOutfitId
+                    val outfits = library.filter { matches(it.name) }.favoritesFirst()
+                    when {
+                        library.isEmpty() -> entries += WardrobeEntry.Note(
+                            "outfits",
+                            "You have no saved outfits yet. Use + above the preview to save your current look.",
+                        )
+                        outfits.isEmpty() -> entries += WardrobeEntry.Note("outfits", "No outfits match your search.")
+                        else -> outfits.mapTo(entries) { WardrobeEntry.Outfit(it, it.id == activeId) }
+                    }
+                }
+            }
+        }
 
-        WardrobeSection.Skins ->
-            entries += WardrobeEntry.Note("skins", "The skin library isn't available yet.")
+        WardrobeSection.Skins -> {
+            val library = SkinLibrary.skins
+            entries += WardrobeEntry.LibraryHeader(
+                WardrobeSection.Skins,
+                "Every skin you wear is saved here automatically.",
+                action = "Add skin",
+            )
+            when (val state = SkinLibrary.state) {
+                LibraryState.Idle, LibraryState.Loading ->
+                    entries += WardrobeEntry.Note("skins", "Loading your skins...")
+                is LibraryState.Unavailable ->
+                    entries += WardrobeEntry.Note("skins", state.reason)
+                LibraryState.Loaded -> {
+                    val wornId = SkinLibrary.wornSkinId()
+                    val skins = library.filter { matches(it.name) }.favoriteSkinsFirst()
+                    when {
+                        library.isEmpty() -> entries += WardrobeEntry.Note(
+                            "skins",
+                            "You have no saved skins yet. Use Add skin to save one.",
+                        )
+                        skins.isEmpty() -> entries += WardrobeEntry.Note("skins", "No skins match your search.")
+                        else -> skins.mapTo(entries) { WardrobeEntry.Skin(it, it.id == wornId) }
+                    }
+                }
+            }
+        }
 
         WardrobeSection.Emotes -> {
             if (emoteKeybindWarning != null) {

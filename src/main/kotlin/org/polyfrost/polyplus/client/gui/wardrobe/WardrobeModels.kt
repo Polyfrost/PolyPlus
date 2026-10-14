@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.key
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -152,6 +154,19 @@ internal sealed interface WardrobeEntry {
     data class Bundle(val bundle: BundleInfo) : WardrobeEntry {
         override val key: String get() = "bundle-${bundle.id}"
     }
+
+    data class LibraryHeader(val section: WardrobeSection, val note: String, val action: String? = null) : WardrobeEntry {
+        override val key: String get() = "library-${section.name}"
+        override val fullSpan: Boolean get() = true
+    }
+
+    data class Outfit(val outfit: OutfitInfo, val active: Boolean) : WardrobeEntry {
+        override val key: String get() = "outfit-${outfit.id}"
+    }
+
+    data class Skin(val skin: PlayerSkinInfo, val worn: Boolean) : WardrobeEntry {
+        override val key: String get() = "skin-${skin.id}"
+    }
 }
 
 internal sealed interface WardrobeSelection {
@@ -159,7 +174,13 @@ internal sealed interface WardrobeSelection {
     data class Shop(val infoId: Int) : WardrobeSelection
     data class Mojang(val capeId: String) : WardrobeSelection
     data class Bundle(val bundleId: Int) : WardrobeSelection
+    data class Outfit(val outfitId: Int) : WardrobeSelection
+    data class Skin(val skinId: Int) : WardrobeSelection
 }
+
+internal fun List<OutfitInfo>.favoritesFirst(): List<OutfitInfo> = sortedByDescending { it.favorite }
+
+internal fun List<PlayerSkinInfo>.favoriteSkinsFirst(): List<PlayerSkinInfo> = sortedByDescending { it.favorite }
 
 internal val WARDROBE_COSMETIC_TYPES: List<CosmeticType> =
     CosmeticType.entries.filter { it != CosmeticType.Unknown && it != CosmeticType.Emote }

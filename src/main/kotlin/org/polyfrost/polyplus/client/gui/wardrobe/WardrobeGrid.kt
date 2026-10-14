@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -64,6 +67,11 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.ppShapeOf
@@ -95,6 +103,10 @@ internal fun WardrobeGrid(
     onBundle: (BundleInfo) -> Unit,
     onBuyBundle: (BundleInfo) -> Unit,
     onOpenStore: () -> Unit,
+    onLibraryAction: (WardrobeSection) -> Unit,
+    onSelectOutfit: (OutfitInfo) -> Unit,
+    onSelectSkin: (PlayerSkinInfo) -> Unit,
+    onStatus: (String) -> Unit,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -262,6 +274,78 @@ internal fun WardrobeGrid(
                         CoverThumbnail(bundle.assetId, modifier)
                     }
                 }
+                is WardrobeEntry.LibraryHeader -> LibraryIntro(
+                    note = entry.note,
+                    action = entry.action,
+                    onAction = { onLibraryAction(entry.section) },
+                )
+                is WardrobeEntry.Outfit -> {
+                    val outfit = entry.outfit
+                    var renaming by remember { mutableStateOf(false) }
+                    WardrobeCard(
+                        name = outfit.name,
+                        detail = {
+                            CardDetailText(if (entry.active) "Active" else cosmeticCountLabel(outfit.equipped.size))
+                            if (renaming) {
+                                RenamePopup(
+                                    current = outfit.name,
+                                    onSave = { renameOutfit(outfit, it, onStatus) },
+                                    onDismiss = { renaming = false },
+                                )
+                            }
+                        },
+                        action = wearAction(entry.active),
+                        onAction = { wearOutfit(outfit, onStatus) },
+                        equipped = entry.active,
+                        selected = selection == WardrobeSelection.Outfit(outfit.id),
+                        enabled = !OutfitLibrary.busy,
+                        badge = favoriteBadge(outfit.favorite),
+                        onClick = { onSelectOutfit(outfit) },
+                        menu = listOf(
+                            CardMenuAction("Wear", enabled = !entry.active) { wearOutfit(outfit, onStatus) },
+                            CardMenuAction("Rename") { renaming = true },
+                            CardMenuAction(favoriteMenuLabel(outfit.favorite)) { toggleOutfitFavorite(outfit, onStatus) },
+                            CardMenuAction("Delete") { deleteOutfit(outfit, onStatus) },
+                        ),
+                    ) { modifier ->
+                        OutfitThumbnail(outfit, modifier)
+                    }
+                }
+                is WardrobeEntry.Skin -> {
+                    val skin = entry.skin
+                    var renaming by remember { mutableStateOf(false) }
+                    WardrobeCard(
+                        name = skin.name,
+                        detail = {
+                            CardDetailText(skin.model.label)
+                            if (renaming) {
+                                RenamePopup(
+                                    current = skin.name,
+                                    onSave = { renameSkin(skin, it, onStatus) },
+                                    onDismiss = { renaming = false },
+                                )
+                            }
+                        },
+                        action = wearAction(entry.worn),
+                        onAction = { wearSkin(skin, onStatus) },
+                        equipped = entry.worn,
+                        selected = selection == WardrobeSelection.Skin(skin.id),
+                        enabled = !SkinLibrary.busy,
+                        badge = favoriteBadge(skin.favorite),
+                        onClick = { onSelectSkin(skin) },
+                        menu = listOf(
+                            CardMenuAction("Wear", enabled = !entry.worn) { wearSkin(skin, onStatus) },
+                            CardMenuAction("Rename") { renaming = true },
+                            CardMenuAction(favoriteMenuLabel(skin.favorite)) { toggleSkinFavorite(skin, onStatus) },
+                            CardMenuAction(
+                                if (skin.model == SkinModel.Slim) "Switch to classic arms" else "Switch to slim arms",
+                            ) { switchSkinModel(skin, onStatus) },
+                            CardMenuAction("Delete") { deleteSkin(skin, onStatus) },
+                        ),
+                    ) { modifier ->
+                        SkinThumbnail(skin, modifier)
+                    }
+                }
             }
         }
     }
@@ -287,10 +371,25 @@ private class CardMenuAction(val label: String, val enabled: Boolean = true, val
 
 private enum class CardBadgeStyle { New, Sale, Accent }
 
-private data class CardBadge(val label: String, val style: CardBadgeStyle)
+private data class CardBadge(val label: String, val style: CardBadgeStyle, val icon: String? = null)
 
 private fun equipAction(equipped: Boolean): CardAction =
     if (equipped) CardAction("Equipped", "tick") else CardAction("Equip", "profiles")
+
+private fun wearAction(wearing: Boolean): CardAction =
+    if (wearing) CardAction("Wearing", "tick", enabled = false) else CardAction("Wear", "profiles")
+
+private fun favoriteBadge(favorite: Boolean): CardBadge? =
+    if (favorite) CardBadge("", CardBadgeStyle.Accent, icon = "star-filled") else null
+
+private fun favoriteMenuLabel(favorite: Boolean): String =
+    if (favorite) "Remove from favourites" else "Add to favourites"
+
+private fun cosmeticCountLabel(count: Int): String = when (count) {
+    0 -> "No cosmetics"
+    1 -> "1 cosmetic"
+    else -> "$count cosmetics"
+}
 
 private val CARD_SUCCESS = Color(0xFF239A60)
 private val CARD_NEUTRAL_CHIP = Color(0xFFD9D9D9)
@@ -502,10 +601,9 @@ private fun CardMenuButton(
 }
 
 @Composable
-private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
-    val theme = LocalTheme.current
+private fun rememberDropdownPosition(): PopupPositionProvider {
     val gap = with(LocalDensity.current) { 4.dp.roundToPx() }
-    val positionProvider = remember(gap) {
+    return remember(gap) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -525,8 +623,13 @@ private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDis
             }
         }
     }
+}
+
+@Composable
+private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
+    val theme = LocalTheme.current
     Popup(
-        popupPositionProvider = positionProvider,
+        popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
@@ -567,6 +670,52 @@ private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
+private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    val theme = LocalTheme.current
+    var value by remember { mutableStateOf(current) }
+    val focusRequester = remember { FocusRequester() }
+    val save = {
+        val name = value.trim()
+        if (name.isNotEmpty()) {
+            onDismiss()
+            if (name != current) onSave(name)
+        }
+    }
+    Popup(
+        popupPositionProvider = rememberDropdownPosition(),
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Column(
+            modifier = Modifier.width(240.dp)
+                .clip(ppShape(16.dp))
+                .background(theme.popupBackground)
+                .border(1.dp, theme.borderColor, ppShape(16.dp))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SocialText("Rename", color = theme.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            WardrobeTextField(
+                value = value,
+                onValueChange = { value = it },
+                placeholder = current,
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                maxLength = MAX_LIBRARY_NAME_LENGTH,
+                onSubmit = save,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                SmallButton("Cancel", iconPath = "close", primary = false, onClick = onDismiss)
+                SmallButton("Save", iconPath = "tick", primary = true, onClick = save)
+            }
+        }
+        LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    }
+}
+
+@Composable
 private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolean, onAction: () -> Unit) {
     val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
@@ -596,8 +745,9 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
 @Composable
 private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
     val theme = LocalTheme.current
-    Box(
-        modifier = modifier.widthIn(min = 81.dp).height(21.dp)
+    val color = if (badge.style == CardBadgeStyle.New) theme.textColor else theme.accentTextColor
+    Row(
+        modifier = modifier.widthIn(min = if (badge.label.isEmpty()) 40.dp else 81.dp).height(21.dp)
             .clip(ppShapeOf(bottomStart = 7.dp, bottomEnd = 7.dp))
             .background(
                 when (badge.style) {
@@ -607,14 +757,20 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
                 },
             )
             .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        SocialText(
-            badge.label,
-            color = if (badge.style == CardBadgeStyle.New) theme.textColor else theme.accentTextColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-        )
+        if (badge.icon != null) {
+            Icon(badge.icon, color = color, modifier = Modifier.size(12.dp))
+        }
+        if (badge.label.isNotEmpty()) {
+            SocialText(
+                badge.label,
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 
@@ -629,5 +785,19 @@ private fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
         Icon("alert-circle", color = theme.textColor, modifier = Modifier.size(16.dp))
         SocialText(text, color = theme.textColor, fontSize = 12.sp, modifier = Modifier.weight(1f))
         SmallButton(action, iconPath = "keyboard", primary = false, onClick = onAction)
+    }
+}
+
+@Composable
+private fun LibraryIntro(note: String, action: String?, onAction: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(33.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SocialText(note, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        if (action != null) {
+            SmallButton(action, iconPath = "plus", primary = false, onClick = onAction)
+        }
     }
 }

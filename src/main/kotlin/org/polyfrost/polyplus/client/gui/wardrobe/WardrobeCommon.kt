@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.runtime.ReadOnlyComposable
@@ -29,7 +32,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -42,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.internal.ui.components.Icon
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
@@ -69,6 +75,45 @@ internal fun SmallButton(
         Spacer(Modifier.width(8.dp))
         SocialText(label, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
+}
+
+@Composable
+internal fun WardrobeTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    maxLength: Int = 64,
+    onSubmit: (() -> Unit)? = null,
+) {
+    val theme = LocalTheme.current
+    BasicTextField(
+        value = value,
+        onValueChange = { if (it.length <= maxLength) onValueChange(it) },
+        singleLine = true,
+        textStyle = TextStyle(
+            color = theme.textColor,
+            fontSize = 12.sp,
+            fontFamily = theme.typography.family,
+        ),
+        cursorBrush = SolidColor(theme.textColor),
+        keyboardActions = onSubmit?.let { submit -> KeyboardActions(onDone = { submit() }) } ?: KeyboardActions.Default,
+        keyboardOptions = if (onSubmit != null) KeyboardOptions(imeAction = ImeAction.Done) else KeyboardOptions.Default,
+        modifier = modifier
+            .clip(ppShape(5.dp))
+            .background(theme.chipBackground)
+            .border(1.dp, theme.borderColor, ppShape(5.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .trackTextInputFocus(),
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    SocialText(placeholder, color = theme.textColorSecondary, fontSize = 12.sp, maxLines = 1)
+                }
+                inner()
+            }
+        },
+    )
 }
 
 @Composable

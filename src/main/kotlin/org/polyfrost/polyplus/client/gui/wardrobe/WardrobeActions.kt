@@ -10,6 +10,11 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -27,6 +32,116 @@ internal fun toggleMojangCape(cape: MojangCape, onStatus: (String) -> Unit) {
             )
         }
     }
+}
+
+private fun <T> launchLibraryCall(
+    onStatus: (String) -> Unit,
+    pending: String?,
+    call: suspend () -> Result<T>,
+    failure: (Throwable) -> String,
+    success: (T) -> String,
+) {
+    pending?.let(onStatus)
+    PolyPlusClient.SCOPE.launch {
+        val result = call()
+        ClientPlatform.runOnMain { onStatus(result.fold(onSuccess = success, onFailure = failure)) }
+    }
+}
+
+internal fun wearOutfit(outfit: OutfitInfo, onStatus: (String) -> Unit) {
+    if (OutfitLibrary.busy) return
+    launchLibraryCall(
+        onStatus,
+        "Switching to ${outfit.name}...",
+        { OutfitLibrary.apply(outfit.id) },
+        OutfitLibrary::failureMessage,
+    ) { "Wearing ${it.name}." }
+}
+
+internal fun createOutfitFromCurrent(onStatus: (String) -> Unit) {
+    if (OutfitLibrary.busy) return
+    launchLibraryCall(
+        onStatus,
+        "Saving your current look...",
+        { OutfitLibrary.createFromCurrent() },
+        OutfitLibrary::failureMessage,
+    ) { "Saved ${it.name}." }
+}
+
+internal fun renameOutfit(outfit: OutfitInfo, name: String, onStatus: (String) -> Unit) {
+    launchLibraryCall(
+        onStatus,
+        null,
+        { OutfitLibrary.rename(outfit.id, name) },
+        OutfitLibrary::failureMessage,
+    ) { "Renamed ${outfit.name} to ${it.name}." }
+}
+
+internal fun toggleOutfitFavorite(outfit: OutfitInfo, onStatus: (String) -> Unit) {
+    val favorite = !outfit.favorite
+    launchLibraryCall(
+        onStatus,
+        null,
+        { OutfitLibrary.setFavorite(outfit.id, favorite) },
+        OutfitLibrary::failureMessage,
+    ) { if (favorite) "Added ${it.name} to favourites." else "Removed ${it.name} from favourites." }
+}
+
+internal fun deleteOutfit(outfit: OutfitInfo, onStatus: (String) -> Unit) {
+    launchLibraryCall(
+        onStatus,
+        "Deleting ${outfit.name}...",
+        { OutfitLibrary.delete(outfit.id) },
+        OutfitLibrary::failureMessage,
+    ) { "Deleted ${outfit.name}." }
+}
+
+internal fun wearSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
+    if (SkinLibrary.busy) return
+    launchLibraryCall(
+        onStatus,
+        "Changing your skin to ${skin.name}...",
+        { SkinLibrary.wear(skin.id) },
+        SkinLibrary::failureMessage,
+    ) { "Wearing ${skin.name}." }
+}
+
+internal fun renameSkin(skin: PlayerSkinInfo, name: String, onStatus: (String) -> Unit) {
+    launchLibraryCall(
+        onStatus,
+        null,
+        { SkinLibrary.rename(skin.id, name) },
+        SkinLibrary::failureMessage,
+    ) { "Renamed ${skin.name} to ${it.name}." }
+}
+
+internal fun toggleSkinFavorite(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
+    val favorite = !skin.favorite
+    launchLibraryCall(
+        onStatus,
+        null,
+        { SkinLibrary.setFavorite(skin.id, favorite) },
+        SkinLibrary::failureMessage,
+    ) { if (favorite) "Added ${it.name} to favourites." else "Removed ${it.name} from favourites." }
+}
+
+internal fun switchSkinModel(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
+    val model = if (skin.model == SkinModel.Slim) SkinModel.Classic else SkinModel.Slim
+    launchLibraryCall(
+        onStatus,
+        null,
+        { SkinLibrary.setModel(skin.id, model) },
+        SkinLibrary::failureMessage,
+    ) { "${it.name} now uses ${if (it.model == SkinModel.Slim) "slim" else "classic"} arms." }
+}
+
+internal fun deleteSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
+    launchLibraryCall(
+        onStatus,
+        "Deleting ${skin.name}...",
+        { SkinLibrary.delete(skin.id) },
+        SkinLibrary::failureMessage,
+    ) { "Deleted ${skin.name}." }
 }
 
 @Composable
