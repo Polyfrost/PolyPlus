@@ -299,6 +299,11 @@ object CosmeticSync {
         val uuid = UUID.fromString(packet.player)
         CosmeticCatalog.applyRemoteEquippedSlot(uuid, packet.slot, packet.cosmeticId)
         applyActiveToPlayer(uuid, packet.cosmeticId?.let(::listOf).orEmpty())
+        if (uuid == ClientPlatform.localPlayerUuid() &&
+            CosmeticCatalog.localEquipped().equipped[packet.slot] != packet.cosmeticId
+        ) {
+            PolyPlusClient.SCOPE.launch { CosmeticService.syncLocalActive() }
+        }
     }
 
     private fun handleParticleColorChanged(packet: ClientboundPacket.PlayerParticleColorChanged) {
