@@ -49,6 +49,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import kotlin.math.atan2
 import kotlin.math.sqrt
 import kotlinx.coroutines.isActive
@@ -134,14 +135,12 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
-    val slots = remember {
-        val ownedIds = CosmeticCatalog.ownedEmoteIds()
-        val owned = CosmeticCatalog.allEmoteDefinitions()
-            .filter { it.id in ownedIds }
-            .sortedBy { it.id }
-            .take(SLOT_COUNT)
-            .map { WheelSlot(it.id, it.name) }
-        List(SLOT_COUNT) { index -> owned.getOrNull(index) }
+    val wheelIndex = EmoteWheels.activeIndex
+    val wheelCount = EmoteWheels.wheelCount
+    val slots = remember(wheelIndex, wheelCount) {
+        EmoteWheels.slots(wheelIndex).map { id ->
+            id?.let { emoteId -> CosmeticCatalog.getEmoteDefinition(emoteId)?.let { WheelSlot(it.id, it.name) } }
+        }
     }
 
     var mouseXRoot by remember { mutableFloatStateOf(0f) }
@@ -192,6 +191,10 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
                 val pos = event.changes.firstOrNull()?.position ?: return@onPointerEvent
                 mouseXRoot = pos.x + rootPos.x
                 mouseYRoot = pos.y + rootPos.y
+            }
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
+                if (delta != 0f) EmoteWheels.cycle(if (delta > 0f) 1 else -1)
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -204,6 +207,17 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
             )
 
             val hoveredName = slots.getOrNull(hoveredSlot)?.name
+            if (hoveredName == null && wheelCount > 1) {
+                BasicText(
+                    text = "Wheel ${wheelIndex + 1} of $wheelCount",
+                    style = TextStyle(
+                        color = LocalTheme.current.textColorSecondary,
+                        fontSize = 12.sp,
+                        fontFamily = LocalTheme.current.typography.family,
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+            }
             if (hoveredName != null) {
                 Box(
                     modifier = Modifier.widthIn(max = INNER_DIAMETER - 48.dp),

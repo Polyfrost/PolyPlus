@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -79,5 +81,37 @@ private fun HeaderIconButton(iconPath: String, tooltip: String, onClick: () -> U
     ) {
         Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
         if (hovered) TooltipPopup(tooltip)
+    }
+}
+
+@Composable
+internal fun PreviewModeToggle(wheelMode: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(33.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PreviewModeOption("Character", "profiles", selected = !wheelMode, modifier = Modifier.weight(1f), onClick = { onChange(false) })
+        PreviewModeOption("Emote wheel", "dots-grid", selected = wheelMode, modifier = Modifier.weight(1f), onClick = { onChange(true) })
+    }
+}
+
+@Composable
+private fun PreviewModeOption(label: String, iconPath: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val theme = LocalTheme.current
+    val color = if (selected) theme.accentTextColor else theme.textColor
+    Row(
+        modifier = modifier.fillMaxHeight()
+            .clip(ppShape(8.dp))
+            .background(if (selected) Accent else theme.chipBackground)
+            .border(1.dp, if (hovered && !selected) theme.textColorSecondary else theme.borderColor, ppShape(8.dp))
+            .hoverable(interaction)
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(iconPath, color = color, modifier = Modifier.size(14.dp))
+        SocialText(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }

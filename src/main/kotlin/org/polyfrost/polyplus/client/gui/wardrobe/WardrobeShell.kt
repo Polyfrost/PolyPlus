@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.oneconfig.internal.ui.shell.ShellState
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
@@ -67,6 +68,8 @@ internal fun WardrobeShell(
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
     var showCart by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    var wheelMode by remember { mutableStateOf(false) }
+    var wheelSlot by remember { mutableStateOf<Int?>(null) }
     val storeVariantPicks = remember { mutableStateMapOf<Int, Int>() }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
@@ -135,9 +138,28 @@ internal fun WardrobeShell(
                         store.all.firstOrNull { info -> info.variantList.any { v -> item.variants.any { it.id == v.id } } }?.coverAssetId
                     },
                     onOwned = { item ->
-                        selection = WardrobeSelection.Owned(item.groupId, item.type)
-                        showCart = false
-                        onEquip(item)
+                        if (wheelMode && item.type == CosmeticType.Emote) {
+                            val wheel = EmoteWheels.activeIndex
+                            val target = wheelSlot
+                            val placed = if (target != null) {
+                                EmoteWheels.assign(wheel, target, item.groupId)
+                                target
+                            } else {
+                                EmoteWheels.addToFirstEmpty(wheel, item.groupId)
+                            }
+                            wheelSlot = null
+                            onStatus(
+                                if (placed == null) {
+                                    "Wheel ${wheel + 1} is full. Pick a slot to replace."
+                                } else {
+                                    "Added ${item.name} to wheel ${wheel + 1}."
+                                },
+                            )
+                        } else {
+                            selection = WardrobeSelection.Owned(item.groupId, item.type)
+                            showCart = false
+                            onEquip(item)
+                        }
                     },
                     onShop = { info ->
                         val ownedItem = items.firstOrNull { item -> item.owned && info.variantList.any { v -> item.variants.any { it.id == v.id } } }
@@ -159,51 +181,73 @@ internal fun WardrobeShell(
             }
         }
 
-        Box(modifier = Modifier.width(320.dp).fillMaxHeight()) {
-            when {
-                showCart -> WardrobeCartPane(
-                    cart = cart,
-                    status = status,
-                    onClose = { showCart = false },
-                    onRemove = onRemoveFromCart,
-                    onCheckout = onCheckout,
+        Column(modifier = Modifier.width(320.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (polyPlusAvailable) {
+                PreviewModeToggle(
+                    wheelMode = wheelMode,
+                    onChange = { wheel ->
+                        wheelMode = wheel
+                        wheelSlot = null
+                        if (wheel) {
+                            section = WardrobeSection.Emotes
+                            showHistory = false
+                            showCart = false
+                        }
+                    },
                 )
-                selectedShop != null -> {
-                    val variant = selectedStoreVariant(selectedShop, storeVariantPicks, ownedIds)
-                    StoreDetailPanel(
-                        info = selectedShop,
-                        variant = variant,
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    showCart -> WardrobeCartPane(
+                        cart = cart,
                         status = status,
-                        ownedIds = ownedIds,
-                        inCart = cosmeticCartKey(variant.id) in cart.map { it.key },
-                        onSelectVariant = { storeVariantPicks[selectedShop.id] = it },
-                        onAddToCart = onAddToCart,
-                        onBuyNow = onBuyNow,
+                        onClose = { showCart = false },
+                        onRemove = onRemoveFromCart,
+                        onCheckout = onCheckout,
+                    )
+                    selectedShop != null -> {
+                        val variant = selectedStoreVariant(selectedShop, storeVariantPicks, ownedIds)
+                        StoreDetailPanel(
+                            info = selectedShop,
+                            variant = variant,
+                            status = status,
+                            ownedIds = ownedIds,
+                            inCart = cosmeticCartKey(variant.id) in cart.map { it.key },
+                            onSelectVariant = { storeVariantPicks[selectedShop.id] = it },
+                            onAddToCart = onAddToCart,
+                            onBuyNow = onBuyNow,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    wheelMode -> EmoteWheelEditor(
+                        selectedSlot = wheelSlot,
+                        coverForEmote = { id -> store.all.firstOrNull { info -> info.variantList.any { it.id == id } }?.coverAssetId },
+                        onSelectSlot = { wheelSlot = it },
                         modifier = Modifier.fillMaxSize(),
                     )
-                }
-                selectedBundle != null -> BundleDetailPanel(
-                    bundle = selectedBundle,
-                    status = status,
-                    onBuy = { onBuyBundle(selectedBundle) },
-                    modifier = Modifier.fillMaxSize(),
-                )
-                else -> {
-                    val showBack = selectedMojang != null || selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
-                        (selection == null && section == WardrobeSection.Cosmetics)
-                    PreviewPanel(
-                        selected = selectedOwned?.takeIf { selectedMojang == null },
-                        heading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION },
+                    selectedBundle != null -> BundleDetailPanel(
+                        bundle = selectedBundle,
                         status = status,
-                        selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
-                        onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },
-                        showBack = showBack,
-                        showAuraColor = selectedOwned?.type == CosmeticType.Aura,
-                        auraColor = auraColor,
-                        onPreviewAuraColor = onPreviewAuraColor,
-                        onSelectAuraColor = onSelectAuraColor,
+                        onBuy = { onBuyBundle(selectedBundle) },
                         modifier = Modifier.fillMaxSize(),
                     )
+                    else -> {
+                        val showBack = selectedMojang != null || selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
+                            (selection == null && section == WardrobeSection.Cosmetics)
+                        PreviewPanel(
+                            selected = selectedOwned?.takeIf { selectedMojang == null },
+                            heading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION },
+                            status = status,
+                            selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
+                            onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },
+                            showBack = showBack,
+                            showAuraColor = selectedOwned?.type == CosmeticType.Aura,
+                            auraColor = auraColor,
+                            onPreviewAuraColor = onPreviewAuraColor,
+                            onSelectAuraColor = onSelectAuraColor,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
