@@ -245,7 +245,6 @@ internal fun WardrobeShell(
                         showCart = false
                     },
                     onBuyBundle = onBuyBundle,
-                    onOpenStore = { section = WardrobeSection.Featured },
                     onLibraryAction = { target ->
                         if (target == WardrobeSection.Skins) {
                             addingSkin = true

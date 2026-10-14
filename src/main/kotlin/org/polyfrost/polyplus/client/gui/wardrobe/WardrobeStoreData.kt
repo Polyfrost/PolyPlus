@@ -185,10 +185,9 @@ internal fun buildWardrobeEntries(
             val shopItems = shop(type)
             if (type == CosmeticType.Cape) {
                 entries += WardrobeEntry.Divider(type.displayName, anchor = true)
-                entries += WardrobeEntry.ForceCapes
                 entries += WardrobeEntry.Group(
                     "minecraft",
-                    "Minecraft",
+                    "Minecraft capes",
                     "Everyone sees this cape, including players without PolyPlus.",
                 )
                 when (mojangState) {
@@ -207,8 +206,9 @@ internal fun buildWardrobeEntries(
                 }
                 entries += WardrobeEntry.Group(
                     "polyplus",
-                    "PolyPlus",
+                    "PolyPlus capes",
                     "Players with PolyPlus see this cape instead of your Minecraft cape.",
+                    forceToggle = polyPlusAvailable,
                 )
                 if (!polyPlusAvailable) {
                     entries += WardrobeEntry.Note(

@@ -119,7 +119,7 @@ internal sealed interface WardrobeEntry {
         override val fullSpan: Boolean get() = true
     }
 
-    data class Group(val id: String, val title: String, val note: String, val action: String? = null) : WardrobeEntry {
+    data class Group(val id: String, val title: String, val note: String, val forceToggle: Boolean = false) : WardrobeEntry {
         override val key: String get() = "group-$id"
         override val fullSpan: Boolean get() = true
     }
@@ -131,11 +131,6 @@ internal sealed interface WardrobeEntry {
 
     data class Banner(val id: String, val text: String, val action: String) : WardrobeEntry {
         override val key: String get() = "banner-$id"
-        override val fullSpan: Boolean get() = true
-    }
-
-    data object ForceCapes : WardrobeEntry {
-        override val key: String get() = "force-capes"
         override val fullSpan: Boolean get() = true
     }
 

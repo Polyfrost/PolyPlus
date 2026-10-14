@@ -88,7 +88,7 @@ private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (t
     CosmeticType.Shoulder -> PreviewFraming(FRONT_YAW_DEG, 0.58f, 0.62f)
     CosmeticType.Wings -> PreviewFraming(BACK_YAW_DEG, 0.5f, 0.5f)
     CosmeticType.Backpack -> PreviewFraming(BACK_YAW_DEG, 0.55f, 0.55f)
-    CosmeticType.Cape -> PreviewFraming(BACK_YAW_DEG, 0.42f, 0.5f)
+    CosmeticType.Cape -> PreviewFraming(BACK_YAW_DEG, 0.68f, 0.5f)
     CosmeticType.Aura -> PreviewFraming(FRONT_YAW_DEG, 0.5f, 0.5f)
     CosmeticType.Glove -> PreviewFraming(FRONT_YAW_DEG, 0.7f, 0.42f)
     else -> PreviewFraming(FRONT_YAW_DEG, 0.42f, 0.52f)

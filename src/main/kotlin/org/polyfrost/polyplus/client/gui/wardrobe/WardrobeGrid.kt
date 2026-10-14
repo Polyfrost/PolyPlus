@@ -102,7 +102,6 @@ internal fun WardrobeGrid(
     onMojang: (MojangCape) -> Unit,
     onBundle: (BundleInfo) -> Unit,
     onBuyBundle: (BundleInfo) -> Unit,
-    onOpenStore: () -> Unit,
     onLibraryAction: (WardrobeSection) -> Unit,
     onSelectOutfit: (OutfitInfo) -> Unit,
     onSelectSkin: (PlayerSkinInfo) -> Unit,
@@ -123,15 +122,9 @@ internal fun WardrobeGrid(
         ) { entry ->
             when (entry) {
                 is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
-                is WardrobeEntry.Group -> CapeSectionHeader(
-                    title = entry.title,
-                    note = entry.note,
-                    action = entry.action,
-                    onAction = onOpenStore,
-                )
+                is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
                 is WardrobeEntry.Note -> CapeSectionNote(entry.text)
                 is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open(KeybindsGraph) })
-                WardrobeEntry.ForceCapes -> ForceCapesControl()
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
                     val variantId = selectedVariantId(item, variantPicks)
