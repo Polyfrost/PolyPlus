@@ -46,9 +46,10 @@ fun PlayerPreview(
     previewKey: Any = source,
     live: Boolean = false,
     bottomFadeFraction: Float = 0f,
+    rotation: PreviewRotation? = null,
 ) {
     if (live) {
-        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction)
+        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction, rotation)
         return
     }
     PlayerPreviewBitmap(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey)
@@ -65,15 +66,18 @@ private fun PlayerPreviewLive(
     initialYaw: Float,
     previewKey: Any,
     bottomFadeFraction: Float,
+    rotation: PreviewRotation?,
 ) {
     val entry = remember { PlayerPreviewOffscreen.register() }
     DisposableEffect(entry) {
         onDispose { PlayerPreviewOffscreen.unregister(entry) }
     }
 
-    remember(previewKey, initialYaw) {
-        entry.dragYaw = 0f; entry.dragPitch = 0f
-        entry.spinAccum = 0f; entry.lastSpinNanos = 0L
+    if (rotation == null) {
+        remember(previewKey, initialYaw) {
+            entry.dragYaw = 0f; entry.dragPitch = 0f
+            entry.spinAccum = 0f; entry.lastSpinNanos = 0L
+        }
     }
 
     SideEffect {
@@ -81,7 +85,11 @@ private fun PlayerPreviewLive(
         entry.modelScale = modelScale
         entry.verticalAnchor = verticalAnchor
         entry.autoSpin = autoSpin
-        entry.initialYaw = initialYaw
+        entry.initialYaw = rotation?.yaw ?: initialYaw
+        if (rotation != null) {
+            entry.dragYaw = 0f
+            entry.dragPitch = rotation.pitch
+        }
     }
 
     val frameNanos by produceState(0L) { while (true) withFrameNanos { value = it } }
@@ -90,15 +98,24 @@ private fun PlayerPreviewLive(
 
     val dragModifier: Modifier =
         if (allowDrag) {
-            Modifier.pointerInput(entry) {
+            Modifier.pointerInput(entry, rotation) {
                 detectDragGestures(
                     onDragStart = { entry.dragging = true },
                     onDragEnd = { entry.dragging = false },
                     onDragCancel = { entry.dragging = false },
                 ) { change, drag ->
-                    entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
-                    entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
-                        .coerceIn(-MAX_PITCH, MAX_PITCH)
+                    if (rotation != null) {
+                        rotation.yaw -= drag.x * DRAG_YAW_SENSITIVITY
+                        rotation.pitch = (rotation.pitch + drag.y * DRAG_PITCH_SENSITIVITY)
+                            .coerceIn(-MAX_PITCH, MAX_PITCH)
+                        rotation.userRotated = true
+                        entry.initialYaw = rotation.yaw
+                        entry.dragPitch = rotation.pitch
+                    } else {
+                        entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
+                        entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
+                            .coerceIn(-MAX_PITCH, MAX_PITCH)
+                    }
                     change.consume()
                 }
             }
