@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -113,6 +114,9 @@ internal fun WardrobeShell(
             (entry as? WardrobeEntry.Divider)?.takeIf { it.anchor }?.let { it.label to index }
         }
     }
+    val activeAnchor by remember(anchors) {
+        derivedStateOf { anchors.lastOrNull { it.second <= gridState.firstVisibleItemIndex }?.second ?: anchors.firstOrNull()?.second }
+    }
     LaunchedEffect(section) {
         val target = pendingScroll
         pendingScroll = null
@@ -145,27 +149,18 @@ internal fun WardrobeShell(
     }
 
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        WardrobeRail(
-            sections = sections,
-            selected = section,
-            anchors = anchors,
-            modifier = Modifier.width(150.dp).fillMaxHeight(),
-            onSelect = {
-                section = it
-                showHistory = false
-                addingSkin = false
-            },
-            onAnchor = { index -> scope.launch { gridState.scrollToItem(index) } },
-        )
-
         Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             WardrobeHeader(
-                title = when {
-                    showHistory -> "History"
-                    section == WardrobeSection.Outfits -> "Outfits (${OutfitLibrary.outfits.size}/${OutfitLibrary.limit})"
-                    section == WardrobeSection.Skins -> "Skins (${SkinLibrary.skins.size}/${SkinLibrary.limit})"
-                    else -> section.label
+                sections = sections,
+                selected = section,
+                anchors = anchors,
+                activeAnchor = activeAnchor,
+                onSelectSection = {
+                    section = it
+                    showHistory = false
+                    addingSkin = false
                 },
+                onAnchor = { index -> scope.launch { gridState.scrollToItem(index) } },
                 sort = sort,
                 cartSize = cart.size,
                 showingHistory = showHistory,

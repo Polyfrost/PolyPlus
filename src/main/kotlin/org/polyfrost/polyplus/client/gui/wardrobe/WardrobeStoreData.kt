@@ -111,7 +111,7 @@ internal fun buildWardrobeEntries(
             val library = OutfitLibrary.outfits
             entries += WardrobeEntry.LibraryHeader(
                 WardrobeSection.Outfits,
-                "Save your look and switch between outfits.",
+                "${library.size} of ${OutfitLibrary.limit} saved. Save your look and switch between outfits.",
             )
             when (val state = OutfitLibrary.state) {
                 LibraryState.Idle, LibraryState.Loading ->
@@ -137,7 +137,7 @@ internal fun buildWardrobeEntries(
             val library = SkinLibrary.skins
             entries += WardrobeEntry.LibraryHeader(
                 WardrobeSection.Skins,
-                "Every skin you wear is saved here automatically.",
+                "${library.size} of ${SkinLibrary.limit} saved. Every skin you wear is saved here automatically.",
                 action = "Add skin",
             )
             when (val state = SkinLibrary.state) {
