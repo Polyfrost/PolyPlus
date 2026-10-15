@@ -1,3 +1,2 @@
-## 1.3.5
-- Vulkan on 1.21.11/26.1.2
-- Fix mod card for 3dSkinLayers/WaveyCapes
+## 1.3.6
+- Fix scissors on Vulkan 26.1/1.21.11
