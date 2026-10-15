@@ -76,9 +76,11 @@ internal fun EmoteWheelEditor(
             })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("New wheel", iconPath = "plus", primary = false, onClick = {
-                if (EmoteWheels.addWheel()) onSelectSlot(null)
-            })
+            if (wheelCount < EmoteWheels.MAX_WHEELS) {
+                SmallButton("New wheel", iconPath = "plus", primary = false, onClick = {
+                    if (EmoteWheels.addWheel()) onSelectSlot(null)
+                })
+            }
             if (wheelCount > 1) {
                 SmallButton("Remove", iconPath = "trash", primary = false, onClick = {
                     EmoteWheels.removeWheel(wheelIndex)

@@ -41,6 +41,7 @@ internal fun CosmeticsLoadingScreen(
     onRetry: () -> Unit,
 ) {
     val failed = state.failure != null
+    val outdatedRuntime = state.failure == CosmeticLoadProgress.OUTDATED_RUNTIME
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -54,10 +55,10 @@ internal fun CosmeticsLoadingScreen(
             textAlign = TextAlign.Center,
         )
         SocialText(
-            if (failed) {
-                "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
-            } else {
-                state.label
+            when {
+                outdatedRuntime -> "PolyPlus needs a newer Fabric Language Kotlin. Update it and restart the game."
+                failed -> "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
+                else -> state.label
             },
             color = LocalTheme.current.textColorSecondary,
             fontSize = 12.sp,
@@ -65,8 +66,10 @@ internal fun CosmeticsLoadingScreen(
             textAlign = TextAlign.Center,
         )
         if (failed) {
-            Spacer(Modifier.height(2.dp))
-            SmallButton("Retry", iconPath = "refresh", primary = true, onClick = onRetry)
+            if (!outdatedRuntime) {
+                Spacer(Modifier.height(2.dp))
+                SmallButton("Retry", iconPath = "refresh", primary = true, onClick = onRetry)
+            }
         } else {
             ProgressBar(state.fraction, Modifier.width(360.dp))
         }

@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -38,6 +43,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -208,6 +214,7 @@ internal fun AuraCustomPopover(
 ) {
     val state = remember { AuraPickerState(selectedColor ?: 0xFFFFFFFF.toInt()) }
     var hexText by remember { mutableStateOf(argbHex(state.currentArgb())) }
+    var hexPending by remember { mutableStateOf(false) }
     LaunchedEffect(selectedColor) {
         if (selectedColor != null && selectedColor != state.lastEmitted) {
             state.applyFrom(selectedColor)
@@ -225,8 +232,16 @@ internal fun AuraCustomPopover(
     fun emitCommit() {
         val argb = state.currentArgb()
         state.lastEmitted = argb
+        hexPending = false
         onCommit(argb)
     }
+
+    fun commitHex() {
+        if (hexPending) emitCommit()
+    }
+
+    val latestCommitHex by rememberUpdatedState<() -> Unit> { commitHex() }
+    DisposableEffect(Unit) { onDispose { latestCommitHex() } }
 
     val hue = state.hue
     val saturation = state.saturation
@@ -387,14 +402,17 @@ internal fun AuraCustomPopover(
             BasicTextField(
                 value = hexText,
                 onValueChange = { input ->
-                    val filtered = input.filter { it.isLetterOrDigit() }.take(6)
+                    val filtered = input.filter { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }.take(6)
                     hexText = filtered
                     hexToArgb(filtered, state.alpha)?.let { argb ->
                         state.applyFrom(argb)
                         state.lastEmitted = argb
-                        onCommit(argb)
+                        hexPending = true
+                        onPreview(argb)
                     }
                 },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { commitHex() }),
                 singleLine = true,
                 textStyle = TextStyle(
                     color = LocalTheme.current.textColor,
@@ -407,6 +425,7 @@ internal fun AuraCustomPopover(
                     .background(LocalTheme.current.chipBackground)
                     .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
                     .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .onFocusChanged { if (!it.isFocused) commitHex() }
                     .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

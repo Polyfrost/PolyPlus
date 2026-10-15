@@ -16,10 +16,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -195,7 +200,7 @@ internal fun VariantChips(
     ownedVariantIds: Set<Int> = emptySet(),
 ) {
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(max = MAX_CHIP_HEIGHT).verticalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -259,8 +264,14 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
             color = if (selected) theme.accentTextColor else theme.textColor,
             fontSize = 12.sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = MAX_CHIP_LABEL_WIDTH),
         )
     }
 }
+
+private val MAX_CHIP_HEIGHT = 96.dp
+
+private val MAX_CHIP_LABEL_WIDTH = 120.dp
 
 private val PILL_RADIUS = 18.dp

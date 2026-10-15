@@ -197,7 +197,7 @@ internal fun WardrobeGrid(
                         menu = listOf(
                             CardMenuAction("Preview") { onShop(info) },
                             CardMenuAction("Add to cart", enabled = !inCart && !owned && variant.id !in ownedIds) { onAddToCart(info, variant) },
-                            CardMenuAction("Buy now", enabled = !owned) { onBuyNow(info, variant) },
+                            CardMenuAction("Buy now", enabled = !owned && variant.id !in ownedIds) { onBuyNow(info, variant) },
                         ),
                     ) { modifier ->
                         val (source, loadTick) = rememberCosmeticPreviewSource(variant.id, info.type)

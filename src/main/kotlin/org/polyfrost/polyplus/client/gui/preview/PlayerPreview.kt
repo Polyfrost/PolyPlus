@@ -80,15 +80,17 @@ private fun PlayerPreviewLive(
         }
     }
 
+    val sharedYaw = rotation?.yaw
+    val sharedPitch = rotation?.pitch
     SideEffect {
         entry.source = source
         entry.modelScale = modelScale
         entry.verticalAnchor = verticalAnchor
         entry.autoSpin = autoSpin
-        entry.initialYaw = rotation?.yaw ?: initialYaw
-        if (rotation != null) {
+        entry.initialYaw = sharedYaw ?: initialYaw
+        if (sharedPitch != null) {
             entry.dragYaw = 0f
-            entry.dragPitch = rotation.pitch
+            entry.dragPitch = sharedPitch
         }
     }
 

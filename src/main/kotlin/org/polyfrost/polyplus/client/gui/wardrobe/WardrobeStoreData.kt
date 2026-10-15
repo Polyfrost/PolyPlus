@@ -1,13 +1,11 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.cosmetics.BundleCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
@@ -24,40 +22,78 @@ internal class WardrobeStoreData {
     var newest by mutableStateOf<List<CosmeticStoreInfo>>(emptyList())
     var bundles by mutableStateOf<List<BundleInfo>>(emptyList())
     var loading by mutableStateOf(true)
-    var failed by mutableStateOf(false)
+    var featuredLoading by mutableStateOf(true)
+    var failedTypes by mutableStateOf<Set<CosmeticType>>(emptySet())
+    var featuredFailed by mutableStateOf(false)
 
     val all: List<CosmeticStoreInfo> get() = byType.values.flatten() + popular + newest
 
     suspend fun load() {
         loading = true
+        featuredLoading = true
         val types = CosmeticType.entries.filter { it != CosmeticType.Unknown }
         coroutineScope {
-            val perType = types.map { type ->
-                async {
-                    type to CosmeticStore.search(
-                        perPage = CosmeticStore.MAX_PAGE_SIZE,
-                        sort = CosmeticStore.Sort.Popularity,
-                        types = listOf(type.serializedName),
-                        reportFailures = false,
-                    ).getOrNull()
+            launch {
+                val popularFetched = async {
+                    CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Popularity).getOrNull()
+                        ?.also { response -> popular = response.results.filter { it.type != CosmeticType.Unknown } }
+                }
+                val newestFetched = async {
+                    CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Newest).getOrNull()
+                        ?.also { response -> newest = response.results.filter { it.type != CosmeticType.Unknown } }
+                }
+                val bundlesFetched = async {
+                    BundleCatalog.search(perPage = FEATURED_ROW_SIZE).getOrNull()
+                        ?.also { response -> bundles = response.bundles.filter { it.purchasable } }
+                }
+                featuredFailed = popularFetched.await() == null && newestFetched.await() == null && bundlesFetched.await() == null
+                featuredLoading = false
+            }
+            for (type in types) {
+                launch {
+                    val fetched = searchAll(type)
+                    val previous = byType[type]
+                    val results = when {
+                        fetched == null -> previous
+                        fetched.partial && previous != null -> previous
+                        else -> fetched.items
+                    }
+                    if (results != null) byType = byType + (type to results)
+                    failedTypes = if (results == null) failedTypes + type else failedTypes - type
                 }
             }
-            val popularResult = async { CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Popularity) }
-            val newestResult = async { CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Newest) }
-            val bundleResult = async { BundleCatalog.search(perPage = FEATURED_ROW_SIZE) }
-
-            val fetched = perType.awaitAll()
-            byType = fetched.mapNotNull { (type, response) -> response?.let { type to it.results } }.toMap()
-            popular = popularResult.await().getOrNull()?.results.orEmpty()
-            newest = newestResult.await().getOrNull()?.results.orEmpty()
-            bundles = bundleResult.await().getOrNull()?.bundles.orEmpty().filter { it.purchasable }
-            failed = fetched.all { it.second == null }
         }
+        featuredLoading = false
         loading = false
+    }
+
+    private class StoreResults(val items: List<CosmeticStoreInfo>, val partial: Boolean)
+
+    private suspend fun searchAll(type: CosmeticType): StoreResults? {
+        val results = LinkedHashMap<Int, CosmeticStoreInfo>()
+        var page = 1
+        do {
+            val response = CosmeticStore.search(
+                page = page,
+                perPage = CosmeticStore.MAX_PAGE_SIZE,
+                sort = CosmeticStore.Sort.Popularity,
+                types = listOf(type.serializedName),
+                reportFailures = false,
+            ).getOrNull() ?: return if (page == 1) null else StoreResults(results.values.toList(), partial = true)
+            response.results.forEach { results.putIfAbsent(it.id, it) }
+            page++
+        } while (page <= response.pagination.totalPages && page <= MAX_STORE_PAGES)
+        return StoreResults(results.values.toList(), partial = false)
     }
 }
 
 private const val FEATURED_ROW_SIZE = 6
+
+private const val MAX_STORE_PAGES = 10
+
+private const val STORE_LOADING = "Loading the store..."
+
+private const val STORE_FAILED = "Couldn't reach the PolyPlus store."
 
 internal fun buildWardrobeEntries(
     section: WardrobeSection,
@@ -74,7 +110,7 @@ internal fun buildWardrobeEntries(
     fun matches(name: String) = needle.isEmpty() || name.contains(needle, ignoreCase = true)
     fun owned(type: CosmeticType) = items.filter { it.owned && it.type == type && matches(it.name) }
     fun shop(type: CosmeticType) = store.byType[type].orEmpty()
-        .filter { !it.anyOwned(ownedIds) && matches(it.name) }
+        .filter { !it.fullyOwned(ownedIds) && matches(it.name) }
         .sortedFor(sort)
 
     val entries = mutableListOf<WardrobeEntry>()
@@ -99,8 +135,8 @@ internal fun buildWardrobeEntries(
                 entries += WardrobeEntry.Note(
                     "featured",
                     when {
-                        store.loading -> "Loading the store..."
-                        store.failed -> "Couldn't reach the PolyPlus store."
+                        store.featuredLoading -> STORE_LOADING
+                        store.featuredFailed -> STORE_FAILED
                         else -> "Nothing featured right now."
                     },
                 )
@@ -175,8 +211,15 @@ internal fun buildWardrobeEntries(
                     entries += WardrobeEntry.Divider(category, anchor = true)
                     infos.mapTo(entries) { WardrobeEntry.Shop(it, "emote") }
                 }
-            if (entries.isEmpty()) {
-                entries += WardrobeEntry.Note("emotes", if (store.loading) "Loading emotes..." else "No emotes found.")
+            if (entries.all { it is WardrobeEntry.Banner }) {
+                entries += WardrobeEntry.Note(
+                    "emotes",
+                    when {
+                        CosmeticType.Emote in store.failedTypes -> STORE_FAILED
+                        store.loading -> "Loading emotes..."
+                        else -> "No emotes found."
+                    },
+                )
             }
         }
 
@@ -216,7 +259,14 @@ internal fun buildWardrobeEntries(
                         "PolyPlus capes need the Terms of Service and Privacy Policy. Accept them under Privacy in the PolyPlus settings.",
                     )
                 } else if (ownedItems.isEmpty() && shopItems.isEmpty()) {
-                    entries += WardrobeEntry.Note("polyplus", "No PolyPlus capes found.")
+                    entries += WardrobeEntry.Note(
+                        "polyplus",
+                        when {
+                            CosmeticType.Cape in store.failedTypes -> STORE_FAILED
+                            store.loading -> STORE_LOADING
+                            else -> "No PolyPlus capes found."
+                        },
+                    )
                 }
             } else if (ownedItems.isEmpty() && shopItems.isEmpty()) {
                 continue

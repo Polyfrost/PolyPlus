@@ -15,7 +15,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -77,13 +80,32 @@ object MojangCapeService {
     @Volatile
     private var changedThisSession = false
 
+    @Volatile
+    private var loadedFor: UUID? = null
+
+    @Volatile
+    private var refreshJob: Deferred<Result<List<MojangCape>>>? = null
+
     suspend fun refreshIfNeeded() {
-        if (state is MojangCapeState.Idle) refresh()
+        val stale = loadedFor != null && loadedFor != ClientPlatform.localPlayerUuid()
+        if (stale || state is MojangCapeState.Idle || state is MojangCapeState.Unavailable) refresh()
     }
 
-    suspend fun refresh(): Result<List<MojangCape>> = requestLock.withLock {
-        if (state !is MojangCapeState.Loaded) state = MojangCapeState.Loading
-        request { token -> PolyPlusClient.HTTP.get(PROFILE_URL) { authorize(token) } }
+    suspend fun refresh(): Result<List<MojangCape>> {
+        val job = synchronized(this) {
+            refreshJob?.takeIf { it.isActive } ?: PolyPlusClient.SCOPE.async {
+                requestLock.withLock {
+                    val owner = ClientPlatform.localPlayerUuid()
+                    if (state !is MojangCapeState.Loaded || loadedFor != owner) state = MojangCapeState.Loading
+                    try {
+                        request { token -> PolyPlusClient.HTTP.get(PROFILE_URL) { authorize(token) } }
+                    } finally {
+                        if (state is MojangCapeState.Loading) state = MojangCapeState.Idle
+                    }
+                }
+            }.also { refreshJob = it }
+        }
+        return job.await()
     }
 
     suspend fun select(capeId: String): Result<List<MojangCape>> = mutate { token ->
@@ -98,7 +120,15 @@ object MojangCapeService {
         PolyPlusClient.HTTP.delete(ACTIVE_CAPE_URL) { authorize(token) }
     }
 
-    fun activeCape(): MojangCape? = (state as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.active }
+    fun isLoaded(): Boolean = localCapes() != null
+
+    fun activeCape(): MojangCape? = localCapes()?.firstOrNull { it.active }
+
+    private fun localCapes(): List<MojangCape>? {
+        val capes = (state as? MojangCapeState.Loaded)?.capes ?: return null
+        val owner = loadedFor ?: return null
+        return capes.takeIf { owner == runCatching { ClientPlatform.localPlayerUuid() }.getOrNull() }
+    }
 
     fun texture(cape: MojangCape): Identifier? {
         val hash = cape.textureHash
@@ -112,11 +142,11 @@ object MojangCapeService {
     fun localCapeTexture(): Identifier? = activeCape()?.let(::texture)
 
     @JvmStatic
-    fun localCapeHidden(): Boolean = state is MojangCapeState.Loaded && activeCape() == null
+    fun localCapeHidden(): Boolean = localCapes()?.none { it.active } == true
 
     @JvmStatic
     fun overridesLocalCape(uuid: UUID): Boolean =
-        changedThisSession && state is MojangCapeState.Loaded && uuid == ClientPlatform.localPlayerUuid()
+        changedThisSession && state is MojangCapeState.Loaded && uuid == loadedFor && uuid == ClientPlatform.localPlayerUuid()
 
     fun failureMessage(error: Throwable): String = when (error) {
         is MojangCapeException -> error.message ?: SIGNED_OUT_MESSAGE
@@ -137,6 +167,7 @@ object MojangCapeService {
         }
 
     private suspend fun request(call: suspend (String) -> HttpResponse): Result<List<MojangCape>> {
+        val owner = ClientPlatform.localPlayerUuid()
         val result = runSuspendCatching {
             val token = accessToken() ?: throw MojangCapeException(SIGNED_OUT_MESSAGE)
             val response = call(token)
@@ -144,6 +175,8 @@ object MojangCapeService {
             response.body<ProfileResponse>().capes.map { it.toCape() }
         }
         result.onSuccess { capes ->
+            if (loadedFor != owner) changedThisSession = false
+            loadedFor = owner
             state = MojangCapeState.Loaded(capes)
             capes.forEach(::texture)
         }.onFailure { error ->
@@ -189,6 +222,10 @@ object MojangCapeService {
                 LOGGER.warn("Failed to load the texture for Minecraft cape {}", cape.name, it)
                 retryAt[hash] = System.currentTimeMillis() + TEXTURE_RETRY_MS
                 withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(file) } }
+                PolyPlusClient.SCOPE.launch {
+                    delay(TEXTURE_RETRY_MS)
+                    textureVersion++
+                }
             }
             downloading.remove(hash)
         }

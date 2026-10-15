@@ -55,12 +55,12 @@ object CapeResolver {
         if (CosmeticAssetCache.getCapeTexture(playerId) != null) return CapeDecision.POLYPLUS
 
         val mojangKnown = MojangCapeService.overridesLocalCape(playerId) ||
-            (foreign && local && MojangCapeService.state is MojangCapeState.Loaded)
+            (foreign && local && MojangCapeService.isLoaded())
         if (mojangKnown) {
             if (MojangCapeService.localCapeHidden()) return CapeDecision.NONE
             if (MojangCapeService.localCapeTexture() != null) return CapeDecision.MOJANG
         }
-        return if (foreign) CapeDecision.VANILLA else CapeDecision.KEEP
+        return if (foreign && local) CapeDecision.VANILLA else CapeDecision.KEEP
     }
 
     //? if > 1.8.9 {

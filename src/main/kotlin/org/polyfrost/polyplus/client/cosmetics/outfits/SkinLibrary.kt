@@ -6,9 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Deferred
@@ -44,6 +46,10 @@ object SkinLibrary {
     private const val MAX_DOWNLOAD_BYTES = 1024L * 1024L
     private const val RECORD_INTERVAL_MS = 30_000L
     private const val NOT_A_SKIN = "That image isn't a Minecraft skin."
+    internal const val TOO_LARGE = "That skin file is too large. Skins can be at most 64 KB."
+    internal const val MAX_FILE_BYTES = 64L * 1024L
+    private const val BITMAP_RETRY_MS = 60_000L
+    private const val RECORD_FAILURE_BACKOFF_MS = 10 * 60_000L
     private const val DOWNLOAD_FAILED = "Couldn't download that image."
     private val USERNAME_PATTERN = Regex("^[A-Za-z0-9_]{1,16}$")
     private val HASH_PATTERN = Regex("^[0-9a-f]{32,64}$")
@@ -55,7 +61,7 @@ object SkinLibrary {
     private val cacheDir = File("${PolyPlusConstants.NAME}/skins")
     private val bitmaps = ConcurrentHashMap<String, ImageBitmap>()
     private val loading = ConcurrentHashMap.newKeySet<String>()
-    private val failed = ConcurrentHashMap.newKeySet<String>()
+    private val failed = ConcurrentHashMap<String, Long>()
     private val signedInFor = AtomicReference<UUID?>(null)
 
     var skins by mutableStateOf<List<PlayerSkinInfo>>(emptyList())
@@ -80,6 +86,20 @@ object SkinLibrary {
     private var recordJob: Deferred<Result<PlayerSkinInfo?>>? = null
 
     @Volatile
+    private var recordJobBackground = false
+
+    @Volatile
+    private var refreshJob: Deferred<Result<Unit>>? = null
+
+    private data class RecordFailure(val at: Long, val conflict: Boolean)
+
+    private class SkinRecordSkipped(reason: String) : Exception(reason)
+
+    private val recordFailures = ConcurrentHashMap<Pair<UUID, String>, RecordFailure>()
+
+    private var wornHash by mutableStateOf<Pair<UUID, String>?>(null)
+
+    @Volatile
     private var lastRecordOwner: UUID? = null
 
     @Volatile
@@ -94,9 +114,15 @@ object SkinLibrary {
         }
     }
 
-    suspend fun refresh(): Result<Unit> = refreshLocked().also { recordInBackground() }
+    suspend fun refresh(): Result<Unit> {
+        val job = synchronized(this) {
+            refreshJob?.takeIf { it.isActive } ?: PolyPlusClient.SCOPE.async { refreshLocked() }.also { refreshJob = it }
+        }
+        return job.await().also { recordInBackground() }
+    }
 
-    suspend fun recordCurrent(): Result<PlayerSkinInfo?> = recordShared(fresh = false)
+    suspend fun recordCurrent(background: Boolean = false): Result<PlayerSkinInfo?> =
+        recordShared(fresh = false, background = background)
 
     suspend fun addFromBytes(png: ByteArray, name: String?, model: SkinModel): Result<PlayerSkinInfo> {
         if (!OutfitApi.allowed()) return unavailable()
@@ -142,6 +168,7 @@ object SkinLibrary {
         try {
             MojangSkinService.setSkin(skin.url, skin.model)
                 .getOrElse { return Result.failure(mojangFailure(it)) }
+            wornHash = ClientPlatform.localPlayerUuid() to skin.hash
             val patched = OutfitLibrary.onSkinWorn(id)
             recordInBackground(force = true)
             patched.onFailure {
@@ -162,25 +189,49 @@ object SkinLibrary {
     suspend fun setFavorite(id: Int, favorite: Boolean): Result<PlayerSkinInfo> =
         patch(id, buildJsonObject { put("favorite", favorite) })
 
-    suspend fun setModel(id: Int, model: SkinModel): Result<PlayerSkinInfo> =
-        patch(id, buildJsonObject { put("model", model.serializedName) })
+    suspend fun setModel(id: Int, model: SkinModel): Result<PlayerSkinInfo> {
+        val worn = wornSkinId() == id
+        val updated = patch(id, buildJsonObject { put("model", model.serializedName) })
+            .getOrElse { return Result.failure(it) }
+        if (!worn) return Result.success(updated)
+        busy = true
+        try {
+            MojangSkinService.setSkin(updated.url, updated.model).getOrElse {
+                return Result.failure(
+                    OutfitException("${updated.name} was updated, but your Minecraft skin wasn't changed (${MojangSkinService.failureMessage(it)})."),
+                )
+            }
+            recordInBackground(force = true)
+        } finally {
+            busy = false
+        }
+        return Result.success(updated)
+    }
 
     suspend fun delete(id: Int): Result<Unit> {
         if (!OutfitApi.allowed()) return unavailable()
         return OutfitApi.send<Unit>(HttpMethod.Delete, "/skins/$id")
             .onSuccess {
-                skins = skins.filter { it.id != id }
-                OutfitLibrary.onSkinDeleted(id)
+                forget(id)
+                val owner = ClientPlatform.localPlayerUuid()
+                recordFailures.entries.removeIf { it.key.first == owner && it.value.conflict }
             }
-            .onFailure { LOGGER.error("Failed to delete skin {}", id, it) }
+            .onFailure {
+                LOGGER.error("Failed to delete skin {}", id, it)
+                forgetIfMissing(id, it)
+            }
     }
 
-    fun wornSkinId(): Int? = OutfitLibrary.activeOutfit()?.skinId
+    fun wornSkinId(): Int? {
+        val owner = runCatching { ClientPlatform.localPlayerUuid() }.getOrNull()
+        val hash = wornHash?.takeIf { it.first == owner }?.second ?: return OutfitLibrary.activeOutfit()?.skinId
+        return skins.firstOrNull { it.hash == hash }?.id
+    }
 
     fun bitmap(skin: PlayerSkinInfo): ImageBitmap? {
         val key = skin.hash.ifBlank { skin.url }
         bitmaps[key]?.let { return it }
-        if (key !in failed && loading.add(key)) loadBitmap(skin, key)
+        if (System.currentTimeMillis() >= (failed[key] ?: 0L) && loading.add(key)) loadBitmap(skin, key)
         return null
     }
 
@@ -198,41 +249,51 @@ object SkinLibrary {
 
     internal fun onSignedIn(profileId: UUID) {
         if (signedInFor.getAndSet(profileId) == profileId) return
-        recordInBackground(force = true)
+        recordInBackground(force = true, background = true)
     }
 
-    internal fun recordInBackground(force: Boolean = false) {
+    internal fun recordInBackground(force: Boolean = false, background: Boolean = !force) {
         if (!OutfitApi.allowed()) return
         val owner = runCatching { ClientPlatform.localPlayerUuid() }.getOrNull() ?: return
         if (!force && lastRecordOwner == owner && System.currentTimeMillis() - lastRecordAt < RECORD_INTERVAL_MS) return
         PolyPlusClient.SCOPE.launch {
-            recordShared(fresh = force).onFailure { LOGGER.warn("Could not save the current Minecraft skin", it) }
+            recordShared(fresh = force, background = background).onFailure {
+                if (it is SkinRecordSkipped) {
+                    LOGGER.debug("Skipped saving the current Minecraft skin: {}", it.message)
+                } else {
+                    LOGGER.warn("Could not save the current Minecraft skin", it)
+                }
+            }
         }
     }
 
-    private suspend fun recordShared(fresh: Boolean): Result<PlayerSkinInfo?> {
+    private suspend fun recordShared(fresh: Boolean, background: Boolean): Result<PlayerSkinInfo?> {
         if (!OutfitApi.allowed()) return OutfitApi.privacyFailure()
         val job = recordJobLock.withLock {
             val running = recordJob?.takeIf { it.isActive }
-            if (running != null && !fresh) {
+            if (running != null && !fresh && (background || !recordJobBackground)) {
                 running
             } else {
                 PolyPlusClient.SCOPE.async {
                     running?.join()
-                    recordLock.withLock { recordActive() }
-                }.also { recordJob = it }
+                    recordLock.withLock { recordActive(background) }
+                }.also {
+                    recordJob = it
+                    recordJobBackground = background
+                }
             }
         }
         return job.await()
     }
 
-    private suspend fun recordActive(): Result<PlayerSkinInfo?> {
+    private suspend fun recordActive(background: Boolean): Result<PlayerSkinInfo?> {
         val owner = ClientPlatform.localPlayerUuid()
         try {
             val current = MojangSkinService.activeSkin()
                 .getOrElse { return Result.failure(mojangFailure(it)) }
                 ?: return Result.success(null)
-            return record(current, null, owner)
+            current.textureHash?.let { wornHash = owner to it }
+            return record(current, null, owner, background, correctModel = true)
         } finally {
             lastRecordOwner = owner
             lastRecordAt = System.currentTimeMillis()
@@ -247,13 +308,19 @@ object SkinLibrary {
         try {
             val recorded = recordLock.withLock {
                 val owner = ClientPlatform.localPlayerUuid()
+                if (loadedFor == owner && skins.size >= limit) {
+                    return Result.failure(OutfitException("Your skin library is full ($limit skins). Delete one to make room."))
+                }
                 val worn = upload().getOrElse { return Result.failure(mojangFailure(it)) }
                     ?: return Result.failure(
                         OutfitException("Your skin changed, but Minecraft hasn't reported it yet. Try again in a moment."),
                     )
-                record(worn, name, owner).also {
+                worn.textureHash?.let { wornHash = owner to it }
+                record(worn, name, owner, correctModel = true).also {
                     lastRecordOwner = owner
                     lastRecordAt = System.currentTimeMillis()
+                }.recoverCatching {
+                    throw OutfitException("Your skin changed, but it couldn't be saved to your library (${failureMessage(it)}).")
                 }
             }
             recorded.onSuccess { skin ->
@@ -266,11 +333,23 @@ object SkinLibrary {
         }
     }
 
-    private suspend fun record(skin: MojangSkin, name: String?, owner: UUID): Result<PlayerSkinInfo> {
+    private suspend fun record(
+        skin: MojangSkin,
+        name: String?,
+        owner: UUID,
+        background: Boolean = false,
+        correctModel: Boolean = false,
+    ): Result<PlayerSkinInfo> {
         val hash = skin.textureHash
             ?: return Result.failure(OutfitException("Minecraft didn't report a usable skin texture."))
-        if (name == null && loadedFor == owner) {
-            skins.firstOrNull { it.hash == hash }?.let { return Result.success(it) }
+        val key = owner to hash
+        if (background) {
+            recordFailures[key]?.let { failure ->
+                if (System.currentTimeMillis() - failure.at < RECORD_FAILURE_BACKOFF_MS) {
+                    val reason = if (failure.conflict) "the skin library is full" else "the last attempt failed recently"
+                    return Result.failure(SkinRecordSkipped(reason))
+                }
+            }
         }
         val label = name?.trim()?.takeIf { it.isNotEmpty() }
         val body = buildJsonObject {
@@ -278,10 +357,24 @@ object SkinLibrary {
             put("model", skin.model.serializedName)
             if (label != null) put("name", label)
         }
-        return OutfitApi.send<SkinResponse>(HttpMethod.Post, "/skins", body)
+        val recorded = OutfitApi.send<SkinResponse>(HttpMethod.Post, "/skins", body)
             .map { it.toInfo() }
-            .onSuccess { recorded -> if (loadedFor == owner) replace(recorded) }
-            .onFailure { LOGGER.error("Failed to save skin {}", hash, it) }
+            .onSuccess { recorded ->
+                recordFailures.remove(key)
+                if (loadedFor == owner) replace(recorded)
+            }
+            .onFailure {
+                LOGGER.error("Failed to save skin {}", hash, it)
+                val conflict = (it as? ClientRequestException)?.response?.status == HttpStatusCode.Conflict
+                recordFailures[key] = RecordFailure(System.currentTimeMillis(), conflict)
+            }
+            .getOrElse { return Result.failure(it) }
+        if (!correctModel || recorded.model == skin.model) return Result.success(recorded)
+        return OutfitApi.send<SkinResponse>(HttpMethod.Patch, "/skins/${recorded.id}", buildJsonObject { put("model", skin.model.serializedName) })
+            .map { it.toInfo() }
+            .onSuccess { updated -> if (loadedFor == owner) replace(updated) }
+            .onFailure { LOGGER.warn("Failed to update the arm model of skin {}", recorded.id, it) }
+            .recover { recorded }
     }
 
     private suspend fun refreshLocked(): Result<Unit> = requestLock.withLock {
@@ -293,18 +386,22 @@ object SkinLibrary {
         }
         val owner = ClientPlatform.localPlayerUuid()
         if (state !is LibraryState.Loaded || loadedFor != owner) state = LibraryState.Loading
-        OutfitApi.send<SkinListResponse>(HttpMethod.Get, "/skins")
-            .onSuccess { response ->
-                skins = response.skins.map { it.toInfo() }
-                limit = response.limit
-                loadedFor = owner
-                state = LibraryState.Loaded
-            }
-            .onFailure { error ->
-                LOGGER.error("Failed to fetch skins", error)
-                if (state !is LibraryState.Loaded) state = LibraryState.Unavailable(failureMessage(error))
-            }
-            .map { }
+        try {
+            OutfitApi.send<SkinListResponse>(HttpMethod.Get, "/skins")
+                .onSuccess { response ->
+                    skins = response.skins.map { it.toInfo() }
+                    limit = response.limit
+                    loadedFor = owner
+                    state = LibraryState.Loaded
+                }
+                .onFailure { error ->
+                    LOGGER.error("Failed to fetch skins", error)
+                    if (state !is LibraryState.Loaded) state = LibraryState.Unavailable(failureMessage(error))
+                }
+                .map { }
+        } finally {
+            if (state is LibraryState.Loading) state = LibraryState.Idle
+        }
     }
 
     private suspend fun patch(id: Int, body: JsonObject): Result<PlayerSkinInfo> {
@@ -312,7 +409,19 @@ object SkinLibrary {
         return OutfitApi.send<SkinResponse>(HttpMethod.Patch, "/skins/$id", body)
             .map { it.toInfo() }
             .onSuccess(::replace)
-            .onFailure { LOGGER.error("Failed to update skin {}", id, it) }
+            .onFailure {
+                LOGGER.error("Failed to update skin {}", id, it)
+                forgetIfMissing(id, it)
+            }
+    }
+
+    private fun forgetIfMissing(id: Int, error: Throwable) {
+        if ((error as? ClientRequestException)?.response?.status == HttpStatusCode.NotFound) forget(id)
+    }
+
+    private fun forget(id: Int) {
+        skins = skins.filter { it.id != id }
+        OutfitLibrary.onSkinDeleted(id)
     }
 
     private suspend fun download(url: String): Result<ByteArray> = runSuspendCatching {
@@ -325,13 +434,23 @@ object SkinLibrary {
     }.onFailure { LOGGER.warn("Failed to download a skin from {}", url, it) }
 
     private fun validate(png: ByteArray) {
+        if (png.size > MAX_SKIN_BYTES) throw OutfitException(TOO_LARGE)
         if (png.size < PNG_SIGNATURE.size || !PNG_SIGNATURE.indices.all { png[it] == PNG_SIGNATURE[it] }) {
             throw OutfitException("Skins must be PNG images.")
         }
-        val image = runCatching { ImageIO.read(ByteArrayInputStream(png)) }.getOrNull()
-            ?: throw OutfitException(NOT_A_SKIN)
-        if (image.width != 64 || (image.height != 64 && image.height != 32)) throw OutfitException(NOT_A_SKIN)
-        if (png.size > MAX_SKIN_BYTES) throw OutfitException("That skin file is too large. Skins can be at most 64 KB.")
+        val size = runCatching {
+            ImageIO.createImageInputStream(ByteArrayInputStream(png)).use { input ->
+                val reader = ImageIO.getImageReaders(input).asSequence().firstOrNull() ?: return@use null
+                try {
+                    reader.input = input
+                    reader.getWidth(0) to reader.getHeight(0)
+                } finally {
+                    reader.dispose()
+                }
+            }
+        }.getOrNull() ?: throw OutfitException(NOT_A_SKIN)
+        if (size.first != 64 || (size.second != 64 && size.second != 32)) throw OutfitException(NOT_A_SKIN)
+        runCatching { ImageIO.read(ByteArrayInputStream(png)) }.getOrNull() ?: throw OutfitException(NOT_A_SKIN)
     }
 
     private fun loadBitmap(skin: PlayerSkinInfo, key: String) {
@@ -345,13 +464,45 @@ object SkinLibrary {
                             decoded
                         }
                     }
-                bitmaps[key] = image.toComposeImageBitmap()
+                bitmaps[key] = previewImage(image).toComposeImageBitmap()
+                failed.remove(key)
                 bitmapVersion++
             }.onFailure {
-                failed.add(key)
+                failed[key] = System.currentTimeMillis() + BITMAP_RETRY_MS
                 LOGGER.debug("Could not load the preview for skin {}", skin.id, it)
             }
             loading.remove(key)
+        }
+    }
+
+    private fun previewImage(source: BufferedImage): BufferedImage {
+        val image = BufferedImage(source.width, source.height, BufferedImage.TYPE_INT_ARGB)
+        image.createGraphics().apply { drawImage(source, 0, 0, null) }.dispose()
+        opaque(image, 0, 0, 32, 16)
+        if (image.height <= 32) clearIfOpaque(image, 32, 0, 64, 32)
+        opaque(image, 0, 16, 64, 32)
+        opaque(image, 16, 48, 48, 64)
+        return image
+    }
+
+    private fun clearIfOpaque(image: BufferedImage, x0: Int, y0: Int, x1: Int, y1: Int) {
+        for (x in x0 until minOf(x1, image.width)) {
+            for (y in y0 until minOf(y1, image.height)) {
+                if (image.getRGB(x, y) ushr 24 < 128) return
+            }
+        }
+        for (x in x0 until minOf(x1, image.width)) {
+            for (y in y0 until minOf(y1, image.height)) {
+                image.setRGB(x, y, image.getRGB(x, y) and 0xFFFFFF)
+            }
+        }
+    }
+
+    private fun opaque(image: BufferedImage, x0: Int, y0: Int, x1: Int, y1: Int) {
+        for (x in x0 until minOf(x1, image.width)) {
+            for (y in y0 until minOf(y1, image.height)) {
+                image.setRGB(x, y, image.getRGB(x, y) or (0xFF shl 24))
+            }
         }
     }
 

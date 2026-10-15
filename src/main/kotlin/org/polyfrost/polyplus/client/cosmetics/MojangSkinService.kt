@@ -89,7 +89,7 @@ object MojangSkinService {
     }
 
     suspend fun activeSkin(): Result<MojangSkin?> = runSuspendCatching {
-        val token = accessToken() ?: return@runSuspendCatching null
+        val token = accessToken() ?: throw MojangSkinException(SIGNED_OUT_MESSAGE)
         readProfile(token)
     }
 
@@ -98,7 +98,13 @@ object MojangSkinService {
         val response = PolyPlusClient.HTTP.get("$SESSION_PROFILE_URL/$id") {
             accept(ContentType.Application.Json)
         }
-        if (response.status != HttpStatusCode.OK) return@runSuspendCatching null
+        when (response.status) {
+            HttpStatusCode.OK -> Unit
+            HttpStatusCode.NoContent, HttpStatusCode.NotFound -> return@runSuspendCatching null
+            HttpStatusCode.TooManyRequests ->
+                throw MojangSkinException("Minecraft is limiting lookups right now. Try again in a minute.")
+            else -> throw MojangSkinException(UNREACHABLE_MESSAGE)
+        }
         val texturesValue = response.body<SessionProfile>().properties
             .firstOrNull { it.name == "textures" }
             ?.value
@@ -139,7 +145,7 @@ object MojangSkinService {
     private suspend fun change(call: suspend (String) -> HttpResponse): Result<MojangSkin?> = requestLock.withLock {
         runSuspendCatching {
             val token = accessToken() ?: throw MojangSkinException(SIGNED_OUT_MESSAGE)
-            val previous = knownTexture
+            val previous = knownTexture ?: runSuspendCatching { readProfile(token) }.getOrNull()?.textureHash
             val response = call(token)
             ensureSkinChanged(response)
             val reported = runSuspendCatching { response.body<ServicesProfile>() }.getOrNull()?.let(::activeSkin)
@@ -153,16 +159,12 @@ object MojangSkinService {
     }
 
     private suspend fun readBack(token: String, previous: String?): MojangSkin? {
-        var latest: MojangSkin? = null
         repeat(READBACK_ATTEMPTS) {
             delay(READBACK_DELAY_MS)
             val skin = runSuspendCatching { readProfile(token) }.getOrNull()
-            if (skin != null) {
-                latest = skin
-                if (skin.textureHash != previous) return skin
-            }
+            if (skin != null && skin.textureHash != previous) return skin
         }
-        return latest
+        return null
     }
 
     private suspend fun readProfile(token: String): MojangSkin? {

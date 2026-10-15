@@ -1,9 +1,10 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
@@ -17,12 +18,28 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.util.concurrent.atomic.AtomicBoolean
+
+private val lookChangePending = AtomicBoolean(false)
+private val equipLock = Mutex()
+
+private const val LOOK_CHANGE_BUSY = "Another change is still running. Try again in a moment."
+
+private fun beginLookChange(): Boolean =
+    !OutfitLibrary.busy && !SkinLibrary.busy && !MojangCapeService.busy && lookChangePending.compareAndSet(false, true)
+
+private fun beginLookChange(onStatus: (String) -> Unit): Boolean =
+    beginLookChange().also { if (!it) onStatus(LOOK_CHANGE_BUSY) }
 
 internal fun toggleMojangCape(cape: MojangCape, onStatus: (String) -> Unit) {
-    if (MojangCapeService.busy) return
+    if (!beginLookChange(onStatus)) return
     onStatus(if (cape.active) "Removing ${cape.name}..." else "Equipping ${cape.name}...")
     PolyPlusClient.SCOPE.launch {
-        val result = if (cape.active) MojangCapeService.clear() else MojangCapeService.select(cape.id)
+        val result = try {
+            if (cape.active) MojangCapeService.clear() else MojangCapeService.select(cape.id)
+        } finally {
+            lookChangePending.set(false)
+        }
         ClientPlatform.runOnMain {
             onStatus(
                 result.fold(
@@ -48,22 +65,29 @@ private fun <T> launchLibraryCall(
     }
 }
 
+private suspend fun <T> releasing(flag: AtomicBoolean, call: suspend () -> Result<T>): Result<T> =
+    try {
+        call()
+    } finally {
+        flag.set(false)
+    }
+
 internal fun wearOutfit(outfit: OutfitInfo, onStatus: (String) -> Unit) {
-    if (OutfitLibrary.busy) return
+    if (!beginLookChange(onStatus)) return
     launchLibraryCall(
         onStatus,
         "Switching to ${outfit.name}...",
-        { OutfitLibrary.apply(outfit.id) },
+        { releasing(lookChangePending) { OutfitLibrary.apply(outfit.id) } },
         OutfitLibrary::failureMessage,
     ) { "Wearing ${it.name}." }
 }
 
 internal fun createOutfitFromCurrent(onStatus: (String) -> Unit) {
-    if (OutfitLibrary.busy) return
+    if (!beginLookChange(onStatus)) return
     launchLibraryCall(
         onStatus,
         "Saving your current look...",
-        { OutfitLibrary.createFromCurrent() },
+        { releasing(lookChangePending) { OutfitLibrary.createFromCurrent() } },
         OutfitLibrary::failureMessage,
     ) { "Saved ${it.name}." }
 }
@@ -96,12 +120,16 @@ internal fun deleteOutfit(outfit: OutfitInfo, onStatus: (String) -> Unit) {
     ) { "Deleted ${outfit.name}." }
 }
 
+internal fun beginSkinChange(): Boolean = beginLookChange()
+
+internal fun endSkinChange() = lookChangePending.set(false)
+
 internal fun wearSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
-    if (SkinLibrary.busy) return
+    if (!beginLookChange(onStatus)) return
     launchLibraryCall(
         onStatus,
         "Changing your skin to ${skin.name}...",
-        { SkinLibrary.wear(skin.id) },
+        { releasing(lookChangePending) { SkinLibrary.wear(skin.id) } },
         SkinLibrary::failureMessage,
     ) { "Wearing ${skin.name}." }
 }
@@ -127,10 +155,11 @@ internal fun toggleSkinFavorite(skin: PlayerSkinInfo, onStatus: (String) -> Unit
 
 internal fun switchSkinModel(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
     val model = if (skin.model == SkinModel.Slim) SkinModel.Classic else SkinModel.Slim
+    if (!beginLookChange(onStatus)) return
     launchLibraryCall(
         onStatus,
         null,
-        { SkinLibrary.setModel(skin.id, model) },
+        { releasing(lookChangePending) { SkinLibrary.setModel(skin.id, model) } },
         SkinLibrary::failureMessage,
     ) { "${it.name} now uses ${if (it.model == SkinModel.Slim) "slim" else "classic"} arms." }
 }
@@ -160,16 +189,17 @@ internal fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
                         CosmeticVariantUi(variant.id, variant.variantName)
                     }
                 }
-                val equippedVariantId = group.variants.firstOrNull { it.id in equippedIds }?.id
+                val equippedVariant = group.variants.firstOrNull { it.id in equippedIds }
                 CosmeticUiItem(
                     groupId = group.groupId,
                     type = group.type,
                     name = group.name,
                     collection = "${group.type.displayName} Collection",
                     owned = group.variants.any { it.id in ownedIds },
-                    equipped = equippedVariantId != null,
+                    equipped = equippedVariant != null,
                     variants = byLabel.values.toList(),
-                    equippedVariantId = equippedVariantId,
+                    equippedVariantId = equippedVariant?.let { byLabel[it.variantName]?.id ?: it.id },
+                    equippedCosmeticId = equippedVariant?.id,
                 )
             }
 
@@ -198,10 +228,12 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
     }
 
     PolyPlusClient.SCOPE.launch {
-        val result = if (item.type == CosmeticType.Emote) {
-            CosmeticService.equipEmote(variantId)
-        } else {
-            CosmeticService.equip(variantId)
+        val result = equipLock.withLock {
+            if (item.type == CosmeticType.Emote) {
+                CosmeticService.equipEmote(variantId)
+            } else {
+                CosmeticService.equip(variantId)
+            }
         }
         ClientPlatform.runOnMain {
             onComplete(
@@ -216,15 +248,17 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
 
 internal fun unequip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
     PolyPlusClient.SCOPE.launch {
-        val result = if (item.type == CosmeticType.Emote) {
-            CosmeticService.clearEmote()
-        } else {
-            val slot = CosmeticCatalog.localEquipped().equipped.entries
-                .firstOrNull { it.value == item.equippedVariantId }?.key
-            if (slot == null) {
-                Result.failure(IllegalStateException("${item.name} is not equipped"))
+        val result = equipLock.withLock {
+            if (item.type == CosmeticType.Emote) {
+                CosmeticService.clearEmote()
             } else {
-                CosmeticService.clearSlot(slot)
+                val slot = CosmeticCatalog.localEquipped().equipped.entries
+                    .firstOrNull { it.value == item.equippedCosmeticId }?.key
+                if (slot == null) {
+                    Result.success(Unit)
+                } else {
+                    CosmeticService.clearSlot(slot)
+                }
             }
         }
         ClientPlatform.runOnMain {

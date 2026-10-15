@@ -1,7 +1,5 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.key
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
@@ -40,7 +38,7 @@ internal fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProd
 internal fun cosmeticCartKey(variantId: Int): String = "cosmetic-$variantId"
 
 internal fun CosmeticStoreInfo.cartName(variant: CosmeticVariantUi): String =
-    if (variantList.size > 1 && !variant.name.equals(name, ignoreCase = true)) "$name - ${variant.name}" else name
+    if (uiVariants().size > 1 && !variant.name.equals(name, ignoreCase = true)) "$name - ${variant.name}" else name
 
 internal data class CosmeticVariantUi(val id: Int, val name: String)
 
@@ -84,6 +82,7 @@ internal data class CosmeticUiItem(
     val equipped: Boolean,
     val variants: List<CosmeticVariantUi>,
     val equippedVariantId: Int?,
+    val equippedCosmeticId: Int? = equippedVariantId,
 ) {
     val id: Int get() = groupId
     val hasVariants: Boolean get() = variants.size > 1
@@ -92,7 +91,7 @@ internal data class CosmeticUiItem(
 internal const val MOJANG_CAPE_COLLECTION = "Minecraft cape"
 
 internal fun selectedVariantId(item: CosmeticUiItem, picks: Map<Int, Int>): Int? =
-    picks[item.groupId] ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
+    picks[item.groupId]?.takeIf { id -> item.variants.any { it.id == id } } ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
 
 internal enum class WardrobeSection(val label: String, val icon: String) {
     Featured("Featured", "star-filled"),

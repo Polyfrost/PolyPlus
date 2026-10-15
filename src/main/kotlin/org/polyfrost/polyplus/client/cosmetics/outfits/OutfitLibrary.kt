@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,11 +20,11 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
-import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 object OutfitLibrary {
@@ -30,6 +32,8 @@ object OutfitLibrary {
 
     private val requestLock = Mutex()
     private val adopting = AtomicBoolean(false)
+    private val adoptionAttempts = ConcurrentHashMap<Pair<UUID, Int>, Long>()
+    private const val ADOPTION_RETRY_MS = 10 * 60_000L
 
     var outfits by mutableStateOf<List<OutfitInfo>>(emptyList())
         private set
@@ -52,31 +56,44 @@ object OutfitLibrary {
     @Volatile
     private var loadedFor: UUID? = null
 
-    suspend fun refreshIfNeeded() {
+    @Volatile
+    private var refreshJob: Deferred<Result<Unit>>? = null
+
+    suspend fun refreshIfNeeded(reload: Boolean = false) {
         val stale = loadedFor != null && loadedFor != ClientPlatform.localPlayerUuid()
-        if (stale || state is LibraryState.Idle || state is LibraryState.Unavailable) refresh()
+        if (reload || stale || state is LibraryState.Idle || state is LibraryState.Unavailable) refresh()
         SkinLibrary.recordInBackground()
     }
 
-    suspend fun refresh(): Result<Unit> = requestLock.withLock { refreshLocked() }
+    suspend fun refresh(): Result<Unit> {
+        val job = synchronized(this) {
+            refreshJob?.takeIf { it.isActive }
+                ?: PolyPlusClient.SCOPE.async { requestLock.withLock { refreshLocked() } }.also { refreshJob = it }
+        }
+        return job.await()
+    }
 
     suspend fun createFromCurrent(): Result<OutfitInfo> {
         if (!OutfitApi.allowed()) return unavailable()
         return requestLock.withLock {
             busy = true
             try {
-                if (MojangCapeService.state !is MojangCapeState.Loaded) {
-                    MojangCapeService.refresh().onFailure {
-                        return@withLock Result.failure(
-                            OutfitException(
-                                "Couldn't read your Minecraft cape, so the outfit wasn't saved (${MojangCapeService.failureMessage(it)}).",
-                            ),
-                        )
-                    }
+                MojangCapeService.refresh().onFailure {
+                    return@withLock Result.failure(
+                        OutfitException(
+                            "Couldn't read your Minecraft cape, so the outfit wasn't saved (${MojangCapeService.failureMessage(it)}).",
+                        ),
+                    )
                 }
                 val skinId = SkinLibrary.recordCurrent()
-                    .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
-                    .getOrNull()?.id
+                    .getOrElse {
+                        LOGGER.warn("Could not add the current Minecraft skin to the library", it)
+                        return@withLock Result.failure(
+                            OutfitException(
+                                "Couldn't save your current skin, so the outfit wasn't saved (${SkinLibrary.failureMessage(it)}).",
+                            ),
+                        )
+                    }?.id
                 val capeId = MojangCapeService.activeCape()?.id
                 val particleColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
                 val body = buildJsonObject {
@@ -144,30 +161,55 @@ object OutfitLibrary {
     internal fun activeOutfit(): OutfitInfo? = activeOutfitId?.let { id -> outfits.firstOrNull { it.id == id } }
 
     internal fun onMojangCapeChanged(capeId: String?) {
-        val outfit = liveSyncTarget() ?: return
-        if (outfit.mojangCapeId == capeId) return
-        PolyPlusClient.SCOPE.launch { patch(outfit.id, buildJsonObject { put("mojang_cape_id", capeId) }) }
+        if (applying || !OutfitApi.allowed()) return
+        PolyPlusClient.SCOPE.launch {
+            val outfit = liveSyncTarget() ?: return@launch
+            if (outfit.blank) {
+                adoptLive(outfit).onFailure {
+                    LOGGER.debug("Could not adopt the current look into outfit {}: {}", outfit.id, it.message)
+                }
+                return@launch
+            }
+            if (outfit.mojangCapeId == capeId) return@launch
+            patch(outfit.id, buildJsonObject { put("mojang_cape_id", capeId) })
+        }
     }
 
     internal fun onParticleColorChanged(color: Int?) {
-        val outfit = liveSyncTarget() ?: return
-        if (outfit.particleColor == color) return
-        PolyPlusClient.SCOPE.launch { patch(outfit.id, buildJsonObject { put("particle_color", color) }) }
+        val outfit = activeOutfit() ?: return
+        if (outfit.particleColor != color) replace(outfit.copy(particleColor = color))
     }
 
     internal suspend fun onSkinWorn(skinId: Int): Result<Unit> {
-        val id = activeOutfitId ?: return Result.success(Unit)
-        if (activeOutfit()?.skinId == skinId) return Result.success(Unit)
-        return patch(id, buildJsonObject { put("skin_id", skinId) }).map { }
+        val outfit = liveSyncTarget() ?: return Result.success(Unit)
+        if (outfit.blank) {
+            adoptLive(outfit, skinId).onFailure {
+                LOGGER.debug("Could not adopt the current look into outfit {}: {}", outfit.id, it.message)
+            }
+            return Result.success(Unit)
+        }
+        if (outfit.skinId == skinId) return Result.success(Unit)
+        return patch(outfit.id, buildJsonObject { put("skin_id", skinId) }).map { }
     }
 
     internal fun onSkinDeleted(skinId: Int) {
         outfits = outfits.map { if (it.skinId == skinId) it.copy(skinId = null) else it }
     }
 
-    private fun liveSyncTarget(): OutfitInfo? {
-        if (applying || !OutfitApi.allowed()) return null
+    private suspend fun liveSyncTarget(): OutfitInfo? {
+        if (applying || !OutfitApi.allowed() || state !is LibraryState.Loaded) return null
+        if (refresh().isFailure || applying) return null
         return activeOutfit()
+    }
+
+    private suspend fun adoptLive(target: OutfitInfo, wornSkinId: Int? = null): Result<Unit> = requestLock.withLock {
+        val outfit = activeOutfit()?.takeIf { it.id == target.id } ?: return@withLock Result.success(Unit)
+        when {
+            outfit.blank -> adoptCurrentLook(outfit, wornSkinId = wornSkinId)
+            wornSkinId != null && outfit.skinId != wornSkinId ->
+                patch(outfit.id, buildJsonObject { put("skin_id", wornSkinId) }).map { }
+            else -> Result.success(Unit)
+        }
     }
 
     private suspend fun patch(id: Int, body: JsonObject): Result<OutfitInfo> {
@@ -190,22 +232,34 @@ object OutfitLibrary {
         }
         val owner = ClientPlatform.localPlayerUuid()
         if (state !is LibraryState.Loaded || loadedFor != owner) state = LibraryState.Loading
-        return OutfitApi.send<OutfitListResponse>(HttpMethod.Get, "/outfits")
-            .onSuccess { response ->
-                outfits = response.outfits.map { it.toInfo() }
-                activeOutfitId = response.activeOutfitId
-                limit = response.limit
-                loadedFor = owner
-                state = LibraryState.Loaded
-                activeOutfit()?.takeIf { it.blank }?.let { blank ->
-                    PolyPlusClient.SCOPE.launch { adoptCurrentLook(blank) }
+        try {
+            return OutfitApi.send<OutfitListResponse>(HttpMethod.Get, "/outfits")
+                .onSuccess { response ->
+                    outfits = response.outfits.map { it.toInfo() }
+                    activeOutfitId = response.activeOutfitId
+                    limit = response.limit
+                    loadedFor = owner
+                    state = LibraryState.Loaded
+                    activeOutfit()?.takeIf { it.blank && claimBackgroundAdoption(owner, it.id) }?.let { target ->
+                        PolyPlusClient.SCOPE.launch {
+                            requestLock.withLock {
+                                activeOutfit()?.takeIf { it.id == target.id && it.blank }?.let { outfit ->
+                                    adoptCurrentLook(outfit, background = true).onFailure {
+                                        LOGGER.debug("Could not adopt the current look into outfit {}: {}", outfit.id, it.message)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            .onFailure { error ->
-                LOGGER.error("Failed to fetch outfits", error)
-                if (state !is LibraryState.Loaded) state = LibraryState.Unavailable(failureMessage(error))
-            }
-            .map { }
+                .onFailure { error ->
+                    LOGGER.error("Failed to fetch outfits", error)
+                    if (state !is LibraryState.Loaded) state = LibraryState.Unavailable(failureMessage(error))
+                }
+                .map { }
+        } finally {
+            if (state is LibraryState.Loading) state = LibraryState.Idle
+        }
     }
 
     private suspend fun applyLocked(id: Int): Result<OutfitInfo> {
@@ -221,10 +275,13 @@ object OutfitLibrary {
         response.skin?.let { skin -> SkinLibrary.remember(skin.toInfo()) }
 
         val problems = mutableListOf<String>()
-        if (outfit.blank) {
-            adoptCurrentLook(outfit)
+        if (response.adopted) {
+            adoptCurrentLook(outfit).onFailure {
+                problems += "your current skin and cape weren't saved to it (${it.message})"
+            }
         }
-        response.skin?.toInfo()?.let { skin ->
+        val keepLook = response.adopted || outfit.blank
+        response.skin?.toInfo()?.takeIf { !keepLook }?.let { skin ->
             val current = MojangSkinService.activeSkin().getOrNull()
             if (current == null || current.textureHash != skin.hash || current.model != skin.model) {
                 MojangSkinService.setSkin(skin.url, skin.model)
@@ -234,7 +291,7 @@ object OutfitLibrary {
                     }
             }
         }
-        if (!outfit.blank) {
+        if (!keepLook) {
             applyMojangCape(outfit.mojangCapeId).onFailure {
                 problems += "your Minecraft cape wasn't changed (${MojangCapeService.failureMessage(it)})"
             }
@@ -257,27 +314,45 @@ object OutfitLibrary {
         return Result.failure(OutfitException(message))
     }
 
-    private suspend fun adoptCurrentLook(outfit: OutfitInfo) {
-        if (!adopting.compareAndSet(false, true)) return
+    private suspend fun adoptCurrentLook(
+        outfit: OutfitInfo,
+        background: Boolean = false,
+        wornSkinId: Int? = null,
+    ): Result<Unit> {
+        if (!adopting.compareAndSet(false, true)) return Result.success(Unit)
         try {
-            MojangCapeService.refreshIfNeeded()
-            if (MojangCapeService.state !is MojangCapeState.Loaded) return
-            val skinId = SkinLibrary.recordCurrent()
-                .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
-                .getOrElse { return }?.id
+            MojangCapeService.refresh().onFailure {
+                return Result.failure(OutfitException(MojangCapeService.failureMessage(it)))
+            }
+            if (!MojangCapeService.isLoaded()) return Result.failure(OutfitException("Couldn't read your Minecraft cape."))
             val capeId = MojangCapeService.activeCape()?.id
+            val skinId = wornSkinId ?: SkinLibrary.recordCurrent(background)
+                .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
+                .getOrElse { return Result.failure(OutfitException(SkinLibrary.failureMessage(it))) }
+                ?.id
             patch(outfit.id, buildJsonObject {
-                if (skinId != null) put("skin_id", skinId)
+                put("skin_id", skinId)
                 put("mojang_cape_id", capeId)
-            })
+                put("blank", false)
+            }).onFailure { return Result.failure(OutfitException(failureMessage(it))) }
+            return Result.success(Unit)
         } finally {
             adopting.set(false)
         }
     }
 
+    private fun claimBackgroundAdoption(owner: UUID, id: Int): Boolean {
+        val now = System.currentTimeMillis()
+        val key = owner to id
+        val last = adoptionAttempts[key]
+        if (last != null && now - last < ADOPTION_RETRY_MS) return false
+        adoptionAttempts[key] = now
+        return true
+    }
+
     private suspend fun applyMojangCape(capeId: String?): Result<Unit> = runSuspendCatching {
-        MojangCapeService.refreshIfNeeded()
-        val loaded = MojangCapeService.state is MojangCapeState.Loaded
+        MojangCapeService.refresh()
+        val loaded = MojangCapeService.isLoaded()
         val current = MojangCapeService.activeCape()?.id
         if (capeId == null) {
             if (!loaded || current == null) return@runSuspendCatching

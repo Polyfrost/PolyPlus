@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,8 +57,11 @@ internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
             loading && transactions.isEmpty() -> CenteredNote("Loading transactions...")
             loadError != null && transactions.isEmpty() -> CenteredNote(loadError!!)
             transactions.isEmpty() -> CenteredNote("No transactions yet.")
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                items(transactions, key = { it.id }) { tx -> TransactionRow(tx) }
+            else -> Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                loadError?.let { SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp) }
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    items(transactions, key = { it.id }) { tx -> TransactionRow(tx) }
+                }
             }
         }
     }

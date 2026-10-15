@@ -9,16 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,7 +61,14 @@ internal fun WardrobeShell(
 ) {
     val store = remember { WardrobeStoreData() }
     var storeReloadKey by remember { mutableIntStateOf(0) }
-    LaunchedEffect(storeReloadKey) { if (polyPlusAvailable) store.load() else store.loading = false }
+    LaunchedEffect(storeReloadKey) {
+        if (polyPlusAvailable) {
+            store.load()
+        } else {
+            store.loading = false
+            store.featuredLoading = false
+        }
+    }
     LaunchedEffect(Unit) { MojangCapeService.refreshIfNeeded() }
 
     val sections = if (polyPlusAvailable) WardrobeSection.entries else listOf(WardrobeSection.Cosmetics)
@@ -96,7 +99,7 @@ internal fun WardrobeShell(
     LaunchedEffect(section) {
         if (!polyPlusAvailable) return@LaunchedEffect
         when (section) {
-            WardrobeSection.Outfits -> OutfitLibrary.refreshIfNeeded()
+            WardrobeSection.Outfits -> OutfitLibrary.refreshIfNeeded(reload = true)
             WardrobeSection.Skins -> {
                 SkinLibrary.refreshIfNeeded()
                 OutfitLibrary.refreshIfNeeded()
@@ -104,9 +107,9 @@ internal fun WardrobeShell(
             else -> Unit
         }
     }
-    val outfitKey = listOf(OutfitLibrary.outfits, OutfitLibrary.activeOutfitId, OutfitLibrary.state)
-    val skinKey = listOf(SkinLibrary.skins, SkinLibrary.state, SkinLibrary.wornSkinId())
-    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
+    val outfitKey = listOf(OutfitLibrary.outfits, OutfitLibrary.activeOutfitId, OutfitLibrary.state, OutfitLibrary.limit)
+    val skinKey = listOf(SkinLibrary.skins, SkinLibrary.state, SkinLibrary.wornSkinId(), SkinLibrary.limit)
+    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, store.featuredLoading, store.failedTypes, store.featuredFailed, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
         buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
     }
     val coverByVariant = remember(store.byType, store.popular, store.newest) {
@@ -235,6 +238,7 @@ internal fun WardrobeShell(
                     onSelectVariant = onSelectVariant,
                     onShop = { info ->
                         val ownedItem = items.firstOrNull { item -> item.owned && info.variantList.any { v -> item.variants.any { it.id == v.id } } }
+                            ?.takeIf { info.fullyOwned(ownedIds) }
                         selection = if (ownedItem != null) WardrobeSelection.Owned(ownedItem.groupId, ownedItem.type) else WardrobeSelection.Shop(info.id)
                         showCart = false
                     },

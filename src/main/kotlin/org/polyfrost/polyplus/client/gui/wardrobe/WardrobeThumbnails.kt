@@ -95,12 +95,6 @@ private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (t
 }
 
 @Composable
-internal fun rememberCosmeticPreviewSource(item: CosmeticUiItem): Pair<PlayerPreviewSource?, Int> {
-    val cosmeticId = item.equippedVariantId ?: item.variants.firstOrNull()?.id ?: return null to 0
-    return rememberCosmeticPreviewSource(cosmeticId, item.type)
-}
-
-@Composable
 internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): Pair<PlayerPreviewSource?, Int> {
     val isCape = type == CosmeticType.Cape
     val isPet = type == CosmeticType.Pet

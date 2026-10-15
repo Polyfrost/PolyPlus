@@ -1,13 +1,9 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -19,6 +15,7 @@ import androidx.navigation.compose.composable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import net.minecraft.client.gui.screens.TitleScreen
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
@@ -80,6 +77,13 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun openCosmetics() = openOneConfig(PolyPlusCosmeticsRoute)
+
+    fun openCosmeticsFromKeybind() {
+        when (ClientPlatform.currentScreen()) {
+            null, is TitleScreen, is PolyPlusMainMenuScreen -> openCosmetics()
+            else -> Unit
+        }
+    }
 
     @JvmStatic
     fun openMods() = openOneConfig(ModsGraph)
@@ -144,15 +148,21 @@ private fun PolyPlusCosmeticsScreen() {
         }
     }
 
-    fun checkout(productIds: List<String>) {
+    var checkoutPending by remember { mutableStateOf(false) }
+
+    fun checkout(productIds: List<String>, claimed: Boolean = false) {
+        if (checkoutPending && !claimed) return
         if (productIds.isEmpty()) {
+            checkoutPending = false
             status = "Nothing purchasable in your cart yet."
             return
         }
+        checkoutPending = true
         status = "Opening checkout..."
         PolyPlusClient.SCOPE.launch {
             val result = BillingService.checkoutAndOpen(productIds)
             ClientPlatform.runOnMain {
+                checkoutPending = false
                 status = result.fold(
                     onSuccess = { "Checkout opened in your browser." },
                     onFailure = ::checkoutFailureMessage,
@@ -196,7 +206,7 @@ private fun PolyPlusCosmeticsScreen() {
         },
         onSelectVariant = { groupId, variantId ->
             variantPicks[groupId] = variantId
-            val item = allItems.firstOrNull { it.groupId == groupId }
+            val item = allItems.firstOrNull { it.groupId == groupId && it.variants.any { variant -> variant.id == variantId } }
             if (item != null && item.equipped && item.equippedVariantId != variantId) {
                 status = "Equipping ${item.name}..."
                 equip(item, variantId) {
@@ -250,14 +260,18 @@ private fun PolyPlusCosmeticsScreen() {
             val label = info.cartName(variant)
             if (variant.id in ownedIds) {
                 status = "You already own $label."
-            } else {
+            } else if (!checkoutPending) {
+                checkoutPending = true
                 status = "Opening checkout..."
                 PolyPlusClient.SCOPE.launch {
                     val priceId = CosmeticStore.view(variant.id).getOrNull()?.storeProductId
                     if (priceId.isNullOrBlank()) {
-                        ClientPlatform.runOnMain { status = "$label isn't purchasable yet." }
+                        ClientPlatform.runOnMain {
+                            checkoutPending = false
+                            status = "$label isn't purchasable yet."
+                        }
                     } else {
-                        ClientPlatform.runOnMain { checkout(listOf(priceId)) }
+                        ClientPlatform.runOnMain { checkout(listOf(priceId), claimed = true) }
                     }
                 }
             }

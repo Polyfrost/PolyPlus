@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
@@ -26,6 +27,8 @@ object CosmeticSwatches {
     private val LOGGER = LogManager.getLogger("polyplus/swatches")
     private val art = ConcurrentHashMap<Int, SwatchArt>()
     private val requested = ConcurrentHashMap.newKeySet<Int>()
+
+    private const val RETRY_MS = 60_000L
 
     private const val CAPE_TEXTURE_WIDTH = 64
     private const val LEGACY_CAPE_TEXTURE_WIDTH = 22
@@ -47,15 +50,23 @@ object CosmeticSwatches {
                 CosmeticAssetCache.ensureCosmeticLoaded(id)
                 val built = withContext(Dispatchers.IO) { build(id) }
                 if (built == null) {
-                    requested.remove(id)
+                    retryLater(id)
                     return@runSuspendCatching
                 }
                 art[id] = built
                 version++
             }.onFailure {
-                requested.remove(id)
+                retryLater(id)
                 LOGGER.debug("Could not build a swatch for cosmetic {}", id, it)
             }
+        }
+    }
+
+    private fun retryLater(id: Int) {
+        PolyPlusClient.SCOPE.launch {
+            delay(RETRY_MS)
+            requested.remove(id)
+            version++
         }
     }
 

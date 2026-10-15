@@ -11,13 +11,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -59,6 +60,7 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.cosmetics.outfits.LibraryState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitException
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
@@ -71,7 +73,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 
-internal const val MAX_LIBRARY_NAME_LENGTH = 32
+internal const val MAX_LIBRARY_NAME_LENGTH = 64
 
 private const val MAX_USERNAME_LENGTH = 16
 
@@ -266,6 +268,8 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
     var picking by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    val shown = remember { AtomicBoolean(true) }
+    DisposableEffect(Unit) { onDispose { shown.set(false) } }
 
     fun chooseFile() {
         if (picking) return
@@ -299,23 +303,27 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
             message = problem
             return
         }
+        if (!beginSkinChange()) {
+            message = "Another skin change is still running."
+            return
+        }
         working = true
         message = "Adding skin..."
         PolyPlusClient.SCOPE.launch {
-            val result = when (chosen) {
-                SkinSource.Username -> SkinLibrary.addFromUsername(player)
-                SkinSource.Url -> SkinLibrary.addFromUrl(link, label, arms)
-                SkinSource.File -> {
-                    val bytes = path?.let { readSkinFile(it) }
-                    if (bytes == null) {
-                        ClientPlatform.runOnMain {
-                            working = false
-                            message = "Couldn't read that file."
-                        }
-                        return@launch
+            val result = try {
+                when (chosen) {
+                    SkinSource.Username -> SkinLibrary.addFromUsername(player)
+                    SkinSource.Url -> SkinLibrary.addFromUrl(link, label, arms)
+                    SkinSource.File -> {
+                        val bytes = (path?.let { readSkinFile(it) } ?: Result.failure(OutfitException(UNREADABLE_SKIN_FILE)))
+                        bytes.fold(
+                            onSuccess = { SkinLibrary.addFromBytes(it, label, arms) },
+                            onFailure = { Result.failure(it) },
+                        )
                     }
-                    SkinLibrary.addFromBytes(bytes, label, arms)
                 }
+            } finally {
+                endSkinChange()
             }
             ClientPlatform.runOnMain {
                 working = false
@@ -323,7 +331,7 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
                     onSuccess = { skin ->
                         message = null
                         onStatus("Added ${skin.name} to your skins.")
-                        onClose()
+                        if (shown.get()) onClose()
                     },
                     onFailure = { message = SkinLibrary.failureMessage(it) },
                 )
@@ -467,8 +475,15 @@ private fun FieldGroup(label: String, content: @Composable () -> Unit) {
     }
 }
 
-private suspend fun readSkinFile(path: Path): ByteArray? =
-    withContext(Dispatchers.IO) { runCatching { Files.readAllBytes(path) }.getOrNull() }
+private suspend fun readSkinFile(path: Path): Result<ByteArray> =
+    withContext(Dispatchers.IO) {
+        val size = runCatching { Files.size(path) }
+            .getOrElse { return@withContext Result.failure(OutfitException(UNREADABLE_SKIN_FILE)) }
+        if (size > SkinLibrary.MAX_FILE_BYTES) return@withContext Result.failure(OutfitException(SkinLibrary.TOO_LARGE))
+        runCatching { Files.readAllBytes(path) }.recoverCatching { throw OutfitException(UNREADABLE_SKIN_FILE) }
+    }
+
+private const val UNREADABLE_SKIN_FILE = "Couldn't read that file."
 
 private fun pickSkinFile(): Path? =
     TinyFdApi.getInstance().openFileSelector("Choose a skin", null, arrayOf("*.png"), "PNG images")

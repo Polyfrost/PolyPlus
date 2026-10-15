@@ -111,6 +111,7 @@ internal data class SkinListResponse(
 internal data class ApplyOutfitResponse(
     val outfit: OutfitResponse,
     val skin: SkinResponse? = null,
+    val adopted: Boolean = false,
 )
 
 internal const val LIBRARY_LIMIT = 128

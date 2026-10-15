@@ -48,7 +48,10 @@ object EmoteWheels {
     fun addToFirstEmpty(index: Int, emoteId: Int): Int? {
         val current = slots(index)
         if (emoteId in current) return current.indexOf(emoteId)
-        val slot = current.indexOfFirst { it == null }.takeIf { it >= 0 } ?: return null
+        val raw = stored.wheels.getOrNull(index)?.let { wheel -> List(SLOT_COUNT) { wheel.getOrNull(it) } } ?: current
+        val slot = raw.indexOfFirst { it == null }.takeIf { it >= 0 }
+            ?: current.indexOfFirst { it == null }.takeIf { it >= 0 }
+            ?: return null
         assign(index, slot, emoteId)
         return slot
     }

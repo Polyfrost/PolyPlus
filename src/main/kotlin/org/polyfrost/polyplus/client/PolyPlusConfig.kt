@@ -232,7 +232,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var wardrobeKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
         if (state) {
-            PolyPlusOneConfigIntegration.openCosmetics()
+            PolyPlusOneConfigIntegration.openCosmeticsFromKeybind()
         }
         true
     }

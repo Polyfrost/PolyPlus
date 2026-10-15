@@ -924,10 +924,11 @@ object PlayerPreviewRenderer {
             } ?: MojangCapeService.localCapeTexture()
     }
 
-    private fun hidesCape(source: PlayerPreviewSource): Boolean =
-        source == PlayerPreviewSource.LocalLive &&
-            CosmeticCatalog.localEquipped().cape == null &&
-            MojangCapeService.localCapeHidden()
+    private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
+        is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
+        PlayerPreviewSource.LocalLive ->
+            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden()
+    }
 
     //? if >= 1.21.10 {
     private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
