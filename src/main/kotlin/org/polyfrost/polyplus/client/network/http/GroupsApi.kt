@@ -72,5 +72,5 @@ object GroupsApi {
     }
 
     suspend fun claim(groupId: Int): Result<GroupSummary> =
-        PolyPlusClient.HTTP.postBodyAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/claim")
+        PolyPlusClient.HTTP.postBodyAuthorized("${PolyPlusConfig.apiUrl}/groups/$groupId/claim") { applyActAs() }
 }
