@@ -37,6 +37,7 @@ object ChatIdentity {
         if (_actAs.value == owner) return
         _actAs.value = owner
         GroupsRepository.reset()
+        SpecialChatRepository.refreshTargets()
     }
 
     fun HttpRequestBuilder.applyActAs() {
