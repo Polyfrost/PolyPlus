@@ -1,2 +1,2 @@
-## 1.3.6
-- Fix scissors on Vulkan 26.1/1.21.11
+## 1.3.7
+- Fix sodium extra macOS reduced resolution
