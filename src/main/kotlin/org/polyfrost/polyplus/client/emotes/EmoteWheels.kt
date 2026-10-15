@@ -36,7 +36,7 @@ object EmoteWheels {
         if (slot !in 0 until SLOT_COUNT) return
         val wheels = materialized().toMutableList()
         while (wheels.size <= index) wheels += List(SLOT_COUNT) { null }
-        val next = wheels[index].toMutableList()
+        val next = MutableList(SLOT_COUNT) { wheels[index].getOrNull(it) }
         if (emoteId != null) {
             for (i in next.indices) if (next[i] == emoteId) next[i] = null
         }

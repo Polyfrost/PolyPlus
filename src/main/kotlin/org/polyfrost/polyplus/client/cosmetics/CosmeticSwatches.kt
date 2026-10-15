@@ -45,10 +45,17 @@ object CosmeticSwatches {
         PolyPlusClient.SCOPE.launch {
             runSuspendCatching {
                 CosmeticAssetCache.ensureCosmeticLoaded(id)
-                val built = withContext(Dispatchers.IO) { build(id) } ?: return@runSuspendCatching
+                val built = withContext(Dispatchers.IO) { build(id) }
+                if (built == null) {
+                    requested.remove(id)
+                    return@runSuspendCatching
+                }
                 art[id] = built
                 version++
-            }.onFailure { LOGGER.debug("Could not build a swatch for cosmetic {}", id, it) }
+            }.onFailure {
+                requested.remove(id)
+                LOGGER.debug("Could not build a swatch for cosmetic {}", id, it)
+            }
         }
     }
 

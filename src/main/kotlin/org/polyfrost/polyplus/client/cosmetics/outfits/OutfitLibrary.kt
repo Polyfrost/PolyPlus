@@ -23,11 +23,13 @@ import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 object OutfitLibrary {
     private val LOGGER = LogManager.getLogger("polyplus/outfits")
 
     private val requestLock = Mutex()
+    private val adopting = AtomicBoolean(false)
 
     var outfits by mutableStateOf<List<OutfitInfo>>(emptyList())
         private set
@@ -63,10 +65,18 @@ object OutfitLibrary {
         return requestLock.withLock {
             busy = true
             try {
+                if (MojangCapeService.state !is MojangCapeState.Loaded) {
+                    MojangCapeService.refresh().onFailure {
+                        return@withLock Result.failure(
+                            OutfitException(
+                                "Couldn't read your Minecraft cape, so the outfit wasn't saved (${MojangCapeService.failureMessage(it)}).",
+                            ),
+                        )
+                    }
+                }
                 val skinId = SkinLibrary.recordCurrent()
                     .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
                     .getOrNull()?.id
-                MojangCapeService.refreshIfNeeded()
                 val capeId = MojangCapeService.activeCape()?.id
                 val particleColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
                 val body = buildJsonObject {
@@ -248,16 +258,21 @@ object OutfitLibrary {
     }
 
     private suspend fun adoptCurrentLook(outfit: OutfitInfo) {
-        val skinId = SkinLibrary.recordCurrent()
-            .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
-            .getOrElse { return }?.id
-        MojangCapeService.refreshIfNeeded()
-        if (MojangCapeService.state !is MojangCapeState.Loaded) return
-        val capeId = MojangCapeService.activeCape()?.id
-        patch(outfit.id, buildJsonObject {
-            if (skinId != null) put("skin_id", skinId)
-            put("mojang_cape_id", capeId)
-        })
+        if (!adopting.compareAndSet(false, true)) return
+        try {
+            MojangCapeService.refreshIfNeeded()
+            if (MojangCapeService.state !is MojangCapeState.Loaded) return
+            val skinId = SkinLibrary.recordCurrent()
+                .onFailure { LOGGER.warn("Could not add the current Minecraft skin to the library", it) }
+                .getOrElse { return }?.id
+            val capeId = MojangCapeService.activeCape()?.id
+            patch(outfit.id, buildJsonObject {
+                if (skinId != null) put("skin_id", skinId)
+                put("mojang_cape_id", capeId)
+            })
+        } finally {
+            adopting.set(false)
+        }
     }
 
     private suspend fun applyMojangCape(capeId: String?): Result<Unit> = runSuspendCatching {

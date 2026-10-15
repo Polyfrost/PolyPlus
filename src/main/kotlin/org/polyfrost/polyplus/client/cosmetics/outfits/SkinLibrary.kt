@@ -29,6 +29,7 @@ import org.polyfrost.polyplus.client.cosmetics.MojangSkinException
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
+import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.UUID
@@ -336,12 +337,14 @@ object SkinLibrary {
     private fun loadBitmap(skin: PlayerSkinInfo, key: String) {
         PolyPlusClient.SCOPE.launch {
             runSuspendCatching {
-                val cached = withContext(Dispatchers.IO) { readCache(skin.hash) }
-                val bytes = cached ?: download(skin.url).getOrThrow().also { fresh ->
-                    withContext(Dispatchers.IO) { writeCache(skin.hash, fresh) }
-                }
-                val image = withContext(Dispatchers.IO) { ImageIO.read(ByteArrayInputStream(bytes)) }
-                    ?: throw OutfitException(NOT_A_SKIN)
+                val image = withContext(Dispatchers.IO) { readCache(skin.hash) }
+                    ?: download(skin.url).getOrThrow().let { fresh ->
+                        withContext(Dispatchers.IO) {
+                            val decoded = decode(fresh) ?: throw OutfitException(NOT_A_SKIN)
+                            writeCache(skin.hash, fresh)
+                            decoded
+                        }
+                    }
                 bitmaps[key] = image.toComposeImageBitmap()
                 bitmapVersion++
             }.onFailure {
@@ -355,8 +358,15 @@ object SkinLibrary {
     private fun cacheFile(hash: String): File? =
         hash.lowercase().takeIf { HASH_PATTERN.matches(it) }?.let { File(cacheDir, "$it.png") }
 
-    private fun readCache(hash: String): ByteArray? =
-        cacheFile(hash)?.takeIf { it.isFile }?.let { runCatching { it.readBytes() }.getOrNull() }
+    private fun readCache(hash: String): BufferedImage? {
+        val file = cacheFile(hash)?.takeIf { it.isFile } ?: return null
+        val image = runCatching { file.readBytes() }.getOrNull()?.let(::decode)
+        if (image == null) runCatching { file.delete() }
+        return image
+    }
+
+    private fun decode(bytes: ByteArray): BufferedImage? =
+        runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
 
     private fun writeCache(hash: String, bytes: ByteArray) {
         val file = cacheFile(hash) ?: return

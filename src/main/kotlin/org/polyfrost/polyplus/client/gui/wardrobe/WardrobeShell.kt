@@ -109,6 +109,14 @@ internal fun WardrobeShell(
     val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
         buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
     }
+    val coverByVariant = remember(store.byType, store.popular, store.newest) {
+        val covers = HashMap<Int, Int>()
+        for (info in store.all) {
+            val cover = info.coverAssetId ?: continue
+            for (variant in info.variantList) covers.putIfAbsent(variant.id, cover)
+        }
+        covers
+    }
     val anchors = remember(entries) {
         entries.mapIndexedNotNull { index, entry ->
             (entry as? WardrobeEntry.Divider)?.takeIf { it.anchor }?.let { it.label to index }
@@ -195,9 +203,7 @@ internal fun WardrobeShell(
                     storeVariantPicks = storeVariantPicks,
                     mojangBusy = MojangCapeService.busy,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    coverFor = { item ->
-                        store.all.firstOrNull { info -> info.variantList.any { v -> item.variants.any { it.id == v.id } } }?.coverAssetId
-                    },
+                    coverFor = { item -> item.variants.firstNotNullOfOrNull { coverByVariant[it.id] } },
                     onOwned = { item ->
                         if (wheelMode && item.type == CosmeticType.Emote) {
                             val wheel = EmoteWheels.activeIndex
@@ -318,7 +324,7 @@ internal fun WardrobeShell(
                     )
                     wheelMode -> EmoteWheelEditor(
                         selectedSlot = wheelSlot,
-                        coverForEmote = { id -> store.all.firstOrNull { info -> info.variantList.any { it.id == id } }?.coverAssetId },
+                        coverForEmote = { id -> coverByVariant[id] },
                         onSelectSlot = { wheelSlot = it },
                         modifier = Modifier.fillMaxSize(),
                     )

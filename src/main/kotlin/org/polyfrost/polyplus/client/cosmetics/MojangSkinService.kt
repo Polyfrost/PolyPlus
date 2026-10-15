@@ -1,12 +1,10 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import io.ktor.client.call.body
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.accept
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -22,9 +20,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.MojangAuth.PROFILE_URL
+import org.polyfrost.polyplus.client.cosmetics.MojangAuth.accessToken
+import org.polyfrost.polyplus.client.cosmetics.MojangAuth.authorize
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.nio.charset.StandardCharsets
@@ -40,7 +40,6 @@ class MojangSkinException(message: String) : Exception(message)
 object MojangSkinService {
     private val LOGGER = LogManager.getLogger("polyplus/mojang-skins")
 
-    private const val PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile"
     private const val SKINS_URL = "$PROFILE_URL/skins"
     private const val SESSION_PROFILE_URL = "https://sessionserver.mojang.com/session/minecraft/profile"
     private const val USERNAME_URL = "https://api.mojang.com/users/profiles/minecraft"
@@ -205,19 +204,6 @@ object MojangSkinService {
 
     private fun secure(url: String): String =
         if (url.startsWith("http://textures.minecraft.net/")) "https://" + url.removePrefix("http://") else url
-
-    private fun HttpRequestBuilder.authorize(token: String) {
-        accept(ContentType.Application.Json)
-        header(HttpHeaders.Authorization, "Bearer $token")
-    }
-
-    private fun accessToken(): String? = runCatching {
-        //? if > 1.8.9 {
-        Minecraft.getInstance().user.accessToken
-        //?} else {
-        /*Minecraft.getInstance().session.accessToken
-        *///?}
-    }.getOrNull()?.takeIf { it.isNotBlank() && it != "0" }
 
     @Serializable
     private data class SessionProfile(val properties: List<ProfileProperty> = emptyList())
