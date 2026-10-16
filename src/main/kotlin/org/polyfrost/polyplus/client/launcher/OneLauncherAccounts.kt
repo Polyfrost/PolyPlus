@@ -25,7 +25,8 @@ object OneLauncherAccounts {
             ?: store.defaultUser?.let { LauncherAccountStore.parseUuid(it) }
             ?: store.users.keys.firstNotNullOfOrNull { LauncherAccountStore.parseUuid(it) }
 
-        return (store.users.values + listOfNotNull(session)).mapNotNull { stored ->
+        // Store order is add order (newest last); the unsaved launch account predates all of them
+        return (listOfNotNull(session) + store.users.values).mapNotNull { stored ->
             val id = LauncherAccountStore.parseUuid(stored.id) ?: return@mapNotNull null
             val microsoft = LauncherAccountStore.isMicrosoft(stored)
             Account(
@@ -36,7 +37,7 @@ object OneLauncherAccounts {
                 // The launch account has no refresh token so it can never be refreshed
                 expired = microsoft && stored !== session && LauncherAccountStore.isExpired(stored.expires),
             )
-        }.sortedWith(compareByDescending<Account> { it.active }.thenBy { it.username.lowercase() })
+        }
     }
 
     fun switchTo(id: UUID): Boolean {
