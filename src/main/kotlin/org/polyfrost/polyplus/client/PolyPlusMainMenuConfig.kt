@@ -73,8 +73,8 @@ object PolyPlusMainMenuConfig : Config(
 
     @JvmStatic
     @Switch(
-        title = "Hide Cosmetics Button",
-        description = "Hide the Cosmetics button on the PolyPlus main menu.",
+        title = "Hide Wardrobe Button",
+        description = "Hide the Wardrobe button on the PolyPlus main menu.",
         subcategory = "Elements",
     )
     var hideMainMenuCosmetics = false

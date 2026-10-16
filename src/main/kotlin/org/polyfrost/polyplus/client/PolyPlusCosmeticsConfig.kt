@@ -37,6 +37,13 @@ object PolyPlusCosmeticsConfig : Config(
     var hideFeetCosmeticsWithBoots = true
 
     @JvmStatic
+    @Switch(
+        title = "Force PolyPlus Capes",
+        description = "Show the capes picked in the wardrobe even when another mod sets its own cape.",
+    )
+    var forcePolyPlusCapes = false
+
+    @JvmStatic
     @Dropdown(
         title = "Capes",
         description = "Choose whose capes you can see.",

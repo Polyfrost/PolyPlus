@@ -1,152 +1,60 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
-import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
-import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
-import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.cosmetics.BillingService
-import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
-import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
-import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
-import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
-import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
-import org.polyfrost.polyplus.client.cosmetics.CosmeticService
-import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
-import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
-import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.privacy.PrivacyConsent
-import java.awt.Color as AwtColor
-import java.time.Duration
-import java.time.Instant
-import java.time.OffsetDateTime
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import net.minecraft.client.gui.screens.TitleScreen
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
+import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
+import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
+import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
+import org.polyfrost.oneconfig.internal.ui.shell.ShellState
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.BillingService
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
+import org.polyfrost.polyplus.client.cosmetics.CosmeticService
+import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.gui.wardrobe.CartEntry
+import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticsLoadingScreen
+import org.polyfrost.polyplus.client.gui.wardrobe.MinecraftCapesOnlyScreen
+import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeShell
+import org.polyfrost.polyplus.client.gui.wardrobe.cartName
+import org.polyfrost.polyplus.client.gui.wardrobe.checkoutFailureMessage
+import org.polyfrost.polyplus.client.gui.wardrobe.cosmeticCartKey
+import org.polyfrost.polyplus.client.gui.wardrobe.equip
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberCosmeticItems
+import org.polyfrost.polyplus.client.gui.wardrobe.selectedVariantId
+import org.polyfrost.polyplus.client.gui.wardrobe.toCartEntry
+import org.polyfrost.polyplus.client.gui.wardrobe.unequip
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 @Serializable
 data object PolyPlusCosmeticsRoute
 
 object PolyPlusOneConfigIntegration {
     private val cosmeticsRoute = NavigationRoute(
-        id = "cosmetics",
+        id = "wardrobe",
         icon = "assets/polyplus/ico/stars.svg",
         route = PolyPlusCosmeticsRoute,
     )
 
     @JvmStatic
     fun navigationGroups(original: List<NavigationGroup>): List<NavigationGroup> {
-        if (!PrivacyConsent.allowsOnlineServices()) return original
-
         if (original.any { group -> group.routes.any { it.route == PolyPlusCosmeticsRoute } }) {
             return original
         }
@@ -164,12 +72,18 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun addRoutes(builder: NavGraphBuilder) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
         builder.polyPlusCosmeticsGraph()
     }
 
     @JvmStatic
     fun openCosmetics() = openOneConfig(PolyPlusCosmeticsRoute)
+
+    fun openCosmeticsFromKeybind() {
+        when (ClientPlatform.currentScreen()) {
+            null, is TitleScreen, is PolyPlusMainMenuScreen -> openCosmetics()
+            else -> Unit
+        }
+    }
 
     @JvmStatic
     fun openMods() = openOneConfig(ModsGraph)
@@ -185,95 +99,14 @@ fun NavGraphBuilder.polyPlusCosmeticsGraph() {
     }
 }
 
-private enum class PolyPlusTab {
-    Wardrobe,
-    Store,
-    History,
-}
-
-private data class CartEntry(
-    val key: String,
-    val name: String,
-    val description: String?,
-    val basePrice: Float?,
-    val finalPrice: Float?,
-    val discountRate: Int?,
-    val storeProductId: String?,
-    val coverAssetId: Int? = null,
-) {
-    val free: Boolean get() = (finalPrice ?: 0f) <= 0f
-
-    val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
-}
-
-private fun CosmeticStoreInfo.toCartEntry(variant: CosmeticVariantUi, storeProductId: String?): CartEntry =
-    CartEntry(
-        cosmeticCartKey(variant.id),
-        cartName(variant),
-        description,
-        basePrice,
-        finalPrice,
-        discountRate,
-        storeProductId,
-        coverAssetId,
-    )
-
-private fun cosmeticCartKey(variantId: Int): String = "cosmetic-$variantId"
-
-private fun CosmeticStoreInfo.cartName(variant: CosmeticVariantUi): String =
-    if (variantList.size > 1 && !variant.name.equals(name, ignoreCase = true)) "$name - ${variant.name}" else name
-
-private data class CosmeticVariantUi(val id: Int, val name: String)
-
-private fun CosmeticStoreInfo.uiVariants(): List<CosmeticVariantUi> {
-    val byLabel = LinkedHashMap<String, CosmeticVariantUi>()
-    for (variant in variantList.sortedBy { it.variantOrder }) {
-        val label = variant.variantName ?: name
-        byLabel.getOrPut(label) { CosmeticVariantUi(variant.id, label) }
-    }
-    return byLabel.values.toList()
-}
-
-private fun CosmeticStoreInfo.fullyOwned(ownedIds: Set<Int>): Boolean =
-    uiVariants().all { it.id in ownedIds }
-
-private fun selectedStoreVariant(
-    info: CosmeticStoreInfo,
-    picks: Map<Int, Int>,
-    ownedIds: Set<Int>,
-): CosmeticVariantUi {
-    val variants = info.uiVariants()
-    val picked = picks[info.id]
-    return variants.firstOrNull { it.id == picked }
-        ?: variants.firstOrNull { it.id !in ownedIds }
-        ?: variants.first()
-}
-
-private fun checkoutFailureMessage(error: Throwable): String =
-    if (error is BillingService.AlreadyOwnedException) {
-        error.message ?: "You already own this item."
-    } else {
-        "Checkout failed: ${error.message}"
-    }
-
-private data class CosmeticUiItem(
-    val groupId: Int,
-    val type: CosmeticType,
-    val name: String,
-    val collection: String,
-    val owned: Boolean,
-    val equipped: Boolean,
-    val variants: List<CosmeticVariantUi>,
-    val equippedVariantId: Int?,
-) {
-    val id: Int get() = groupId
-    val hasVariants: Boolean get() = variants.size > 1
-}
-
 @Composable
 private fun PolyPlusCosmeticsScreen() {
+    DisposableEffect(Unit) {
+        ShellState.title = "Wardrobe"
+        onDispose { }
+    }
     if (!PrivacyConsent.allowsOnlineServices()) {
-        OnlineFeaturesDisabled()
+        MinecraftCapesOnlyScreen()
         return
     }
     var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }
@@ -295,29 +128,16 @@ private fun PolyPlusCosmeticsScreen() {
         )
         return
     }
-    var tab by remember { mutableStateOf(PolyPlusTab.Wardrobe) }
-    var tabResolved by remember { mutableStateOf(false) }
-    var showCart by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var manualRefreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
     val cart = remember { mutableStateListOf<CartEntry>() }
     val allItems = rememberCosmeticItems(refreshKey)
     val ownedIds = remember(refreshKey) { CosmeticCatalog.ownedIds() }
-    var selectedId by remember { mutableStateOf<Int?>(null) }
-    val selected = allItems.firstOrNull { it.id == selectedId } ?: allItems.firstOrNull()
     val variantPicks = remember { mutableStateMapOf<Int, Int>() }
     var auraColor by remember { mutableStateOf(CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())) }
     LaunchedEffect(refreshKey) {
         auraColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
-    }
-
-    LaunchedEffect(allItems, tabResolved) {
-        if (tabResolved || allItems.isEmpty()) return@LaunchedEffect
-        if (allItems.none { it.owned }) {
-            tab = PolyPlusTab.Store
-        }
-        tabResolved = true
     }
 
     LaunchedEffect(Unit) {
@@ -328,16 +148,21 @@ private fun PolyPlusCosmeticsScreen() {
         }
     }
 
-    fun checkout() {
-        val productIds = cart.mapNotNull { it.storeProductId }
+    var checkoutPending by remember { mutableStateOf(false) }
+
+    fun checkout(productIds: List<String>, claimed: Boolean = false) {
+        if (checkoutPending && !claimed) return
         if (productIds.isEmpty()) {
+            checkoutPending = false
             status = "Nothing purchasable in your cart yet."
             return
         }
+        checkoutPending = true
         status = "Opening checkout..."
         PolyPlusClient.SCOPE.launch {
             val result = BillingService.checkoutAndOpen(productIds)
             ClientPlatform.runOnMain {
+                checkoutPending = false
                 status = result.fold(
                     onSuccess = { "Checkout opened in your browser." },
                     onFailure = ::checkoutFailureMessage,
@@ -346,2020 +171,116 @@ private fun PolyPlusCosmeticsScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Toolbar(
-            activeTab = tab,
-            cartSize = cart.size,
-            onWardrobe = {
-                tab = PolyPlusTab.Wardrobe
-                tabResolved = true
-                status = null
-            },
-            onStore = {
-                tab = PolyPlusTab.Store
-                tabResolved = true
-                showCart = false
-                status = null
-            },
-            onHistory = {
-                tab = PolyPlusTab.History
-                tabResolved = true
-                status = null
-            },
-            onCart = {
-                tab = PolyPlusTab.Store
-                tabResolved = true
-                showCart = true
-            },
-            onRefresh = {
-                PolyPlusClient.refreshCosmetics()
-                refreshKey++
-                manualRefreshKey++
-                status = "Refreshing cosmetic data..."
-            },
-        )
-
-        when (tab) {
-            PolyPlusTab.Wardrobe -> WardrobeScreen(
-                items = allItems.filter { it.owned },
-                selected = selected,
-                status = status,
-                variantPicks = variantPicks,
-                auraColor = auraColor,
-                onPreviewAuraColor = { color ->
-                    auraColor = color
-                    CosmeticCatalog.setParticleColor(ClientPlatform.localPlayerUuid(), color)
-                },
-                onSelectAuraColor = { color ->
-                    auraColor = color
-                    status = if (color != null) "Updating aura color..." else "Clearing aura color..."
-                    PolyPlusClient.SCOPE.launch {
-                        val result = CosmeticService.setParticleColor(color)
-                        ClientPlatform.runOnMain {
-                            status = result.fold(
-                                onSuccess = { if (color != null) "Aura color updated." else "Aura color cleared." },
-                                onFailure = { "Failed to set aura color: ${it.message}" },
-                            )
-                        }
-                    }
-                },
-                onSelect = { selectedId = it.id },
-                onSelectVariant = { groupId, variantId ->
-                    variantPicks[groupId] = variantId
-                    val item = allItems.firstOrNull { it.groupId == groupId }
-                    if (item != null && item.equipped && item.equippedVariantId != variantId) {
-                        status = "Equipping ${item.name}..."
-                        equip(item, variantId) {
-                            refreshKey++
-                            status = it
-                        }
-                    }
-                },
-                onEquip = { item ->
-                    val variantId = selectedVariantId(item, variantPicks)
-                    if (item.equipped && variantId == item.equippedVariantId) {
-                        status = "Unequipping ${item.name}..."
-                        unequip(item) {
-                            refreshKey++
-                            status = it
-                        }
-                    } else if (variantId == null) {
-                        status = "${item.name} has no variant to equip."
-                    } else {
-                        status = "Equipping ${item.name}..."
-                        equip(item, variantId) {
-                            refreshKey++
-                            status = it
-                        }
-                    }
-                },
-            )
-
-            PolyPlusTab.Store -> StoreScreen(
-                cart = cart,
-                showCart = showCart,
-                status = status,
-                ownedIds = ownedIds,
-                onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
-                onBackToBrowse = { showCart = false },
-                onCheckout = { checkout() },
-                onAddToCart = { info, variant ->
-                    val key = cosmeticCartKey(variant.id)
-                    val label = info.cartName(variant)
-                    if (variant.id in ownedIds) {
-                        status = "You already own $label."
-                    } else if (cart.any { it.key == key }) {
-                        status = "$label is already in your cart."
-                    } else {
-                        status = "Adding $label to cart..."
-                        PolyPlusClient.SCOPE.launch {
-                            val view = CosmeticStore.view(variant.id).getOrNull()
-                            ClientPlatform.runOnMain {
-                                val priceId = view?.storeProductId
-                                if (priceId.isNullOrBlank()) {
-                                    status = "$label isn't purchasable yet."
-                                } else if (cart.none { it.key == key }) {
-                                    cart += info.toCartEntry(variant, priceId)
-                                    status = "$label added to cart."
-                                }
-                            }
-                        }
-                    }
-                },
-                onBuyNow = { info, variant ->
-                    val label = info.cartName(variant)
-                    if (variant.id in ownedIds) {
-                        status = "You already own $label."
-                        return@StoreScreen
-                    }
-                    status = "Opening checkout..."
-                    PolyPlusClient.SCOPE.launch {
-                        val view = CosmeticStore.view(variant.id).getOrNull()
-                        val priceId = view?.storeProductId
-                        if (priceId.isNullOrBlank()) {
-                            ClientPlatform.runOnMain { status = "$label isn't purchasable yet." }
-                        } else {
-                            val result = BillingService.checkoutAndOpen(listOf(priceId))
-                            ClientPlatform.runOnMain {
-                                status = result.fold(
-                                    onSuccess = { "Checkout opened in your browser." },
-                                    onFailure = ::checkoutFailureMessage,
-                                )
-                            }
-                        }
-                    }
-                },
-            )
-
-            PolyPlusTab.History -> HistoryScreen(ownedIds = ownedIds, reloadKey = manualRefreshKey)
-        }
-    }
-}
-
-@Composable
-private fun Toolbar(
-    activeTab: PolyPlusTab,
-    cartSize: Int,
-    onWardrobe: () -> Unit,
-    onStore: () -> Unit,
-    onHistory: () -> Unit,
-    onCart: () -> Unit,
-    onRefresh: () -> Unit,
-) {
-    Row(modifier = Modifier.fillMaxWidth().height(33.dp), verticalAlignment = Alignment.CenterVertically) {
-        TabButton("Wardrobe", activeTab == PolyPlusTab.Wardrobe, onWardrobe)
-        Spacer(Modifier.width(8.dp))
-        TabButton("Store", activeTab == PolyPlusTab.Store, onStore)
-        Spacer(Modifier.width(8.dp))
-        TabButton("History", activeTab == PolyPlusTab.History, onHistory)
-        Spacer(Modifier.weight(1f))
-        SmallButton("Refresh", iconPath = "refresh", primary = false, onClick = onRefresh)
-        Spacer(Modifier.width(8.dp))
-        SmallButton("Cart ($cartSize)", iconPath = "assets/polyplus/ico/shopping-cart/0.svg", primary = true, onClick = onCart)
-    }
-}
-
-@Composable
-private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.height(33.dp)
-            .clip(ppShape(7.dp))
-            .background(if (selected) Accent else LocalTheme.current.chipBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(
-            label,
-            color = if (selected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
-private fun SmallButton(
-    label: String,
-    iconPath: String,
-    primary: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.height(33.dp)
-            .clip(ppShape(7.dp))
-            .background(if (primary) Accent else LocalTheme.current.chipBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(iconPath, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(8.dp))
-        SocialText(label, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun WardrobeScreen(
-    items: List<CosmeticUiItem>,
-    selected: CosmeticUiItem?,
-    status: String?,
-    variantPicks: Map<Int, Int>,
-    auraColor: Int?,
-    onPreviewAuraColor: (Int) -> Unit,
-    onSelectAuraColor: (Int?) -> Unit,
-    onSelect: (CosmeticUiItem) -> Unit,
-    onSelectVariant: (Int, Int) -> Unit,
-    onEquip: (CosmeticUiItem) -> Unit,
-) {
-    var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
-    var stockedTypes by remember {
-        mutableStateOf(CosmeticType.entries.filter { it != CosmeticType.Unknown })
-    }
-    LaunchedEffect(Unit) {
-        stockedTypes = CosmeticStore.stockedTypes()
-    }
-
-    val railTypes = remember(stockedTypes, items) {
-        val owned = items.mapTo(mutableSetOf()) { it.type }
-        CosmeticType.entries.filter {
-            it != CosmeticType.Unknown && (it in stockedTypes || it in owned)
-        }
-    }
-
-    LaunchedEffect(railTypes) {
-        if (railTypes.isNotEmpty() && selectedType !in railTypes) {
-            selectedType = railTypes.first()
-        }
-    }
-
-    val displayItems = remember(items, selectedType) {
-        items.filter { it.type == selectedType }
-    }
-
-    LaunchedEffect(selectedType, displayItems.isEmpty()) {
-        if (selected?.type != selectedType) {
-            displayItems.firstOrNull()?.let(onSelect)
-        }
-    }
-
-    val previewItem = selected?.takeIf { it.type == selectedType } ?: displayItems.firstOrNull()
-    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(19.dp)) {
-        CategoryRail(
-            selected = selectedType,
-            onSelect = { selectedType = it },
-            types = railTypes,
-        )
-        CosmeticGrid(
-            items = displayItems,
-            modifier = Modifier.width(596.dp).fillMaxHeight(),
-            onSelect = onSelect,
-            onEquip = onEquip,
-        )
-        PreviewPanel(
-            selected = previewItem,
-            status = status,
-            selectedVariantId = previewItem?.let { selectedVariantId(it, variantPicks) },
-            onSelectVariant = { variantId ->
-                previewItem?.let { onSelectVariant(it.groupId, variantId) }
-            },
-            showAuraColor = selectedType == CosmeticType.Aura,
-            auraColor = auraColor,
-            onPreviewAuraColor = onPreviewAuraColor,
-            onSelectAuraColor = onSelectAuraColor,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        )
-    }
-}
-
-@Composable
-private fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
-    var transactions by remember { mutableStateOf<List<TransactionInfo>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var loadError by remember { mutableStateOf<String?>(null) }
-
-    // keyed on ownership rather than the catalog poll so transactions only refetch when a purchase lands
-    LaunchedEffect(ownedIds, reloadKey) {
-        loading = true
-        loadError = null
-        BillingService.fetchTransactions()
-            .onSuccess { transactions = it }
-            .onFailure { loadError = "Couldn't load transactions: ${it.message}" }
-        loading = false
-    }
-
-    Box(
-        modifier = Modifier.fillMaxSize().clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
-            .padding(18.dp),
-    ) {
-        when {
-            loading && transactions.isEmpty() -> CenteredNote("Loading transactions...")
-            loadError != null && transactions.isEmpty() -> CenteredNote(loadError!!)
-            transactions.isEmpty() -> CenteredNote("No transactions yet.")
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                items(transactions, key = { it.id }) { tx -> TransactionRow(tx) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TransactionRow(tx: TransactionInfo) {
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .clip(ppShape(8.dp))
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
-            .padding(horizontal = 13.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            SocialText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            SocialText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-        }
-        tx.amount?.let { SocialText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
-        SocialText(
-            tx.status.displayName,
-            color = statusColor(tx.status),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-        )
-    }
-}
-
-private fun statusColor(status: TransactionStatus): Color = when (status) {
-    TransactionStatus.Completed -> Color(0xFF239A60)
-    TransactionStatus.Pending -> Color(0xFFE0A030)
-    TransactionStatus.Failed -> Color(0xFFFF4444)
-    TransactionStatus.Refunded, TransactionStatus.PartiallyRefunded, TransactionStatus.Chargeback -> Color(0xFF8A9296)
-    TransactionStatus.Unknown -> Color(0xFF8A9296)
-}
-
-@Composable
-private fun CategoryRail(
-    selected: CosmeticType,
-    onSelect: (CosmeticType) -> Unit,
-    types: List<CosmeticType> = CosmeticType.entries.filter { it != CosmeticType.Unknown },
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.width(58.dp)) {
-        types.forEach { type ->
-            val isSelected = type == selected
-            Box(
-                modifier = Modifier.fillMaxWidth().height(57.dp)
-                    .clip(ppShape(7.dp))
-                    .background(if (isSelected) Accent else LocalTheme.current.chipBackground)
-                    .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-                    .clickable { onSelect(type) },
-                contentAlignment = Alignment.Center,
-            ) {
-                SocialText(
-                    type.displayName,
-                    color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CosmeticGrid(
-    items: List<CosmeticUiItem>,
-    modifier: Modifier,
-    onSelect: (CosmeticUiItem) -> Unit,
-    onEquip: (CosmeticUiItem) -> Unit,
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(19.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        items(items) { item ->
-            CosmeticCard(
-                item = item,
-                onSelect = { onSelect(item) },
-                onEquip = { onEquip(item) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun CosmeticCard(
-    item: CosmeticUiItem,
-    onSelect: () -> Unit,
-    onEquip: () -> Unit,
-) {
-    val border = if (item.equipped) Accent else LocalTheme.current.borderColor
-    val buttonColor = if (item.equipped) Accent else Color(0xB3232D32)
-    val activate = { onSelect(); onEquip() }
-
-    Box(
-        modifier = Modifier.size(180.dp, 258.dp)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, border, ppShape(12.dp))
-            .clickable(onClick = activate),
-    ) {
-        val (source, loadTick) = rememberCosmeticPreviewSource(item)
-        CosmeticThumbnail(
-            source = source,
-            type = item.type,
-            previewKey = "card-${item.groupId}-$loadTick",
-            modifier = Modifier.offset(17.dp, 17.dp).size(144.dp),
-        )
-        CardLabel(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        CardLabel(item.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.offset(17.dp, 192.dp).width(146.dp))
-
-        Row(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
-                .background(buttonColor)
-                .clickable(onClick = activate),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SocialText(if (item.equipped) "Equipped" else "Equip", color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
-    when {
-        finalPrice == null -> SocialText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
-        finalPrice <= 0f -> SocialText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        discounted && basePrice != null -> {
-            SocialText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
-            Spacer(Modifier.width(4.dp))
-            SocialText(money(finalPrice), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-        else -> SocialText(money(finalPrice), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun PriceLabel(info: CosmeticStoreInfo) = PriceLabel(info.basePrice, info.finalPrice, info.discounted)
-
-@Composable
-private fun PriceLabel(entry: CartEntry) = PriceLabel(entry.basePrice, entry.finalPrice, entry.discounted)
-
-@Composable
-private fun PreviewPanel(
-    selected: CosmeticUiItem?,
-    status: String?,
-    modifier: Modifier,
-    selectedVariantId: Int? = null,
-    onSelectVariant: (Int) -> Unit = {},
-    showAuraColor: Boolean = false,
-    auraColor: Int? = null,
-    onPreviewAuraColor: (Int) -> Unit = {},
-    onSelectAuraColor: (Int?) -> Unit = {},
-) {
-    Box(
-        modifier = modifier.clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
-    ) {
-        val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
-            .containsKey(BodySlot.Hat)
-        PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-            source = PlayerPreviewSource.LocalLive,
-            autoSpin = false,
-            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
-            initialYaw = FRONT_YAW_DEG,
-            live = true,
-        )
-        Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (selected != null) {
-                Column {
-                    SocialText(selected.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    SocialText(selected.collection, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                }
-            }
-            if (status != null) {
-                SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-            }
-        }
-        val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
-        if (variants.isNotEmpty() || showAuraColor) {
-            PreviewPill(
-                variants = variants,
-                selectedVariantId = selectedVariantId,
-                onSelectVariant = onSelectVariant,
-                showAuraColor = showAuraColor,
-                auraColor = auraColor,
-                onPreviewAuraColor = onPreviewAuraColor,
-                onSelectAuraColor = onSelectAuraColor,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(18.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PreviewPill(
-    variants: List<CosmeticVariantUi>,
-    selectedVariantId: Int?,
-    onSelectVariant: (Int) -> Unit,
-    showAuraColor: Boolean,
-    auraColor: Int?,
-    onPreviewAuraColor: (Int) -> Unit,
-    onSelectAuraColor: (Int?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var customOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(showAuraColor) { if (!showAuraColor) customOpen = false }
-
-    var pillHeight by remember { mutableIntStateOf(0) }
-    val popoverGapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
-
-    Box(modifier) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { pillHeight = it.height }
-                .clip(ppShape(PILL_RADIUS))
-                .background(LocalTheme.current.chipBackground)
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(PILL_RADIUS))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (variants.isNotEmpty()) {
-                VariantStrip(
-                    variants = variants,
-                    selectedVariantId = selectedVariantId,
-                    onSelect = onSelectVariant,
-                )
-            }
-            if (variants.isNotEmpty() && showAuraColor) {
-                Box(Modifier.width(1.dp).height(20.dp).background(LocalTheme.current.borderColor))
-            }
-            if (showAuraColor) {
-                AuraSwatchRow(
-                    selectedColor = auraColor,
-                    customOpen = customOpen,
-                    onToggleCustom = { customOpen = !customOpen },
-                    onCommit = onSelectAuraColor,
-                )
-            }
-        }
-        if (customOpen && showAuraColor) {
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, pillHeight + popoverGapPx),
-                onDismissRequest = { customOpen = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                AuraCustomPopover(
-                    selectedColor = auraColor,
-                    onPreview = onPreviewAuraColor,
-                    onCommit = onSelectAuraColor,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RowScope.VariantStrip(
-    variants: List<CosmeticVariantUi>,
-    selectedVariantId: Int?,
-    onSelect: (Int) -> Unit,
-) {
-    val scrollState = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    val wheelStep = with(LocalDensity.current) { VARIANT_WHEEL_STEP.toPx() }
-    val arrowStep = with(LocalDensity.current) { VARIANT_ARROW_STEP.toPx() }
-    val overflows = scrollState.maxValue > 0 && scrollState.maxValue != Int.MAX_VALUE
-
-    if (overflows) {
-        ScrollArrow(
-            iconName = "left-arrow",
-            enabled = scrollState.value > 0,
-            onClick = { scope.launch { scrollState.animateScrollBy(-arrowStep) } },
-        )
-    }
-    Row(
-        modifier = Modifier.weight(1f, fill = false)
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        if (event.type != PointerEventType.Scroll) continue
-                        val delta = event.changes.first().scrollDelta
-                        if (delta.x == 0f && delta.y != 0f) {
-                            scope.launch { scrollState.scrollBy(delta.y * wheelStep) }
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
-            }
-            .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        for (variant in variants) {
-            val isSelected = variant.id == selectedVariantId
-            Box(
-                modifier = Modifier
-                    .clip(ppShape(6.dp))
-                    .background(if (isSelected) Accent else LocalTheme.current.componentBackground)
-                    .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, ppShape(6.dp))
-                    .clickable { onSelect(variant.id) }
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-            ) {
-                SocialText(
-                    variant.name,
-                    color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
-                    fontSize = 12.sp,
-                )
-            }
-        }
-    }
-    if (overflows) {
-        ScrollArrow(
-            iconName = "right-arrow",
-            enabled = scrollState.value < scrollState.maxValue,
-            onClick = { scope.launch { scrollState.animateScrollBy(arrowStep) } },
-        )
-    }
-}
-
-@Composable
-private fun ScrollArrow(iconName: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(18.dp)
-            .clip(ppShape(4.dp))
-            .background(LocalTheme.current.componentBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(4.dp))
-            .alpha(if (enabled) 1f else 0.35f)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(iconName, color = LocalTheme.current.textColor, modifier = Modifier.size(10.dp))
-    }
-}
-
-@Composable
-private fun AuraSwatchRow(
-    selectedColor: Int?,
-    customOpen: Boolean,
-    onToggleCustom: () -> Unit,
-    onCommit: (Int?) -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-        AuraDot(
-            color = Color(DEFAULT_AURA_ARGB),
-            isSelected = selectedColor == null,
-            onClick = { onCommit(null) },
-        )
-        for (color in AURA_PRESETS) {
-            AuraDot(
-                color = Color(color),
-                isSelected = selectedColor == color,
-                onClick = { onCommit(color) },
-            )
-        }
-        val isCustom = selectedColor != null && selectedColor !in AURA_PRESETS
-        AuraDot(
-            color = if (isCustom) Color(selectedColor!!) else LocalTheme.current.componentBackground,
-            isSelected = isCustom || customOpen,
-            onClick = onToggleCustom,
-        ) {
-            if (!isCustom) {
-                SocialText("+", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AuraDot(
-    color: Color,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit = {},
-) {
-    Box(
-        modifier = Modifier.size(18.dp)
-            .clip(ppShape(4.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Checkerboard(Modifier.fillMaxSize())
-        Box(Modifier.fillMaxSize().background(color))
-        Box(
-            Modifier.fillMaxSize().border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) Accent else LocalTheme.current.borderColor,
-                shape = ppShape(4.dp),
-            ),
-        )
-        content()
-    }
-}
-
-@Composable
-private fun VariantPicker(
-    variants: List<CosmeticVariantUi>,
-    selectedVariantId: Int?,
-    onSelect: (Int) -> Unit,
-    ownedVariantIds: Set<Int> = emptySet(),
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(220.dp)) {
-        SocialText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-        for (row in variants.chunked(2)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (variant in row) {
-                    val isSelected = variant.id == selectedVariantId
-                    Box(
-                        modifier = Modifier
-                            .alpha(if (variant.id in ownedVariantIds && !isSelected) 0.55f else 1f)
-                            .clip(ppShape(6.dp))
-                            .background(if (isSelected) Accent else LocalTheme.current.chipBackground)
-                            .border(1.dp, if (isSelected) Accent else LocalTheme.current.borderColor, ppShape(6.dp))
-                            .clickable { onSelect(variant.id) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    ) {
-                        SocialText(
-                            variant.name,
-                            color = if (isSelected) LocalTheme.current.accentTextColor else LocalTheme.current.textColor,
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private val PILL_RADIUS = 18.dp
-
-private val VARIANT_WHEEL_STEP = 48.dp
-
-private val VARIANT_ARROW_STEP = 96.dp
-
-private val AURA_COLORS: List<Int> = listOf(
-    0xFFFF4444.toInt(),
-    0xFFFF9E3D.toInt(),
-    0xFFF4D03F.toInt(),
-    0xFF2ECC71.toInt(),
-    0xFF1ABC9C.toInt(),
-    0xFF3DA5FF.toInt(),
-    0xFF6C5CE7.toInt(),
-    0xFFB05CFF.toInt(),
-    0xFFFF6FD8.toInt(),
-    0xFFFFFFFF.toInt(),
-    0xFF3A3F43.toInt(),
-    0xFF9BA2A6.toInt(),
-)
-
-private const val DEFAULT_AURA_ARGB: Int = -1
-
-private val AURA_PRESETS: List<Int> = AURA_COLORS.filter { it != DEFAULT_AURA_ARGB }
-
-/** Converts an ARGB int to a HSB float array (hue in degrees, saturation and brightness as a float between 0 and 1). */
-private fun argbToHsb(argb: Int): FloatArray =
-    AwtColor.RGBtoHSB((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF, null)
-        .also { it[0] *= 360f }
-
-private fun hsbToColor(hue: Float, saturation: Float, brightness: Float): Color =
-    Color.hsv(hue, saturation, brightness)
-
-private fun argbHex(argb: Int): String =
-    "%02X%02X%02X".format((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
-
-private fun hexToArgb(hex: String, alpha: Float): Int? {
-    val h = hex.removePrefix("#").trim()
-    if (h.length != 6) return null
-    return try {
-        ((alpha.coerceIn(0f, 1f) * 255f).roundToInt() shl 24) or Integer.parseInt(h, 16)
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private fun Color.toArgb(alpha: Float): Int =
-    ((alpha.coerceIn(0f, 1f) * 255f).roundToInt() shl 24) or
-        ((red.coerceIn(0f, 1f) * 255f).roundToInt() shl 16) or
-        ((green.coerceIn(0f, 1f) * 255f).roundToInt() shl 8) or
-        (blue.coerceIn(0f, 1f) * 255f).roundToInt()
-
-private class AuraPickerState(argb: Int) {
-    var hue by mutableFloatStateOf(0f)
-    var saturation by mutableFloatStateOf(0f)
-    var brightness by mutableFloatStateOf(0f)
-    var alpha by mutableFloatStateOf(1f)
-
-    var lastEmitted: Int? = null
-
-    init {
-        applyFrom(argb)
-    }
-
-    fun applyFrom(argb: Int) {
-        val hsb = argbToHsb(argb)
-        hue = hsb[0]
-        saturation = hsb[1]
-        brightness = hsb[2]
-        alpha = ((argb ushr 24) and 0xFF) / 255f
-    }
-
-    fun currentArgb(): Int = hsbToColor(hue, saturation, brightness).toArgb(alpha)
-}
-
-@Composable
-private fun Checkerboard(modifier: Modifier, cell: Dp = 4.dp) {
-    Box(
-        modifier = modifier.drawBehind {
-            val step = cell.toPx()
-            val cols = ceil(size.width / step).toInt()
-            val rows = ceil(size.height / step).toInt()
-            for (x in 0..cols) {
-                for (y in 0..rows) {
-                    drawRect(
-                        color = if ((x + y) % 2 == 0) Color(0xFF5F6568) else Color(0xFF3D4245),
-                        topLeft = Offset(x * step, y * step),
-                        size = Size(step, step),
+    WardrobeShell(
+        items = allItems,
+        ownedIds = ownedIds,
+        cart = cart,
+        status = status,
+        variantPicks = variantPicks,
+        auraColor = auraColor,
+        historyReloadKey = manualRefreshKey,
+        onStatus = { status = it },
+        onRefresh = {
+            PolyPlusClient.refreshCosmetics()
+            PolyPlusClient.SCOPE.launch { MojangCapeService.refresh() }
+            refreshKey++
+            manualRefreshKey++
+            status = "Refreshing cosmetic data..."
+        },
+        onPreviewAuraColor = { color ->
+            auraColor = color
+            CosmeticCatalog.setParticleColor(ClientPlatform.localPlayerUuid(), color)
+        },
+        onSelectAuraColor = { color ->
+            auraColor = color
+            status = if (color != null) "Updating aura color..." else "Clearing aura color..."
+            PolyPlusClient.SCOPE.launch {
+                val result = CosmeticService.setParticleColor(color)
+                ClientPlatform.runOnMain {
+                    status = result.fold(
+                        onSuccess = { if (color != null) "Aura color updated." else "Aura color cleared." },
+                        onFailure = { "Failed to set aura color: ${it.message}" },
                     )
                 }
             }
         },
-    )
-}
-
-@Composable
-private fun AuraCustomPopover(
-    selectedColor: Int?,
-    onPreview: (Int) -> Unit,
-    onCommit: (Int?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val state = remember { AuraPickerState(selectedColor ?: 0xFFFFFFFF.toInt()) }
-    var hexText by remember { mutableStateOf(argbHex(state.currentArgb())) }
-    LaunchedEffect(selectedColor) {
-        if (selectedColor != null && selectedColor != state.lastEmitted) {
-            state.applyFrom(selectedColor)
-            hexText = argbHex(selectedColor)
-        }
-    }
-
-    fun emitPreview() {
-        val argb = state.currentArgb()
-        state.lastEmitted = argb
-        hexText = argbHex(argb)
-        onPreview(argb)
-    }
-
-    fun emitCommit() {
-        val argb = state.currentArgb()
-        state.lastEmitted = argb
-        onCommit(argb)
-    }
-
-    val hue = state.hue
-    val saturation = state.saturation
-    val brightness = state.brightness
-    val alpha = state.alpha
-    val current = hsbToColor(hue, saturation, brightness)
-
-    Column(
-        modifier = modifier.width(190.dp)
-            .clip(ppShape(10.dp))
-            .background(LocalTheme.current.popupBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(10.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SocialText("Aura Color", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-
-        var paneSize by remember { mutableStateOf(Size.Zero) }
-        Box(
-            modifier = Modifier.fillMaxWidth().height(120.dp)
-                .clip(ppShape(6.dp))
-                .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
-                .drawWithCache {
-                    val hueColor = hsbToColor(hue, 1f, 1f)
-                    val horizontal = Brush.horizontalGradient(listOf(Color.White, hueColor))
-                    val vertical = Brush.verticalGradient(listOf(Color.Transparent, Color.Black))
-                    onDrawBehind {
-                        drawRect(horizontal)
-                        drawRect(vertical)
-                    }
+        onSelectVariant = { groupId, variantId ->
+            variantPicks[groupId] = variantId
+            val item = allItems.firstOrNull { it.groupId == groupId && it.variants.any { variant -> variant.id == variantId } }
+            if (item != null && item.equipped && item.equippedVariantId != variantId) {
+                status = "Equipping ${item.name}..."
+                equip(item, variantId) {
+                    refreshKey++
+                    status = it
                 }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        fun update(x: Float, y: Float) {
-                            state.saturation = (x / paneSize.width).coerceIn(0f, 1f)
-                            state.brightness = 1f - (y / paneSize.height).coerceIn(0f, 1f)
-                            emitPreview()
+            }
+        },
+        onEquip = { item ->
+            val variantId = selectedVariantId(item, variantPicks)
+            if (item.equipped && variantId == item.equippedVariantId) {
+                status = "Unequipping ${item.name}..."
+                unequip(item) {
+                    refreshKey++
+                    status = it
+                }
+            } else if (variantId == null) {
+                status = "${item.name} has no variant to equip."
+            } else {
+                status = "Equipping ${item.name}..."
+                equip(item, variantId) {
+                    refreshKey++
+                    status = it
+                }
+            }
+        },
+        onAddToCart = { info, variant ->
+            val key = cosmeticCartKey(variant.id)
+            val label = info.cartName(variant)
+            if (variant.id in ownedIds) {
+                status = "You already own $label."
+            } else if (cart.any { it.key == key }) {
+                status = "$label is already in your cart."
+            } else {
+                status = "Adding $label to cart..."
+                PolyPlusClient.SCOPE.launch {
+                    val view = CosmeticStore.view(variant.id).getOrNull()
+                    ClientPlatform.runOnMain {
+                        val priceId = view?.storeProductId
+                        if (priceId.isNullOrBlank()) {
+                            status = "$label isn't purchasable yet."
+                        } else if (cart.none { it.key == key }) {
+                            cart += info.toCartEntry(variant, priceId)
+                            status = "$label added to cart."
                         }
-                        update(down.position.x, down.position.y)
-                        do {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { ch ->
-                                if (ch.pressed) {
-                                    update(ch.position.x, ch.position.y)
-                                    ch.consume()
-                                }
-                            }
-                        } while (event.changes.any { it.pressed })
-                        emitCommit()
                     }
-                },
-        ) {
-            val selX = (saturation * paneSize.width).coerceIn(0f, paneSize.width)
-            val selY = ((1f - brightness) * paneSize.height).coerceIn(0f, paneSize.height)
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset((selX - 7.dp.toPx()).roundToInt(), (selY - 7.dp.toPx()).roundToInt()) }
-                    .size(14.dp)
-                    .clip(ppShape(7.dp))
-                    .background(current)
-                    .border(2.dp, Color.White, ppShape(7.dp)),
-            )
-        }
-
-        Box(
-            modifier = Modifier.fillMaxWidth().height(14.dp)
-                .clip(ppShape(4.dp))
-                .drawWithCache {
-                    val gradient = Brush.horizontalGradient(
-                        listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
-                    )
-                    onDrawBehind { drawRect(gradient) }
                 }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        fun update(x: Float) {
-                            state.hue = ((x / size.width) * 360f).coerceIn(0f, 360f)
-                            emitPreview()
+            }
+        },
+        onBuyNow = { info, variant ->
+            val label = info.cartName(variant)
+            if (variant.id in ownedIds) {
+                status = "You already own $label."
+            } else if (!checkoutPending) {
+                checkoutPending = true
+                status = "Opening checkout..."
+                PolyPlusClient.SCOPE.launch {
+                    val priceId = CosmeticStore.view(variant.id).getOrNull()?.storeProductId
+                    if (priceId.isNullOrBlank()) {
+                        ClientPlatform.runOnMain {
+                            checkoutPending = false
+                            status = "$label isn't purchasable yet."
                         }
-                        update(down.position.x)
-                        do {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { ch ->
-                                if (ch.pressed) {
-                                    update(ch.position.x)
-                                    ch.consume()
-                                }
-                            }
-                        } while (event.changes.any { it.pressed })
-                        emitCommit()
-                    }
-                },
-        ) {
-            var barWidth by remember { mutableStateOf(0f) }
-            Box(Modifier.fillMaxWidth().height(14.dp).onSizeChanged { barWidth = it.width.toFloat() })
-            Box(
-                modifier = Modifier.align(Alignment.CenterStart)
-                    .offset { IntOffset(((hue / 360f) * barWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
-                    .size(10.dp)
-                    .clip(ppShape(5.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
-            )
-        }
-
-        Box(
-            modifier = Modifier.fillMaxWidth().height(14.dp)
-                .clip(ppShape(4.dp))
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        fun update(x: Float) {
-                            state.alpha = (x / size.width).coerceIn(0f, 1f)
-                            emitPreview()
-                        }
-                        update(down.position.x)
-                        do {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { ch ->
-                                if (ch.pressed) {
-                                    update(ch.position.x)
-                                    ch.consume()
-                                }
-                            }
-                        } while (event.changes.any { it.pressed })
-                        emitCommit()
-                    }
-                },
-        ) {
-            Checkerboard(Modifier.fillMaxWidth().height(14.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth().height(14.dp)
-                    .drawWithCache {
-                        val gradient = Brush.horizontalGradient(listOf(current.copy(alpha = 0f), current))
-                        onDrawBehind { drawRect(gradient) }
-                    },
-            )
-            var alphaBarWidth by remember { mutableStateOf(0f) }
-            Box(Modifier.fillMaxWidth().height(14.dp).onSizeChanged { alphaBarWidth = it.width.toFloat() })
-            Box(
-                modifier = Modifier.align(Alignment.CenterStart)
-                    .offset { IntOffset((alpha * alphaBarWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
-                    .size(10.dp)
-                    .clip(ppShape(5.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
-            )
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.size(28.dp).clip(ppShape(5.dp))) {
-                Checkerboard(Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
-                Box(Modifier.fillMaxSize().border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)))
-            }
-            BasicTextField(
-                value = hexText,
-                onValueChange = { input ->
-                    val filtered = input.filter { it.isLetterOrDigit() }.take(6)
-                    hexText = filtered
-                    hexToArgb(filtered, state.alpha)?.let { argb ->
-                        state.applyFrom(argb)
-                        state.lastEmitted = argb
-                        onCommit(argb)
-                    }
-                },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = LocalTheme.current.textColor,
-                    fontSize = 12.sp,
-                    fontFamily = LocalTheme.current.typography.family,
-                ),
-                cursorBrush = SolidColor(LocalTheme.current.textColor),
-                modifier = Modifier.weight(1f)
-                    .clip(ppShape(5.dp))
-                    .background(LocalTheme.current.chipBackground)
-                    .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                    .trackTextInputFocus(),
-                decorationBox = { inner ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SocialText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        inner()
-                    }
-                },
-            )
-        }
-
-    }
-}
-
-@Composable
-private fun CartPanel(
-    items: List<CartEntry>,
-    status: String?,
-    modifier: Modifier,
-    onRemove: (String) -> Unit,
-    onCheckout: () -> Unit,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        if (items.isEmpty()) {
-            CenteredNote("Your cart is empty.")
-            return@Column
-        }
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            items(items, key = { it.key }) { item ->
-                CartRow(item = item, onRemove = { onRemove(item.key) })
-            }
-        }
-
-        val subtotal = items.sumOf { (it.basePrice ?: 0f).toDouble() }.toFloat()
-        val total = items.sumOf { (it.finalPrice ?: it.basePrice ?: 0f).toDouble() }.toFloat()
-        val discount = (subtotal - total).coerceAtLeast(0f)
-        RowTotals("Subtotal", money(subtotal), LocalTheme.current.textColor)
-        if (discount > 0f) {
-            RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
-        }
-        RowTotals("Total", if (total <= 0f) "FREE" else money(total), Color.White, large = true)
-        if (status != null) {
-            SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-        }
-        SmallButton(
-            label = "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
-            iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
-            primary = true,
-            onClick = onCheckout,
-        )
-    }
-}
-
-@Composable
-private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(81.dp)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
-            .padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        CoverThumbnail(item.coverAssetId, Modifier.size(58.dp))
-        Column(Modifier.weight(1f)) {
-            SocialText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            item.description?.takeIf { it.isNotBlank() }?.let {
-                SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-            }
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(item) }
-            if (item.discounted) SocialText("SAVE ${item.discountRate}%", color = Color(0xFF239A60), fontSize = 12.sp)
-            SocialText("Remove", color = Color(0xFFFF4444), fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRemove))
-        }
-    }
-}
-
-@Composable
-private fun RowTotals(label: String, value: String, color: Color, large: Boolean = false) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        SocialText(label, color = LocalTheme.current.textColor, fontSize = if (large) 18.sp else 12.sp, modifier = Modifier.weight(1f))
-        SocialText(value, color = color, fontSize = if (large) 22.sp else 12.sp, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Normal)
-    }
-}
-
-@Composable
-private fun CenteredNote(text: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        SocialText(text, color = LocalTheme.current.textColorSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun CosmeticThumbnail(
-    source: PlayerPreviewSource?,
-    type: CosmeticType,
-    previewKey: String,
-    modifier: Modifier,
-) {
-    val framing = cosmeticPreviewFraming(type)
-    Box(modifier) {
-        CheckerThumbnail(Modifier.fillMaxSize())
-        if (source != null) {
-            PlayerPreview(
-                Modifier.fillMaxSize(),
-                source = source,
-                autoSpin = false,
-                allowDrag = false,
-                modelScale = framing.modelScale,
-                verticalAnchor = framing.verticalAnchor,
-                initialYaw = framing.yawDeg,
-                previewKey = previewKey,
-                live = needsLivePreview(type, source),
-            )
-        }
-    }
-}
-
-private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource) = when (type) {
-    CosmeticType.Aura -> true
-    CosmeticType.Cape ->
-        (source as? PlayerPreviewSource.Override)?.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true
-    else -> false
-}
-
-private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)
-
-private const val FRONT_YAW_DEG = 180f + 22.9f
-private const val BACK_YAW_DEG = 22.9f
-private const val STORE_PREVIEW_FADE_FRACTION = 0.22f
-
-private fun cosmeticPreviewFraming(type: CosmeticType): PreviewFraming = when (type) {
-    CosmeticType.Hat, CosmeticType.Glasses -> PreviewFraming(FRONT_YAW_DEG, 1.0f, 1.5f)
-    CosmeticType.Boots -> PreviewFraming(FRONT_YAW_DEG, 0.85f, 0.26f)
-    CosmeticType.Shoulder -> PreviewFraming(FRONT_YAW_DEG, 0.58f, 0.62f)
-    CosmeticType.Wings -> PreviewFraming(BACK_YAW_DEG, 0.5f, 0.5f)
-    CosmeticType.Backpack -> PreviewFraming(BACK_YAW_DEG, 0.55f, 0.55f)
-    CosmeticType.Cape -> PreviewFraming(BACK_YAW_DEG, 0.42f, 0.5f)
-    CosmeticType.Aura -> PreviewFraming(FRONT_YAW_DEG, 0.5f, 0.5f)
-    CosmeticType.Glove -> PreviewFraming(FRONT_YAW_DEG, 0.7f, 0.42f)
-    else -> PreviewFraming(FRONT_YAW_DEG, 0.42f, 0.52f)
-}
-
-@Composable
-private fun rememberCosmeticPreviewSource(item: CosmeticUiItem): Pair<PlayerPreviewSource?, Int> {
-    val cosmeticId = item.equippedVariantId ?: item.variants.firstOrNull()?.id ?: return null to 0
-    return rememberCosmeticPreviewSource(cosmeticId, item.type)
-}
-
-@Composable
-private fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType): Pair<PlayerPreviewSource?, Int> {
-    val isCape = type == CosmeticType.Cape
-    val isPet = type == CosmeticType.Pet
-
-    var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
-    val loaded = CosmeticAssetCache.installs.let { isPreviewAssetLoaded(previewId, isCape, isPet) }
-    // a trim can evict a preview's assets while the screen is closed, so it reloads them when shown again
-    LaunchedEffect(cosmeticId, loaded) {
-        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
-        val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
-        previewId = id
-        if (!isPreviewAssetLoaded(id, isCape, isPet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
-    }
-
-    val loadTick = (if (loaded) 1 else 0) + (if (isCape && CosmeticAssetCache.isCapeAnimated(previewId)) 2 else 0)
-
-    val source = remember(previewId, loadTick, isCape, isPet) {
-        when {
-            isCape -> PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId)
-            isPet -> {
-                val attached = CosmeticAssetCache.getAttachedCosmetic(previewId)
-                if (attached != null) {
-                    val equipment = CosmeticEquipment()
-                    equipment.equip(attached)
-                    PlayerPreviewSource.Override(equipment)
-                } else {
-                    val pet = CosmeticAssetCache.getPetDefinition(previewId) ?: return@remember null
-                    PlayerPreviewSource.Override(CosmeticEquipment(), pet = pet)
-                }
-            }
-            else -> {
-                val attached = CosmeticAssetCache.getAttachedCosmetic(previewId) ?: return@remember null
-                val equipment = CosmeticEquipment()
-                equipment.equip(attached)
-                PlayerPreviewSource.Override(equipment)
-            }
-        }
-    }
-
-    return source to loadTick
-}
-
-@Composable
-private fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier: Modifier) {
-    val label = when {
-        owned -> "OWNED"
-        isNewItem(createdAt) -> "NEW"
-        else -> return
-    }
-    Box(
-        modifier = modifier.align(Alignment.TopStart)
-            .clip(ppShape(4.dp))
-            .background(if (owned) Color(0xFF239A60) else Accent)
-            .padding(horizontal = 7.dp, vertical = 2.dp),
-    ) {
-        SocialText(label, color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-private fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
-    isCape -> CosmeticAssetCache.isCapeLoaded(id)
-    isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
-    else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
-}
-
-private fun isNewItem(createdAt: String): Boolean {
-    if (createdAt.isBlank()) return false
-    return runCatching {
-        val created = OffsetDateTime.parse(createdAt).toInstant()
-        created.isAfter(Instant.now().minus(Duration.ofDays(7)))
-    }.getOrDefault(false)
-}
-
-private const val STORE_PAGE_SIZE = CosmeticStore.MAX_PAGE_SIZE
-
-private const val STORE_PREFETCH_DISTANCE = 6
-
-@Composable
-private fun StoreScreen(
-    cart: List<CartEntry>,
-    showCart: Boolean,
-    status: String?,
-    ownedIds: Set<Int>,
-    onRemoveFromCart: (String) -> Unit,
-    onBackToBrowse: () -> Unit,
-    onCheckout: () -> Unit,
-    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
-    onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
-) {
-    val variantPicks = remember { mutableStateMapOf<Int, Int>() }
-    var query by remember { mutableStateOf("") }
-    var submitted by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(CosmeticType.Cape) }
-    var nextPage by remember { mutableIntStateOf(1) }
-    var results by remember { mutableStateOf<List<CosmeticStoreInfo>>(emptyList()) }
-    var hasMore by remember { mutableStateOf(true) }
-    var loading by remember { mutableStateOf(true) }
-    var loadError by remember { mutableStateOf<String?>(null) }
-    var selectedId by remember { mutableStateOf<Int?>(null) }
-    var stockedTypes by remember {
-        mutableStateOf(CosmeticType.entries.filter { it != CosmeticType.Unknown })
-    }
-    val gridState = rememberLazyGridState()
-
-    LaunchedEffect(Unit) {
-        stockedTypes = CosmeticStore.stockedTypes()
-    }
-
-    LaunchedEffect(submitted, selectedType, nextPage) {
-        loading = true
-        loadError = null
-        CosmeticStore.search(
-            page = nextPage,
-            perPage = STORE_PAGE_SIZE,
-            text = submitted.ifBlank { null },
-            types = listOf(selectedType.serializedName),
-        )
-            .onSuccess { resp ->
-                results = if (nextPage == 1) resp.results else results + resp.results
-                hasMore = nextPage < resp.pagination.totalPages
-            }
-            .onFailure {
-                loadError = "Couldn't load store: ${it.message}"
-                hasMore = false
-            }
-        loading = false
-    }
-
-    val items = remember(results, ownedIds) {
-        results.sortedBy { if (it.fullyOwned(ownedIds)) 1 else 0 }
-    }
-
-    val nearEnd by remember {
-        derivedStateOf {
-            val info = gridState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
-            last.index >= info.totalItemsCount - STORE_PREFETCH_DISTANCE
-        }
-    }
-    LaunchedEffect(nearEnd, hasMore, loading) {
-        if (nearEnd && hasMore && !loading) nextPage++
-    }
-
-    LaunchedEffect(items) {
-        if (selectedId == null || items.none { it.id == selectedId }) {
-            selectedId = items.firstOrNull()?.id
-        }
-    }
-
-    val cartKeys = cart.map { it.key }.toSet()
-    val selected = items.firstOrNull { it.id == selectedId }
-
-    fun reset() {
-        results = emptyList()
-        hasMore = true
-        nextPage = 1
-    }
-
-    fun submit() {
-        submitted = query.trim()
-        reset()
-    }
-
-    LaunchedEffect(stockedTypes) {
-        if (stockedTypes.isNotEmpty() && selectedType !in stockedTypes) {
-            selectedType = stockedTypes.first()
-            reset()
-        }
-    }
-
-    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(19.dp)) {
-        CategoryRail(
-            selected = selectedType,
-            onSelect = {
-                if (it != selectedType) {
-                    selectedType = it
-                    reset()
-                }
-            },
-            types = stockedTypes,
-        )
-        Column(modifier = Modifier.width(596.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            StoreSearchBar(query = query, onQueryChange = { query = it }, onSubmit = { submit() })
-            when {
-                loading && items.isEmpty() -> CenteredNote("Loading cosmetics...")
-                loadError != null && items.isEmpty() -> CenteredNote(loadError!!)
-                items.isEmpty() -> CenteredNote(
-                    if (submitted.isBlank()) {
-                        "No ${selectedType.displayName.lowercase()} cosmetics available yet."
                     } else {
-                        "No cosmetics match \"$submitted\"."
-                    },
-                )
-                else -> StoreGrid(
-                    items = items,
-                    cartKeys = cartKeys,
-                    ownedIds = ownedIds,
-                    variantPicks = variantPicks,
-                    state = gridState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onSelect = { selectedId = it.id },
-                    onAddToCart = onAddToCart,
-                )
-            }
-        }
-
-        val selectedVariant = selected?.let { selectedStoreVariant(it, variantPicks, ownedIds) }
-        Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (showCart) {
-                SmallButton("Back to store", iconPath = "left-arrow", primary = false, onClick = onBackToBrowse)
-                CartPanel(
-                    items = cart,
-                    status = status,
-                    modifier = Modifier.fillMaxSize(),
-                    onRemove = onRemoveFromCart,
-                    onCheckout = onCheckout,
-                )
-            } else {
-                StoreDetailPanel(
-                    info = selected,
-                    variant = selectedVariant,
-                    status = status,
-                    ownedIds = ownedIds,
-                    inCart = selectedVariant?.let { cosmeticCartKey(it.id) in cartKeys } ?: false,
-                    onSelectVariant = { variantId -> selected?.let { variantPicks[it.id] = variantId } },
-                    onAddToCart = onAddToCart,
-                    onBuyNow = onBuyNow,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StoreSearchBar(query: String, onQueryChange: (String) -> Unit, onSubmit: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(33.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            singleLine = true,
-            textStyle = TextStyle(
-                color = LocalTheme.current.textColor,
-                fontSize = 13.sp,
-                fontFamily = LocalTheme.current.typography.family,
-            ),
-            cursorBrush = SolidColor(LocalTheme.current.textColor),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-            modifier = Modifier.weight(1f).fillMaxHeight()
-                .clip(ppShape(7.dp))
-                .background(LocalTheme.current.chipBackground)
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(7.dp))
-                .padding(horizontal = 12.dp)
-                .trackTextInputFocus(),
-            decorationBox = { inner ->
-                Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) {
-                        if (query.isEmpty()) {
-                            SocialText("Search cosmetics...", color = LocalTheme.current.textColorSecondary, fontSize = 13.sp)
-                        }
-                        inner()
-                    }
-                }
-            },
-        )
-        SmallButton("Search", iconPath = "assets/polyplus/ico/search.svg", primary = true, onClick = onSubmit)
-    }
-}
-
-@Composable
-private fun StoreGrid(
-    items: List<CosmeticStoreInfo>,
-    cartKeys: Set<String>,
-    ownedIds: Set<Int>,
-    variantPicks: Map<Int, Int>,
-    state: LazyGridState,
-    modifier: Modifier,
-    onSelect: (CosmeticStoreInfo) -> Unit,
-    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        state = state,
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(19.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        items(items, key = { it.id }) { info ->
-            val variant = selectedStoreVariant(info, variantPicks, ownedIds)
-            StoreCard(
-                info = info,
-                variant = variant,
-                owned = info.fullyOwned(ownedIds),
-                variantOwned = variant.id in ownedIds,
-                inCart = cosmeticCartKey(variant.id) in cartKeys,
-                onSelect = { onSelect(info) },
-                onAddToCart = { onAddToCart(info, variant) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun StoreCard(
-    info: CosmeticStoreInfo,
-    variant: CosmeticVariantUi,
-    owned: Boolean,
-    variantOwned: Boolean,
-    inCart: Boolean,
-    onSelect: () -> Unit,
-    onAddToCart: () -> Unit,
-) {
-    val variantCount = info.uiVariants().size
-    val border = when {
-        inCart -> Accent
-        owned -> LocalTheme.current.borderColor
-        info.discounted -> Color(0xFF239A60)
-        else -> LocalTheme.current.borderColor
-    }
-    val buttonColor = if (inCart) Accent else Color(0xB3232D32)
-
-    Box(
-        modifier = Modifier.size(180.dp, 258.dp)
-            .alpha(if (owned) 0.6f else 1f)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, border, ppShape(12.dp))
-            .clickable(onClick = onSelect),
-    ) {
-        val (source, loadTick) = rememberCosmeticPreviewSource(variant.id, info.type)
-        CosmeticThumbnail(
-            source = source,
-            type = info.type,
-            previewKey = "store-${variant.id}-$loadTick",
-            modifier = Modifier.offset(17.dp, 17.dp).size(144.dp),
-        )
-        CardLabel(info.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.offset(17.dp, 169.dp).width(146.dp))
-        Row(modifier = Modifier.offset(17.dp, 193.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PriceLabel(info)
-            if (variantCount > 1) {
-                SocialText("$variantCount variants", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
-            }
-        }
-
-        OwnershipBadge(owned, info.createdAt, Modifier.offset(x = 8.dp, y = 8.dp))
-
-        if (info.discounted && !owned) {
-            Box(
-                modifier = Modifier.align(Alignment.TopEnd).size(66.dp, 21.dp)
-                    .background(Color(0xFF239A60), ppShapeOf(bottomStart = 4.dp, topEnd = 12.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                SocialText("${info.discountRate}% OFF", color = LocalTheme.current.accentTextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-
-        Row(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
-                .background(buttonColor)
-                .clickable(onClick = if (inCart || variantOwned) onSelect else onAddToCart),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val label = when {
-                variantOwned && owned -> "Owned"
-                variantOwned -> "Owned - see variants"
-                inCart -> "In cart"
-                else -> "Add to cart"
-            }
-            SocialText(label, color = LocalTheme.current.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun StoreDetailPanel(
-    info: CosmeticStoreInfo?,
-    variant: CosmeticVariantUi?,
-    status: String?,
-    ownedIds: Set<Int>,
-    inCart: Boolean,
-    onSelectVariant: (Int) -> Unit,
-    onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
-    onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
-    modifier: Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(330.dp)
-                .clip(ppShape(12.dp))
-                .background(cardBrush())
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
-        ) {
-            if (info == null || variant == null) {
-                CenteredNote("Select a cosmetic to preview it.")
-            } else {
-                val (source, _) = rememberCosmeticPreviewSource(variant.id, info.type)
-                val fades = info.type != CosmeticType.Boots
-                PlayerPreview(
-                    Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-                    source = source ?: PlayerPreviewSource.LocalLive,
-                    autoSpin = false,
-                    bottomFadeFraction = if (fades) STORE_PREVIEW_FADE_FRACTION else 0f,
-                    verticalAnchor = when (info.type) {
-                        CosmeticType.Hat -> 0.70f
-                        CosmeticType.Boots -> 0.44f
-                        else -> 0.56f
-                    },
-                    initialYaw = FRONT_YAW_DEG,
-                    previewKey = "store-detail-${variant.id}",
-                    live = true,
-                )
-                OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
-            }
-        }
-
-        Box(
-            modifier = Modifier.weight(1f).fillMaxWidth()
-                .clip(ppShape(12.dp))
-                .background(cardBrush())
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
-        ) {
-            if (info == null || variant == null) {
-                CenteredNote("Browse the store to buy individual cosmetics.")
-            } else {
-                val variants = info.uiVariants()
-                Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(
-                        modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        SocialText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        SocialText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
-                        if (variants.size > 1) {
-                            VariantPicker(
-                                variants = variants,
-                                selectedVariantId = variant.id,
-                                onSelect = onSelectVariant,
-                                ownedVariantIds = ownedIds,
-                            )
-                        }
-                        if (info.tags.all.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                for (tag in info.tags.all.take(4)) {
-                                    Box(
-                                        modifier = Modifier.clip(ppShape(5.dp))
-                                            .background(LocalTheme.current.chipBackground)
-                                            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                                    ) {
-                                        SocialText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
-                                    }
-                                }
-                            }
-                        }
-                        info.description?.takeIf { it.isNotBlank() }?.let {
-                            SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                        }
-                    }
-                    if (status != null) {
-                        SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
-                    }
-                    if (variant.id in ownedIds) {
-                        SocialText(
-                            "You already own this cosmetic.",
-                            color = LocalTheme.current.textColorSecondary,
-                            fontSize = 12.sp,
-                        )
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallButton(
-                                label = if (inCart) "In cart" else "Add to cart",
-                                iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
-                                primary = false,
-                                onClick = { if (!inCart) onAddToCart(info, variant) },
-                            )
-                            SmallButton(
-                                label = "Buy now",
-                                iconPath = "assets/polyplus/ico/shopping-bag.svg",
-                                primary = true,
-                                onClick = { onBuyNow(info, variant) },
-                            )
-                        }
+                        ClientPlatform.runOnMain { checkout(listOf(priceId), claimed = true) }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
-    val cover = rememberCoverImage(coverAssetId)
-    Box(modifier) {
-        CheckerThumbnail(Modifier.fillMaxSize())
-        if (cover != null) {
-            Image(
-                bitmap = cover,
-                contentDescription = null,
-                filterQuality = FilterQuality.None,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().clip(ppShape(5.dp)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun CheckerThumbnail(modifier: Modifier) {
-    Checkerboard(
-        modifier = modifier.clip(ppShape(5.dp))
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)),
-        cell = 9.dp,
+        },
+        onBuyBundle = { bundle ->
+            val priceId = bundle.storeProductId
+            if (priceId.isNullOrBlank()) status = "${bundle.name} isn't purchasable yet." else checkout(listOf(priceId))
+        },
+        onRemoveFromCart = { key -> cart.removeAll { it.key == key } },
+        onCheckout = { checkout(cart.mapNotNull { it.storeProductId }) },
     )
-}
-
-@Composable
-private fun CosmeticsLoadingScreen(
-    state: CosmeticLoadProgress.Snapshot,
-    onRetry: () -> Unit,
-) {
-    val failed = state.failure != null
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-    ) {
-        SocialText(
-            if (failed) "Couldn't load cosmetics" else "Loading cosmetics",
-            color = LocalTheme.current.textColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        SocialText(
-            if (failed) {
-                "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
-            } else {
-                state.label
-            },
-            color = LocalTheme.current.textColorSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(360.dp),
-            textAlign = TextAlign.Center,
-        )
-        if (failed) {
-            Spacer(Modifier.height(2.dp))
-            SmallButton("Retry", iconPath = "refresh", primary = true, onClick = onRetry)
-        } else {
-            ProgressBar(state.fraction, Modifier.width(360.dp))
-        }
-    }
-}
-
-private const val SWEEP_WIDTH_FRACTION = 0.35f
-
-@Composable
-private fun ProgressBar(fraction: Float?, modifier: Modifier) {
-    val track = LocalTheme.current.chipBackground
-    val shape = ppShape(4.dp)
-    Box(
-        modifier
-            .height(8.dp)
-            .clip(shape)
-            .background(track)
-            .border(1.dp, LocalTheme.current.borderColor, shape),
-    ) {
-        if (fraction != null) {
-            val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), animationSpec = tween(220))
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(animated)
-                    .clip(shape)
-                    .background(Accent),
-            )
-        } else {
-            val transition = rememberInfiniteTransition(label = "cosmeticsLoadingSweep")
-            val head by transition.animateFloat(
-                initialValue = -SWEEP_WIDTH_FRACTION,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1_100, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-                label = "cosmeticsLoadingSweepHead",
-            )
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val width = maxWidth
-                Box(
-                    Modifier
-                        .offset(x = width * head)
-                        .fillMaxHeight()
-                        .width(width * SWEEP_WIDTH_FRACTION)
-                        .clip(shape)
-                        .background(Accent),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnlineFeaturesDisabled() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-    ) {
-        SocialText(
-            "Cosmetics are unavailable",
-            color = LocalTheme.current.textColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        SocialText(
-            "The Terms of Service and Privacy Policy were declined, so PolyPlus does not contact its " +
-                "servers. Accept them under Privacy in the PolyPlus settings to use cosmetics.",
-            color = LocalTheme.current.textColorSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.width(420.dp),
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun CardLabel(
-    text: String,
-    color: Color,
-    fontSize: TextUnit,
-    modifier: Modifier = Modifier,
-    fontWeight: FontWeight = FontWeight.Normal,
-) {
-    var truncated by remember(text) { mutableStateOf(false) }
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-
-    Box(modifier.hoverable(interaction)) {
-        SocialText(
-            text,
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            maxLines = 1,
-            softWrap = true,
-            overflow = TextOverflow.Ellipsis,
-            onTextLayout = { truncated = it.hasVisualOverflow },
-        )
-        if (truncated && hovered) {
-            TooltipPopup(text)
-        }
-    }
-}
-
-@Composable
-private fun TooltipPopup(text: String) {
-    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
-    val positionProvider = remember(gap) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                val above = anchorBounds.top - gap - popupContentSize.height
-                val y = if (above >= 0) above else anchorBounds.bottom + gap
-                return IntOffset(x, y)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        Box(
-            modifier = Modifier.widthIn(max = 240.dp)
-                .clip(ppShape(6.dp))
-                .background(LocalTheme.current.popupBackground)
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 5.dp),
-        ) {
-            SocialText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
-        }
-    }
-}
-
-@Composable
-private fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
-    remember(refreshKey) {
-        val ownedIds = CosmeticCatalog.ownedIds()
-        val equippedIds = CosmeticCatalog.localEquipped().equipped.values.toSet()
-        val selectedEmote = CosmeticCatalog.selectedEmoteId()
-
-        val groupItems = CosmeticCatalog.cosmeticGroupViews()
-            .sortedWith(compareBy<CosmeticGroupView> { it.type.ordinal }.thenBy { it.groupId })
-            .map { group ->
-                val byLabel = LinkedHashMap<String, CosmeticVariantUi>()
-                for (variant in group.variants) {
-                    byLabel.getOrPut(variant.variantName) {
-                        CosmeticVariantUi(variant.id, variant.variantName)
-                    }
-                }
-                val equippedVariantId = group.variants.firstOrNull { it.id in equippedIds }?.id
-                CosmeticUiItem(
-                    groupId = group.groupId,
-                    type = group.type,
-                    name = group.name,
-                    collection = "${group.type.displayName} Collection",
-                    owned = group.variants.any { it.id in ownedIds },
-                    equipped = equippedVariantId != null,
-                    variants = byLabel.values.toList(),
-                    equippedVariantId = equippedVariantId,
-                )
-            }
-
-        val emoteItems = CosmeticCatalog.allEmoteDefinitions()
-            .sortedBy { it.id }
-            .map { emote ->
-                CosmeticUiItem(
-                    groupId = emote.id,
-                    type = CosmeticType.Emote,
-                    name = emote.name,
-                    collection = "${CosmeticType.Emote.displayName} Collection",
-                    owned = emote.id in ownedIds,
-                    equipped = selectedEmote == emote.id,
-                    variants = listOf(CosmeticVariantUi(emote.id, emote.name)),
-                    equippedVariantId = if (selectedEmote == emote.id) emote.id else null,
-                )
-            }
-
-        groupItems + emoteItems
-    }
-
-private fun selectedVariantId(item: CosmeticUiItem, picks: Map<Int, Int>): Int? =
-    picks[item.groupId] ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
-
-private fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) -> Unit) {
-    if (!item.owned) {
-        onComplete("${item.name} is not in your locker.")
-        return
-    }
-
-    PolyPlusClient.SCOPE.launch {
-        val result = if (item.type == CosmeticType.Emote) {
-            CosmeticService.equipEmote(variantId)
-        } else {
-            CosmeticService.equip(variantId)
-        }
-        ClientPlatform.runOnMain {
-            onComplete(
-                result.fold(
-                    onSuccess = { "Equipped ${item.name}." },
-                    onFailure = { "Failed to equip ${item.name}: ${it.message}" },
-                ),
-            )
-        }
-    }
-}
-
-private fun unequip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
-    PolyPlusClient.SCOPE.launch {
-        val result = if (item.type == CosmeticType.Emote) {
-            CosmeticService.clearEmote()
-        } else {
-            val slot = CosmeticCatalog.localEquipped().equipped.entries
-                .firstOrNull { it.value == item.equippedVariantId }?.key
-            if (slot == null) {
-                Result.failure(IllegalStateException("${item.name} is not equipped"))
-            } else {
-                CosmeticService.clearSlot(slot)
-            }
-        }
-        ClientPlatform.runOnMain {
-            onComplete(
-                result.fold(
-                    onSuccess = { "Unequipped ${item.name}." },
-                    onFailure = { "Failed to unequip ${item.name}: ${it.message}" },
-                ),
-            )
-        }
-    }
-}
-
-private fun cardBrush(): Brush =
-    Brush.verticalGradient(
-        listOf(
-            Color(0x59232D32),
-            Color(0xB3232D32),
-        ),
-    )
-
-private fun money(amount: Float, currency: String? = null): String {
-    val formatted = String.format("%.2f", amount)
-    return if (currency == null || currency.equals("usd", ignoreCase = true)) "$$formatted" else "$formatted ${currency.uppercase()}"
 }

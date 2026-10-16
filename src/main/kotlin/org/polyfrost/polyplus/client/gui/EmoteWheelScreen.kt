@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
@@ -49,6 +51,8 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.emotes.EmoteWheels
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 import kotlinx.coroutines.isActive
@@ -71,6 +75,9 @@ private const val RING_STROKE_W = 1f
 
 private const val SLOT_COUNT = 8
 private const val SECTOR_DEG = 360f / SLOT_COUNT
+
+private const val SCROLL_NOTCH = 8f
+private const val MAC_SCROLL_NOTCH = 2f
 
 private val PopInEasing = CubicBezierEasing(0.0f, 0.55f, 0.45f, 1.0f)
 
@@ -134,14 +141,12 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
-    val slots = remember {
-        val ownedIds = CosmeticCatalog.ownedEmoteIds()
-        val owned = CosmeticCatalog.allEmoteDefinitions()
-            .filter { it.id in ownedIds }
-            .sortedBy { it.id }
-            .take(SLOT_COUNT)
-            .map { WheelSlot(it.id, it.name) }
-        List(SLOT_COUNT) { index -> owned.getOrNull(index) }
+    val wheelIndex = EmoteWheels.activeIndex
+    val wheelCount = EmoteWheels.wheelCount
+    val slots = remember(wheelIndex, wheelCount) {
+        EmoteWheels.slots(wheelIndex).map { id ->
+            id?.let { emoteId -> CosmeticCatalog.getEmoteDefinition(emoteId)?.let { WheelSlot(it.id, it.name) } }
+        }
     }
 
     var mouseXRoot by remember { mutableFloatStateOf(0f) }
@@ -166,7 +171,7 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
             val dy = mouseYRoot - cy
             val dist = sqrt(dx * dx + dy * dy)
             if (dist in innerRadiusPx * popIn.value..wheelRadiusPx * popIn.value) {
-                val angle = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f + 360f) % 360f
+                val angle = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f + SECTOR_DEG / 2f + 360f) % 360f
                 (angle / SECTOR_DEG).toInt().coerceIn(0, SLOT_COUNT - 1)
             } else {
                 -1
@@ -174,15 +179,17 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
         }
     }
 
+    val currentSlots by rememberUpdatedState(slots)
     LaunchedEffect(Unit) {
         while (isActive) {
             withFrameNanos {}
             if (!EmoteWheelKeybind.isHeld()) {
-                onRelease(slots.getOrNull(hoveredSlot)?.id)
+                onRelease(currentSlots.getOrNull(hoveredSlot)?.id)
                 break
             }
         }
     }
+    val scrollAccum = remember { FloatArray(1) }
 
     Box(
         modifier = Modifier
@@ -192,6 +199,16 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
                 val pos = event.changes.firstOrNull()?.position ?: return@onPointerEvent
                 mouseXRoot = pos.x + rootPos.x
                 mouseYRoot = pos.y + rootPos.y
+            }
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
+                val notch = if (DesktopHelper.isMac) MAC_SCROLL_NOTCH else SCROLL_NOTCH
+                scrollAccum[0] += delta
+                while (abs(scrollAccum[0]) >= notch) {
+                    val step = if (scrollAccum[0] > 0f) 1 else -1
+                    EmoteWheels.cycle(step)
+                    scrollAccum[0] -= step * notch
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -204,6 +221,17 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
             )
 
             val hoveredName = slots.getOrNull(hoveredSlot)?.name
+            if (hoveredName == null && wheelCount > 1) {
+                BasicText(
+                    text = "Wheel ${wheelIndex + 1} of $wheelCount",
+                    style = TextStyle(
+                        color = LocalTheme.current.textColorSecondary,
+                        fontSize = 12.sp,
+                        fontFamily = LocalTheme.current.typography.family,
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+            }
             if (hoveredName != null) {
                 Box(
                     modifier = Modifier.widthIn(max = INNER_DIAMETER - 48.dp),
@@ -258,7 +286,7 @@ private fun WheelCanvas(
             val center = Offset(cx, cy)
 
             for (i in 0 until SLOT_COUNT) {
-                val startDeg = -90f + i * SECTOR_DEG
+                val startDeg = -90f - SECTOR_DEG / 2f + i * SECTOR_DEG
                 val hasEmote = slots.getOrNull(i) != null
                 val isHovered = i == hoveredSlot && hasEmote
 

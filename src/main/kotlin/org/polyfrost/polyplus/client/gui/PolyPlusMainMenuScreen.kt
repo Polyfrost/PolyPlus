@@ -898,9 +898,9 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
                 badge = groups.any { it.unread },
             )
         }
-        if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics) {
             PillButton(
-                "Cosmetics",
+                "Wardrobe",
                 ASSETS + "diamond-01.svg",
                 Modifier.fillMaxWidth(),
                 onClick = { PolyPlusOneConfigIntegration.openCosmetics() },

@@ -34,7 +34,9 @@ import org.polyfrost.polyplus.events.WebSocketMessage
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object CosmeticSync {
@@ -53,6 +55,9 @@ object CosmeticSync {
 
     @Volatile
     private var capWarned = false
+
+    private const val LOCAL_RESYNC_DELAY_MS = 500L
+    private val localResyncPending = AtomicBoolean(false)
 
     //? if >= 1.21.1 || = 1.8.9 {
     private const val RECONCILE_INTERVAL_TICKS = 20
@@ -299,6 +304,17 @@ object CosmeticSync {
         val uuid = UUID.fromString(packet.player)
         CosmeticCatalog.applyRemoteEquippedSlot(uuid, packet.slot, packet.cosmeticId)
         applyActiveToPlayer(uuid, packet.cosmeticId?.let(::listOf).orEmpty())
+        if (uuid == ClientPlatform.localPlayerUuid() &&
+            packet.slot != BodySlot.Unknown &&
+            CosmeticCatalog.localEquipped().equipped[packet.slot] != packet.cosmeticId &&
+            localResyncPending.compareAndSet(false, true)
+        ) {
+            PolyPlusClient.SCOPE.launch {
+                delay(LOCAL_RESYNC_DELAY_MS)
+                localResyncPending.set(false)
+                CosmeticService.syncLocalActive()
+            }
+        }
     }
 
     private fun handleParticleColorChanged(packet: ClientboundPacket.PlayerParticleColorChanged) {

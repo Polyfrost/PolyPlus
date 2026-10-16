@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosmetics
@@ -26,6 +27,7 @@ object CosmeticService {
             }
         }
         PolyConnection.sendPacket(ServerboundPacket.SetParticleColor(color)).getOrThrow()
+        OutfitLibrary.onParticleColorChanged(color)
     }
 
     suspend fun clearEmote(): Result<Unit> = runCatching {

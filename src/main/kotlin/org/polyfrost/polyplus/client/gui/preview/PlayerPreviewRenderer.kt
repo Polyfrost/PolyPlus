@@ -15,6 +15,7 @@ import org.jetbrains.skia.ImageInfo
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.rotateBy
@@ -579,7 +580,8 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
-        state.showCape = source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null
+        state.showCape = (source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null) &&
+            !hidesCape(source)
         capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
         state.bodyRot = yawDeg
         state.yRot = 0f
@@ -617,6 +619,7 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(state) == null) return
         state.id = PREVIEW_ENTITY_ID
         if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
+        if (hidesCape(source)) state.showCape = false
         state.bodyRot = yawDeg
         state.boundingBoxWidth = PLAYER_BB_WIDTH
         state.boundingBoxHeight = PLAYER_BB_HEIGHT
@@ -914,11 +917,17 @@ object PlayerPreviewRenderer {
         is PlayerPreviewSource.Override ->
             source.capeCosmeticId?.let {
                 org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
-            }
+            } ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
             org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
                 org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
-            }
+            } ?: MojangCapeService.localCapeTexture()
+    }
+
+    private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
+        is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
+        PlayerPreviewSource.LocalLive ->
+            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden()
     }
 
     //? if >= 1.21.10 {
@@ -968,6 +977,9 @@ object PlayerPreviewRenderer {
         override fun getPlayerInfo(): PlayerInfo? = null
         override fun isModelPartShown(part: PlayerModelPart): Boolean = true
     }
+
+    private fun withoutCape(skin: PlayerSkin): PlayerSkin =
+        PlayerSkin(skin.texture(), skin.textureUrl(), null, skin.elytraTexture(), skin.model(), skin.secure())
 
     private object PreviewWorld {
         var cached: ClientLevel? = null
@@ -1161,6 +1173,7 @@ object PlayerPreviewRenderer {
         }
         equipmentByEntityId[LEGACY_PREVIEW_ENTITY_ID] = equipment
         val state = legacyState(skin, yawDeg)
+        if (hidesCape(source)) state.showCape = false
         val renderer = legacyPlayerRenderer(mc, skin) ?: return false
         //?}
         //? if < 1.21.4 {
@@ -1170,7 +1183,7 @@ object PlayerPreviewRenderer {
         val player = legacyDummy(mc, level) ?: return false
         val cape = capeOverride(source)
             ?: CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
-        player.skinOverride = cape?.let { withCape(skin, it) } ?: skin
+        player.skinOverride = if (hidesCape(source)) withoutCape(skin) else cape?.let { withCape(skin, it) } ?: skin
         bindLegacyEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = yawDeg; player.yBodyRotO = yawDeg
@@ -1339,6 +1352,7 @@ import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderer
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
@@ -1623,10 +1637,11 @@ object PlayerPreviewRenderer {
     private fun capeFor(mc: Minecraft, source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override ->
             if (source.equipment.get(BodySlot.Backpack) != null) null
-            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource)
+            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
-                ?: mc.player?.capeTextureLocation
+                ?: MojangCapeService.localCapeTexture()
+                ?: if (MojangCapeService.localCapeHidden()) null else mc.player?.capeTextureLocation
     }
 
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
@@ -1674,7 +1689,8 @@ object PlayerPreviewRenderer {
                 if (type == MinecraftProfileTexture.Type.SKIN) fetchedSkin = location to (texture.getMetadata("model") == "slim")
             }, false)
         }
-        return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
+        val id = ClientPlatform.localPlayerUuid()
+        return DefaultSkinUtils.getDefaultSkin(id) to (DefaultSkinUtils.getDefaultModelType(id) == "slim")
     }
 
     private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {
