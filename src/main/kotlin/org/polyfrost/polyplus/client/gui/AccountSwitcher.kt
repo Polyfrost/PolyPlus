@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +25,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,112 +40,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.shell.ShellState.playerName
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
-import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
-import org.polyfrost.polyplus.client.social.FriendsRepository
-import org.polyfrost.polyplus.client.social.GroupsRepository
-import org.polyfrost.polyplus.client.social.PlayerNamesRepository
-import org.polyfrost.polyplus.client.social.SessionsRepository
-import org.polyfrost.polyplus.client.social.SocialOverlay
-import org.polyfrost.polyplus.client.social.SpecialChatRepository
-import org.polyfrost.polyplus.client.social.SpecialChatResponses
-import java.time.LocalTime
-import javax.swing.GroupLayout
-//? if = 1.8.9
-//import org.polyfrost.polyplus.client.social.singleplayerServer
+import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 
 @Composable
 fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
-    var tab by remember { mutableStateOf(SocialTab.Chat) }
-    var selectedGroupId by remember { mutableStateOf<Int?>(null) }
-    var showAddFriend by remember { mutableStateOf(false) }
-    var hostFlow by remember { mutableStateOf<HostFlowStep?>(null) }
-    var hostingCurrentWorld by remember { mutableStateOf(false) }
-    var inviteToGroupId by remember { mutableStateOf<Int?>(null) }
-    var showInviteToSession by remember { mutableStateOf(false) }
-    var showCreateGroup by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var unreadOnly by remember { mutableStateOf(false) }
-    var specialFilter by remember { mutableStateOf(SpecialChatResponses.Filter.All) }
-    val mutedGroups = remember { mutableStateOf(setOf<Int>()) }
-    val renameOverrides = remember { mutableStateOf(mapOf<Int, String>()) }
+    val actions = rememberAccountActions()
+    var offlineEntry by remember { mutableStateOf(false) }
+    // list() is in add order, newest last
+    val accounts = actions.accounts
+    val idle = actions.idle
 
-    val selfId = remember { runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("") }
-    val groups by GroupsRepository.groups.collectAsState()
-    val friends by FriendsRepository.friends.collectAsState()
-    val incomingRequests by FriendsRepository.incomingRequests.collectAsState()
-    val outgoingRequests by FriendsRepository.outgoingRequests.collectAsState()
-    val incomingInvites by SessionsRepository.incomingInvites.collectAsState()
-    val names by PlayerNamesRepository.names.collectAsState()
-    val hostedSessionId by P2PSessionManager.currentSessionIdFlow.collectAsState()
-    val isSpecialChatTarget = SpecialChatRepository.status.collectAsState().value?.isSpecialChatTarget == true
-    val respondedChats by SpecialChatResponses.responded.collectAsState()
-    val scanningResponses by SpecialChatResponses.scanning.collectAsState()
-
-    val visibleGroups =
-        remember(groups, searchQuery, unreadOnly, specialFilter, respondedChats, selectedGroupId, names) {
-            groups.filter { group ->
-                (!unreadOnly || group.unread || group.id == selectedGroupId) &&
-                        (
-                                !group.special || specialFilter == SpecialChatResponses.Filter.All ||
-                                        (group.id in respondedChats) == (specialFilter == SpecialChatResponses.Filter.Responded)
-                                ) &&
-                        (searchQuery.isBlank() || conversationTitle(group, selfId) { names[it] ?: it.take(8) }.contains(
-                            searchQuery,
-                            ignoreCase = true
-                        ))
-            }
-        }
-
-    LaunchedEffect(specialFilter, groups) {
-        if (specialFilter != SpecialChatResponses.Filter.All) SpecialChatResponses.refresh(groups, selfId)
-    }
-
-    LaunchedEffect(Unit) {
-        if (SocialOverlay.consumeAutoHostCurrentWorld()) {
-            hostingCurrentWorld = true
-            hostFlow = HostFlowStep.SelectWorld
-        }
-    }
-
-    fun openConversation(groupId: Int) {
-        selectedGroupId = groupId
-        val special = groups.firstOrNull { it.id == groupId }?.special == true
-        tab = if (isSpecialChatTarget && special) SocialTab.Special else SocialTab.Chat
-        GroupsRepository.loadMessages(groupId)
-    }
-
-    var friendBaseline by remember { mutableStateOf<Set<String>?>(null) }
-    LaunchedEffect(friends) {
-        val currentIds = friends.map { it.player }.toSet()
-        val previous = friendBaseline
-        if (previous != null) {
-            val added = currentIds - previous
-            added.firstOrNull()?.let { newFriend ->
-                GroupsRepository.openDirectMessage(newFriend) { result -> result.onSuccess { openConversation(it.id) } }
-            }
-        }
-        friendBaseline = currentIds
-    }
+    LaunchedEffect(Unit) { actions.reload() }
 
     CompositionLocalProvider(LocalDensity provides scaledDensity(SOCIAL_UI_SCALE)) {
         Box(
@@ -147,7 +72,7 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                 .background(SocialWindowScrim)
                 .clickable(
                     indication = null,
-                    interactionSource = remember { MutableInteractionSource() }) { onClose() },
+                    interactionSource = remember { MutableInteractionSource() }) { if (idle) onClose() },
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -162,8 +87,6 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                     .border(SocialBorderWidth, SocialBorderColor, SocialWindowShape)
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
             ) {
-
-
                 Row(
                     modifier = Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -175,85 +98,217 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
                 Row(Modifier.fillMaxWidth().weight(1f)) {
-                    PlayerPreview(
-                        Modifier.width(320.dp).fillMaxHeight(),
-                        source = PlayerPreviewSource.LocalLive,
-                        initialYaw = 180f + 22.9f,
-                        live = true,
-                        modelScale = 0.35F
-                    )
+                    // the live preview reads the session user, so rebuild it when the active account changes
+                    key(accounts?.firstOrNull { it.active }?.id) {
+                        PlayerPreview(
+                            Modifier.width(320.dp).fillMaxHeight(),
+                            source = PlayerPreviewSource.LocalLive,
+                            initialYaw = 180f + 22.9f,
+                            live = true,
+                            modelScale = 0.35F
+                        )
+                    }
                     Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
-                        Column(verticalArrangement = Arrangement.Top) {
-                            Row(Modifier.padding(24.dp)) {
-                                AccountButton(
-                                    enabled = true,
-                                    onClick = onClose
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            when {
+                                accounts == null -> SocialText(
+                                    "Loading…",
+                                    fontSize = 14.sp,
+                                    color = SocialTextSecondary
                                 )
-                            }
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                            ) {
-                                AddAccountButton(
-                                    icon = ASSETS + "globe-01.svg",
-                                    text = "Add Microsoft account",
-                                    enabled = true,
-                                    onClick = onClose,
+
+                                accounts.isEmpty() -> SocialText(
+                                    "No accounts found in the launcher",
+                                    fontSize = 14.sp,
+                                    color = SocialTextSecondary,
                                 )
-                                Spacer(Modifier.padding(12.dp))
-                                AddAccountButton(
-                                    icon = ASSETS + "plus.svg",
-                                    text = "Add offline account",
-                                    enabled = true,
-                                    onClick = onClose,
-                                )
+
+                                else -> accounts.forEach { account ->
+                                    key(account.id) {
+                                        AccountButton(
+                                            account = account,
+                                            enabled = idle,
+                                            onClick = { actions.switchTo(account) },
+                                            onRemove = { actions.remove(account) },
+                                            onRefresh = { actions.refresh(account) },
+                                            refreshing = actions.refreshingId == account.id,
+                                        )
+                                    }
+                                }
                             }
                         }
+                        AccountStatusText(actions.busy, actions.error, actions.errorSteps)
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            AddAccountButton(
+                                icon = ASSETS + "globe-01.svg",
+                                text = "Add Microsoft account",
+                                enabled = idle,
+                                onClick = actions::addMicrosoft,
+                            )
+                            Spacer(Modifier.padding(12.dp))
+                            AddAccountButton(
+                                icon = ASSETS + "plus.svg",
+                                text = "Add offline account",
+                                enabled = idle,
+                                onClick = {
+                                    actions.clearError()
+                                    offlineEntry = true
+                                },
+                            )
+                        }
+
                     }
                 }
             }
+        }
+
+        if (offlineEntry) {
+            OfflineAccountPopup(
+                busy = actions.busy,
+                error = actions.error,
+                onSubmit = { username -> actions.addOffline(username) { offlineEntry = false } },
+                onCancel = {
+                    actions.clearError()
+                    offlineEntry = false
+                },
+            )
+        }
+
+        val session = actions.loginSession
+        if (session != null) {
+            MicrosoftLoginPopup(
+                code = session.userCode,
+                verificationUri = session.verificationUri,
+                browserAuthUrl = session.browserAuthUrl,
+                status = actions.busy,
+                onCancel = actions::cancelLogin,
+            )
         }
     }
 }
 
 @Composable
 fun AccountButton(
+    account: OneLauncherAccounts.Account,
     enabled: Boolean,
     onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onRefresh: () -> Unit,
+    refreshing: Boolean = false,
 ) {
-    val selfId = remember { runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("") }
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    var confirmRemove by remember { mutableStateOf(false) }
+    val clickable = enabled && !account.active && !confirmRemove
+    val borderColor = when {
+        account.expired -> SocialDangerColor
+        account.active -> Accent
+        else -> LocalTheme.current.borderColor
+    }
+
     Row(
         modifier = Modifier
             .clip(ppShape(8.dp))
-            .background(if (hovered && enabled) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
+            .background(if (hovered && clickable) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
-            .alpha(if (enabled) 1f else 0.5f)
+            .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
+            .alpha(if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f)
             .fillMaxWidth()
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
+            .border(1.dp, borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SocialAvatar(selfId, 36.dp)
-        Column(verticalArrangement = Arrangement.SpaceEvenly) {
+        SocialAvatar(account.id.toString(), 36.dp)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceEvenly) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SocialText(
+                    account.username,
+                    fontSize = 20.sp,
+                    color = LocalTheme.current.textColor,
+                    textAlign = TextAlign.Right
+                )
+                if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", Accent)
+                if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
+            }
             SocialText(
-                playerName(),
-                fontSize = 20.sp,
-                color = LocalTheme.current.textColor,
-                textAlign = TextAlign.Right
-            )
-            SocialText(
-                selfId,
+                if (confirmRemove) "Remove this account?"
+                else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
                 fontSize = 13.sp,
-                color = LocalTheme.current.textColorSecondary,
+                color = if (confirmRemove) SocialDangerColor else LocalTheme.current.textColorSecondary,
                 textAlign = TextAlign.Right
             )
         }
+        if (confirmRemove) {
+            AccountActionIcon(ASSETS + "check-circle.svg", SocialDangerColor, enabled) {
+                confirmRemove = false
+                onRemove()
+            }
+            AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
+        } else {
+            if (account.microsoft) {
+                RefreshAccountButton(
+                    color = if (account.expired) SocialDangerColor else SocialTextSecondary,
+                    enabled = enabled,
+                    spinning = refreshing,
+                    onClick = onRefresh,
+                )
+            }
+            AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
+        }
     }
 }
+
+@Composable
+private fun AccountBadge(icon: String, text: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(LocalTheme.current.componentBackground)
+            .border(1.dp, color, RoundedCornerShape(50))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(icon, color, Modifier.size(12.dp))
+        SocialText(text, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
+@Composable
+private fun RefreshAccountButton(color: Color, enabled: Boolean, spinning: Boolean, onClick: () -> Unit) {
+    val rotation = if (spinning) {
+        val transition = rememberInfiniteTransition()
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(REFRESH_SPIN_MS, easing = LinearEasing)),
+        )
+        angle
+    } else 0f
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(ppShape(6.dp))
+            .alpha(if (enabled || spinning) 1f else 0.4f)
+            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(ASSETS + "refresh-cw-01.svg", color, Modifier.size(18.dp).rotate(rotation))
+    }
+}
+
+private const val REFRESH_SPIN_MS = 800
 
 private const val SOCIAL_UI_SCALE = 1.3f

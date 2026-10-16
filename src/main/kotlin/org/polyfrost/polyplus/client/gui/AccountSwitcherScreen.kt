@@ -7,6 +7,7 @@ import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -14,7 +15,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //? if >= 1.21.10 {
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
-import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 //?}
 
 //? if < 26.1 && > 1.8.9 {

@@ -7,24 +7,13 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.gui.AccountSwitcherScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 
+//? if = 1.8.9 {
+/*import org.polyfrost.polyplus.client.social.execute
+import org.polyfrost.polyplus.client.social.setScreen
+*///?}
+
 object AccountSwitcherOverlay {
     private val logger = LogManager.getLogger("polyplus/account-switcher-overlay")
-
-
-    fun toggle() {
-        val mc = Minecraft.getInstance()
-        //? if >= 26.2 {
-        val current = mc.gui.screen()
-        //?} else {
-        /*val current = mc.screen
-        *///?}
-
-        when (current) {
-            is AccountSwitcherScreen -> close()
-            null, is TitleScreen, is PolyPlusMainMenuScreen -> open(current)
-            else -> logger.debug("Ignoring Shift+P: {} is open and isn't safe to interrupt", current.javaClass.simpleName)
-        }
-    }
 
     fun open(from: Screen? = currentScreen()) {
         val mc = Minecraft.getInstance()
