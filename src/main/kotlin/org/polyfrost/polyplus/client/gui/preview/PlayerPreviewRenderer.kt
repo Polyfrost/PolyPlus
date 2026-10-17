@@ -1624,10 +1624,11 @@ object PlayerPreviewRenderer {
     private fun capeFor(mc: Minecraft, source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override ->
             if (source.equipment.get(BodySlot.Backpack) != null) null
-            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource)
+            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: accountCape(mc)
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
                 ?: mc.player?.capeTextureLocation
+                ?: accountCape(mc)
     }
 
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
@@ -1663,6 +1664,8 @@ object PlayerPreviewRenderer {
 
     @Volatile
     private var fetchedSkin: Pair<Identifier, Boolean>? = null
+    @Volatile
+    private var fetchedCape: Identifier? = null
     private var skinRequestedFor: UUID? = null
 
     private fun localSkin(mc: Minecraft): Pair<Identifier, Boolean> {
@@ -1672,15 +1675,21 @@ object PlayerPreviewRenderer {
             val id = profile.id
             skinRequestedFor = id
             fetchedSkin = null
+            fetchedCape = null
             mc.skinManager.register(profile, { type, location, texture ->
-                if (type == MinecraftProfileTexture.Type.SKIN && skinRequestedFor == id) {
-                    fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                if (skinRequestedFor == id) when (type) {
+                    MinecraftProfileTexture.Type.SKIN -> fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                    MinecraftProfileTexture.Type.CAPE -> fetchedCape = location
+                    else -> {}
                 }
             }, false)
         }
         fetchedSkin?.let { return it }
         return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
     }
+
+    private fun accountCape(mc: Minecraft): Identifier? =
+        fetchedCape.takeIf { skinRequestedFor == mc.session.profile.id }
 
     private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {
         val data = BufferUtils.createByteBuffer(w * h * 4)
