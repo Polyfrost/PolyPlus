@@ -1347,6 +1347,7 @@ import org.polyfrost.polyplus.client.render.PoseStack
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlinx.coroutines.launch
 import java.util.Collections
+import java.util.UUID
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -1662,18 +1663,22 @@ object PlayerPreviewRenderer {
 
     @Volatile
     private var fetchedSkin: Pair<Identifier, Boolean>? = null
-    private var skinRequested = false
+    private var skinRequestedFor: UUID? = null
 
     private fun localSkin(mc: Minecraft): Pair<Identifier, Boolean> {
         mc.player?.let { return it.skinTextureLocation to (it.modelType == "slim") }
-        fetchedSkin?.let { return it }
         val profile = mc.session.profile
-        if (!skinRequested) {
-            skinRequested = true
+        if (skinRequestedFor != profile.id) {
+            val id = profile.id
+            skinRequestedFor = id
+            fetchedSkin = null
             mc.skinManager.register(profile, { type, location, texture ->
-                if (type == MinecraftProfileTexture.Type.SKIN) fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                if (type == MinecraftProfileTexture.Type.SKIN && skinRequestedFor == id) {
+                    fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                }
             }, false)
         }
+        fetchedSkin?.let { return it }
         return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
     }
 
