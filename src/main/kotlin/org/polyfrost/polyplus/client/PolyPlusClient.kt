@@ -51,6 +51,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
@@ -174,6 +175,7 @@ object PolyPlusClient {
         step("login gate") { MinecraftLoginGate.register() }
         step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
+        step("oneclient server api") { OneClientServerApi.initialize() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
 

@@ -24,8 +24,10 @@ public class MixinClientPacketListener {
 /*import net.minecraft.client.network.handler.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket;
+import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
+import org.polyfrost.polyplus.client.serverapi.OneClientServerApi;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -49,6 +51,19 @@ public class MixinClientPacketListener {
     @Inject(method = "closeWorld", at = @At("HEAD"))
     private void polyplus$onDisconnect(CallbackInfo ci) {
         P2PSessionManager.onClientDisconnected();
+        OneClientServerApi.reset();
+    }
+
+    @Inject(
+        method = "handleCustomPayload",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/network/PacketUtils;ensureOnSameThread(Lnet/minecraft/network/packet/Packet;Lnet/minecraft/network/handler/PacketHandler;Lnet/minecraft/util/BlockableEventLoop;)V",
+            shift = At.Shift.AFTER
+        )
+    )
+    private void polyplus$oneClientServerApi(CustomPayloadS2CPacket packet, CallbackInfo ci) {
+        OneClientServerApi.onLegacyPayload(packet.getChannel(), packet.getData());
     }
 }
 *///?}
