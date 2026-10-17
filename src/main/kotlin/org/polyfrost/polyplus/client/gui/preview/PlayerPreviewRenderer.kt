@@ -1345,8 +1345,13 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
 import org.polyfrost.polyplus.client.render.PoseStack
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.PolyPlusConstants
+import net.minecraft.client.render.texture.HttpImageProcessor
+import net.minecraft.client.render.texture.HttpTexture
+import java.awt.image.BufferedImage
 import kotlinx.coroutines.launch
 import java.util.Collections
+import java.util.UUID
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -1623,10 +1628,12 @@ object PlayerPreviewRenderer {
     private fun capeFor(mc: Minecraft, source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override ->
             if (source.equipment.get(BodySlot.Backpack) != null) null
-            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource)
+            else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: accountCape(mc)
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
                 ?: mc.player?.capeTextureLocation
+                ?: optifineCape(mc)
+                ?: accountCape(mc)
     }
 
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
@@ -1662,20 +1669,70 @@ object PlayerPreviewRenderer {
 
     @Volatile
     private var fetchedSkin: Pair<Identifier, Boolean>? = null
-    private var skinRequested = false
+    @Volatile
+    private var fetchedCape: Identifier? = null
+    private var skinRequestedFor: UUID? = null
 
     private fun localSkin(mc: Minecraft): Pair<Identifier, Boolean> {
         mc.player?.let { return it.skinTextureLocation to (it.modelType == "slim") }
-        fetchedSkin?.let { return it }
         val profile = mc.session.profile
-        if (!skinRequested) {
-            skinRequested = true
+        if (skinRequestedFor != profile.id) {
+            val id = profile.id
+            skinRequestedFor = id
+            fetchedSkin = null
+            fetchedCape = null
             mc.skinManager.register(profile, { type, location, texture ->
-                if (type == MinecraftProfileTexture.Type.SKIN) fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                if (skinRequestedFor == id) when (type) {
+                    MinecraftProfileTexture.Type.SKIN -> fetchedSkin = location to (texture.getMetadata("model") == "slim")
+                    MinecraftProfileTexture.Type.CAPE -> fetchedCape = location
+                    else -> {}
+                }
             }, false)
         }
+        fetchedSkin?.let { return it }
         return DefaultSkinUtils.getDefaultSkin(profile.id) to (DefaultSkinUtils.getDefaultModelType(profile.id) == "slim")
     }
+
+    private fun accountCape(mc: Minecraft): Identifier? =
+        fetchedCape.takeIf { skinRequestedFor == mc.session.profile.id }
+
+    private val OPTIFINE_USERNAME = Regex("[A-Za-z0-9_]+")
+    private val optifineCapesRequested = ConcurrentHashMap.newKeySet<String>()
+    private val optifineCapesLoaded = ConcurrentHashMap.newKeySet<String>()
+
+    private fun optifineCape(mc: Minecraft): Identifier? {
+        if (!ceraOptifineCapes()) return null
+        val name = mc.session.username
+        if (!name.matches(OPTIFINE_USERNAME)) return null
+        val location = Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "optifine_cape/${name.lowercase()}")
+        if (optifineCapesRequested.add(name)) {
+            mc.textureManager.register(location, HttpTexture(null, "https://optifine.net/capes/$name.png", null, object : HttpImageProcessor {
+                override fun process(image: BufferedImage): BufferedImage {
+                    var width = 64
+                    var height = 32
+                    while (width < image.width || height < image.height) {
+                        width *= 2
+                        height *= 2
+                    }
+                    return BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB).apply {
+                        graphics.apply { drawImage(image, 0, 0, null); dispose() }
+                    }
+                }
+
+                override fun onTextureDownloaded() {
+                    optifineCapesLoaded.add(name)
+                }
+            }))
+        }
+        return location.takeIf { name in optifineCapesLoaded }
+    }
+
+    private val ceraConfig by lazy { runCatching { Class.forName("dev.rdh.cera.Cera").getField("CONFIG") }.getOrNull() }
+
+    private fun ceraOptifineCapes(): Boolean = runCatching {
+        val config = ceraConfig?.get(null) ?: return false
+        config.javaClass.getField("optifineCosmetics").getBoolean(config)
+    }.getOrDefault(false)
 
     private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {
         val data = BufferUtils.createByteBuffer(w * h * 4)
