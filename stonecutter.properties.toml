@@ -25,6 +25,8 @@ mod.mc_compat = "1.8.9"
 mod.mc_releases = "1.8.9"
 feather_build = 2
 deps.osl_entrypoints = "0.6.1+mc13w16a-mc1.14.4"
+deps.osl_core = "0.11.0+mc14w27a-mc1.14.4"
+deps.osl_keybinds = "0.3.0+mc13w36a-mc17w15a"
 
 ["1.21.1"]
 mod.mc_compat = "1.21.1"

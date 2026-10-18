@@ -44,6 +44,8 @@
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
     //? if = 1.8.9
+    //"client.MixinInventoryMenuScreen",
+    //? if = 1.8.9
     //"client.MixinOptionsScreen",
     "client.MixinOnlineServerEntry",
     //? if > 1.8.9
