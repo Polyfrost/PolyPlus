@@ -405,10 +405,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         Theme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val guiScaleFactor = guiScaleFactorFor(if (guiScale <= 0) maxGuiScale else guiScale)
+                val effectiveGuiScale = if (guiScale <= 0) maxGuiScale else guiScale
                 val containFit = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
                     .takeIf { it.isFinite() && it > 0f } ?: 1f
-                val scale = containFit * guiScaleFactor * UI_SCALE * GUI_DENSITY_TRIM
+                val scale = minOf(effectiveGuiScale / REFERENCE_GUI_SCALE, containFit) * UI_SCALE * GUI_DENSITY_TRIM
                 val compact = pages[page] == OnboardingStep.Terms
                 val panelWidth by animateFloatAsState(
                     if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
