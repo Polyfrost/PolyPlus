@@ -654,8 +654,6 @@ internal const val REFERENCE_GUI_SCALE = 2f
 
 internal fun mcGuiScale(): Int = Minecraft.getInstance().window.guiScale.toInt()
 
-internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI_SCALE).coerceIn(0.01f, 1f)
-
 internal const val GUI_DENSITY_TRIM = 0.88f
 
 @Composable

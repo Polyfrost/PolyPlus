@@ -246,6 +246,8 @@ dependencies {
             mappings(rootProject.file("mappings/feather-overrides.tiny"))
         })
         testCompileOnly("net.ornithemc.osl-gen2:entrypoints:${property("deps.osl_entrypoints")}")
+        modImplementation("net.ornithemc.osl-gen2:core:${property("deps.osl_core")}")
+        modImplementation("net.ornithemc.osl-gen2:keybinds:${property("deps.osl_keybinds")}")
         include(implementation("org.joml:joml:1.10.8")!!)
         compileOnly("org.embeddedt.celeritas:celeritas-common:2.5.0-pre.1") { isTransitive = false }
     } else {
@@ -369,7 +371,7 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("oneconfigVersion", oneconfigVersion)
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
-            line.takeUnless { "\"fabric-api\"" in it }?.replace("\"java\": \">=21\"", "\"java\": \">=25\"")
+            line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"").replace("\"java\": \">=21\"", "\"java\": \">=25\"")
         }
         expand(
             mapOf(

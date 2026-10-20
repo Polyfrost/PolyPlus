@@ -46,6 +46,7 @@ import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.ChatIdentity
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -71,7 +72,12 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
     val mutedGroups = remember { mutableStateOf(setOf<Int>()) }
     val renameOverrides = remember { mutableStateOf(mapOf<Int, String>()) }
 
-    val selfId = remember { runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("") }
+    val localId = remember { ChatIdentity.localId() }
+    val actAs by ChatIdentity.actAs.collectAsState()
+    val delegations by ChatIdentity.delegations.collectAsState()
+    val selfId = actAs ?: localId
+    LaunchedEffect(Unit) { ChatIdentity.refreshDelegations() }
+    LaunchedEffect(actAs) { selectedGroupId = null }
     val groups by GroupsRepository.groups.collectAsState()
     val friends by FriendsRepository.friends.collectAsState()
     val incomingRequests by FriendsRepository.incomingRequests.collectAsState()
@@ -147,6 +153,9 @@ fun SocialOverlayContent(screen: Screen, onClose: () -> Unit) {
         ) {
             SocialHeaderToolbar(
                 selfId = selfId,
+                actAs = actAs,
+                delegations = delegations,
+                nameOf = { names[it] ?: it.take(8) },
                 searchOpen = searchOpen,
                 searchQuery = searchQuery,
                 unreadOnly = unreadOnly,
@@ -315,6 +324,9 @@ private fun EmptyConversationHint(friendCount: Int = -1, onAddFriend: (() -> Uni
 @Composable
 private fun SocialHeaderToolbar(
     selfId: String,
+    actAs: String?,
+    delegations: List<String>,
+    nameOf: (String) -> String,
     searchOpen: Boolean,
     searchQuery: String,
     unreadOnly: Boolean,
@@ -403,7 +415,18 @@ private fun SocialHeaderToolbar(
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SocialAvatar(selfId, 30.dp)
-            SocialText(localPlayerName(), fontSize = 14.sp)
+            if (delegations.isEmpty()) {
+                SocialText(localPlayerName(), fontSize = 14.sp)
+            } else {
+                SocialDropdown(
+                    label = "Chat as",
+                    options = listOf<String?>(null) + delegations,
+                    selected = actAs,
+                    labelFor = { it?.let(nameOf) ?: localPlayerName() },
+                    modifier = Modifier.width(220.dp),
+                    onSelect = ChatIdentity::switchTo,
+                )
+            }
         }
     }
 }

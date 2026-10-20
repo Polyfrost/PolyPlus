@@ -1,12 +1,12 @@
 mod.name = "PolyPlus"
 mod.id = "polyplus"
-mod.version = "1.3.3"
+mod.version = "1.3.10"
 mod.group = "org.polyfrost"
 
 deps.fabric_loader = "0.19.5"
 deps.fabric_language_kotlin = "1.13.13+kotlin.2.4.10"
 deps.oneconfig = "1.4.3"
-deps.polydium = "1.0.5"
+deps.polydium = "1.1.5"
 deps.kotlin = "2.4.10"
 deps.ktor = "3.5.2"
 deps.sentry = "7.22.6"
@@ -25,6 +25,8 @@ mod.mc_compat = "1.8.9"
 mod.mc_releases = "1.8.9"
 feather_build = 2
 deps.osl_entrypoints = "0.6.1+mc13w16a-mc1.14.4"
+deps.osl_core = "0.11.0+mc14w27a-mc1.14.4"
+deps.osl_keybinds = "0.3.0+mc13w36a-mc17w15a"
 
 ["1.21.1"]
 mod.mc_compat = "1.21.1"
