@@ -65,7 +65,6 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.internal.ui.navigation.graph.KeybindsGraph
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
@@ -130,7 +129,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
                 is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
                 is WardrobeEntry.Note -> CapeSectionNote(entry.text)
-                is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open(KeybindsGraph) })
+                is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
                     val variantId = selectedVariantId(item, variantPicks)
