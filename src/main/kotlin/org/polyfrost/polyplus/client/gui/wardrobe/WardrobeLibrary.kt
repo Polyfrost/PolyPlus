@@ -198,7 +198,6 @@ private fun DrawScope.drawSkinFront(skin: ImageBitmap, slim: Boolean) {
 internal fun OutfitSwitcher(onStatus: (String) -> Unit) {
     LaunchedEffect(Unit) { OutfitLibrary.refreshIfNeeded() }
     val state = OutfitLibrary.state
-    if (state is LibraryState.Unavailable) return
     val theme = OneConfigTheme.current
     val outfits = OutfitLibrary.outfits.favoritesFirst()
     val activeId = OutfitLibrary.activeOutfitId
@@ -207,6 +206,7 @@ internal fun OutfitSwitcher(onStatus: (String) -> Unit) {
     val active = outfits.firstOrNull { it.id == activeId }
     val canCycle = !busy && loaded && outfits.isNotEmpty() && (active == null || outfits.size > 1)
     val label = when {
+        state is LibraryState.Unavailable -> state.reason
         active != null -> active.name
         !loaded -> "Loading outfits..."
         outfits.isEmpty() -> "No saved outfits"
