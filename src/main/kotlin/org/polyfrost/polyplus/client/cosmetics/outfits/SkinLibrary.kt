@@ -16,6 +16,7 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -379,6 +380,7 @@ object SkinLibrary {
 
     private suspend fun refreshLocked(): Result<Unit> = requestLock.withLock {
         failed.clear()
+        bitmapVersion++
         if (!OutfitApi.allowed()) {
             skins = emptyList()
             state = LibraryState.Unavailable(OutfitApi.PRIVACY_MESSAGE)
@@ -472,6 +474,10 @@ object SkinLibrary {
                 LOGGER.debug("Could not load the preview for skin {}", skin.id, it)
             }
             loading.remove(key)
+            if (failed.containsKey(key)) {
+                delay(BITMAP_RETRY_MS)
+                bitmapVersion++
+            }
         }
     }
 
