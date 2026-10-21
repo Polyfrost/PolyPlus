@@ -355,7 +355,7 @@ object OutfitLibrary {
         val loaded = MojangCapeService.isLoaded()
         val current = MojangCapeService.activeCape()?.id
         if (capeId == null) {
-            if (!loaded || current == null) return@runSuspendCatching
+            if (loaded && current == null) return@runSuspendCatching
             MojangCapeService.clear().getOrThrow()
         } else {
             if (loaded && current == capeId) return@runSuspendCatching
