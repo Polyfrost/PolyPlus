@@ -149,11 +149,14 @@ internal fun WardrobeShell(
     val previewHeading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION }
         ?: selectedOutfit?.let { it.name to "Outfit" }
         ?: selectedSkin?.let { it.name to "${it.model.label} skin" }
-    val selectionPreview = rememberSelectionPreview(
+    val itemPreview = rememberSelectionPreview(
         owned = selectedOwned,
         variantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
         mojang = selectedMojang,
     )
+    val outfitPreview = rememberOutfitPreview(selectedOutfit)
+    val skinPreview = rememberSkinPreview(selectedSkin)
+    val selectionPreview = outfitPreview ?: skinPreview ?: itemPreview
     val previewRotation = remember { PreviewRotation(FRONT_YAW_DEG) }
     val selectionShowsBack = if (selection == null) {
         null

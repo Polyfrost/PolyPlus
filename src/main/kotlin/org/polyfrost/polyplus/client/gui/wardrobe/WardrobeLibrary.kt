@@ -56,6 +56,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
@@ -71,6 +72,8 @@ import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
+import org.polyfrost.polyplus.client.gui.preview.PreviewTint
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -125,7 +128,59 @@ private fun isOutfitAssetLoaded(slot: BodySlot, id: Int): Boolean = when (slot) 
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 
-internal fun outfitPreviewSource(equipped: Map<BodySlot, Int>, mojangCape: Identifier?): PlayerPreviewSource {
+@Composable
+internal fun rememberOutfitPreview(outfit: OutfitInfo?): SelectionPreview? {
+    val installs = CosmeticAssetCache.installs
+    val textureVersion = MojangCapeService.textureVersion
+    val mojangState = MojangCapeService.state
+    val skins = SkinLibrary.skins
+    val skinVersion = SkinLibrary.textureVersion
+    LaunchedEffect(outfit?.equipped) {
+        for ((slot, id) in outfit?.equipped.orEmpty()) {
+            if (!isOutfitAssetLoaded(slot, id)) CosmeticAssetCache.ensureCosmeticLoaded(id)
+        }
+    }
+    val source = remember(outfit, installs, textureVersion, mojangState, skins, skinVersion) {
+        outfit?.let { outfitPreviewSource(it.equipped, outfitMojangCape(it), outfitSkin(it), PreviewTint(it.particleColor)) }
+    }
+    if (outfit == null || source == null) return null
+    return SelectionPreview(source, BodySlot.Hat in outfit.equipped)
+}
+
+@Composable
+internal fun rememberSkinPreview(skin: PlayerSkinInfo?): SelectionPreview? {
+    val installs = CosmeticAssetCache.installs
+    val textureVersion = MojangCapeService.textureVersion
+    val mojangState = MojangCapeService.state
+    val skinVersion = SkinLibrary.textureVersion
+    val base = CosmeticCatalog.localEquipped().equipped
+    val preview = remember(skin, skinVersion) { skin?.let(::previewSkin) }
+    val source = remember(base, installs, textureVersion, mojangState, preview) {
+        outfitPreviewSource(base, MojangCapeService.localCapeTexture(), preview)
+    }
+    if (skin == null) return null
+    return SelectionPreview(source, BodySlot.Hat in base)
+}
+
+private fun outfitMojangCape(outfit: OutfitInfo): Identifier? {
+    val capeId = outfit.mojangCapeId ?: return null
+    return (MojangCapeService.state as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.id == capeId }?.let(MojangCapeService::texture)
+}
+
+private fun outfitSkin(outfit: OutfitInfo): PreviewSkin? {
+    val skinId = outfit.skinId ?: return null
+    return SkinLibrary.skins.firstOrNull { it.id == skinId }?.let(::previewSkin)
+}
+
+private fun previewSkin(skin: PlayerSkinInfo): PreviewSkin? =
+    SkinLibrary.texture(skin.hash, skin.url)?.let { PreviewSkin(it, skin.model == SkinModel.Slim) }
+
+internal fun outfitPreviewSource(
+    equipped: Map<BodySlot, Int>,
+    mojangCape: Identifier?,
+    skin: PreviewSkin? = null,
+    tint: PreviewTint? = null,
+): PlayerPreviewSource {
     val equipment = CosmeticEquipment()
     var pet: PetDefinition? = null
     for ((slot, id) in equipped) {
@@ -143,6 +198,8 @@ internal fun outfitPreviewSource(equipped: Map<BodySlot, Int>, mojangCape: Ident
         pet = pet,
         capeCosmeticId = capeId,
         mojangCape = if (capeId == null) mojangCape else null,
+        skin = skin,
+        tint = tint,
     )
 }
 
