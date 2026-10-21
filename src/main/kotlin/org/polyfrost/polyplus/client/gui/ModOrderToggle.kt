@@ -45,7 +45,7 @@ object ModOrderToggle {
     fun Overlay(content: @Composable () -> Unit) {
         Box {
             content()
-            Box(Modifier.align(Alignment.TopEnd)) {
+            Box(Modifier.align(Alignment.TopEnd).padding(end = PAGE_GUTTER.dp)) {
                 var alphabetical by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
                 var confirming by remember { mutableStateOf(false) }
                 val theme = OneConfigTheme.current
@@ -126,4 +126,5 @@ object ModOrderToggle {
     }
 
     private const val POPUP_DROP = 42
+    private const val PAGE_GUTTER = 25
 }
