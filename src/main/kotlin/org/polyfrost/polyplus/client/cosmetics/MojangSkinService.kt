@@ -1,5 +1,8 @@
 package org.polyfrost.polyplus.client.cosmetics
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import io.ktor.client.call.body
 import io.ktor.client.request.accept
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -25,7 +28,10 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.PROFILE_URL
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.accessToken
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.authorize
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
+import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.nio.charset.StandardCharsets
 import java.util.Base64
@@ -53,6 +59,15 @@ object MojangSkinService {
 
     @Volatile
     private var knownTexture: String? = null
+
+    @Volatile
+    private var changedSkin: MojangSkin? = null
+
+    @Volatile
+    private var changedFor: UUID? = null
+
+    var changedSkinVersion by mutableIntStateOf(0)
+        private set
 
     suspend fun setSkin(url: String, model: SkinModel): Result<MojangSkin?> = change { token ->
         PolyPlusClient.HTTP.post(SKINS_URL) {
@@ -149,13 +164,28 @@ object MojangSkinService {
             val response = call(token)
             ensureSkinChanged(response)
             val reported = runSuspendCatching { response.body<ServicesProfile>() }.getOrNull()?.let(::activeSkin)
-            if (reported != null) {
+            val skin = if (reported != null) {
                 knownTexture = reported.textureHash
                 reported
             } else {
                 readBack(token, previous)
             }
+            if (skin != null) {
+                changedSkin = skin
+                changedFor = ClientPlatform.localPlayerUuid()
+                changedSkinVersion++
+            }
+            skin
         }.onFailure { LOGGER.warn("Minecraft skin change failed", it) }
+    }
+
+    @JvmStatic
+    fun localPreviewSkin(playerId: UUID): PreviewSkin? {
+        val skin = changedSkin ?: return null
+        if (playerId != changedFor || playerId != ClientPlatform.localPlayerUuid()) return null
+        val hash = skin.textureHash ?: return null
+        val texture = SkinLibrary.texture(hash, skin.url) ?: return null
+        return PreviewSkin(texture, skin.model == SkinModel.Slim)
     }
 
     private suspend fun readBack(token: String, previous: String?): MojangSkin? {

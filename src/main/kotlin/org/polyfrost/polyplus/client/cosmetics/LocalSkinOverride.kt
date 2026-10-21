@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
+import java.util.UUID
 
 //? if >= 1.21.10 {
 import net.minecraft.core.ClientAsset
@@ -11,7 +12,13 @@ import net.minecraft.world.entity.player.PlayerSkin
 *///?}
 
 object LocalSkinOverride {
+    @JvmStatic
+    fun forPlayer(playerId: UUID): PreviewSkin? = MojangSkinService.localPreviewSkin(playerId)
+
     //? if >= 1.21.10 {
+    @JvmStatic
+    fun apply(playerId: UUID, original: PlayerSkin): PlayerSkin = forPlayer(playerId)?.let { withSkin(original, it) } ?: original
+
     fun withSkin(original: PlayerSkin, skin: PreviewSkin): PlayerSkin = PlayerSkin(
         ClientAsset.ResourceTexture(skin.texture),
         original.cape(),
@@ -20,7 +27,10 @@ object LocalSkinOverride {
         original.secure(),
     )
     //?} elif > 1.8.9 {
-    /*fun withSkin(original: PlayerSkin, skin: PreviewSkin): PlayerSkin = PlayerSkin(
+    /*@JvmStatic
+    fun apply(playerId: UUID, original: PlayerSkin): PlayerSkin = forPlayer(playerId)?.let { withSkin(original, it) } ?: original
+
+    fun withSkin(original: PlayerSkin, skin: PreviewSkin): PlayerSkin = PlayerSkin(
         skin.texture,
         null,
         original.capeTexture(),

@@ -238,7 +238,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun previewSkin(source: PlayerPreviewSource): PreviewSkin? =
-        (source as? PlayerPreviewSource.Override)?.skin
+        (source as? PlayerPreviewSource.Override)?.skin ?: LocalSkinOverride.forPlayer(ClientPlatform.localPlayerUuid())
 
     private val latestByKey = ConcurrentHashMap<Any, ImageBitmap>()
     // readbacks land frames after capture, so only keys an on-screen preview still retains get cached
@@ -1369,6 +1369,7 @@ import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderer
@@ -1726,7 +1727,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun previewSkin(source: PlayerPreviewSource): PreviewSkin? =
-        (source as? PlayerPreviewSource.Override)?.skin
+        (source as? PlayerPreviewSource.Override)?.skin ?: LocalSkinOverride.forPlayer(ClientPlatform.localPlayerUuid())
 
     private fun particleColor(source: PlayerPreviewSource): Int? {
         val tint = (source as? PlayerPreviewSource.Override)?.tint

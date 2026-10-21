@@ -7,6 +7,7 @@ import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
+import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
@@ -16,6 +17,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.UUID;
 
 //? if >= 1.21.10 {
 import net.minecraft.world.entity.player.PlayerSkin;
@@ -69,7 +72,8 @@ public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, P
 
         GameProfile profile = this.playerInfo.getProfile();
         //~ if >= 1.21.10 'getId' -> 'id'
-        return CapeResolver.applyCape(profile.id(), profile, original);
+        UUID player = profile.id();
+        return LocalSkinOverride.apply(player, CapeResolver.applyCape(player, profile, original));
     }
 }
 //?} else {
@@ -84,10 +88,12 @@ import org.polyfrost.polyplus.client.PolyPlusConfig;
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
+import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride;
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import org.polyfrost.polyplus.client.gui.preview.PreviewSkin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -154,6 +160,19 @@ public abstract class MixinAbstractClientPlayer extends PlayerEntity implements 
             default:
                 return original;
         }
+    }
+
+    @ModifyReturnValue(method = "getSkinTextureLocation()Lnet/minecraft/resource/Identifier;", at = @At("RETURN"))
+    private Identifier polyplus$replaceSkinTexture(Identifier original) {
+        PreviewSkin skin = LocalSkinOverride.forPlayer(((ClientPlayerEntity) (Object) this).getUuid());
+        return skin != null ? skin.getTexture() : original;
+    }
+
+    @ModifyReturnValue(method = "getModelType", at = @At("RETURN"))
+    private String polyplus$replaceSkinModel(String original) {
+        PreviewSkin skin = LocalSkinOverride.forPlayer(((ClientPlayerEntity) (Object) this).getUuid());
+        if (skin == null) return original;
+        return skin.getSlim() ? "slim" : "default";
     }
 
     @Unique
