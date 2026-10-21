@@ -15,6 +15,7 @@ import org.jetbrains.skia.ImageInfo
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -199,6 +200,7 @@ import java.util.stream.Stream
 
 object PlayerPreviewRenderer {
     private val equipmentByEntityId = ConcurrentHashMap<Int, CosmeticEquipment>()
+    private val tintByEntityId = ConcurrentHashMap<Int, PreviewTint>()
 
     @JvmStatic
     fun previewEquipment(entityId: Int): CosmeticEquipment? = equipmentByEntityId[entityId]
@@ -224,12 +226,19 @@ object PlayerPreviewRenderer {
     //?}
 
     @JvmStatic
-    fun previewParticleColor(entityId: Int): Int? =
-        if (equipmentByEntityId.containsKey(entityId)) {
-            CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
-        } else {
-            null
-        }
+    fun previewParticleColor(entityId: Int): Int? {
+        if (!equipmentByEntityId.containsKey(entityId)) return null
+        val tint = tintByEntityId[entityId]
+        return if (tint != null) tint.particleColor else CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
+    }
+
+    private fun bindTint(entityId: Int, source: PlayerPreviewSource) {
+        val tint = (source as? PlayerPreviewSource.Override)?.tint
+        if (tint != null) tintByEntityId[entityId] = tint else tintByEntityId.remove(entityId)
+    }
+
+    private fun previewSkin(source: PlayerPreviewSource): PreviewSkin? =
+        (source as? PlayerPreviewSource.Override)?.skin
 
     private val latestByKey = ConcurrentHashMap<Any, ImageBitmap>()
     // readbacks land frames after capture, so only keys an on-screen preview still retains get cached
@@ -573,6 +582,7 @@ object PlayerPreviewRenderer {
             return
         }
         bindEquipment(player, source)
+        bindTint(player.id, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = 0f; player.yBodyRotO = 0f
         player.yHeadRot = 0f; player.yHeadRotO = 0f
@@ -582,6 +592,7 @@ object PlayerPreviewRenderer {
         state.lightCoords = 0xF000F0
         state.showCape = (source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null) &&
             !hidesCape(source)
+        previewSkin(source)?.let { state.skin = LocalSkinOverride.withSkin(state.skin, it) }
         capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
         state.bodyRot = yawDeg
         state.yRot = 0f
@@ -607,13 +618,15 @@ object PlayerPreviewRenderer {
     }
 
     private fun renderDirectState(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
-        val baseSkin = localSkin(mc) ?: return
+        val accountSkin = localSkin(mc) ?: return
+        val baseSkin = previewSkin(source)?.let { LocalSkinOverride.withSkin(accountSkin, it) } ?: accountSkin
         val skin = capeOverride(source)?.let { withCape(baseSkin, it) } ?: baseSkin
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
             PlayerPreviewSource.LocalLive -> localEquipment()
         }
         equipmentByEntityId[PREVIEW_ENTITY_ID] = equipment
+        bindTint(PREVIEW_ENTITY_ID, source)
 
         val state = directState(skin)
         if (mc.entityRenderDispatcher.getRenderer(state) == null) return
@@ -1093,6 +1106,7 @@ object PlayerPreviewRenderer {
                     ?: legacyLocalEquipment()
         } ?: return
         equipmentByEntityId[player.id] = equipment
+        bindTint(player.id, source)
     }
 
     private val legacyLoadAttempted =
@@ -1164,7 +1178,8 @@ object PlayerPreviewRenderer {
         val mc = Minecraft.getInstance()
 
         //? if >= 1.21.4 {
-        val baseSkin = legacySkin(mc) ?: return false
+        val accountSkin = legacySkin(mc) ?: return false
+        val baseSkin = previewSkin(source)?.let { LocalSkinOverride.withSkin(accountSkin, it) } ?: accountSkin
         val skin = capeOverride(source)?.let { withCape(baseSkin, it) } ?: baseSkin
         val equipment = when (source) {
             is PlayerPreviewSource.Override -> source.equipment
@@ -1172,6 +1187,7 @@ object PlayerPreviewRenderer {
                 (mc.player as? PlayerCosmeticsAccess)?.`polyplus$cosmeticEquipment`() ?: CosmeticEquipment()
         }
         equipmentByEntityId[LEGACY_PREVIEW_ENTITY_ID] = equipment
+        bindTint(LEGACY_PREVIEW_ENTITY_ID, source)
         val state = legacyState(skin, yawDeg)
         if (hidesCape(source)) state.showCape = false
         val renderer = legacyPlayerRenderer(mc, skin) ?: return false
@@ -1179,7 +1195,8 @@ object PlayerPreviewRenderer {
         //? if < 1.21.4 {
         /*// 1.21.1 has no render states: it must render a real entity, which needs a client
         val level = mc.level ?: PreviewWorld.level() ?: return false
-        val skin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
+        val accountSkin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
+        val skin = previewSkin(source)?.let { LocalSkinOverride.withSkin(accountSkin, it) } ?: accountSkin
         val player = legacyDummy(mc, level) ?: return false
         val cape = capeOverride(source)
             ?: CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
@@ -1498,7 +1515,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun drawPlayer(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
-        val (skin, slim) = localSkin(mc)
+        val (skin, slim) = previewSkin(source)?.let { it.texture to it.slim } ?: localSkin(mc)
         val model = models.getOrPut(slim) { PlayerModel(0f, slim) }
         val scale = h * modelScale
 
@@ -1575,7 +1592,7 @@ object PlayerPreviewRenderer {
                 renderContext,
                 model,
                 equipment,
-                CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid()),
+                particleColor(source),
                 false,
                 emptySet(),
             )
@@ -1706,6 +1723,14 @@ object PlayerPreviewRenderer {
         fetchedSkin?.let { return it }
         val id = ClientPlatform.localPlayerUuid()
         return DefaultSkinUtils.getDefaultSkin(id) to (DefaultSkinUtils.getDefaultModelType(id) == "slim")
+    }
+
+    private fun previewSkin(source: PlayerPreviewSource): PreviewSkin? =
+        (source as? PlayerPreviewSource.Override)?.skin
+
+    private fun particleColor(source: PlayerPreviewSource): Int? {
+        val tint = (source as? PlayerPreviewSource.Override)?.tint
+        return if (tint != null) tint.particleColor else CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
     }
 
     private fun accountCape(mc: Minecraft): Identifier? =

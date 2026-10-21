@@ -12,5 +12,11 @@ sealed interface PlayerPreviewSource {
         val pet: PetDefinition? = null,
         val capeCosmeticId: Int? = null,
         val mojangCape: Identifier? = null,
+        val skin: PreviewSkin? = null,
+        val tint: PreviewTint? = null,
     ) : PlayerPreviewSource
 }
+
+data class PreviewSkin(val texture: Identifier, val slim: Boolean)
+
+data class PreviewTint(val particleColor: Int?)

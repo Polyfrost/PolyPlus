@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 
 @Composable
 fun PlayerPreview(
@@ -197,7 +198,8 @@ private fun PlayerPreviewBitmap(
         }
     }
 
-    val bitmap: ImageBitmap? by produceState(null, source, yaw, pitch, sizePx, modelScale, verticalAnchor, previewKey) {
+    val skinRevision = SkinLibrary.textureVersion
+    val bitmap: ImageBitmap? by produceState(null, source, yaw, pitch, sizePx, modelScale, verticalAnchor, previewKey, skinRevision) {
         if (sizePx.width > 0 && sizePx.height > 0) {
             withContext(Dispatchers.Default) {
                 var attempts = 0

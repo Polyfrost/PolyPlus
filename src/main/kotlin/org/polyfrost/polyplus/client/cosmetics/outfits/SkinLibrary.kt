@@ -24,12 +24,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangSkin
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinException
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
+import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.awt.image.BufferedImage
@@ -55,6 +57,20 @@ object SkinLibrary {
     private val USERNAME_PATTERN = Regex("^[A-Za-z0-9_]{1,16}$")
     private val HASH_PATTERN = Regex("^[0-9a-f]{32,64}$")
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+    private val LEGACY_LIMB_COPIES = listOf(
+        intArrayOf(24, 48, 20, 52, 4, 16, 8, 20),
+        intArrayOf(28, 48, 24, 52, 8, 16, 12, 20),
+        intArrayOf(20, 52, 16, 64, 8, 20, 12, 32),
+        intArrayOf(24, 52, 20, 64, 4, 20, 8, 32),
+        intArrayOf(28, 52, 24, 64, 0, 20, 4, 32),
+        intArrayOf(32, 52, 28, 64, 12, 20, 16, 32),
+        intArrayOf(40, 48, 36, 52, 44, 16, 48, 20),
+        intArrayOf(44, 48, 40, 52, 48, 16, 52, 20),
+        intArrayOf(36, 52, 32, 64, 48, 20, 52, 32),
+        intArrayOf(40, 52, 36, 64, 44, 20, 48, 32),
+        intArrayOf(44, 52, 40, 64, 40, 20, 44, 32),
+        intArrayOf(48, 52, 44, 64, 52, 20, 56, 32),
+    )
 
     private val requestLock = Mutex()
     private val recordLock = Mutex()
@@ -63,6 +79,9 @@ object SkinLibrary {
     private val bitmaps = ConcurrentHashMap<String, ImageBitmap>()
     private val loading = ConcurrentHashMap.newKeySet<String>()
     private val failed = ConcurrentHashMap<String, Long>()
+    private val textures = ConcurrentHashMap<String, Identifier>()
+    private val textureLoading = ConcurrentHashMap.newKeySet<String>()
+    private val textureFailed = ConcurrentHashMap<String, Long>()
     private val signedInFor = AtomicReference<UUID?>(null)
 
     var skins by mutableStateOf<List<PlayerSkinInfo>>(emptyList())
@@ -78,6 +97,9 @@ object SkinLibrary {
         private set
 
     var bitmapVersion by mutableIntStateOf(0)
+        private set
+
+    var textureVersion by mutableIntStateOf(0)
         private set
 
     @Volatile
@@ -233,6 +255,13 @@ object SkinLibrary {
         val key = skin.hash.ifBlank { skin.url }
         bitmaps[key]?.let { return it }
         if (System.currentTimeMillis() >= (failed[key] ?: 0L) && loading.add(key)) loadBitmap(skin, key)
+        return null
+    }
+
+    fun texture(hash: String, url: String): Identifier? {
+        val key = hash.lowercase().takeIf { HASH_PATTERN.matches(it) } ?: return null
+        textures[key]?.let { return it }
+        if (System.currentTimeMillis() >= (textureFailed[key] ?: 0L) && textureLoading.add(key)) loadTexture(key, url)
         return null
     }
 
@@ -479,6 +508,61 @@ object SkinLibrary {
                 bitmapVersion++
             }
         }
+    }
+
+    private fun loadTexture(hash: String, url: String) {
+        PolyPlusClient.SCOPE.launch {
+            runSuspendCatching {
+                val file = File(cacheDir, "textures/$hash.png")
+                if (!file.isFile) {
+                    val image = withContext(Dispatchers.IO) { readCache(hash) }
+                        ?: download(url).getOrThrow().let { fresh ->
+                            withContext(Dispatchers.IO) {
+                                val decoded = decode(fresh) ?: throw OutfitException(NOT_A_SKIN)
+                                writeCache(hash, fresh)
+                                decoded
+                            }
+                        }
+                    withContext(Dispatchers.IO) {
+                        file.parentFile.mkdirs()
+                        ImageIO.write(modernLayout(previewImage(image)), "png", file)
+                    }
+                }
+                RemoteTextures.register(texturePath(hash), file.toPath())
+                textures[hash] = textureLocation(hash)
+                textureFailed.remove(hash)
+                textureVersion++
+            }.onFailure {
+                textureFailed[hash] = System.currentTimeMillis() + BITMAP_RETRY_MS
+                LOGGER.debug("Could not load the texture for skin {}", hash, it)
+            }
+            textureLoading.remove(hash)
+            if (textureFailed.containsKey(hash)) {
+                delay(BITMAP_RETRY_MS)
+                textureVersion++
+            }
+        }
+    }
+
+    private fun textureLocation(hash: String): Identifier =
+        Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "skin/$hash")
+
+    private fun texturePath(hash: String): Identifier {
+        //? if >= 1.21.10 {
+        return Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "textures/skin/$hash.png")
+        //?} else {
+        /*return textureLocation(hash)
+        *///?}
+    }
+
+    private fun modernLayout(source: BufferedImage): BufferedImage {
+        if (source.height != 32) return source
+        val image = BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        graphics.drawImage(source, 0, 0, null)
+        for (r in LEGACY_LIMB_COPIES) graphics.drawImage(source, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], null)
+        graphics.dispose()
+        return image
     }
 
     private fun previewImage(source: BufferedImage): BufferedImage {
