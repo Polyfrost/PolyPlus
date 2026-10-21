@@ -102,11 +102,13 @@ internal fun OutfitThumbnail(outfit: OutfitInfo, modifier: Modifier) {
             if (!isOutfitAssetLoaded(slot, id)) CosmeticAssetCache.ensureCosmeticLoaded(id)
         }
     }
-    val mojangCape = remember(outfit.mojangCapeId, mojangState, textureVersion) {
-        val capeId = outfit.mojangCapeId ?: return@remember null
-        (mojangState as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.id == capeId }?.let(MojangCapeService::texture)
+    val skins = SkinLibrary.skins
+    val skinVersion = SkinLibrary.textureVersion
+    val mojangCape = remember(outfit.mojangCapeId, mojangState, textureVersion) { outfitMojangCape(outfit) }
+    val skin = remember(outfit.skinId, skins, skinVersion) { outfitSkin(outfit) }
+    val source = remember(outfit.equipped, installs, mojangCape, skin, outfit.particleColor) {
+        outfitPreviewSource(outfit.equipped, mojangCape, skin, PreviewTint(outfit.particleColor))
     }
-    val source = remember(outfit.equipped, installs, mojangCape) { outfitPreviewSource(outfit.equipped, mojangCape) }
     val loaded = outfit.equipped.count { (slot, id) -> isOutfitAssetLoaded(slot, id) }
     val capeId = outfit.equipped[BodySlot.Cape]
     PlayerPreview(
@@ -117,7 +119,7 @@ internal fun OutfitThumbnail(outfit: OutfitInfo, modifier: Modifier) {
         modelScale = 0.42f,
         verticalAnchor = 0.52f,
         initialYaw = FRONT_YAW_DEG,
-        previewKey = "outfit-${outfit.id}-${outfit.updatedAt}-$loaded-${mojangCape != null}",
+        previewKey = "outfit-${outfit.id}-${outfit.updatedAt}-$loaded-${mojangCape != null}-${skin?.texture}-${outfit.particleColor}",
         live = BodySlot.Aura in outfit.equipped || (capeId != null && CosmeticAssetCache.isCapeAnimated(capeId)),
     )
 }
