@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.ScrollState
@@ -35,8 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
@@ -386,10 +389,10 @@ private fun MessageBubble(
             Box(
                 modifier = Modifier
                     .clip(ppShapeOf(topStart = 14.dp, topEnd = 14.dp, bottomStart = if (outgoing) 14.dp else 3.dp, bottomEnd = if (outgoing) 3.dp else 14.dp))
-                    .background(if (outgoing) Accent.copy(alpha = 0.85f) else SocialCardBackground)
+                    .background(if (outgoing) OneConfigTheme.accent.copy(alpha = 0.85f) else SocialCardBackground)
                     .border(
                         SocialBorderWidth,
-                        if (outgoing) Accent else SocialBorderColor,
+                        if (outgoing) OneConfigTheme.accent else SocialBorderColor,
                         ppShapeOf(topStart = 14.dp, topEnd = 14.dp, bottomStart = if (outgoing) 14.dp else 3.dp, bottomEnd = if (outgoing) 3.dp else 14.dp),
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -486,8 +489,8 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
             }
             SocialIconButton(
                 SOCIAL_ASSETS + "chevron-right.svg",
-                background = if (!disabled && value.isNotBlank()) Accent.asSocialSelected else null,
-                tint = if (!disabled && value.isNotBlank()) Accent else SocialTextSecondary,
+                background = if (!disabled && value.isNotBlank()) OneConfigTheme.accent.asSocialSelected else null,
+                tint = if (!disabled && value.isNotBlank()) OneConfigTheme.accent else SocialTextSecondary,
                 tooltip = "Send",
                 onClick = trySend,
             )

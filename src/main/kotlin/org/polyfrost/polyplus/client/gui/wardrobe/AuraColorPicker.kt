@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -51,9 +53,9 @@ import androidx.compose.ui.unit.sp
 import java.awt.Color as AwtColor
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 
@@ -79,12 +81,12 @@ internal fun AuraSwatchRow(
         }
         val isCustom = selectedColor != null && selectedColor !in AURA_PRESETS
         AuraDot(
-            color = if (isCustom) Color(selectedColor!!) else LocalTheme.current.componentBackground,
+            color = if (isCustom) Color(selectedColor!!) else OneConfigTheme.current.componentBackground,
             isSelected = isCustom || customOpen,
             onClick = onToggleCustom,
         ) {
             if (!isCustom) {
-                SocialText("+", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
+                SocialText("+", color = OneConfigTheme.current.textColorSecondary, fontSize = 11.sp)
             }
         }
     }
@@ -108,7 +110,7 @@ private fun AuraDot(
         Box(
             Modifier.fillMaxSize().border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) Accent else LocalTheme.current.borderColor,
+                color = if (isSelected) OneConfigTheme.accent else OneConfigTheme.current.borderColor,
                 shape = ppShape(6.dp),
             ),
         )
@@ -252,12 +254,12 @@ internal fun AuraCustomPopover(
     Column(
         modifier = modifier.width(190.dp)
             .clip(ppShape(16.dp))
-            .background(LocalTheme.current.popupBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(16.dp))
+            .background(OneConfigTheme.current.popupBackground)
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SocialText("Aura Color", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText("Aura Color", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
 
         var paneSize by remember { mutableStateOf(Size.Zero) }
         Box(
@@ -397,7 +399,7 @@ internal fun AuraCustomPopover(
             Box(modifier = Modifier.size(28.dp).clip(ppShape(5.dp))) {
                 Checkerboard(Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
-                Box(Modifier.fillMaxSize().border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)))
+                Box(Modifier.fillMaxSize().border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)))
             }
             BasicTextField(
                 value = hexText,
@@ -415,21 +417,21 @@ internal fun AuraCustomPopover(
                 keyboardActions = KeyboardActions(onDone = { commitHex() }),
                 singleLine = true,
                 textStyle = TextStyle(
-                    color = LocalTheme.current.textColor,
+                    color = OneConfigTheme.current.textColor,
                     fontSize = 12.sp,
-                    fontFamily = LocalTheme.current.typography.family,
+                    fontFamily = OneConfigTheme.current.fontFamily,
                 ),
-                cursorBrush = SolidColor(LocalTheme.current.textColor),
+                cursorBrush = SolidColor(OneConfigTheme.current.textColor),
                 modifier = Modifier.weight(1f)
                     .clip(ppShape(5.dp))
-                    .background(LocalTheme.current.chipBackground)
-                    .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
+                    .background(OneConfigTheme.current.chipBackground)
+                    .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp))
                     .padding(horizontal = 8.dp, vertical = 6.dp)
                     .onFocusChanged { if (!it.isFocused) commitHex() }
                     .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SocialText("#", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText("#", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
                         inner()
                     }
                 },

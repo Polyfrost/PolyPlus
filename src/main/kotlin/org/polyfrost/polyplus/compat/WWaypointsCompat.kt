@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.compat
 
 import androidx.compose.foundation.layout.widthIn
@@ -9,9 +11,10 @@ import androidx.compose.ui.unit.sp
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.config.v1.Tree
-import org.polyfrost.oneconfig.internal.ui.api.Tooltip
-import org.polyfrost.oneconfig.internal.ui.components.Text
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Tooltip
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 
 //? if wwaypoints {
 import com.mojang.blaze3d.platform.InputConstants
@@ -91,7 +94,7 @@ object WWaypointsCompat {
     @JvmStatic
     fun DisabledReasonTooltip(reason: String, content: @Composable () -> Unit) {
         Tooltip(
-            text = { Text(reason, color = LocalTheme.current.textColor, fontSize = 12.sp) },
+            text = { Text(reason, modifier = Modifier, color = OneConfigTheme.current.textColor, fontSize = 12.sp) },
             modifier = Modifier.widthIn(max = 260.dp),
             anchor = Alignment.TopCenter,
             content = content,
