@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -20,7 +19,6 @@ import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
 import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
 import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
-import org.polyfrost.oneconfig.internal.ui.shell.ShellState
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -101,10 +99,6 @@ fun NavGraphBuilder.polyPlusCosmeticsGraph() {
 
 @Composable
 private fun PolyPlusCosmeticsScreen() {
-    DisposableEffect(Unit) {
-        ShellState.title = "Wardrobe"
-        onDispose { }
-    }
     if (!PrivacyConsent.allowsOnlineServices()) {
         MinecraftCapesOnlyScreen()
         return
