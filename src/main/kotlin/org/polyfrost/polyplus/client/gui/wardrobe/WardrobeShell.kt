@@ -146,18 +146,61 @@ internal fun WardrobeShell(
     val previewHeading = selectedMojang?.let { it.name to MOJANG_CAPE_COLLECTION }
         ?: selectedOutfit?.let { it.name to "Outfit" }
         ?: selectedSkin?.let { it.name to "${it.model.label} skin" }
+    val selectionPreview = rememberSelectionPreview(
+        owned = selectedOwned,
+        variantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
+        mojang = selectedMojang,
+    )
     val previewRotation = remember { PreviewRotation(FRONT_YAW_DEG) }
-    val showBack = selectedMojang != null ||
-        selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
-        selectedShop?.type?.let { it in BACK_VIEW_TYPES } == true ||
-        (selection == null && section == WardrobeSection.Cosmetics)
-    LaunchedEffect(showBack) {
+    val selectionShowsBack = if (selection == null) {
+        null
+    } else {
+        selectedMojang != null ||
+            selectedOwned?.type?.let { it in BACK_VIEW_TYPES } == true ||
+            selectedShop?.type?.let { it in BACK_VIEW_TYPES } == true
+    }
+    val activeAnchorLabel by remember(anchors) {
+        derivedStateOf { anchors.firstOrNull { it.second == activeAnchor }?.first }
+    }
+    val scrollShowsBack = section == WardrobeSection.Cosmetics && activeAnchorLabel == CosmeticType.Cape.displayName
+    var showBack by remember { mutableStateOf(false) }
+    LaunchedEffect(scrollShowsBack) { showBack = scrollShowsBack }
+    LaunchedEffect(selection) { selectionShowsBack?.let { showBack = it } }
+    var rotationResets by remember { mutableIntStateOf(0) }
+    LaunchedEffect(showBack, rotationResets) {
         if (previewRotation.userRotated) return@LaunchedEffect
         val target = if (showBack) BACK_YAW_DEG else FRONT_YAW_DEG
-        val delta = ((target - previewRotation.yaw) % 360f + 540f) % 360f - 180f
-        animate(previewRotation.yaw, previewRotation.yaw + delta, animationSpec = tween(300)) { value, _ ->
-            if (!previewRotation.userRotated) previewRotation.yaw = value
+        val startYaw = previewRotation.yaw
+        val startPitch = previewRotation.pitch
+        val delta = ((target - startYaw) % 360f + 540f) % 360f - 180f
+        animate(0f, 1f, animationSpec = tween(300)) { progress, _ ->
+            if (!previewRotation.userRotated) {
+                previewRotation.yaw = startYaw + delta * progress
+                previewRotation.pitch = startPitch * (1f - progress)
+            }
         }
+    }
+    val resetRotation: () -> Unit = {
+        previewRotation.userRotated = false
+        rotationResets++
+    }
+    val addToWheel = { item: CosmeticUiItem ->
+        val wheel = EmoteWheels.activeIndex
+        val target = wheelSlot
+        val placed = if (target != null) {
+            EmoteWheels.assign(wheel, target, item.groupId)
+            target
+        } else {
+            EmoteWheels.addToFirstEmpty(wheel, item.groupId)
+        }
+        wheelSlot = null
+        onStatus(
+            if (placed == null) {
+                "Wheel ${wheel + 1} is full. Pick a slot to replace."
+            } else {
+                "Added ${item.name} to wheel ${wheel + 1}."
+            },
+        )
     }
 
     Row(modifier = Modifier.fillMaxSize().padding(horizontal = 25.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -210,26 +253,19 @@ internal fun WardrobeShell(
                     coverFor = { item -> item.variants.firstNotNullOfOrNull { coverByVariant[it.id] } },
                     onOwned = { item ->
                         if (wheelMode && item.type == CosmeticType.Emote) {
-                            val wheel = EmoteWheels.activeIndex
-                            val target = wheelSlot
-                            val placed = if (target != null) {
-                                EmoteWheels.assign(wheel, target, item.groupId)
-                                target
-                            } else {
-                                EmoteWheels.addToFirstEmpty(wheel, item.groupId)
-                            }
-                            wheelSlot = null
-                            onStatus(
-                                if (placed == null) {
-                                    "Wheel ${wheel + 1} is full. Pick a slot to replace."
-                                } else {
-                                    "Added ${item.name} to wheel ${wheel + 1}."
-                                },
-                            )
+                            addToWheel(item)
                         } else {
                             selection = WardrobeSelection.Owned(item.groupId, item.type)
                             showCart = false
                             onEquip(item)
+                        }
+                    },
+                    onClickOwned = { item ->
+                        if (wheelMode && item.type == CosmeticType.Emote) {
+                            addToWheel(item)
+                        } else {
+                            selection = WardrobeSelection.Owned(item.groupId, item.type)
+                            showCart = false
                         }
                     },
                     onPreviewOwned = { item ->
@@ -250,6 +286,10 @@ internal fun WardrobeShell(
                         selection = WardrobeSelection.Mojang(cape.id)
                         showCart = false
                         toggleMojangCape(cape, onStatus)
+                    },
+                    onPreviewMojang = { cape ->
+                        selection = WardrobeSelection.Mojang(cape.id)
+                        showCart = false
                     },
                     onBundle = { bundle ->
                         selection = WardrobeSelection.Bundle(bundle.id)
@@ -346,6 +386,7 @@ internal fun WardrobeShell(
                             onBuyNow = onBuyNow,
                             modifier = Modifier.fillMaxSize(),
                             rotation = previewRotation,
+                            onResetRotation = resetRotation,
                         )
                     }
                     selectedBundle != null -> BundleDetailPanel(
@@ -362,6 +403,8 @@ internal fun WardrobeShell(
                             selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
                             onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },
                             rotation = previewRotation,
+                            onResetRotation = resetRotation,
+                            selectionPreview = selectionPreview,
                             showAuraColor = selectedOwned?.type == CosmeticType.Aura,
                             auraColor = auraColor,
                             onPreviewAuraColor = onPreviewAuraColor,

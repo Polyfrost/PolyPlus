@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +95,7 @@ internal fun WardrobeGrid(
     modifier: Modifier,
     coverFor: (CosmeticUiItem) -> Int?,
     onOwned: (CosmeticUiItem) -> Unit,
+    onClickOwned: (CosmeticUiItem) -> Unit,
     onPreviewOwned: (CosmeticUiItem) -> Unit,
     onSelectVariant: (Int, Int) -> Unit,
     onShop: (CosmeticStoreInfo) -> Unit,
@@ -100,6 +103,7 @@ internal fun WardrobeGrid(
     onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     onMojang: (MojangCape) -> Unit,
+    onPreviewMojang: (MojangCape) -> Unit,
     onBundle: (BundleInfo) -> Unit,
     onBuyBundle: (BundleInfo) -> Unit,
     onLibraryAction: (WardrobeSection) -> Unit,
@@ -135,7 +139,7 @@ internal fun WardrobeGrid(
                         onAction = { onOwned(item) },
                         equipped = item.equipped,
                         selected = selection == WardrobeSelection.Owned(item.groupId, item.type),
-                        onClick = { onOwned(item) },
+                        onClick = { onClickOwned(item) },
                         variants = item.variants,
                         selectedVariantId = variantId,
                         onPickVariant = { onSelectVariant(item.groupId, it) },
@@ -221,8 +225,9 @@ internal fun WardrobeGrid(
                         equipped = cape.active,
                         selected = selection == WardrobeSelection.Mojang(cape.id),
                         enabled = !mojangBusy,
-                        onClick = { onMojang(cape) },
+                        onClick = { onPreviewMojang(cape) },
                         menu = listOf(
+                            CardMenuAction("Preview") { onPreviewMojang(cape) },
                             CardMenuAction(if (cape.active) "Remove" else "Equip") { onMojang(cape) },
                         ),
                     ) { modifier ->
@@ -391,8 +396,6 @@ private val CARD_HAIRLINE = Color(0x1AFFFFFF)
 private val CARD_STRIP = Color(0xB3232D32)
 private val CARD_HIGHLIGHT = Color(0x0DFFFFFF)
 
-private const val MAX_VISIBLE_SWATCHES = 4
-
 @Composable
 private fun CardDetailText(text: String) {
     CardLabel(text, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
@@ -500,27 +503,13 @@ private fun VariantSwatches(
     onPick: (Int) -> Unit,
     modifier: Modifier,
 ) {
-    val theme = LocalTheme.current
     Column(
-        modifier = modifier,
+        modifier = modifier.verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        variants.take(MAX_VISIBLE_SWATCHES).forEach { variant ->
+        variants.forEach { variant ->
             VariantSwatch(variant, selected = variant.id == selectedVariantId, onClick = { onPick(variant.id) })
-        }
-        val hidden = variants.size - MAX_VISIBLE_SWATCHES
-        if (hidden > 0) {
-            Box(
-                modifier = Modifier.height(16.dp).widthIn(min = 16.dp)
-                    .clip(ppShape(5.dp))
-                    .background(theme.chipBackground)
-                    .border(1.dp, CARD_HAIRLINE, ppShape(5.dp))
-                    .padding(horizontal = 2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                SocialText("+$hidden", color = theme.textColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-            }
         }
     }
 }

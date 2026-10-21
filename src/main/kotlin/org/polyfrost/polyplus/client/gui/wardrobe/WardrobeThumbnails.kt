@@ -154,7 +154,7 @@ internal fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier
     }
 }
 
-private fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
+internal fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
     isCape -> CosmeticAssetCache.isCapeLoaded(id)
     isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null

@@ -146,6 +146,7 @@ internal fun StoreDetailPanel(
     onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     modifier: Modifier,
     rotation: PreviewRotation? = null,
+    onResetRotation: () -> Unit = {},
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
@@ -175,6 +176,7 @@ internal fun StoreDetailPanel(
                     rotation = rotation,
                 )
                 OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
+                ResetRotationButton(rotation, onResetRotation)
             }
         }
 

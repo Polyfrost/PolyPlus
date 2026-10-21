@@ -123,7 +123,7 @@ private fun isOutfitAssetLoaded(slot: BodySlot, id: Int): Boolean = when (slot) 
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 
-private fun outfitPreviewSource(equipped: Map<BodySlot, Int>, mojangCape: Identifier?): PlayerPreviewSource {
+internal fun outfitPreviewSource(equipped: Map<BodySlot, Int>, mojangCape: Identifier?): PlayerPreviewSource {
     val equipment = CosmeticEquipment()
     var pet: PetDefinition? = null
     for ((slot, id) in equipped) {

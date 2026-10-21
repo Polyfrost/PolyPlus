@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +49,11 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
+import org.polyfrost.polyplus.client.cosmetics.MojangCape
+import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -56,6 +61,7 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 @Composable
 internal fun PreviewPanel(
@@ -66,6 +72,8 @@ internal fun PreviewPanel(
     selectedVariantId: Int? = null,
     onSelectVariant: (Int) -> Unit = {},
     rotation: PreviewRotation? = null,
+    onResetRotation: () -> Unit = {},
+    selectionPreview: SelectionPreview? = null,
     showAuraColor: Boolean = false,
     auraColor: Int? = null,
     onPreviewAuraColor: (Int) -> Unit = {},
@@ -76,17 +84,18 @@ internal fun PreviewPanel(
             .background(cardBrush())
             .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
     ) {
-        val hasHeadCosmetic = CosmeticCatalog.localEquipped().equipped
-            .containsKey(BodySlot.Hat)
+        val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
+            ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
         PlayerPreview(
             Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-            source = PlayerPreviewSource.LocalLive,
+            source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
             autoSpin = false,
             verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
             initialYaw = FRONT_YAW_DEG,
             live = true,
             rotation = rotation,
         )
+        ResetRotationButton(rotation, onResetRotation)
         Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
             if (title != null) {
@@ -128,6 +137,54 @@ internal fun PreviewPanel(
                 }
             }
         }
+    }
+}
+
+internal class SelectionPreview(val source: PlayerPreviewSource, val hasHeadCosmetic: Boolean)
+
+@Composable
+internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, mojang: MojangCape?): SelectionPreview? {
+    val slot = owned?.type?.defaultSlot()
+    val previewsOwned = owned != null && slot != null && variantId != null &&
+        !(owned.equipped && owned.equippedVariantId == variantId)
+    val installs = CosmeticAssetCache.installs
+    val textureVersion = MojangCapeService.textureVersion
+    val mojangState = MojangCapeService.state
+
+    var previewId by remember(variantId) { mutableStateOf(variantId) }
+    LaunchedEffect(variantId, previewsOwned) {
+        if (!previewsOwned || variantId == null) return@LaunchedEffect
+        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+        val id = CosmeticCatalog.resolveVariantForSkin(variantId, slim)
+        previewId = id
+        if (!isPreviewAssetLoaded(id, slot == BodySlot.Cape, slot == BodySlot.Pet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
+    }
+
+    val base = CosmeticCatalog.localEquipped().equipped
+    val look = remember(base, owned?.equippedCosmeticId, slot, previewId, previewsOwned, mojang?.id) {
+        base.toMutableMap().apply {
+            val id = previewId
+            if (previewsOwned && slot != null && id != null) {
+                owned?.equippedCosmeticId?.let { equippedId -> values.removeAll { it == equippedId } }
+                put(slot, id)
+            }
+            if (mojang != null) remove(BodySlot.Cape)
+        }
+    }
+    val mojangTexture = remember(mojang?.textureHash, textureVersion) { mojang?.let(MojangCapeService::texture) }
+    val localMojang = remember(mojangState, textureVersion) { MojangCapeService.localCapeTexture() }
+    val source = remember(look, installs, mojangTexture, localMojang) {
+        outfitPreviewSource(look, mojangTexture ?: localMojang)
+    }
+    if (!previewsOwned && mojang == null) return null
+    return SelectionPreview(source, BodySlot.Hat in look)
+}
+
+@Composable
+internal fun BoxScope.ResetRotationButton(rotation: PreviewRotation?, onReset: () -> Unit) {
+    if (rotation?.userRotated != true) return
+    Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
+        SmallButton("Reset view", iconPath = "refresh", primary = false, onClick = onReset)
     }
 }
 
