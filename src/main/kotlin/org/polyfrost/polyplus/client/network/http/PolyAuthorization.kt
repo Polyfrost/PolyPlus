@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
@@ -196,6 +197,7 @@ object PolyAuthorization {
         if (modsReported.compareAndSet(false, true)) {
             PolyPlusClient.SCOPE.launch(Dispatchers.IO) { reportMods(response.token) }
         }
+        SkinLibrary.onSignedIn(profileId)
         return Authorized(profileId, response)
     }
 

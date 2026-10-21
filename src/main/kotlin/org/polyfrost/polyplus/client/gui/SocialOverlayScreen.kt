@@ -1,12 +1,15 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.social.SocialOverlay
 
 //? if >= 26.1 {
@@ -140,7 +143,7 @@ class SocialOverlayScreen(internal val previousScreen: Screen?) : ComposeScreen(
 
     @Composable
     override fun compose() {
-        Theme {
+        ProvideOneConfigTheme {
             SocialOverlayContent(screen = this, onClose = { Minecraft.getInstance().execute { SocialOverlay.close() } })
         }
     }

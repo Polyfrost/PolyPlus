@@ -458,6 +458,17 @@ object CosmeticAssetCache {
             CosmeticType.Emote -> "emote-$id"
             else -> "cosmetic-$id"
         }
+
+    fun primaryTextureFile(id: Int): File? {
+        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return null
+        val dir = baseDir.resolve(definition.cacheKey())
+        if (!dir.isDirectory) return null
+        return dir.walkTopDown()
+            .filter { it.isFile && !it.name.startsWith(APPLE_DOUBLE_PREFIX) && it.extension.equals("png", ignoreCase = true) }
+            .sortedBy { it.invariantSeparatorsPath }
+            .firstOrNull()
+            ?: dir.resolve("asset.bin").takeIf { it.isFile }
+    }
 }
 
 private const val MAX_CAPE_FRAME_PIXELS = 1024L * 512

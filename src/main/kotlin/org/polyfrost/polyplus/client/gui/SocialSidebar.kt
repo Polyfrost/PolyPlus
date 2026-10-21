@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -25,8 +27,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
@@ -104,9 +106,9 @@ private fun SidebarTabButton(
     onClick: () -> Unit,
 ) {
     val (interaction, hovered) = rememberSocialHover()
-    val background by animateColorAsState(if (selected) Accent.asSocialSelected else if (hovered) SocialHoverOverlay else Color.Transparent)
-    val border by animateColorAsState(if (selected) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
-    val textColor by animateColorAsState(if (selected) Accent else SocialTextSecondary)
+    val background by animateColorAsState(if (selected) OneConfigTheme.accent.asSocialSelected else if (hovered) SocialHoverOverlay else Color.Transparent)
+    val border by animateColorAsState(if (selected) OneConfigTheme.accent else if (hovered) SocialHoverBorder else SocialBorderColor)
+    val textColor by animateColorAsState(if (selected) OneConfigTheme.accent else SocialTextSecondary)
     Box(
         modifier = modifier
             .height(30.dp)
@@ -119,7 +121,7 @@ private fun SidebarTabButton(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             SocialText(label, fontSize = 13.sp, color = textColor)
-            if (badge) Box(Modifier.size(6.dp).clip(LocalTheme.current.circleShape).background(Accent))
+            if (badge) Box(Modifier.size(6.dp).clip(OneConfigTheme.current.circleShape).background(OneConfigTheme.accent))
         }
     }
 }
@@ -168,7 +170,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
     val (interaction, hovered) = rememberSocialHover()
     val border by animateColorAsState(
         when {
-            selected -> Accent
+            selected -> OneConfigTheme.accent
             hovered -> SocialHoverBorder
             else -> SocialBorderColor
         },
@@ -178,7 +180,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
             .fillMaxWidth()
             .height(60.dp)
             .clip(SocialPanelShape)
-            .background(if (selected) Accent.asSocialSelected else SocialCardBackground)
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else SocialCardBackground)
             .border(SocialBorderWidth, border, SocialPanelShape)
             .hoverable(interaction)
             .clickableWithSound(onClick)
@@ -187,7 +189,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (group.kind == GroupKind.Group) {
-            val ringColor = if (selected) Accent.asSocialSelected else SocialCardBackground
+            val ringColor = if (selected) OneConfigTheme.accent.asSocialSelected else SocialCardBackground
             SocialGroupAvatar(group.members.filterNot { it == selfId }, 38.dp, ringColor = ringColor)
         } else {
             val other = group.members.firstOrNull { it != selfId } ?: selfId
@@ -197,7 +199,7 @@ private fun ConversationRow(group: GroupSummary, selfId: String, selected: Boole
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SocialText(title, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
                 if (group.unread) {
-                    Box(Modifier.size(8.dp).clip(LocalTheme.current.circleShape).background(Accent))
+                    Box(Modifier.size(8.dp).clip(OneConfigTheme.current.circleShape).background(OneConfigTheme.accent))
                 }
             }
             val last = group.lastMessage
@@ -261,7 +263,7 @@ private fun FriendQuickList(friends: List<Friend>, onSelectFriend: (String) -> U
                         Box(
                             Modifier
                                 .size(10.dp)
-                                .clip(LocalTheme.current.circleShape)
+                                .clip(OneConfigTheme.current.circleShape)
                                 .background(SocialSuccessColor)
                                 .align(Alignment.BottomEnd),
                         )

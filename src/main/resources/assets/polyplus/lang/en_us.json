@@ -8,5 +8,6 @@
   "polyplus.session.refreshing": "Refreshing session...",
   "polyplus.session.reconnecting": "Reconnecting...",
   "polyplus.session.refreshFailed": "Refresh failed - click to retry",
+  "polyplus.page.wardrobe": "Wardrobe",
   "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this."
 }

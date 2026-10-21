@@ -102,7 +102,9 @@ object CosmeticCatalog {
             }.bodyOrThrow<CosmeticList>()
         }.onFailure { reportCatalogFailure(it) }
             .getOrElse {
-                CosmeticLoadProgress.fail(it.message ?: it::class.java.simpleName)
+                CosmeticLoadProgress.fail(
+                    if (isRuntimeMismatch(it)) CosmeticLoadProgress.OUTDATED_RUNTIME else it.message ?: it::class.java.simpleName,
+                )
                 return
             }
         CosmeticLoadProgress.onCatalogFetched()

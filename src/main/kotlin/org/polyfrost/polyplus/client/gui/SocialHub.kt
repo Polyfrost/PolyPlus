@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -40,8 +42,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.FriendsRepository
@@ -360,8 +362,8 @@ private fun SocialHeaderToolbar(
             SocialIconButton(
                 SOCIAL_ASSETS + "user-plus-01.svg",
                 tooltip = "Invite Friends to World",
-                background = Accent.asSocialSelected,
-                tint = Accent,
+                background = OneConfigTheme.accent.asSocialSelected,
+                tint = OneConfigTheme.accent,
                 onClick = onInviteToSession,
             )
         }
@@ -388,10 +390,10 @@ private fun SocialHeaderToolbar(
                     specialFilter == SpecialChatResponses.Filter.Responded -> "Showing chats that replied"
                     else -> "Filter by whether they replied"
                 },
-                background = if (specialFilter != SpecialChatResponses.Filter.All) Accent.asSocialSelected else null,
+                background = if (specialFilter != SpecialChatResponses.Filter.All) OneConfigTheme.accent.asSocialSelected else null,
                 tint = when (specialFilter) {
                     SpecialChatResponses.Filter.Awaiting -> SocialWarnColor
-                    SpecialChatResponses.Filter.Responded -> Accent
+                    SpecialChatResponses.Filter.Responded -> OneConfigTheme.accent
                     else -> SocialTextPrimary
                 },
                 onClick = onCycleSpecialFilter,
@@ -401,15 +403,15 @@ private fun SocialHeaderToolbar(
         SocialIconButton(
             SOCIAL_ASSETS + "message-chat-circle.svg",
             tooltip = if (unreadOnly) "Show all conversations" else "Show unread only",
-            background = if (unreadOnly) Accent.asSocialSelected else null,
-            tint = if (unreadOnly) Accent else SocialTextPrimary,
+            background = if (unreadOnly) OneConfigTheme.accent.asSocialSelected else null,
+            tint = if (unreadOnly) OneConfigTheme.accent else SocialTextPrimary,
             onClick = onToggleUnreadOnly,
         )
 
         SocialIconButton(
             SOCIAL_ASSETS + "search-lg.svg",
             tooltip = if (searchOpen) "Close search" else "Search conversations",
-            background = if (searchOpen) Accent.asSocialSelected else null,
+            background = if (searchOpen) OneConfigTheme.accent.asSocialSelected else null,
             onClick = onToggleSearch,
         )
 
@@ -448,7 +450,7 @@ private fun WorldInvitesButton(invites: List<SessionInvite>, onOpenConversation:
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(2.dp)
-                    .clip(LocalTheme.current.circleShape)
+                    .clip(OneConfigTheme.current.circleShape)
                     .background(SocialWarnColor)
                     .padding(horizontal = 4.dp),
             ) {
