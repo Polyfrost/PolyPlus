@@ -6,3 +6,4 @@
 - Changed wWaypoints toast titles to always mention wWaypoints
 - Removed wWaypoints toasts for its sharing backend dropping and reconnecting
 - Fixed Poly+'s icon being cut off in Mod Menu and launchers
+- wWaypoints' toggle sneak is no longer forcibly disabled – added a patch to stop it from flagging anticheats

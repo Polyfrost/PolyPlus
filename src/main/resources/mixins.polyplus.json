@@ -161,6 +161,8 @@
     //? if > 1.8.9
     "compat.wwaypoints.MixinEssentialSharingContextResolver",
     //? if > 1.8.9
+    "compat.wwaypoints.MixinLocalPlayer",
+    //? if > 1.8.9
     "compat.wwaypoints.MixinServerFeaturePolicy",
     //? if > 1.8.9
     "compat.wwaypoints.MixinServerPolicyFeedback",

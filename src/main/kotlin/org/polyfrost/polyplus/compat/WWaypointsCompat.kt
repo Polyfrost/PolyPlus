@@ -37,9 +37,7 @@ object WWaypointsCompat {
         "wwaypoints.toggleSneakStaySneakedInContainers",
         "wwaypoints.toggleSneakBetterInteractions",
         "wwaypoints.sneakKeybindOverrides",
-        "wwaypoints.toggleSneakIndicatorMode",
         "wwaypoints.signGuiPopup",
-        "wwaypoints.key.toggle_sneak",
         "wwaypoints.key.sign_gui_popup_toggle",
     )
 
@@ -60,10 +58,9 @@ object WWaypointsCompat {
         SettingRowDecorators.register(disabledReasonTooltip)
         ClientLifecycleEvents.CLIENT_STARTED.register { client ->
             if (disableFeatures(WaypointsClient.getConfig())) WaypointsClient.saveConfig()
-            val boundKeys = listOf(WaypointsClient.getToggleSneakKey(), WaypointsClient.getSignGuiPopupToggleKey())
-                .filterNot { it.isUnbound }
-            if (boundKeys.isEmpty()) return@register
-            boundKeys.forEach { it.setKey(InputConstants.UNKNOWN) }
+            val popupKey = WaypointsClient.getSignGuiPopupToggleKey()
+            if (popupKey.isUnbound) return@register
+            popupKey.setKey(InputConstants.UNKNOWN)
             KeyMapping.resetMapping()
             client.options.save()
         }

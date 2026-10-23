@@ -4,8 +4,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 
 //? if wwaypoints {
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import com.moulberry.mixinconstraints.annotations.IfModLoaded;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -34,13 +32,6 @@ public class MixinToggleSneakConfigScreen {
         polyplus$rawMouseY = mouseY;
     }
     //?}
-
-    // 0.8.1 only greys out the toggle and indicator controls when the server disables the whole mod
-    @IfModLoaded(value = "wwaypoints", minVersion = "0.8.1")
-    @ModifyExpressionValue(method = "updatePolicyControls", at = @At(value = "INVOKE", target = "Lcom/wwaypoints/client/ServerFeaturePolicy;allowsMod()Z"), remap = false)
-    private boolean lockToggleControls(boolean original) {
-        return false;
-    }
 
     @Inject(method = "render", at = @At("TAIL"))
     private void renderDisabledReason(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
