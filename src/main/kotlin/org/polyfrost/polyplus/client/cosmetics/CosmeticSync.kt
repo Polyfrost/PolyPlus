@@ -119,6 +119,7 @@ object CosmeticSync {
                 PolyPlusBadge.clearTabCache()
                 CosmeticAssetCache.reset()
                 PetManager.despawnAll()
+                PolyPlusClient.refreshCosmetics()
             }
             wasConnected = connected
             Unit
@@ -131,6 +132,7 @@ object CosmeticSync {
             if (assetResetPending) {
                 assetResetPending = false
                 CosmeticAssetCache.reset()
+                PolyPlusClient.refreshCosmetics()
             }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
             val configUiOpen = ClientPlatform.currentScreen() is OneConfigUIScreen
