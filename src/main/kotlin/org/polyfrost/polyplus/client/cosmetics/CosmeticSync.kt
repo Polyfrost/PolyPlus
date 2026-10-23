@@ -76,6 +76,9 @@ object CosmeticSync {
     private const val TRIM_DELAY_TICKS = 20
     private var trimCountdown = 0
     private var configUiWasOpen = false
+
+    @Volatile
+    private var assetResetPending = false
     //?}
 
     fun earlyInitialize() {
@@ -105,7 +108,8 @@ object CosmeticSync {
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
             PolyPlusBadge.clearTabCache()
-            CosmeticAssetCache.reset()
+            // this can run on the Netty thread, where waiting on the main thread hangs forever once Minecraft#disconnect drops the task
+            assetResetPending = true
             PetManager.despawnAll()
             //?}
         }
@@ -127,6 +131,10 @@ object CosmeticSync {
         //? if >= 1.21.1 {
         eventHandler<WorldEvent.Unload> { trimCountdown = TRIM_DELAY_TICKS }
         eventHandler<TickEvent.End> {
+            if (assetResetPending) {
+                assetResetPending = false
+                CosmeticAssetCache.reset()
+            }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
             val configUiOpen = OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
             if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
