@@ -33,7 +33,6 @@ import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -165,7 +164,6 @@ object PolyPlusClient {
         }
         step("rich text privacy") { RichTextPrivacy.warmUp() }
         step("default settings") { DefaultSettings.initialize() }
-        step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }

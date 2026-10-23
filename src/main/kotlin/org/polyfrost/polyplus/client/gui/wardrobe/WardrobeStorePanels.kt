@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -30,8 +28,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
@@ -44,14 +41,14 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 @Composable
 internal fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
     when {
-        finalPrice == null -> SocialText("—", color = OneConfigTheme.current.textColorSecondary, fontSize = 14.sp)
+        finalPrice == null -> SocialText("—", color = LocalTheme.current.textColorSecondary, fontSize = 14.sp)
         finalPrice <= 0f -> SocialText("FREE", color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         discounted && basePrice != null -> {
             SocialText(money(basePrice), color = Color(0xFFFF4444), fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
             Spacer(Modifier.width(4.dp))
             SocialText(money(finalPrice), color = Color(0xFF239A60), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
-        else -> SocialText(money(finalPrice), color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        else -> SocialText(money(finalPrice), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -86,13 +83,13 @@ private fun CartPanel(
         val subtotal = items.sumOf { (it.basePrice ?: it.finalPrice ?: 0f).toDouble() }.toFloat()
         val total = items.sumOf { (it.finalPrice ?: it.basePrice ?: 0f).toDouble() }.toFloat()
         val discount = (subtotal - total).coerceAtLeast(0f)
-        RowTotals("Subtotal", money(subtotal), OneConfigTheme.current.textColor)
+        RowTotals("Subtotal", money(subtotal), LocalTheme.current.textColor)
         if (discount > 0f) {
             RowTotals("Discounts", "-${money(discount)}", Color(0xFF239A60))
         }
         RowTotals("Total", if (total <= 0f) "FREE" else money(total), Color.White, large = true)
         if (status != null) {
-            SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
         SmallButton(
             label = "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
@@ -109,16 +106,16 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
         modifier = Modifier.fillMaxWidth().height(81.dp)
             .clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
             .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         CoverThumbnail(item.coverAssetId, Modifier.size(58.dp))
         Column(Modifier.weight(1f)) {
-            SocialText(item.name, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(item.name, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             item.description?.takeIf { it.isNotBlank() }?.let {
-                SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -132,7 +129,7 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
 @Composable
 private fun RowTotals(label: String, value: String, color: Color, large: Boolean = false) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        SocialText(label, color = OneConfigTheme.current.textColor, fontSize = if (large) 18.sp else 12.sp, modifier = Modifier.weight(1f))
+        SocialText(label, color = LocalTheme.current.textColor, fontSize = if (large) 18.sp else 12.sp, modifier = Modifier.weight(1f))
         SocialText(value, color = color, fontSize = if (large) 22.sp else 12.sp, fontWeight = if (large) FontWeight.Medium else FontWeight.Normal)
     }
 }
@@ -156,7 +153,7 @@ internal fun StoreDetailPanel(
             modifier = Modifier.fillMaxWidth().height(330.dp)
                 .clip(ppShape(12.dp))
                 .background(cardBrush())
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
         ) {
             if (info == null || variant == null) {
                 CenteredNote("Select a cosmetic to preview it.")
@@ -187,7 +184,7 @@ internal fun StoreDetailPanel(
             modifier = Modifier.weight(1f).fillMaxWidth()
                 .clip(ppShape(12.dp))
                 .background(cardBrush())
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+                .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
         ) {
             if (info == null || variant == null) {
                 CenteredNote("Browse the store to buy individual cosmetics.")
@@ -198,8 +195,8 @@ internal fun StoreDetailPanel(
                         modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        SocialText(info.type.displayName, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
-                        SocialText(info.name, color = OneConfigTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        SocialText(info.type.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText(info.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
                         if (variants.size > 1) {
                             VariantPicker(
@@ -214,26 +211,26 @@ internal fun StoreDetailPanel(
                                 for (tag in info.tags.all.take(4)) {
                                     Box(
                                         modifier = Modifier.clip(ppShape(5.dp))
-                                            .background(OneConfigTheme.current.chipBackground)
-                                            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp))
+                                            .background(LocalTheme.current.chipBackground)
+                                            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp))
                                             .padding(horizontal = 8.dp, vertical = 3.dp),
                                     ) {
-                                        SocialText(tag.replaceFirstChar { it.uppercase() }, color = OneConfigTheme.current.textColor, fontSize = 11.sp)
+                                        SocialText(tag.replaceFirstChar { it.uppercase() }, color = LocalTheme.current.textColor, fontSize = 11.sp)
                                     }
                                 }
                             }
                         }
                         info.description?.takeIf { it.isNotBlank() }?.let {
-                            SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                            SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                         }
                     }
                     if (status != null) {
-                        SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
                     }
                     if (variant.id in ownedIds) {
                         SocialText(
                             "You already own this cosmetic.",
-                            color = OneConfigTheme.current.textColorSecondary,
+                            color = LocalTheme.current.textColorSecondary,
                             fontSize = 12.sp,
                         )
                     } else {
@@ -276,7 +273,7 @@ internal fun WardrobeCartPane(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SocialText("Cart", color = OneConfigTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            SocialText("Cart", color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             SmallButton("Close", iconPath = "close", primary = false, onClick = onClose)
         }
         CartPanel(items = cart, status = status, modifier = Modifier.weight(1f).fillMaxWidth(), onRemove = onRemove, onCheckout = onCheckout)
@@ -290,15 +287,15 @@ internal fun BundleDetailPanel(bundle: BundleInfo, status: String?, onBuy: () ->
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         CoverThumbnail(bundle.assetId, Modifier.fillMaxWidth().height(200.dp))
-        SocialText("Bundle", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
-        SocialText(bundle.name, color = OneConfigTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        SocialText("Bundle", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText(bundle.name, color = LocalTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted) }
         bundle.description?.takeIf { it.isNotBlank() }?.let {
-            SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
         Spacer(Modifier.weight(1f))
         if (status != null) {
-            SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
         }
         SmallButton("Buy now", iconPath = "assets/polyplus/ico/shopping-bag.svg", primary = true, onClick = onBuy)
     }

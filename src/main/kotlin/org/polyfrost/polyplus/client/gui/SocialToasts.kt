@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.background
@@ -22,9 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.social.SocialErrors
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.delay
@@ -70,6 +67,6 @@ private fun SocialToastBubble(message: String, onDismiss: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(SOCIAL_ASSETS + "x-close.svg", SocialDangerColor, Modifier.padding(top = 1.dp).size(16.dp))
-        SocialText(message, fontSize = 13.sp, color = OneConfigTheme.current.textColor)
+        SocialText(message, fontSize = 13.sp, color = LocalTheme.current.textColor)
     }
 }

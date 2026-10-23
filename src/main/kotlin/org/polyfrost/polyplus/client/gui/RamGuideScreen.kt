@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.background
@@ -19,9 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 
 private val MEMORY_STEPS = listOf(
@@ -54,7 +51,7 @@ class RamGuideScreen(private val advice: JvmAdvisor.Advice) : ComposeScreen(Rend
 
     @Composable
     override fun compose() {
-        ProvideOneConfigTheme { RamGuideContent(advice, onDismiss = { onClose() }) }
+        Theme { RamGuideContent(advice, onDismiss = { onClose() }) }
     }
 }
 

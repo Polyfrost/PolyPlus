@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
@@ -12,8 +10,11 @@ import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
+import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
+import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
+import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
+import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.concurrent.ConcurrentHashMap
 
@@ -374,12 +375,12 @@ object OnboardingFeatures {
 
     fun applyTheme(light: Boolean, style: Int) {
         val theme = when {
-            style == 1 && light -> OneConfigTheme.MINECRAFT_LIGHT
-            style == 1 -> OneConfigTheme.MINECRAFT_DARK
-            light -> OneConfigTheme.POLY_GLASS_LIGHT
-            else -> OneConfigTheme.POLY_GLASS_DARK
+            style == 1 && light -> MinecraftLight
+            style == 1 -> MinecraftDark
+            light -> PolyGlassLight
+            else -> PolyGlassDark
         }
-        OneConfigTheme.activate(theme)
+        ThemeRegistry.activate(theme)
     }
 
     private fun applyToggleSprint(enabled: Boolean) {

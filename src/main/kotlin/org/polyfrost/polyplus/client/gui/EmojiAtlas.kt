@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.Canvas
@@ -24,8 +22,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import org.jetbrains.skia.Image as SkiaImage
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import kotlin.math.roundToInt
 
@@ -117,7 +114,7 @@ internal fun SocialEmojiText(
             color = color,
             fontSize = fontSize,
             fontWeight = fontWeight,
-            fontFamily = OneConfigTheme.current.fontFamily,
+            fontFamily = LocalTheme.current.typography.family,
             textAlign = TextAlign.Start,
         ),
     )

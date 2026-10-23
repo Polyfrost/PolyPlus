@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -48,8 +46,7 @@ import org.polyfrost.polyplus.client.host.GameType
 import org.polyfrost.polyplus.client.social.setScreen
 *///?}
 import org.jetbrains.skia.Image
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -197,13 +194,13 @@ private fun CenteredHint(text: String) {
 @Composable
 private fun WorldCard(entry: HostWorldManager.HostWorldEntry, selected: Boolean, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
-    val border by animateColorAsState(if (selected) OneConfigTheme.accent else if (hovered) SocialHoverBorder else SocialBorderColor)
+    val border by animateColorAsState(if (selected) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(90.dp)
             .clip(SocialPanelShape)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else SocialCardBackground)
+            .background(if (selected) Accent.asSocialSelected else SocialCardBackground)
             .border(SocialBorderWidth, border, SocialPanelShape)
             .hoverable(interaction)
             .clickableWithSound(onClick)
@@ -485,7 +482,7 @@ private fun GroupInviteRow(group: GroupSummary, selfId: String, invitees: Set<St
         SocialIconButton(
             icon = if (allInvited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
             tint = if (allInvited) Color.White else SocialTextPrimary,
-            background = if (allInvited) OneConfigTheme.accent.asSocialSelected else null,
+            background = if (allInvited) Accent.asSocialSelected else null,
             tooltip = if (allInvited) "Everyone invited" else "Invite everyone in this group",
             onClick = { if (!allInvited) onInviteAll(members) },
         )
@@ -504,7 +501,7 @@ private fun FriendInviteRow(friend: Friend, invited: Boolean, onToggle: (Boolean
         SocialIconButton(
             icon = if (invited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
             tint = if (invited) Color.White else SocialTextPrimary,
-            background = if (invited) OneConfigTheme.accent.asSocialSelected else null,
+            background = if (invited) Accent.asSocialSelected else null,
             tooltip = if (invited) "Invited" else "Invite",
             onClick = { onToggle(!invited) },
         )

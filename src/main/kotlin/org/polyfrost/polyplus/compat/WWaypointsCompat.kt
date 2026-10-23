@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.compat
 
 import androidx.compose.foundation.layout.widthIn
@@ -11,12 +9,9 @@ import androidx.compose.ui.unit.sp
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.config.v1.Tree
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.SettingRowDecorator
-import org.polyfrost.oneconfig.api.ui.v1.SettingRowDecorators
-import org.polyfrost.oneconfig.api.ui.v1.components.Text
-import org.polyfrost.oneconfig.api.ui.v1.components.Tooltip
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.api.Tooltip
+import org.polyfrost.oneconfig.internal.ui.components.Text
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 
 //? if wwaypoints {
 import com.mojang.blaze3d.platform.InputConstants
@@ -45,19 +40,10 @@ object WWaypointsCompat {
 
     private val logger = LogManager.getLogger("PolyPlus/WWaypointsCompat")
 
-    private val disabledReasonTooltip = object : SettingRowDecorator() {
-        @Composable
-        override fun Decorate(property: Property<*>, content: @Composable () -> Unit) {
-            val reason = disabledReason(property) ?: return content()
-            DisabledReasonTooltip(reason, content)
-        }
-    }
-
     //? if wwaypoints {
     // written to disk as well so the features stay off if Poly+ is removed later
     fun initialize() {
         if (!FabricLoader.getInstance().isModLoaded("wwaypoints")) return
-        SettingRowDecorators.register(disabledReasonTooltip)
         ClientLifecycleEvents.CLIENT_STARTED.register { client ->
             if (disableFeatures(WaypointsClient.getConfig())) WaypointsClient.saveConfig()
             val boundKeys = listOf(WaypointsClient.getToggleSneakKey(), WaypointsClient.getSignGuiPopupToggleKey())
@@ -105,7 +91,7 @@ object WWaypointsCompat {
     @JvmStatic
     fun DisabledReasonTooltip(reason: String, content: @Composable () -> Unit) {
         Tooltip(
-            text = { Text(reason, modifier = Modifier, color = OneConfigTheme.current.textColor, fontSize = 12.sp) },
+            text = { Text(reason, color = LocalTheme.current.textColor, fontSize = 12.sp) },
             modifier = Modifier.widthIn(max = 260.dp),
             anchor = Alignment.TopCenter,
             content = content,

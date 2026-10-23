@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.animation.animateColorAsState
@@ -28,14 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -49,7 +46,7 @@ internal fun CapeGroupHeading(title: String, note: String, forceToggle: Boolean)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        SocialText(title, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         InfoTip(note)
         Spacer(Modifier.weight(1f))
         if (forceToggle) ForceCapesToggle()
@@ -62,7 +59,7 @@ private fun ForceCapesToggle() {
     val modName = CapeResolver.localOverrideModName
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val toggle = {
         forced = !forced
         PolyPlusCosmeticsConfig.forcePolyPlusCapes = forced
@@ -98,8 +95,8 @@ private fun ForceCapesToggle() {
 
 @Composable
 private fun CapeSwitch(checked: Boolean) {
-    val theme = OneConfigTheme.current
-    val track by animateColorAsState(if (checked) OneConfigTheme.accent else CAPE_SWITCH_TRACK)
+    val theme = LocalTheme.current
+    val track by animateColorAsState(if (checked) Accent else theme.controlTrackColor)
     val thumbOffset by animateDpAsState(if (checked) 19.dp else 3.dp, animationSpec = spring())
     Box(
         modifier = Modifier.size(width = 34.dp, height = 18.dp)
@@ -119,7 +116,7 @@ private fun CapeSwitch(checked: Boolean) {
 private fun InfoTip(text: String) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Box(Modifier.size(16.dp).hoverable(interaction), contentAlignment = Alignment.Center) {
         Icon("info", color = if (hovered) theme.textColor else theme.textColorSecondary, modifier = Modifier.size(14.dp))
         if (hovered) TooltipPopup(text)
@@ -131,12 +128,10 @@ internal fun CapeSectionNote(text: String) {
     Box(
         modifier = Modifier.fillMaxWidth().height(57.dp)
             .clip(ppShape(16.dp))
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .border(1.dp, LocalTheme.current.borderColor, ppShape(16.dp))
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        SocialText(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText(text, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
     }
 }
-
-private val CAPE_SWITCH_TRACK = Color(0xFF74777F)

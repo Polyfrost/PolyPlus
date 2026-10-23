@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -29,9 +27,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 
@@ -52,7 +50,7 @@ internal fun WardrobeHeader(
     onRefresh: () -> Unit,
     onCart: () -> Unit,
 ) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().height(33.dp),
@@ -110,12 +108,12 @@ internal fun WardrobeHeader(
 private fun SectionChip(section: WardrobeSection, selected: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val color = if (selected) theme.accentTextColor else theme.textColor
     Row(
         modifier = Modifier.height(33.dp)
             .clip(ppShape(8.dp))
-            .background(if (selected) OneConfigTheme.accent else theme.chipBackground)
+            .background(if (selected) Accent else theme.chipBackground)
             .border(1.dp, if (hovered && !selected) theme.textColorSecondary else theme.borderColor, ppShape(8.dp))
             .hoverable(interaction)
             .clickable(onClick = onClick)
@@ -132,7 +130,7 @@ private fun SectionChip(section: WardrobeSection, selected: Boolean, onClick: ()
 private fun AnchorChip(label: String, active: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Box(
         modifier = Modifier.height(26.dp)
             .clip(ppShape(6.dp))
@@ -156,7 +154,7 @@ private fun AnchorChip(label: String, active: Boolean, onClick: () -> Unit) {
 private fun HeaderIconButton(iconPath: String, tooltip: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Box(
         modifier = Modifier.size(33.dp)
             .clip(ppShape(8.dp))
@@ -186,12 +184,12 @@ internal fun PreviewModeToggle(wheelMode: Boolean, onChange: (Boolean) -> Unit) 
 internal fun PreviewModeOption(label: String, iconPath: String?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val color = if (selected) theme.accentTextColor else theme.textColor
     Row(
         modifier = modifier.fillMaxHeight()
             .clip(ppShape(8.dp))
-            .background(if (selected) OneConfigTheme.accent else theme.chipBackground)
+            .background(if (selected) Accent else theme.chipBackground)
             .border(1.dp, if (hovered && !selected) theme.textColorSecondary else theme.borderColor, ppShape(8.dp))
             .hoverable(interaction)
             .clickable(onClick = onClick),

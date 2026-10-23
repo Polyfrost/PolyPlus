@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.animation.core.animate
@@ -27,8 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.page.currentPageSearchQuery
+import org.polyfrost.oneconfig.internal.ui.shell.ShellState
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
@@ -77,7 +74,7 @@ internal fun WardrobeShell(
 
     val sections = if (polyPlusAvailable) WardrobeSection.entries else listOf(WardrobeSection.Cosmetics)
     var section by remember { mutableStateOf(sections.first()) }
-    val query = currentPageSearchQuery
+    val query = ShellState.searchQuery
     var sort by remember { mutableStateOf(WardrobeSort.Popular) }
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
     var showCart by remember { mutableStateOf(false) }

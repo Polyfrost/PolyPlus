@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Image
@@ -61,10 +59,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.navigation.graph.KeybindsGraph
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
@@ -129,7 +128,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
                 is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
                 is WardrobeEntry.Note -> CapeSectionNote(entry.text)
-                is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
+                is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open(KeybindsGraph) })
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
                     val variantId = selectedVariantId(item, variantPicks)
@@ -177,7 +176,7 @@ internal fun WardrobeGrid(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 PriceLabel(info)
                                 if (variantCount > 1) {
-                                    SocialText("$variantCount variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 11.sp)
+                                    SocialText("$variantCount variants", color = LocalTheme.current.textColorSecondary, fontSize = 11.sp)
                                 }
                             }
                         },
@@ -352,7 +351,7 @@ internal fun WardrobeGrid(
 
 @Composable
 private fun WardrobeDivider(label: String) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -399,7 +398,7 @@ private val CARD_HIGHLIGHT = Color(0x0DFFFFFF)
 
 @Composable
 private fun CardDetailText(text: String) {
-    CardLabel(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+    CardLabel(text, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
@@ -419,12 +418,12 @@ private fun WardrobeCard(
     menu: List<CardMenuAction> = emptyList(),
     thumbnail: @Composable (Modifier) -> Unit,
 ) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var menuOpen by remember { mutableStateOf(false) }
     val outline = when {
-        equipped -> OneConfigTheme.accent
+        equipped -> Accent
         selected || (hovered && enabled) -> theme.textColorSecondary
         else -> theme.borderColor
     }
@@ -517,7 +516,7 @@ private fun VariantSwatches(
 
 @Composable
 private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
@@ -548,7 +547,7 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
             Modifier.fillMaxSize().border(
                 1.dp,
                 when {
-                    selected -> OneConfigTheme.accent
+                    selected -> Accent
                     hovered -> theme.textColorSecondary
                     else -> CARD_HAIRLINE
                 },
@@ -568,7 +567,7 @@ private fun CardMenuButton(
     open: Boolean,
     onOpenChange: (Boolean) -> Unit,
 ) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Box(
         modifier = Modifier.requiredSize(22.dp)
             .clip(ppShape(6.dp))
@@ -610,7 +609,7 @@ private fun rememberDropdownPosition(): PopupPositionProvider {
 
 @Composable
 private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Popup(
         popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
@@ -635,7 +634,7 @@ private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDis
 
 @Composable
 private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Box(
@@ -654,7 +653,7 @@ private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     var value by remember { mutableStateOf(current) }
     val focusRequester = remember { FocusRequester() }
     val save = {
@@ -700,14 +699,14 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
 
 @Composable
 private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolean, onAction: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val color = if (active) theme.accentTextColor else theme.textColor
     Box(Modifier.fillMaxWidth().height(36.dp)) {
         Row(
             modifier = Modifier.fillMaxSize()
-                .background(if (active) OneConfigTheme.accent else CARD_STRIP)
+                .background(if (active) Accent else CARD_STRIP)
                 .hoverable(interaction)
                 .clickable(enabled = enabled, onClick = onAction),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -727,7 +726,7 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
 
 @Composable
 private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val color = if (badge.style == CardBadgeStyle.New) theme.textColor else theme.accentTextColor
     Row(
         modifier = modifier.widthIn(min = if (badge.label.isEmpty()) 40.dp else 81.dp).height(21.dp)
@@ -736,7 +735,7 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
                 when (badge.style) {
                     CardBadgeStyle.New -> CARD_SUCCESS
                     CardBadgeStyle.Sale -> CARD_NEUTRAL_CHIP
-                    CardBadgeStyle.Accent -> OneConfigTheme.accent
+                    CardBadgeStyle.Accent -> Accent
                 },
             )
             .padding(horizontal = 10.dp),
@@ -759,7 +758,7 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
 
 @Composable
 private fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().wardrobePanel().padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -778,7 +777,7 @@ private fun LibraryIntro(note: String, action: String?, onAction: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SocialText(note, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        SocialText(note, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
         if (action != null) {
             SmallButton(action, iconPath = "plus", primary = false, onClick = onAction)
         }

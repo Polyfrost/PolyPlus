@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -30,9 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -50,7 +48,7 @@ internal fun EmoteWheelEditor(
     onSelectSlot: (Int?) -> Unit,
     modifier: Modifier,
 ) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val wheelIndex = EmoteWheels.activeIndex
     val wheelCount = EmoteWheels.wheelCount
     val slots = EmoteWheels.slots(wheelIndex)
@@ -137,7 +135,7 @@ private fun WheelSlotCell(
     onClick: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val name = emoteId?.let { CosmeticCatalog.getEmoteDefinition(it)?.name }
@@ -148,7 +146,7 @@ private fun WheelSlotCell(
             .border(
                 1.dp,
                 when {
-                    selected -> OneConfigTheme.accent
+                    selected -> Accent
                     hovered -> theme.textColorSecondary
                     else -> theme.borderColor
                 },
@@ -198,7 +196,7 @@ private fun WheelSlotCell(
 
 @Composable
 internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String? = null, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
+    val theme = LocalTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     Box(

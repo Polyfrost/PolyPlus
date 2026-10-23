@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.features
 
+import androidx.compose.runtime.MutableIntState
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.ModCardOrder
 import org.polyfrost.oneconfig.internal.ui.api.ConfigData
 import org.polyfrost.oneconfig.internal.ui.api.ConfigRegistry
 import org.polyfrost.oneconfig.internal.ui.api.ModFavorites
@@ -25,6 +22,7 @@ object DefaultModOrder {
 
     private const val ORDER_SEED = "239252252"
 
+    private const val ONECONFIG_ORDER = "org.polyfrost.oneconfig.internal.ui.api.ModOrder"
     private const val HUD_CARD_PREFIX = "oneconfig.hud:"
 
     fun preview(alphabetical: Boolean): List<ConfigData> {
@@ -45,8 +43,16 @@ object DefaultModOrder {
         refreshOneConfig()
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun refreshOneConfig() {
-        ModCardOrder.replace(readOrder(orderFile()))
+        runCatching {
+            val type = Class.forName(ONECONFIG_ORDER)
+            fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }.get(null)
+            val order = field("order") as MutableList<String>
+            order.clear()
+            order.addAll(readOrder(orderFile()))
+            (field("revision\$delegate") as MutableIntState).intValue++
+        }.onFailure { logger.warn("Could not refresh OneConfig's mod order, it applies after a restart", it) }
     }
 
     fun initialize() {

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.animation.core.LinearEasing
@@ -31,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -51,7 +49,7 @@ internal fun CosmeticsLoadingScreen(
     ) {
         SocialText(
             if (failed) "Couldn't load cosmetics" else "Loading cosmetics",
-            color = OneConfigTheme.current.textColor,
+            color = LocalTheme.current.textColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
@@ -62,7 +60,7 @@ internal fun CosmeticsLoadingScreen(
                 failed -> "PolyPlus couldn't reach its servers (${state.failure}). Check your connection and try again."
                 else -> state.label
             },
-            color = OneConfigTheme.current.textColorSecondary,
+            color = LocalTheme.current.textColorSecondary,
             fontSize = 12.sp,
             modifier = Modifier.width(360.dp),
             textAlign = TextAlign.Center,
@@ -82,14 +80,14 @@ private const val SWEEP_WIDTH_FRACTION = 0.35f
 
 @Composable
 private fun ProgressBar(fraction: Float?, modifier: Modifier) {
-    val track = OneConfigTheme.current.chipBackground
+    val track = LocalTheme.current.chipBackground
     val shape = ppShape(4.dp)
     Box(
         modifier
             .height(8.dp)
             .clip(shape)
             .background(track)
-            .border(1.dp, OneConfigTheme.current.borderColor, shape),
+            .border(1.dp, LocalTheme.current.borderColor, shape),
     ) {
         if (fraction != null) {
             val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), animationSpec = tween(220))
@@ -98,7 +96,7 @@ private fun ProgressBar(fraction: Float?, modifier: Modifier) {
                     .fillMaxHeight()
                     .fillMaxWidth(animated)
                     .clip(shape)
-                    .background(OneConfigTheme.accent),
+                    .background(Accent),
             )
         } else {
             val transition = rememberInfiniteTransition(label = "cosmeticsLoadingSweep")
@@ -119,7 +117,7 @@ private fun ProgressBar(fraction: Float?, modifier: Modifier) {
                         .fillMaxHeight()
                         .width(width * SWEEP_WIDTH_FRACTION)
                         .clip(shape)
-                        .background(OneConfigTheme.accent),
+                        .background(Accent),
                 )
             }
         }

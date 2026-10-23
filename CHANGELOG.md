@@ -1,2 +1,2 @@
-## 1.3.11
-- Fixed the game freezing after loading a few worlds in the same session
+## Unreleased changes
+- Fixed the game failing to start because Poly+ required an unreleased version of OneConfig

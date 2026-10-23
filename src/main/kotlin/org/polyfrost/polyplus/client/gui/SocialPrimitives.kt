@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -62,10 +60,10 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
 import java.util.UUID
 
 @Composable
@@ -122,7 +120,7 @@ internal fun SocialText(
     fontWeight: FontWeight = FontWeight.Normal,
     textAlign: TextAlign = TextAlign.Start,
     letterSpacing: TextUnit = TextUnit.Unspecified,
-    fontFamily: FontFamily = OneConfigTheme.current.fontFamily,
+    fontFamily: FontFamily = LocalTheme.current.typography.family,
     textDecoration: TextDecoration? = null,
     maxLines: Int = Int.MAX_VALUE,
     softWrap: Boolean = maxLines != 1,
@@ -229,7 +227,7 @@ internal fun SocialButton(
     val background by animateColorAsState(
         when {
             filled && danger -> SocialDangerColor
-            filled -> OneConfigTheme.accent
+            filled -> Accent
             else -> SocialControlBackground
         },
     )
@@ -318,7 +316,7 @@ internal fun SocialTextField(
     maxLength: Int = 64,
     onSubmit: (() -> Unit)? = null,
 ) {
-    val bodyFont = OneConfigTheme.current.fontFamily
+    val bodyFont = LocalTheme.current.typography.family
     val focusRequester = remember { FocusRequester() }
     Row(
         modifier = modifier
@@ -339,7 +337,7 @@ internal fun SocialTextField(
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).trackTextInputFocus(),
                 singleLine = true,
                 textStyle = TextStyle(color = SocialTextPrimary, fontSize = 14.sp, fontFamily = bodyFont),
-                cursorBrush = SolidColor(OneConfigTheme.accent),
+                cursorBrush = SolidColor(Accent),
                 keyboardActions = onSubmit?.let {
                     KeyboardActions(onDone = { it() }, onSend = { it() })
                 } ?: KeyboardActions.Default,
@@ -376,11 +374,11 @@ internal fun SocialToggle(label: String, checked: Boolean, modifier: Modifier = 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SocialText(label, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        val theme = OneConfigTheme.current
-        val boxColor by animateColorAsState(if (checked) OneConfigTheme.accent else theme.componentBackground)
+        val theme = LocalTheme.current
+        val boxColor by animateColorAsState(if (checked) Accent else theme.componentBackground)
         val boxBorder by animateColorAsState(
             when {
-                checked -> OneConfigTheme.accent
+                checked -> Accent
                 hovered -> theme.textColorSecondary
                 else -> theme.borderColor
             },
@@ -422,12 +420,12 @@ internal fun <T> SocialDropdown(
     val (triggerInteraction, triggerHovered) = rememberSocialHover()
     val triggerBorder by animateColorAsState(
         when {
-            expanded -> OneConfigTheme.accent
+            expanded -> Accent
             triggerHovered -> SocialHoverBorder
             else -> SocialBorderColor
         },
     )
-    val triggerBackground by animateColorAsState(if (expanded) OneConfigTheme.accent.asSocialSelected else SocialControlBackground)
+    val triggerBackground by animateColorAsState(if (expanded) Accent.asSocialSelected else SocialControlBackground)
     var triggerSize by remember { mutableStateOf(IntSize.Zero) }
     Box(modifier = modifier) {
         Box(
@@ -478,7 +476,7 @@ internal fun <T> SocialDropdown(
                     options.forEach { option ->
                         SocialMenuItem(
                             label = labelFor(option),
-                            color = if (option == selected) OneConfigTheme.accent else SocialTextPrimary,
+                            color = if (option == selected) Accent else SocialTextPrimary,
                             selected = option == selected,
                             horizontalPadding = 10.dp,
                         ) { onSelect(option); expanded = false }
@@ -503,7 +501,7 @@ internal fun SocialMenuItem(
     val (interaction, hovered) = rememberSocialHover()
     val background by animateColorAsState(
         when {
-            selected -> OneConfigTheme.accent.asSocialSelected
+            selected -> Accent.asSocialSelected
             hovered -> SocialHoverOverlay
             else -> Color.Transparent
         },

@@ -1,10 +1,10 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.emotes
 
 import net.minecraft.client.Minecraft
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
+import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
+import org.polyfrost.oneconfig.internal.ui.components.asRenderText
+import org.polyfrost.oneconfig.internal.ui.components.localizedTitle
+import org.polyfrost.oneconfig.internal.ui.keybind.collectAllKeybindGroups
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.EmoteWheelScreen
 
@@ -42,10 +42,12 @@ object EmoteWheelKeybind {
         val wheel = PolyPlusConfig.emoteWheelKeybind
         if (!wheel.isBound) return emptyList()
         return runCatching {
-            KeybindManager.configKeybinds().asSequence()
+            collectAllKeybindGroups().asSequence()
+                .flatMap { it.entries.asSequence() }
                 .mapNotNull { entry ->
-                    if (entry.keybind === wheel || !wheel.conflictsWith(entry.keybind)) return@mapNotNull null
-                    entry.title
+                    val other = entry.prop.get() as? OneConfigKeybind ?: return@mapNotNull null
+                    if (other === wheel || !wheel.conflictsWith(other)) return@mapNotNull null
+                    entry.prop.localizedTitle().asRenderText().ifBlank { entry.path }
                 }
                 .distinct()
                 .toList()

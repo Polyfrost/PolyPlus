@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.client.Minecraft
@@ -18,8 +16,7 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
+import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
@@ -136,7 +133,7 @@ object CosmeticSync {
                 CosmeticAssetCache.reset()
             }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
-            val configUiOpen = OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
+            val configUiOpen = ClientPlatform.currentScreen() is OneConfigUIScreen
             if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
             configUiWasOpen = configUiOpen
             if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
@@ -487,7 +484,7 @@ object CosmeticSync {
     //? if >= 1.21.1 {
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog - closing it calls trim again
-        if (OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return
+        if (ClientPlatform.currentScreen() is OneConfigUIScreen) return
         val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
             CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
         val inUse = HashSet<Identifier>()

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.core.Animatable
@@ -45,10 +43,10 @@ import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
@@ -104,7 +102,7 @@ class EmoteWheelScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     @Composable
     override fun compose() {
-        ProvideOneConfigTheme {
+        Theme {
             EmoteWheelContent(
                 logger = logger,
                 onRelease = { emoteId ->
@@ -227,9 +225,9 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
                 BasicText(
                     text = "Wheel ${wheelIndex + 1} of $wheelCount",
                     style = TextStyle(
-                        color = OneConfigTheme.current.textColorSecondary,
+                        color = LocalTheme.current.textColorSecondary,
                         fontSize = 12.sp,
-                        fontFamily = OneConfigTheme.current.fontFamily,
+                        fontFamily = LocalTheme.current.typography.family,
                         textAlign = TextAlign.Center,
                     ),
                 )
@@ -242,10 +240,10 @@ private fun EmoteWheelContent(logger: Logger, onRelease: (Int?) -> Unit) {
                     BasicText(
                         text = hoveredName,
                         style = TextStyle(
-                            color = OneConfigTheme.current.textColor,
+                            color = LocalTheme.current.textColor,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
-                            fontFamily = OneConfigTheme.current.fontFamily,
+                            fontFamily = LocalTheme.current.typography.family,
                             textAlign = TextAlign.Center,
                         ),
                         maxLines = 1,
@@ -264,10 +262,10 @@ private fun WheelCanvas(
     slots: List<WheelSlot?>,
     onLayout: (Rect) -> Unit,
 ) {
-    val accent = OneConfigTheme.accent
-    val filledColor = OneConfigTheme.current.chipBackground
-    val emptyColor = OneConfigTheme.current.componentBackground
-    val ringColor = OneConfigTheme.current.borderColor
+    val accent = Accent
+    val filledColor = LocalTheme.current.chipBackground
+    val emptyColor = LocalTheme.current.componentBackground
+    val ringColor = LocalTheme.current.borderColor
     Canvas(
         modifier = Modifier
             .size(WHEEL_DIAMETER)

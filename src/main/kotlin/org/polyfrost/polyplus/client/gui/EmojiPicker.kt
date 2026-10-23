@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -42,9 +40,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.internal.ui.themes.Accent
 import org.polyfrost.polyplus.client.emoji.EmojiRecents
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 
@@ -60,7 +57,7 @@ internal fun EmojiPickerButton(onPick: (String) -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val background by animateColorAsState(
         when {
-            open -> OneConfigTheme.accent.asSocialSelected
+            open -> Accent.asSocialSelected
             hovered -> SocialHoverOverlay
             else -> Color.Transparent
         },
@@ -80,7 +77,7 @@ internal fun EmojiPickerButton(onPick: (String) -> Unit) {
             if (buttonGlyph != null) {
                 EmojiGlyph(buttonGlyph, Modifier.size(18.dp))
             } else {
-                Icon(SOCIAL_ASSETS + "stars.svg", if (open) OneConfigTheme.accent else SocialTextSecondary, Modifier.size(16.dp))
+                Icon(SOCIAL_ASSETS + "stars.svg", if (open) Accent else SocialTextSecondary, Modifier.size(16.dp))
             }
         }
         if (open) {
