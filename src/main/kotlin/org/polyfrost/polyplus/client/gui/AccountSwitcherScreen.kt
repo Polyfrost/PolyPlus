@@ -1,0 +1,146 @@
+package org.polyfrost.polyplus.client.gui
+
+import androidx.compose.runtime.Composable
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
+import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
+import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.polyplus.client.AccountSwitcherOverlay
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if >= 1.21.10 {
+import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
+//?}
+
+//? if < 26.1 && > 1.8.9 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
+//? if = 1.8.9 {
+/*import org.polyfrost.polyplus.client.social.execute
+import org.lwjgl.input.Keyboard
+*///?}
+
+class AccountSwitcherScreen(internal val previousScreen: Screen?) : ComposeScreen(RenderMode.CONTINUOUS) {
+    private var firstFrameDrawn = false
+    private val openedAt = System.currentTimeMillis()
+
+    //? if > 1.8.9 {
+    override fun shouldCloseOnEsc(): Boolean = true
+
+    private fun inGame(): Boolean = Minecraft.getInstance().level != null
+    //?} else {
+    /*private fun inGame(): Boolean = Minecraft.getInstance().world != null
+
+    private var escaping = false
+
+    override fun handleKeyboard() {
+        escaping = Keyboard.getEventKeyState() && Keyboard.getEventKey() == Keyboard.KEY_ESCAPE
+        try {
+            super.handleKeyboard()
+        } finally {
+            escaping = false
+        }
+    }
+
+    override fun removed() {
+        super.removed()
+        if (escaping) Minecraft.getInstance().tell { AccountSwitcherOverlay.restoreAfterEscape(previousScreen) }
+    }
+
+    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (inGame() && OneConfigConfig.enableBackgroundBlur) BlurRenderer.drawBlur(worldBlurRadius())
+        super.render(mouseX, mouseY, tickDelta)
+    }
+    *///?}
+
+    /** Mirrors OneConfig's own fullscreen blur fade-in (see OneConfigUIScreen). */
+    private fun worldBlurRadius(): Float {
+        val progress = (System.currentTimeMillis() - openedAt).toFloat() / OPEN_ANIMATION_MS
+        return FULLSCREEN_BLUR_RADIUS * progress.coerceIn(0f, 1f)
+    }
+
+    private companion object {
+        private const val FULLSCREEN_BLUR_RADIUS = 8f
+        private const val OPEN_ANIMATION_MS = 250L
+    }
+
+    //? if <26.1 && > 1.8.9 {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (!inGame()) {
+            MenuBackgroundPass.enqueue(true)
+            renderPanorama(ctx, tickDelta)
+            if (firstFrameDrawn) {
+                val gameRenderer = Minecraft.getInstance().gameRenderer
+                //? if <1.21.4 {
+                gameRenderer.processBlurEffect(tickDelta)
+                //?} else {
+                /^gameRenderer.processBlurEffect()
+                ^///?}
+            }
+        } else if (OneConfigConfig.enableBackgroundBlur) {
+            //? if >= 1.21.10 {
+            /^if (SkiaCtx.isDeferredComposeBackend) {
+                ctx.nextStratum()
+                ctx.blurBeforeThisStratum()
+                SkiaCtx.requestBlurSnapshot()
+            }
+            ^///?}
+            BlurRenderer.drawBlur(worldBlurRadius())
+        }
+        super.render(ctx, mouseX, mouseY, tickDelta)
+        firstFrameDrawn = true
+    }
+
+    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (!inGame()) return
+        super.renderBackground(ctx, mouseX, mouseY, tickDelta)
+    }
+    *///?} else if > 1.8.9 {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (!inGame()) {
+            MenuBackgroundPass.enqueue(true)
+            Minecraft.getInstance().gameRenderer
+                //? if >= 26.2 {
+                .panorama()
+                .extractRenderState(ctx, width, height)
+            //?} else {
+            /*.getPanorama()
+            .extractRenderState(ctx, width, height, true)
+            *///?}
+            ctx.blurBeforeThisStratum()
+        } else if (OneConfigConfig.enableBackgroundBlur) {
+            if (SkiaCtx.isDeferredComposeBackend) {
+                ctx.nextStratum()
+                ctx.blurBeforeThisStratum()
+                SkiaCtx.requestBlurSnapshot()
+            }
+            BlurRenderer.drawBlur(worldBlurRadius())
+        }
+        super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
+    }
+
+    override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (!inGame()) return
+        super.extractBackground(ctx, mouseX, mouseY, tickDelta)
+    }
+    //?}
+
+    //? if > 1.8.9 {
+    override fun onClose() {
+        Minecraft.getInstance().execute { AccountSwitcherOverlay.close() }
+    }
+    //?}
+
+    @Composable
+    override fun compose() {
+        Theme {
+            AccountSwitcherContent(screen = this, onClose = { Minecraft.getInstance().execute { AccountSwitcherOverlay.close() } })
+        }
+    }
+}
