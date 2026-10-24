@@ -15,7 +15,14 @@ internal val isMinecraftTheme: Boolean
     get() = LocalTheme.current.previewImage.startsWith("minecraft")
 
 // pixel versions of PolyPlus icons, by file name: OneConfig's where it has one, else PolyPlus's own
-private val PolyPlusPixelIcons = setOf("user-01", "log-in-04", "diamond-01", "minecraft-block")
+private val PolyPlusPixelIcons = mapOf(
+    "user-01" to "user-01",
+    "log-in-04" to "log-in-04",
+    "diamond-01" to "diamond-01",
+    "minecraft-block" to "minecraft-block",
+    // Mod Menu's button
+    "package-01" to "minecraft-block",
+)
 private val MinecraftIcons = mapOf(
     "settings-02" to "cog",
     "settings-04" to "preferences",
@@ -26,6 +33,7 @@ private val MinecraftIcons = mapOf(
     "x-close" to "close",
     "maximize-02" to "maximise",
     "moon-star" to "moon",
+    "sun" to "sun",
     "refresh-cw-01" to "refresh",
     "trash-01" to "trash",
     "copy-01" to "copy",
@@ -45,7 +53,7 @@ private val MinecraftIcons = mapOf(
 internal fun themedIcon(path: String): String {
     if (!isMinecraftTheme) return path
     val name = path.substringAfterLast('/').removeSuffix(".svg")
-    if (name in PolyPlusPixelIcons) return "assets/polyplus/mainmenu/minecraft/$name.svg"
+    PolyPlusPixelIcons[name]?.let { return "assets/polyplus/mainmenu/minecraft/$it.svg" }
     return MinecraftIcons[name]?.let { "/assets/oneconfig/ico/minecraft/$it.svg" } ?: path
 }
 
