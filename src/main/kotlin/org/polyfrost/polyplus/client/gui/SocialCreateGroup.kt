@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -26,8 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 
@@ -59,13 +62,13 @@ internal fun CreateGroupDialog(friends: List<Friend>, onCreate: (name: String, m
                     friends.forEach { friend ->
                         val checked = friend.player in selected
                         val (interaction, hovered) = rememberSocialHover()
-                        val border by animateColorAsState(if (checked) Accent else if (hovered) SocialHoverBorder else SocialBorderColor)
+                        val border by animateColorAsState(if (checked) OneConfigTheme.accent else if (hovered) SocialHoverBorder else SocialBorderColor)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .clip(SocialFieldShape)
-                                .background(if (checked) Accent.asSocialSelected else SocialControlBackground)
+                                .background(if (checked) OneConfigTheme.accent.asSocialSelected else SocialControlBackground)
                                 .border(SocialBorderWidth, border, SocialFieldShape)
                                 .hoverable(interaction)
                                 .clickableWithSound {

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -21,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,10 +48,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 
@@ -64,16 +65,16 @@ internal fun SmallButton(
     Row(
         modifier = Modifier.height(33.dp)
             .clip(ppShape(8.dp))
-            .background(if (primary) Accent else LocalTheme.current.chipBackground)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
+            .background(if (primary) OneConfigTheme.accent else OneConfigTheme.current.chipBackground)
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(iconPath, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, modifier = Modifier.size(14.dp))
+        Icon(iconPath, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(8.dp))
-        SocialText(label, color = if (primary) LocalTheme.current.accentTextColor else LocalTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        SocialText(label, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -86,7 +87,7 @@ internal fun WardrobeTextField(
     maxLength: Int = 64,
     onSubmit: (() -> Unit)? = null,
 ) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     BasicTextField(
         value = value,
         onValueChange = { if (it.length <= maxLength) onValueChange(it) },
@@ -94,7 +95,7 @@ internal fun WardrobeTextField(
         textStyle = TextStyle(
             color = theme.textColor,
             fontSize = 12.sp,
-            fontFamily = theme.typography.family,
+            fontFamily = theme.fontFamily,
         ),
         cursorBrush = SolidColor(theme.textColor),
         keyboardActions = onSubmit?.let { submit -> KeyboardActions(onDone = { submit() }) } ?: KeyboardActions.Default,
@@ -119,7 +120,7 @@ internal fun WardrobeTextField(
 @Composable
 internal fun CenteredNote(text: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        SocialText(text, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp, textAlign = TextAlign.Center)
+        SocialText(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -177,21 +178,20 @@ internal fun TooltipPopup(text: String) {
         Box(
             modifier = Modifier.widthIn(max = 240.dp)
                 .clip(ppShape(6.dp))
-                .background(LocalTheme.current.popupBackground)
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(6.dp))
+                .background(OneConfigTheme.current.popupBackground)
+                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(6.dp))
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) {
-            SocialText(text, color = LocalTheme.current.textColor, fontSize = 12.sp)
+            SocialText(text, color = OneConfigTheme.current.textColor, fontSize = 12.sp)
         }
     }
 }
 
 @Composable
-@ReadOnlyComposable
-internal fun cardBrush(): Brush = SolidColor(LocalTheme.current.modCardBackground)
+internal fun cardBrush(): Brush = SolidColor(OneConfigTheme.current.modCardBackground)
 
 @Composable
 internal fun Modifier.wardrobePanel(): Modifier =
     clip(ppShape(16.dp))
-        .background(LocalTheme.current.modCardBackground)
-        .border(1.dp, LocalTheme.current.borderColor, ppShape(16.dp))
+        .background(OneConfigTheme.current.modCardBackground)
+        .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))

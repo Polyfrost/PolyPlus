@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.core.LinearEasing
@@ -39,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,12 +88,12 @@ import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.SamplingMode
-import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.screens.ModCard as OneConfigModCard
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.BlockHighlightDraft
@@ -403,7 +404,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             advance()
         }
 
-        Theme {
+        ProvideOneConfigTheme {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val effectiveGuiScale = if (guiScale <= 0) maxGuiScale else guiScale
                 val containFit = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
@@ -440,7 +441,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                                 )
                                 .clip(ButtonShape)
                                 .background(PageBackground.copy(alpha = 0.9f))
-                                .border(SocialPanelBorderWidth, LocalTheme.current.borderColor, ButtonShape),
+                                .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, ButtonShape),
                         ) {
                             when (val step = pages[page]) {
                                 OnboardingStep.Terms ->
@@ -721,8 +722,8 @@ private fun CardChip(label: String, selected: Boolean, interactive: Boolean = tr
         Modifier
             .size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp)
             .clip(shape)
-            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, shape)
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
             .then(if (interactive) Modifier.clickableWithSound { if (!selected) onClick() } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
@@ -782,8 +783,8 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
                 Modifier
                     .size(CARD_DROPDOWN_WIDTH.dp, CARD_ROW_HEIGHT.dp)
                     .clip(shape)
-                    .background(if (expanded) Accent.asSocialSelected else ChoiceBackground)
-                    .border(SocialPanelBorderWidth, if (expanded) SolidColor(Accent) else SocialPanelBorderBrush, shape)
+                    .background(if (expanded) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+                    .border(SocialPanelBorderWidth, if (expanded) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
                     .clickableWithSound { expanded = !expanded }
                     .padding(horizontal = CARD_MENU_INSET.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -808,7 +809,7 @@ private fun CardMenuItem(label: String, selected: Boolean, onClick: () -> Unit) 
         Modifier
             .fillMaxWidth()
             .height(CARD_MENU_ITEM_HEIGHT.dp)
-            .background(if (selected) Accent.asSocialSelected else Color.Transparent)
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else Color.Transparent)
             .clickableWithSound(onClick)
             .padding(horizontal = CARD_MENU_INSET.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -821,7 +822,7 @@ private fun CardMenuItem(label: String, selected: Boolean, onClick: () -> Unit) 
             if (selected) FontWeight.Medium else FontWeight.Light,
             TextAlign.Start,
         )
-        if (selected) Icon(MAIN_MENU_ASSETS + "check.svg", Accent, Modifier.size(12.dp))
+        if (selected) Icon(MAIN_MENU_ASSETS + "check.svg", OneConfigTheme.accent, Modifier.size(12.dp))
     }
 }
 
@@ -880,8 +881,8 @@ private fun ModOrderCard(label: String, alphabetical: Boolean, selected: Boolean
     }
     Box(
         Modifier.width(MOD_ORDER_CARD_WIDTH.dp).clip(ButtonShape)
-            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape),
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape),
     ) {
         Column(
             Modifier.padding(MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, 10.dp),
@@ -1201,7 +1202,7 @@ private fun Swatch(rgb: Int, selected: Boolean, enabled: Boolean, onClick: () ->
             .size(SWATCH_SIZE.dp)
             .clip(shape)
             .background(Color(0xFF000000.toInt() or rgb))
-            .border(if (selected) 2.dp else SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, shape)
+            .border(if (selected) 2.dp else SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
     )
 }
@@ -1216,8 +1217,8 @@ private fun ToggleKeyButton() {
     val shape = ppShape(6.dp)
     Box(
         Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp).clip(shape)
-            .background(if (capturing) Accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (capturing) SolidColor(Accent) else SocialPanelBorderBrush, shape)
+            .background(if (capturing) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (capturing) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
             .clickableWithSound {
                 if (capturing) return@clickableWithSound
                 capturing = true
@@ -1304,7 +1305,7 @@ private fun OnboardingSlider(
                 .background(ChoiceBackground)
                 .border(1.dp, SocialPanelBorderBrush, trackShape),
         ) {
-            Box(Modifier.fillMaxWidth(animated).height(trackHeight).background(Accent))
+            Box(Modifier.fillMaxWidth(animated).height(trackHeight).background(OneConfigTheme.accent))
         }
         Box(
             Modifier
@@ -1363,7 +1364,7 @@ private fun OptimizingPage() {
             animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
             label = "spin",
         )
-        Icon(MAIN_MENU_ASSETS + "loading-02.svg", Accent, Modifier.size(40.dp).rotate(angle))
+        Icon(MAIN_MENU_ASSETS + "loading-02.svg", OneConfigTheme.accent, Modifier.size(40.dp).rotate(angle))
         Spacer(Modifier.height(18.dp))
         SocialText("Waiting to optimize game…", 16.sp, Modifier.width(PANEL_WIDTH.dp), SocialTextPrimary, FontWeight.Medium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))
@@ -1474,8 +1475,8 @@ private fun MotionBlurModeCard(
         Modifier
             .size(MODE_CARD_WIDTH.dp, MODE_CARD_HEIGHT.dp)
             .clip(ButtonShape)
-            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         Column(
@@ -1485,7 +1486,7 @@ private fun MotionBlurModeCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, if (selected) Accent else SocialTextPrimary, Modifier.size(18.dp))
+                Icon(icon, if (selected) OneConfigTheme.accent else SocialTextPrimary, Modifier.size(18.dp))
                 SocialText(title, 15.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(9.dp))
@@ -1506,7 +1507,7 @@ private fun MotionBlurModeCard(
                 "Recommended",
                 11.sp,
                 Modifier.align(Alignment.BottomCenter).padding(14.dp),
-                Accent,
+                OneConfigTheme.accent,
                 FontWeight.Medium,
                 textAlign = TextAlign.Center,
             )
@@ -1606,12 +1607,12 @@ private fun ChoiceButton(
             .clip(ButtonShape)
             .background(
                 when {
-                    primary -> Accent
-                    selected -> Accent.asSocialSelected
+                    primary -> OneConfigTheme.accent
+                    selected -> OneConfigTheme.accent.asSocialSelected
                     else -> ChoiceBackground
                 },
             )
-            .border(SocialPanelBorderWidth, if (selected || primary) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
+            .border(SocialPanelBorderWidth, if (selected || primary) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -1625,8 +1626,8 @@ private fun ChoiceButton(
 private fun StyleCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(198.dp, 155.dp).clip(ButtonShape)
-            .background(if (selected) Accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(Accent) else SocialPanelBorderBrush, ButtonShape)
+            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
+            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
             .clickableWithSound(onClick),
     ) {
         UiPreview(Modifier.offset(13.dp, 12.dp), rounded)
@@ -1639,7 +1640,7 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
     val shape = if (rounded) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp)
     Row(modifier.size(172.dp, 108.dp).clip(shape).border(1.dp, Color(0x1AFFFFFF), shape)) {
         Column(Modifier.width(44.dp).height(108.dp).background(Color(0xB3151C22)).padding(8.dp, 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(Modifier.size(29.dp, 7.dp).background(Accent))
+            Box(Modifier.size(29.dp, 7.dp).background(OneConfigTheme.accent))
             repeat(3) { Box(Modifier.width(if (it == 0) 20.dp else 29.dp).height(4.dp).background(if (it == 0) SocialTextSecondary else SocialTextPrimary)) }
         }
         Column(Modifier.width(128.dp).height(108.dp).background(Color(0xF211171C)).padding(8.dp, 7.dp)) {
@@ -1647,7 +1648,7 @@ private fun UiPreview(modifier: Modifier, rounded: Boolean) {
             Spacer(Modifier.height(8.dp))
             repeat(3) {
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    repeat(3) { Box(Modifier.size(34.dp, 23.dp).background(Color(0xFF1A2229)).border(0.dp, Color.Transparent).padding(top = 17.dp).background(Accent)) }
+                    repeat(3) { Box(Modifier.size(34.dp, 23.dp).background(Color(0xFF1A2229)).border(0.dp, Color.Transparent).padding(top = 17.dp).background(OneConfigTheme.accent)) }
                 }
                 Spacer(Modifier.height(5.dp))
             }
@@ -2096,7 +2097,7 @@ private fun TermsPage(
 // Mirrors OneConfig's CheckboxIndicator so the onboarding checkbox matches the rest of the UI
 @Composable
 private fun CheckBox(checked: Boolean) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     Box(
@@ -2104,11 +2105,11 @@ private fun CheckBox(checked: Boolean) {
             .size(24.dp)
             .hoverable(interactionSource)
             .clip(theme.checkBoxShape)
-            .background(if (checked) Accent else theme.componentBackground)
+            .background(if (checked) OneConfigTheme.accent else theme.componentBackground)
             .border(
                 1.5.dp,
                 when {
-                    checked -> Accent
+                    checked -> OneConfigTheme.accent
                     hovered -> theme.textColorSecondary
                     else -> theme.borderColor
                 },
@@ -2126,10 +2127,10 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
         label,
         Modifier.clickableTextWithSound(onClick),
         TextStyle(
-            color = Accent,
+            color = OneConfigTheme.accent,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            fontFamily = LocalTheme.current.typography.family,
+            fontFamily = OneConfigTheme.current.fontFamily,
             textDecoration = TextDecoration.Underline,
         ),
     )
@@ -2409,17 +2410,16 @@ private const val GUIDE_MARGIN = CARD_MARGIN
 
 private val ButtonShape: Shape
     @Composable
-    @ReadOnlyComposable
     get() = ppShape(9.dp)
 
 private val PageBackground: Color
-    @Composable get() = LocalTheme.current.pageBackground
+    @Composable get() = OneConfigTheme.current.pageBackground
 private val ShadowColor = Color(0x26000000)
 
 private val ChoiceBackground: Color
-    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
+    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
 private val MenuBackground: Color
-    @Composable get() = LocalTheme.current.componentBackground
+    @Composable get() = OneConfigTheme.current.componentBackground
 
 private const val HUD_TEXT_SIZE = 21f
 private const val HUD_PADDING = HUD_TEXT_SIZE * (4f / 9f)

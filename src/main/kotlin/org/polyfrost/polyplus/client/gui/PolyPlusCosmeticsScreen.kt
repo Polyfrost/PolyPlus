@@ -9,16 +9,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import net.minecraft.client.gui.screens.TitleScreen
-import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
-import org.polyfrost.oneconfig.internal.ui.navigation.NavigationGroup
-import org.polyfrost.oneconfig.internal.ui.navigation.NavigationRoute
-import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModsGraph
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -41,64 +33,8 @@ import org.polyfrost.polyplus.client.gui.wardrobe.unequip
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 
-@Serializable
-data object PolyPlusCosmeticsRoute
-
-object PolyPlusOneConfigIntegration {
-    private val cosmeticsRoute = NavigationRoute(
-        id = "wardrobe",
-        icon = "assets/polyplus/ico/stars.svg",
-        route = PolyPlusCosmeticsRoute,
-    )
-
-    @JvmStatic
-    fun navigationGroups(original: List<NavigationGroup>): List<NavigationGroup> {
-        if (original.any { group -> group.routes.any { it.route == PolyPlusCosmeticsRoute } }) {
-            return original
-        }
-
-        return original.map { group ->
-            if (group.id == "Personalization") {
-                val routes = group.routes.toMutableList()
-                routes.add(minOf(1, routes.size), cosmeticsRoute)
-                NavigationGroup(group.id, *routes.toTypedArray())
-            } else {
-                group
-            }
-        }
-    }
-
-    @JvmStatic
-    fun addRoutes(builder: NavGraphBuilder) {
-        builder.polyPlusCosmeticsGraph()
-    }
-
-    @JvmStatic
-    fun openCosmetics() = openOneConfig(PolyPlusCosmeticsRoute)
-
-    fun openCosmeticsFromKeybind() {
-        when (ClientPlatform.currentScreen()) {
-            null, is TitleScreen, is PolyPlusMainMenuScreen -> openCosmetics()
-            else -> Unit
-        }
-    }
-
-    @JvmStatic
-    fun openMods() = openOneConfig(ModsGraph)
-
-    private fun openOneConfig(route: Any) {
-        OneConfigUI.open(route)
-    }
-}
-
-fun NavGraphBuilder.polyPlusCosmeticsGraph() {
-    composable<PolyPlusCosmeticsRoute> {
-        PolyPlusCosmeticsScreen()
-    }
-}
-
 @Composable
-private fun PolyPlusCosmeticsScreen() {
+internal fun PolyPlusCosmeticsScreen() {
     if (!PrivacyConsent.allowsOnlineServices()) {
         MinecraftCapesOnlyScreen()
         return

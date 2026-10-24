@@ -23,6 +23,8 @@
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
     //? if = 1.8.9
+    //"client.MixinControlsListWidget",
+    //? if = 1.8.9
     //"client.MixinControlsOptionsScreen",
     //? if > 1.8.9
     "client.MixinCubeMap",
@@ -125,13 +127,7 @@
     "compat.mountopacity.MixinEntityHook",
     //? if = 1.8.9
     //"compat.oneconfig.MixinComposeScreen",
-    "compat.oneconfig.MixinConfigScreenKt",
-    "compat.oneconfig.MixinModsKt",
-    "compat.oneconfig.MixinNavigationKt",
-    "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
-    "compat.oneconfig.MixinTreeConfigData",
-    "compat.oneconfig.MixinUITheme",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",
     //? if > 1.8.9
