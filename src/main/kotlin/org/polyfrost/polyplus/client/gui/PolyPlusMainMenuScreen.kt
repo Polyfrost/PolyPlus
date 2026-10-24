@@ -742,6 +742,11 @@ private sealed interface QuickplayEntry {
 }
 private const val BASE_HEIGHT = 720f
 
+// every icon on this screen goes through here so the Minecraft themes get pixel icons
+@Composable
+private fun Icon(path: String, color: Color, modifier: Modifier) =
+    org.polyfrost.oneconfig.internal.ui.components.Icon(themedIcon(path), color, modifier)
+
 @Composable
 private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
     Column(modifier = modifier.width(440.dp), horizontalAlignment = Alignment.CenterHorizontally) {
