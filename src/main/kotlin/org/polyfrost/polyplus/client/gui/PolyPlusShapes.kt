@@ -20,6 +20,7 @@ private val PolyPlusPixelIcons = mapOf(
     "log-in-04" to "log-in-04",
     "diamond-01" to "diamond-01",
     "minecraft-block" to "minecraft-block",
+    "video-recorder" to "video-recorder",
     // Mod Menu's button
     "package-01" to "minecraft-block",
 )
