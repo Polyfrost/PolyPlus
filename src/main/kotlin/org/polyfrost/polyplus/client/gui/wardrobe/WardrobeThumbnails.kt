@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Image
@@ -25,8 +27,8 @@ import androidx.compose.ui.unit.sp
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
@@ -147,10 +149,10 @@ internal fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier
     Box(
         modifier = modifier.align(Alignment.TopStart)
             .clip(ppShape(5.dp))
-            .background(if (owned) Color(0xFF239A60) else Accent)
+            .background(if (owned) Color(0xFF239A60) else OneConfigTheme.accent)
             .padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
-        SocialText(label, color = LocalTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        SocialText(label, color = OneConfigTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -189,7 +191,7 @@ internal fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
 private fun CheckerThumbnail(modifier: Modifier) {
     Checkerboard(
         modifier = modifier.clip(ppShape(5.dp))
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(5.dp)),
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)),
         cell = 9.dp,
     )
 }

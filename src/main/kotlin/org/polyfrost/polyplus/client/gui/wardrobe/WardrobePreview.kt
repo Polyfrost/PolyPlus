@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Image
@@ -47,8 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
@@ -82,7 +84,7 @@ internal fun PreviewPanel(
     Box(
         modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp)),
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
             ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
@@ -100,12 +102,12 @@ internal fun PreviewPanel(
             val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
             if (title != null) {
                 Column {
-                    SocialText(title, color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    subtitle?.let { SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp) }
+                    SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    subtitle?.let { SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp) }
                 }
             }
             if (status != null) {
-                SocialText(status, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
         val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
@@ -118,12 +120,12 @@ internal fun PreviewPanel(
                     Column(
                         modifier = Modifier.fillMaxWidth()
                             .clip(ppShape(12.dp))
-                            .background(LocalTheme.current.chipBackground)
-                            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
+                            .background(OneConfigTheme.current.chipBackground)
+                            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SocialText("Variants", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+                        SocialText("Variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
                         VariantChips(variants, selectedVariantId, onSelectVariant)
                     }
                 }
@@ -205,8 +207,8 @@ private fun PreviewPill(
             modifier = Modifier
                 .onSizeChanged { pillHeight = it.height }
                 .clip(ppShape(PILL_RADIUS))
-                .background(LocalTheme.current.chipBackground)
-                .border(1.dp, LocalTheme.current.borderColor, ppShape(PILL_RADIUS))
+                .background(OneConfigTheme.current.chipBackground)
+                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(PILL_RADIUS))
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -243,7 +245,7 @@ internal fun VariantPicker(
     ownedVariantIds: Set<Int> = emptySet(),
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        SocialText("Variant", color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText("Variant", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
         VariantChips(variants, selectedVariantId, onSelect, ownedVariantIds)
     }
 }
@@ -274,7 +276,7 @@ internal fun VariantChips(
 
 @Composable
 private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: Boolean, onClick: () -> Unit) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
@@ -283,11 +285,11 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
         modifier = Modifier.height(28.dp)
             .alpha(if (dimmed) 0.55f else 1f)
             .clip(ppShape(6.dp))
-            .background(if (selected) Accent else theme.componentBackground)
+            .background(if (selected) OneConfigTheme.accent else theme.componentBackground)
             .border(
                 1.dp,
                 when {
-                    selected -> Accent
+                    selected -> OneConfigTheme.accent
                     hovered -> theme.textColorSecondary
                     else -> theme.borderColor
                 },

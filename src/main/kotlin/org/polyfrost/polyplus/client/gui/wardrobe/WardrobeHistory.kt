@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
@@ -24,7 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -50,7 +53,7 @@ internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
     Box(
         modifier = Modifier.fillMaxSize().clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(12.dp))
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
             .padding(18.dp),
     ) {
         when {
@@ -58,7 +61,7 @@ internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
             loadError != null && transactions.isEmpty() -> CenteredNote(loadError!!)
             transactions.isEmpty() -> CenteredNote("No transactions yet.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                loadError?.let { SocialText(it, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp) }
+                loadError?.let { SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp) }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     items(transactions, key = { it.id }) { tx -> TransactionRow(tx) }
                 }
@@ -72,16 +75,16 @@ private fun TransactionRow(tx: TransactionInfo) {
     Row(
         modifier = Modifier.fillMaxWidth()
             .clip(ppShape(8.dp))
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 13.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            SocialText("Order #${tx.id}", color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            SocialText(tx.provider.displayName, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+            SocialText("Order #${tx.id}", color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            SocialText(tx.provider.displayName, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
         }
-        tx.amount?.let { SocialText(money(it, tx.currency), color = LocalTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+        tx.amount?.let { SocialText(money(it, tx.currency), color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
         SocialText(
             tx.status.displayName,
             color = statusColor(tx.status),

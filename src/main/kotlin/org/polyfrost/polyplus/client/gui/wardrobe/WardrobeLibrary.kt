@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Canvas
@@ -48,10 +50,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.resources.Identifier
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.api.TinyFdApi
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -255,7 +257,7 @@ private fun DrawScope.drawSkinFront(skin: ImageBitmap, slim: Boolean) {
 internal fun OutfitSwitcher(onStatus: (String) -> Unit) {
     LaunchedEffect(Unit) { OutfitLibrary.refreshIfNeeded() }
     val state = OutfitLibrary.state
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     val outfits = OutfitLibrary.outfits.favoritesFirst()
     val activeId = OutfitLibrary.activeOutfitId
     val busy = OutfitLibrary.busy
@@ -316,7 +318,7 @@ private enum class SkinSource(val label: String, val icon: String) {
 
 @Composable
 internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modifier: Modifier) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     val sources = SkinSource.entries
     var source by remember { mutableStateOf(SkinSource.Username) }
     var username by remember { mutableStateOf("") }
@@ -479,7 +481,7 @@ private fun SegmentedControl(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
 ) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().height(33.dp)
             .clip(ppShape(8.dp))
@@ -496,7 +498,7 @@ private fun SegmentedControl(
             Row(
                 modifier = Modifier.weight(1f).fillMaxHeight()
                     .clip(ppShape(6.dp))
-                    .background(if (selected) Accent else Color.Transparent)
+                    .background(if (selected) OneConfigTheme.accent else Color.Transparent)
                     .hoverable(interaction)
                     .clickable { onSelect(index) },
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
@@ -511,12 +513,12 @@ private fun SegmentedControl(
 
 @Composable
 private fun PrimaryWideButton(label: String, iconPath: String, enabled: Boolean, onClick: () -> Unit) {
-    val theme = LocalTheme.current
+    val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().height(33.dp)
             .alpha(if (enabled) 1f else 0.6f)
             .clip(ppShape(8.dp))
-            .background(Accent)
+            .background(OneConfigTheme.accent)
             .clickable(enabled = enabled, onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -529,7 +531,7 @@ private fun PrimaryWideButton(label: String, iconPath: String, enabled: Boolean,
 @Composable
 private fun FieldGroup(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SocialText(label, color = LocalTheme.current.textColorSecondary, fontSize = 12.sp)
+        SocialText(label, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
         content()
     }
 }
