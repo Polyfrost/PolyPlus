@@ -51,7 +51,6 @@ private val MinecraftIcons = mapOf(
 
 /** [path], or OneConfig's pixel version of it under the Minecraft themes. */
 @Composable
-@ReadOnlyComposable
 internal fun themedIcon(path: String): String {
     if (!isMinecraftTheme) return path
     val name = path.substringAfterLast('/').removeSuffix(".svg")
