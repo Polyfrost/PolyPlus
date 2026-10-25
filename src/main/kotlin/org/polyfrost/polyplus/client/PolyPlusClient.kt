@@ -29,6 +29,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
 import org.polyfrost.polyplus.client.features.DefaultModOrder
+import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.ModpackDiff
@@ -157,6 +158,7 @@ object PolyPlusClient {
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
+        step("pylon raw input") { PylonRawInput.initialize() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("legal documents") {
             if (PrivacyConsent.state() == PrivacyConsent.State.ACCEPTED && !PrivacyConsent.managedByLauncher) {
