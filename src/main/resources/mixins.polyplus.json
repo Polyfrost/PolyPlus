@@ -165,9 +165,13 @@
     //? if > 1.8.9
     "compat.wwaypoints.MixinServerPolicyFeedback",
     //? if > 1.8.9
+    "compat.wwaypoints.MixinSharingLiveConnection",
+    //? if > 1.8.9
     "compat.wwaypoints.MixinToggleSneakConfigScreen",
     //? if > 1.8.9
     "compat.wwaypoints.MixinToggleSneakService",
+    //? if > 1.8.9
+    "compat.wwaypoints.MixinUiToast",
     //? if = 1.8.9
     //"client.network.MixinPlayerManager",
     "client.network.ServerCommonPacketListenerAccessor"
