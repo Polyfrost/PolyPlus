@@ -107,7 +107,6 @@ import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
@@ -741,6 +740,11 @@ private sealed interface QuickplayEntry {
     }
 }
 private const val BASE_HEIGHT = 720f
+
+// every icon on this screen goes through here so the Minecraft themes get pixel icons
+@Composable
+private fun Icon(path: String, color: Color, modifier: Modifier) =
+    org.polyfrost.oneconfig.api.ui.v1.components.Icon(themedIcon(path), color, modifier)
 
 @Composable
 private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
