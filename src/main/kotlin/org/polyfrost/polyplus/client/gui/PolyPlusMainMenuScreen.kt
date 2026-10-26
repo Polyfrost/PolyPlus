@@ -354,6 +354,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 quickplay = quickplay,
                 pingTick = pingTick,
             )
+            BadModsDialog()
         }
     }
 

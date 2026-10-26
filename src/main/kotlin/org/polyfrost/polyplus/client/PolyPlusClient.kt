@@ -28,6 +28,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
+import org.polyfrost.polyplus.client.features.BadMods
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
@@ -176,6 +177,7 @@ object PolyPlusClient {
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("modpack diff") { ModpackDiff.logAsync() }
+        step("bad mods") { BadMods.checkAsync() }
         step("login gate") { MinecraftLoginGate.register() }
         step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
