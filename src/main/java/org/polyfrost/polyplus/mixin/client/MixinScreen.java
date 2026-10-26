@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.gui.screens.Screen;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
+import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -60,6 +61,26 @@ public class MixinScreen {
         MenuPanorama.drawBackdrop(graphics, self, true);
     }
 
+    // PauseScreen doesn't override render on every version, so the vanilla pause menu's player panel hooks in here
+    @Inject(
+        //? if >= 26.1 {
+        method = "extractRenderState",
+        //?} else {
+        /*method = "render",
+        *///?}
+        at = @At("TAIL")
+    )
+    private void polyplus$drawPauseMenuPanel(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int mouseX, int mouseY, float tickDelta, CallbackInfo ci
+    ) {
+        PauseMenuPanel.render(graphics, (Screen) (Object) this);
+    }
+
     @WrapMethod(
         //? if >= 26.1 {
         method = "extractMenuBackground(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIII)V"
@@ -85,6 +106,7 @@ public class MixinScreen {
 import net.minecraft.client.gui.screen.game.inventory.InventoryMenuScreen;
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
+import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -104,6 +126,11 @@ public class MixinScreen {
     @Inject(method = "render", at = @At("TAIL"))
     private void polyplus$endBackgroundPass(int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
         MenuPanorama.beginPass();
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void polyplus$drawPauseMenuPanel(int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
+        PauseMenuPanel.render((Screen) (Object) this, mouseX, mouseY);
     }
 
     @Inject(method = "drawBackgroundTexture", at = @At("HEAD"), cancellable = true)
