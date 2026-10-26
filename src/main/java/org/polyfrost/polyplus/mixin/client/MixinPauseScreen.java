@@ -13,9 +13,11 @@ import org.spongepowered.asm.mixin.injection.At;
 *///?} elif = 1.8.9 {
 /*import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.menu.GameMenuScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.resource.language.I18n;
 import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 *///?}
 
 /**
- * Renames the pause menu's dedicated LAN button.
+ * Renames the pause menu's dedicated LAN button, and on 1.8.9 adds the player panel's buttons (see PauseMenuPanel).
  * On 26.3 this is inside the World Options screen (see MixinWorldOptionsScreen).
  */
 //? if < 26.3 && > 1.8.9 {
@@ -64,6 +66,16 @@ public class MixinPauseScreen {
         for (ButtonWidget button : ((ScreenAccessor) this).polyplus$buttons()) {
             if (button.id == 7) button.message = I18n.translate("polyplus.hostWorld");
         }
+    }
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void polyplus$addPlayerPanel(CallbackInfo ci) {
+        PauseMenuPanel.addLegacyButtons((Screen) (Object) this);
+    }
+
+    @Inject(method = "buttonClicked", at = @At("HEAD"), cancellable = true)
+    private void polyplus$playerPanelButton(ButtonWidget button, CallbackInfo ci) {
+        if (PauseMenuPanel.onLegacyButton((Screen) (Object) this, button.id)) ci.cancel();
     }
     *///?}
 }

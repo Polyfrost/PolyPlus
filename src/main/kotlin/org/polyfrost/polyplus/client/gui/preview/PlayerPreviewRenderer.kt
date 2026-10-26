@@ -590,6 +590,13 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
+        // the dummy's skin customisation data is never synced, which hides every outer layer; match directState
+        state.showHat = true
+        state.showJacket = true
+        state.showLeftSleeve = true
+        state.showRightSleeve = true
+        state.showLeftPants = true
+        state.showRightPants = true
         state.showCape = (source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null) &&
             !hidesCape(source)
         previewSkin(source)?.let { state.skin = LocalSkinOverride.withSkin(state.skin, it) }

@@ -5,11 +5,17 @@ import com.mojang.blaze3d.pipeline.RenderTarget
 //?} else {
 /*import net.minecraft.client.render.pipeline.RenderTarget
 *///?}
+import org.jetbrains.skia.BlendMode
 import org.jetbrains.skia.Canvas
+import org.jetbrains.skia.Color4f
 import org.jetbrains.skia.ContentChangeMode
+import org.jetbrains.skia.FilterTileMode
+import org.jetbrains.skia.Gradient
 import org.jetbrains.skia.Paint
+import org.jetbrains.skia.Point
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
+import org.jetbrains.skia.Shader
 import org.polyfrost.oneconfig.internal.ui.SkiaOffscreenTarget
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
@@ -28,6 +34,8 @@ object PlayerPreviewOffscreen {
         var dragYaw = 0f
         var dragPitch = 0f
         var dragging = false
+        // drawn by a vanilla screen through Skia rather than by a Compose screen
+        var vanillaHost = false
         var spinAccum = 0f
         var lastSpinNanos = 0L
 
@@ -81,7 +89,7 @@ object PlayerPreviewOffscreen {
         var rendered = false
         for (e in entries) {
             val sinceDraw = now - e.lastDrawNanos
-            if (!composeScreen || sinceDraw > RELEASE_NANOS) {
+            if ((!composeScreen && !e.vanillaHost) || sinceDraw > RELEASE_NANOS) {
                 if (e.offscreen != null) release(e)
                 e.lastSpinNanos = 0L
                 continue
@@ -145,5 +153,40 @@ object PlayerPreviewOffscreen {
         canvas.scale(width / w, height / h)
         surface.draw(canvas, 0, 0, SamplingMode.LINEAR, blitPaint)
         canvas.restore()
+    }
+
+    private const val FADE_STOPS = 12
+    private val fadePaint = Paint().apply { blendMode = BlendMode.DST_IN }
+
+    /** [draw] with the same edge and bottom fades PlayerPreview applies, for screens that aren't Compose. */
+    fun drawFaded(entry: Entry, canvas: Canvas, x: Float, y: Float, width: Float, height: Float, bottomFadeFraction: Float) {
+        if (width <= 0f || height <= 0f) return
+        val bounds = Rect.makeWH(width, height)
+        canvas.save()
+        canvas.translate(x, y)
+        canvas.saveLayer(bounds, null)
+        draw(entry, canvas, width, height)
+        val edge = PlayerPreviewRenderer.EDGE_FADE_FRACTION
+        val left = (0..FADE_STOPS).map { it / FADE_STOPS.toFloat() }.map { t -> t * edge to t }
+        val stops = left + left.asReversed().map { (pos, t) -> 1f - pos to t }
+        fade(canvas, bounds, stops, Point(0f, 0f), Point(width, 0f))
+        if (bottomFadeFraction > 0f) {
+            val f = bottomFadeFraction.coerceAtMost(1f)
+            val bottom = (FADE_STOPS downTo 0).map { it / FADE_STOPS.toFloat() }.map { t -> 1f - t * f to t }
+            fade(canvas, bounds, bottom, Point(0f, 0f), Point(0f, height))
+        }
+        canvas.restore()
+        canvas.restore()
+    }
+
+    // masks what's already drawn by an alpha gradient; stops are (position, alpha before smoothing)
+    private fun fade(canvas: Canvas, bounds: Rect, stops: List<Pair<Float, Float>>, from: Point, to: Point) {
+        val colors = stops.map { (_, t) -> Color4f(1f, 1f, 1f, PlayerPreviewRenderer.smooth(t)) }.toTypedArray()
+        val positions = stops.map { it.first }.toFloatArray()
+        val shader = Shader.makeLinearGradient(from, to, Gradient(Gradient.Colors(colors, positions, FilterTileMode.CLAMP)))
+        fadePaint.shader = shader
+        canvas.drawRect(bounds, fadePaint)
+        fadePaint.shader = null
+        shader.close()
     }
 }

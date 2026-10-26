@@ -42,6 +42,8 @@
     "client.MixinIntegratedServer",
     "client.MixinMinecraft",
     "client.MixinMinecraftSystemReport",
+    //? if > 1.8.9
+    "client.MixinMouseHandler",
     "client.MixinJoinMultiplayerScreen",
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
@@ -73,6 +75,8 @@
     "client.access.AbstractSelectionListAccessor",
     "client.access.OnlineServerEntryInvoker",
     "client.access.ScreenAccessor",
+    //? if > 1.8.9
+    "client.access.SpriteIconButtonAccessor",
     //? if > 1.8.9
     "client.access.UserAccessor",
     //? if <1.21.8

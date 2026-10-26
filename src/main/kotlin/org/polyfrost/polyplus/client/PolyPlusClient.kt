@@ -34,7 +34,7 @@ import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.PauseMenuPanel
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -66,6 +66,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 
 //? if >= 26.2 {
 import org.polyfrost.polyplus.compat.RrlsCrashGuard
@@ -197,6 +198,7 @@ object PolyPlusClient {
         //? if = 1.21.1 || >= 1.21.8
         step("player preview") { PlayerPreviewRenderer.initialize() }
         step("vanilla menu button") { VanillaMenuButton.register() }
+        step("pause menu panel") { PauseMenuPanel.register() }
 
         step("websocket") {
             PolyConnection.initialize {
