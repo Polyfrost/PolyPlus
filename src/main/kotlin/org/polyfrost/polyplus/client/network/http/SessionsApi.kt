@@ -1,8 +1,8 @@
 package org.polyfrost.polyplus.client.network.http
 
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
+import org.polyfrost.polyplus.libs.ktor.client.request.setBody
+import org.polyfrost.polyplus.libs.ktor.http.ContentType
+import org.polyfrost.polyplus.libs.ktor.http.contentType
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.CreateSessionRequest

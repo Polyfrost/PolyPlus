@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.social
 
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.header
+import org.polyfrost.polyplus.libs.ktor.client.request.HttpRequestBuilder
+import org.polyfrost.polyplus.libs.ktor.client.request.header
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch

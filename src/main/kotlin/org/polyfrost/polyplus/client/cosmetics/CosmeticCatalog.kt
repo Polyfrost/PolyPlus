@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import io.ktor.client.plugins.expectSuccess
-import io.ktor.client.request.get
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
+import org.polyfrost.polyplus.libs.ktor.client.plugins.expectSuccess
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.request.setBody
+import org.polyfrost.polyplus.libs.ktor.http.ContentType
+import org.polyfrost.polyplus.libs.ktor.http.contentType
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig

@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.cosmetics
 
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.accept
-import io.ktor.client.request.header
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
+import org.polyfrost.polyplus.libs.ktor.client.request.HttpRequestBuilder
+import org.polyfrost.polyplus.libs.ktor.client.request.accept
+import org.polyfrost.polyplus.libs.ktor.client.request.header
+import org.polyfrost.polyplus.libs.ktor.http.ContentType
+import org.polyfrost.polyplus.libs.ktor.http.HttpHeaders
 import net.minecraft.client.Minecraft
 
 internal object MojangAuth {

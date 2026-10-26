@@ -139,6 +139,13 @@ val flkProvidedVersions: Map<String, String> = run {
         }
 }
 
+val flkCoroutinesVersion: String = configurations.detachedConfiguration(
+    dependencies.create("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion"),
+).resolvedConfiguration.resolvedArtifacts
+    .map { it.moduleVersion.id }
+    .single { it.group == "org.jetbrains.kotlinx" && it.name == "kotlinx-coroutines-core-jvm" }
+    .version
+
 configurations.all {
     resolutionStrategy.eachDependency {
         flkProvidedVersions["${requested.group}:${requested.name}"]?.let { useVersion(it) }
@@ -229,9 +236,61 @@ val relocateSentry = tasks.register<ShadowJar>("relocateSentry") {
     isReproducibleFileOrder = true
 }
 
+val ktorRelocatedPackage = "org.polyfrost.polyplus.libs.ktor"
+val coroutinesRelocatedPackage = "org.polyfrost.polyplus.libs.coroutines"
+
+val ktorShade: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    exclude(group = "org.jetbrains.kotlin")
+    exclude(group = "org.slf4j")
+    for (module in flkProvidedModules) {
+        val (group, name) = module.split(":")
+        exclude(group = group, module = name)
+    }
+}
+
+// Ktor gets its own coroutines copy because another mod can ship an older, unrelocated
+// kotlinx.coroutines that wins over FLK's. PolyPlus code keeps FLK's coroutines so it can
+// still hand flows and scopes to Compose.
+val relocateKtor = tasks.register<ShadowJar>("relocateKtor") {
+    group = "build"
+    description = "Relocates io.ktor into $ktorRelocatedPackage and its kotlinx.coroutines into $coroutinesRelocatedPackage"
+
+    configurations = listOf(ktorShade)
+    relocate("io.ktor", ktorRelocatedPackage)
+    relocate("kotlinx.coroutines", coroutinesRelocatedPackage)
+    relocate("_COROUTINE", "$coroutinesRelocatedPackage._COROUTINE")
+    mergeServiceFiles()
+
+    exclude(
+        "META-INF/versions/9/module-info.class",
+        "META-INF/INDEX.LIST",
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "META-INF/com.android.tools/**",
+        "META-INF/proguard/**",
+        "DebugProbesKt.bin",
+        "org/intellij/**",
+        "org/jetbrains/annotations/**",
+        "module-info.class",
+    )
+
+    archiveBaseName = "ktor-relocated"
+    archiveVersion = ""
+    archiveClassifier = ""
+    destinationDirectory = layout.buildDirectory.dir("relocated")
+
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 tasks.jar {
-    from(zipTree(relocateSentry.flatMap { it.archiveFile })) {
-        exclude("META-INF/MANIFEST.MF")
+    for (relocated in listOf(relocateSentry, relocateKtor)) {
+        from(zipTree(relocated.flatMap { it.archiveFile })) {
+            exclude("META-INF/MANIFEST.MF")
+        }
     }
 }
 
@@ -305,7 +364,10 @@ dependencies {
 
     sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
-    for (module in ktorModules) implementation(module)
+    for (module in ktorModules) ktorShade(module)
+    implementation(files(relocateKtor.flatMap { it.archiveFile }))
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$flkCoroutinesVersion")
+    for ((module, version) in flkProvidedVersions) compileOnly("$module:$version")
 
     implementation(include("gg.sona:eos:2.2.0")!!)
 
@@ -313,18 +375,6 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
-}
-
-run {
-    val closure = configurations.detachedConfiguration(
-        *ktorModules.map { dependencies.create(it) }.toTypedArray()
-    )
-    closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
-        val id = art.moduleVersion.id
-        if (id.group == "org.jetbrains.kotlin") return@forEach
-        if ("${id.group}:${id.name}" in flkProvidedModules) return@forEach
-        dependencies.include("${id.group}:${id.name}:${id.version}")
-    }
 }
 
 val modId = property("mod.id") as String

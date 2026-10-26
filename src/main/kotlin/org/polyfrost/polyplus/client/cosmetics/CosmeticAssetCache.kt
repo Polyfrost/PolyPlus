@@ -3,9 +3,9 @@ package org.polyfrost.polyplus.client.cosmetics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import io.ktor.client.plugins.timeout
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsBytes
+import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

@@ -1,8 +1,8 @@
 package org.polyfrost.polyplus.client.features
 
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.parameter
+import org.polyfrost.polyplus.libs.ktor.client.call.body
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.request.parameter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable

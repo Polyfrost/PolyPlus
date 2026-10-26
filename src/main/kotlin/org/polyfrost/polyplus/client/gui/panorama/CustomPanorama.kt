@@ -1,9 +1,9 @@
 package org.polyfrost.polyplus.client.gui.panorama
 
 //? if >= 1.21.11 {
-import io.ktor.client.plugins.timeout
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsBytes
+import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier

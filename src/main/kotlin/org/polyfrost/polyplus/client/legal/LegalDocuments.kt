@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.legal
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.userAgent
+import org.polyfrost.polyplus.libs.ktor.client.HttpClient
+import org.polyfrost.polyplus.libs.ktor.client.engine.cio.CIO
+import org.polyfrost.polyplus.libs.ktor.client.plugins.HttpTimeout
+import org.polyfrost.polyplus.libs.ktor.client.plugins.defaultRequest
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
+import org.polyfrost.polyplus.libs.ktor.http.userAgent
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants

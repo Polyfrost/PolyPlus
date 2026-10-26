@@ -4,9 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch

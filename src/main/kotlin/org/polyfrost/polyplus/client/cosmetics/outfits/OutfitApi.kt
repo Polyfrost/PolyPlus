@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client.cosmetics.outfits
 
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
+import org.polyfrost.polyplus.libs.ktor.client.request.setBody
+import org.polyfrost.polyplus.libs.ktor.http.ContentType
+import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.http.contentType
 import kotlinx.serialization.json.JsonObject
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig

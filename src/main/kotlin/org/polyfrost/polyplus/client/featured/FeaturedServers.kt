@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.featured
 
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
