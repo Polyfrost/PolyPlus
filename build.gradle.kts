@@ -367,7 +367,10 @@ dependencies {
     for (module in ktorModules) ktorShade(module)
     implementation(files(relocateKtor.flatMap { it.archiveFile }))
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$flkCoroutinesVersion")
-    for ((module, version) in flkProvidedVersions) compileOnly("$module:$version")
+    for ((module, version) in flkProvidedVersions) {
+        compileOnly("$module:$version")
+        testCompileOnly("$module:$version")
+    }
 
     implementation(include("gg.sona:eos:2.2.0")!!)
 
