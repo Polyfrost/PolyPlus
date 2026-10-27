@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -393,9 +394,7 @@ internal fun SocialToggle(label: String, checked: Boolean, modifier: Modifier = 
                 .border(SocialIndicatorBorderWidth, boxBorder, theme.checkBoxShape),
             contentAlignment = Alignment.Center,
         ) {
-            // TODO: fix DSL scope violation instead of working around it with an FQN
-            @Suppress("UnnecessaryFullyQualifiedName")
-            androidx.compose.animation.AnimatedVisibility(visible = checked, enter = fadeIn(), exit = fadeOut()) {
+            this@Row.AnimatedVisibility(visible = checked, enter = fadeIn(), exit = fadeOut()) {
                 Canvas(Modifier.size(12.dp)) {
                     val w = size.width
                     val h = size.height
