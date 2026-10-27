@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import net.fabricmc.loader.api.FabricLoader
+import java.awt.Color
 import java.nio.file.Path
 import kotlin.io.path.createFile
 import kotlin.io.path.exists
@@ -79,7 +80,7 @@ class BlockHighlightStyle(
     class Rainbow(val speed: Float, val delay: Int, val saturation: Float, val brightness: Float) {
         fun color(millis: Long, primary: Boolean): Int {
             val hue = (Math.ceil((millis + if (primary) 0 else delay).toDouble()) * speed / 50.0) % 360.0
-            return java.awt.Color.HSBtoRGB((hue / 360.0).toFloat(), saturation, brightness)
+            return Color.HSBtoRGB((hue / 360.0).toFloat(), saturation, brightness)
         }
     }
 

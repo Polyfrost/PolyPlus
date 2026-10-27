@@ -44,7 +44,7 @@ import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.world.level.GameType
 //?} else {
 /*import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
-import org.polyfrost.polyplus.client.host.GameType
+import net.minecraft.world.WorldSettings.GameMode as GameType
 import org.polyfrost.polyplus.client.social.setScreen
 *///?}
 import org.jetbrains.skia.Image

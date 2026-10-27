@@ -13,6 +13,7 @@ import net.minecraft.client.resources.DefaultPlayerSkin
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
 import org.joml.Quaternionf
+import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
@@ -91,7 +92,6 @@ import net.minecraft.client.player.RemotePlayer
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.Collections
 import kotlinx.coroutines.launch
@@ -929,11 +929,11 @@ object PlayerPreviewRenderer {
     private fun capeOverride(source: PlayerPreviewSource): Identifier? = when (source) {
         is PlayerPreviewSource.Override ->
             source.capeCosmeticId?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+                CosmeticAssetCache.getCapeResource(it)
             } ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
-            org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog.localEquipped().cape?.let {
-                org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache.getCapeResource(it)
+            CosmeticCatalog.localEquipped().cape?.let {
+                CosmeticAssetCache.getCapeResource(it)
             } ?: MojangCapeService.localCapeTexture()
     }
 

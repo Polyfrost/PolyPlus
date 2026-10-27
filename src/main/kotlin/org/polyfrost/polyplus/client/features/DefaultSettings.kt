@@ -7,8 +7,11 @@ import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 //?} else {
 /*import net.minecraft.client.options.KeyBinding as KeyMapping
+import org.lwjgl.opengl.Display
 *///?}
 import net.minecraft.client.Minecraft
+//? if >= 1.21.11
+import net.minecraft.client.TextureFilteringMethod
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
@@ -317,7 +320,7 @@ object DefaultSettings {
         options.entityShadows().set(false)
         //?} else {
         /*options.vsync = false
-        org.lwjgl.opengl.Display.setVSyncEnabled(false)
+        Display.setVSyncEnabled(false)
         options.fpsLimit = UNLIMITED_FRAMERATE
         options.entityShadows = false
         *///?}
@@ -327,8 +330,8 @@ object DefaultSettings {
     //? if >= 1.21.11 {
     private fun disableTextureFiltering() {
         val options = Minecraft.getInstance().options ?: return
-        if (options.textureFiltering().get() != net.minecraft.client.TextureFilteringMethod.RGSS) return
-        options.textureFiltering().set(net.minecraft.client.TextureFilteringMethod.NONE)
+        if (options.textureFiltering().get() != TextureFilteringMethod.RGSS) return
+        options.textureFiltering().set(TextureFilteringMethod.NONE)
         options.save()
         logger.info("Turned off RGSS texture filtering")
     }

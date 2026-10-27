@@ -31,12 +31,11 @@ import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 //?}
 //? if ornithe {
-/*import org.polyfrost.polyplus.client.PolyPlusClient
+/*import net.minecraft.world.WorldSettings.GameMode as GameType
+import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.network.p2p.P2PListenContext
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
-
-typealias GameType = net.minecraft.world.WorldSettings.GameMode
 *///?}
 
 object HostWorldManager {

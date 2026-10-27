@@ -9,7 +9,8 @@ import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
-//?}
+//?} else
+//import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.TitleScreen
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -40,9 +41,9 @@ object VanillaMenuButton {
     fun register() {}
 
     @JvmStatic
-    fun legacyButton(screenWidth: Int): net.minecraft.client.gui.widget.ButtonWidget? =
+    fun legacyButton(screenWidth: Int): ButtonWidget? =
         if (!PolyPlusMainMenuConfig.useVanillaMainMenu) null
-        else net.minecraft.client.gui.widget.ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "P+")
+        else ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "P+")
 
     @JvmStatic
     fun onLegacyButton() = openPolyPlusMenu()

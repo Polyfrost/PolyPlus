@@ -6,7 +6,9 @@ import com.mojang.blaze3d.platform.InputConstants
 //? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
 //?} else {
-/*import net.minecraft.client.options.KeyBinding as KeyMapping
+/*import net.minecraft.client.options.GameOptions
+import net.minecraft.client.options.KeyBinding as KeyMapping
+import net.minecraft.client.render.Window
 *///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
@@ -354,7 +356,7 @@ object OnboardingFeatures {
             //?} elif > 1.8.9 {
             /*mc.resizeDisplay()
             *///?} else {
-            /*val window = net.minecraft.client.render.Window(mc)
+            /*val window = Window(mc)
             mc.screen?.init(mc, window.width, window.height)
             *///?}
         }.onFailure { logger.warn("Could not apply GUI scale preference", it) }
@@ -700,7 +702,7 @@ object OnboardingFeatures {
         //? if > 1.8.9 {
         gammaToggleKey()?.translatedKeyMessage?.string
         //?} else {
-        /*gammaToggleKey()?.let { net.minecraft.client.options.GameOptions.getKeyName(it.keyCode) }
+        /*gammaToggleKey()?.let { GameOptions.getKeyName(it.keyCode) }
         *///?}
     }.getOrNull()
 

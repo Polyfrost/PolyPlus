@@ -27,7 +27,8 @@ import net.minecraft.client.multiplayer.PlayerInfo
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 //?} else {
-/*import net.minecraft.client.gui.GuiElement
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity
+import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.network.PlayerInfo
 import net.minecraft.client.render.platform.GlStateManager
 import org.polyfrost.polyplus.client.emoji.EmojiFont
@@ -223,7 +224,7 @@ object PolyPlusBadge {
 
     @JvmStatic
     fun badgesNameTag(entity: Any?, name: String): Boolean =
-        entity is net.minecraft.client.entity.living.player.ClientPlayerEntity &&
+        entity is ClientPlayerEntity &&
             name == entity.displayName.formattedString &&
             shouldBadge(entity.uuid)
     *///?}

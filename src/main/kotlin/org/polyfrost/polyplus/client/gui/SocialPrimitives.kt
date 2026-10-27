@@ -393,6 +393,8 @@ internal fun SocialToggle(label: String, checked: Boolean, modifier: Modifier = 
                 .border(SocialIndicatorBorderWidth, boxBorder, theme.checkBoxShape),
             contentAlignment = Alignment.Center,
         ) {
+            // TODO: fix DSL scope violation instead of working around it with an FQN
+            @Suppress("UnnecessaryFullyQualifiedName")
             androidx.compose.animation.AnimatedVisibility(visible = checked, enter = fadeIn(), exit = fadeOut()) {
                 Canvas(Modifier.size(12.dp)) {
                     val w = size.width

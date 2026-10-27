@@ -15,6 +15,7 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
@@ -115,7 +116,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingFireOverlayHeight = 0.0
 
     @JvmStatic @Include
-    var onboardingFireOverlayOpacity = org.polyfrost.polyplus.client.features.OnboardingFeatures.FIRE_OPACITY_VANILLA
+    var onboardingFireOverlayOpacity = OnboardingFeatures.FIRE_OPACITY_VANILLA
 
     @JvmStatic @Include
     var onboardingShieldHeight = 0f
