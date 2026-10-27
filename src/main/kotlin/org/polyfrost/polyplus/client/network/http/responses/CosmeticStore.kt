@@ -4,6 +4,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class SaleInfo(
+    val price: Float = 0f,
+    val discount: Float = 0f,
+    val percent: Int = 0,
+    val name: String = "",
+    @SerialName("ends_at") val endsAt: String? = null,
+)
+
+@Serializable
 data class CosmeticTags(
     val colors: List<String> = emptyList(),
     val custom: List<String> = emptyList(),
@@ -30,7 +39,7 @@ data class CosmeticStoreInfo(
     val collection: Int? = null,
     val type: CosmeticType = CosmeticType.Unknown,
     @SerialName("base_price") val basePrice: Float? = null,
-    @SerialName("discount_rate") val discountRate: Int? = null,
+    val sale: SaleInfo? = null,
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
     @SerialName("created_at") val createdAt: String = "",
@@ -44,11 +53,9 @@ data class CosmeticStoreInfo(
 
     val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 
-    val finalPrice: Float?
-        get() = basePrice?.let { base ->
-            val rate = (discountRate ?: 0).coerceIn(0, 100)
-            base * (1f - rate / 100f)
-        }
+    val discountRate: Int? get() = sale?.percent?.takeIf { it > 0 }
+
+    val finalPrice: Float? get() = sale?.price ?: basePrice
 }
 
 @Serializable
@@ -66,7 +73,7 @@ data class CosmeticStoreView(
     val collection: Int? = null,
     val type: CosmeticType = CosmeticType.Unknown,
     @SerialName("base_price") val basePrice: Float? = null,
-    @SerialName("discount_rate") val discountRate: Int? = null,
+    val sale: SaleInfo? = null,
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
     @SerialName("created_at") val createdAt: String = "",
@@ -74,6 +81,8 @@ data class CosmeticStoreView(
     val variants: List<StoreVariant>? = null,
 ) {
     val purchasable: Boolean get() = !storeProductId.isNullOrBlank()
+
+    val discountRate: Int? get() = sale?.percent?.takeIf { it > 0 }
 
     val variantList: List<StoreVariant>
         get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))

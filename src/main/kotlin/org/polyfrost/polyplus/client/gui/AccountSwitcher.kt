@@ -1,3 +1,6 @@
+// OneConfig's public UI API is still marked experimental
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.core.LinearEasing
@@ -48,9 +51,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.gui.screens.Screen
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
@@ -213,14 +216,14 @@ fun AccountButton(
     val clickable = enabled && !account.active && !confirmRemove
     val borderColor = when {
         account.expired -> SocialDangerColor
-        account.active -> Accent
-        else -> LocalTheme.current.borderColor
+        account.active -> OneConfigTheme.accent
+        else -> OneConfigTheme.current.borderColor
     }
 
     Row(
         modifier = Modifier
             .clip(ppShape(8.dp))
-            .background(if (hovered && clickable) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
+            .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
             .alpha(if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f)
@@ -236,17 +239,17 @@ fun AccountButton(
                 SocialText(
                     account.username,
                     fontSize = 20.sp,
-                    color = LocalTheme.current.textColor,
+                    color = OneConfigTheme.current.textColor,
                     textAlign = TextAlign.Right
                 )
-                if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", Accent)
+                if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
                 if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
             }
             SocialText(
                 if (confirmRemove) "Remove this account?"
                 else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
                 fontSize = 13.sp,
-                color = if (confirmRemove) SocialDangerColor else LocalTheme.current.textColorSecondary,
+                color = if (confirmRemove) SocialDangerColor else OneConfigTheme.current.textColorSecondary,
                 textAlign = TextAlign.Right
             )
         }
@@ -275,7 +278,7 @@ private fun AccountBadge(icon: String, text: String, color: Color) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(LocalTheme.current.componentBackground)
+            .background(OneConfigTheme.current.componentBackground)
             .border(1.dp, color, RoundedCornerShape(50))
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -106,26 +106,27 @@ object LauncherAccountStore {
 
     private fun platformLauncherDirs(): List<File> {
         val home = File(System.getProperty("user.home") ?: return emptyList())
-        return when {
-            ClientPlatform.isWindows -> {
-                val base = System.getenv("LOCALAPPDATA")?.let(::File) ?: File(home, "AppData/Local")
-                listOf(
-                    File(base, "Polyfrost/OneClient/data"),
-                    File(base, "Polyfrost/OneClient-dev/data"),
-                )
-            }
-            ClientPlatform.isMac -> {
-                val base = File(home, "Library/Application Support")
-                listOf(
-                    File(base, "org.Polyfrost.OneClient"),
-                    File(base, "org.Polyfrost.OneClient-dev"),
-                )
-            }
-            else -> {
-                val base = System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() }?.let(::File)
-                    ?: File(home, ".local/share")
-                listOf(File(base, "oneclient"), File(base, "oneclient-dev"))
-            }
+        return listOf("OneClient", "OneClient-dev").map { app ->
+            val legacy = legacyLauncherDir(home, app)
+            if (File(legacy, "settings.json").isFile) legacy else File(dataDir(home), "Polyfrost/$app")
         }
     }
+
+    private fun dataDir(home: File): File = when {
+        ClientPlatform.isWindows -> System.getenv("APPDATA")?.let(::File) ?: File(home, "AppData/Roaming")
+        ClientPlatform.isMac -> File(home, "Library/Application Support")
+        else -> xdgDataHome(home)
+    }
+
+    private fun legacyLauncherDir(home: File, app: String): File = when {
+        ClientPlatform.isWindows -> File(
+            System.getenv("LOCALAPPDATA")?.let(::File) ?: File(home, "AppData/Local"),
+            "Polyfrost/$app/data",
+        )
+        ClientPlatform.isMac -> File(home, "Library/Application Support/org.Polyfrost.$app")
+        else -> File(xdgDataHome(home), app.lowercase())
+    }
+
+    private fun xdgDataHome(home: File): File =
+        System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() }?.let(::File) ?: File(home, ".local/share")
 }

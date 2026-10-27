@@ -1,19 +1,19 @@
 package org.polyfrost.polyplus.client.network.http
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ResponseException
-import io.ktor.client.plugins.ServerResponseException
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.request
-import io.ktor.client.request.url
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.isSuccess
+import org.polyfrost.polyplus.libs.ktor.client.HttpClient
+import org.polyfrost.polyplus.libs.ktor.client.call.body
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ResponseException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
+import org.polyfrost.polyplus.libs.ktor.client.request.HttpRequestBuilder
+import org.polyfrost.polyplus.libs.ktor.client.request.bearerAuth
+import org.polyfrost.polyplus.libs.ktor.client.request.request
+import org.polyfrost.polyplus.libs.ktor.client.request.url
+import org.polyfrost.polyplus.libs.ktor.client.statement.HttpResponse
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
+import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.http.isSuccess
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuilder.() -> Unit): HttpResponse {

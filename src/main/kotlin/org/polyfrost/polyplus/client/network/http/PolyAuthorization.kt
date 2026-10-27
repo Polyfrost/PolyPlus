@@ -1,15 +1,15 @@
 package org.polyfrost.polyplus.client.network.http
 
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.expectSuccess
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.parameter
-import io.ktor.client.request.post
-import io.ktor.client.request.put
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.expectSuccess
+import org.polyfrost.polyplus.libs.ktor.client.request.bearerAuth
+import org.polyfrost.polyplus.libs.ktor.client.request.parameter
+import org.polyfrost.polyplus.libs.ktor.client.request.post
+import org.polyfrost.polyplus.libs.ktor.client.request.put
+import org.polyfrost.polyplus.libs.ktor.client.request.setBody
+import org.polyfrost.polyplus.libs.ktor.http.ContentType
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.http.contentType
 import kotlinx.serialization.Serializable
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.metadata.ModOrigin
@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.AuthResponse
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
@@ -196,6 +197,7 @@ object PolyAuthorization {
         if (modsReported.compareAndSet(false, true)) {
             PolyPlusClient.SCOPE.launch(Dispatchers.IO) { reportMods(response.token) }
         }
+        SkinLibrary.onSignedIn(profileId)
         return Authorized(profileId, response)
     }
 

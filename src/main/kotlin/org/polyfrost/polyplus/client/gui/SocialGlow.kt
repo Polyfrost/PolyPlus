@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
@@ -5,11 +7,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 
 @Composable
 internal fun Modifier.socialGlow(opacity: Float = 0.25f): Modifier {
-    val accent = Accent
+    val accent = OneConfigTheme.accent
     return this.drawBehind {
         val glowRadius = size.maxDimension * 0.7f
         val topLeft = Offset(size.width * 0.12f, -size.height * 0.15f)

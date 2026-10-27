@@ -23,13 +23,17 @@ typealias PolyPlayerModel = PlayerModel
 //?}
 
 //? if = 1.8.9 {
-/*typealias PolyPlayerModel = net.minecraft.client.render.model.entity.PlayerModel
+/*import net.minecraft.client.render.model.entity.PlayerModel
+import net.minecraft.client.render.model.ModelPart
+import org.joml.Quaternionf
 
-fun net.minecraft.client.render.model.ModelPart.translateAndRotate(poseStack: PoseStack) {
+typealias PolyPlayerModel = PlayerModel
+
+fun ModelPart.translateAndRotate(poseStack: PoseStack) {
     poseStack.translate(translateX, translateY, translateZ)
     poseStack.translate(x / 16f, y / 16f, z / 16f)
     if (rotationX != 0f || rotationY != 0f || rotationZ != 0f) {
-        poseStack.mulPose(org.joml.Quaternionf().rotationZYX(rotationZ, rotationY, rotationX))
+        poseStack.mulPose(Quaternionf().rotationZYX(rotationZ, rotationY, rotationX))
     }
 }
 *///?}

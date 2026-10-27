@@ -12,6 +12,8 @@ import org.polyfrost.oneconfig.utils.v1.Multithreading
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 //? if >= 1.21.10 {
@@ -23,6 +25,8 @@ import net.minecraft.world.entity.player.PlayerModelType
 *///?}
 
 object ClientPlatform {
+    private const val MAIN_SYNC_TIMEOUT_SECONDS = 30L
+
     val isWindows: Boolean
         get() = System.getProperty("os.name").lowercase().contains("windows")
 
@@ -52,8 +56,11 @@ object ClientPlatform {
         }
         val result = AtomicReference<T>()
         val error = AtomicReference<Throwable>()
+        // whichever side claims it first decides, so a task never runs after its caller has given up on it
+        val claimed = AtomicBoolean()
         val latch = CountDownLatch(1)
         client.execute {
+            if (!claimed.compareAndSet(false, true)) return@execute
             try {
                 result.set(action())
             } catch (t: Throwable) {
@@ -62,10 +69,15 @@ object ClientPlatform {
                 latch.countDown()
             }
         }
-        latch.await()
+        // Minecraft#disconnect drops queued tasks, which would otherwise leave this waiting forever
+        if (!latch.await(MAIN_SYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            if (claimed.compareAndSet(false, true)) {
+                throw IllegalStateException("Main thread did not run the task within $MAIN_SYNC_TIMEOUT_SECONDS seconds")
+            }
+            latch.await()
+        }
         error.get()?.let { throw it }
-        @Suppress("UNCHECKED_CAST")
-        return result.get() as T
+        return result.get()
     }
 
     fun currentScreen(): Screen? {
@@ -90,7 +102,20 @@ object ClientPlatform {
         Multithreading.submit { DesktopHelper.browse(URI(uri)) }
     }
 
-    fun localPlayerUuid(): UUID = Minecraft.getInstance().user.profileId
+    @Volatile
+    private var offlineUuid: Pair<String, UUID>? = null
+
+    fun localPlayerUuid(): UUID {
+        val user = Minecraft.getInstance().user
+        val id: UUID? = user.profileId
+        return id ?: offlineUuidFor(user.name)
+    }
+
+    private fun offlineUuidFor(name: String): UUID {
+        offlineUuid?.let { (cachedName, uuid) -> if (cachedName == name) return uuid }
+        return UUID.nameUUIDFromBytes("OfflinePlayer:$name".toByteArray(Charsets.UTF_8))
+            .also { offlineUuid = name to it }
+    }
 
     fun localPlayerName(): String = Minecraft.getInstance().user.name
 

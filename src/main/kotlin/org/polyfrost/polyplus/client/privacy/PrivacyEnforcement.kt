@@ -5,6 +5,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.features.BadMods
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -35,6 +36,7 @@ object PrivacyEnforcement {
                 LOGGER.info("Consent granted; bootstrapping PolyPlus online services.")
                 PolyPlusClient.refreshCosmetics()
             }
+            BadMods.checkAsync()
         } else {
             bootstrapped.set(false)
         }

@@ -1,3 +1,6 @@
+// OneConfig's public UI API is still marked experimental
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
@@ -6,7 +9,8 @@ import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 
 //? if >= 26.1 {
@@ -139,7 +143,7 @@ class AccountSwitcherScreen(internal val previousScreen: Screen?) : ComposeScree
 
     @Composable
     override fun compose() {
-        Theme {
+        ProvideOneConfigTheme {
             AccountSwitcherContent(screen = this, onClose = { Minecraft.getInstance().execute { AccountSwitcherOverlay.close() } })
         }
     }

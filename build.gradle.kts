@@ -1,10 +1,12 @@
 @file:Suppress("UnstableApiUsage")
 
+import dev.detekt.gradle.Detekt
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import dev.kikugie.loomx.LoomCompatDependencyExtension
 import dev.kikugie.loomx.LoomCompatProjectExtension
 import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.ltgt.gradle.errorprone.errorprone
 import net.ornithemc.ploceus.api.PloceusGradleExtensionApi
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.kotlin.dsl.getByName
@@ -20,6 +22,8 @@ plugins {
     id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
     id("ploceus") version "1.17.4" apply false
     id("me.modmuss50.mod-publish-plugin")
+    id("dev.detekt") version "2.0.0-alpha.6"
+    id("net.ltgt.errorprone") version "5.1.1"
 }
 
 shadow {
@@ -59,7 +63,6 @@ val minecraftPredicate = property("mod.mc_compat") as String
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
     put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
-    put("skyboxify", optionalProperty("deps.skyboxify") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -140,6 +143,13 @@ val flkProvidedVersions: Map<String, String> = run {
         }
 }
 
+val flkCoroutinesVersion: String = configurations.detachedConfiguration(
+    dependencies.create("net.fabricmc:fabric-language-kotlin:$fabricLanguageKotlinVersion"),
+).resolvedConfiguration.resolvedArtifacts
+    .map { it.moduleVersion.id }
+    .single { it.group == "org.jetbrains.kotlinx" && it.name == "kotlinx-coroutines-core-jvm" }
+    .version
+
 configurations.all {
     resolutionStrategy.eachDependency {
         flkProvidedVersions["${requested.group}:${requested.name}"]?.let { useVersion(it) }
@@ -165,7 +175,6 @@ if (isOrnithe) {
             "**/mixin/compat/mountopacity/**",
             "**/mixin/compat/polytone/**",
             "**/mixin/compat/rrls/**",
-            "**/mixin/compat/skyboxify/**",
             "**/mixin/compat/sodium/**",
             "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",
@@ -231,9 +240,61 @@ val relocateSentry = tasks.register<ShadowJar>("relocateSentry") {
     isReproducibleFileOrder = true
 }
 
+val ktorRelocatedPackage = "org.polyfrost.polyplus.libs.ktor"
+val coroutinesRelocatedPackage = "org.polyfrost.polyplus.libs.coroutines"
+
+val ktorShade: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    exclude(group = "org.jetbrains.kotlin")
+    exclude(group = "org.slf4j")
+    for (module in flkProvidedModules) {
+        val (group, name) = module.split(":")
+        exclude(group = group, module = name)
+    }
+}
+
+// Ktor gets its own coroutines copy because another mod can ship an older, unrelocated
+// kotlinx.coroutines that wins over FLK's. PolyPlus code keeps FLK's coroutines so it can
+// still hand flows and scopes to Compose.
+val relocateKtor = tasks.register<ShadowJar>("relocateKtor") {
+    group = "build"
+    description = "Relocates io.ktor into $ktorRelocatedPackage and its kotlinx.coroutines into $coroutinesRelocatedPackage"
+
+    configurations = listOf(ktorShade)
+    relocate("io.ktor", ktorRelocatedPackage)
+    relocate("kotlinx.coroutines", coroutinesRelocatedPackage)
+    relocate("_COROUTINE", "$coroutinesRelocatedPackage._COROUTINE")
+    mergeServiceFiles()
+
+    exclude(
+        "META-INF/versions/9/module-info.class",
+        "META-INF/INDEX.LIST",
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "META-INF/com.android.tools/**",
+        "META-INF/proguard/**",
+        "DebugProbesKt.bin",
+        "org/intellij/**",
+        "org/jetbrains/annotations/**",
+        "module-info.class",
+    )
+
+    archiveBaseName = "ktor-relocated"
+    archiveVersion = ""
+    archiveClassifier = ""
+    destinationDirectory = layout.buildDirectory.dir("relocated")
+
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 tasks.jar {
-    from(zipTree(relocateSentry.flatMap { it.archiveFile })) {
-        exclude("META-INF/MANIFEST.MF")
+    for (relocated in listOf(relocateSentry, relocateKtor)) {
+        from(zipTree(relocated.flatMap { it.archiveFile })) {
+            exclude("META-INF/MANIFEST.MF")
+        }
     }
 }
 
@@ -248,6 +309,8 @@ dependencies {
             mappings(rootProject.file("mappings/feather-overrides.tiny"))
         })
         testCompileOnly("net.ornithemc.osl-gen2:entrypoints:${property("deps.osl_entrypoints")}")
+        modImplementation("net.ornithemc.osl-gen2:core:${property("deps.osl_core")}")
+        modImplementation("net.ornithemc.osl-gen2:keybinds:${property("deps.osl_keybinds")}")
         include(implementation("org.joml:joml:1.10.8")!!)
         compileOnly("org.embeddedt.celeritas:celeritas-common:2.5.0-pre.1") { isTransitive = false }
     } else {
@@ -265,6 +328,7 @@ dependencies {
         modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
         modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
         modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
+        include("org.polyfrost:polydium:${property("deps.polydium")}+$mcVersion")
     }
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
     // This is a library, not a traditional mod. It must not use modRuntimeOnly,
@@ -277,14 +341,6 @@ dependencies {
 
     optionalProperty("deps.wwaypoints")?.let {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
-    }
-
-    optionalProperty("deps.skyboxify")?.let {
-        modCompileOnly("maven.modrinth:skyboxify:$it") { isTransitive = false }
-    }
-
-    optionalProperty("deps.iris")?.let {
-        modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
     }
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
@@ -312,7 +368,13 @@ dependencies {
 
     sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
-    for (module in ktorModules) implementation(module)
+    for (module in ktorModules) ktorShade(module)
+    implementation(files(relocateKtor.flatMap { it.archiveFile }))
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$flkCoroutinesVersion")
+    for ((module, version) in flkProvidedVersions) {
+        compileOnly("$module:$version")
+        testCompileOnly("$module:$version")
+    }
 
     implementation(include("gg.sona:eos:2.2.0")!!)
 
@@ -320,18 +382,21 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
+
+    errorprone("com.google.errorprone:error_prone_core:${property("deps.errorprone")}")
 }
 
-run {
-    val closure = configurations.detachedConfiguration(
-        *ktorModules.map { dependencies.create(it) }.toTypedArray()
-    )
-    closure.resolvedConfiguration.resolvedArtifacts.forEach { art ->
-        val id = art.moduleVersion.id
-        if (id.group == "org.jetbrains.kotlin") return@forEach
-        if ("${id.group}:${id.name}" in flkProvidedModules) return@forEach
-        dependencies.include("${id.group}:${id.name}:${id.version}")
+tasks.withType<JavaCompile>().configureEach {
+    options.errorprone {
+        disableAllChecks = true
+        error("UnnecessarilyFullyQualified")
     }
+}
+
+// the enabled Detekt rules need type resolution, which only the per-compilation tasks have
+tasks.named<Detekt>("detekt") {
+    enabled = false
+    dependsOn(tasks.withType<Detekt>().matching { it.name != "detekt" && !it.name.endsWith("SourceSet") })
 }
 
 val modId = property("mod.id") as String
@@ -378,7 +443,7 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("oneconfigVersion", oneconfigVersion)
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
-            line.takeUnless { "\"fabric-api\"" in it }?.replace("\"java\": \">=21\"", "\"java\": \">=25\"")
+            line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"").replace("\"java\": \">=21\"", "\"java\": \">=25\"")
         }
         expand(
             mapOf(
@@ -414,6 +479,8 @@ val modVersion = property("mod.version") as String
 // these intentionally support multiple different properties, do not remove
 val modrinthId = optionalProperty("oneconfig.publish.modrinth", "publish.modrinth")
 val modrinthToken = optionalProperty("oneconfig.publish.modrinth.token", "publish.modrinth.token", "modrinth.token")
+val curseforgeId = optionalProperty("oneconfig.publish.curseforge", "publish.curseforge")
+val curseforgeToken = optionalProperty("oneconfig.publish.curseforge.token", "publish.curseforge.token", "curseforge.token")
 
 val minecraftVersion = (property("mod.mc_releases") as String).split(",").map { it.trim() }
 val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
@@ -428,7 +495,7 @@ publishMods {
 
     modLoaders.add(loader)
 
-    dryRun = modrinthId == null || modrinthToken == null
+    dryRun = modrinthId == null || modrinthToken == null || (curseforgeId != null && curseforgeToken == null)
 
     if (modrinthId != null) {
         modrinth {
@@ -436,6 +503,19 @@ publishMods {
             accessToken = modrinthToken.orEmpty()
 
             minecraftVersions.addAll(minecraftVersion)
+
+            requires("oneconfig")
+            requires("fabric-language-kotlin")
+        }
+    }
+
+    if (curseforgeId != null && !isOrnithe) {
+        curseforge {
+            projectId = curseforgeId
+            accessToken = curseforgeToken.orEmpty()
+
+            minecraftVersions.addAll(minecraftVersion)
+            client = true
 
             requires("oneconfig")
             requires("fabric-language-kotlin")

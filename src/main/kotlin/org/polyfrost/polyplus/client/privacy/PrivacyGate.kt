@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.privacy
 
-import io.ktor.client.plugins.api.createClientPlugin
-import io.ktor.http.Url
+import org.polyfrost.polyplus.libs.ktor.client.plugins.api.createClientPlugin
+import org.polyfrost.polyplus.libs.ktor.http.Url
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 

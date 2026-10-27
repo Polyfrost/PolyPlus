@@ -11,7 +11,7 @@ data class BundleInfo(
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("base_price") val basePrice: Float? = null,
-    @SerialName("discount_rate") val discountRate: Int? = null,
+    val sale: SaleInfo? = null,
     @SerialName("store_product_id") val storeProductId: String? = null,
 ) {
     val purchasable: Boolean get() = !storeProductId.isNullOrBlank()
@@ -20,11 +20,9 @@ data class BundleInfo(
 
     val discounted: Boolean get() = (discountRate ?: 0) > 0 && !free
 
-    val finalPrice: Float?
-        get() = basePrice?.let { base ->
-            val rate = (discountRate ?: 0).coerceIn(0, 100)
-            base * (1f - rate / 100f)
-        }
+    val discountRate: Int? get() = sale?.percent?.takeIf { it > 0 }
+
+    val finalPrice: Float? get() = sale?.price ?: basePrice
 }
 
 @Serializable

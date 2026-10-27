@@ -3,6 +3,7 @@
     "id": "${mod_id}",
     "version": "${mod_version}",
     "name": "${mod_name}",
+    "icon": "icon.png",
     "description": "${mod_description}",
     "authors": [
         "Polyfrost"
@@ -20,12 +21,6 @@
         ],
         "debugify": [
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
-        ],
-        "mixinsquared": [
-            "org.polyfrost.polyplus.compat.IrisMixinTweaks"
-        ],
-        "mixinsquared-adjuster": [
-            "org.polyfrost.polyplus.compat.IrisMixinTweaks"
         ]
     },
     "languageAdapters": {
@@ -39,7 +34,7 @@
         "fabric-api": "*",
         "fabricloader": ">=0.16.0",
         "java": ">=21",
-        "fabric-language-kotlin": ">=1.13.13",
+        "fabric-language-kotlin": ">=1.14.1",
         "oneconfigv1": ">=${oneconfig_version}",
         "compose-multiplatform": ">=1.0.6"
     },

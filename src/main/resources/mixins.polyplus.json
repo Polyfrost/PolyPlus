@@ -23,6 +23,8 @@
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
     //? if = 1.8.9
+    //"client.MixinControlsListWidget",
+    //? if = 1.8.9
     //"client.MixinControlsOptionsScreen",
     //? if > 1.8.9
     "client.MixinCubeMap",
@@ -44,6 +46,8 @@
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
     //? if = 1.8.9
+    //"client.MixinInventoryMenuScreen",
+    //? if = 1.8.9
     //"client.MixinOptionsScreen",
     "client.MixinOnlineServerEntry",
     //? if > 1.8.9
@@ -56,8 +60,6 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
-    //? if >= 26.2
-    "client.MixinStagedVertexBufferPool",
     //? if > 1.8.9
     "client.MixinTabButton",
     "client.MixinTitleScreen",
@@ -121,31 +123,11 @@
     "compat.essential.MixinPartnerModConfig",
     //? if > 1.8.9
     "compat.euphoria.MixinSodiumConsole",
-    //? if >= 26.2 {
-    "compat.iris.MixinClientLevelData",
-    "compat.iris.MixinFogRenderer",
-    "compat.iris.MixinGlCommandEncoder",
-    "compat.iris.MixinHandRenderer",
-    "compat.iris.MixinIrisTimeUniforms",
-    "compat.iris.MixinLevelRenderer",
-    "compat.iris.MixinSkyRenderer",
-    "compat.iris.MixinSpriteContents",
-    "compat.iris.MixinVanillaRenderingPipeline",
-    //?}
-    //? if = 26.2 {
-    /*"compat.iris.MixinRenderRegion",
-    *///?}
     //? if > 1.8.9
     "compat.mountopacity.MixinEntityHook",
     //? if = 1.8.9
     //"compat.oneconfig.MixinComposeScreen",
-    "compat.oneconfig.MixinConfigScreenKt",
-    "compat.oneconfig.MixinModsKt",
-    "compat.oneconfig.MixinNavigationKt",
-    "compat.oneconfig.MixinRoutesKt",
     "compat.oneconfig.MixinSkiaCtx",
-    "compat.oneconfig.MixinTreeConfigData",
-    "compat.oneconfig.MixinUITheme",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",
     //? if > 1.8.9
@@ -154,10 +136,6 @@
     "compat.rrls.MixinOverlayHelper",
     "compat.rrls.MixinRrlsAbstractTexture",
     //?}
-    //? if > 1.8.9
-    "compat.skyboxify.MixinEventManager",
-    //? if > 1.8.9
-    "compat.skyboxify.MixinSkyboxManager",
     //? if > 1.8.9
     "compat.sodium.MixinSodiumConfigBuilder",
     //? if > 1.8.9
@@ -169,13 +147,9 @@
     //? if > 1.8.9
     "compat.waveycapes.MixinPlayerWrapper",
     //? if > 1.8.9
-    "compat.wwaypoints.MixinClientDimensionUtils",
-    //? if > 1.8.9
     "compat.wwaypoints.MixinConfigStorage",
     //? if > 1.8.9
     "compat.wwaypoints.MixinEssentialSharingContextResolver",
-    //? if > 1.8.9
-    "compat.wwaypoints.MixinHideWaypointCycle",
     //? if > 1.8.9
     "compat.wwaypoints.MixinServerFeaturePolicy",
     //? if > 1.8.9

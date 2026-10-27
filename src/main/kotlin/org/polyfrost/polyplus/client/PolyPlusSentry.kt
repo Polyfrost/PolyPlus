@@ -1,12 +1,12 @@
 package org.polyfrost.polyplus.client
 
 import com.google.common.collect.MapMaker
-import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.network.sockets.SocketTimeoutException
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.HttpRequestTimeoutException
-import io.ktor.client.plugins.ServerResponseException
-import io.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.client.network.sockets.ConnectTimeoutException
+import org.polyfrost.polyplus.libs.ktor.client.network.sockets.SocketTimeoutException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.HttpRequestTimeoutException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.libs.sentry.Attachment

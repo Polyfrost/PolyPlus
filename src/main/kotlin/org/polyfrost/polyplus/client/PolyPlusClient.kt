@@ -1,22 +1,22 @@
 package org.polyfrost.polyplus.client
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.HttpRequestRetry
-import io.ktor.client.plugins.HttpResponseValidator
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.ServerResponseException
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.websocket.WebSockets
-import io.ktor.client.statement.bodyAsText
-import io.ktor.client.statement.request
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.Url
-import io.ktor.http.userAgent
-import io.ktor.serialization.kotlinx.json.json
+import org.polyfrost.polyplus.libs.ktor.client.HttpClient
+import org.polyfrost.polyplus.libs.ktor.client.engine.cio.CIO
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.HttpRequestRetry
+import org.polyfrost.polyplus.libs.ktor.client.plugins.HttpResponseValidator
+import org.polyfrost.polyplus.libs.ktor.client.plugins.HttpTimeout
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
+import org.polyfrost.polyplus.libs.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import org.polyfrost.polyplus.libs.ktor.client.plugins.defaultRequest
+import org.polyfrost.polyplus.libs.ktor.client.plugins.websocket.WebSockets
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
+import org.polyfrost.polyplus.libs.ktor.client.statement.request
+import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
+import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
+import org.polyfrost.polyplus.libs.ktor.http.Url
+import org.polyfrost.polyplus.libs.ktor.http.userAgent
+import org.polyfrost.polyplus.libs.ktor.serialization.kotlinx.json.json
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -28,11 +28,14 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
+import org.polyfrost.polyplus.client.features.BadMods
 import org.polyfrost.polyplus.client.features.DefaultModOrder
+import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.VanillaMenuButton
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -51,6 +54,7 @@ import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
@@ -155,6 +159,7 @@ object PolyPlusClient {
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
+        step("pylon raw input") { PylonRawInput.initialize() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("legal documents") {
             if (PrivacyConsent.state() == PrivacyConsent.State.ACCEPTED && !PrivacyConsent.managedByLauncher) {
@@ -163,6 +168,7 @@ object PolyPlusClient {
         }
         step("rich text privacy") { RichTextPrivacy.warmUp() }
         step("default settings") { DefaultSettings.initialize() }
+        step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
@@ -171,9 +177,11 @@ object PolyPlusClient {
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("modpack diff") { ModpackDiff.logAsync() }
+        step("bad mods") { BadMods.checkAsync() }
         step("login gate") { MinecraftLoginGate.register() }
         step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
+        step("oneclient server api") { OneClientServerApi.initialize() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
 

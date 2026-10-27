@@ -15,6 +15,8 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -32,6 +34,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var modOrderSeed = ""
+
+    @JvmStatic @Include
+    var pylonRawInput: Boolean? = null
 
     @JvmStatic @Include
     var alphabeticalModOrder = false
@@ -63,12 +68,22 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     @JvmStatic @Include
     var jvmAdviceShownAt = 0L
 
+    @JvmStatic @Include
+    var ignoredBadMods = ""
+
     @JvmStatic
     @Switch(
         title = "RAM Analysis Notifications",
         description = "Check how much memory this pack actually needs and suggest a change when the current allocation is hurting performance. Shown at most once every two days.",
     )
     var ramAdviceNotifications = true
+
+    @JvmStatic
+    @Switch(
+        title = "Problematic Mod Warnings",
+        description = "Warn on startup when an installed mod is on OneClient's list of mods known to cause crashes or conflicts.",
+    )
+    var badModWarnings = true
 
     @JvmStatic @Include
     var dynamicFov = true
@@ -101,7 +116,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingFireOverlayHeight = 0.0
 
     @JvmStatic @Include
-    var onboardingFireOverlayOpacity = 100f
+    var onboardingFireOverlayOpacity = OnboardingFeatures.FIRE_OPACITY_VANILLA
 
     @JvmStatic @Include
     var onboardingShieldHeight = 0f
@@ -221,6 +236,18 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var emoteWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
         EmoteWheelKeybind.onKeybindState(state)
+        true
+    }
+
+    @Keybind(
+        title = "Open Wardrobe",
+        subcategory = "Keybinds",
+        description = "Open the PolyPlus wardrobe",
+    )
+    var wardrobeKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) {
+            PolyPlusOneConfigIntegration.openCosmeticsFromKeybind()
+        }
         true
     }
 

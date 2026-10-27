@@ -5,6 +5,7 @@ package org.polyfrost.polyplus.mixin.client;
 import net.minecraft.client.gui.screen.menu.options.ControlsOptionsScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.options.GameOptions;
+import org.polyfrost.polyplus.client.features.PylonRawInput;
 import org.polyfrost.polyplus.client.features.SensitivityConverter;
 import org.polyfrost.polyplus.client.gui.SensitivityConverterScreen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +25,10 @@ public abstract class MixinControlsOptionsScreen extends Screen {
 
     @Inject(method = "init", at = @At("RETURN"))
     private void polyplus$addConvertButton(CallbackInfo ci) {
+        if (PylonRawInput.isAvailable()) {
+            this.buttons.add(new ButtonWidget(polyplus$CONVERT_BUTTON, this.width / 2 + 5, 18 + 24, 150, 20, polyplus$rawInputLabel()));
+            return;
+        }
         if (!SensitivityConverter.INSTANCE.isWindows()) return;
         this.buttons.add(new ButtonWidget(polyplus$CONVERT_BUTTON, this.width / 2 + 5, 18 + 24, 150, 20, "Convert Sensitivity..."));
     }
@@ -33,7 +38,17 @@ public abstract class MixinControlsOptionsScreen extends Screen {
         if (button.id != polyplus$CONVERT_BUTTON) return;
         ci.cancel();
 
+        if (PylonRawInput.isAvailable()) {
+            PylonRawInput.setEnabled(!PylonRawInput.getEnabled());
+            button.message = polyplus$rawInputLabel();
+            return;
+        }
         this.minecraft.openScreen(new SensitivityConverterScreen(this, this.options));
+    }
+
+    @Unique
+    private static String polyplus$rawInputLabel() {
+        return "Raw Input: " + (PylonRawInput.getEnabled() ? "ON" : "OFF");
     }
 }
 *///?}

@@ -1,12 +1,13 @@
 package org.polyfrost.polyplus.client.features
 
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.parameter
+import org.polyfrost.polyplus.libs.ktor.client.call.body
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.request.parameter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import net.fabricmc.loader.api.FabricLoader
+import net.fabricmc.loader.api.ModContainer
 import net.fabricmc.loader.api.metadata.ModOrigin
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -62,13 +63,7 @@ object ModpackDiff {
 
     private suspend fun log() {
         val loader = FabricLoader.getInstance()
-        // OneClient points this at a per-instance directory outside the game directory
-        val modsDir = (System.getProperty("fabric.modsFolder")?.let(Path::of) ?: loader.gameDir.resolve("mods"))
-            .toAbsolutePath().normalize()
-        val loaded = loader.allMods
-            .filter { it.containingMod.isEmpty && it.origin.kind == ModOrigin.Kind.PATH }
-            .flatMap { mod -> mod.origin.paths.map { mod to it.toAbsolutePath().normalize() } }
-            .filter { (_, path) -> path.startsWith(modsDir) && Files.isRegularFile(path) }
+        val loaded = modJars()
             .associate { (mod, path) -> sha1(path) to "${mod.metadata.id} ${mod.metadata.version.friendlyString} (${path.fileName})" }
 
         val mcVersion = loader.getModContainer("minecraft").get().metadata.version.friendlyString
@@ -103,6 +98,16 @@ object ModpackDiff {
         })
     }
 
+    fun modJars(): List<Pair<ModContainer, Path>> {
+        val loader = FabricLoader.getInstance()
+        val modsDir = (System.getProperty("fabric.modsFolder")?.let(Path::of) ?: loader.gameDir.resolve("mods"))
+            .toAbsolutePath().normalize()
+        return loader.allMods
+            .filter { it.containingMod.isEmpty && it.origin.kind == ModOrigin.Kind.PATH }
+            .flatMap { mod -> mod.origin.paths.map { mod to it.toAbsolutePath().normalize() } }
+            .filter { (_, path) -> path.startsWith(modsDir) && Files.isRegularFile(path) }
+    }
+
     private suspend fun fetchPackMods(url: String): Map<String, String> {
         val bytes = PolyPlusClient.HTTP.get(url).body<ByteArray>()
         return ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
@@ -114,7 +119,7 @@ object ModpackDiff {
         }
     }
 
-    private fun sha1(path: Path): String {
+    fun sha1(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-1")
         DigestInputStream(Files.newInputStream(path), digest).use { it.transferTo(OutputStream.nullOutputStream()) }
         return HexFormat.of().formatHex(digest.digest())

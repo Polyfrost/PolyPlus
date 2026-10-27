@@ -9,6 +9,8 @@ object CosmeticLoadProgress {
 
     private const val ASSET_WEIGHT = 0.75f
 
+    const val OUTDATED_RUNTIME = "Fabric Language Kotlin is out of date"
+
     data class Snapshot(
         val started: Boolean,
         val ready: Boolean,

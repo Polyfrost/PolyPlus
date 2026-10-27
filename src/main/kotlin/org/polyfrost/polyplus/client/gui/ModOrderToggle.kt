@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.background
@@ -25,14 +27,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.internal.ui.api.Tooltip
-import org.polyfrost.oneconfig.internal.ui.components.Chip
-import org.polyfrost.oneconfig.internal.ui.components.Icon
-import org.polyfrost.oneconfig.internal.ui.components.onClick
-import org.polyfrost.oneconfig.internal.ui.components.rememberInteractionSource
-import org.polyfrost.oneconfig.internal.ui.components.Text
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.oneconfig.internal.ui.themes.concentric
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Tooltip
+import org.polyfrost.oneconfig.api.ui.v1.components.onClick
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberInteractionSource
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.concentric
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 
@@ -42,10 +45,10 @@ object ModOrderToggle {
     fun Overlay(content: @Composable () -> Unit) {
         Box {
             content()
-            Box(Modifier.align(Alignment.TopEnd)) {
+            Box(Modifier.align(Alignment.TopEnd).padding(end = PAGE_GUTTER.dp)) {
                 var alphabetical by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
                 var confirming by remember { mutableStateOf(false) }
-                val theme = LocalTheme.current
+                val theme = OneConfigTheme.current
                 Row(
                     Modifier
                         .height(36.dp)
@@ -64,7 +67,7 @@ object ModOrderToggle {
                         onDismissRequest = { confirming = false },
                         properties = PopupProperties(focusable = true),
                     ) {
-                        val theme = LocalTheme.current
+                        val theme = OneConfigTheme.current
                         Column(
                             Modifier
                                 .width(280.dp)
@@ -76,6 +79,7 @@ object ModOrderToggle {
                             Text(
                                 "Sort mods ${if (alphabetical) "in the recommended order" else "from A to Z"}? " +
                                     "This wipes your existing mod order, including any mods you dragged around.",
+                                modifier = Modifier,
                                 color = theme.textColor,
                                 fontSize = 13.sp,
                             )
@@ -98,10 +102,10 @@ object ModOrderToggle {
 
     @Composable
     private fun Segment(icon: String, hint: String, selected: Boolean, onSwitch: () -> Unit) {
-        val theme = LocalTheme.current
+        val theme = OneConfigTheme.current
         val interactionSource = rememberInteractionSource()
         Tooltip(
-            text = { Text(hint, color = theme.textColor, fontSize = 12.sp) },
+            text = { Text(hint, modifier = Modifier, color = theme.textColor, fontSize = 12.sp) },
             modifier = Modifier,
             anchor = Alignment.BottomCenter,
         ) {
@@ -122,4 +126,5 @@ object ModOrderToggle {
     }
 
     private const val POPUP_DROP = 42
+    private const val PAGE_GUTTER = 25
 }

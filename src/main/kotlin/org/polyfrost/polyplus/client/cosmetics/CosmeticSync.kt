@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.cosmetics
 
 import net.minecraft.client.Minecraft
@@ -16,7 +18,8 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.PacketEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.event.v1.events.WorldEvent
-import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
@@ -34,7 +37,9 @@ import org.polyfrost.polyplus.events.WebSocketMessage
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object CosmeticSync {
@@ -54,6 +59,9 @@ object CosmeticSync {
     @Volatile
     private var capWarned = false
 
+    private const val LOCAL_RESYNC_DELAY_MS = 500L
+    private val localResyncPending = AtomicBoolean(false)
+
     //? if >= 1.21.1 || = 1.8.9 {
     private const val RECONCILE_INTERVAL_TICKS = 20
     private var reconcileTicks = 0
@@ -68,6 +76,9 @@ object CosmeticSync {
     private const val TRIM_DELAY_TICKS = 20
     private var trimCountdown = 0
     private var configUiWasOpen = false
+
+    @Volatile
+    private var assetResetPending = false
     //?}
 
     fun earlyInitialize() {
@@ -97,7 +108,8 @@ object CosmeticSync {
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
             PolyPlusBadge.clearTabCache()
-            CosmeticAssetCache.reset()
+            // this can run on the Netty thread, where waiting on the main thread hangs forever once Minecraft#disconnect drops the task
+            assetResetPending = true
             PetManager.despawnAll()
             //?}
         }
@@ -110,6 +122,7 @@ object CosmeticSync {
                 PolyPlusBadge.clearTabCache()
                 CosmeticAssetCache.reset()
                 PetManager.despawnAll()
+                PolyPlusClient.refreshCosmetics()
             }
             wasConnected = connected
             Unit
@@ -119,8 +132,13 @@ object CosmeticSync {
         //? if >= 1.21.1 {
         eventHandler<WorldEvent.Unload> { trimCountdown = TRIM_DELAY_TICKS }
         eventHandler<TickEvent.End> {
+            if (assetResetPending) {
+                assetResetPending = false
+                CosmeticAssetCache.reset()
+                PolyPlusClient.refreshCosmetics()
+            }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
-            val configUiOpen = ClientPlatform.currentScreen() is OneConfigUIScreen
+            val configUiOpen = OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
             if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
             configUiWasOpen = configUiOpen
             if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
@@ -299,6 +317,17 @@ object CosmeticSync {
         val uuid = UUID.fromString(packet.player)
         CosmeticCatalog.applyRemoteEquippedSlot(uuid, packet.slot, packet.cosmeticId)
         applyActiveToPlayer(uuid, packet.cosmeticId?.let(::listOf).orEmpty())
+        if (uuid == ClientPlatform.localPlayerUuid() &&
+            packet.slot != BodySlot.Unknown &&
+            CosmeticCatalog.localEquipped().equipped[packet.slot] != packet.cosmeticId &&
+            localResyncPending.compareAndSet(false, true)
+        ) {
+            PolyPlusClient.SCOPE.launch {
+                delay(LOCAL_RESYNC_DELAY_MS)
+                localResyncPending.set(false)
+                CosmeticService.syncLocalActive()
+            }
+        }
     }
 
     private fun handleParticleColorChanged(packet: ClientboundPacket.PlayerParticleColorChanged) {
@@ -460,7 +489,7 @@ object CosmeticSync {
     //? if >= 1.21.1 {
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog - closing it calls trim again
-        if (ClientPlatform.currentScreen() is OneConfigUIScreen) return
+        if (OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return
         val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
             CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
         val inUse = HashSet<Identifier>()

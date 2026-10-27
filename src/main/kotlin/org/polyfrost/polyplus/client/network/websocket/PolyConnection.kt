@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.network.websocket
 
-import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
-import io.ktor.client.plugins.websocket.webSocket
-import io.ktor.client.request.bearerAuth
-import io.ktor.websocket.Frame
-import io.ktor.websocket.readText
+import org.polyfrost.polyplus.libs.ktor.client.plugins.websocket.DefaultClientWebSocketSession
+import org.polyfrost.polyplus.libs.ktor.client.plugins.websocket.webSocket
+import org.polyfrost.polyplus.libs.ktor.client.request.bearerAuth
+import org.polyfrost.polyplus.libs.ktor.websocket.Frame
+import org.polyfrost.polyplus.libs.ktor.websocket.readText
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
@@ -18,9 +18,9 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.IOException
 import java.nio.channels.UnresolvedAddressException
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -184,25 +184,27 @@ object PolyConnection {
             handshakeSucceeded = true
             notifyReconnected()
 
-            val sender = launch {
-                for (message in _outgoing) {
-                    try {
-                        send(Frame.Text(message))
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        LOGGER.error("Failed to send WebSocket message", e)
+            coroutineScope {
+                val sender = launch {
+                    for (message in _outgoing) {
+                        try {
+                            send(Frame.Text(message))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            LOGGER.error("Failed to send WebSocket message", e)
+                        }
                     }
                 }
-            }
 
-            connectionCallback?.invoke()
-            for (frame in incoming) {
-                val text = (frame as? Frame.Text)?.readText() ?: continue
-                process(this, text)
-            }
+                connectionCallback?.invoke()
+                for (frame in incoming) {
+                    val text = (frame as? Frame.Text)?.readText() ?: continue
+                    process(text)
+                }
 
-            sender.cancel()
+                sender.cancel()
+            }
         }
     }
 
@@ -254,7 +256,7 @@ object PolyConnection {
         }.onFailure { LOGGER.error("Failed to show reconnect notification", it) }
     }
 
-    private fun process(scope: CoroutineScope, message: String) {
+    private fun process(message: String) {
         try {
             val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
             if (packet is ClientboundPacket.Error) {

@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import io.ktor.client.call.body
-import io.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.call.body
+import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Image as SkiaImage
 import org.polyfrost.polyplus.client.PolyPlusClient

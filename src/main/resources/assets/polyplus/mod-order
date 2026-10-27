@@ -10,6 +10,8 @@ betterscreens
 betterscreens.json
 freelook.json
 behindyouv3.json
+polycrosshair
+polycrosshair.json
 crosshairtweaks
 crosshairtweaks.json
 scrolltweaks
@@ -50,6 +52,7 @@ detailab
 jade
 evergreenhud.json
 waveycapes
+legacy_waveycapes
 skinlayers3d
 legacy_skin_layers
 chattweaks.json
@@ -104,6 +107,7 @@ odin
 sbo/config
 iqaddons
 modernwarpmenu
+polydium.json
 skyboxify
 smoothskies
 smoothskies.json
@@ -158,3 +162,4 @@ meowdding-lib/config
 architectury
 fzzy_config
 tcdcommons
+exploint

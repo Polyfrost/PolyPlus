@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
@@ -34,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.network.http.responses.BlockedPlayer
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.FriendRequest
@@ -190,7 +193,7 @@ private fun FriendCard(friend: Friend, onMessage: () -> Unit, onRemove: () -> Un
             SocialAvatar(friend.player, 40.dp)
             if (friend.online) {
                 Box(
-                    Modifier.size(11.dp).clip(LocalTheme.current.circleShape).background(SocialSuccessColor).align(Alignment.BottomEnd),
+                    Modifier.size(11.dp).clip(OneConfigTheme.current.circleShape).background(SocialSuccessColor).align(Alignment.BottomEnd),
                 )
             }
         }

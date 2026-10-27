@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture
 import org.polyfrost.polyplus.client.render.NativeImage
 //?} else {
 /*import net.minecraft.client.render.texture.DynamicTexture
+import net.minecraft.client.render.texture.TextureManager
 import javax.imageio.ImageIO
 *///?}
 import net.minecraft.resources.Identifier
@@ -86,5 +87,5 @@ internal object RemoteTextures {
 }
 
 //? if = 1.8.9 {
-/*private fun net.minecraft.client.render.texture.TextureManager.release(id: Identifier) = close(id)
+/*private fun TextureManager.release(id: Identifier) = close(id)
 *///?}

@@ -3,9 +3,9 @@ package org.polyfrost.polyplus.client.cosmetics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import io.ktor.client.plugins.timeout
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsBytes
+import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
+import org.polyfrost.polyplus.libs.ktor.client.request.get
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -458,6 +458,17 @@ object CosmeticAssetCache {
             CosmeticType.Emote -> "emote-$id"
             else -> "cosmetic-$id"
         }
+
+    fun primaryTextureFile(id: Int): File? {
+        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return null
+        val dir = baseDir.resolve(definition.cacheKey())
+        if (!dir.isDirectory) return null
+        return dir.walkTopDown()
+            .filter { it.isFile && !it.name.startsWith(APPLE_DOUBLE_PREFIX) && it.extension.equals("png", ignoreCase = true) }
+            .sortedBy { it.invariantSeparatorsPath }
+            .firstOrNull()
+            ?: dir.resolve("asset.bin").takeIf { it.isFile }
+    }
 }
 
 private const val MAX_CAPE_FRAME_PIXELS = 1024L * 512

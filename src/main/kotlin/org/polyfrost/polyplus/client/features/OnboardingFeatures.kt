@@ -1,20 +1,21 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.features
 
 import com.mojang.blaze3d.platform.InputConstants
 //? if > 1.8.9 {
 import net.minecraft.client.KeyMapping
 //?} else {
-/*import net.minecraft.client.options.KeyBinding as KeyMapping
+/*import net.minecraft.client.options.GameOptions
+import net.minecraft.client.options.KeyBinding as KeyMapping
+import net.minecraft.client.render.Window
 *///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
-import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassDark
-import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
-import org.polyfrost.oneconfig.internal.ui.themes.ThemeRegistry
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.concurrent.ConcurrentHashMap
 
@@ -35,9 +36,10 @@ object OnboardingFeatures {
     val polyBlurAvailable: Boolean by lazy { classExists(POLYBLUR_CONFIG) }
     val betterGrassAvailable: Boolean by lazy { classExists(LBG_MOD) }
     val fireOverlayAvailable: Boolean by lazy { hasFloatingField(OVERLAY_TWEAKS_CONFIG, FIRE_OVERLAY_HEIGHT) }
-    val fireOverlayOpacityAvailable: Boolean by lazy {
-        hasFloatingField(OVERLAY_TWEAKS_CONFIG, FIRE_OVERLAY_OPACITY)
+    private val fireOverlayOpacityField: String? by lazy {
+        listOf(FIRE_OVERLAY_OPACITY, FIRE_OVERLAY_OPACITY_LEGACY).firstOrNull { hasFloatingField(OVERLAY_TWEAKS_CONFIG, it) }
     }
+    val fireOverlayOpacityAvailable: Boolean get() = fireOverlayOpacityField != null
     val mountOpacityAvailable: Boolean by lazy { classExists(MOUNT_OPACITY_CONFIG) }
     val waveyCapesAvailable: Boolean by lazy {
         classExists(WAVEY_MOD_BASE) || classExists(LEGACY_WAVEY_CONFIG)
@@ -171,12 +173,11 @@ object OnboardingFeatures {
         }
     }
 
-    /** Whether the mod sits off the value it ships with, the only reason to explain where that value lives. */
     private fun ModCard.movedFromDefault(): Boolean = when (this) {
         ModCard.GRASS -> (currentBetterGrassMode() ?: BETTER_GRASS_FANCY) != BETTER_GRASS_FANCY
         ModCard.FIRE_OVERLAY ->
             (currentFireOverlayHeight() ?: FIRE_OVERLAY_MAX) < FIRE_OVERLAY_MAX - 0.001 ||
-                (currentFireOverlayOpacity() ?: FIRE_OPACITY_MAX) < FIRE_OPACITY_MAX - 0.001f
+                (currentFireOverlayOpacity() ?: FIRE_OPACITY_VANILLA) < FIRE_OPACITY_VANILLA - 0.5f
         ModCard.SHIELD_HEIGHT -> (currentShieldHeight() ?: SHIELD_HEIGHT_MAX) < SHIELD_HEIGHT_MAX - 0.001f
         ModCard.MOUNT -> (currentHorseOpacity() ?: HORSE_OPACITY_MAX) < HORSE_OPACITY_MAX - 0.001f
         else -> false
@@ -355,7 +356,7 @@ object OnboardingFeatures {
             //?} elif > 1.8.9 {
             /*mc.resizeDisplay()
             *///?} else {
-            /*val window = net.minecraft.client.render.Window(mc)
+            /*val window = Window(mc)
             mc.screen?.init(mc, window.width, window.height)
             *///?}
         }.onFailure { logger.warn("Could not apply GUI scale preference", it) }
@@ -375,12 +376,12 @@ object OnboardingFeatures {
 
     fun applyTheme(light: Boolean, style: Int) {
         val theme = when {
-            style == 1 && light -> MinecraftLight
-            style == 1 -> MinecraftDark
-            light -> PolyGlassLight
-            else -> PolyGlassDark
+            style == 1 && light -> OneConfigTheme.MINECRAFT_LIGHT
+            style == 1 -> OneConfigTheme.MINECRAFT_DARK
+            light -> OneConfigTheme.POLY_GLASS_LIGHT
+            else -> OneConfigTheme.POLY_GLASS_DARK
         }
-        ThemeRegistry.activate(theme)
+        OneConfigTheme.activate(theme)
     }
 
     private fun applyToggleSprint(enabled: Boolean) {
@@ -501,7 +502,7 @@ object OnboardingFeatures {
 
     fun currentFireOverlayOpacity(): Float? = runCatching {
         val instance = overlayTweaksAccess().first
-        readFloatingField(instance, FIRE_OVERLAY_OPACITY).toFloat()
+        readFloatingField(instance, fireOverlayOpacityField!!).toFloat()
     }.getOrNull()
 
     fun currentShieldHeight(): Float? = runCatching {
@@ -520,10 +521,11 @@ object OnboardingFeatures {
         if (applyFireSettings && fireOverlayAvailable) {
             writeFloatingField(instance, FIRE_OVERLAY_HEIGHT, height.coerceIn(FIRE_OVERLAY_MIN, FIRE_OVERLAY_MAX))
         }
-        if (applyFireSettings && fireOverlayOpacityAvailable) {
+        val opacityField = fireOverlayOpacityField
+        if (applyFireSettings && opacityField != null) {
             writeFloatingField(
                 instance,
-                FIRE_OVERLAY_OPACITY,
+                opacityField,
                 opacity.coerceIn(FIRE_OPACITY_MIN, FIRE_OPACITY_MAX).toDouble(),
             )
         }
@@ -700,7 +702,7 @@ object OnboardingFeatures {
         //? if > 1.8.9 {
         gammaToggleKey()?.translatedKeyMessage?.string
         //?} else {
-        /*gammaToggleKey()?.let { net.minecraft.client.options.GameOptions.getKeyName(it.keyCode) }
+        /*gammaToggleKey()?.let { GameOptions.getKeyName(it.keyCode) }
         *///?}
     }.getOrNull()
 
@@ -857,9 +859,11 @@ object OnboardingFeatures {
     const val FIRE_OVERLAY_MIN = -0.5
     const val FIRE_OVERLAY_MAX = 0.0
 
-    private const val FIRE_OVERLAY_OPACITY = "customFireOverlayOpacity"
+    private const val FIRE_OVERLAY_OPACITY = "fireOverlayOpacity"
+    private const val FIRE_OVERLAY_OPACITY_LEGACY = "customFireOverlayOpacity"
     const val FIRE_OPACITY_MIN = 0f
     const val FIRE_OPACITY_MAX = 100f
+    const val FIRE_OPACITY_VANILLA = 90f
 
     private const val SHIELD_HEIGHT = "customShieldHeight"
     const val SHIELD_HEIGHT_MIN = -0.5f

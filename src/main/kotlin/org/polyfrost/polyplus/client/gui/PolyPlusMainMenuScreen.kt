@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -36,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,16 +107,12 @@ import net.minecraft.realms.RealmsBridge
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
-import org.polyfrost.oneconfig.internal.ui.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.oneconfig.internal.ui.themes.Accent
-import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftDark
-import org.polyfrost.oneconfig.internal.ui.themes.MinecraftLight
-import org.polyfrost.oneconfig.internal.ui.themes.PolyGlassLight
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -277,7 +274,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             }
         }
 
-        Theme {
+        ProvideOneConfigTheme {
             MainMenu(
                 screen = this,
                 guiScale = menuGuiScale,
@@ -355,6 +352,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 quickplay = quickplay,
                 pingTick = pingTick,
             )
+            BadModsDialog()
         }
     }
 
@@ -624,15 +622,14 @@ const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 private val PanelBackground: Color
-    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.5f)
+    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
 private val ServerIconBackground = Color(0x33FFFFFF)
 private val FeaturedCardBackground: Color
-    @Composable get() = LocalTheme.current.componentBackground.copy(alpha = 0.8f)
+    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.8f)
 private val CloseBackground = Color(0x80FF4444)
 
 private val PanelShape: Shape
     @Composable
-    @ReadOnlyComposable
     get() = ppShape(9.dp)
 
 private val Outfit: FontFamily by lazy {
@@ -650,8 +647,6 @@ internal fun mainMenuPanoramaEnabled(): Boolean {
 internal const val REFERENCE_GUI_SCALE = 2f
 
 internal fun mcGuiScale(): Int = Minecraft.getInstance().window.guiScale.toInt()
-
-internal fun guiScaleFactorFor(guiScale: Int): Float = (guiScale / REFERENCE_GUI_SCALE).coerceIn(0.01f, 1f)
 
 internal const val GUI_DENSITY_TRIM = 0.88f
 
@@ -743,6 +738,11 @@ private sealed interface QuickplayEntry {
     }
 }
 private const val BASE_HEIGHT = 720f
+
+// every icon on this screen goes through here so the Minecraft themes get pixel icons
+@Composable
+private fun Icon(path: String, color: Color, modifier: Modifier) =
+    org.polyfrost.oneconfig.api.ui.v1.components.Icon(themedIcon(path), color, modifier)
 
 @Composable
 private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
@@ -895,9 +895,9 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
                 badge = groups.any { it.unread },
             )
         }
-        if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics && PrivacyConsent.allowsOnlineServices()) {
+        if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics) {
             PillButton(
-                "Cosmetics",
+                "Wardrobe",
                 ASSETS + "diamond-01.svg",
                 Modifier.fillMaxWidth(),
                 onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
@@ -999,9 +999,9 @@ private fun VanillaMenuButton() {
 
 @Composable
 private fun ThemeToggleButton() {
-    val themeName = LocalTheme.current.name
-    val light = themeName == PolyGlassLight.name || themeName == MinecraftLight.name
-    val minecraftStyle = themeName == MinecraftDark.name || themeName == MinecraftLight.name
+    val themeName = OneConfigTheme.current.name
+    val light = themeName == OneConfigTheme.POLY_GLASS_LIGHT.name || themeName == OneConfigTheme.MINECRAFT_LIGHT.name
+    val minecraftStyle = themeName == OneConfigTheme.MINECRAFT_DARK.name || themeName == OneConfigTheme.MINECRAFT_LIGHT.name
     IconButton(
         icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
         tooltip = if (light) "Switch to dark theme" else "Switch to light theme",
@@ -1134,7 +1134,7 @@ private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
 
 @Composable
 private fun FooterBrandText(platform: String) {
-    val bodyFont = LocalTheme.current.typography.family
+    val bodyFont = OneConfigTheme.current.fontFamily
     val primary = Color.White
     val secondary = SocialTextSecondary
 
@@ -1179,8 +1179,8 @@ private fun PillButton(label: String, icon: String, modifier: Modifier = Modifie
                 Modifier.align(Alignment.CenterEnd)
                     .padding(end = 14.dp)
                     .size(8.dp)
-                    .clip(LocalTheme.current.circleShape)
-                    .background(Accent),
+                    .clip(OneConfigTheme.current.circleShape)
+                    .background(OneConfigTheme.accent),
             )
         }
     }
@@ -1347,7 +1347,7 @@ private fun AccountSwitcherPanel(
         modifier = Modifier
             .width(panelWidth)
             .clip(PanelShape)
-            .background(LocalTheme.current.pageBackground.copy(alpha = 0.8f))
+            .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1458,7 +1458,7 @@ internal fun AccountRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(ppShape(8.dp))
-            .background(if (hovered && clickable) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
+            .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
             .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -1532,11 +1532,11 @@ fun AddAccountButton(
     Row(
         modifier = Modifier
             .clip(ppShape(8.dp))
-            .background(if (hovered && enabled) LocalTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
+            .background(if (hovered && enabled) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
             .alpha(if (enabled) 1f else 0.5f)
-            .border(1.dp, LocalTheme.current.borderColor, ppShape(8.dp))
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1559,7 +1559,7 @@ internal fun MicrosoftLoginPopup(
             modifier = Modifier
                 .width(380.dp)
                 .clip(PanelShape)
-                .background(LocalTheme.current.pageBackground.copy(alpha = 0.8f))
+                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
                 .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .swallowClicks()
                 .padding(horizontal = 22.dp, vertical = 24.dp),
@@ -1591,8 +1591,8 @@ internal fun MicrosoftLoginPopup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(ppShape(8.dp))
-                    .background(LocalTheme.current.componentBackground.copy(alpha = 0.5f))
-                    .border(SocialPanelBorderWidth, Accent, ppShape(8.dp))
+                    .background(OneConfigTheme.current.componentBackground.copy(alpha = 0.5f))
+                    .border(SocialPanelBorderWidth, OneConfigTheme.accent, ppShape(8.dp))
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1669,7 +1669,7 @@ internal fun OfflineAccountPopup(
             modifier = Modifier
                 .width(380.dp)
                 .clip(PanelShape)
-                .background(LocalTheme.current.pageBackground.copy(alpha = 0.8f))
+                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
                 .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .swallowClicks()
                 .padding(horizontal = 22.dp, vertical = 24.dp),
@@ -1737,8 +1737,8 @@ private fun LoginModalButton(
         modifier = modifier
             .height(44.dp)
             .clip(PanelShape)
-            .background(if (filled) Accent else PanelBackground)
-            .border(SocialPanelBorderWidth, if (filled) SolidColor(Accent) else SocialPanelBorderBrush, PanelShape)
+            .background(if (filled) OneConfigTheme.accent else PanelBackground)
+            .border(SocialPanelBorderWidth, if (filled) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, PanelShape)
             .clickableWithSound(onClick)
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -1764,7 +1764,7 @@ private fun OrDivider() {
 
 @Composable
 private fun LoadingSpinner(modifier: Modifier) {
-    Icon(ASSETS + "loading-02.svg", Accent, modifier)
+    Icon(ASSETS + "loading-02.svg", OneConfigTheme.accent, modifier)
 }
 
 @Composable
@@ -1839,8 +1839,8 @@ private fun TooltipBubble(text: String) {
     Box(
         modifier = Modifier
             .clip(PanelShape)
-            .background(LocalTheme.current.popupBackground)
-            .border(SocialPanelBorderWidth, LocalTheme.current.borderColor, PanelShape)
+            .background(OneConfigTheme.current.popupBackground)
+            .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, PanelShape)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
