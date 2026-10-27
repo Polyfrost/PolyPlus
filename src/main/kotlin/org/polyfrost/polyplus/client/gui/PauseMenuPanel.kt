@@ -41,6 +41,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
+//? if < 26.3
+//import org.polyfrost.polyplus.client.PolyPlusConfig
+
 /**
  * The title screen's player preview with Social and Wardrobe buttons under it, shown beside the pause menu's
  * buttons in both the vanilla and the Compose pause menu. Layout is in vanilla GUI pixels.
@@ -117,7 +120,7 @@ object PauseMenuPanel {
         *///?}
         // MixinPauseScreen already turns the menu's Open to LAN button into Host World; 26.3 moved LAN into World Options
         //? if < 26.3 {
-        /*val menuHostsWorld = org.polyfrost.polyplus.client.PolyPlusConfig.replacePauseLanButton
+        /*val menuHostsWorld = PolyPlusConfig.replacePauseLanButton
         *///?} else {
         val menuHostsWorld = false
         //?}
