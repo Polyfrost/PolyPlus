@@ -2,7 +2,7 @@ name: Build with Gradle
 
 on:
   push:
-    branches: '*'
+    branches: 'main'
     paths-ignore:
       - 'README.md'
       - 'LICENSE.md'
@@ -19,8 +19,8 @@ permissions:
   contents: read
 
 concurrency:
-  # Maximum of one running workflow per pull request source branch or pushed branch
-  group: ${{ github.head_ref || github.ref }}
+  # maximum of one running workflow per pull request source branch or pushed branch
+  group: ${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -67,3 +67,30 @@ jobs:
         with:
           path: ${{ steps.mod-jar.outputs.path }}
           archive: false
+
+  # also upload a zip with all jars (for nightly.link)
+  bundle:
+    name: "Bundle built jars"
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*.jar"
+          path: jars
+          merge-multiple: true
+
+      - name: Resolve bundle name
+        id: bundle
+        run: |
+          jars=(jars/*.jar)
+          name="$(basename "${jars[0]}")"
+          echo "name=${name%%+*}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bundled mod jars
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.bundle.outputs.name }}
+          path: jars/*.jar
