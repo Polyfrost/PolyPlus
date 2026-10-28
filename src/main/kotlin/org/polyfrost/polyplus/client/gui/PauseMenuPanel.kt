@@ -155,11 +155,14 @@ object PauseMenuPanel {
         )
     }
 
-    private val statsRequested = WeakHashMap<Screen, Unit>()
+    private var statsRequestedAt: Long? = null
 
-    // the client's stat counter only fills in once asked, as vanilla's Statistics screen does. once per menu, not per resize
-    fun requestStats(screen: Screen) {
-        if (statsRequested.put(screen, Unit) != null) return
+    // the client's stat counter only updates when asked, as vanilla's Statistics screen does. asked again every so
+    // often while the label is shown, since playtime keeps counting in multiplayer and unpaused LAN worlds
+    private fun requestStats() {
+        val now = System.nanoTime()
+        statsRequestedAt?.let { if (now - it < STATS_REQUEST_NANOS) return }
+        statsRequestedAt = now
         //? if > 1.8.9 {
         Minecraft.getInstance().connection?.send(ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.REQUEST_STATS))
         //?} else {
@@ -167,7 +170,12 @@ object PauseMenuPanel {
         *///?}
     }
 
-    fun playtimeLabel(): String = "Playtime: " + (playTimeTicks()?.let(::formatPlaytime) ?: "-")
+    private const val STATS_REQUEST_NANOS = 10_000_000_000L
+
+    fun playtimeLabel(): String {
+        requestStats()
+        return "Playtime: " + (playTimeTicks()?.let(::formatPlaytime) ?: "-")
+    }
 
     private fun playTimeTicks(): Int? =
         //? if > 1.8.9 {
@@ -247,7 +255,6 @@ object PauseMenuPanel {
                 return@register
             }
             addIconButton("Settings", "settings", leftX, layout.wardrobeY) { openSettings() }
-            requestStats(screen)
             // render-only, so it draws and highlights like the buttons around it but never gets the click or its sound
             playtimeButtons[screen] = access.polyplusAddRenderableOnly(
                 Button.builder(Component.literal(playtimeLabel())) {}.bounds(leftX, layout.playtimeY, layout.width, BUTTON_HEIGHT).build(),
@@ -292,7 +299,6 @@ object PauseMenuPanel {
             return
         }
         addIconButton(LEGACY_SETTINGS_ID, "Settings", "settings", leftX, layout.wardrobeY)
-        requestStats(screen)
         // kept out of the screen's buttons and drawn in render, so it looks like one but never takes a click or its sound
         playtimeButtons[screen] = ButtonWidget(0, leftX, layout.playtimeY, layout.width, BUTTON_HEIGHT, playtimeLabel())
     }

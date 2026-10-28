@@ -90,7 +90,6 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
         val menuLeft = buttons.minOfOrNull { it.x } ?: 0
         val menuRight = buttons.maxOfOrNull { it.x + it.width } ?: 0
         layout = PauseLayout(width, widgets, PauseMenuPanel.layout(width, menuLeft, menuRight, buttons.map { it.y }))
-        PauseMenuPanel.requestStats(this)
     }
 
     //? if > 1.8.9 {
