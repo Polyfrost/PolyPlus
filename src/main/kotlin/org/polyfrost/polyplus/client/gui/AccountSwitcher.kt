@@ -52,7 +52,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -61,8 +60,7 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 
 @Composable
-fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
-    val actions = rememberAccountActions()
+internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit) {
     var offlineEntry by remember { mutableStateOf(false) }
     // list() is in add order, newest last
     val accounts = actions.accounts
@@ -77,7 +75,7 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                 .background(SocialWindowScrim)
                 .clickable(
                     indication = null,
-                    interactionSource = remember { MutableInteractionSource() }) { if (idle) onClose() },
+                    interactionSource = remember { MutableInteractionSource() }, onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
             Column(

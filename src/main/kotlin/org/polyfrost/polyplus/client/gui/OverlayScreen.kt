@@ -4,6 +4,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -143,9 +144,15 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
     }
     //?}
 
+    /** Whether Escape and [dismiss] may close the overlay right now. */
+    protected open fun canDismiss(): Boolean = true
+
+    override fun handleKeyPressed(key: Int, modifiers: Int): Boolean =
+        key == InputConstants.KEY_ESCAPE && !canDismiss()
+
     fun dismiss() {
         Minecraft.getInstance().execute {
-            if (ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(previousScreen)
+            if (canDismiss() && ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(previousScreen)
         }
     }
 
