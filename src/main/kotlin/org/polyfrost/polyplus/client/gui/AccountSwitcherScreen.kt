@@ -7,8 +7,9 @@ import net.minecraft.client.gui.screens.Screen
 class AccountSwitcherScreen(previousScreen: Screen?) : OverlayScreen(previousScreen) {
     private var actions: AccountActions? = null
 
-    // a switch can't be cancelled once started, so leaving mid-switch would let it land after a newer one
-    override fun canDismiss(): Boolean = actions?.idle != false
+    // launcher calls keep running once the screen is gone, so a stale switch could land after a newer one;
+    // a pending Microsoft sign-in is safe to leave since it's cancelled with the screen, and Escape must reach its popup
+    override fun canDismiss(): Boolean = actions?.let { it.idle || it.loginSession != null } ?: true
 
     @Composable
     override fun content(onClose: () -> Unit) {
