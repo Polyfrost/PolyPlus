@@ -58,22 +58,8 @@ object SocialOverlay {
     }
 
     fun close() {
-        val mc = Minecraft.getInstance()
-        mc.execute {
-            //? if >= 26.2 {
-            (mc.gui.screen() as? SocialOverlayScreen)?.let { mc.gui.setScreen(it.previousScreen) }
-            //?} else {
-            /*(mc.screen as? SocialOverlayScreen)?.let { mc.setScreen(it.previousScreen) }
-            *///?}
-        }
+        (currentScreen() as? SocialOverlayScreen)?.dismiss()
     }
-
-    //? if = 1.8.9 {
-    /*fun restoreAfterEscape(previousScreen: Screen?) {
-        val mc = Minecraft.getInstance()
-        if (mc.screen == null || mc.screen is TitleScreen) mc.setScreen(previousScreen)
-    }
-    *///?}
 
     private fun currentScreen(): Screen? {
         val mc = Minecraft.getInstance()

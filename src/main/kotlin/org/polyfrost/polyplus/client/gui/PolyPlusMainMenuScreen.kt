@@ -113,7 +113,6 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.AccountSwitcherOverlay
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -1401,7 +1400,7 @@ private fun AccountSwitcherPanel(
             icon = ASSETS + "users-01.svg",
             text = "Manage accounts",
             enabled = idle,
-            onClick = { AccountSwitcherOverlay.open(screen) },
+            onClick = { ClientPlatform.setScreen(AccountSwitcherScreen(screen)) },
         )
         AccountStatusText(busy, error, errorSteps)
     }
