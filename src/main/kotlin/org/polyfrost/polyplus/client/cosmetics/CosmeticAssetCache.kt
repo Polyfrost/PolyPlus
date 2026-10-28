@@ -48,6 +48,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -162,6 +164,9 @@ object CosmeticAssetCache {
     private val CAPE_LIMITS = ArchiveLimits(maxDownloadBytes = 16 * MIB, maxExtractedBytes = 32 * MIB, maxEntries = 16)
     private val MODEL_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 64)
     private val EMOTE_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 128)
+
+    private val SHA256_HEX = Regex("[0-9a-fA-F]{64}")
+    private const val BACKEND_PLACEHOLDER_HASH = "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
 
     suspend fun preloadDefinitions(
         definitions: Collection<CosmeticDefinition>,
@@ -289,8 +294,18 @@ object CosmeticAssetCache {
             }
             val limits = definition.type.archiveLimits()
             val bytes = download(url, limits.maxDownloadBytes)
+            verifyHash(definition, bytes)
             AssetArchive.materialize(bytes, cosmeticDir, limits)
             hashManager.updateHash(hashKey, definition.hash)
+        }
+    }
+
+    private fun verifyHash(definition: CosmeticDefinition, bytes: ByteArray) {
+        val expected = definition.hash
+        if (!SHA256_HEX.matches(expected) || expected.equals(BACKEND_PLACEHOLDER_HASH, ignoreCase = true)) return
+        val actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+        if (!actual.equals(expected, ignoreCase = true)) {
+            throw RejectedArchiveException("Cosmetic ${definition.id} does not match its hash")
         }
     }
 
