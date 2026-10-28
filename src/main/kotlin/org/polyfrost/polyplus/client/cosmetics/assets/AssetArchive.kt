@@ -2,6 +2,8 @@ package org.polyfrost.polyplus.client.cosmetics.assets
 
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipInputStream
@@ -11,17 +13,26 @@ import kotlin.io.path.outputStream
 internal class OutOfDiskSpaceException(cause: IOException) :
     IOException("Out of disk space while writing cosmetic assets", cause)
 
+internal class RejectedArchiveException(message: String) : IOException(message)
+
+internal data class ArchiveLimits(val maxDownloadBytes: Long, val maxExtractedBytes: Long, val maxEntries: Int)
+
 internal object AssetArchive {
     private val OUT_OF_SPACE_MARKERS =
         listOf("no space left", "not enough space", "disk full", "insufficient disk space")
 
-    fun materialize(bytes: ByteArray, targetDir: Path): Path = mappingDiskFull {
+    fun materialize(bytes: ByteArray, targetDir: Path, limits: ArchiveLimits): Path = mappingDiskFull {
         targetDir.createDirectories()
-        if (isZip(bytes)) {
-            extractZip(bytes, targetDir)
-        } else {
-            val single = targetDir.resolve("asset.bin")
-            Files.write(single, bytes)
+        try {
+            if (isZip(bytes)) {
+                extractZip(bytes, targetDir, limits)
+            } else {
+                val single = targetDir.resolve("asset.bin")
+                Files.write(single, bytes)
+            }
+        } catch (e: RejectedArchiveException) {
+            targetDir.toFile().deleteRecursively()
+            throw e
         }
         targetDir
     }
@@ -42,19 +53,45 @@ internal object AssetArchive {
     private fun isZip(bytes: ByteArray): Boolean =
         bytes.size >= 2 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()
 
-    private fun extractZip(bytes: ByteArray, targetDir: Path) {
+    private fun extractZip(bytes: ByteArray, targetDir: Path, limits: ArchiveLimits) {
+        val root = targetDir.toAbsolutePath().normalize()
+        var entries = 0
+        var extracted = 0L
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
+                if (++entries > limits.maxEntries) {
+                    throw RejectedArchiveException("Archive has more than ${limits.maxEntries} entries")
+                }
                 if (!entry.isDirectory) {
-                    val out = targetDir.resolve(entry.name)
+                    val out = entryPath(root, entry.name)
                     out.parent?.createDirectories()
-                    out.outputStream().use { zip.copyTo(it) }
+                    extracted += out.outputStream().use { copyAtMost(zip, it, limits.maxExtractedBytes - extracted) }
                 }
                 zip.closeEntry()
                 entry = zip.nextEntry
             }
         }
+    }
+
+    private fun copyAtMost(input: InputStream, output: OutputStream, budget: Long): Long {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var copied = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return copied
+            copied += read
+            if (copied > budget) throw RejectedArchiveException("Archive expands past its size limit")
+            output.write(buffer, 0, read)
+        }
+    }
+
+    private fun entryPath(root: Path, name: String): Path {
+        val out = runCatching { root.resolve(name).normalize() }.getOrNull()
+        if (out == null || out == root || !out.startsWith(root)) {
+            throw RejectedArchiveException("Zip entry $name escapes the cosmetic folder")
+        }
+        return out
     }
 }
 
