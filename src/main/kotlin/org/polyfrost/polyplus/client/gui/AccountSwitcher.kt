@@ -239,8 +239,11 @@ fun AccountButton(
                 SocialText(
                     account.username,
                     fontSize = 20.sp,
+                    modifier = Modifier.weight(1f, fill = false),
                     color = OneConfigTheme.current.textColor,
-                    textAlign = TextAlign.Right
+                    textAlign = TextAlign.Right,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
                 if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
