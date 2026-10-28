@@ -11,17 +11,24 @@ import kotlin.io.path.outputStream
 internal class OutOfDiskSpaceException(cause: IOException) :
     IOException("Out of disk space while writing cosmetic assets", cause)
 
+internal class RejectedArchiveException(message: String) : IOException(message)
+
 internal object AssetArchive {
     private val OUT_OF_SPACE_MARKERS =
         listOf("no space left", "not enough space", "disk full", "insufficient disk space")
 
     fun materialize(bytes: ByteArray, targetDir: Path): Path = mappingDiskFull {
         targetDir.createDirectories()
-        if (isZip(bytes)) {
-            extractZip(bytes, targetDir)
-        } else {
-            val single = targetDir.resolve("asset.bin")
-            Files.write(single, bytes)
+        try {
+            if (isZip(bytes)) {
+                extractZip(bytes, targetDir)
+            } else {
+                val single = targetDir.resolve("asset.bin")
+                Files.write(single, bytes)
+            }
+        } catch (e: RejectedArchiveException) {
+            targetDir.toFile().deleteRecursively()
+            throw e
         }
         targetDir
     }
@@ -43,11 +50,12 @@ internal object AssetArchive {
         bytes.size >= 2 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()
 
     private fun extractZip(bytes: ByteArray, targetDir: Path) {
+        val root = targetDir.toAbsolutePath().normalize()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
                 if (!entry.isDirectory) {
-                    val out = targetDir.resolve(entry.name)
+                    val out = entryPath(root, entry.name)
                     out.parent?.createDirectories()
                     out.outputStream().use { zip.copyTo(it) }
                 }
@@ -55,6 +63,14 @@ internal object AssetArchive {
                 entry = zip.nextEntry
             }
         }
+    }
+
+    private fun entryPath(root: Path, name: String): Path {
+        val out = runCatching { root.resolve(name).normalize() }.getOrNull()
+        if (out == null || out == root || !out.startsWith(root)) {
+            throw RejectedArchiveException("Zip entry $name escapes the cosmetic folder")
+        }
+        return out
     }
 }
 
