@@ -1561,6 +1561,7 @@ internal fun MicrosoftLoginPopup(
                 .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
                 .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .swallowClicks()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
