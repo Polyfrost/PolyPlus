@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -1921,7 +1922,7 @@ private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onCl
     }
 }
 
-private enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
+internal enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
 
 @Composable
 private fun IconButton(
@@ -1945,46 +1946,51 @@ private fun IconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-        if (tooltip != null && hovered) {
-            val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-            val positionProvider = remember(gap, tooltipPlacement) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset = when (tooltipPlacement) {
-                        TooltipPlacement.BELOW_END ->
-                            IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
-                        TooltipPlacement.ABOVE_CENTER -> IntOffset(
-                            anchorBounds.center.x - popupContentSize.width / 2,
-                            anchorBounds.top - gap - popupContentSize.height,
-                        )
-                    }
-                }
-            }
-            Popup(
-                popupPositionProvider = positionProvider,
-                properties = PopupProperties(focusable = false, clippingEnabled = false),
-            ) {
-                TooltipBubble(tooltip)
+        if (tooltip != null && hovered) HoverTooltip(tooltip, tooltipPlacement)
+    }
+}
+
+/** A tooltip bubble placed against the composable it's called in, wrapping at [maxWidth]. */
+@Composable
+internal fun HoverTooltip(text: String, placement: TooltipPlacement, maxWidth: Dp = Dp.Unspecified) {
+    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
+    val positionProvider = remember(gap, placement) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset = when (placement) {
+                TooltipPlacement.BELOW_END ->
+                    IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
+                TooltipPlacement.ABOVE_CENTER -> IntOffset(
+                    anchorBounds.center.x - popupContentSize.width / 2,
+                    anchorBounds.top - gap - popupContentSize.height,
+                )
             }
         }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        TooltipBubble(text, maxWidth)
     }
 }
 
 @Composable
-private fun TooltipBubble(text: String) {
+private fun TooltipBubble(text: String, maxWidth: Dp) {
     Box(
         modifier = Modifier
+            .widthIn(max = maxWidth)
             .clip(PanelShape)
             .background(OneConfigTheme.current.popupBackground)
             .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, PanelShape)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        SocialText(text, fontSize = 13.sp, maxLines = 1, textAlign = TextAlign.Center)
+        SocialText(text, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 

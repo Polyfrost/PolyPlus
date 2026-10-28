@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,7 +46,9 @@ import net.minecraft.resources.Identifier
 import org.jetbrains.skia.Image as SkiaImage
 import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
+import org.polyfrost.polyplus.mixin.client.access.AbstractWidgetAccessor
 import org.polyfrost.polyplus.mixin.client.access.SpriteIconButtonAccessor
+import org.polyfrost.polyplus.mixin.client.access.TooltipAccessor
 //?} else {
 /*import net.minecraft.client.gui.screen.menu.GameMenuScreen as PauseScreen
 import net.minecraft.client.gui.widget.ButtonWidget
@@ -103,6 +106,7 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
                         widget.x, widget.y, widget.width, widget.height,
                         widget.message.string, widget.isActive,
                         (widget as? SpriteIconButton)?.let { spriteIcon(it) },
+                        tooltip(widget),
                     ) { press(widget) }
                     is AbstractStringWidget -> PauseText(widget.x, widget.y, widget.width, widget.height, widget.message.string)
                     else -> null
@@ -118,6 +122,11 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
             /*button.onPress()
             *///?}
         }
+    }
+
+    private fun tooltip(widget: AbstractWidget): String? {
+        val tooltip = (widget as AbstractWidgetAccessor).`polyplus$tooltip`().get() ?: return null
+        return (tooltip as TooltipAccessor).`polyplus$message`().string
     }
 
     private fun spriteIcon(button: SpriteIconButton): PauseIcon? {
@@ -143,7 +152,7 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
         val access = vanilla as ScreenAccessor
         val title = PauseText(0, LEGACY_TITLE_Y, width, LEGACY_TEXT_HEIGHT, I18n.translate("menu.game"))
         return listOf(title) + access.`polyplus$buttons`().filter { it.visible }.map { button ->
-            PauseButton(button.x, button.y, button.getWidth(), LEGACY_BUTTON_HEIGHT, button.message, button.active, null) { press(button) }
+            PauseButton(button.x, button.y, button.getWidth(), LEGACY_BUTTON_HEIGHT, button.message, button.active, null, null) { press(button) }
         }
     }
 
@@ -244,6 +253,7 @@ private class PauseButton(
     val label: String,
     val active: Boolean,
     val icon: PauseIcon?,
+    val tooltip: String?,
     val press: () -> Unit,
 ) : PauseWidget(x, y, width, height)
 
@@ -332,7 +342,10 @@ private fun PauseTitle(text: String, modifier: Modifier) {
 
 @Composable
 private fun PausePill(button: PauseButton, modifier: Modifier) {
-    Box(modifier.pillSurface(button.press, enabled = button.active), contentAlignment = Alignment.Center) {
+    val (interaction, hovered) = rememberSocialHover()
+    Box(modifier.pillSurface(button.press, enabled = button.active).hoverable(interaction), contentAlignment = Alignment.Center) {
+        // vanilla wraps tooltips at 170 GUI pixels
+        if (button.tooltip != null && hovered) HoverTooltip(button.tooltip, TooltipPlacement.ABOVE_CENTER, gui(170))
         val icon = button.icon
         if (icon != null) {
             Image(
