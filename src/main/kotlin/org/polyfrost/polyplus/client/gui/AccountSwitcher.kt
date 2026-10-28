@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.gui.screens.Screen
@@ -104,7 +106,7 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                     // the live preview reads the session user, so rebuild it when the active account changes
                     key(accounts?.firstOrNull { it.active }?.id) {
                         PlayerPreview(
-                            Modifier.width(320.dp).fillMaxHeight(),
+                            Modifier.fillMaxWidth(0.35f).widthIn(max = 320.dp).fillMaxHeight(),
                             source = PlayerPreviewSource.LocalLive,
                             initialYaw = 180f + 22.9f,
                             live = true,
@@ -149,9 +151,10 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                             }
                         }
                         AccountStatusText(actions.busy, actions.error, actions.errorSteps)
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             AddAccountButton(
                                 icon = ASSETS + "globe-01.svg",
@@ -159,7 +162,6 @@ fun AccountSwitcherContent(screen: Screen, onClose: () -> Unit) {
                                 enabled = idle,
                                 onClick = actions::addMicrosoft,
                             )
-                            Spacer(Modifier.padding(12.dp))
                             AddAccountButton(
                                 icon = ASSETS + "plus.svg",
                                 text = "Add offline account",
@@ -250,7 +252,9 @@ fun AccountButton(
                 else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
                 fontSize = 13.sp,
                 color = if (confirmRemove) SocialDangerColor else OneConfigTheme.current.textColorSecondary,
-                textAlign = TextAlign.Right
+                textAlign = TextAlign.Right,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         if (confirmRemove) {
