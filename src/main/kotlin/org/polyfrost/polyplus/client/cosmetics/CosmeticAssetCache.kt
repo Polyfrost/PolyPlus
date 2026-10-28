@@ -4,8 +4,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
-import org.polyfrost.polyplus.libs.ktor.client.request.get
-import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
+import org.polyfrost.polyplus.libs.ktor.client.request.prepareGet
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsChannel
+import org.polyfrost.polyplus.libs.ktor.http.contentLength
+import org.polyfrost.polyplus.libs.ktor.http.isSuccess
+import org.polyfrost.polyplus.libs.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -20,8 +23,10 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.bedrock.geometry.BedrockGeometry
+import org.polyfrost.polyplus.client.cosmetics.assets.ArchiveLimits
 import org.polyfrost.polyplus.client.cosmetics.assets.AssetArchive
 import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
+import org.polyfrost.polyplus.client.cosmetics.assets.RejectedArchiveException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -39,7 +44,9 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.utils.HashManager
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -150,6 +157,11 @@ object CosmeticAssetCache {
 
     private const val CAPE_SHEET_EXTENSION = "sheet"
     private const val APPLE_DOUBLE_PREFIX = "._"
+
+    private const val MIB = 1024L * 1024
+    private val CAPE_LIMITS = ArchiveLimits(maxDownloadBytes = 16 * MIB, maxExtractedBytes = 32 * MIB, maxEntries = 16)
+    private val MODEL_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 64)
+    private val EMOTE_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 128)
 
     suspend fun preloadDefinitions(
         definitions: Collection<CosmeticDefinition>,
@@ -275,10 +287,47 @@ object CosmeticAssetCache {
             if (cosmeticDirFile.exists()) {
                 cosmeticDirFile.deleteRecursively()
             }
-            val bytes = PolyPlusClient.HTTP.get(url) { timeout { requestTimeoutMillis = 60_000 } }.bodyAsBytes()
-            AssetArchive.materialize(bytes, cosmeticDir)
+            val limits = definition.type.archiveLimits()
+            val bytes = download(url, limits.maxDownloadBytes)
+            AssetArchive.materialize(bytes, cosmeticDir, limits)
             hashManager.updateHash(hashKey, definition.hash)
         }
+    }
+
+    private suspend fun download(url: String, maxBytes: Long): ByteArray =
+        PolyPlusClient.HTTP.prepareGet(url) { timeout { requestTimeoutMillis = 60_000 } }.execute { response ->
+            if (!response.status.isSuccess()) throw IOException("Downloading $url failed with ${response.status}")
+            val length = response.contentLength()
+            if (length != null && length > maxBytes) {
+                throw RejectedArchiveException("$url is $length bytes, over the $maxBytes byte limit")
+            }
+            val channel = response.bodyAsChannel()
+            val body = ByteArrayOutputStream()
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = channel.readAvailable(buffer, 0, buffer.size)
+                if (read < 0) break
+                if (body.size() + read > maxBytes) {
+                    throw RejectedArchiveException("$url is over the $maxBytes byte limit")
+                }
+                body.write(buffer, 0, read)
+            }
+            body.toByteArray()
+        }
+
+    private fun CosmeticType.archiveLimits(): ArchiveLimits = when (this) {
+        CosmeticType.Cape -> CAPE_LIMITS
+        CosmeticType.Backpack,
+        CosmeticType.Glasses,
+        CosmeticType.Wings,
+        CosmeticType.Glove,
+        CosmeticType.Hat,
+        CosmeticType.Aura,
+        CosmeticType.Boots,
+        CosmeticType.Shoulder,
+        CosmeticType.Pet,
+        CosmeticType.Unknown -> MODEL_LIMITS
+        CosmeticType.Emote -> EMOTE_LIMITS
     }
 
     private fun loadCosmeticAssetsLocked(definition: CosmeticDefinition) {
