@@ -102,11 +102,15 @@ object PauseMenuPanel {
         if (!PolyPlusMainMenuConfig.pauseMenuPlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
         val room = screenWidth - menuRight - MENU_GAP
-        val width = minOf(WIDTH, room - MIN_EDGE_MARGIN)
-        if (width < MIN_WIDTH) return null
-        val x = screenWidth - width - (room - width).coerceAtMost(EDGE_MARGIN)
+        val rightWidth = minOf(WIDTH, room - MIN_EDGE_MARGIN)
+        if (rightWidth < MIN_WIDTH) return null
         val leftRoom = menuLeft - MENU_GAP
-        val leftX = if (leftRoom - width >= MIN_EDGE_MARGIN) (leftRoom - width).coerceAtMost(EDGE_MARGIN) else null
+        val leftWidth = minOf(WIDTH, leftRoom - MIN_EDGE_MARGIN)
+        val leftFits = leftWidth >= MIN_WIDTH
+        // integer centering can leave the menu a pixel off center, so both columns take the narrower side's width
+        val width = if (leftFits) minOf(rightWidth, leftWidth) else rightWidth
+        val x = screenWidth - width - (room - width).coerceAtMost(EDGE_MARGIN)
+        val leftX = if (leftFits) (leftRoom - width).coerceAtMost(EDGE_MARGIN) else null
 
         val social = PrivacyConsent.allowsOnlineServices()
         val rows = menuRowsY.distinct().sorted()
