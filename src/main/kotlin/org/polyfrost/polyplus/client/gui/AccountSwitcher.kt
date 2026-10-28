@@ -260,7 +260,7 @@ fun AccountButton(
             }
             AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
         } else {
-            if (account.microsoft) {
+            if (account.refreshable) {
                 RefreshAccountButton(
                     color = if (account.expired) SocialDangerColor else SocialTextSecondary,
                     enabled = enabled,

@@ -13,6 +13,7 @@ object OneLauncherAccounts {
         val id: UUID,
         val username: String,
         val microsoft: Boolean,
+        val refreshable: Boolean,
         val active: Boolean,
         val expired: Boolean,
     )
@@ -33,6 +34,7 @@ object OneLauncherAccounts {
                 id = id,
                 username = stored.username,
                 microsoft = microsoft,
+                refreshable = LauncherAccountStore.isRefreshable(stored),
                 active = id == activeId,
                 // The launch account has no refresh token so it can never be refreshed
                 expired = microsoft && stored !== session && LauncherAccountStore.isExpired(stored.expires),
@@ -142,6 +144,7 @@ object OneLauncherAccounts {
         id = LauncherAccountStore.parseUuid(id) ?: UUID(0L, 0L),
         username = username,
         microsoft = LauncherAccountStore.isMicrosoft(this),
+        refreshable = LauncherAccountStore.isRefreshable(this),
         active = active,
         expired = LauncherAccountStore.isMicrosoft(this) && LauncherAccountStore.isExpired(expires),
     )
