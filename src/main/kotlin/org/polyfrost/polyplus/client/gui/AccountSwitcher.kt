@@ -111,13 +111,13 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                         )
                     }
                     Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
+                    // scroll the whole column, as errors and the add buttons can outgrow short windows too
                     Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
-                                .verticalScroll(rememberScrollState()),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             when {
