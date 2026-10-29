@@ -61,7 +61,6 @@ import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 
 @Composable
 internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit) {
-    var offlineEntry by remember { mutableStateOf(false) }
     // list() is in add order, newest last
     val accounts = actions.accounts
     val idle = actions.idle
@@ -164,10 +163,7 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                                 icon = ASSETS + "plus.svg",
                                 text = "Add offline account",
                                 enabled = idle,
-                                onClick = {
-                                    actions.clearError()
-                                    offlineEntry = true
-                                },
+                                onClick = actions::openOfflineEntry,
                             )
                         }
 
@@ -176,15 +172,12 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
             }
         }
 
-        if (offlineEntry) {
+        if (actions.offlineEntry) {
             OfflineAccountPopup(
                 busy = actions.busy,
                 error = actions.error,
-                onSubmit = { username -> actions.addOffline(username) { offlineEntry = false } },
-                onCancel = {
-                    actions.clearError()
-                    offlineEntry = false
-                },
+                onSubmit = actions::addOffline,
+                onCancel = actions::cancelOfflineEntry,
             )
         }
 

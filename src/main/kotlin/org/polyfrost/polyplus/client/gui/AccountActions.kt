@@ -31,6 +31,8 @@ internal class AccountActions(private val scope: CoroutineScope) {
         private set
     var refreshingId by mutableStateOf<UUID?>(null)
         private set
+    var offlineEntry by mutableStateOf(false)
+        private set
     private var loginJob: Job? = null
 
     val idle: Boolean get() = busy == null
@@ -42,6 +44,16 @@ internal class AccountActions(private val scope: CoroutineScope) {
     fun clearError() {
         error = null
         errorSteps = null
+    }
+
+    fun openOfflineEntry() {
+        clearError()
+        offlineEntry = true
+    }
+
+    fun cancelOfflineEntry() {
+        clearError()
+        offlineEntry = false
     }
 
     private fun fail(throwable: Throwable, fallback: String) {
@@ -81,9 +93,9 @@ internal class AccountActions(private val scope: CoroutineScope) {
         }
     }
 
-    fun addOffline(username: String, onSuccess: () -> Unit = {}) = runBusy("Adding account…") {
+    fun addOffline(username: String) = runBusy("Adding account…") {
         runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addOffline(username) } }
-            .onSuccess { onSuccess() }
+            .onSuccess { offlineEntry = false }
             .onFailure { error = it.message ?: "Couldn't add that account" }
     }
 
