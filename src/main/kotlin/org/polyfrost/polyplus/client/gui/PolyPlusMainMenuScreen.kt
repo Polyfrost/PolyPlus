@@ -58,7 +58,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -1274,6 +1277,8 @@ private fun AccountPill(name: String, screen: Screen) {
     val actions = rememberAccountActions()
     var open by remember { mutableStateOf(false) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
+    var panelRoom by remember { mutableStateOf(0) }
+    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
     val accounts = remember(actions.accounts) {
         actions.accounts?.sortedWith(compareByDescending<OneLauncherAccounts.Account> { it.active }.thenBy { it.username.lowercase() })
     }
@@ -1294,7 +1299,13 @@ private fun AccountPill(name: String, screen: Screen) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .onSizeChanged { pillSize = it },
+            .onGloballyPositioned {
+                pillSize = it.size
+                val top = it.positionInWindow().y.toInt()
+                val windowHeight = it.findRootCoordinates().size.height
+                // the panel opens on the roomier side and scrolls its list to fit, so it never covers the pill
+                panelRoom = (maxOf(top, windowHeight - top - it.size.height) - gap).coerceAtLeast(0)
+            },
     ) {
         Box(
             modifier = Modifier
@@ -1322,7 +1333,6 @@ private fun AccountPill(name: String, screen: Screen) {
             )
         }
         if (open) {
-            val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
             val positionProvider = remember(gap) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
@@ -1330,7 +1340,12 @@ private fun AccountPill(name: String, screen: Screen) {
                         windowSize: IntSize,
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
-                    ): IntOffset = IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
+                    ): IntOffset {
+                        val below = anchorBounds.bottom + gap
+                        val fitsBelow = below + popupContentSize.height <= windowSize.height
+                        val y = if (fitsBelow) below else anchorBounds.top - gap - popupContentSize.height
+                        return IntOffset(anchorBounds.right - popupContentSize.width, y)
+                    }
                 }
             }
             Popup(
@@ -1340,6 +1355,7 @@ private fun AccountPill(name: String, screen: Screen) {
             ) {
                 AccountSwitcherPanel(
                     panelWidth = with(LocalDensity.current) { pillSize.width.toDp() },
+                    panelMaxHeight = with(LocalDensity.current) { panelRoom.toDp() },
                     accounts = accounts,
                     busy = busy,
                     error = actions.error,
@@ -1357,6 +1373,7 @@ private fun AccountPill(name: String, screen: Screen) {
 @Composable
 private fun AccountSwitcherPanel(
     panelWidth: Dp,
+    panelMaxHeight: Dp,
     accounts: List<OneLauncherAccounts.Account>?,
     busy: String?,
     error: String?,
@@ -1371,6 +1388,7 @@ private fun AccountSwitcherPanel(
     Column(
         modifier = Modifier
             .width(panelWidth)
+            .heightIn(max = panelMaxHeight)
             .clip(PanelShape)
             .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
@@ -1404,6 +1422,7 @@ private fun AccountSwitcherPanel(
             else -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f, fill = false)
                     .heightIn(max = 300.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),

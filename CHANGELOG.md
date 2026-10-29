@@ -7,3 +7,4 @@
 - Removed wWaypoints toasts for its sharing backend dropping and reconnecting
 - Fixed Poly+'s icon being cut off in Mod Menu and launchers
 - wWaypoints' toggle sneak is no longer forcibly disabled – added a patch to stop it from flagging anticheats
+- Fixed the main menu account dropdown running off the bottom of the window when there are many accounts
