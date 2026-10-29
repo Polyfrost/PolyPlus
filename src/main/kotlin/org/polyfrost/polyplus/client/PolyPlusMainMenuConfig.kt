@@ -41,6 +41,22 @@ object PolyPlusMainMenuConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "PolyPlus Pause Menu",
+        description = "Replace the vanilla pause menu with a PolyPlus one. Menus opened from it stay vanilla.",
+        subcategory = "Pause Menu",
+    )
+    var usePolyPlusPauseMenu = false
+
+    @JvmStatic
+    @Switch(
+        title = "Pause Menu Player Preview",
+        description = "Show your player with Social and Wardrobe buttons beside the pause menu, when there's room.",
+        subcategory = "Pause Menu",
+    )
+    var pauseMenuPlayerPanel = true
+
+    @JvmStatic
+    @Switch(
         title = "Hide Quickplay",
         description = "Hide the Quickplay recent servers panel on the PolyPlus main menu.",
         subcategory = "Elements",

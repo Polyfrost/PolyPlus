@@ -18,13 +18,9 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 @Mixin(targets = "org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx", remap = false)
 public class MixinSkiaCtx {
     //? if < 26.1 {
-    /*// draw() returns before its TAIL on frames without Skia work, so released previews are disposed from its HEAD too
-    @Inject(method = "draw", at = @At("HEAD"), remap = false)
-    private void polyplus$disposeReleasedPreviews(CallbackInfo ci) {
-        PlayerPreviewOffscreen.disposeReleased();
-    }
-
-    @Inject(method = "draw", at = @At("TAIL"), remap = false)
+    /*// RETURN rather than TAIL, so frames where draw() bails early with nothing of its own to draw still render
+    // previews: a vanilla screen hosting one through the HUD path gives draw() no work
+    @Inject(method = "draw", at = @At("RETURN"), remap = false)
     private void polyplus$renderPlayerPreviews(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
