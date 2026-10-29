@@ -124,16 +124,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
 
-    //? if > 1.8.9 {
-    override fun shouldCloseOnEsc(): Boolean = false
-    //?} else {
-    /*override fun keyPressed(chr: Char, key: Int) {
-        if (key != 1) super.keyPressed(chr, key)
-    }
-    *///?}
-
+    // consuming Escape here rather than via shouldCloseOnEsc, since OneConfig hands unhandled keys straight to Screen on 1.8.9
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
-        val capture = OnboardingKeyCapture.pending ?: return false
+        val capture = OnboardingKeyCapture.pending ?: return key == InputConstants.KEY_ESCAPE
         capture(
             if (key == InputConstants.KEY_ESCAPE) {
                 null
