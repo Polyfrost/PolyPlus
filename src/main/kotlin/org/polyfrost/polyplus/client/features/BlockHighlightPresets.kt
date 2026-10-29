@@ -31,7 +31,9 @@ object BlockHighlightPresets {
     fun markerPath(): Path = FabricLoader.getInstance().configDir.resolve(FIRST_OPEN_MARKER)
 
     fun presetJson(name: String): String {
-        val text = manager().getResourceAsStream("/assets/presets/$name.json")
+        val manager = manager()
+        val text = (manager.getResourceAsStream("/assets/customblockhighlight/presets/$name.json")
+            ?: manager.getResourceAsStream("/assets/presets/$name.json"))
             ?.use { it.readBytes().decodeToString() }
             ?: error("Custom Block Highlight has no '$name' preset")
         val gson = gson()
