@@ -137,7 +137,7 @@
     "compat.mountopacity.MixinEntityHook",
     //? if = 1.8.9
     //"compat.oneconfig.MixinComposeScreen",
-    "compat.oneconfig.MixinSkiaCtx",
+    "compat.oneconfig.MixinGlHost",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",
     //? if > 1.8.9

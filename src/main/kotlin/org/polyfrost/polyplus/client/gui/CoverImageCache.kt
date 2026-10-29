@@ -3,11 +3,11 @@ package org.polyfrost.polyplus.client.gui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.polyfrost.polyplus.libs.ktor.client.call.body
 import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.apache.logging.log4j.LogManager
-import org.jetbrains.skia.Image as SkiaImage
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.util.Collections
@@ -42,7 +42,7 @@ object CoverImageCache {
         return withContext(Dispatchers.IO) {
             runSuspendCatching {
                 val bytes = PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/asset/$assetId").body<ByteArray>()
-                SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+                PolyBitmap.decode(bytes)!!.asComposeImageBitmap()
             }.onFailure {
                 retryAt[assetId] = System.currentTimeMillis() + RETRY_DELAY_MS
                 LOGGER.error("Failed to load cover asset {}", assetId, it)
@@ -77,7 +77,7 @@ object RemoteImageCache {
             runSuspendCatching {
                 val bytes = PolyPlusClient.HTTP.get(url).body<ByteArray>()
                 require(bytes.size <= MAX_BYTES) { "image exceeds 2 MiB" }
-                SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+                PolyBitmap.decode(bytes)!!.asComposeImageBitmap()
             }.onFailure {
                 retryAt[url] = System.currentTimeMillis() + RETRY_DELAY_MS
                 LOGGER.warn("Failed to load remote image {}", url, it)

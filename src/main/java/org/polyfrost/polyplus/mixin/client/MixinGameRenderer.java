@@ -20,11 +20,17 @@ import net.minecraft.util.ARGB;
 //? if >= 26.1 {
 import net.minecraft.client.renderer.state.gui.GuiRenderState;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
+//?}
+
+//? if >= 1.21.11 {
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.minecraft.client.Minecraft;
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 //?}
 
-//? if >= 26.1 && < 26.3 {
+//? if >= 1.21.11 && < 26.3 {
 /*import net.minecraft.client.DeltaTracker;
 *///?}
 
@@ -50,6 +56,24 @@ public class MixinGameRenderer {
             return POLYPLUS_PANORAMA_BLUR_RADIUS;
         }
         return original;
+    }
+    //?}
+
+    //? if >= 1.21.11 {
+    @Inject(method = "render", at = @At("HEAD"))
+    //? if >= 26.3 {
+    private void polyplus$renderPlayerPreviews(CallbackInfo ci) {
+    //?} else {
+    /*private void polyplus$renderPlayerPreviews(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+    *///?}
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null) return;
+        //? if >= 26.2 {
+        RenderTarget rt = ((GameRenderer) (Object) this).mainRenderTarget();
+        //?} else {
+        /*RenderTarget rt = mc.getMainRenderTarget();
+        *///?}
+        if (rt != null) PlayerPreviewOffscreen.renderAll(rt);
     }
     //?}
 

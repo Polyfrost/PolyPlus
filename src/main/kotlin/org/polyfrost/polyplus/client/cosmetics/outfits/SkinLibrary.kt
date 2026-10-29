@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
 import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
@@ -495,7 +496,7 @@ object SkinLibrary {
                             decoded
                         }
                     }
-                bitmaps[key] = previewImage(image).toComposeImageBitmap()
+                bitmaps[key] = PolyBitmap.fromAwt(previewImage(image)).asComposeImageBitmap()
                 failed.remove(key)
                 bitmapVersion++
             }.onFailure {

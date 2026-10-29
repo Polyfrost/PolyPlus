@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
@@ -23,7 +22,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
-import org.jetbrains.skia.Image as SkiaImage
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
@@ -37,7 +37,7 @@ internal object EmojiAtlas {
     val bitmap: ImageBitmap? by lazy {
         runCatching {
             val bytes = EmojiAtlas::class.java.getResourceAsStream(PATH)!!.use { it.readBytes() }
-            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+            PolyBitmap.decode(bytes)!!.asComposeImageBitmap()
         }.getOrNull()
     }
 

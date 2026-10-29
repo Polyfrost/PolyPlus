@@ -1,15 +1,17 @@
 package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.ui.geometry.Offset
-import org.apache.logging.log4j.LogManager
-import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.Image as SkiaImage
-import org.jetbrains.skia.ImageFilter
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Rect
-import org.jetbrains.skia.RuntimeEffect
-import org.jetbrains.skia.RuntimeShaderBuilder
-import org.jetbrains.skia.SamplingMode
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import org.polyfrost.compose.backend.drawPoly
+import org.polyfrost.compose.render.FilterQuality
+import org.polyfrost.compose.render.PolyBitmap
+import org.polyfrost.compose.render.PolyColor
+import java.util.WeakHashMap
+import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 object UnityMotionBlur {
     private const val MAX_BLUR = 0.08f
@@ -22,14 +24,7 @@ object UnityMotionBlur {
 
     val NONE = Motion(Offset.Zero, MIN_SAMPLES)
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/MotionBlurPreview")
-
-    @Volatile
-    private var shaderUsable = true
-
-    private val effect: RuntimeEffect? by lazy {
-        runCatching { RuntimeEffect.makeForShader(SKSL) }.getOrNull()
-    }
+    private val cache = WeakHashMap<PolyBitmap, MutableMap<List<Int>, PolyBitmap>>()
 
     fun maxSmear(strength: Int): Motion {
         val intensity = (strength.coerceIn(0, 10) / 10f) * MAX_BLUR
@@ -39,76 +34,81 @@ object UnityMotionBlur {
         return Motion(Offset(intensity, 0f), samples)
     }
 
-    fun draw(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
-        if (!shaderUsable) return blit(canvas, image, src, dst, bounds)
-        try {
-            drawBlurred(canvas, image, src, dst, bounds, motion)
-        } catch (e: LinkageError) {
-            shaderUsable = false
-            LOGGER.warn("Motion blur preview disabled; skiko API mismatch", e)
-            blit(canvas, image, src, dst, bounds)
+    fun draw(scope: DrawScope, image: PolyBitmap, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
+        val dx = motion.velocity.x * bounds.width * src.width / dst.width
+        val dy = motion.velocity.y * bounds.height * src.height / dst.height
+        blit(scope, blurred(image, dx, dy, motion.samples.toInt()), src, dst, bounds)
+    }
+
+    private fun blit(scope: DrawScope, image: PolyBitmap, src: Rect, dst: Rect, bounds: Rect) {
+        val w = image.width.toFloat()
+        val h = image.height.toFloat()
+        scope.clipRect(bounds.left, bounds.top, bounds.right, bounds.bottom) {
+            drawPoly {
+                it.image(image, dst.left, dst.top, dst.width, dst.height, src.left / w, src.top / h, src.right / w, src.bottom / h, PolyColor(-1), FilterQuality.Low)
+            }
         }
     }
 
-    private fun blit(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect) {
-        canvas.save()
-        canvas.clipRect(bounds)
-        canvas.drawImageRect(image, src, dst, SamplingMode.LINEAR, null, true)
-        canvas.restore()
+    private fun blurred(image: PolyBitmap, dx: Float, dy: Float, n: Int): PolyBitmap {
+        if (n < 2 || dx * dx + dy * dy < 1e-6f) return image
+        val key = listOf((dx * 10f).roundToInt(), (dy * 10f).roundToInt(), n)
+        return synchronized(cache) { cache.getOrPut(image) { HashMap() }.getOrPut(key) { smear(image, dx, dy, n.coerceAtMost(SAMPLE_LIMIT)) } }
     }
 
-    private fun drawBlurred(canvas: Canvas, image: SkiaImage, src: Rect, dst: Rect, bounds: Rect, motion: Motion) {
-        val runtime = effect ?: return blit(canvas, image, src, dst, bounds)
-        val builder = RuntimeShaderBuilder(runtime)
-        builder.uniform("Size", bounds.width, bounds.height)
-        builder.uniform("Velocity", motion.velocity.x, motion.velocity.y)
-        builder.uniform("Samples", motion.samples)
-        builder.uniform("Jitter", JITTER)
-        val filter = builder.use { ImageFilter.makeRuntimeShader(it, "DiffuseSampler", null) }
-        filter.use {
-            Paint().use { paint ->
-                paint.imageFilter = it
-                canvas.save()
-                canvas.clipRect(bounds)
-                canvas.drawImageRect(image, src, dst, SamplingMode.LINEAR, paint, true)
-                canvas.restore()
+    private fun gnoise(x: Float, y: Float): Float {
+        val d = x * 0.06711056f + y * 0.00583715f
+        val f = 52.9829189f * (d - floor(d))
+        return f - floor(f)
+    }
+
+    private fun smear(image: PolyBitmap, dx: Float, dy: Float, n: Int): PolyBitmap {
+        val w = image.width
+        val h = image.height
+        val px = image.pixels
+        val premul = FloatArray(w * h * 4)
+        for (i in 0 until w * h) {
+            val a = (px[i * 4 + 3].toInt() and 0xFF) / 255f
+            for (c in 0..2) premul[i * 4 + c] = (px[i * 4 + c].toInt() and 0xFF) * a
+            premul[i * 4 + 3] = a * 255f
+        }
+        val out = ByteArray(px.size)
+        val acc = FloatArray(4)
+        for (y in 0 until h) for (x in 0 until w) {
+            val j = (gnoise(x + 0.5f, y + 0.5f) - 0.5f) * JITTER
+            acc.fill(0f)
+            var total = 0f
+            for (i in 0 until n) {
+                val t = (i + 0.5f + j) / n - 0.5f
+                val weight = 1f - abs(t) * 2f
+                sample(premul, w, h, x + dx * t, y + dy * t, weight, acc)
+                total += weight
             }
+            if (total <= 0f) continue
+            val a = acc[3] / total
+            if (a <= 0f) continue
+            val o = (y * w + x) * 4
+            for (c in 0..2) out[o + c] = (acc[c] / total / (a / 255f)).roundToInt().coerceIn(0, 255).toByte()
+            out[o + 3] = a.roundToInt().coerceIn(0, 255).toByte()
+        }
+        return PolyBitmap(w, h, out)
+    }
+
+    private fun sample(src: FloatArray, w: Int, h: Int, x: Float, y: Float, weight: Float, acc: FloatArray) {
+        val fx = x.coerceIn(0f, (w - 1).toFloat())
+        val fy = y.coerceIn(0f, (h - 1).toFloat())
+        val x0 = fx.toInt()
+        val y0 = fy.toInt()
+        val x1 = minOf(x0 + 1, w - 1)
+        val y1 = minOf(y0 + 1, h - 1)
+        val tx = fx - x0
+        val ty = fy - y0
+        for (c in 0..3) {
+            val top = src[(y0 * w + x0) * 4 + c] * (1f - tx) + src[(y0 * w + x1) * 4 + c] * tx
+            val bottom = src[(y1 * w + x0) * 4 + c] * (1f - tx) + src[(y1 * w + x1) * 4 + c] * tx
+            acc[c] += (top * (1f - ty) + bottom * ty) * weight
         }
     }
 
     data class Motion(val velocity: Offset, val samples: Float)
-
-    private val SKSL = """
-        uniform shader DiffuseSampler;
-        uniform float2 Size;
-        uniform float2 Velocity;
-        uniform float Samples;
-        uniform float Jitter;
-
-        float gnoise(float2 p) {
-            return fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
-        }
-
-        half4 main(float2 coord) {
-            int n = int(Samples);
-            if (n < 2 || dot(Velocity, Velocity) < 1e-9) {
-                return DiffuseSampler.eval(coord);
-            }
-
-            float j = (gnoise(coord) - 0.5) * Jitter;
-
-            float4 acc = float4(0.0);
-            float total = 0.0;
-            for (int i = 0; i < $SAMPLE_LIMIT; i++) {
-                if (i < n) {
-                    float t = (float(i) + 0.5 + j) / float(n) - 0.5;
-                    float w = 1.0 - abs(t) * 2.0;
-                    acc += float4(DiffuseSampler.eval(coord + Velocity * Size * t)) * w;
-                    total += w;
-                }
-            }
-
-            return total > 0.0 ? half4(acc / total) : DiffuseSampler.eval(coord);
-        }
-    """.trimIndent()
 }

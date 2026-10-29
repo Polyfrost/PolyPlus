@@ -1,16 +1,12 @@
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.asComposeCanvas
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
-import androidx.compose.ui.platform.registerSkikoComposeImplementation
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import net.minecraft.client.Minecraft
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -23,63 +19,28 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //? if = 1.8.9
 //import org.lwjgl.input.Mouse
 
-@OptIn(InternalComposeUiApi::class)
 object MenuBackgroundPass {
     private const val PARALLAX_EASE = 0.02f
 
     private val drawScope = CanvasDrawScope()
-
-    init {
-        registerSkikoComposeImplementation()
-    }
+    private val inline = InlineCanvas("menu_background")
 
     private var startNanos = 0L
     private var easedX = 0.5f
     private var easedY = 0.5f
 
-    fun enqueue(panorama: Boolean) {
-        if (!SkiaCtx.isReady) return
-        SkiaCtx.queueDraw { render(panorama) }
-    }
-
     //? if >= 26.1 {
     @JvmStatic
-    fun renderInline(ctx: GuiGraphicsExtractor, panorama: Boolean, screen: Any): Boolean {
-        if (!SkiaCtx.isReady) return false
-        if (screen is ComposeScreen) {
-            SkiaCtx.queueHudDraw { render(panorama) }
-            SkiaCtx.drawNow()
-            SkiaCtx.blitHud(ctx)
-        } else {
-            SkiaCtx.drawComposeBlit(ctx) { render(panorama) }
-        }
-        return true
-    }
+    fun renderInline(ctx: GuiGraphicsExtractor, panorama: Boolean): Boolean = inline.draw(ctx) { render(it, panorama) }
     //?} elif > 1.8.9 {
     /*@JvmStatic
-    fun renderInline(ctx: GuiGraphics, panorama: Boolean, screen: Any): Boolean {
-        if (!SkiaCtx.isReady) return false
-        if (screen is ComposeScreen) {
-            SkiaCtx.queueHudDraw { render(panorama) }
-            SkiaCtx.drawNow()
-            SkiaCtx.blitHud(ctx)
-        } else {
-            SkiaCtx.drawComposeBlit(ctx) { render(panorama) }
-        }
-        return true
-    }
+    fun renderInline(ctx: GuiGraphics, panorama: Boolean): Boolean = inline.draw(ctx) { render(it, panorama) }
     *///?} else {
     /*@JvmStatic
-    fun renderInline(panorama: Boolean, screen: Any): Boolean {
-        if (!SkiaCtx.isReady) return false
-        SkiaCtx.queueHudDraw { render(panorama) }
-        SkiaCtx.drawNow()
-        SkiaCtx.blitHud()
-        return true
-    }
+    fun renderInline(panorama: Boolean): Boolean = inline.draw { render(it, panorama) }
     *///?}
 
-    private fun render(panorama: Boolean) {
+    private fun render(canvas: Canvas, panorama: Boolean) {
         val mc = Minecraft.getInstance()
         val w = mc.window.width
         val h = mc.window.height
@@ -102,7 +63,6 @@ object MenuBackgroundPass {
         easedY += (targetY - easedY) * PARALLAX_EASE
         val mouse = Offset(easedX, easedY)
 
-        val canvas = SkiaCtx.canvas.asComposeCanvas()
         drawScope.draw(Density(1f), LayoutDirection.Ltr, canvas, Size(w.toFloat(), h.toFloat())) {
             if (panorama) {
                 drawPanoramaOverlay()

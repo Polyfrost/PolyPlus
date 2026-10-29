@@ -22,9 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -33,6 +31,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.polyfrost.compose.backend.drawPoly
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 
@@ -143,7 +142,9 @@ private fun PlayerPreviewLive(
             .drawBehind {
                 // reading frameNanos invalidates this draw every frame so the newest offscreen render shows
                 if (frameNanos == 0L) return@drawBehind
-                drawIntoCanvas { PlayerPreviewOffscreen.draw(entry, it.skiaCanvas, size.width, size.height) }
+                val w = size.width
+                val h = size.height
+                drawPoly { PlayerPreviewOffscreen.draw(entry, it, w, h) }
                 drawRect(edgeFade, blendMode = BlendMode.DstIn)
                 bottomFade?.let { drawRect(it, blendMode = BlendMode.DstIn) }
             },
@@ -155,14 +156,14 @@ private const val FADE_STOPS = 12
 private fun fadeStop(position: Float, t: Float): Pair<Float, Color> =
     position to Color.White.copy(alpha = PlayerPreviewRenderer.smooth(t))
 
-private fun edgeFadeBrush(): Brush {
+internal fun edgeFadeBrush(): Brush {
     val edge = PlayerPreviewRenderer.EDGE_FADE_FRACTION
     val left = (0..FADE_STOPS).map { i -> (i / FADE_STOPS.toFloat()).let { fadeStop(it * edge, it) } }
     val right = left.asReversed().map { (x, c) -> 1f - x to c }
     return Brush.horizontalGradient(*(left + right).toTypedArray())
 }
 
-private fun bottomFadeBrush(fraction: Float): Brush? {
+internal fun bottomFadeBrush(fraction: Float): Brush? {
     if (fraction <= 0f) return null
     val f = fraction.coerceAtMost(1f)
     val stops = (FADE_STOPS downTo 0).map { i -> (i / FADE_STOPS.toFloat()).let { fadeStop(1f - it * f, it) } }

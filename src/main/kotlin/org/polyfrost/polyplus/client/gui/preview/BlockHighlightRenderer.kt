@@ -1,31 +1,33 @@
 package org.polyfrost.polyplus.client.gui.preview
 
-import org.jetbrains.skia.BlendMode
-import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.ColorFilter
-import org.jetbrains.skia.Color4f
-import org.jetbrains.skia.FilterTileMode
-import org.jetbrains.skia.Gradient
-import org.jetbrains.skia.Image
-import org.jetbrains.skia.Matrix33
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.PathBuilder
-import org.jetbrains.skia.Point
-import org.jetbrains.skia.Rect
-import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Shader
-import org.jetbrains.skia.Surface
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle.Depth
 import org.polyfrost.polyplus.client.features.BlockHighlightStyle.Faces
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 object BlockHighlightRenderer {
-    fun faces(preset: String, load: (String) -> Image? = VanillaTextures::load): List<Image?> =
-        presetTextures(preset)?.map(load) ?: grassBlock(load)
+    fun faces(preset: String, load: (String) -> PolyBitmap? = VanillaTextures::load): List<ImageBitmap?> =
+        (presetTextures(preset)?.map(load) ?: grassBlock(load)).map { it?.asComposeImageBitmap() }
 
     private fun presetTextures(preset: String): List<String>? {
         //? if > 1.8.9 {
@@ -46,7 +48,7 @@ object BlockHighlightRenderer {
         *///?}
     }
 
-    private fun grassBlock(load: (String) -> Image?): List<Image?> {
+    private fun grassBlock(load: (String) -> PolyBitmap?): List<PolyBitmap?> {
         //? if > 1.8.9 {
         fun grass(name: String) = "textures/block/grass_block_$name.png"
         val dirt = "textures/block/dirt.png"
@@ -58,23 +60,33 @@ object BlockHighlightRenderer {
         return listOf(layered(load, grass("top") to GRASS_TINT), load(dirt)) + List(4) { side }
     }
 
-    private fun layered(load: (String) -> Image?, vararg layers: Pair<String, Int>): Image? {
+    private fun layered(load: (String) -> PolyBitmap?, vararg layers: Pair<String, Int>): PolyBitmap? {
         val images = layers.map { (path, tint) -> (load(path) ?: return null) to tint }
         val size = images.first().first.width
-        val bounds = Rect.makeWH(size.toFloat(), size.toFloat())
-        return Surface.makeRasterN32Premul(size, size).use { surface ->
-            images.forEach { (image, tint) ->
-                val frame = Rect.makeWH(image.width.toFloat(), image.width.toFloat())
-                val filter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
-                Paint().use { paint ->
-                    paint.colorFilter = filter
-                    surface.canvas.drawImageRect(image, frame, bounds, SamplingMode.DEFAULT, paint, true)
+        val out = FloatArray(size * size * 4)
+        images.forEach { (image, tint) ->
+            val frame = image.width
+            val px = image.pixels
+            for (y in 0 until size) for (x in 0 until size) {
+                val si = ((y * frame / size) * image.width + x * frame / size) * 4
+                val sa = (px[si + 3].toInt() and 0xFF) / 255f * ((tint ushr 24) and 0xFF) / 255f
+                if (sa <= 0f) continue
+                val di = (y * size + x) * 4
+                for (c in 0..2) {
+                    val sc = (px[si + c].toInt() and 0xFF) / 255f * ((tint shr (16 - c * 8)) and 0xFF) / 255f
+                    out[di + c] = sc * sa + out[di + c] * (1f - sa)
                 }
-                filter?.close()
-                image.close()
+                out[di + 3] = sa + out[di + 3] * (1f - sa)
             }
-            surface.makeImageSnapshot()
         }
+        val bytes = ByteArray(out.size)
+        for (i in 0 until size * size) {
+            val a = out[i * 4 + 3]
+            if (a <= 0f) continue
+            for (c in 0..2) bytes[i * 4 + c] = (out[i * 4 + c] / a * 255f + 0.5f).toInt().coerceIn(0, 255).toByte()
+            bytes[i * 4 + 3] = (a * 255f + 0.5f).toInt().coerceIn(0, 255).toByte()
+        }
+        return PolyBitmap(size, size, bytes)
     }
 
     private class Face(val axis: Int, val sign: Int, val shade: Float, val tl: Int, val tr: Int, val bl: Int)
@@ -117,14 +129,14 @@ object BlockHighlightRenderer {
             return Triple(x1, y * cp - z1 * sp, y * sp + z1 * cp)
         }
 
-        fun project(corner: Int, scale: Float): Point {
+        fun project(corner: Int, scale: Float): Offset {
             val h = scale / 2f
             val (x, y, _) = rotate(
                 if (bit(corner, 0) == 1) h else -h,
                 if (bit(corner, 1) == 1) h else -h,
                 if (bit(corner, 2) == 1) h else -h,
             )
-            return Point(cx + x * unit, cy - y * unit)
+            return Offset(cx + x * unit, cy - y * unit)
         }
 
         fun facing(face: Face): Float {
@@ -138,11 +150,11 @@ object BlockHighlightRenderer {
     }
 
     fun draw(
-        canvas: Canvas,
+        canvas: DrawScope,
         width: Float,
         height: Float,
         style: BlockHighlightStyle,
-        textures: List<Image?>,
+        textures: List<ImageBitmap?>,
         millis: Long,
         yaw: Float,
         pitch: Float = 0.5f,
@@ -193,37 +205,30 @@ object BlockHighlightRenderer {
         Depth.ALWAYS_PASS -> true
     }
 
-    private fun drawBlockFace(canvas: Canvas, view: View, face: Face, texture: Image?) {
+    private fun drawBlockFace(canvas: DrawScope, view: View, face: Face, texture: ImageBitmap?) {
         val tl = view.project(face.tl, 1f)
         val tr = view.project(face.tr, 1f)
         val bl = view.project(face.bl, 1f)
         val shade = (face.shade * 255).toInt()
         val tint = (0xFF shl 24) or (shade shl 16) or (shade shl 8) or shade
-        Paint().use { paint ->
-            paint.isAntiAlias = true
-            if (texture == null) {
-                paint.color = tint and 0xFF7F7F7F.toInt()
-                parallelogram(tl, tr, bl).use { canvas.drawPath(it, paint) }
-                return
-            }
-            val size = texture.width.toFloat()
-            val filter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
-            paint.colorFilter = filter
-            canvas.save()
-            canvas.concat(
-                Matrix33(
-                    (tr.x - tl.x) / size, (bl.x - tl.x) / size, tl.x,
-                    (tr.y - tl.y) / size, (bl.y - tl.y) / size, tl.y,
-                    0f, 0f, 1f,
-                ),
+        if (texture == null) {
+            canvas.drawPath(parallelogram(tl, tr, bl), Color(tint and 0xFF7F7F7F.toInt()))
+            return
+        }
+        val size = texture.width
+        canvas.inFace(tl, tr, bl, size.toFloat()) {
+            drawImage(
+                texture,
+                srcOffset = IntOffset.Zero,
+                srcSize = IntSize(size, size),
+                dstSize = IntSize(size, size),
+                colorFilter = ColorFilter.tint(Color(tint), BlendMode.Modulate),
+                filterQuality = FilterQuality.None,
             )
-            canvas.drawImageRect(texture, Rect.makeWH(size, size), Rect.makeWH(size, size), SamplingMode.DEFAULT, paint, true)
-            canvas.restore()
-            filter?.close()
         }
     }
 
-    private fun drawFillFace(canvas: Canvas, view: View, face: Face, scale: Float, c1: Int, c2: Int, alpha: Int) {
+    private fun drawFillFace(canvas: DrawScope, view: View, face: Face, scale: Float, c1: Int, c2: Int, alpha: Int) {
         if (alpha <= 0) return
         val s = scale + 0.0002f
         val tl = view.project(face.tl, s)
@@ -232,20 +237,55 @@ object BlockHighlightRenderer {
         val corners = listOf(face.tl, face.tr, face.bl, face.tl xor face.tr xor face.bl)
         val low = corners.minBy(::gradientT)
         val high = corners.maxBy(::gradientT)
-        val shader = gradient(
-            view.project(low, s), view.project(high, s),
-            lerp(c1, c2, gradientT(low)), lerp(c1, c2, gradientT(high)), alpha,
-        )
-        Paint().use { paint ->
-            paint.isAntiAlias = true
-            paint.shader = shader
-            parallelogram(tl, tr, bl).use { canvas.drawPath(it, paint) }
-        }
-        shader.close()
+        val a = view.project(low, s)
+        val b = view.project(high, s)
+        val ca = lerp(c1, c2, gradientT(low))
+        val cb = lerp(c1, c2, gradientT(high))
+        val m00 = (tr.x - tl.x) / FILL_UNIT
+        val m01 = (bl.x - tl.x) / FILL_UNIT
+        val m10 = (tr.y - tl.y) / FILL_UNIT
+        val m11 = (bl.y - tl.y) / FILL_UNIT
+        val det = m00 * m11 - m01 * m10
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val d2 = dx * dx + dy * dy
+        if (det == 0f) return
+        val ax = a.x - tl.x
+        val ay = a.y - tl.y
+        val start = Offset((m11 * ax - m01 * ay) / det, (-m10 * ax + m00 * ay) / det)
+        val gx = if (d2 == 0f) 0f else (m00 * dx + m10 * dy) / d2
+        val gy = if (d2 == 0f) 0f else (m01 * dx + m11 * dy) / d2
+        val g2 = gx * gx + gy * gy
+        val end = if (g2 == 0f) start else Offset(start.x + gx / g2, start.y + gy / g2)
+        val brush = gradient(start, end, ca, cb, alpha)
+        canvas.inFace(tl, tr, bl, FILL_UNIT) { drawRect(brush, Offset.Zero, Size(FILL_UNIT, FILL_UNIT)) }
+    }
+
+    private inline fun DrawScope.inFace(tl: Offset, tr: Offset, bl: Offset, size: Float, block: DrawScope.() -> Unit) {
+        val m00 = (tr.x - tl.x) / size
+        val m01 = (bl.x - tl.x) / size
+        val m10 = (tr.y - tl.y) / size
+        val m11 = (bl.y - tl.y) / size
+        val e = (m00 + m11) / 2f
+        val f = (m00 - m11) / 2f
+        val g = (m10 + m01) / 2f
+        val h = (m10 - m01) / 2f
+        val q = hypot(e, h)
+        val r = hypot(f, g)
+        val a1 = atan2(g, f)
+        val a2 = atan2(h, e)
+        val theta = Math.toDegrees(((a2 + a1) / 2f).toDouble()).toFloat()
+        val phi = Math.toDegrees(((a2 - a1) / 2f).toDouble()).toFloat()
+        withTransform({
+            translate(tl.x, tl.y)
+            rotate(theta, Offset.Zero)
+            scale(q + r, q - r, Offset.Zero)
+            rotate(phi, Offset.Zero)
+        }, block)
     }
 
     private fun drawEdge(
-        canvas: Canvas,
+        canvas: DrawScope,
         view: View,
         edge: Edge,
         layer: BlockHighlightStyle.Layer,
@@ -283,48 +323,54 @@ object BlockHighlightRenderer {
         segment(canvas, maxInner, maxOuter, inner, outer, lerp(ca, cb, 1f - t), cb, alpha)
     }
 
-    private fun segment(canvas: Canvas, a: Point, b: Point, wa: Float, wb: Float, ca: Int, cb: Int, alpha: Int) {
+    private fun segment(canvas: DrawScope, a: Offset, b: Offset, wa: Float, wb: Float, ca: Int, cb: Int, alpha: Int) {
         val length = distance(a, b)
         if (length < 0.01f || (wa <= 0f && wb <= 0f)) return
-        val nx = -(b.y - a.y) / length
-        val ny = (b.x - a.x) / length
-        val path = PathBuilder().use { it
-            .moveTo(a.x + nx * wa / 2f, a.y + ny * wa / 2f)
-            .lineTo(b.x + nx * wb / 2f, b.y + ny * wb / 2f)
-            .lineTo(b.x - nx * wb / 2f, b.y - ny * wb / 2f)
-            .lineTo(a.x - nx * wa / 2f, a.y - ny * wa / 2f)
-            .closePath()
-            .detach()
+        val core = minOf(wa, wb)
+        val brush = gradient(Offset.Zero, Offset(length, 0f), ca, cb, alpha)
+        val angle = Math.toDegrees(atan2(b.y - a.y, b.x - a.x).toDouble()).toFloat()
+        canvas.withTransform({
+            translate(a.x, a.y)
+            rotate(angle, Offset.Zero)
+        }) {
+            if (core > 0f) drawRect(brush, Offset(0f, -core / 2f), Size(length, core))
+            if (wa == wb) return@withTransform
+            val wide = if (wa > wb) 0f else length
+            val sliver = (maxOf(wa, wb) - core) / 2f
+            val color = Color((alpha shl 24) or (lerp(ca, cb, if (wa > wb) 1f / 3f else 2f / 3f) and 0xFFFFFF))
+            for (side in intArrayOf(-1, 1)) {
+                val edge = side * core / 2f
+                drawPath(
+                    Path().apply {
+                        moveTo(0f, edge)
+                        lineTo(length, edge)
+                        lineTo(wide, edge + side * sliver)
+                        close()
+                    },
+                    color,
+                )
+            }
         }
-        val shader = gradient(a, b, ca, cb, alpha)
-        Paint().use { paint ->
-            paint.isAntiAlias = true
-            paint.shader = shader
-            canvas.drawPath(path, paint)
-        }
-        shader.close()
-        path.close()
     }
 
-    private fun gradient(a: Point, b: Point, ca: Int, cb: Int, alpha: Int): Shader {
+    private fun gradient(a: Offset, b: Offset, ca: Int, cb: Int, alpha: Int): Brush {
         val argbA = (alpha shl 24) or (ca and 0xFFFFFF)
         val argbB = (alpha shl 24) or (cb and 0xFFFFFF)
-        if (ca == cb || distance(a, b) < 0.01f) return Shader.makeColor(argbA)
-        return Shader.makeLinearGradient(a, b, Gradient(Gradient.Colors(arrayOf(Color4f(argbA), Color4f(argbB)), null, FilterTileMode.CLAMP)))
+        if (ca == cb || distance(a, b) < 0.01f) return SolidColor(Color(argbA))
+        return Brush.linearGradient(listOf(Color(argbA), Color(argbB)), a, b)
     }
 
-    private fun parallelogram(tl: Point, tr: Point, bl: Point) = PathBuilder().use {
-        it.moveTo(tl.x, tl.y)
-            .lineTo(tr.x, tr.y)
-            .lineTo(tr.x + bl.x - tl.x, tr.y + bl.y - tl.y)
-            .lineTo(bl.x, bl.y)
-            .closePath()
-            .detach()
+    private fun parallelogram(tl: Offset, tr: Offset, bl: Offset) = Path().apply {
+        moveTo(tl.x, tl.y)
+        lineTo(tr.x, tr.y)
+        lineTo(tr.x + bl.x - tl.x, tr.y + bl.y - tl.y)
+        lineTo(bl.x, bl.y)
+        close()
     }
 
-    private fun lerp(a: Point, b: Point, t: Float) = Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+    private fun lerp(a: Offset, b: Offset, t: Float) = Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
-    private fun distance(a: Point, b: Point) = hypot(b.x - a.x, b.y - a.y)
+    private fun distance(a: Offset, b: Offset) = hypot(b.x - a.x, b.y - a.y)
 
     private fun lerp(c1: Int, c2: Int, t: Float): Int {
         fun channel(shift: Int) = ((c1 shr shift and 0xFF) + ((c2 shr shift and 0xFF) - (c1 shr shift and 0xFF)) * t).toInt()
@@ -332,6 +378,7 @@ object BlockHighlightRenderer {
     }
 
     private const val LINE_WIDTH_UNIT = 230f
+    private const val FILL_UNIT = 16f
     private const val WHITE = -1
     private const val GRASS_TINT = 0xFF91BD59.toInt() // plains grass colour
 }

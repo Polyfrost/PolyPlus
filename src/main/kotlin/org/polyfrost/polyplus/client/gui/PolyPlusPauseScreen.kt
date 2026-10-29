@@ -36,16 +36,14 @@ import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if > 1.8.9 {
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import net.minecraft.client.gui.components.AbstractButton
 import net.minecraft.client.gui.components.AbstractStringWidget
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.SpriteIconButton
 import net.minecraft.client.gui.screens.PauseScreen
 import net.minecraft.resources.Identifier
-import org.jetbrains.skia.Image as SkiaImage
-import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
-import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.mixin.client.access.AbstractWidgetAccessor
 import org.polyfrost.polyplus.mixin.client.access.SpriteIconButtonAccessor
 import org.polyfrost.polyplus.mixin.client.access.TooltipAccessor
@@ -144,7 +142,7 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
         val location = Identifier.fromNamespaceAndPath(id.namespace, "textures/gui/sprites/${id.path}.png")
         val resource = Minecraft.getInstance().resourceManager.getResource(location).orElse(null)
             ?: return@runCatching null
-        SkiaImage.makeFromEncoded(resource.open().use { it.readBytes() }).toComposeImageBitmap()
+        PolyBitmap.decode(resource.open().use { it.readBytes() })?.asComposeImageBitmap()
     }.getOrNull()
     //?} else {
     /*// 1.8.9's pause menu draws its title in render instead of as a widget, and its buttons are always 20px tall
@@ -161,32 +159,18 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
     }
     *///?}
 
-    // vanilla's GUI blur doesn't reach the Compose layer, so the world is blurred the same way OneConfig's own
-    // screens do it, at the strength set by vanilla's Menu Background Blur option. 1.8.9 has no menu blur.
     // ComposeScreen's resize doesn't re-init, so the hidden screen is caught up to the window size here too,
-    // which also covers GUI scale changes
+    // which also covers GUI scale changes. ComposeScreen's background draws the world blur from blurAlpha
     //? if >= 26.1 {
-    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        blurWorld { if (SkiaCtx.isDeferredComposeBackend) { ctx.nextStratum(); ctx.blurBeforeThisStratum(); SkiaCtx.requestBlurSnapshot() } }
-        super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
-    }
-
     override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (vanilla.width != width || vanilla.height != height) syncVanilla()
+        super.extractBackground(ctx, mouseX, mouseY, tickDelta)
         extractMenuBackground(ctx)
     }
     //?} elif > 1.8.9 {
-    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        //? if >= 1.21.10 {
-        blurWorld { if (SkiaCtx.isDeferredComposeBackend) { ctx.nextStratum(); ctx.blurBeforeThisStratum(); SkiaCtx.requestBlurSnapshot() } }
-        //?} else {
-        /^blurWorld {}
-        ^///?}
-        super.render(ctx, mouseX, mouseY, tickDelta)
-    }
-
-    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (vanilla.width != width || vanilla.height != height) syncVanilla()
+        super.renderBackground(ctx, mouseX, mouseY, tickDelta)
         renderMenuBackground(ctx)
     }
     *///?} else {
@@ -198,12 +182,10 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
     *///?}
 
     //? if > 1.8.9 {
-    private inline fun blurWorld(deferredBlur: () -> Unit) {
-        val blurriness = Minecraft.getInstance().options.menuBackgroundBlurriness
-        if (blurriness <= 0) return
-        deferredBlur()
-        BlurRenderer.drawBlur(blurriness * BLUR_RADIUS_PER_STEP)
-    }
+    // vanilla's Menu Background Blur option sets the strength; its default of 5 is OneConfig's full blur.
+    // 1.8.9 has no menu blur
+    override fun blurAlpha(): Float =
+        (Minecraft.getInstance().options.menuBackgroundBlurriness / DEFAULT_MENU_BLURRINESS).coerceIn(0f, 1f)
 
     override fun isPauseScreen(): Boolean = vanilla.isPauseScreen
 
@@ -260,7 +242,7 @@ private class PauseButton(
 private class PauseIcon(val image: ImageBitmap, val width: Int, val height: Int)
 
 // vanilla's default Menu Background Blur of 5 lands on the radius OneConfig uses for its own fullscreen blur
-private const val BLUR_RADIUS_PER_STEP = 8f / 5f
+private const val DEFAULT_MENU_BLURRINESS = 5f
 
 //? if = 1.8.9 {
 /*private const val LEGACY_TITLE_Y = 40

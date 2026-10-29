@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.gui.preview
 
 //? if > 1.8.9 {
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.polyfrost.compose.backend.asComposeImageBitmap
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.platform.Lighting
@@ -10,8 +10,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.DefaultPlayerSkin
-import org.jetbrains.skia.Image as SkiaImage
-import org.jetbrains.skia.ImageInfo
+import org.polyfrost.compose.render.PolyBitmap
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -340,13 +339,13 @@ object PlayerPreviewRenderer {
                 val si = (srcRow + x) * pixelSize
                 val di = (dstRow + x) * 4
                 val f = fade[x]
-                out[di] = scaleByte(data.get(si + 2).toInt() and 0xFF, f)
-                out[di + 1] = scaleByte(data.get(si + 1).toInt() and 0xFF, f)
-                out[di + 2] = scaleByte(data.get(si).toInt() and 0xFF, f)
+                out[di] = data.get(si)
+                out[di + 1] = data.get(si + 1)
+                out[di + 2] = data.get(si + 2)
                 out[di + 3] = scaleByte(data.get(si + 3).toInt() and 0xFF, f)
             }
         }
-        return SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap()
+        return PolyBitmap(w, h, out).asComposeImageBitmap()
     }
 
     private val mountOpacitySetter: MethodHandle? = runCatching {
@@ -1330,13 +1329,13 @@ object PlayerPreviewRenderer {
                     //val px = img.getPixelRGBA(x, y)
                     val di = (dstRow + x) * 4
                     val f = fade[x]
-                    out[di] = scaleByte((px ushr 16) and 0xFF, f)
-                    out[di + 1] = scaleByte((px ushr 8) and 0xFF, f)
-                    out[di + 2] = scaleByte(px and 0xFF, f)
+                    out[di] = px.toByte()
+                    out[di + 1] = (px ushr 8).toByte()
+                    out[di + 2] = (px ushr 16).toByte()
                     out[di + 3] = scaleByte((px ushr 24) and 0xFF, f)
                 }
             }
-            publish(key) { SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap() }
+            publish(key) { PolyBitmap(w, h, out).asComposeImageBitmap() }
         } finally {
             img.close()
         }
@@ -1346,7 +1345,7 @@ object PlayerPreviewRenderer {
 }
 //?} else {
 /*import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.polyfrost.compose.backend.asComposeImageBitmap
 import net.minecraft.client.Minecraft
 import net.minecraft.client.render.vertex.Tesselator
 import net.minecraft.client.render.model.Model
@@ -1359,8 +1358,7 @@ import net.minecraft.client.render.vertex.DefaultVertexFormat
 import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.resources.Identifier
 import com.mojang.authlib.minecraft.MinecraftProfileTexture
-import org.jetbrains.skia.Image as SkiaImage
-import org.jetbrains.skia.ImageInfo
+import org.polyfrost.compose.render.PolyBitmap
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
@@ -1797,13 +1795,13 @@ object PlayerPreviewRenderer {
                 val f = fadeAlpha((x + 0.5f) / w, ty, true, 0f)
                 val si = (y * w + x) * 4
                 val di = (outRow * w + x) * 4
-                out[di] = scaleByte(data.get(si + 2).toInt() and 0xFF, f)
-                out[di + 1] = scaleByte(data.get(si + 1).toInt() and 0xFF, f)
-                out[di + 2] = scaleByte(data.get(si).toInt() and 0xFF, f)
+                out[di] = data.get(si)
+                out[di + 1] = data.get(si + 1)
+                out[di + 2] = data.get(si + 2)
                 out[di + 3] = scaleByte(data.get(si + 3).toInt() and 0xFF, f)
             }
         }
-        return SkiaImage.makeRaster(ImageInfo.makeN32Premul(w, h), out, w * 4).toComposeImageBitmap()
+        return PolyBitmap(w, h, out).asComposeImageBitmap()
     }
 
     private fun scaleByte(v: Int, f: Float): Byte = (v * f).toInt().coerceAtMost(255).toByte()

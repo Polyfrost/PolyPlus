@@ -112,7 +112,7 @@ object MenuPanorama {
             ctx.fill(0, 0, screen.width, screen.height, BASE_COLOR)
             filledThisFrame = true
         }
-        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop(), screen)
+        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop())
         if (drew) drawnThisPass = true
         return drew
     }
@@ -125,7 +125,7 @@ object MenuPanorama {
             ctx.fill(0, 0, screen.width, screen.height, BASE_COLOR)
             filledThisFrame = true
         }
-        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop(), screen)
+        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop())
         if (drew) drawnThisPass = true
         return drew
     }
@@ -138,7 +138,7 @@ object MenuPanorama {
             GuiElement.fill(0, 0, screen.width, screen.height, BASE_COLOR)
             filledThisFrame = true
         }
-        val drew = MenuBackgroundPass.renderInline(panoramaBackdrop(), screen)
+        val drew = MenuBackgroundPass.renderInline(panoramaBackdrop())
         if (drew) drawnThisPass = true
         return drew
     }
@@ -149,7 +149,7 @@ object MenuPanorama {
         if (!panoramaBackdrop() || !drawLegacyPanorama(width, height)) {
             GuiElement.fill(0, 0, width, height, BASE_COLOR)
         }
-        MenuBackgroundPass.renderInline(panoramaBackdrop(), this)
+        MenuBackgroundPass.renderInline(panoramaBackdrop())
     }
 
     private const val WASH_TOP = 0x80FFFFFF.toInt()

@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -75,7 +76,7 @@ object CosmeticSwatches {
         val file = CosmeticAssetCache.primaryTextureFile(id) ?: return null
         val image = ImageIO.read(file) ?: return null
         return if (definition.type == CosmeticType.Cape) {
-            capeFront(image)?.let { SwatchArt.Picture(it.toComposeImageBitmap()) }
+            capeFront(image)?.let { SwatchArt.Picture(PolyBitmap.fromAwt(it).asComposeImageBitmap()) }
         } else {
             dominantColors(image).takeIf { it.isNotEmpty() }?.let(SwatchArt::Stripes)
         }

@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,7 +46,8 @@ import net.minecraft.world.level.GameType
 import net.minecraft.world.WorldSettings.GameMode as GameType
 import org.polyfrost.polyplus.client.social.setScreen
 *///?}
-import org.jetbrains.skia.Image
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -213,7 +213,7 @@ private fun WorldCard(entry: HostWorldManager.HostWorldEntry, selected: Boolean,
     ) {
         val bitmap = remember(entry.iconBytes) {
             entry.iconBytes?.let { bytes ->
-                runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+                runCatching { PolyBitmap.decode(bytes)!!.asComposeImageBitmap() }.getOrNull()
             }
         }
         if (bitmap != null) {

@@ -13,11 +13,6 @@ import net.minecraft.client.options.GameOptions;
 import org.polyfrost.polyplus.PolyPlusEntrypoint;
 *///?}
 
-//? if >= 26.2 {
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen;
-//?}
-
 @Mixin(value = Minecraft.class, priority = 1500)
 public class MixinMinecraft {
     //? if > 1.8.9 {
@@ -51,24 +46,4 @@ public class MixinMinecraft {
         return controlDown || GameOptions.isPressed(PolyPlusEntrypoint.dropModifier);
     }
     *///?}
-
-    //? if >= 26.2 {
-    @Inject(
-        method = "renderFrame",
-        at = @At(
-            value = "INVOKE",
-            //? if >= 26.3 {
-            target = "Lcom/mojang/renderpearl/api/device/GpuSurface;blitFromTexture(Lcom/mojang/renderpearl/api/commands/CommandEncoder;Lcom/mojang/renderpearl/api/textures/GpuTextureView;)V"
-            //?} else {
-            /*target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
-            *///?}
-        )
-    )
-    private void polyplus$renderPlayerPreviews(CallbackInfo ci) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null) return;
-        RenderTarget rt = mc.gameRenderer.mainRenderTarget();
-        if (rt != null) PlayerPreviewOffscreen.renderAll(rt);
-    }
-    //?}
 }

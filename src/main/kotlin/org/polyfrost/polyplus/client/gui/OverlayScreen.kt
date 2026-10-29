@@ -10,16 +10,11 @@ import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.OneConfigConfig
-import org.polyfrost.oneconfig.internal.ui.compose.BlurRenderer
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?}
-
-//? if >= 1.21.10 {
-import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
 //?}
 
 //? if < 26.1 && > 1.8.9 {
@@ -65,28 +60,22 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
         val current = ClientPlatform.currentScreen()
         if (current == null || current is TitleScreen) ClientPlatform.setScreen(previousScreen)
     }
-
-    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
-        if (inGame() && OneConfigConfig.enableBackgroundBlur) BlurRenderer.drawBlur(worldBlurRadius())
-        super.render(mouseX, mouseY, tickDelta)
-    }
     *///?}
 
     /** Mirrors OneConfig's own fullscreen blur fade-in (see OneConfigUIScreen). */
-    private fun worldBlurRadius(): Float {
+    override fun blurAlpha(): Float {
+        if (!inGame() || !OneConfigConfig.enableBackgroundBlur) return 0f
         val progress = (System.currentTimeMillis() - openedAt).toFloat() / OPEN_ANIMATION_MS
-        return FULLSCREEN_BLUR_RADIUS * progress.coerceIn(0f, 1f)
+        return progress.coerceIn(0f, 1f)
     }
 
     private companion object {
-        private const val FULLSCREEN_BLUR_RADIUS = 8f
         private const val OPEN_ANIMATION_MS = 250L
     }
 
     //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
-            MenuBackgroundPass.enqueue(true)
             renderPanorama(ctx, tickDelta)
             if (firstFrameDrawn) {
                 val gameRenderer = Minecraft.getInstance().gameRenderer
@@ -96,15 +85,7 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
                 /^gameRenderer.processBlurEffect()
                 ^///?}
             }
-        } else if (OneConfigConfig.enableBackgroundBlur) {
-            //? if >= 1.21.10 {
-            /^if (SkiaCtx.isDeferredComposeBackend) {
-                ctx.nextStratum()
-                ctx.blurBeforeThisStratum()
-                SkiaCtx.requestBlurSnapshot()
-            }
-            ^///?}
-            BlurRenderer.drawBlur(worldBlurRadius())
+            MenuBackgroundPass.renderInline(ctx, true)
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
@@ -117,7 +98,6 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
     *///?} else if > 1.8.9 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
-            MenuBackgroundPass.enqueue(true)
             Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
                 .panorama()
@@ -127,13 +107,7 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
                 .extractRenderState(ctx, width, height, true)
                 *///?}
             ctx.blurBeforeThisStratum()
-        } else if (OneConfigConfig.enableBackgroundBlur) {
-            if (SkiaCtx.isDeferredComposeBackend) {
-                ctx.nextStratum()
-                ctx.blurBeforeThisStratum()
-                SkiaCtx.requestBlurSnapshot()
-            }
-            BlurRenderer.drawBlur(worldBlurRadius())
+            MenuBackgroundPass.renderInline(ctx, true)
         }
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }

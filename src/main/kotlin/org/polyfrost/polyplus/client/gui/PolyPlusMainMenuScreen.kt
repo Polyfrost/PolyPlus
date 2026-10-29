@@ -57,7 +57,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -106,8 +105,8 @@ import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.realms.RealmsBridge
 *///?}
 import org.apache.logging.log4j.LogManager
-import org.jetbrains.skia.Image as SkiaImage
-import org.jetbrains.skia.ImageInfo
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -187,8 +186,8 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
-        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         super.render(mouseX, mouseY, tickDelta)
+        MenuBackgroundPass.renderInline(mainMenuPanoramaEnabled())
         firstFrameDrawn = true
     }
     *///?}
@@ -196,7 +195,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
-        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             renderPanorama(ctx, tickDelta)
             if (firstFrameDrawn) {
@@ -208,13 +206,13 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 ^///?}
             }
         }
+        MenuBackgroundPass.renderInline(ctx, mainMenuPanoramaEnabled())
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
     }
     *///?} elif >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
-        MenuBackgroundPass.enqueue(mainMenuPanoramaEnabled())
         if (mainMenuPanoramaEnabled()) {
             Minecraft.getInstance().gameRenderer
                 //? if >= 26.2 {
@@ -226,6 +224,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                 *///?}
             ctx.blurBeforeThisStratum()
         }
+        MenuBackgroundPass.renderInline(ctx, mainMenuPanoramaEnabled())
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
     //?}
@@ -423,7 +422,7 @@ private object MainMenuRasterAssets {
     private fun load(path: String): ImageBitmap? =
         cache[path] ?: runCatching {
             val bytes = PolyPlusMainMenuScreen::class.java.getResourceAsStream("/$path")!!.use { it.readBytes() }
-            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+            PolyBitmap.decode(bytes)!!.asComposeImageBitmap()
         }.getOrNull()?.also { cache[path] = it }
 }
 
@@ -596,14 +595,13 @@ private fun buildFace(skin: BufferedImage): ImageBitmap {
             val hat = runCatching { skin.getRGB(40 + ox, 8 + oy) }.getOrDefault(0)
             val argb = if ((hat ushr 24) != 0) hat else base
             val i = (y * size + x) * 4
-            out[i] = argb.toByte()               // B
+            out[i] = (argb ushr 16).toByte()     // R
             out[i + 1] = (argb ushr 8).toByte()  // G
-            out[i + 2] = (argb ushr 16).toByte() // R
+            out[i + 2] = argb.toByte()           // B
             out[i + 3] = 0xFF.toByte()           // A
         }
     }
-    return SkiaImage.makeRaster(ImageInfo.makeN32Premul(size, size), out, size * 4)
-        .toComposeImageBitmap()
+    return PolyBitmap(size, size, out).asComposeImageBitmap()
 }
 
 private class MenuActions(
@@ -1923,14 +1921,14 @@ private fun RasterImage(
 @Composable
 private fun rememberFavicon(bytes: ByteArray?): ImageBitmap? = remember(bytes) {
     if (bytes == null || bytes.isEmpty()) null
-    else runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+    else runCatching { PolyBitmap.decode(bytes)!!.asComposeImageBitmap() }.getOrNull()
 }
 
 //? if = 1.8.9 {
 /*@Composable
 private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
     if (icon.isNullOrEmpty()) null
-    else runCatching { SkiaImage.makeFromEncoded(Base64.getDecoder().decode(icon)).toComposeImageBitmap() }.getOrNull()
+    else runCatching { PolyBitmap.decode(Base64.getDecoder().decode(icon))!!.asComposeImageBitmap() }.getOrNull()
 }
 *///?}
 

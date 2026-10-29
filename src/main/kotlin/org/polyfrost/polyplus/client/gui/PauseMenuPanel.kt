@@ -1,20 +1,23 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
-import org.polyfrost.oneconfig.internal.ui.compose.SkiaCtx
+import org.polyfrost.compose.backend.PolyCanvas
+import org.polyfrost.compose.backend.asComposeImageBitmap
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-import org.jetbrains.skia.BlendMode
-import org.jetbrains.skia.ColorFilter
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Rect
-import org.jetbrains.skia.SamplingMode
-import org.jetbrains.skia.Image as SkiaImage
 import java.util.WeakHashMap
 import kotlin.math.roundToInt
 
@@ -189,7 +192,7 @@ object PauseMenuPanel {
         return if (minutes < 60) "${minutes}m" else "${minutes / 60}h ${minutes % 60}m"
     }
 
-    // vanilla pause menu: its own buttons, and the preview drawn into it through Skia
+    // vanilla pause menu: its own buttons, and the preview drawn into it through an inline canvas
 
     private fun openSocial(from: Screen) = SocialOverlay.open(from)
 
@@ -322,18 +325,16 @@ object PauseMenuPanel {
         val layout = layouts[screen] ?: return
         // stats arrive a moment after the request, and keep counting while the menu is open
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
-        if (!SkiaCtx.isReady) return
         updateDrag(screen, layout)
-        SkiaCtx.drawComposeBlit(ctx) { drawPreview(screen, layout); drawIcons(screen) }
+        inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     //?} elif > 1.8.9 {
     /*@JvmStatic
     fun render(ctx: GuiGraphics, screen: Screen) {
         val layout = layouts[screen] ?: return
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
-        if (!SkiaCtx.isReady) return
         updateDrag(screen, layout)
-        SkiaCtx.drawComposeBlit(ctx) { drawPreview(screen, layout); drawIcons(screen) }
+        inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     *///?} else {
     /*@JvmStatic
@@ -343,13 +344,12 @@ object PauseMenuPanel {
             if (playtimeDue()) it.message = playtimeLabel()
             it.render(Minecraft.getInstance(), mouseX, mouseY)
         }
-        if (!SkiaCtx.isReady) return
         updateDrag(screen, layout)
-        SkiaCtx.queueHudDraw { drawPreview(screen, layout); drawIcons(screen) }
-        SkiaCtx.drawNow()
-        SkiaCtx.blitHud()
+        inline.draw { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     *///?}
+
+    private val inline = InlineCanvas("pause_menu_panel")
 
     private var playtimeRefreshedAt = 0L
 
@@ -442,36 +442,39 @@ object PauseMenuPanel {
     // vanilla's text shadow: one GUI pixel down-right, at a quarter of white
     private const val ICON_SHADOW = 0xFF3F3F3F.toInt()
 
-    private val iconImages = HashMap<String, SkiaImage?>()
+    private val iconImages = HashMap<String, ImageBitmap?>()
 
-    private fun iconImage(name: String): SkiaImage? = iconImages.getOrPut(name) {
+    private fun iconImage(name: String): ImageBitmap? = iconImages.getOrPut(name) {
         runCatching {
             PauseMenuPanel::class.java.getResourceAsStream("/assets/polyplus/textures/gui/pause/$name.png")
-                ?.use { SkiaImage.makeFromEncoded(it.readBytes()) }
+                ?.use { PolyBitmap.decode(it.readBytes())?.asComposeImageBitmap() }
         }.getOrNull()
     }
 
-    // lazy like the preview, so the object can initialize at startup without touching Skia
-    private val iconPaint by lazy { Paint() }
-    private val iconShadowFilter by lazy { ColorFilter.makeBlend(ICON_SHADOW, BlendMode.SRC_IN) }
-    private val iconSource = Rect.makeWH(ICON_SOURCE_SIZE.toFloat(), ICON_SOURCE_SIZE.toFloat())
+    private val iconPaint by lazy { Paint().apply { filterQuality = FilterQuality.None } }
+    // vanilla's text shadow is the color scaled down, which a multiply by the shadow's grey matches
+    private val iconShadowFilter by lazy {
+        val s = (ICON_SHADOW and 0xFF) / 255f
+        ColorFilter.colorMatrix(ColorMatrix().apply { setToScale(s, s, s, 1f) })
+    }
+    private val iconSource = IntSize(ICON_SOURCE_SIZE, ICON_SOURCE_SIZE)
 
-    private fun drawIcons(screen: Screen) {
+    private fun drawIcons(canvas: PolyCanvas, screen: Screen) {
         val buttonIcons = icons[screen] ?: return
         if (screen.width <= 0) return
-        // Skia draws in framebuffer pixels
+        // the canvas draws in framebuffer pixels
         val scale = Minecraft.getInstance().window.width / screen.width.toFloat()
         for (icon in buttonIcons) {
             val image = iconImage(icon.icon) ?: continue
-            drawIcon(image, icon.x + 1, icon.y + 1, scale, iconShadowFilter)
-            drawIcon(image, icon.x, icon.y, scale, null)
+            drawIcon(canvas, image, icon.x + 1, icon.y + 1, scale, iconShadowFilter)
+            drawIcon(canvas, image, icon.x, icon.y, scale, null)
         }
     }
 
-    private fun drawIcon(image: SkiaImage, x: Int, y: Int, scale: Float, filter: ColorFilter?) {
+    private fun drawIcon(canvas: PolyCanvas, image: ImageBitmap, x: Int, y: Int, scale: Float, filter: ColorFilter?) {
         iconPaint.colorFilter = filter
-        val dst = Rect.makeXYWH(x * scale, y * scale, ICON_SIZE * scale, ICON_SIZE * scale)
-        SkiaCtx.canvas.drawImageRect(image, iconSource, dst, SamplingMode.DEFAULT, iconPaint, true)
+        val size = (ICON_SIZE * scale).roundToInt()
+        canvas.drawImageRect(image, IntOffset.Zero, iconSource, IntOffset((x * scale).roundToInt(), (y * scale).roundToInt()), IntSize(size, size), iconPaint)
     }
 
     private fun textWidth(text: String): Int =
@@ -481,17 +484,17 @@ object PauseMenuPanel {
         /*Minecraft.getInstance().textRenderer.getWidth(text)
         *///?}
 
-    private fun drawPreview(screen: Screen, layout: Layout) {
+    private fun drawPreview(canvas: PolyCanvas, screen: Screen, layout: Layout) {
         if (!layout.showsPreview || screen.width <= 0 || screen.height <= 0) return
         val spec = menuPreviewSpec()
         preview.modelScale = spec.modelScale
         preview.fw = layout.previewWidth / screen.width.toFloat()
         preview.fh = layout.previewHeight / screen.height.toFloat()
-        // Skia draws in framebuffer pixels
+        // the canvas draws in framebuffer pixels
         val scale = Minecraft.getInstance().window.width / screen.width.toFloat()
         PlayerPreviewOffscreen.drawFaded(
             preview,
-            SkiaCtx.canvas,
+            canvas,
             layout.previewX * scale,
             layout.previewY * scale,
             layout.previewWidth * scale,

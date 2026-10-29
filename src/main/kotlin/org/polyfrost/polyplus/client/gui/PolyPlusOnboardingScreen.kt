@@ -61,8 +61,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.skiaCanvas
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -81,13 +80,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
-import org.jetbrains.skia.BlendMode
-import org.jetbrains.skia.Canvas as SkiaCanvas
-import org.jetbrains.skia.ColorFilter
-import org.jetbrains.skia.Image as SkiaImage
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Rect as SkiaRect
-import org.jetbrains.skia.SamplingMode
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import org.polyfrost.compose.backend.drawPoly
+import org.polyfrost.compose.render.FilterQuality
+import org.polyfrost.compose.render.PolyBitmap
+import org.polyfrost.compose.render.PolyColor
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -156,12 +155,11 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     }
 
     override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
-        MenuBackgroundPass.enqueue(true)
         super.render(mouseX, mouseY, tickDelta)
+        MenuBackgroundPass.renderInline(true)
     }
     *///?} elif <26.1 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        MenuBackgroundPass.enqueue(true)
         renderPanorama(ctx, tickDelta)
         if (firstFrameDrawn) {
             val gameRenderer = Minecraft.getInstance().gameRenderer
@@ -171,6 +169,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             /*gameRenderer.processBlurEffect()
             *///?}
         }
+        MenuBackgroundPass.renderInline(ctx, true)
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
     }
@@ -178,7 +177,6 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     *///?} else {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        MenuBackgroundPass.enqueue(true)
         Minecraft.getInstance().gameRenderer
             //? if >= 26.2 {
             .panorama()
@@ -188,6 +186,7 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             .extractRenderState(ctx, width, height, true)
             *///?}
         ctx.blurBeforeThisStratum()
+        MenuBackgroundPass.renderInline(ctx, true)
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
@@ -1569,7 +1568,7 @@ private fun GuideShot(path: String) {
                 .border(1.dp, SocialPanelBorderBrush, shape),
         ) {
             Canvas(Modifier.fillMaxSize()) {
-                drawIntoCanvas { canvas -> canvas.skiaCanvas.drawCover(shot, size.width, size.height) }
+                drawCover(shot, size.width, size.height)
             }
         }
     }
@@ -1752,21 +1751,15 @@ private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
                     sourceWidth = image.width
                     sourceHeight = (sourceWidth / destinationRatio).roundToInt()
                 }
-                val src = SkiaRect.makeXYWH(
-                    (image.width - sourceWidth) / 2f,
-                    (image.height - sourceHeight) / 2f,
-                    sourceWidth.toFloat(),
-                    sourceHeight.toFloat(),
+                val src = Rect(
+                    Offset((image.width - sourceWidth) / 2f, (image.height - sourceHeight) / 2f),
+                    Size(sourceWidth.toFloat(), sourceHeight.toFloat()),
                 )
-                val dst = SkiaRect.makeXYWH(
-                    (size.width - destinationWidth) / 2f,
-                    (size.height - destinationHeight) / 2f,
-                    destinationWidth,
-                    destinationHeight,
+                val dst = Rect(
+                    Offset((size.width - destinationWidth) / 2f, (size.height - destinationHeight) / 2f),
+                    Size(destinationWidth, destinationHeight),
                 )
-                drawIntoCanvas {
-                    UnityMotionBlur.draw(it.skiaCanvas, image, src, dst, SkiaRect.makeWH(size.width, size.height), motion)
-                }
+                UnityMotionBlur.draw(this, image, src, dst, Rect(0f, 0f, size.width, size.height), motion)
             }
         }
     }
@@ -1810,7 +1803,7 @@ private fun CapePreview(enabled: Boolean) {
     }
     Box {
         PreviewFrame {
-            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+            shot?.let { drawCover(it, size.width, size.height) }
         }
         FpsBadge(if (enabled) TOGGLE_ON_FPS else PREVIEW_FPS[0])
     }
@@ -1823,7 +1816,7 @@ private fun SkinLayersPreview(enabled: Boolean) {
     val shot = if (enabled) on else off
     Box {
         PreviewFrame {
-            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+            shot?.let { drawCover(it, size.width, size.height) }
         }
         FpsBadge(if (enabled) TOGGLE_ON_FPS else PREVIEW_FPS[0])
     }
@@ -1836,7 +1829,7 @@ private fun DynamicLightsPreview(mode: Int) {
     val shot = if (mode == OnboardingFeatures.DYNAMIC_LIGHTS_OFF) off else on
     Box {
         PreviewFrame {
-            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+            shot?.let { drawCover(it, size.width, size.height) }
         }
         FpsBadge(PREVIEW_FPS.getOrElse(mode) { PREVIEW_FPS.last() })
     }
@@ -1877,12 +1870,8 @@ private fun GammaPreview(gamma: Float) {
     val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
     val fade by animateFloatAsState((gamma - OnboardingFeatures.GAMMA_MIN) / span, animationSpec = spring())
     PreviewFrame {
-        drawIntoCanvas { canvas ->
-            val skia = canvas.skiaCanvas
-            dark?.let { skia.drawCover(it, size.width, size.height) }
-            val lit = bright ?: return@drawIntoCanvas
-            skia.drawCover(lit, size.width, size.height, fade)
-        }
+        dark?.let { drawCover(it, size.width, size.height) }
+        bright?.let { drawCover(it, size.width, size.height, fade) }
     }
 }
 
@@ -1900,7 +1889,7 @@ private fun BetterGrassPreview(mode: Int) {
     val shot = shots.getOrNull(mode)
     Box {
         PreviewFrame {
-            drawIntoCanvas { canvas -> shot?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+            shot?.let { drawCover(it, size.width, size.height) }
         }
         FpsBadge(PREVIEW_FPS.getOrElse(mode) { PREVIEW_FPS.last() })
     }
@@ -1913,20 +1902,18 @@ private fun FireOverlayPreview(height: Double, opacity: Float) {
     val shift by animateFloatAsState((-height).toFloat(), animationSpec = spring())
     val fade by animateFloatAsState(opacity / OnboardingFeatures.FIRE_OPACITY_MAX, animationSpec = spring())
     PreviewFrame {
-        drawIntoCanvas { canvas -> scene?.let { canvas.skiaCanvas.drawCover(it, size.width, size.height) } }
+        scene?.let { drawCover(it, size.width, size.height) }
         drawRect(SceneShade)
         val flames = fire ?: return@PreviewFrame
-        val frame = SkiaRect.makeWH(flames.width.toFloat(), flames.width.toFloat())
+        val frame = Rect(0f, 0f, flames.width.toFloat(), flames.width.toFloat())
         val dy = (FIRE_BASELINE + shift) * size.height
         for (direction in intArrayOf(-1, 1)) {
-            drawIntoCanvas {
-                it.skiaCanvas.drawPixelArt(
-                    flames,
-                    SkiaRect.makeXYWH(direction * size.width * FIRE_QUAD_OFFSET, dy, size.width, size.height),
-                    frame,
-                    fireTint(fade),
-                )
-            }
+            drawPixelArt(
+                flames,
+                Rect(Offset(direction * size.width * FIRE_QUAD_OFFSET, dy), Size(size.width, size.height)),
+                frame,
+                fireTint(fade),
+            )
         }
     }
 }
@@ -1942,12 +1929,10 @@ private fun BlockHighlightPreview(json: String, block: String, width: Float, hei
     }
     PreviewFrame(width, height) {
         val skia = style ?: return@PreviewFrame
-        drawIntoCanvas {
-            BlockHighlightRenderer.draw(
-                it.skiaCanvas, size.width, size.height, skia, textures,
-                System.currentTimeMillis(), millis * BLOCK_SPIN_PER_MS + BLOCK_SPIN_START,
-            )
-        }
+        BlockHighlightRenderer.draw(
+            this, size.width, size.height, skia, textures,
+            System.currentTimeMillis(), millis * BLOCK_SPIN_PER_MS + BLOCK_SPIN_START,
+        )
     }
 }
 
@@ -1962,12 +1947,8 @@ private fun HorsePreview(opacity: Float) {
         animationSpec = spring(),
     )
     PreviewFrame {
-        drawIntoCanvas { canvas ->
-            val skia = canvas.skiaCanvas
-            scene?.let { skia.drawCover(it, size.width, size.height) }
-            val mount = horse ?: return@drawIntoCanvas
-            skia.drawCover(mount, size.width, size.height, fade)
-        }
+        scene?.let { drawCover(it, size.width, size.height) }
+        horse?.let { drawCover(it, size.width, size.height, fade) }
     }
 }
 
@@ -1979,35 +1960,29 @@ private fun ShieldPreview(height: Float) {
     val shield = remember { loadOnboardingImage(SHIELD_ASSETS + SHIELD_LAYER) }
     val drop by animateFloatAsState(-height, animationSpec = spring())
     PreviewFrame {
-        drawIntoCanvas { canvas ->
-            val skia = canvas.skiaCanvas
-            scene?.let { skia.drawCover(it, size.width, size.height) }
-            val plate = shield ?: return@drawIntoCanvas
-            skia.save()
-            skia.translate(0f, drop * SHIELD_DROP_PER_UNIT * size.height)
-            skia.drawCover(plate, size.width, size.height)
-            skia.restore()
+        scene?.let { drawCover(it, size.width, size.height) }
+        val plate = shield ?: return@PreviewFrame
+        translate(0f, drop * SHIELD_DROP_PER_UNIT * size.height) {
+            drawCover(plate, size.width, size.height)
         }
     }
 }
 
-private fun SkiaCanvas.drawPixelArt(
-    image: SkiaImage,
-    dst: SkiaRect,
-    src: SkiaRect = SkiaRect.makeWH(image.width.toFloat(), image.height.toFloat()),
+private fun DrawScope.drawPixelArt(
+    image: PolyBitmap,
+    dst: Rect,
+    src: Rect = Rect(0f, 0f, image.width.toFloat(), image.height.toFloat()),
     tint: Int? = null,
 ) {
-    if (tint == null) {
-        drawImageRect(image, src, dst, SamplingMode.DEFAULT, null, true)
-        return
-    }
-    Paint().use { paint ->
-        paint.colorFilter = ColorFilter.makeBlend(tint, BlendMode.MODULATE)
-        drawImageRect(image, src, dst, SamplingMode.DEFAULT, paint, true)
+    val w = image.width.toFloat()
+    val h = image.height.toFloat()
+    val color = PolyColor(tint ?: -1)
+    drawPoly {
+        it.image(image, dst.left, dst.top, dst.width, dst.height, src.left / w, src.top / h, src.right / w, src.bottom / h, color, FilterQuality.None)
     }
 }
 
-private fun SkiaCanvas.drawCover(image: SkiaImage, width: Float, height: Float, alpha: Float = 1f) {
+private fun DrawScope.drawCover(image: PolyBitmap, width: Float, height: Float, alpha: Float = 1f) {
     val target = width / height
     val source = image.width.toFloat() / image.height.toFloat()
     val sourceWidth: Int
@@ -2019,25 +1994,17 @@ private fun SkiaCanvas.drawCover(image: SkiaImage, width: Float, height: Float, 
         sourceWidth = image.width
         sourceHeight = (sourceWidth / target).roundToInt()
     }
-    val src = SkiaRect.makeXYWH(
-        (image.width - sourceWidth) / 2f,
-        (image.height - sourceHeight) / 2f,
-        sourceWidth.toFloat(),
-        sourceHeight.toFloat(),
-    )
-    if (alpha >= 1f) {
-        drawImageRect(image, src, SkiaRect.makeWH(width, height), SamplingMode.LINEAR, null, true)
-        return
-    }
-    Paint().use { paint ->
-        paint.color = ((alpha.coerceIn(0f, 1f) * 255).toInt() shl 24) or 0xFFFFFF
-        drawImageRect(image, src, SkiaRect.makeWH(width, height), SamplingMode.LINEAR, paint, true)
-    }
+    val u0 = (image.width - sourceWidth) / 2f / image.width
+    val v0 = (image.height - sourceHeight) / 2f / image.height
+    val u1 = u0 + sourceWidth.toFloat() / image.width
+    val v1 = v0 + sourceHeight.toFloat() / image.height
+    val color = PolyColor(((alpha.coerceIn(0f, 1f) * 255).toInt() shl 24) or 0xFFFFFF)
+    drawPoly { it.image(image, 0f, 0f, width, height, u0, v0, u1, v1, color, FilterQuality.Low) }
 }
 
-private fun loadOnboardingImage(path: String): SkiaImage? = runCatching {
+private fun loadOnboardingImage(path: String): PolyBitmap? = runCatching {
     val bytes = PolyPlusOnboardingScreen::class.java.getResourceAsStream("/$path")!!.use { it.readBytes() }
-    SkiaImage.makeFromEncoded(bytes)
+    PolyBitmap.decode(bytes)
 }.getOrNull()
 
 @Composable
