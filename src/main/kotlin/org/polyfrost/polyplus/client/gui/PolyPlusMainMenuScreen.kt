@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -124,15 +125,12 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.launcher.MicrosoftAuth
-import org.polyfrost.polyplus.client.launcher.MicrosoftAuthException
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.awt.image.BufferedImage
 import java.io.IOException
@@ -148,7 +146,6 @@ import java.util.concurrent.Executors
 import javax.imageio.ImageIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -624,7 +621,6 @@ private class MenuActions(
 internal const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
-private val PageBackground = Color(0xFF11171C)
 private val PanelBackground: Color
     @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
 private val ServerIconBackground = Color(0x33FFFFFF)
@@ -868,7 +864,7 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
             MenuPlayerPreview(Modifier.fillMaxWidth())
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
-            AccountPill(name = playerName())
+            AccountPill(name = playerName(), screen = screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld && PrivacyConsent.allowsOnlineServices()) {
             HostWorldButton(screen)
@@ -1276,132 +1272,19 @@ private fun ServerRow(
 }
 
 @Composable
-private fun AccountPill(name: String) {
-    val scope = rememberCoroutineScope()
+private fun AccountPill(name: String, screen: Screen) {
+    val actions = rememberAccountActions()
     var open by remember { mutableStateOf(false) }
-    var accounts by remember { mutableStateOf<List<OneLauncherAccounts.Account>?>(null) }
-    var busy by remember { mutableStateOf<String?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var errorSteps by remember { mutableStateOf<List<String>?>(null) }
-    var loginSession by remember { mutableStateOf<MicrosoftAuth.MicrosoftLoginSession?>(null) }
-    var loginJob by remember { mutableStateOf<Job?>(null) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
-
-    suspend fun reload() {
-        accounts = withContext(Dispatchers.IO) { OneLauncherAccounts.list() }
+    val accounts = remember(actions.accounts) {
+        actions.accounts?.sortedWith(compareByDescending<OneLauncherAccounts.Account> { it.active }.thenBy { it.username.lowercase() })
     }
+    val busy = actions.busy
 
     LaunchedEffect(open) {
         if (open) {
-            error = null
-            errorSteps = null
-            reload()
-        }
-    }
-
-    val onSwitch: (OneLauncherAccounts.Account) -> Unit = { account ->
-        if (busy == null && !account.active) {
-            scope.launch {
-                busy = "Switching…"
-                error = null
-                errorSteps = null
-                val ok = withContext(Dispatchers.IO) { OneLauncherAccounts.switchTo(account.id) }
-                if (!ok) error = "Couldn't switch to that account"
-                reload()
-                busy = null
-            }
-        }
-    }
-    val onAddMicrosoft: () -> Unit = {
-        if (busy == null) {
-            loginJob = scope.launch {
-                error = null
-                errorSteps = null
-                busy = "Starting Microsoft sign-in…"
-                // cancellation can discard beginLogin's result or skip finishLogin entirely,
-                // so this job owns the session's server until it ends
-                var started: MicrosoftAuth.MicrosoftLoginSession? = null
-                try {
-                    val session = runSuspendCatching {
-                        withContext(Dispatchers.IO) { OneLauncherAccounts.beginLogin().also { started = it } }
-                    }
-                        .onFailure {
-                            error = it.message ?: "Couldn't start sign-in"
-                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
-                        }
-                        .getOrNull()
-                    if (session == null) {
-                        busy = null
-                        loginJob = null
-                        return@launch
-                    }
-                    loginSession = session
-                    ClientPlatform.openUri(session.browserAuthUrl)
-                    busy = "Waiting for you to finish signing in…"
-                    runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.finishLogin(session) } }
-                        .onFailure {
-                            error = it.message ?: "Microsoft sign-in failed"
-                            errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
-                        }
-                } finally {
-                    started?.let { runCatching { OneLauncherAccounts.cancelLogin(it) } }
-                }
-                loginSession = null
-                loginJob = null
-                reload()
-                busy = null
-            }
-        }
-    }
-    val onCancelLogin: () -> Unit = {
-        loginJob?.cancel()
-        loginSession?.let { runCatching { OneLauncherAccounts.cancelLogin(it) } }
-        loginJob = null
-        loginSession = null
-        busy = null
-        error = null
-        errorSteps = null
-    }
-    val onRefresh: (OneLauncherAccounts.Account) -> Unit = { account ->
-        if (busy == null) {
-            scope.launch {
-                busy = "Refreshing session…"
-                error = null
-                errorSteps = null
-                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.refresh(account.id) } }
-                    .onFailure {
-                        error = it.message ?: "Couldn't refresh that account"
-                        errorSteps = (it as? MicrosoftAuthException)?.stepsToFix?.takeIf { steps -> steps.isNotEmpty() }
-                    }
-                reload()
-                busy = null
-            }
-        }
-    }
-    val onAddOffline: (String) -> Unit = { username ->
-        if (busy == null) {
-            scope.launch {
-                busy = "Adding account…"
-                error = null
-                errorSteps = null
-                runSuspendCatching { withContext(Dispatchers.IO) { OneLauncherAccounts.addOffline(username) } }
-                    .onFailure { error = it.message ?: "Couldn't add that account" }
-                reload()
-                busy = null
-            }
-        }
-    }
-    val onRemove: (OneLauncherAccounts.Account) -> Unit = { account ->
-        if (busy == null) {
-            scope.launch {
-                busy = "Removing account…"
-                error = null
-                errorSteps = null
-                val ok = withContext(Dispatchers.IO) { OneLauncherAccounts.remove(account.id) }
-                if (!ok) error = "Couldn't remove that account"
-                reload()
-                busy = null
-            }
+            actions.clearError()
+            actions.reload()
         }
     }
 
@@ -1461,27 +1344,14 @@ private fun AccountPill(name: String) {
                     panelWidth = with(LocalDensity.current) { pillSize.width.toDp() },
                     accounts = accounts,
                     busy = busy,
-                    error = error,
-                    errorSteps = errorSteps,
-                    loginSession = loginSession,
-                    onSwitch = onSwitch,
-                    onRemove = onRemove,
-                    onRefresh = onRefresh,
-                    onAddMicrosoft = onAddMicrosoft,
-                    onCancelLogin = onCancelLogin,
-                    onAddOffline = onAddOffline,
+                    error = actions.error,
+                    errorSteps = actions.errorSteps,
+                    onSwitch = actions::switchTo,
+                    onRemove = actions::remove,
+                    onRefresh = actions::refresh,
+                    screen = screen,
                 )
             }
-        }
-        val session = loginSession
-        if (session != null) {
-            MicrosoftLoginPopup(
-                code = session.userCode,
-                verificationUri = session.verificationUri,
-                browserAuthUrl = session.browserAuthUrl,
-                status = busy,
-                onCancel = onCancelLogin,
-            )
         }
     }
 }
@@ -1493,22 +1363,18 @@ private fun AccountSwitcherPanel(
     busy: String?,
     error: String?,
     errorSteps: List<String>?,
-    loginSession: MicrosoftAuth.MicrosoftLoginSession?,
     onSwitch: (OneLauncherAccounts.Account) -> Unit,
     onRemove: (OneLauncherAccounts.Account) -> Unit,
     onRefresh: (OneLauncherAccounts.Account) -> Unit,
-    onAddMicrosoft: () -> Unit,
-    onCancelLogin: () -> Unit,
-    onAddOffline: (String) -> Unit,
+    screen: Screen,
 ) {
-    var offlineEntry by remember { mutableStateOf(false) }
     val idle = busy == null
 
     Column(
         modifier = Modifier
             .width(panelWidth)
             .clip(PanelShape)
-            .background(PageBackground.copy(alpha = 0.96f))
+            .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
             .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1558,56 +1424,43 @@ private fun AccountSwitcherPanel(
 
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SocialPanelBorderBrush))
 
-        if (offlineEntry) {
-            OfflineAccountEntry(
-                enabled = idle,
-                onSubmit = { username ->
-                    offlineEntry = false
-                    onAddOffline(username)
-                },
-                onCancel = { offlineEntry = false },
-            )
-        } else {
-            AddAccountButton(
-                icon = ASSETS + "log-in-04.svg",
-                text = "Add Microsoft account",
-                enabled = idle,
-                onClick = onAddMicrosoft,
-            )
-            AddAccountButton(
-                icon = ASSETS + "user-01.svg",
-                text = "Add offline account",
-                enabled = idle,
-                onClick = { offlineEntry = true },
-            )
-        }
+        AddAccountButton(
+            icon = ASSETS + "users-01.svg",
+            text = "Manage accounts",
+            enabled = idle,
+            onClick = { ClientPlatform.setScreen(AccountSwitcherScreen(screen)) },
+        )
+        AccountStatusText(busy, error, errorSteps)
+    }
+}
 
-        if (busy != null) {
-            SocialText(busy, fontSize = 12.sp, color = SocialTextSecondary, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
-        }
-        if (error != null) {
-            SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
-        }
-        if (!errorSteps.isNullOrEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                SocialText(
-                    "What you can do:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.align(Alignment.Start),
-                    textAlign = TextAlign.Center,
-                )
-                errorSteps.forEach { step ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        SocialText("•", fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                        SocialText(step, fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                    }
+@Composable
+internal fun ColumnScope.AccountStatusText(busy: String?, error: String?, errorSteps: List<String>?) {
+//    if (busy != null) {
+//        SocialText(busy, fontSize = 12.sp, color = SocialTextSecondary, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
+//    }
+    if (error != null) {
+        SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
+    }
+    if (!errorSteps.isNullOrEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            SocialText(
+                "What you can do:",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                textAlign = TextAlign.Center,
+            )
+            errorSteps.forEach { step ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    SocialText("•", fontSize = 12.sp, color = SocialTextSecondary,  textAlign = TextAlign.Center)
+                    SocialText(step, fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
                 }
             }
         }
@@ -1615,7 +1468,7 @@ private fun AccountSwitcherPanel(
 }
 
 @Composable
-private fun AccountRow(
+internal fun AccountRow(
     account: OneLauncherAccounts.Account,
     enabled: Boolean,
     onClick: () -> Unit,
@@ -1695,7 +1548,7 @@ private fun AccountRow(
 }
 
 @Composable
-private fun AddAccountButton(
+fun AddAccountButton(
     icon: String,
     text: String,
     enabled: Boolean,
@@ -1705,12 +1558,12 @@ private fun AddAccountButton(
     val hovered by interaction.collectIsHoveredAsState()
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .clip(ppShape(8.dp))
             .background(if (hovered && enabled) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
             .alpha(if (enabled) 1f else 0.5f)
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1721,55 +1574,7 @@ private fun AddAccountButton(
 }
 
 @Composable
-private fun OfflineAccountEntry(
-    enabled: Boolean,
-    onSubmit: (String) -> Unit,
-    onCancel: () -> Unit,
-) {
-    var value by remember { mutableStateOf("") }
-    val bodyFont = OneConfigTheme.current.fontFamily
-    val valid = value.trim().length in 3..16
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(34.dp)
-                .clip(ppShape(6.dp))
-                .background(OneConfigTheme.current.componentBackground.copy(alpha = 0.5f))
-                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ppShape(6.dp))
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            BasicTextField(
-                value = value,
-                onValueChange = { if (it.length <= 16) value = it },
-                modifier = Modifier.trackTextInputFocus(),
-                singleLine = true,
-                enabled = enabled,
-                textStyle = TextStyle(color = SocialTextPrimary, fontSize = 13.sp, fontFamily = bodyFont),
-                cursorBrush = SolidColor(OneConfigTheme.accent),
-                decorationBox = { inner ->
-                    if (value.isEmpty()) {
-                        SocialText("Username", fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                    }
-                    inner()
-                },
-            )
-        }
-        AccountActionIcon(ASSETS + "check-circle.svg", SocialSuccessColor, enabled && valid) {
-            if (valid) onSubmit(value.trim())
-        }
-        AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled, onCancel)
-    }
-}
-
-@Composable
-private fun MicrosoftLoginPopup(
+internal fun MicrosoftLoginPopup(
     code: String,
     verificationUri: String,
     browserAuthUrl: String,
@@ -1781,9 +1586,10 @@ private fun MicrosoftLoginPopup(
             modifier = Modifier
                 .width(380.dp)
                 .clip(PanelShape)
-                .background(PageBackground.copy(alpha = 0.96f))
+                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
                 .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
                 .swallowClicks()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -1866,6 +1672,87 @@ private fun MicrosoftLoginPopup(
 }
 
 @Composable
+internal fun OfflineAccountPopup(
+    busy: String?,
+    error: String?,
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var username by remember { mutableStateOf("") }
+    val trimmed = username.trim()
+    val validChars = trimmed.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }
+    val valid = trimmed.length in 3..16 && validChars
+    val idle = busy == null
+    // the error belongs to the last name tried, so hide it once the user edits
+    var submitted by remember { mutableStateOf<String?>(null) }
+    val submit = {
+        if (valid && idle) {
+            submitted = trimmed
+            onSubmit(trimmed)
+        }
+    }
+
+    SocialModalScrim({ if (idle) onCancel() }) {
+        Column(
+            modifier = Modifier
+                .width(380.dp)
+                .clip(PanelShape)
+                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
+                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
+                .swallowClicks()
+                .padding(horizontal = 22.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            SocialText("Add offline account", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
+            SocialTextField(
+                value = username,
+                onValueChange = { username = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = "Username",
+                leadingIcon = ASSETS + "user-01.svg",
+                maxLength = 16,
+                onSubmit = submit,
+            )
+            val hint = when {
+                error != null && submitted == trimmed -> error
+                trimmed.isNotEmpty() && !validChars -> "Only letters, digits, and underscores"
+                trimmed.isNotEmpty() && trimmed.length < 3 -> "At least 3 characters"
+                else -> null
+            }
+            if (hint != null) {
+                SocialText(hint, fontSize = 12.sp, color = SocialDangerColor, textAlign = TextAlign.Center)
+            }
+            if (busy != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    LoadingSpinner(Modifier.size(14.dp))
+                    SocialText(busy, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LoginModalButton(
+                    label = "Cancel",
+                    icon = ASSETS + "x-close.svg",
+                    filled = false,
+                    modifier = Modifier.weight(1f).alpha(if (idle) 1f else 0.5f),
+                    onClick = { if (idle) onCancel() },
+                )
+                LoginModalButton(
+                    label = "Add account",
+                    icon = ASSETS + "plus.svg",
+                    filled = true,
+                    modifier = Modifier.weight(1f).alpha(if (valid && idle) 1f else 0.5f),
+                    onClick = submit,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LoginModalButton(
     label: String,
     icon: String,
@@ -1909,7 +1796,7 @@ private fun LoadingSpinner(modifier: Modifier) {
 }
 
 @Composable
-private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
+internal fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(30.dp)
@@ -2051,7 +1938,7 @@ private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
 private fun rememberRaster(path: String): ImageBitmap? =
     if (MainMenuRasterAssets.ready) MainMenuRasterAssets.cached(path) else null
 
-private fun playerName(): String = runCatching {
+fun playerName(): String = runCatching {
     Minecraft.getInstance().user.name
 }.getOrDefault("Player")
 
