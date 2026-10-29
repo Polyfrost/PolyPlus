@@ -5,3 +5,4 @@
 - Added an optional Poly+ pause menu, enabled in the Main Menu settings
 - Changed wWaypoints toast titles to always mention wWaypoints
 - Removed wWaypoints toasts for its sharing backend dropping and reconnecting
+- Fixed Poly+'s icon being cut off in Mod Menu and launchers
