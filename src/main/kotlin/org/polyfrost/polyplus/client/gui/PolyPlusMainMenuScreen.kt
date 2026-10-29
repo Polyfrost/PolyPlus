@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -620,7 +621,7 @@ private class MenuActions(
     val connect: (ServerData) -> Unit,
 )
 
-private const val ASSETS = "assets/polyplus/mainmenu/"
+internal const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 private val PageBackground = Color(0xFF11171C)
@@ -864,23 +865,7 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!PolyPlusMainMenuConfig.hideMainMenuPlayerPreview) {
-        val hasHeadCosmetic = CosmeticCatalog
-            .localEquipped().equipped
-            .containsKey(BodySlot.Hat)
-        val previewHeight = if (hasHeadCosmetic) 270.dp else 210.dp
-        val previewScale = if (hasHeadCosmetic) 0.82f else 1.05f
-        val previewFadeStart = if (hasHeadCosmetic) 0.784f else 0.72243f
-        Box(modifier = Modifier.fillMaxWidth().height(previewHeight)) {
-            PlayerPreview(
-                Modifier.fillMaxWidth().height(previewHeight),
-                source = PlayerPreviewSource.LocalLive,
-                modelScale = previewScale,
-                verticalAnchor = 1.0f,
-                initialYaw = 180f + 22.9f,
-                live = true,
-                bottomFadeFraction = 1f - previewFadeStart,
-            )
-        }
+            MenuPlayerPreview(Modifier.fillMaxWidth())
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
             AccountPill(name = playerName())
@@ -889,28 +874,66 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
             HostWorldButton(screen)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuSocial && PrivacyConsent.allowsOnlineServices()) {
-            val groups by GroupsRepository.groups.collectAsState()
-            PillButton(
-                "Social",
-                ASSETS + "message-chat-circle.svg",
-                Modifier.fillMaxWidth(),
-                onClick = { SocialOverlay.open(screen) },
-                badge = groups.any { it.unread },
-            )
+            SocialPill(screen, Modifier.fillMaxWidth())
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics) {
-            PillButton(
-                "Wardrobe",
-                ASSETS + "diamond-01.svg",
-                Modifier.fillMaxWidth(),
-                onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
-            )
+            WardrobePill(Modifier.fillMaxWidth())
         }
     }
 }
 
+/** Sizing of the title screen's player preview, which grows to fit a hat cosmetic. */
+internal class MenuPreviewSpec(val height: Dp, val modelScale: Float, val fadeStart: Float)
+
+internal fun menuPreviewSpec(): MenuPreviewSpec {
+    val hasHeadCosmetic = CosmeticCatalog
+        .localEquipped().equipped
+        .containsKey(BodySlot.Hat)
+    return if (hasHeadCosmetic) MenuPreviewSpec(270.dp, 0.82f, 0.784f) else MenuPreviewSpec(210.dp, 1.05f, 0.72243f)
+}
+
+internal const val MENU_PREVIEW_YAW = 180f + 22.9f
+
 @Composable
-private fun HostWorldButton(screen: Screen) {
+internal fun MenuPlayerPreview(modifier: Modifier) {
+    val spec = menuPreviewSpec()
+    Box(modifier = modifier.height(spec.height)) {
+        PlayerPreview(
+            Modifier.fillMaxWidth().height(spec.height),
+            source = PlayerPreviewSource.LocalLive,
+            modelScale = spec.modelScale,
+            verticalAnchor = 1.0f,
+            initialYaw = MENU_PREVIEW_YAW,
+            live = true,
+            bottomFadeFraction = 1f - spec.fadeStart,
+        )
+    }
+}
+
+@Composable
+internal fun SocialPill(screen: Screen, modifier: Modifier) {
+    val groups by GroupsRepository.groups.collectAsState()
+    PillButton(
+        "Social",
+        ASSETS + "message-chat-circle.svg",
+        modifier,
+        onClick = { SocialOverlay.open(screen) },
+        badge = groups.any { it.unread },
+    )
+}
+
+@Composable
+internal fun WardrobePill(modifier: Modifier) {
+    PillButton(
+        "Wardrobe",
+        ASSETS + "diamond-01.svg",
+        modifier,
+        onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
+    )
+}
+
+@Composable
+internal fun HostWorldButton(screen: Screen, modifier: Modifier = Modifier.fillMaxWidth()) {
     var showFlow by remember { mutableStateOf(false) }
     var hostingCurrentWorld by remember { mutableStateOf(false) }
     val friends by FriendsRepository.friends.collectAsState()
@@ -919,7 +942,7 @@ private fun HostWorldButton(screen: Screen) {
         runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
     }
 
-    Box(Modifier.fillMaxWidth()) {
+    Box(modifier) {
         PillButton(
             label = "Host World",
             icon = ASSETS + "log-in-04.svg",
@@ -1160,16 +1183,21 @@ private fun FooterBrandText(platform: String) {
 }
 
 @Composable
-private fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, borderBrush: Brush = SocialPanelBorderBrush, badge: Boolean = false) {
+internal fun Modifier.pillSurface(onClick: (() -> Unit)?, borderBrush: Brush = SocialPanelBorderBrush, enabled: Boolean = true): Modifier =
+    clip(PanelShape)
+        .background(PanelBackground)
+        .border(SocialPanelBorderWidth, borderBrush, PanelShape)
+        .alpha(if (enabled) 1f else 0.5f)
+        .then(if (enabled && onClick != null) Modifier.clickableWithSound(onClick) else Modifier)
+
+@Composable
+internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, borderBrush: Brush = SocialPanelBorderBrush, badge: Boolean = false) {
     Box(modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(45.dp)
-                .clip(PanelShape)
-                .background(PanelBackground)
-                .border(SocialPanelBorderWidth, borderBrush, PanelShape)
-                .clickableWithSound(onClick)
+                .pillSurface(onClick, borderBrush)
                 .padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
@@ -1894,7 +1922,7 @@ private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onCl
     }
 }
 
-private enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
+internal enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
 
 @Composable
 private fun IconButton(
@@ -1918,46 +1946,51 @@ private fun IconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-        if (tooltip != null && hovered) {
-            val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-            val positionProvider = remember(gap, tooltipPlacement) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset = when (tooltipPlacement) {
-                        TooltipPlacement.BELOW_END ->
-                            IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
-                        TooltipPlacement.ABOVE_CENTER -> IntOffset(
-                            anchorBounds.center.x - popupContentSize.width / 2,
-                            anchorBounds.top - gap - popupContentSize.height,
-                        )
-                    }
-                }
-            }
-            Popup(
-                popupPositionProvider = positionProvider,
-                properties = PopupProperties(focusable = false, clippingEnabled = false),
-            ) {
-                TooltipBubble(tooltip)
+        if (tooltip != null && hovered) HoverTooltip(tooltip, tooltipPlacement)
+    }
+}
+
+/** A tooltip bubble placed against the composable it's called in, wrapping at [maxWidth]. */
+@Composable
+internal fun HoverTooltip(text: String, placement: TooltipPlacement, maxWidth: Dp = Dp.Unspecified) {
+    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
+    val positionProvider = remember(gap, placement) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset = when (placement) {
+                TooltipPlacement.BELOW_END ->
+                    IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
+                TooltipPlacement.ABOVE_CENTER -> IntOffset(
+                    anchorBounds.center.x - popupContentSize.width / 2,
+                    anchorBounds.top - gap - popupContentSize.height,
+                )
             }
         }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        TooltipBubble(text, maxWidth)
     }
 }
 
 @Composable
-private fun TooltipBubble(text: String) {
+private fun TooltipBubble(text: String, maxWidth: Dp) {
     Box(
         modifier = Modifier
+            .widthIn(max = maxWidth)
             .clip(PanelShape)
             .background(OneConfigTheme.current.popupBackground)
             .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, PanelShape)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        SocialText(text, fontSize = 13.sp, maxLines = 1, textAlign = TextAlign.Center)
+        SocialText(text, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 
