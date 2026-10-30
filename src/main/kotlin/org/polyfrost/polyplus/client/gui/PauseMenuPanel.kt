@@ -100,20 +100,26 @@ object PauseMenuPanel {
      * Host World sits under the preview, on the row above Social. Settings and playtime mirror the column on the
      * other side of the menu, from [menuLeft], when it fits: Settings on the last row beside the quit button and
      * playtime on the row above it.
+     * [onLeft] puts the column on the left side instead, keeping to the screen's left edge, without Settings and playtime.
      */
-    fun layout(screenWidth: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>): Layout? {
+    fun layout(screenWidth: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
         if (!PolyPlusMainMenuConfig.pauseMenuPlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
-        val room = screenWidth - menuRight - MENU_GAP
-        val rightWidth = minOf(WIDTH, room - MIN_EDGE_MARGIN)
-        if (rightWidth < MIN_WIDTH) return null
+        val rightRoom = screenWidth - menuRight - MENU_GAP
+        val rightWidth = minOf(WIDTH, rightRoom - MIN_EDGE_MARGIN)
         val leftRoom = menuLeft - MENU_GAP
         val leftWidth = minOf(WIDTH, leftRoom - MIN_EDGE_MARGIN)
         val leftFits = leftWidth >= MIN_WIDTH
         // integer centering can leave the menu a pixel off center, so both columns take the narrower side's width
-        val width = if (leftFits) minOf(rightWidth, leftWidth) else rightWidth
-        val x = screenWidth - width - (room - width).coerceAtMost(EDGE_MARGIN)
-        val leftX = if (leftFits) (leftRoom - width).coerceAtMost(EDGE_MARGIN) else null
+        val width = when {
+            onLeft -> leftWidth
+            leftFits -> minOf(rightWidth, leftWidth)
+            else -> rightWidth
+        }
+        if (width < MIN_WIDTH) return null
+        val edgeMargin = ((if (onLeft) leftRoom else rightRoom) - width).coerceAtMost(EDGE_MARGIN)
+        val x = if (onLeft) edgeMargin else screenWidth - width - edgeMargin
+        val leftX = if (!onLeft && leftFits) (leftRoom - width).coerceAtMost(EDGE_MARGIN) else null
 
         val social = PrivacyConsent.allowsOnlineServices()
         val rows = menuRowsY.distinct().sorted()
@@ -223,20 +229,42 @@ object PauseMenuPanel {
     // the Compose pause menu mirrors a hidden vanilla one, which must not get these buttons too
     private fun vanillaMenuShown(): Boolean = !PolyPlusMainMenuConfig.usePolyPlusPauseMenu
 
+    // Essential's pause menu adds proxy Buttons for the player and buttons it draws on either side of the menu
+    fun isEssentialWidget(widget: Any): Boolean = widget.javaClass.name.startsWith("gg.essential.")
+
+    // Essential's left side bar: its player and the Wardrobe button under it
+    private val ESSENTIAL_LEFT_SIDE_BAR = setOf("player", "wardrobe_2")
+
     //? if > 1.8.9 {
+    // Essential takes an element off the screen once its proxy is hidden, as it does for FancyMenu.
+    // shortcut: a running cosmetics sale keeps its banner, which Essential parents to the side bar itself
+    private fun hideEssentialLeftSideBar(proxies: List<AbstractButton>) {
+        for (proxy in proxies) {
+            val id = runCatching { proxy.javaClass.getMethod("getEssentialId").invoke(proxy) as String }.getOrNull()
+            if (id !in ESSENTIAL_LEFT_SIDE_BAR) continue
+            proxy.visible = false
+            proxy.active = false
+        }
+    }
+
     fun register() {
         ScreenEvents.AFTER_INIT.register { _, screen, _, _ ->
             if (screen !is PauseScreen || !screen.showsPauseMenu() || !vanillaMenuShown()) return@register
-            val menuButtons = screen.children().filterIsInstance<AbstractButton>().filter { it.visible }
+            val (essentialProxies, menuButtons) = screen.children().filterIsInstance<AbstractButton>()
+                .filter { it.visible }
+                .partition(::isEssentialWidget)
             val menuLeft = menuButtons.minOfOrNull { it.x } ?: return@register
             val menuRight = menuButtons.maxOf { it.x + it.width }
-            val layout = layout(screen.width, menuLeft, menuRight, menuButtons.map { it.y })
+            // Essential's own bar is on the right, so the player goes in place of Essential's on the left
+            val withEssential = essentialProxies.isNotEmpty()
+            val layout = layout(screen.width, menuLeft, menuRight, menuButtons.map { it.y }, onLeft = withEssential)
             if (layout == null) {
                 layouts.remove(screen)
                 icons.remove(screen)
                 return@register
             }
             layouts[screen] = layout
+            if (withEssential) hideEssentialLeftSideBar(essentialProxies)
             val access = screen as ScreenAccessor
             val buttonIcons = mutableListOf<ButtonIcon>()
             fun addIconButton(text: String, icon: String, x: Int, y: Int, onPress: () -> Unit) {
