@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.apache.logging.log4j.LogManager
 import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
@@ -52,11 +53,14 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
  * buttons in both the vanilla and the Compose pause menu. Layout is in vanilla GUI pixels.
  */
 object PauseMenuPanel {
+    private val LOGGER = LogManager.getLogger()
+
     // a 20px vanilla button comes out at the title screen's 45dp pill height
     const val DP_PER_GUI_PIXEL = 45f / 20f
 
     // the title screen's 300dp right column and its 50dp edge padding
     const val WIDTH = 133
+    private const val BUTTON_WIDTH = 112
     private const val EDGE_MARGIN = 22
 
     const val BUTTON_HEIGHT = 20
@@ -86,7 +90,9 @@ object PauseMenuPanel {
         val hostWorldY: Int?,
         val leftX: Int?,
         val playtimeY: Int,
+        val onLeft: Boolean,
     ) {
+        val playtimeX: Int? get() = if (onLeft) x else leftX
         val previewScale: Float get() = previewWidth / WIDTH.toFloat()
         val showsPreview: Boolean get() = previewWidth > 0 && previewHeight > 0
     }
@@ -94,15 +100,16 @@ object PauseMenuPanel {
     /**
      * Null when the panel is off or there isn't room for it to the right of the menu's buttons. The column keeps to
      * the screen's right edge like the title screen's, and at high GUI scales, where the vanilla menu takes most
-     * of the screen, it narrows and its edge margin shrinks to fit. Without room above the buttons the preview is
-     * left out and the buttons stay.
-     * Social and Wardrobe sit on the same rows as the menu's last two rows, given as [menuRowsY].
+     * of the screen, it narrows and its edge margin shrinks to fit. The preview and buttons are centered together on
+     * the screen's height, and the preview shrinks or is left out when there isn't room for it.
+     * Social and Wardrobe are spaced like the menu's last two rows, given as [menuRowsY].
      * Host World sits under the preview, on the row above Social. Settings and playtime mirror the column on the
-     * other side of the menu, from [menuLeft], when it fits: Settings on the last row beside the quit button and
-     * playtime on the row above it.
-     * [onLeft] puts the column on the left side instead, keeping to the screen's left edge, without Settings and playtime.
+     * other side of the menu, from [menuLeft], when it fits: Settings level with Wardrobe and playtime on the row
+     * above it.
+     * [onLeft] puts the column on the left side instead, keeping to the screen's left edge, without Settings and with
+     * playtime as its top row, right under the preview.
      */
-    fun layout(screenWidth: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
+    fun layout(screenWidth: Int, screenHeight: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
         if (!PolyPlusMainMenuConfig.pauseMenuPlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
         val rightRoom = screenWidth - menuRight - MENU_GAP
@@ -111,11 +118,12 @@ object PauseMenuPanel {
         val leftWidth = minOf(WIDTH, leftRoom - MIN_EDGE_MARGIN)
         val leftFits = leftWidth >= MIN_WIDTH
         // integer centering can leave the menu a pixel off center, so both columns take the narrower side's width
-        val width = when {
+        val columnWidth = when {
             onLeft -> leftWidth
             leftFits -> minOf(rightWidth, leftWidth)
             else -> rightWidth
         }
+        val width = minOf(BUTTON_WIDTH, columnWidth)
         if (width < MIN_WIDTH) return null
         val edgeMargin = ((if (onLeft) leftRoom else rightRoom) - width).coerceAtMost(EDGE_MARGIN)
         val x = if (onLeft) edgeMargin else screenWidth - width - edgeMargin
@@ -140,15 +148,20 @@ object PauseMenuPanel {
         val hostWorld = social && singleplayer && !menuHostsWorld
         // one row above Social, right under the preview. not the menu's own row there: 1.8.9 leaves a blank row above Options
         val hostWorldY = if (hostWorld && socialY != null) socialY - VANILLA_ROW_STEP else null
-        val topButtonY = hostWorldY ?: socialY ?: lastRow
+        val buttonsTopY = hostWorldY ?: socialY ?: lastRow
+        val playtimeY = if (onLeft) buttonsTopY - VANILLA_ROW_STEP else secondLastRow
+        val topButtonY = if (onLeft) playtimeY else buttonsTopY
 
-        // the title screen's preview at this column width, shrunk further if it would run off the top
+        // the title screen's preview at this column width, shrunk further if the column wouldn't fit the screen's height
         val fullHeight = menuPreviewSpec().height.value / DP_PER_GUI_PIXEL
-        val headroom = topButtonY - PREVIEW_GAP - TOP_MARGIN
-        val scale = minOf(width / WIDTH.toFloat(), headroom / fullHeight).coerceAtLeast(0f)
+        val buttonsHeight = lastRow + BUTTON_HEIGHT - topButtonY
+        val headroom = screenHeight - 2 * TOP_MARGIN - buttonsHeight - PREVIEW_GAP
+        val scale = minOf(columnWidth / WIDTH.toFloat(), headroom / fullHeight).coerceAtLeast(0f)
         val previewWidth = (WIDTH * scale).roundToInt()
         val previewHeight = (fullHeight * scale).roundToInt()
-        val previewY = topButtonY - PREVIEW_GAP - previewHeight
+        val previewY = (screenHeight - previewHeight - PREVIEW_GAP - buttonsHeight) / 2
+        // the rows above are relative to the menu's, so move them all to where the centered column puts the top one
+        val rowOffset = previewY + previewHeight + PREVIEW_GAP - topButtonY
         return Layout(
             x = x,
             width = width,
@@ -156,11 +169,12 @@ object PauseMenuPanel {
             previewY = previewY,
             previewWidth = previewWidth,
             previewHeight = previewHeight,
-            socialY = socialY,
-            wardrobeY = lastRow,
-            hostWorldY = hostWorldY,
+            socialY = socialY?.plus(rowOffset),
+            wardrobeY = lastRow + rowOffset,
+            hostWorldY = hostWorldY?.plus(rowOffset),
             leftX = leftX,
-            playtimeY = secondLastRow,
+            playtimeY = playtimeY + rowOffset,
+            onLeft = onLeft,
         )
     }
 
@@ -236,8 +250,32 @@ object PauseMenuPanel {
     private val ESSENTIAL_LEFT_SIDE_BAR = setOf("player", "wardrobe_2")
 
     //? if > 1.8.9 {
-    // Essential takes an element off the screen once its proxy is hidden, as it does for FancyMenu.
-    // shortcut: a running cosmetics sale keeps its banner, which Essential parents to the side bar itself
+    private val essentialFlagsHidden = WeakHashMap<Screen, Unit>()
+
+    /**
+     * The side bar's sale and NEW flags have no proxies, so this takes away the container holding them and the side bar,
+     * once Essential has built it on the screen's first frames. The names are Essential's own, so if it renames them
+     * the flags just stay.
+     * shortcut: not restored if a resize then leaves the panel no room, until the menu is reopened. rare, and only cosmetic
+     */
+    private fun hideEssentialFlags(screen: Screen) {
+        if (screen in essentialFlagsHidden) return
+        // accessible because Essential's Layer implementation is package-private
+        fun Any.call(method: String): Any? = javaClass.getMethod(method).apply { isAccessible = true }.invoke(this)
+        fun Any.children(): List<Any> = (call("getChildren") as List<*>).filterNotNull()
+        try {
+            val layer = screen.call("essential\$getProxyHandler")?.call("getLayer") ?: return
+            val container = layer.call("getWindow")!!.children().firstOrNull { child ->
+                child.children().any { it.javaClass.name == "gg.essential.gui.menu.LeftSideBar" }
+            } ?: return
+            container.javaClass.getMethod("hide", Boolean::class.javaPrimitiveType).invoke(container, true)
+        } catch (e: ReflectiveOperationException) {
+            LOGGER.warn("Couldn't hide Essential's pause menu flags", e)
+        }
+        essentialFlagsHidden[screen] = Unit
+    }
+
+    // Essential takes an element off the screen once its proxy is hidden, as it does for FancyMenu
     private fun hideEssentialLeftSideBar(proxies: List<AbstractButton>) {
         for (proxy in proxies) {
             val id = runCatching { proxy.javaClass.getMethod("getEssentialId").invoke(proxy) as String }.getOrNull()
@@ -257,7 +295,7 @@ object PauseMenuPanel {
             val menuRight = menuButtons.maxOf { it.x + it.width }
             // Essential's own bar is on the right, so the player goes in place of Essential's on the left
             val withEssential = essentialProxies.isNotEmpty()
-            val layout = layout(screen.width, menuLeft, menuRight, menuButtons.map { it.y }, onLeft = withEssential)
+            val layout = layout(screen.width, screen.height, menuLeft, menuRight, menuButtons.map { it.y }, onLeft = withEssential)
             if (layout == null) {
                 layouts.remove(screen)
                 icons.remove(screen)
@@ -280,15 +318,15 @@ object PauseMenuPanel {
                 addIconButton(Component.translatable("polyplus.hostWorld").string, "host-world", layout.x, y) { openHostWorld(screen) }
             }
             icons[screen] = buttonIcons
-            val leftX = layout.leftX
-            if (leftX == null) {
+            layout.leftX?.let { addIconButton("Settings", "settings", it, layout.wardrobeY) { openSettings() } }
+            val playtimeX = layout.playtimeX
+            if (playtimeX == null) {
                 playtimeButtons.remove(screen)
                 return@register
             }
-            addIconButton("Settings", "settings", leftX, layout.wardrobeY) { openSettings() }
             // render-only, so it draws and highlights like the buttons around it but never gets the click or its sound
             playtimeButtons[screen] = access.polyplusAddRenderableOnly(
-                Button.builder(Component.literal(playtimeLabel())) {}.bounds(leftX, layout.playtimeY, layout.width, BUTTON_HEIGHT).build(),
+                Button.builder(Component.literal(playtimeLabel())) {}.bounds(playtimeX, layout.playtimeY, layout.width, BUTTON_HEIGHT).build(),
             )
         }
     }
@@ -307,7 +345,7 @@ object PauseMenuPanel {
         val menuButtons = buttons.filter { it.visible }
         val menuLeft = menuButtons.minOfOrNull { it.x } ?: return
         val menuRight = menuButtons.maxOf { it.x + it.getWidth() }
-        val layout = layout(screen.width, menuLeft, menuRight, menuButtons.map { it.y })
+        val layout = layout(screen.width, screen.height, menuLeft, menuRight, menuButtons.map { it.y })
         if (layout == null) {
             layouts.remove(screen)
             icons.remove(screen)
@@ -351,6 +389,7 @@ object PauseMenuPanel {
     @JvmStatic
     fun render(ctx: GuiGraphicsExtractor, screen: Screen) {
         val layout = layouts[screen] ?: return
+        if (layout.onLeft) hideEssentialFlags(screen)
         // stats arrive a moment after the request, and keep counting while the menu is open
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
         updateDrag(screen, layout)
@@ -360,6 +399,7 @@ object PauseMenuPanel {
     /*@JvmStatic
     fun render(ctx: GuiGraphics, screen: Screen) {
         val layout = layouts[screen] ?: return
+        if (layout.onLeft) hideEssentialFlags(screen)
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
         updateDrag(screen, layout)
         inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
