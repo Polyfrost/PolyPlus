@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Pasta",
+  "polyplus.serverFolder.hint": "Pasta (opcional)",
+  "polyplus.serverFolder.pick": "Escolher uma pasta existente",
+  "polyplus.serverSort": "Ordenar: %s",
+  "polyplus.serverSort.custom": "Manual"
+}

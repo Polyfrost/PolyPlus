@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Thư mục",
+  "polyplus.serverFolder.hint": "Thư mục (không bắt buộc)",
+  "polyplus.serverFolder.pick": "Chọn thư mục có sẵn",
+  "polyplus.serverSort": "Sắp xếp: %s",
+  "polyplus.serverSort.custom": "Riêng"
+}

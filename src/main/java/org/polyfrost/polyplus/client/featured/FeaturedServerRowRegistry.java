@@ -4,6 +4,8 @@ package org.polyfrost.polyplus.client.featured;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.multiplayer.ServerData;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class FeaturedServerRowRegistry {
     private FeaturedServerRowRegistry() {
@@ -18,7 +20,19 @@ public final class FeaturedServerRowRegistry {
         boolean promoted,
         boolean header
     ) {
-        Row row = new Row(list, entry, screen, data, server, promoted, header);
+        Row row = new Row(list, entry, screen, data, server, promoted, header, null);
+        ((FeaturedServerEntryAccess) entry).polyplus$setFeaturedRow(row);
+        return row;
+    }
+
+    public static Row registerFolder(
+        ServerSelectionList.OnlineServerEntry entry,
+        ServerSelectionList list,
+        JoinMultiplayerScreen screen,
+        ServerData data,
+        String folder
+    ) {
+        Row row = new Row(list, entry, screen, data, null, false, true, folder);
         ((FeaturedServerEntryAccess) entry).polyplus$setFeaturedRow(row);
         return row;
     }
@@ -36,6 +50,15 @@ public final class FeaturedServerRowRegistry {
         return count;
     }
 
+    public static List<String> folders(ServerSelectionList list) {
+        var folders = new ArrayList<String>();
+        for (var entry : list.children()) {
+            var row = get(entry);
+            if (row != null && row.folder() != null) folders.add(row.folder());
+        }
+        return folders;
+    }
+
     public static void release(ServerSelectionList list) {
         for (var entry : list.children()) {
             if (get(entry) != null) entry.close();
@@ -50,6 +73,7 @@ public final class FeaturedServerRowRegistry {
         FeaturedServer server,
         boolean promoted,
         boolean header,
+        String folder,
         Box box
     ) {
         private Row(
@@ -59,9 +83,10 @@ public final class FeaturedServerRowRegistry {
             ServerData data,
             FeaturedServer server,
             boolean promoted,
-            boolean header
+            boolean header,
+            String folder
         ) {
-            this(list, entry, screen, data, server, promoted, header, new Box());
+            this(list, entry, screen, data, server, promoted, header, folder, new Box());
         }
 
         public int x() {

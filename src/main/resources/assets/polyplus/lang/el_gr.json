@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Φάκελος",
+  "polyplus.serverFolder.hint": "Φάκελος (προαιρετικό)",
+  "polyplus.serverFolder.pick": "Επιλογή υπάρχοντος φακέλου",
+  "polyplus.serverSort": "Ταξινόμηση: %s",
+  "polyplus.serverSort.custom": "Δική"
+}

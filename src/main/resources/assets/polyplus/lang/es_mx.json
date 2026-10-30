@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Carpeta",
+  "polyplus.serverFolder.hint": "Carpeta (opcional)",
+  "polyplus.serverFolder.pick": "Elegir una carpeta existente",
+  "polyplus.serverSort": "Ordenar: %s",
+  "polyplus.serverSort.custom": "Manual"
+}

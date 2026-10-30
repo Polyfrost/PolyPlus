@@ -41,6 +41,8 @@ public final class FeaturedServerVanillaRenderer {
         0b1100011,
     };
     private static final int GLYPH_CAP_HEIGHT = 7;
+    // Up and down glyphs at the right end of a hovered folder header in the custom order
+    private static final int FOLDER_ARROW_WIDTH = 12;
 
     private FeaturedServerVanillaRenderer() {
     }
@@ -55,11 +57,15 @@ public final class FeaturedServerVanillaRenderer {
         int x,
         int y,
         int width,
-        int height
+        int height,
+        int mouseX,
+        int mouseY
     ) {
         row.bounds(x, y, width, height);
         if (row.header()) {
-            var label = Component.translatable("polyplus.featured.sponsored");
+            var label = row.folder() == null
+                ? Component.translatable("polyplus.featured.sponsored")
+                : Component.literal((ServerFolders.isCollapsed(row.folder()) ? "\u25B6 " : "\u25BC ") + row.folder());
             var font = Minecraft.getInstance().font;
             int labelWidth = font.width(label);
             int labelX = x + (width - labelWidth) / 2;
@@ -73,13 +79,26 @@ public final class FeaturedServerVanillaRenderer {
                 lineY + 1,
                 lineColor
             );
+            boolean arrows = folderArrows(row)
+                && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+            int lineEnd = x + width - SECTION_INSET - (arrows ? 2 * FOLDER_ARROW_WIDTH + SECTION_LABEL_GAP : 0);
             graphics.fill(
-                Math.min(x + width - SECTION_INSET, labelX + labelWidth + SECTION_LABEL_GAP),
+                Math.min(lineEnd, labelX + labelWidth + SECTION_LABEL_GAP),
                 lineY,
-                x + width - SECTION_INSET,
+                lineEnd,
                 lineY + 1,
                 lineColor
             );
+            if (arrows) {
+                int arrowX = x + width - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+                //? if >= 26.1 {
+                graphics.text(font, "\u25B2", arrowX + 2, labelY, 0xFFAAAAAA);
+                graphics.text(font, "\u25BC", arrowX + FOLDER_ARROW_WIDTH + 2, labelY, 0xFFAAAAAA);
+                //?} else {
+                /*graphics.drawString(font, "\u25B2", arrowX + 2, labelY, 0xFFAAAAAA);
+                graphics.drawString(font, "\u25BC", arrowX + FOLDER_ARROW_WIDTH + 2, labelY, 0xFFAAAAAA);
+                *///?}
+            }
             //? if >= 26.1 {
             graphics.text(font, label, labelX, labelY, 0xFFAAAAAA);
             //?} else {
@@ -88,6 +107,18 @@ public final class FeaturedServerVanillaRenderer {
             return;
         }
         drawOutline(graphics, row.server().getOutlineStyle(), x, y, width, height);
+    }
+
+    private static boolean folderArrows(FeaturedServerRowRegistry.Row row) {
+        return row.folder() != null && ServerFolders.sort() == ServerFolders.Sort.CUSTOM;
+    }
+
+    /** -1 or 1 when the click lands on a folder header's up or down glyph, else 0 */
+    public static int folderArrowHit(FeaturedServerRowRegistry.Row row, double mouseX) {
+        if (!folderArrows(row)) return 0;
+        int arrowX = row.x() + row.width() - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+        if (mouseX < arrowX || mouseX >= arrowX + 2 * FOLDER_ARROW_WIDTH) return 0;
+        return mouseX < arrowX + FOLDER_ARROW_WIDTH ? -1 : 1;
     }
 
     public static void after(

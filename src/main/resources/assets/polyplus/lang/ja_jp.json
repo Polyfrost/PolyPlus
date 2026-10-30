@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "フォルダー",
+  "polyplus.serverFolder.hint": "フォルダー（任意）",
+  "polyplus.serverFolder.pick": "既存のフォルダーを選択",
+  "polyplus.serverSort": "並べ替え：%s",
+  "polyplus.serverSort.custom": "カスタム"
+}

@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Тека",
+  "polyplus.serverFolder.hint": "Тека (необов'язково)",
+  "polyplus.serverFolder.pick": "Вибрати наявну теку",
+  "polyplus.serverSort": "Сортування: %s",
+  "polyplus.serverSort.custom": "Власне"
+}

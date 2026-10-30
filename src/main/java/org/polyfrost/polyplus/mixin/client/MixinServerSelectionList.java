@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerModelsKt;
 import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
 import org.polyfrost.polyplus.client.featured.FeaturedServers;
+import org.polyfrost.polyplus.client.featured.ServerFolders;
 import org.polyfrost.polyplus.mixin.client.access.AbstractSelectionListAccessor;
 import org.polyfrost.polyplus.mixin.client.access.OnlineServerEntryInvoker;
 import org.spongepowered.asm.mixin.Final;
@@ -17,7 +18,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 
 @Mixin(ServerSelectionList.class)
@@ -73,6 +76,16 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         }
     }
 
+    // Reorders the existing rows to match the saved list, so nothing reloads like updateOnlineServers would
+    @Override
+    public void polyplus$followSavedOrder() {
+        var servers = screen.getServers();
+        var position = new IdentityHashMap<ServerData, Integer>();
+        for (int index = 0; index < servers.size(); index++) position.put(servers.get(index), index);
+        onlineServers.sort(Comparator.comparingInt(entry -> position.getOrDefault(entry.getServerData(), Integer.MAX_VALUE)));
+        polyplus$rebuildFeaturedServers();
+    }
+
     @Override
     public void polyplus$rebuildFeaturedServers() {
         var self = (ServerSelectionList) (Object) this;
@@ -96,7 +109,13 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
                 addRemote(server, true);
             }
         }
-        for (var entry : onlineServers) add(entry);
+        var groups = ServerFolders.layout(onlineServers, entry -> entry.getServerData().ip, entry -> entry.getServerData().name);
+        for (var group : groups) {
+            if (group.folder != null) addFolderHeader(group.folder);
+            if (group.folder == null || !ServerFolders.isCollapsed(group.folder)) {
+                for (var entry : group.items) add(entry);
+            }
+        }
         add(lanHeader);
         for (var entry : networkServers) add(entry);
 
@@ -120,6 +139,14 @@ public abstract class MixinServerSelectionList implements FeaturedServerListAcce
         var entry = OnlineServerEntryInvoker.polyplus$create(self, screen, data);
         FeaturedServerRowRegistry.register(entry, self, screen, data, server, promoted, false);
         add(entry);
+    }
+
+    private void addFolderHeader(String folder) {
+        var data = new ServerData(folder, "0.0.0.0", ServerData.Type.OTHER);
+        var self = (ServerSelectionList) (Object) this;
+        var entry = OnlineServerEntryInvoker.polyplus$create(self, screen, data);
+        FeaturedServerRowRegistry.registerFolder(entry, self, screen, data, folder);
+        add(entry, true);
     }
 
     private void addHeader() {

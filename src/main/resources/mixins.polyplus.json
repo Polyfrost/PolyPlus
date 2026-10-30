@@ -42,6 +42,8 @@
     //? if >= 1.21.11
     "client.MixinGuiMessage",
     "client.MixinIntegratedServer",
+    //? if > 1.8.9
+    "client.MixinManageServerScreen",
     "client.MixinMinecraft",
     "client.MixinMinecraftSystemReport",
     //? if > 1.8.9

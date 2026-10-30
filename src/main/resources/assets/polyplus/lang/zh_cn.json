@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "文件夹",
+  "polyplus.serverFolder.hint": "文件夹（可选）",
+  "polyplus.serverFolder.pick": "选择已有文件夹",
+  "polyplus.serverSort": "排序：%s",
+  "polyplus.serverSort.custom": "自定义"
+}

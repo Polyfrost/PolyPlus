@@ -2,22 +2,33 @@ package org.polyfrost.polyplus.mixin.client;
 
 //? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.network.chat.Component;
 import org.polyfrost.polyplus.client.featured.FeaturedServerEntryAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerListAccess;
 import org.polyfrost.polyplus.client.featured.FeaturedServerRowRegistry;
 import org.polyfrost.polyplus.client.featured.FeaturedServerVanillaRenderer;
 import org.polyfrost.polyplus.client.featured.FeaturedServers;
+import org.polyfrost.polyplus.client.featured.ServerFolders;
 import org.polyfrost.polyplus.mixin.client.access.AbstractSelectionListAccessor;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -34,7 +45,19 @@ import net.minecraft.client.input.MouseButtonEvent;
 
 @Mixin(ServerSelectionList.OnlineServerEntry.class)
 public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAccess {
+    //? if >= 26.1 {
+    private static final String RENDER = "extractContent";
+    //?} elif >= 1.21.10 {
+    /*private static final String RENDER = "renderContent";
+    *///?} else {
+    /*private static final String RENDER = "render";
+    *///?}
+
+    @Shadow @Final private JoinMultiplayerScreen screen;
+    @Shadow @Final private ServerData serverData;
+    @Shadow @Final ServerSelectionList this$0;
     @Unique private FeaturedServerRowRegistry.Row polyplus$row;
+    @Unique private boolean polyplus$swapped;
 
     @Override
     public FeaturedServerRowRegistry.Row polyplus$featuredRow() {
@@ -54,7 +77,7 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
     ) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, left, top, width, height);
+        FeaturedServerVanillaRenderer.before(graphics, row, left, top, width, height, mouseX, mouseY);
         if (row.header()) ci.cancel();
     }
 
@@ -88,7 +111,7 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
         var self = (ServerSelectionList.OnlineServerEntry) (Object) this;
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight());
+        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight(), mouseX, mouseY);
         if (row.header()) ci.cancel();
     }
 
@@ -121,7 +144,7 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
         var self = (ServerSelectionList.OnlineServerEntry) (Object) this;
         var row = FeaturedServerRowRegistry.get(this);
         if (row == null) return;
-        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight());
+        FeaturedServerVanillaRenderer.before(graphics, row, self.getX(), self.getY(), self.getWidth(), self.getHeight(), mouseX, mouseY);
         if (row.header()) ci.cancel();
     }
 
@@ -208,6 +231,71 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
     }
     //?}
 
+    // With folders the move arrows work inside the server's own folder: positions and the count
+    // are counted within it and mapped back to the saved list when swapping.
+    // A sorted list has no order to move in, so it reports one server and the arrows go away
+    @WrapOperation(
+        method = {RENDER, "keyPressed", "mouseClicked"},
+        at = @At(value = "INVOKE", target = "Ljava/util/List;indexOf(Ljava/lang/Object;)I")
+    )
+    private int polyplus$folderIndex(List<?> children, Object entry, Operation<Integer> original) {
+        if (FeaturedServerRowRegistry.get(this) != null) return original.call(children, entry);
+        if (ServerFolders.sort() != ServerFolders.Sort.CUSTOM) return 0;
+        if (!ServerFolders.hasAny()) return original.call(children, entry);
+        var group = polyplus$folderGroup();
+        for (int index = 0; index < group.size(); index++) {
+            if (screen.getServers().get(group.get(index)) == serverData) return index;
+        }
+        return original.call(children, entry);
+    }
+
+    @WrapOperation(
+        method = {RENDER, "keyPressed", "mouseClicked"},
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ServerList;size()I")
+    )
+    private int polyplus$folderSize(ServerList servers, Operation<Integer> original) {
+        if (FeaturedServerRowRegistry.get(this) != null) return original.call(servers);
+        if (ServerFolders.sort() != ServerFolders.Sort.CUSTOM) return 1;
+        return ServerFolders.hasAny() ? polyplus$folderGroup().size() : original.call(servers);
+    }
+
+    // Vanilla also swaps the rows on screen by position, which the headers throw off, so the
+    // list's own rows are put back in saved order and laid out again
+    @WrapOperation(
+        method = "swap",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/ServerList;swap(II)V")
+    )
+    private void polyplus$swapInFolder(ServerList servers, int from, int to, Operation<Void> original) {
+        if (!ServerFolders.hasAny() || ServerFolders.sort() != ServerFolders.Sort.CUSTOM) {
+            original.call(servers, from, to);
+            return;
+        }
+        var group = polyplus$folderGroup();
+        polyplus$swapped = true;
+        original.call(servers, group.get(from), group.get(to));
+    }
+
+    @Inject(method = "swap", at = @At("TAIL"))
+    private void polyplus$relayoutAfterSwap(int from, int to, CallbackInfo ci) {
+        if (!polyplus$swapped) return;
+        polyplus$swapped = false;
+        var list = this.this$0;
+        ((FeaturedServerListAccess) list).polyplus$followSavedOrder();
+        list.setSelected((ServerSelectionList.OnlineServerEntry) (Object) this);
+    }
+
+    /** Saved-list positions of the servers in this server's folder, in saved order */
+    @Unique
+    private List<Integer> polyplus$folderGroup() {
+        var servers = screen.getServers();
+        var folder = ServerFolders.folderOf(serverData.ip);
+        var group = new ArrayList<Integer>();
+        for (int index = 0; index < servers.size(); index++) {
+            if (Objects.equals(ServerFolders.folderOf(servers.get(index).ip), folder)) group.add(index);
+        }
+        return group;
+    }
+
     @Inject(method = "updateServerList", at = @At("HEAD"), cancellable = true)
     private void polyplus$neverPersistRemoteServer(CallbackInfo ci) {
         if (FeaturedServerRowRegistry.get(this) != null) ci.cancel();
@@ -217,12 +305,22 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
     private void polyplus$headerNarration(CallbackInfoReturnable<Component> cir) {
         var row = FeaturedServerRowRegistry.get(this);
         if (row != null && row.header()) {
-            cir.setReturnValue(Component.translatable("polyplus.featured.sponsored"));
+            cir.setReturnValue(row.folder() == null
+                ? Component.translatable("polyplus.featured.sponsored")
+                : Component.literal(row.folder()));
         }
     }
 
     private boolean handleSpecialClick(FeaturedServerRowRegistry.Row row, double mouseX, double mouseY) {
-        if (row.header()) return true;
+        if (row.header()) {
+            if (row.folder() != null) {
+                int move = FeaturedServerVanillaRenderer.folderArrowHit(row, mouseX);
+                if (move != 0) ServerFolders.moveFolder(row.folder(), move, FeaturedServerRowRegistry.folders(row.list()));
+                else ServerFolders.toggle(row.folder());
+                ((FeaturedServerListAccess) row.list()).polyplus$rebuildFeaturedServers();
+            }
+            return true;
+        }
         if (row.dismissHit(mouseX, mouseY)) {
             var campaign = row.server().getFeatured();
             if (campaign != null) {

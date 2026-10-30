@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "תיקייה",
+  "polyplus.serverFolder.hint": "תיקייה (אופציונלי)",
+  "polyplus.serverFolder.pick": "בחירת תיקייה קיימת",
+  "polyplus.serverSort": "מיון: %s",
+  "polyplus.serverSort.custom": "ידני"
+}

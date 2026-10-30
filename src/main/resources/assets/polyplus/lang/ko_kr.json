@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "폴더",
+  "polyplus.serverFolder.hint": "폴더 (선택 사항)",
+  "polyplus.serverFolder.pick": "기존 폴더 선택",
+  "polyplus.serverSort": "정렬: %s",
+  "polyplus.serverSort.custom": "직접"
+}

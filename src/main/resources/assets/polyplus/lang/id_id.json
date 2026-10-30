@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Folder",
+  "polyplus.serverFolder.hint": "Folder (opsional)",
+  "polyplus.serverFolder.pick": "Pilih folder yang ada",
+  "polyplus.serverSort": "Urutkan: %s",
+  "polyplus.serverSort.custom": "Kustom"
+}

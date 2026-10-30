@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Mappe",
+  "polyplus.serverFolder.hint": "Mappe (valgfritt)",
+  "polyplus.serverFolder.pick": "Velg en eksisterende mappe",
+  "polyplus.serverSort": "Sorter: %s",
+  "polyplus.serverSort.custom": "Manuell"
+}
