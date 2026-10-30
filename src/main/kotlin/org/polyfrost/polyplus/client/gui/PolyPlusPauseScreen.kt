@@ -97,7 +97,8 @@ class PolyPlusPauseScreen(private val vanilla: PauseScreen) : ComposeScreen(Rend
     private fun mirrorWidgets(): List<PauseWidget> =
         vanilla.children()
             .filterIsInstance<AbstractWidget>()
-            .filter { it.visible }
+            // Essential only draws its side bars on a shown PauseScreen, so its proxies here would be dead buttons
+            .filter { it.visible && !PauseMenuPanel.isEssentialWidget(it) }
             .mapNotNull { widget ->
                 when (widget) {
                     is AbstractButton -> PauseButton(

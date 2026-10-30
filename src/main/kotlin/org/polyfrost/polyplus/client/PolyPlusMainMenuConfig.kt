@@ -50,7 +50,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Pause Menu Player Preview",
-        description = "Show your player with Social and Wardrobe buttons beside the pause menu, when there's room.",
+        description = "Show your player with Social and Wardrobe buttons beside the pause menu, when there's room. With Essential's pause menu, it replaces Essential's player on the left.",
         subcategory = "Pause Menu",
     )
     var pauseMenuPlayerPanel = true
