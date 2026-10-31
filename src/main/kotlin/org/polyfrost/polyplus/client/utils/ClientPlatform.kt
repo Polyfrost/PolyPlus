@@ -25,7 +25,7 @@ import net.minecraft.world.entity.player.PlayerModelType
 *///?}
 
 object ClientPlatform {
-    private const val MAIN_SYNC_TIMEOUT_SECONDS = 30L
+    private const val MAIN_SYNC_TIMEOUT_SECONDS = 5L
 
     val isWindows: Boolean
         get() = System.getProperty("os.name").lowercase().contains("windows")
