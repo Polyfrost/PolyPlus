@@ -14,7 +14,25 @@ import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
 import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import org.polyfrost.polyplus.libs.ktor.http.isSuccess
+import org.polyfrost.polyplus.libs.ktor.utils.io.ByteReadChannel
+import org.polyfrost.polyplus.libs.ktor.utils.io.readAvailable
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
+import java.io.ByteArrayOutputStream
+import java.net.URI
+
+internal suspend fun ByteReadChannel.readLimited(maxBytes: Long): ByteArray? {
+    val body = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    while (true) {
+        val read = readAvailable(buffer, 0, buffer.size)
+        if (read < 0) return body.toByteArray()
+        if (body.size() + read > maxBytes) return null
+        body.write(buffer, 0, read)
+    }
+}
+
+internal fun loggableHost(url: String): String =
+    runCatching { URI(url).host }.getOrNull() ?: "an unparseable link"
 
 suspend inline fun HttpClient.requestAuthorized(noinline block: HttpRequestBuilder.() -> Unit): HttpResponse {
     val response = request {

@@ -263,6 +263,7 @@ object OutfitLibrary {
     }
 
     private suspend fun applyLocked(id: Int): Result<OutfitInfo> {
+        val owner = ClientPlatform.localPlayerUuid()
         val response = OutfitApi.send<ApplyOutfitResponse>(HttpMethod.Post, "/outfits/$id/apply")
             .onFailure {
                 LOGGER.error("Failed to apply outfit {}", id, it)
@@ -284,7 +285,7 @@ object OutfitLibrary {
         response.skin?.toInfo()?.takeIf { !keepLook }?.let { skin ->
             val current = MojangSkinService.activeSkin().getOrNull()
             if (current == null || current.textureHash != skin.hash || current.model != skin.model) {
-                MojangSkinService.setSkin(skin.url, skin.model)
+                MojangSkinService.setSkin(skin.url, skin.model, owner)
                     .onSuccess { SkinLibrary.recordInBackground(force = true) }
                     .onFailure {
                         problems += "your Minecraft skin wasn't changed (${MojangSkinService.failureMessage(it)})"

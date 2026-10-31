@@ -11,23 +11,22 @@ import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.request.post
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.client.statement.HttpResponse
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.Headers
 import org.polyfrost.polyplus.libs.ktor.http.HttpHeaders
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
-import org.polyfrost.polyplus.libs.ktor.http.contentType
 import org.polyfrost.polyplus.libs.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.PROFILE_URL
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.accessToken
 import org.polyfrost.polyplus.client.cosmetics.MojangAuth.authorize
+import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitException
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
@@ -50,9 +49,12 @@ object MojangSkinService {
     private const val SESSION_PROFILE_URL = "https://sessionserver.mojang.com/session/minecraft/profile"
     private const val USERNAME_URL = "https://api.mojang.com/users/profiles/minecraft"
     private const val SIGNED_OUT_MESSAGE = "Sign in with a Microsoft account to change your Minecraft skin."
+    private const val BLOCKED_MESSAGE = "Minecraft blocked this skin change. Try again later."
+    private const val ACCOUNT_CHANGED_MESSAGE = "Your account changed, so your skin wasn't updated."
     private const val UNREACHABLE_MESSAGE = "Couldn't reach Minecraft's servers."
     private const val READBACK_ATTEMPTS = 5
     private const val READBACK_DELAY_MS = 1_000L
+    private const val MAX_LOGGED_BODY = 500
     private val TEXTURE_HASH = Regex("^[0-9a-f]{32,64}$")
 
     private val requestLock = Mutex()
@@ -69,39 +71,11 @@ object MojangSkinService {
     var changedSkinVersion by mutableIntStateOf(0)
         private set
 
-    suspend fun setSkin(url: String, model: SkinModel): Result<MojangSkin?> = change { token ->
-        PolyPlusClient.HTTP.post(SKINS_URL) {
-            authorize(token)
-            contentType(ContentType.Application.Json)
-            setBody(
-                buildJsonObject {
-                    put("variant", model.serializedName)
-                    put("url", url)
-                },
-            )
-        }
-    }
+    suspend fun setSkin(url: String, model: SkinModel, owner: UUID): Result<MojangSkin?> =
+        change(model, owner) { SkinLibrary.fetchSkin(secure(url)).getOrThrow() }
 
-    suspend fun uploadSkin(png: ByteArray, model: SkinModel): Result<MojangSkin?> = change { token ->
-        PolyPlusClient.HTTP.post(SKINS_URL) {
-            authorize(token)
-            setBody(
-                MultiPartFormDataContent(
-                    formData {
-                        append("variant", model.serializedName)
-                        append(
-                            "file",
-                            png,
-                            Headers.build {
-                                append(HttpHeaders.ContentType, "image/png")
-                                append(HttpHeaders.ContentDisposition, "filename=\"skin.png\"")
-                            },
-                        )
-                    },
-                ),
-            )
-        }
-    }
+    suspend fun uploadSkin(png: ByteArray, model: SkinModel, owner: UUID): Result<MojangSkin?> =
+        change(model, owner) { png }
 
     suspend fun activeSkin(): Result<MojangSkin?> = runSuspendCatching {
         val token = accessToken() ?: throw MojangSkinException(SIGNED_OUT_MESSAGE)
@@ -153,15 +127,23 @@ object MojangSkinService {
             .takeIf { TEXTURE_HASH.matches(it) }
 
     fun failureMessage(error: Throwable): String = when (error) {
-        is MojangSkinException -> error.message ?: SIGNED_OUT_MESSAGE
+        is MojangSkinException, is OutfitException -> error.message ?: SIGNED_OUT_MESSAGE
         else -> UNREACHABLE_MESSAGE
     }
 
-    private suspend fun change(call: suspend (String) -> HttpResponse): Result<MojangSkin?> = requestLock.withLock {
+    private fun tokenFor(owner: UUID): String {
+        val token = accessToken() ?: throw MojangSkinException(SIGNED_OUT_MESSAGE)
+        if (ClientPlatform.localPlayerUuid() != owner) throw MojangSkinException(ACCOUNT_CHANGED_MESSAGE)
+        return token
+    }
+
+    private suspend fun change(model: SkinModel, owner: UUID, png: suspend () -> ByteArray): Result<MojangSkin?> = requestLock.withLock {
         runSuspendCatching {
-            val token = accessToken() ?: throw MojangSkinException(SIGNED_OUT_MESSAGE)
+            tokenFor(owner)
+            val file = png()
+            val token = tokenFor(owner)
             val previous = knownTexture ?: runSuspendCatching { readProfile(token) }.getOrNull()?.textureHash
-            val response = call(token)
+            val response = post(token, file, model)
             ensureSkinChanged(response)
             val reported = runSuspendCatching { response.body<ServicesProfile>() }.getOrNull()?.let(::activeSkin)
             val skin = if (reported != null) {
@@ -172,12 +154,32 @@ object MojangSkinService {
             }
             if (skin != null) {
                 changedSkin = skin
-                changedFor = ClientPlatform.localPlayerUuid()
+                changedFor = owner
                 changedSkinVersion++
             }
             skin
         }.onFailure { LOGGER.warn("Minecraft skin change failed", it) }
     }
+
+    private suspend fun post(token: String, png: ByteArray, model: SkinModel): HttpResponse =
+        PolyPlusClient.HTTP.post(SKINS_URL) {
+            authorize(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append("variant", model.serializedName)
+                        append(
+                            "file",
+                            png,
+                            Headers.build {
+                                append(HttpHeaders.ContentType, "image/png")
+                                append(HttpHeaders.ContentDisposition, "filename=\"skin.png\"")
+                            },
+                        )
+                    },
+                ),
+            )
+        }
 
     @JvmStatic
     fun localPreviewSkin(playerId: UUID): PreviewSkin? {
@@ -214,17 +216,20 @@ object MojangSkinService {
         return MojangSkin(secure(active.url), SkinModel.fromSerialized(active.variant))
     }
 
-    private fun ensureSkinChanged(response: HttpResponse) {
+    private suspend fun ensureSkinChanged(response: HttpResponse) {
         val status = response.status
         if (status.isSuccess()) return
-        throw MojangSkinException(
-            when (status) {
-                HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden -> SIGNED_OUT_MESSAGE
-                HttpStatusCode.TooManyRequests -> "Minecraft is limiting skin changes right now. Try again in a minute."
-                HttpStatusCode.BadRequest -> "Minecraft couldn't use that skin."
-                else -> "Minecraft's servers couldn't change your skin right now."
-            },
-        )
+        val body = runSuspendCatching { response.bodyAsText() }.getOrDefault("")
+        LOGGER.warn("Minecraft rejected a skin change with {}: {}", status.value, body.take(MAX_LOGGED_BODY))
+        throw MojangSkinException(rejectionMessage(status))
+    }
+
+    internal fun rejectionMessage(status: HttpStatusCode): String = when (status) {
+        HttpStatusCode.Unauthorized -> SIGNED_OUT_MESSAGE
+        HttpStatusCode.Forbidden -> BLOCKED_MESSAGE
+        HttpStatusCode.TooManyRequests -> "Minecraft is limiting skin changes right now. Try again in a minute."
+        HttpStatusCode.BadRequest -> "Minecraft couldn't use that skin."
+        else -> "Minecraft's servers couldn't change your skin right now."
     }
 
     private fun parseUndashed(id: String): UUID? = runCatching {
