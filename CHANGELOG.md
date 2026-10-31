@@ -1,12 +1,3 @@
-## 1.4.0
-- Update Polydium
-- Poly+ will now stop a single malformed language file from a mod or resource pack blocking the game from switching to that language
-- The main menu account switcher now opens a dedicated screen for adding and managing accounts
-- Added a panel beside the pause menu with a player preview, Social, Wardrobe, Host World, Settings and playtime
-- Added an optional Poly+ pause menu, enabled in the Main Menu settings
-- Changed wWaypoints toast titles to always mention wWaypoints
-- Removed wWaypoints toasts for its sharing backend dropping and reconnecting
-- Fixed Poly+'s icon being cut off in Mod Menu and launchers
-- wWaypoints' toggle sneak is no longer forcibly disabled – added a patch to stop it from flagging anticheats
-- Fixed the main menu account dropdown running off the bottom of the window when there are many accounts
-- Fixed Escape closing the onboarding screen on 1.8.9
+## Unreleased changes
+- Fixed skins not changing correctly
+- Fixed the pause menu's Settings button opening the mod list instead of the full settings
