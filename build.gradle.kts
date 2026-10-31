@@ -10,6 +10,7 @@ import net.ltgt.gradle.errorprone.errorprone
 import net.ornithemc.ploceus.api.PloceusGradleExtensionApi
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.kotlin.dsl.getByName
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmExtension
 
 plugins {
@@ -392,6 +393,8 @@ tasks.withType<JavaCompile>().configureEach {
         error("UnnecessarilyFullyQualified")
     }
 }
+
+tasks.withType<KotlinCompile>().configureEach { finalizedBy("detekt") }
 
 // the enabled Detekt rules need type resolution, which only the per-compilation tasks have
 tasks.named<Detekt>("detekt") {
