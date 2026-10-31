@@ -8,8 +8,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
-import org.polyfrost.polyplus.libs.ktor.client.request.get
-import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsBytes
+import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
+import org.polyfrost.polyplus.libs.ktor.client.request.prepareGet
+import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsChannel
 import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import org.polyfrost.polyplus.libs.ktor.http.contentLength
@@ -33,6 +34,8 @@ import org.polyfrost.polyplus.client.cosmetics.MojangSkin
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinException
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
+import org.polyfrost.polyplus.client.network.http.loggableHost
+import org.polyfrost.polyplus.client.network.http.readLimited
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.awt.image.BufferedImage
@@ -48,6 +51,7 @@ object SkinLibrary {
 
     private const val MAX_SKIN_BYTES = 64 * 1024
     private const val MAX_DOWNLOAD_BYTES = 1024L * 1024L
+    private const val DOWNLOAD_TIMEOUT_MS = 60_000L
     private const val RECORD_INTERVAL_MS = 30_000L
     private const val NOT_A_SKIN = "That image isn't a Minecraft skin."
     internal const val TOO_LARGE = "That skin file is too large. Skins can be at most 64 KB."
@@ -152,7 +156,7 @@ object SkinLibrary {
         if (!OutfitApi.allowed()) return unavailable()
         runSuspendCatching { withContext(Dispatchers.IO) { validate(png) } }
             .onFailure { return Result.failure(it) }
-        return uploadAndRecord(name) { MojangSkinService.uploadSkin(png, model) }
+        return uploadAndRecord(name) { MojangSkinService.uploadSkin(png, model, it) }
     }
 
     suspend fun addFromUrl(url: String, name: String?, model: SkinModel): Result<PlayerSkinInfo> {
@@ -161,7 +165,7 @@ object SkinLibrary {
         if (!link.startsWith("https://", ignoreCase = true) && !link.startsWith("http://", ignoreCase = true)) {
             return Result.failure(OutfitException("Enter a link that starts with https://."))
         }
-        return uploadAndRecord(name) { MojangSkinService.setSkin(link, model) }
+        return uploadAndRecord(name) { MojangSkinService.setSkin(link, model, it) }
     }
 
     suspend fun addFromUsername(username: String): Result<PlayerSkinInfo> {
@@ -188,11 +192,12 @@ object SkinLibrary {
         if (!OutfitApi.allowed()) return unavailable()
         val skin = skins.firstOrNull { it.id == id }
             ?: return Result.failure(OutfitException("That skin is no longer in your library."))
+        val owner = ClientPlatform.localPlayerUuid()
         busy = true
         try {
-            MojangSkinService.setSkin(skin.url, skin.model)
+            MojangSkinService.setSkin(skin.url, skin.model, owner)
                 .getOrElse { return Result.failure(mojangFailure(it)) }
-            wornHash = ClientPlatform.localPlayerUuid() to skin.hash
+            wornHash = owner to skin.hash
             val patched = OutfitLibrary.onSkinWorn(id)
             recordInBackground(force = true)
             patched.onFailure {
@@ -215,12 +220,13 @@ object SkinLibrary {
 
     suspend fun setModel(id: Int, model: SkinModel): Result<PlayerSkinInfo> {
         val worn = wornSkinId() == id
+        val owner = ClientPlatform.localPlayerUuid()
         val updated = patch(id, buildJsonObject { put("model", model.serializedName) })
             .getOrElse { return Result.failure(it) }
         if (!worn) return Result.success(updated)
         busy = true
         try {
-            MojangSkinService.setSkin(updated.url, updated.model).getOrElse {
+            MojangSkinService.setSkin(updated.url, updated.model, owner).getOrElse {
                 return Result.failure(
                     OutfitException("${updated.name} was updated, but your Minecraft skin wasn't changed (${MojangSkinService.failureMessage(it)})."),
                 )
@@ -333,16 +339,16 @@ object SkinLibrary {
 
     private suspend fun uploadAndRecord(
         name: String?,
-        upload: suspend () -> Result<MojangSkin?>,
+        upload: suspend (UUID) -> Result<MojangSkin?>,
     ): Result<PlayerSkinInfo> {
+        val owner = ClientPlatform.localPlayerUuid()
         busy = true
         try {
             val recorded = recordLock.withLock {
-                val owner = ClientPlatform.localPlayerUuid()
                 if (loadedFor == owner && skins.size >= limit) {
                     return Result.failure(OutfitException("Your skin library is full ($limit skins). Delete one to make room."))
                 }
-                val worn = upload().getOrElse { return Result.failure(mojangFailure(it)) }
+                val worn = upload(owner).getOrElse { return Result.failure(mojangFailure(it)) }
                     ?: return Result.failure(
                         OutfitException("Your skin changed, but Minecraft hasn't reported it yet. Try again in a moment."),
                     )
@@ -456,14 +462,20 @@ object SkinLibrary {
         OutfitLibrary.onSkinDeleted(id)
     }
 
+    internal suspend fun fetchSkin(url: String): Result<ByteArray> = runSuspendCatching {
+        download(url).getOrThrow().also { withContext(Dispatchers.IO) { validate(it) } }
+    }
+
     private suspend fun download(url: String): Result<ByteArray> = runSuspendCatching {
-        val response = runSuspendCatching { PolyPlusClient.HTTP.get(url) }
-            .getOrElse { throw OutfitException(DOWNLOAD_FAILED) }
-        if (!response.status.isSuccess()) throw OutfitException(DOWNLOAD_FAILED)
-        val length = response.contentLength()
-        if (length != null && length > MAX_DOWNLOAD_BYTES) throw OutfitException(NOT_A_SKIN)
-        runSuspendCatching { response.bodyAsBytes() }.getOrElse { throw OutfitException(DOWNLOAD_FAILED) }
-    }.onFailure { LOGGER.warn("Failed to download a skin from {}", url, it) }
+        runSuspendCatching {
+            PolyPlusClient.HTTP.prepareGet(url) { timeout { requestTimeoutMillis = DOWNLOAD_TIMEOUT_MS } }.execute { response ->
+                if (!response.status.isSuccess()) throw OutfitException(DOWNLOAD_FAILED)
+                val length = response.contentLength()
+                if (length != null && length > MAX_DOWNLOAD_BYTES) throw OutfitException(NOT_A_SKIN)
+                response.bodyAsChannel().readLimited(MAX_DOWNLOAD_BYTES) ?: throw OutfitException(NOT_A_SKIN)
+            }
+        }.getOrElse { throw it as? OutfitException ?: OutfitException(DOWNLOAD_FAILED) }
+    }.onFailure { LOGGER.warn("Failed to download a skin from {}", loggableHost(url), it) }
 
     private fun validate(png: ByteArray) {
         if (png.size > MAX_SKIN_BYTES) throw OutfitException(TOO_LARGE)

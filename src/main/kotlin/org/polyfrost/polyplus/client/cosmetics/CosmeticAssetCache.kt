@@ -8,7 +8,6 @@ import org.polyfrost.polyplus.libs.ktor.client.request.prepareGet
 import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsChannel
 import org.polyfrost.polyplus.libs.ktor.http.contentLength
 import org.polyfrost.polyplus.libs.ktor.http.isSuccess
-import org.polyfrost.polyplus.libs.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -29,6 +28,7 @@ import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RejectedArchiveException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
+import org.polyfrost.polyplus.client.network.http.readLimited
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if >= 1.21.1 || = 1.8.9 {
 import org.polyfrost.polyplus.client.bedrock.geometry.PlayerModelBone
@@ -44,7 +44,6 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.utils.HashManager
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.nio.file.Path
@@ -316,18 +315,8 @@ object CosmeticAssetCache {
             if (length != null && length > maxBytes) {
                 throw RejectedArchiveException("$url is $length bytes, over the $maxBytes byte limit")
             }
-            val channel = response.bodyAsChannel()
-            val body = ByteArrayOutputStream()
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = channel.readAvailable(buffer, 0, buffer.size)
-                if (read < 0) break
-                if (body.size() + read > maxBytes) {
-                    throw RejectedArchiveException("$url is over the $maxBytes byte limit")
-                }
-                body.write(buffer, 0, read)
-            }
-            body.toByteArray()
+            response.bodyAsChannel().readLimited(maxBytes)
+                ?: throw RejectedArchiveException("$url is over the $maxBytes byte limit")
         }
 
     private fun CosmeticType.archiveLimits(): ArchiveLimits = when (this) {
