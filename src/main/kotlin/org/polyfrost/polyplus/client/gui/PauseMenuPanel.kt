@@ -220,7 +220,7 @@ object PauseMenuPanel {
 
     private fun openHostWorld(from: Screen) = SocialOverlay.openHostCurrentWorld(from)
 
-    private fun openSettings() = PolyPlusOneConfigIntegration.openMods()
+    private fun openSettings() = PolyPlusOneConfigIntegration.openSettings()
 
     private val layouts = WeakHashMap<Screen, Layout>()
     private val icons = WeakHashMap<Screen, List<ButtonIcon>>()

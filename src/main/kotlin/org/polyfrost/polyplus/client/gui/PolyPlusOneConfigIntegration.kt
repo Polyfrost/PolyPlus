@@ -65,6 +65,9 @@ object PolyPlusOneConfigIntegration {
     @JvmStatic
     fun openMods() = OneConfigUI.open(MODS_PAGE)
 
+    @JvmStatic
+    fun openSettings() = OneConfigUI.open()
+
     private fun modCardIcon(modId: String, defaultIcon: String?): String? {
         val id = when (val base = modId.replaceFirst(Regex("(v\\d+)?\\.(json|toml)$"), "")) {
             "fullbright", "polyfullbright" -> "gammautils"

@@ -291,7 +291,7 @@ private fun PlayerPanel(screen: Screen, panel: PauseMenuPanel.Layout) {
     panel.hostWorldY?.let { HostWorldButton(screen, Modifier.offset(x, gui(it)).size(width, buttonHeight)) }
     panel.leftX?.let { gui(it) }?.let { leftX ->
         PlaytimePill(Modifier.offset(leftX, gui(panel.playtimeY)).size(width, buttonHeight))
-        PillButton("Settings", ASSETS + "settings-02.svg", Modifier.offset(leftX, gui(panel.wardrobeY)).size(width, buttonHeight), PolyPlusOneConfigIntegration::openMods)
+        PillButton("Settings", ASSETS + "settings-02.svg", Modifier.offset(leftX, gui(panel.wardrobeY)).size(width, buttonHeight), PolyPlusOneConfigIntegration::openSettings)
     }
 }
 
