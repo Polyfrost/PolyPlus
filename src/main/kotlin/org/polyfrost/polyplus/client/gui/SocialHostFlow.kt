@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -217,7 +218,7 @@ private fun WorldCard(entry: HostWorldManager.HostWorldEntry, selected: Boolean,
             }
         }
         if (bitmap != null) {
-            androidx.compose.foundation.Image(
+            Image(
                 bitmap,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp).clip(ppShape(6.dp)),

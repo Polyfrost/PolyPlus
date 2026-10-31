@@ -21,7 +21,8 @@ import org.polyfrost.oneconfig.internal.ui.compose.opengl.StoredGLState
 *///?}
 
 //? if >= 1.21.8 && < 1.21.11 {
-/*import net.minecraft.client.renderer.RenderPipelines
+/*import com.mojang.blaze3d.pipeline.RenderTarget
+import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.resources.Identifier
 import org.polyfrost.oneconfig.internal.ui.OffscreenTarget
@@ -52,7 +53,7 @@ class InlineCanvas(textureName: String) {
     private var texture: TargetTexture? = null
 
     private class TargetTexture : AbstractTexture() {
-        fun set(target: com.mojang.blaze3d.pipeline.RenderTarget) {
+        fun set(target: RenderTarget) {
             texture = target.colorTexture
             textureView = target.colorTextureView
         }
