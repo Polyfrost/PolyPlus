@@ -1,4 +1,4 @@
-## Unreleased changes
+## 1.4.1
 - Fixed skins not changing correctly
 - Fixed the pause menu's Settings button opening the mod list instead of the full settings
 - wWaypoints' sharing backend toasts are now only hidden for users who don't have access to its paid waypoint sharing feature
