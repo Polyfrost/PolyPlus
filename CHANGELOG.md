@@ -3,3 +3,4 @@
 - Fixed the pause menu's Settings button opening the mod list instead of the full settings
 - wWaypoints' sharing backend toasts are now only hidden for users who don't have access to its paid waypoint sharing feature
   * This also hides the connection attempts exhausted toasts, which weren't hidden before
+- The installed mods comparison against the OneClient modpack no longer downloads the modpack itself from Modrinth

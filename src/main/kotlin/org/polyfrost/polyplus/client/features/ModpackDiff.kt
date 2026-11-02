@@ -6,19 +6,18 @@ import org.polyfrost.polyplus.libs.ktor.client.request.parameter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.ModContainer
 import net.fabricmc.loader.api.metadata.ModOrigin
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import java.io.ByteArrayInputStream
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.HexFormat
-import java.util.zip.ZipInputStream
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object ModpackDiff {
@@ -33,16 +32,16 @@ object ModpackDiff {
     private const val MAX_VERSIONS_CHECKED = 10
 
     @Serializable
-    private data class PackVersion(val version_number: String, val files: List<PackFile>)
+    private data class PackVersion(val version_number: String, val dependencies: List<PackDependency>)
 
     @Serializable
-    private data class PackFile(val url: String, val primary: Boolean = false)
+    private data class PackDependency(val version_id: String? = null)
 
     @Serializable
-    private data class PackIndex(val files: List<IndexFile>)
+    private data class ModVersion(val id: String, val files: List<ModFile>)
 
     @Serializable
-    private data class IndexFile(val path: String, val hashes: Map<String, String>, val env: Map<String, String>? = null)
+    private data class ModFile(val filename: String, val hashes: Map<String, String>, val primary: Boolean = false)
 
     data class Diff(val removed: List<String>, val added: List<String>) {
         val size: Int get() = removed.size + added.size
@@ -73,11 +72,11 @@ object ModpackDiff {
                 parameter("game_versions", "[\"$mcVersion\"]")
                 parameter("loaders", "[\"fabric\"]")
                 parameter("include_changelog", "false")
-            }.body<List<PackVersion>>()
+            }.body<List<PackVersion>>().take(MAX_VERSIONS_CHECKED)
+            val jars = fetchModJars(versions.flatMap { it.dependencies }.mapNotNull { it.version_id }.distinct())
 
-            for (version in versions.take(MAX_VERSIONS_CHECKED)) {
-                val file = version.files.firstOrNull { it.primary } ?: version.files.firstOrNull() ?: continue
-                val diff = diff(fetchPackMods(file.url), loaded)
+            for (version in versions) {
+                val diff = diff(version.dependencies.mapNotNull { dep -> dep.version_id?.let(jars::get) }.toMap(), loaded)
                 if (best == null || diff.size < best.diff.size) best = Match(name, version.version_number, diff)
                 if (diff.removed.isEmpty()) break
             }
@@ -108,15 +107,17 @@ object ModpackDiff {
             .filter { (_, path) -> path.startsWith(modsDir) && Files.isRegularFile(path) }
     }
 
-    private suspend fun fetchPackMods(url: String): Map<String, String> {
-        val bytes = PolyPlusClient.HTTP.get(url).body<ByteArray>()
-        return ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            generateSequence { zip.nextEntry }.firstOrNull { it.name == "modrinth.index.json" } ?: return emptyMap()
-            PolyPlusClient.JSON.decodeFromString<PackIndex>(zip.readBytes().decodeToString()).files
-                .filter { it.path.startsWith("mods/") && it.env?.get("client") != "unsupported" }
-                .mapNotNull { file -> file.hashes["sha1"]?.let { it to file.path.removePrefix("mods/") } }
-                .toMap()
-        }
+    // Never download the .mrpack itself: Modrinth counts every CDN fetch as a download of the pack
+    private suspend fun fetchModJars(versionIds: List<String>): Map<String, Pair<String, String>> {
+        if (versionIds.isEmpty()) return emptyMap()
+        return PolyPlusClient.HTTP.get("https://api.modrinth.com/v2/versions") {
+            parameter("ids", PolyPlusClient.JSON.encodeToString(versionIds))
+        }.body<List<ModVersion>>().mapNotNull { version ->
+            val file = version.files.firstOrNull { it.primary } ?: version.files.firstOrNull() ?: return@mapNotNull null
+            // Packs also embed shaders and resource packs
+            if (!file.filename.endsWith(".jar")) return@mapNotNull null
+            file.hashes["sha1"]?.let { version.id to (it to file.filename) }
+        }.toMap()
     }
 
     fun sha1(path: Path): String {
