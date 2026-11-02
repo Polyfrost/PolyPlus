@@ -1,4 +1,4 @@
-## Unreleased changes
+## 1.4.2
 - Updated Polydium to 1.2.2
 
 ### Polydium changes
