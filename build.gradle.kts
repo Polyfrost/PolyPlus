@@ -394,9 +394,6 @@ tasks.withType<JavaCompile>().configureEach {
     }
 }
 
-tasks.named("compileKotlin") { finalizedBy("detektMain") }
-tasks.named("compileTestKotlin") { finalizedBy("detektTest") }
-
 // the enabled Detekt rules need type resolution, which only the per-compilation tasks have
 tasks.named<Detekt>("detekt") {
     enabled = false
