@@ -1,5 +1,6 @@
-## 1.4.3
-- Updated Polydium to 1.2.3
+## Unreleased changes
+- Updated Polydium to 1.2.4
 
 ### Polydium changes
-- Fixed a crash on some GPUs when joining a world for the first time or hovering the Vulkan graphics API option
+- Fixed a crash on the Vulkan backend with mods that rely on OpenGL keeping the previous transforms bound, such as Teamviewer (Hoplite)
+- Fixed a crash when opening the OneConfig menu on the Vulkan backend ("Cannot wait on a fence for the current submit")
