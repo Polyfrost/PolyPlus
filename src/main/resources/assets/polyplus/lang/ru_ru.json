@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Папка",
+  "polyplus.serverFolder.hint": "Папка (необязательно)",
+  "polyplus.serverFolder.pick": "Выбрать существующую папку",
+  "polyplus.serverSort": "Сортировка: %s",
+  "polyplus.serverSort.custom": "Своя"
+}

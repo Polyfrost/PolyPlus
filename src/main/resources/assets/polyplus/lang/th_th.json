@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "โฟลเดอร์",
+  "polyplus.serverFolder.hint": "โฟลเดอร์ (ไม่บังคับ)",
+  "polyplus.serverFolder.pick": "เลือกโฟลเดอร์ที่มีอยู่",
+  "polyplus.serverSort": "เรียง: %s",
+  "polyplus.serverSort.custom": "กำหนดเอง"
+}

@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Mappa",
+  "polyplus.serverFolder.hint": "Mappa (nem kötelező)",
+  "polyplus.serverFolder.pick": "Meglévő mappa kiválasztása",
+  "polyplus.serverSort": "Rendezés: %s",
+  "polyplus.serverSort.custom": "Egyéni"
+}

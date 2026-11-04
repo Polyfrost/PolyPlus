@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Dosar",
+  "polyplus.serverFolder.hint": "Dosar (opțional)",
+  "polyplus.serverFolder.pick": "Alege un dosar existent",
+  "polyplus.serverSort": "Sortare: %s",
+  "polyplus.serverSort.custom": "Manual"
+}

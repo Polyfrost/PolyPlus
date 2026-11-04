@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Ordner",
+  "polyplus.serverFolder.hint": "Ordner (optional)",
+  "polyplus.serverFolder.pick": "Vorhandenen Ordner wählen",
+  "polyplus.serverSort": "Sortieren: %s",
+  "polyplus.serverSort.custom": "Eigene"
+}

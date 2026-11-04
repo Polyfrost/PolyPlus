@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Složka",
+  "polyplus.serverFolder.hint": "Složka (volitelné)",
+  "polyplus.serverFolder.pick": "Vybrat existující složku",
+  "polyplus.serverSort": "Řadit: %s",
+  "polyplus.serverSort.custom": "Vlastní"
+}

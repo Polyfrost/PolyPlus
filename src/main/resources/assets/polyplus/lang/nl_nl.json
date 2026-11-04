@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Map",
+  "polyplus.serverFolder.hint": "Map (optioneel)",
+  "polyplus.serverFolder.pick": "Kies een bestaande map",
+  "polyplus.serverSort": "Sorteren: %s",
+  "polyplus.serverSort.custom": "Eigen"
+}

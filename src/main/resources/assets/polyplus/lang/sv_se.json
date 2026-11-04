@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Mapp",
+  "polyplus.serverFolder.hint": "Mapp (valfritt)",
+  "polyplus.serverFolder.pick": "Välj en befintlig mapp",
+  "polyplus.serverSort": "Sortera: %s",
+  "polyplus.serverSort.custom": "Egen"
+}

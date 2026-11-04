@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "資料夾",
+  "polyplus.serverFolder.hint": "資料夾（選填）",
+  "polyplus.serverFolder.pick": "選擇現有資料夾",
+  "polyplus.serverSort": "排序：%s",
+  "polyplus.serverSort.custom": "自訂"
+}

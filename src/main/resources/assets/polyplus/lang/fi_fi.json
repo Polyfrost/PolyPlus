@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Kansio",
+  "polyplus.serverFolder.hint": "Kansio (valinnainen)",
+  "polyplus.serverFolder.pick": "Valitse olemassa oleva kansio",
+  "polyplus.serverSort": "Lajittele: %s",
+  "polyplus.serverSort.custom": "Oma"
+}

@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "Klasör",
+  "polyplus.serverFolder.hint": "Klasör (isteğe bağlı)",
+  "polyplus.serverFolder.pick": "Var olan bir klasörü seç",
+  "polyplus.serverSort": "Sırala: %s",
+  "polyplus.serverSort.custom": "Özel"
+}

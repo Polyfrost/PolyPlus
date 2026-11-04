@@ -1,0 +1,7 @@
+{
+  "polyplus.serverFolder": "مجلد",
+  "polyplus.serverFolder.hint": "مجلد (اختياري)",
+  "polyplus.serverFolder.pick": "اختر مجلدًا موجودًا",
+  "polyplus.serverSort": "الترتيب: %s",
+  "polyplus.serverSort.custom": "مخصص"
+}
