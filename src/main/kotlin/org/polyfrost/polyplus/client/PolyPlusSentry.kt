@@ -213,10 +213,7 @@ object PolyPlusSentry {
 
         val dev = FabricLoader.getInstance().isDevelopmentEnvironment
 
-        val minecraftVersion = FabricLoader.getInstance()
-            .getModContainer("minecraft")
-            .map { it.metadata.version.friendlyString }
-            .orElse("unknown")
+        val minecraftVersion = PolyPlusConstants.MINECRAFT_VERSION
 
         val options = SentryOptions().apply {
             dsn = DSN

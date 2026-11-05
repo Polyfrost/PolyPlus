@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.network.http
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.contentType
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.CreateSessionRequest
@@ -15,7 +16,7 @@ object SessionsApi {
     suspend fun create(eosSessionId: String? = null): Result<SessionResponse> =
         PolyPlusClient.HTTP.postBodyAuthorized("${PolyPlusConfig.apiUrl}/sessions") {
             contentType(ContentType.Application.Json)
-            setBody(CreateSessionRequest(eosSessionId))
+            setBody(CreateSessionRequest(eosSessionId, PolyPlusConstants.MINECRAFT_VERSION, PolyPlusConstants.LOADER))
         }
 
     suspend fun updateEosSessionId(sessionId: String, eosSessionId: String): Result<SessionResponse> =

@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CreateSessionRequest(
     @SerialName("eos_session_id") val eosSessionId: String? = null,
+    @SerialName("minecraft_version") val minecraftVersion: String,
+    val loader: String,
 )
 
 @Serializable

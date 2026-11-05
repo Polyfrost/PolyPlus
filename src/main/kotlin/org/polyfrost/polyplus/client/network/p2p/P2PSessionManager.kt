@@ -15,9 +15,13 @@ import org.polyfrost.polyplus.client.social.setScreen
 *///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.FramebufferRenderEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
+import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
 import org.polyfrost.polyplus.client.network.eos.EosFailureDiagnosis
 import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
@@ -35,6 +39,8 @@ import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
 import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.client.social.toUserMessage
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -89,6 +95,7 @@ object P2PSessionManager {
     private const val MAX_STALL_RECOVERIES = 2
     private const val STALL_RESTART_READY_TIMEOUT_MS = 20_000L
     private const val EOS_SDK_PACKAGE = "gg.sona.eos"
+    private const val JOIN_INVITE_PROPERTY = "polyplus.joinInvite"
     private const val STALL_UNRECOVERABLE = "Poly+ multiplayer stopped responding. Restart your game, and if you see this message, please report it at https://polyfrost.org/discord."
 
     data class JoinTarget(val host: EosProductUserId, val socket: EosP2PSocketId)
@@ -105,6 +112,7 @@ object P2PSessionManager {
         SessionsRepository.acceptedInvites
             .onEach { invite -> PolyPlusClient.SCOPE.launch { handleAcceptedInvite(invite) } }
             .launchIn(PolyPlusClient.SCOPE)
+        registerLaunchInviteJoin()
 
         HostSharedPack.registerConfigurationHook()
 
@@ -486,6 +494,51 @@ object P2PSessionManager {
 
     private fun localProfileId(): UUID? = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
 
+    private fun registerLaunchInviteJoin() {
+        val inviteId = System.getProperty(JOIN_INVITE_PROPERTY)?.toIntOrNull() ?: return
+        val handler: (FramebufferRenderEvent.End) -> Boolean = {
+            val onMainMenu = when (ClientPlatform.currentScreen()) {
+                is PolyPlusMainMenuScreen -> true
+                is TitleScreen -> PolyPlusMainMenuConfig.useVanillaMainMenu
+                else -> false
+            }
+            if (onMainMenu) PolyPlusClient.SCOPE.launch { joinLaunchInvite(inviteId) }
+            onMainMenu
+        }
+        eventHandler(handler)
+    }
+
+    private suspend fun joinLaunchInvite(inviteId: Int) {
+        if (!awaitEosReady()) {
+            LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join invite {}", inviteId)
+            val reason = (status.value as? EosStatus.Failed)?.reason ?: "Poly+ multiplayer took too long to connect."
+            Notifications.error("PolyPlus", reason)
+            return
+        }
+
+        val invites = SessionsApi.incomingInvites().getOrElse {
+            LOGGER.error("Failed to load session invite {}", inviteId, it)
+            Notifications.error("PolyPlus", it.toUserMessage("Couldn't load your world invite."))
+            return
+        }
+        val invite = invites.find { it.id == inviteId }
+        if (invite == null) {
+            LOGGER.warn("Session invite {} from the launch arguments is no longer open", inviteId)
+            Notifications.error("PolyPlus", "This world invite has expired.")
+            return
+        }
+        SessionsRepository.accept(invite)
+    }
+
+    private suspend fun awaitEosReady(): Boolean {
+        if (status.value == EosStatus.Ready) return true
+        retryLoginNow()
+        LOGGER.info("Waiting for EOS Connect to be ready")
+        return withTimeoutOrNull(AUTH_READY_TIMEOUT_MS.milliseconds) {
+            status.first { it == EosStatus.Ready || it is EosStatus.Failed }
+        } == EosStatus.Ready
+    }
+
     private suspend fun handleAcceptedInvite(invite: SessionInvite) {
         val bridge = this.bridge
         if (bridge == null) {
@@ -493,16 +546,9 @@ object P2PSessionManager {
             return
         }
 
-        if (_status.value != EosStatus.Ready) {
-            retryLoginNow()
-            LOGGER.info("Waiting for EOS Connect to be ready before joining session {}", invite.sessionId)
-            val ready = withTimeoutOrNull(AUTH_READY_TIMEOUT_MS.milliseconds) {
-                status.first { it == EosStatus.Ready || it is EosStatus.Failed }
-            }
-            if (ready != EosStatus.Ready) {
-                LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join session {}", invite.sessionId)
-                return
-            }
+        if (!awaitEosReady()) {
+            LOGGER.error("Gave up waiting for EOS Connect readiness; cannot join session {}", invite.sessionId)
+            return
         }
 
         val hostPuid = invite.eosProductUserId
