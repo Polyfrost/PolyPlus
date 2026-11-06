@@ -53,23 +53,19 @@ import androidx.compose.ui.window.PopupProperties
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.client.gui.screens.TitleScreen
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
-import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.ConcurrentHashMap
 
 internal object MainMenuRasterAssets {
@@ -186,12 +182,7 @@ internal fun HostWorldButton(screen: Screen, modifier: Modifier = Modifier.fillM
     )
 }
 
-internal fun switchToVanillaMenu() {
-    PolyPlusMainMenuConfig.useVanillaMainMenu = true
-    PolyPlusMainMenuConfig.save()
-    LobbyScene.stop()
-    ClientPlatform.setScreen(TitleScreen())
-}
+internal fun switchToVanillaMenu() = MainMenuReplacement.switchToVanilla()
 
 internal fun toggleFullscreen() {
     val mc = Minecraft.getInstance()

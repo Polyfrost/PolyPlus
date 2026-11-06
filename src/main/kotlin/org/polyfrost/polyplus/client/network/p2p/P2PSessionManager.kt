@@ -19,7 +19,6 @@ import org.polyfrost.oneconfig.api.event.v1.events.FramebufferRenderEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
@@ -542,7 +541,7 @@ object P2PSessionManager {
             val screen = ClientPlatform.currentScreen()
             val onMainMenu = when {
                 MainMenuReplacement.isMenu(screen) -> true
-                screen is TitleScreen -> PolyPlusMainMenuConfig.useVanillaMainMenu
+                screen is TitleScreen -> !MainMenuReplacement.replacesTitleScreen()
                 else -> false
             }
             if (onMainMenu) PolyPlusClient.SCOPE.launch { joinLaunchInvite(inviteId) }

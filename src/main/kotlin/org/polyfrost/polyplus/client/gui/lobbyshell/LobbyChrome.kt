@@ -72,9 +72,11 @@ import net.minecraft.client.gui.screens.options.OptionsScreen
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.AccountSwitcherContent
 import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.MainMenuRasterAssets
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.MutedText
@@ -546,6 +548,10 @@ private fun MoreMenu(screen: Screen, onClose: () -> Unit) {
     val theme = themeToggle()
     Column(Modifier.width(MORE_MENU_WIDTH.dp).popup().padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         MoreRow(theme.icon, theme.label, theme.toggle)
+        MoreRow(SOCIAL_ASSETS + "logo.svg", "Switch to PolyPlus main menu") {
+            onClose()
+            MainMenuReplacement.switchToPolyPlusMenu()
+        }
         MoreRow(SOCIAL_ASSETS + "minecraft-block.svg", "Switch to vanilla main menu") {
             onClose()
             switchToVanillaMenu()

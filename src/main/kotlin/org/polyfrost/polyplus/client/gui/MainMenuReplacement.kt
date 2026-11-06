@@ -3,8 +3,10 @@ package org.polyfrost.polyplus.client.gui
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.MainMenuChoice
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
@@ -19,17 +21,25 @@ object MainMenuReplacement {
     private var playing = false
     private var lobbyFailed = false
 
-    @JvmStatic
-    fun enabled(): Boolean = !PolyPlusMainMenuConfig.useVanillaMainMenu && !lobbyFailed
+    private fun choice(): MainMenuChoice {
+        val chosen = PolyPlusMainMenuConfig.mainMenu
+        return if (chosen == MainMenuChoice.LOBBY && lobbyFailed) MainMenuChoice.VANILLA else chosen
+    }
 
     @JvmStatic
-    fun isMenu(screen: Screen?): Boolean = screen is PolyPlusLobbyScreen
+    fun enabled(): Boolean = choice() == MainMenuChoice.LOBBY
+
+    @JvmStatic
+    fun replacesTitleScreen(): Boolean = choice() != MainMenuChoice.VANILLA
+
+    @JvmStatic
+    fun isMenu(screen: Screen?): Boolean = screen is PolyPlusLobbyScreen || screen is PolyPlusMainMenuScreen
 
     @JvmStatic
     fun alreadyOpen(): Boolean = ClientPlatform.currentScreen().let { isMenu(it) || it is PolyPlusOnboardingScreen }
 
     @JvmStatic
-    fun create(): Screen = PolyPlusLobbyScreen()
+    fun create(): Screen = if (choice() == MainMenuChoice.POLYPLUS) PolyPlusMainMenuScreen() else PolyPlusLobbyScreen()
 
     @JvmStatic
     fun open() = ClientPlatform.setScreen(create())
@@ -40,13 +50,32 @@ object MainMenuReplacement {
     }
 
     fun returnToVanilla() {
-        PolyPlusMainMenuConfig.useVanillaMainMenu = true
-        PolyPlusMainMenuConfig.save()
         PolyPlusConfig.brandedStartup = false
-        PolyPlusConfig.pauseScreenStyle = PauseScreenStyle.VANILLA
+        PolyPlusPauseConfig.pauseScreenStyle = PauseScreenStyle.VANILLA
+        PolyPlusPauseConfig.save()
         dismissVanillaOffer()
-        LobbyScene.stop()
-        ClientPlatform.setScreen(TitleScreen())
+        switchTo(MainMenuChoice.VANILLA)
+    }
+
+    fun offerPolyPlusMenu() {
+        dismissVanillaOffer()
+        switchTo(MainMenuChoice.POLYPLUS)
+    }
+
+    @JvmStatic
+    fun switchToLobby() = switchTo(MainMenuChoice.LOBBY)
+
+    @JvmStatic
+    fun switchToPolyPlusMenu() = switchTo(MainMenuChoice.POLYPLUS)
+
+    @JvmStatic
+    fun switchToVanilla() = switchTo(MainMenuChoice.VANILLA)
+
+    private fun switchTo(choice: MainMenuChoice) {
+        PolyPlusMainMenuConfig.mainMenu = choice
+        PolyPlusMainMenuConfig.save()
+        if (choice != MainMenuChoice.LOBBY) LobbyScene.stop()
+        ClientPlatform.setScreen(if (replacesTitleScreen()) create() else TitleScreen())
     }
 
     fun fallBackToVanilla() {

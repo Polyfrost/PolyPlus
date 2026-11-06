@@ -9,8 +9,6 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.lobby.LobbyReveal
-import org.polyfrost.polyplus.client.lobby.LobbyTime
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 1.21.11 {
@@ -33,27 +31,16 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic @Include
     var migratedFromLegacyConfig = false
 
-    @JvmStatic
-    @Switch(
-        title = "Vanilla Main Menu",
-        description = "Start on the vanilla Minecraft title screen instead of the lobby.",
-    )
+    @JvmStatic @Include
     var useVanillaMainMenu = false
 
     @JvmStatic
-    @Switch(
-        title = "Vanilla Pause Menu Player Preview",
-        description = "When the pause screen is set to Vanilla, also show your player with Social and Wardrobe buttons beside it.",
-        subcategory = "Pause Menu",
+    @Dropdown(
+        title = "Main Menu",
+        description = "Choose which main menu the game starts on.",
+        options = ["Lobby", "PolyPlus", "Vanilla"],
     )
-    var vanillaPausePlayerPanel = false
-
-    @JvmStatic
-    @Switch(
-        title = "Quit Without Confirmation",
-        description = "Close the game as soon as you press Quit in the lobby, without asking first.",
-    )
-    var quitWithoutConfirmation = false
+    var mainMenu: MainMenuChoice = MainMenuChoice.LOBBY
 
     @JvmStatic
     @Switch(
@@ -140,24 +127,6 @@ object PolyPlusMainMenuConfig : Config(
     var mainMenuFpsLimit = 260
 
     @JvmStatic
-    @Dropdown(
-        title = "Lobby Reveal",
-        description = "Choose how the lobby scene appears when the menu opens.",
-        options = ["Random", "Wave", "Focus pull", "First light"],
-        subcategory = "Background",
-    )
-    var lobbyReveal: LobbyReveal = LobbyReveal.RANDOM
-
-    @JvmStatic
-    @Dropdown(
-        title = "Lobby Time",
-        description = "Choose the time of day in the lobby scene.",
-        options = ["As captured", "Match theme", "Real time", "Day", "Sunset", "Night"],
-        subcategory = "Background",
-    )
-    var lobbyTime: LobbyTime = LobbyTime.CAPTURED
-
-    @JvmStatic
     @Switch(
         title = "Custom Panorama",
         description = "Use the PolyPlus panorama instead of the vanilla Minecraft one.",
@@ -192,8 +161,11 @@ object PolyPlusMainMenuConfig : Config(
     *///?}
 
     init {
+        PolyPlusPauseConfig.preload()
+        PolyPlusLobbyConfig.preload()
         preload()
         migrateFromLegacyConfig()
+        migrateVanillaMainMenu()
 
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
@@ -217,6 +189,13 @@ object PolyPlusMainMenuConfig : Config(
         if (migratedFromLegacyConfig) return
         loadLegacyPolyPlusOptions("main menu", LOGGER, ::loadFrom)
         migratedFromLegacyConfig = true
+        save()
+    }
+
+    private fun migrateVanillaMainMenu() {
+        if (!useVanillaMainMenu) return
+        mainMenu = MainMenuChoice.VANILLA
+        useVanillaMainMenu = false
         save()
     }
 
@@ -252,4 +231,10 @@ object PolyPlusMainMenuConfig : Config(
             MainMenuFpsLimitMode.SMART -> defaultMainMenuFpsLimit()
             MainMenuFpsLimitMode.CUSTOM -> mainMenuFpsLimit
         }
+}
+
+enum class MainMenuChoice {
+    LOBBY,
+    POLYPLUS,
+    VANILLA,
 }

@@ -25,6 +25,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.BadModsScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
+import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
@@ -180,8 +181,9 @@ object BadMods {
         if (warnings.isEmpty()) return true
         return when (val screen = ClientPlatform.currentScreen()) {
             is PolyPlusLobbyScreen -> true
+            is PolyPlusMainMenuScreen -> true
             is TitleScreen -> {
-                if (MainMenuReplacement.enabled()) return false
+                if (MainMenuReplacement.replacesTitleScreen()) return false
                 //? if > 1.8.9 {
                 Minecraft.getInstance().execute { ClientPlatform.setScreen(BadModsScreen(screen)) }
                 //?} else {

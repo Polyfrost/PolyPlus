@@ -86,8 +86,11 @@ private fun VanillaOfferCard(modifier: Modifier, onDismiss: () -> Unit) {
                 SocialText("Not liking the new UI?", 16.sp, Modifier.weight(1f), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 SocialIconButton(SOCIAL_ASSETS + "x-close.svg", Modifier.size(28.dp), tooltip = "Dismiss", onClick = onDismiss)
             }
-            SocialText("Go back to Minecraft's own menus, pause screen and startup. You can switch back any time in PolyPlus settings.", 12.sp, color = MutedText)
-            CardAction("Return to vanilla", MainMenuReplacement::returnToVanilla)
+            SocialText("Use the PolyPlus main menu, or go back to Minecraft's own menus, pause screen and startup. You can switch back any time in PolyPlus settings.", 12.sp, color = MutedText)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CardAction("PolyPlus menu", Modifier.weight(1f), MainMenuReplacement::offerPolyPlusMenu)
+                CardAction("Return to vanilla", Modifier.weight(1f), MainMenuReplacement::returnToVanilla)
+            }
         }
     }
 }
@@ -165,14 +168,14 @@ private fun CardStatusLine(dot: Color, text: String, color: Color = SocialTextPr
 }
 
 @Composable
-private fun CardAction(label: String, onClick: () -> Unit) {
+private fun CardAction(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val accent = OneConfigTheme.accent
     val shape = ppShape(12.dp)
     val fill by animateColorAsState(accent.copy(alpha = if (hovered) CARD_ACTION_HOVER_ALPHA else CARD_ACTION_ALPHA))
     val edge by animateColorAsState(accent.copy(alpha = if (hovered) 1f else CARD_ACTION_BORDER_ALPHA))
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(CardActionHeight)
             .clip(shape)

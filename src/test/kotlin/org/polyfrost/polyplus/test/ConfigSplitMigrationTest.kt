@@ -7,8 +7,10 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.MainMenuChoice
 import org.polyfrost.polyplus.client.MainMenuFpsLimitMode
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.lobby.LobbyTime
 import java.nio.file.Files
@@ -43,6 +45,7 @@ class ConfigSplitMigrationTest {
             Files.write(folder.resolve("${PolyPlusConstants.ID}.json"), LEGACY_CONFIG.toByteArray())
             Files.deleteIfExists(folder.resolve("${PolyPlusConstants.ID}-mainmenu.json"))
             Files.deleteIfExists(folder.resolve("${PolyPlusConstants.ID}-cosmetics.json"))
+            Files.deleteIfExists(folder.resolve("${PolyPlusConstants.ID}-lobby.json"))
 
             PolyPlusMainMenuConfig.preload()
             PolyPlusCosmeticsConfig.preload()
@@ -51,7 +54,7 @@ class ConfigSplitMigrationTest {
 
     @Test
     fun `main menu options are carried over`() {
-        assertTrue(PolyPlusMainMenuConfig.useVanillaMainMenu)
+        assertEquals(MainMenuChoice.VANILLA, PolyPlusMainMenuConfig.mainMenu)
         assertTrue(PolyPlusMainMenuConfig.hideMainMenuSocial)
         assertTrue(PolyPlusMainMenuConfig.hideMainMenuQuickplay)
         assertEquals(MainMenuFpsLimitMode.CUSTOM, PolyPlusMainMenuConfig.mainMenuFpsLimitMode)
@@ -75,7 +78,7 @@ class ConfigSplitMigrationTest {
     /** One value the split config cannot read must not cost the options copied after it. */
     @Test
     fun `an unreadable value does not abort the rest of the migration`() {
-        assertEquals(LobbyTime.CAPTURED, PolyPlusMainMenuConfig.lobbyTime)
+        assertEquals(LobbyTime.CAPTURED, PolyPlusLobbyConfig.lobbyTime)
         assertFalse(PolyPlusMainMenuConfig.panoramaInAllMenus)
     }
 
