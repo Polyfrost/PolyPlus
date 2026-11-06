@@ -2,7 +2,9 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -39,7 +41,9 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialControlBackground
+import org.polyfrost.polyplus.client.gui.SocialBorderWidth
+import org.polyfrost.polyplus.client.gui.SocialDropdownBackground
+import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -64,7 +68,6 @@ import org.polyfrost.polyplus.client.party.PartyAudio
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
-import org.polyfrost.polyplus.client.party.SvcHandoff
 import org.polyfrost.polyplus.client.party.VoiceInputMode
 
 private val Edge = 24.dp
@@ -97,7 +100,7 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
             if (party != null) VoiceButtons(party)
             if (!back) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close voice settings", onClick = window::closeVoice)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+        PaneRule()
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val control = (maxWidth - Edge * 2 - LabelRoom).coerceAtMost(ControlWidth)
             ScrollFade(Modifier.fillMaxSize().padding(start = Edge, end = Edge, top = Edge), 28.dp) {
@@ -110,7 +113,6 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
                 Section("Talking") {
                     if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
                     SettingRow("Input") { InputControl(control) }
-                    if (PartyVoiceSettings.svcSupported()) SettingRow("Simple Voice Chat") { HandoffControl(control) }
                 }
                 Spacer(Modifier.height(Edge))
             }
@@ -147,21 +149,32 @@ private fun DeviceSelect(input: Boolean, width: Dp) {
     val (interaction, hovered) = rememberSocialHover()
     val drop = with(LocalDensity.current) { MenuDrop.roundToPx() }
     val device = if (input) PartyVoiceSettings.inputDevice() else PartyVoiceSettings.outputDevice()
+    val accent = OneConfigTheme.accent
+    val fill by animateColorAsState(if (open) accent else SocialDropdownBackground)
+    val edge by animateColorAsState(
+        when {
+            open -> accent
+            hovered -> SocialHoverBorder
+            else -> SocialBorderColor
+        },
+    )
+    val ink = if (open) OneConfigTheme.current.accentTextColor else null
     Box {
         Row(
             Modifier
                 .width(width)
                 .height(ControlHeight)
                 .clip(SocialFieldShape)
-                .background(if (hovered) SocialBorderColor else SocialControlBackground)
+                .background(fill)
+                .border(SocialBorderWidth, edge, SocialFieldShape)
                 .hoverable(interaction)
                 .clickableWithSound { open = !open }
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Label(PartyAudio.deviceLabel(device).ifBlank { "Default" }, 14.sp, Modifier.weight(1f))
-            ThemedIcon(SOCIAL_ASSETS + "chevron-up.svg", MutedText, 14.dp, if (open) Modifier else Modifier.rotate(OPEN_CHEVRON))
+            Label(PartyAudio.deviceLabel(device).ifBlank { "Default" }, 14.sp, Modifier.weight(1f), color = ink ?: SocialTextPrimary)
+            ThemedIcon(SOCIAL_ASSETS + "chevron-up.svg", ink ?: MutedText, 14.dp, if (open) Modifier else Modifier.rotate(OPEN_CHEVRON))
         }
         if (open) {
             EscapeCloses { open = false }
@@ -184,34 +197,10 @@ private fun VolumeControl(input: Boolean, width: Dp) {
 
 @Composable
 private fun <T> Segments(options: List<Choice<T>>, selected: T, width: Dp, enabled: Boolean = true, onSelect: (T) -> Unit) {
-    Row(
-        Modifier.width(width).height(ControlHeight).clip(SocialFieldShape).background(SocialControlBackground).padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    SegmentTrack(Modifier.width(width).height(ControlHeight), enabled) {
         options.forEach { option ->
-            Segment(option.label, option.value == selected, enabled, Modifier.weight(1f)) { onSelect(option.value) }
+            SegmentButton(option.label, option.value == selected, Modifier.weight(1f).fillMaxHeight(), 12.sp, enabled, onClick = { onSelect(option.value) })
         }
-    }
-}
-
-@Composable
-private fun Segment(label: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val ink = when {
-        selected -> OneConfigTheme.current.accentTextColor
-        enabled && hovered -> SocialTextPrimary
-        else -> MutedText
-    }
-    Box(
-        modifier
-            .fillMaxSize()
-            .clip(SocialFieldShape)
-            .then(if (selected) Modifier.background(OneConfigTheme.accent) else Modifier)
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Label(label, 12.sp, color = ink, weight = FontWeight.Medium)
     }
 }
 
@@ -229,15 +218,5 @@ private fun InputControl(width: Dp) {
     Segments(options, mode, width) {
         mode = it
         PartyVoiceSettings.setInputMode(it)
-    }
-}
-
-@Composable
-private fun HandoffControl(width: Dp) {
-    val options = remember { listOf(Choice("Ask", SvcHandoff.ASK), Choice("Always", SvcHandoff.ALWAYS), Choice("Never", SvcHandoff.NEVER)) }
-    var handoff by remember { mutableStateOf(PartyVoiceSettings.svcHandoff()) }
-    Segments(options, handoff, width) {
-        handoff = it
-        PartyVoiceSettings.setSvcHandoff(it)
     }
 }

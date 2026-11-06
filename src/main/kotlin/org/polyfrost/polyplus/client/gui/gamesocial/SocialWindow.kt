@@ -45,6 +45,7 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.LocalComposerFocus
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
+import org.polyfrost.polyplus.client.gui.SocialBorderWidth
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialToastHost
@@ -84,6 +85,8 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.ChatIdentity
 import kotlin.math.max
 import kotlin.math.min
+import org.polyfrost.polyplus.client.gui.usableScale
+import org.polyfrost.polyplus.client.gui.usableSize
 
 private const val DESIGN_WIDTH = 1280f
 private const val DESIGN_HEIGHT = 720f
@@ -243,8 +246,9 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
+        if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
         val scale = max(min(widthPx / DESIGN_WIDTH, heightPx / DESIGN_HEIGHT), MIN_SCALE)
-        val density = remember(scale, outer.fontScale) { Density(scale, outer.fontScale) }
+        val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         val layout = remember(widthPx, heightPx, scale) { SocialWindowLayout((widthPx / scale).dp, (heightPx / scale).dp) }
         window.singlePane = layout.singlePane
         val look = remember(layout.singlePane) { SocialLook.InGame.copy(backButton = layout.singlePane) }
@@ -351,7 +355,7 @@ private fun TwoPanes(
         if (layout.singlePane) {
             if (opened) DetailPane(window, layout, state, snapshot, detail, invites, reconnecting, Modifier.fillMaxSize())
         } else {
-            Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
+            Box(Modifier.width(SocialBorderWidth).fillMaxHeight().background(SocialBorderColor))
             DetailPane(window, layout, state, snapshot, detail, invites, reconnecting, Modifier.weight(1f).fillMaxHeight())
         }
     }
@@ -382,7 +386,7 @@ private fun DetailPane(
                 PanelTitle("Blocked", Modifier.weight(1f))
                 SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close") { window.blockedOpen = false }
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+            PaneRule()
             BlockedList(state, snapshot, Modifier.fillMaxWidth().weight(1f))
         }
         detail is SocialDetail.Friend -> FriendDetailPanel(state, snapshot, detail.person, modifier)
@@ -400,6 +404,11 @@ private fun DetailPane(
         )
         else -> OverviewPane(WindowHost, state, snapshot, invites, window::showVoice, modifier)
     }
+}
+
+@Composable
+internal fun PaneRule(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(SocialBorderWidth).background(SocialBorderColor))
 }
 
 private fun memberLine(thread: SocialThread): String? {

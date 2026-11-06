@@ -74,6 +74,8 @@ import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import kotlin.math.max
 import kotlin.math.min
+import org.polyfrost.polyplus.client.gui.usableScale
+import org.polyfrost.polyplus.client.gui.usableSize
 
 private const val MIN_SCALE = 0.72f
 private const val COMPACT_WIDTH = 1300f
@@ -115,8 +117,9 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
+        if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
         val scale = max(min(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT), MIN_SCALE)
-        val density = remember(scale, outer.fontScale) { Density(scale, outer.fontScale) }
+        val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             Box(Modifier.fillMaxSize()) {
                 val narrow = widthPx / scale < COMPACT_WIDTH

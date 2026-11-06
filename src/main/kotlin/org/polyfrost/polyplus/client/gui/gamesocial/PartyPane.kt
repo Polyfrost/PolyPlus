@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
 import org.polyfrost.polyplus.client.gui.SocialIconButton
@@ -77,13 +75,13 @@ internal fun PartyPane(
         val narrow = maxWidth < NarrowPane
         Column(Modifier.fillMaxSize()) {
             RoomHeader(window, party, narrow)
-            Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+            PaneRule()
             PlayTogetherBanner(Modifier.padding(start = Edge, end = Edge, top = 16.dp))
             Box(Modifier.padding(start = Edge, end = Edge, top = 16.dp)) {
                 PartySeats(host, party, if (narrow) NARROW_SEAT_COLUMNS else SEAT_COLUMNS, inviteSeat = true)
             }
             RoomVoice(window, party)
-            Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+            PaneRule()
             RoomChat(thread?.id, snapshot, reconnecting)
         }
     }

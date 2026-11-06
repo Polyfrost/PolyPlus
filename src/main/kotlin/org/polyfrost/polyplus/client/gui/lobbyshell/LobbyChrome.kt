@@ -120,6 +120,8 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.math.roundToInt
+import org.polyfrost.polyplus.client.gui.usableScale
+import org.polyfrost.polyplus.client.gui.usableSize
 
 private const val FROST_MILLIS = 220
 private const val REVEAL_MILLIS = 700
@@ -165,9 +167,10 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
+        if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
         StartupOverlay.rootWidth = widthPx
         val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT)
-        val density = remember(scale, outer.fontScale) { Density(scale, outer.fontScale) }
+        val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             if (lobby.setup) {
                 if (chrome > 0f || StartupOverlay.active) {
@@ -423,7 +426,7 @@ private const val TAG_EASE_MILLIS = 160
 private const val TAG_TWO_LINE_HEIGHT = 46
 private const val TAG_WHEREABOUTS_WIDTH = 180
 private const val TAG_FOCUS_SCALE = 1.08f
-private const val MORE_MENU_WIDTH = 270
+private const val MORE_MENU_WIDTH = 300
 private const val QUIT_ICON = SOCIAL_ASSETS + "x-close.svg"
 private const val QUIT_CARD_WIDTH = 330
 private const val MIN_SHOWN_PLAYTIME = 60_000L

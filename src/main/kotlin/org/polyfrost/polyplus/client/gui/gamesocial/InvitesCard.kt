@@ -35,7 +35,6 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -45,7 +44,6 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxItem
 import org.polyfrost.polyplus.client.gui.lobbysocial.PersonHead
-import org.polyfrost.polyplus.client.gui.ppShape
 
 private val InviteRowHeight = 52.dp
 private val RoomyRowHeight = 60.dp
@@ -61,7 +59,7 @@ internal fun CountPill(count: Int, modifier: Modifier = Modifier) {
         modifier
             .widthIn(min = PillSize)
             .height(PillSize)
-            .clip(ppShape(6.dp))
+            .clip(OneConfigTheme.current.checkBoxShape)
             .background(OneConfigTheme.accent)
             .padding(horizontal = 2.dp),
         contentAlignment = Alignment.Center,
@@ -98,7 +96,7 @@ internal fun InvitesBell(items: List<InboxItem>) {
 
 @Composable
 internal fun InviteRow(item: InboxItem, divided: Boolean, roomy: Boolean = false) {
-    if (divided) Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+    if (divided) PaneRule()
     Row(
         Modifier.fillMaxWidth().height(if (roomy) RoomyRowHeight else InviteRowHeight).padding(start = if (roomy) 16.dp else 12.dp, end = if (roomy) 12.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,

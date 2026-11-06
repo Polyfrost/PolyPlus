@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +27,6 @@ import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.HostFlowSteps
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
 import org.polyfrost.polyplus.client.gui.SocialIconButton
@@ -92,7 +90,7 @@ internal fun WorldPane(window: SocialWindowState, state: SocialPageState, snapsh
             if (hosting != null) SocialButton("Stop hosting", onClick = SocialHosting::stop)
             if (closable && !back) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close world", onClick = window::closeWorld)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+        PaneRule()
         val body = Modifier.fillMaxWidth().weight(1f)
         when {
             hosting != null -> InviteFriends(state, snapshot, body)

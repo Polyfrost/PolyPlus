@@ -116,10 +116,14 @@ internal const val REFERENCE_GUI_SCALE = 2f
 
 internal const val GUI_DENSITY_TRIM = 0.88f
 
+internal fun usableScale(value: Float): Float = if (value.isFinite() && value > 0f) value else 1f
+
+internal fun usableSize(width: Float, height: Float): Boolean = width.isFinite() && height.isFinite() && width > 0f && height > 0f
+
 @Composable
 internal fun scaledDensity(scale: Float): Density {
     val density = LocalDensity.current
-    return remember(density, scale) { Density(density.density * scale, density.fontScale) }
+    return remember(density, scale) { Density(usableScale(density.density * scale), usableScale(density.fontScale)) }
 }
 
 /** Sizing of the title screen's player preview, which grows to fit a hat cosmetic. */

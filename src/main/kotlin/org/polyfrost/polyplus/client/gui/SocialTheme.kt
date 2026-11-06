@@ -101,7 +101,7 @@ internal val SocialBorderColor: Color
 
 internal val SocialWindowShape: Shape
     @Composable
-    get() = ppShape(20.dp)
+    get() = OneConfigTheme.current.backgroundShape
 
 internal val OneConfigUITheme.translucentSurfaces: Boolean
     get() = popupBackground.alpha < 1f
@@ -120,7 +120,7 @@ internal val SocialWindowBackground: Color
 
 internal val SocialPanelShape: Shape
     @Composable
-    get() = ppShape(16.dp)
+    get() = OneConfigTheme.current.popupShape
 
 internal val SocialPopupBackground: Color
     @Composable get() = OneConfigTheme.current.popupBackground
@@ -130,7 +130,7 @@ internal val SocialCardBackground: Color
 
 internal val SocialFieldShape: Shape
     @Composable
-    get() = ppShape(8.dp)
+    get() = OneConfigTheme.current.buttonShape
 
 internal val SocialControlBackground: Color
     @Composable get() = OneConfigTheme.current.componentBackground

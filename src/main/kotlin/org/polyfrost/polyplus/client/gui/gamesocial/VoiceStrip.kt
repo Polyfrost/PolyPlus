@@ -2,9 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LeaveVoiceButton
@@ -39,7 +36,7 @@ internal fun VoiceStrip(window: SocialWindowState, modifier: Modifier = Modifier
     val party = current
     if (party == null || !voice.inVoice) return
     Column(modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(1.dp).background(SocialBorderColor))
+        PaneRule(Modifier.padding(horizontal = 8.dp))
         Row(
             Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

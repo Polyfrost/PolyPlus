@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,16 +24,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.concentric
 import org.polyfrost.polyplus.client.gui.CompactStatusPicker
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialButton
@@ -49,6 +54,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
+import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.lobbysocial.FriendFilter
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxItem
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxLine
@@ -90,6 +96,8 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 private val Inset = 8.dp
 private val ChipHeight = 34.dp
 private val ChipFace = 24.dp
+private val TabHeight = 34.dp
+private val TrackInset = 2.dp
 
 private enum class LeftTab(val label: String, val filter: ThreadFilter?) {
     Chats("Chats", ThreadFilter.All),
@@ -297,10 +305,7 @@ private fun WorldChip(window: SocialWindowState, snapshot: SocialSnapshot, modif
 
 @Composable
 private fun Tabs(list: SocialListState, snapshot: SocialSnapshot, tab: LeftTab, modifier: Modifier, onSelect: (LeftTab) -> Unit) {
-    Row(
-        modifier.fillMaxWidth().clip(SocialFieldShape).background(SocialControlBackground).padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    SegmentTrack(modifier.fillMaxWidth()) {
         LeftTab.entries.filter { it != LeftTab.Special || snapshot.specialTarget }.forEach { entry ->
             val count = when (entry) {
                 LeftTab.Chats -> list.unread(snapshot)
@@ -308,35 +313,58 @@ private fun Tabs(list: SocialListState, snapshot: SocialSnapshot, tab: LeftTab, 
                 LeftTab.Groups -> 0
                 LeftTab.Special -> snapshot.threads.count { it.special && it.unread }
             }
-            SocialTab(entry.label, count, entry == tab, Modifier.weight(1f)) { onSelect(entry) }
+            val selected = entry == tab
+            SegmentButton(entry.label, selected, Modifier.weight(1f).height(TabHeight), onClick = { onSelect(entry) }) {
+                when {
+                    count == 0 -> Unit
+                    selected -> Label(count.toString(), 10.sp, color = OneConfigTheme.current.accentTextColor)
+                    else -> CountPill(count)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SocialTab(label: String, count: Int, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun SegmentTrack(modifier: Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
+            .clip(SocialFieldShape)
+            .background(SocialControlBackground)
+            .padding(TrackInset),
+        horizontalArrangement = Arrangement.spacedBy(TrackInset),
+        content = content,
+    )
+}
+
+@Composable
+internal fun SegmentButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier,
+    fontSize: TextUnit = 14.sp,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    trailing: @Composable () -> Unit = {},
+) {
     val (interaction, hovered) = rememberSocialHover()
+    val active = enabled && hovered
     val ink = when {
         selected -> OneConfigTheme.current.accentTextColor
-        hovered -> SocialTextPrimary
+        active -> SocialTextPrimary
         else -> MutedText
     }
     Row(
         modifier
-            .height(34.dp)
-            .clip(SocialFieldShape)
-            .then(if (selected) Modifier.background(OneConfigTheme.accent) else Modifier)
+            .rowFrame(selected, active, SocialFieldShape.concentric(TrackInset))
             .hoverable(interaction)
-            .clickableWithSound(onClick),
+            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
-        Label(label, 14.sp, color = ink, weight = FontWeight.Medium)
-        when {
-            count == 0 -> Unit
-            selected -> Label(count.toString(), 10.sp, color = ink)
-            else -> CountPill(count)
-        }
+        Label(label, fontSize, color = ink, weight = FontWeight.Medium)
+        trailing()
     }
 }
 

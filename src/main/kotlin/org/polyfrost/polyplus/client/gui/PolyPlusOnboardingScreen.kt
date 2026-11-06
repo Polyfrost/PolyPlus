@@ -571,7 +571,7 @@ internal fun OnboardingFlow(
             animationSpec = spring(),
         )
         CompositionLocalProvider(
-            LocalDensity provides Density(outer.density * LOBBY_PANEL_SCALE, outer.fontScale),
+            LocalDensity provides Density(usableScale(outer.density * LOBBY_PANEL_SCALE), usableScale(outer.fontScale)),
             LocalPanelWidth provides panelWidth,
             LocalPanelHeight provides panelHeight,
         ) {
