@@ -29,7 +29,6 @@ object PartyVoice {
         val blockedNotice: String? = null,
         val talking: Boolean = false,
         val speaking: Set<String> = emptySet(),
-        val svcPaired: Set<String> = emptySet(),
         val noticeOpen: Boolean = false,
     )
 
@@ -47,22 +46,11 @@ object PartyVoice {
     @Volatile private var linuxRtcReady = false
     @Volatile private var active: VoiceTransport? = null
     @Volatile private var talking = false
-    @Volatile private var allPaired = false
     @Volatile private var selfHardMuted = false
     @Volatile private var noticeOpen = false
     @Volatile private var capture: VoiceStream? = null
     @Volatile private var lastLoud = 0L
     @Volatile private var silentSince = 0L
-    @Volatile private var svcTalking = false
-    @Volatile private var lastGate = false
-    private var svcSynced = false
-    private var svcMuted = false
-    private var svcDisabled = false
-    private var svcStartMuted = false
-    private var svcStartDisabled = false
-    private var svcDroveMuted = false
-    private var svcDroveDisabled = false
-    private var svcPaired: Set<String> = emptySet()
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -111,23 +99,17 @@ object PartyVoice {
         stopCapture()
         talking = false
         speakingPlayers = emptySet()
-        svcPaired = emptySet()
-        allPaired = false
-        PartySvc.release()
-        syncSvc()
         publish()
     }
 
     fun toggleMute() {
         muted = !muted
-        if (!muted) PartySvc.noteUnmuted()
         PartyMesh.sendState(muted, deafened)
         publish()
     }
 
     fun toggleDeafen() {
         deafened = !deafened
-        if (!deafened) PartySvc.noteUndeafened()
         PartyMesh.sendState(muted, deafened)
         publish()
     }
@@ -249,10 +231,9 @@ object PartyVoice {
             }
         }
         if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
-        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld || PartySvc.pushToTalkHeld() else now - lastLoud < VAD_HANGOVER_MS
-        shareGate(gate)
+        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld else now - lastLoud < VAD_HANGOVER_MS
         val allowed = inVoice && !muted && !deafened && !micBlocked && !selfHardMuted
-        val talk = allowed && gate && !allPaired
+        val talk = allowed && gate
         talking = talk
         when (active) {
             VoiceTransport.P2p -> PartyMesh.onCapture(frame, talk)
@@ -316,18 +297,14 @@ object PartyVoice {
         val myKey = PartyPresence.local.location.key
         val others = PartyRepository.others(party)
         val gains = PartyProximity.gains(party, myKey)
-        val paired = PartySvc.resolve(others, myKey)
-        syncSvc()
         val talkers = others.filter { it.online && it.state?.voice?.inVoice == true }
-        allPaired = talkers.isNotEmpty() && talkers.all { it.player in paired }
-        svcPaired = paired
         val outputGain = PartyVoiceSettings.outputGain()
         val mix = HashMap<String, PeerMix>()
         for (member in others) {
             val puid = member.eosProductUserId ?: continue
             val proximity = gains[member.player]
             val gain = (proximity?.gain ?: 1f) * PartyVoiceSettings.volumeOf(member.player)
-            val silenced = member.player in paired || PartyVoiceSettings.isMuted(member.player) ||
+            val silenced = PartyVoiceSettings.isMuted(member.player) ||
                 (active == VoiceTransport.P2p && member.voiceHardMuted)
             mix[puid] = PeerMix(gain, proximity?.pan ?: 0f, silenced)
         }
@@ -348,67 +325,7 @@ object PartyVoice {
             }
             else -> emptySet()
         }
-        speakingPlayers = speaking.mapNotNullTo(HashSet()) { byPuid[it] }.filterNot { it in paired }.toSet() + PartySvc.speaking(paired)
-    }
-
-    private fun syncSvc() {
-        val link = PartySvc.link?.takeIf { PartySvc.linked }
-        if (link == null) {
-            if (svcSynced) restoreSvc()
-            svcSynced = false
-            svcTalking = false
-            return
-        }
-        val nowMuted = link.muted()
-        val nowDisabled = link.disabled()
-        if (!svcSynced) {
-            svcSynced = true
-            svcStartMuted = nowMuted
-            svcStartDisabled = nowDisabled
-            svcDroveMuted = false
-            svcDroveDisabled = false
-            if (nowMuted && !muted) {
-                muted = true
-                PartySvc.noteMutedThere()
-            }
-        } else {
-            if (nowMuted != svcMuted) {
-                muted = nowMuted
-                svcDroveMuted = false
-            }
-            if (nowDisabled != svcDisabled) {
-                deafened = nowDisabled
-                svcDroveDisabled = false
-            }
-        }
-        if (muted != nowMuted && link.setMuted(muted)) svcDroveMuted = true
-        if (deafened != nowDisabled && link.setDisabled(deafened)) svcDroveDisabled = true
-        svcMuted = link.muted()
-        svcDisabled = link.disabled()
-        val silent = muted || deafened || selfHardMuted
-        svcTalking = !silent && link.talking(null)
-        PartySvc.blockSound = deafened
-        shareGate(if (capture == null) pttHeld || PartySvc.pushToTalkHeld() else lastGate)
-    }
-
-    private fun shareGate(gate: Boolean) {
-        lastGate = gate
-        if (!PartySvc.linked) return
-        val silent = muted || deafened || selfHardMuted
-        PartySvc.talkOpen = gate && !silent
-        PartySvc.blockMicrophone = silent || (PartyVoiceSettings.pushToTalk() && !gate)
-    }
-
-    private fun restoreSvc() {
-        val link = PartySvc.link ?: return
-        if (svcDroveMuted) link.setMuted(svcStartMuted)
-        if (svcDroveDisabled) link.setDisabled(svcStartDisabled)
-        svcDroveMuted = false
-        svcDroveDisabled = false
-    }
-
-    fun onShutdown() {
-        if (svcSynced) restoreSvc()
+        speakingPlayers = speaking.mapNotNullTo(HashSet()) { byPuid[it] }.toSet()
     }
 
     private fun blockedNotice(): String? {
@@ -421,7 +338,7 @@ object PartyVoice {
 
     private fun publish() {
         val self = PartyRepository.localId()
-        val talkingNow = (talking || svcTalking) && inVoice
+        val talkingNow = talking && inVoice
         val speaking = if (talkingNow) speakingPlayers + self else speakingPlayers
         val next = Ui(
             inVoice = inVoice,
@@ -432,7 +349,6 @@ object PartyVoice {
             blockedNotice = blockedNotice(),
             talking = talkingNow,
             speaking = speaking,
-            svcPaired = svcPaired,
             noticeOpen = noticeOpen,
         )
         if (next != _ui.value) _ui.value = next

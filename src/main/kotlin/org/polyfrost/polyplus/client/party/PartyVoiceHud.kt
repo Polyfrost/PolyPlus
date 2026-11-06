@@ -51,11 +51,8 @@ private const val ICON_SIZE = 9f
 private const val ICON_STROKE_RATIO = 0.09f
 private const val ICON_VIEWBOX = 27f
 private const val CURVE_STEPS = 6
-private const val OWN_HANDOFF_TAG = "On Simple Voice Chat"
-private const val MEMBER_HANDOFF_TAG = "SVC"
 private const val SAMPLE_MEMBER = "Party Member"
 
-private val TAG = PolyColor(0xFFAAAAAA.toInt())
 private val PLACEHOLDER = PolyColor(0x40FFFFFF)
 
 private val SVG_PATH = Regex(" d=\"([^\"]+)\"")
@@ -69,7 +66,6 @@ private data class VoiceRow(
     val speaking: Boolean,
     val muted: Boolean,
     val deafened: Boolean,
-    val tag: String?,
 )
 
 private val micOff by lazy { iconStrokes(SOCIAL_ASSETS + "microphone-off-01.svg") }
@@ -222,7 +218,6 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
                 PolyCanvas(centered.size(side, side)) { x, y, width, _ -> drawHead(row, x, y, width, scale) }
             }
             if (names) Label(row.name, PolyColor(textColor, textChroma, textChromaSpeed), scale)
-            if (names) row.tag?.let { Label(it, TAG, scale) }
             if (showMutedIcon && row.muted) Icon(micOff, scale)
             if (showDeafenedIcon && row.deafened) Icon(headphonesOff, scale)
         }
@@ -309,10 +304,10 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
 private fun sampleRows(): List<VoiceRow> {
     val face = faceOf(PartyRepository.localId())
     return listOf(
-        VoiceRow("sample-self", ClientPlatform.localPlayerName(), true, face, speaking = true, muted = false, deafened = false, tag = null),
-        VoiceRow("sample-speaking", SAMPLE_MEMBER, false, face, speaking = true, muted = false, deafened = false, tag = null),
-        VoiceRow("sample-muted", SAMPLE_MEMBER, false, face, speaking = false, muted = true, deafened = false, tag = null),
-        VoiceRow("sample-deafened", SAMPLE_MEMBER, false, face, speaking = false, muted = true, deafened = true, tag = MEMBER_HANDOFF_TAG),
+        VoiceRow("sample-self", ClientPlatform.localPlayerName(), true, face, speaking = true, muted = false, deafened = false),
+        VoiceRow("sample-speaking", SAMPLE_MEMBER, false, face, speaking = true, muted = false, deafened = false),
+        VoiceRow("sample-muted", SAMPLE_MEMBER, false, face, speaking = false, muted = true, deafened = false),
+        VoiceRow("sample-deafened", SAMPLE_MEMBER, false, face, speaking = false, muted = true, deafened = true),
     )
 }
 
@@ -330,7 +325,6 @@ private fun liveRows(): List<VoiceRow> {
         ui.talking,
         ui.muted || ui.micBlocked || self?.voiceHardMuted == true,
         ui.deafened,
-        if (ui.svcPaired.isNotEmpty()) OWN_HANDOFF_TAG else null,
     )
     val members = PartyRepository.others(party).filter { it.online && it.state?.voice?.inVoice == true }.map { member ->
         val voice = member.state?.voice
@@ -342,7 +336,6 @@ private fun liveRows(): List<VoiceRow> {
             member.player in ui.speaking,
             voice?.muted == true || voice?.micBlocked == true || member.voiceHardMuted,
             voice?.deafened == true,
-            if (member.player in ui.svcPaired) MEMBER_HANDOFF_TAG else null,
         )
     }
     return listOf(own) + members

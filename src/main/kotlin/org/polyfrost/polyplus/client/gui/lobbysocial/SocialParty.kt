@@ -102,7 +102,6 @@ internal class PartyCell(
     val detail: String,
     val speaking: Boolean,
     val muted: Boolean,
-    val paired: Boolean,
 )
 
 internal fun locationLabel(state: MemberState?, online: Boolean): String {
@@ -117,12 +116,11 @@ internal fun locationLabel(state: MemberState?, online: Boolean): String {
     }
 }
 
-private fun voiceLabel(member: PartyMember?, state: MemberState?, paired: Boolean): String? {
+private fun voiceLabel(member: PartyMember?, state: MemberState?): String? {
     val voice = state?.voice ?: return null
     if (!voice.inVoice) return null
     return when {
         voice.micBlocked -> "Can't talk (mic blocked)"
-        paired -> "On Simple Voice Chat"
         member?.voiceHardMuted == true -> "Muted by leader"
         voice.deafened -> "Deafened"
         voice.muted -> "Muted"
@@ -138,7 +136,6 @@ internal fun partyCells(party: Party): List<PartyCell> {
     val selfState = PartyPresence.local.let {
         it.copy(voice = it.voice.copy(inVoice = voice.inVoice, muted = voice.muted, deafened = voice.deafened, micBlocked = voice.micBlocked))
     }
-    val selfPaired = voice.svcPaired.isNotEmpty()
     val selfId = self?.player ?: PartyRepository.localId()
     val local = PartyCell(
         id = selfId,
@@ -147,13 +144,11 @@ internal fun partyCells(party: Party): List<PartyCell> {
         leader = PartyRepository.isSelf(party.leader),
         member = self,
         state = selfState,
-        detail = voiceLabel(self, selfState, selfPaired) ?: "You",
+        detail = voiceLabel(self, selfState) ?: "You",
         speaking = voice.talking,
         muted = voice.inVoice && (voice.muted || voice.deafened || voice.micBlocked),
-        paired = selfPaired,
     )
     val others = PartyRepository.others(party).map { member ->
-        val paired = member.player in voice.svcPaired
         val state = member.state
         PartyCell(
             id = member.player,
@@ -162,10 +157,9 @@ internal fun partyCells(party: Party): List<PartyCell> {
             leader = PartyRepository.samePlayer(member.player, party.leader),
             member = member,
             state = state,
-            detail = if (!member.online) "Offline" else voiceLabel(member, state, paired) ?: locationLabel(state, true),
+            detail = if (!member.online) "Offline" else voiceLabel(member, state) ?: locationLabel(state, true),
             speaking = member.player in voice.speaking,
             muted = state?.voice?.let { it.inVoice && (it.muted || it.deafened || it.micBlocked) } == true || member.voiceHardMuted,
-            paired = paired,
         )
     }
     return listOf(local) + others
@@ -213,7 +207,7 @@ internal fun MemberPopover(host: SocialHost, party: Party, cell: PartyCell, onCl
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Label(if (cell.leader) "${cell.name} · Leader" else cell.name, 14.sp, weight = FontWeight.Medium)
                     Label(locationLabel(cell.state, cell.self || cell.member?.online == true), 12.sp, color = MutedText)
-                    voiceLabel(cell.member, cell.state, cell.paired)?.let { Label(it, 12.sp, color = MutedText) }
+                    voiceLabel(cell.member, cell.state)?.let { Label(it, 12.sp, color = MutedText) }
                 }
             }
             joinable(cell)?.let { address ->

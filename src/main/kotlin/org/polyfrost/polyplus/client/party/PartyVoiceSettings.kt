@@ -9,7 +9,6 @@ import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
 object PartyVoiceSettings {
     private const val DEFAULT_VOLUME = 1f
     private const val MAX_VOLUME = 2f
-    private const val LEGACY_VERSION = "1.8.9"
 
     var memberVolumes by mutableStateOf(parseVolumes(PolyPlusConfig.voiceMemberVolumes))
         private set
@@ -46,15 +45,6 @@ object PartyVoiceSettings {
         PolyPlusConfig.voiceInputMode = mode
         PolyPlusConfig.save()
     }
-
-    fun svcHandoff(): SvcHandoff = PolyPlusConfig.voiceSvcHandoff
-
-    fun setSvcHandoff(handoff: SvcHandoff) {
-        PolyPlusConfig.voiceSvcHandoff = handoff
-        PolyPlusConfig.save()
-    }
-
-    fun svcSupported(): Boolean = PartyScene.mcVersion != LEGACY_VERSION
 
     fun proximityRange(): Float = PolyPlusConfig.voiceProximityRange.coerceIn(16f, 128f)
 

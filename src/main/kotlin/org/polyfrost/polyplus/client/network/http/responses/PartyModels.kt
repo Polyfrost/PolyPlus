@@ -139,7 +139,6 @@ data class MemberScene(
 data class MemberState(
     val location: MemberLocation = MemberLocation(),
     val voice: MemberVoice = MemberVoice(),
-    @SerialName("svc_connected") val svcConnected: Boolean = false,
     val scene: MemberScene? = null,
 )
 

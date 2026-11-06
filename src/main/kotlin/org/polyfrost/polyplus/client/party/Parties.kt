@@ -2,7 +2,6 @@ package org.polyfrost.polyplus.client.party
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
-import org.polyfrost.oneconfig.api.event.v1.events.ShutdownEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.hud.v1.HudManager
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -28,7 +27,6 @@ object Parties {
         PlayTogether.earlyInitialize()
         HudManager.register(PartyVoiceHud(), PolyPlusConstants.ID, "assets/polyplus/brand/oneclient.svg")
         PartyRepository.refreshed.onEach { PartyPresence.forceSend() }.launchIn(PolyPlusClient.SCOPE)
-        eventHandler<ShutdownEvent> { PartyVoice.onShutdown() }
         eventHandler<TickEvent.End> {
             ticks.forEach { step -> runCatching(step).onFailure { LOGGER.error("Party tick failed", it) } }
         }
