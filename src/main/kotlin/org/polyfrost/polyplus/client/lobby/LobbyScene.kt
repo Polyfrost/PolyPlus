@@ -128,8 +128,11 @@ import org.polyfrost.polyplus.mixin.client.access.GameRendererAccessor
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 import org.polyfrost.polyplus.mixin.client.access.ParticleEngineAccessor
 //?}
-//? if > 1.8.9
+//? if > 1.8.9 {
 import org.polyfrost.polyplus.mixin.client.access.OptionsAccessor
+import org.polyfrost.polyplus.mixin.client.access.CameraAccessor
+import net.minecraft.client.CameraType
+//?}
 //? if >= 26.3 {
 import org.lwjgl.sdl.SDLMouse
 //?} elif > 1.8.9 {
@@ -187,6 +190,7 @@ object LobbyScene {
         var extracted = false
         var started = false
         var startNanos = 0L
+        val builtNanos = Util.getNanos()
         var frames = 0L
         var frameTime = 0.0
         var frameLook: Vec3 = Vec3(0.0, 0.0, 0.0)
@@ -197,6 +201,8 @@ object LobbyScene {
         val joined = HashMap<UUID, Long>()
         //? if >= 1.21.10
         var particles: ParticleEngine? = null
+        //? if > 1.8.9
+        val props = ArrayList<Entity>()
     }
 
     private class Driven(
@@ -214,6 +220,11 @@ object LobbyScene {
         /*var fancy = true*/
         //? if >= 1.21.10
         var particles: ParticleEngine? = null
+        //? if > 1.8.9 {
+        var view: CameraType? = null
+        //?} else {
+        /*var view = 0
+        *///?}
     }
 
     private class Binding(val previous: ClientLevel?)
@@ -243,6 +254,10 @@ object LobbyScene {
     private const val SPEAKER_PITCH_SHARE = 0.3f
     const val INTRO_SECONDS = 2.5
     private const val CRANE_SECONDS = 5.0
+    private const val START_WAIT_NANOS = 4_000_000_000L
+    private const val LABEL_HEAD_SHARE = 0.9
+    private const val LABEL_BODY_SHARE = 0.5
+    private const val LABEL_SIGHT_SLACK = 0.5
     private const val OPENING_SECONDS = CRANE_SECONDS
     private const val WAVE_LEAD_SECONDS = 2.0
     private const val FIRST_DISTANCE = 46f
@@ -474,7 +489,15 @@ object LobbyScene {
             avatar.pose = Pose.STANDING
             avatar.arriveNow()
         }
-        if (swappedIn) scene.level.tickEntities() else swapped(scene) { scene.level.tickEntities() }
+        if (swappedIn) tickSceneEntities(scene.level) else swapped(scene) { tickSceneEntities(scene.level) }
+    }
+
+    private fun tickSceneEntities(level: ClientLevel) {
+        //? if > 1.8.9 {
+        LobbyEntities.tick(level)
+        //?} else {
+        /*level.tickEntities()
+        *///?}
     }
 
     private fun pointer(mc: Minecraft): Pair<Double, Double> =
@@ -965,7 +988,10 @@ object LobbyScene {
         val posts = dress(level, stage, mood)
         val avatars = spawnAvatars(mc, level, listener, stage, driven?.cast ?: LobbyFriends.cast())
         LobbyEntrance.plan(level, avatars.filterNot { it.spectral }, avatars) { restingView(mc, stage, it) }
-        return Live(listener, level, gameMode, rig, stage, stage.portraitShot(level), avatars, mood, captured, posts)
+        val built = Live(listener, level, gameMode, rig, stage, stage.portraitShot(level), avatars, mood, captured, posts)
+        //? if > 1.8.9
+        built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
+        return built
     }
 
     private fun sceneClock(captured: Long): Long = driven?.clock ?: LobbyTime.clock(captured)
@@ -1309,7 +1335,7 @@ object LobbyScene {
             for (step in 0L until steps) {
                 if (late) recast(mc, scene, due(frame.cast, scene.joined, scene.simTick, target))
                 scene.simTick++
-                scene.level.tickEntities()
+                tickSceneEntities(scene.level)
                 for (avatar in scene.avatars) {
                     if (avatar.consumeLanded()) land(avatar)
                 }
@@ -1434,6 +1460,18 @@ object LobbyScene {
             //? if = 1.8.9
             /*mc.options.fancyGraphics = true*/
             mc.setCameraEntity(scene.rig)
+            //? if > 1.8.9 {
+            previous.view = mc.options.cameraType
+            mc.options.setCameraType(CameraType.FIRST_PERSON)
+            if (!embedded) {
+                val camera = LobbyCompat.camera(mc.gameRenderer) as CameraAccessor
+                camera.`polyplus$setEyeHeight`(scene.rig.eyeHeight)
+                camera.`polyplus$setEyeHeightOld`(scene.rig.eyeHeight)
+            }
+            //?} else {
+            /*previous.view = mc.options.perspective
+            mc.options.perspective = 0
+            *///?}
             swappedIn = true
         } catch (error: Throwable) {
             end()
@@ -1457,6 +1495,11 @@ object LobbyScene {
                 //? if >= 1.21.10
                 previous.particles?.let { (mc as MinecraftAccessor).`polyplus$setParticleEngine`(it) }
             } finally {
+                //? if > 1.8.9 {
+                previous.view?.let(mc.options::setCameraType)
+                //?} else {
+                /*mc.options.perspective = previous.view
+                *///?}
                 mc.setCameraEntity(previous.camera)
             }
         } finally {
@@ -1471,7 +1514,7 @@ object LobbyScene {
         val crane = 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
         val eased = 1.0 - crane * crane * crane
         val distance = lerp(stage.craneDistance, stage.distance, eased)
-        val pitch = lerp(LobbyStage.CRANE_PITCH, stage.pitch.toDouble(), eased)
+        val pitch = lerp(stage.cranePitch, stage.pitch.toDouble(), eased)
         val yaw = stage.yaw + lerp(stage.craneOrbit, 0.0, eased)
         val aspect = viewAspect(mc)
         val look = LobbyEntrance.view(Vec3(0.0, 0.0, 0.0), yaw, pitch, CAMERA_FOV, aspect).look
@@ -1491,7 +1534,7 @@ object LobbyScene {
         settleFocus(mc, scene, elapsed)
         val parallaxShare = 1.0 - (1.0 - PARALLAX_FOCUS_SHARE) * focusBlend.value
         var distance = lerp(stage.craneDistance, stage.distance, eased) + focusReach.value
-        var pitch = lerp(LobbyStage.CRANE_PITCH, stage.pitch.toDouble(), eased) + sin(time * 0.23 + 2.0) * SWAY_PITCH_DEGREES + parallaxY.value * PARALLAX_PITCH_DEGREES * parallaxShare
+        var pitch = lerp(stage.cranePitch, stage.pitch.toDouble(), eased) + sin(time * 0.23 + 2.0) * SWAY_PITCH_DEGREES + parallaxY.value * PARALLAX_PITCH_DEGREES * parallaxShare
         var yaw = stage.yaw + lerp(stage.craneOrbit, 0.0, eased) + sin(time * 0.17) * SWAY_YAW_DEGREES + parallaxX.value * PARALLAX_YAW_DEGREES * parallaxShare
         var aim = stage.aim.add(Vec3(focusAimX.value, focusAimY.value, focusAimZ.value))
         val framed = LobbyFraming.frame(time, elapsed, eased, OPENING_SECONDS)
@@ -1616,7 +1659,12 @@ object LobbyScene {
             //?} else {
             /*access.`polyplus$extractCamera`(deltaTracker, partialTicks, camera.getCameraEntityPartialTicks(deltaTracker))
             *///?}
-            LobbyCompat.extractLevel(mc, deltaTracker, camera, partialTicks)
+            try {
+                LobbyCompat.extractLevel(mc, deltaTracker, camera, partialTicks)
+            } catch (error: Throwable) {
+                if (!LobbyEntities.purge(scene.level, partialTicks)) throw error
+                LobbyCompat.extractLevel(mc, deltaTracker, camera, partialTicks)
+            }
             //? if >= 26.2
             state.levelRenderState.render3dCrosshair = false
             if (scene.started) {
@@ -1750,7 +1798,8 @@ object LobbyScene {
         /*LobbyCompat.pose(scene.rig, look, right, currentFov)*/
         val focusDistance = lerp(lensRange, currentDistance.toDouble(), LobbyWardrobe.amount).toFloat()
         LobbySky.upload(mc, currentFov, look, right, right.cross(look), time.toFloat(), focusDistance, scene.mood)
-        labels = scene.avatars.filter { it.arrival == LobbyAvatar.Arrival.LANDED && !it.dismissed }.map { avatar ->
+        val eye = scene.rig.position().add(0.0, scene.rig.eyeHeight.toDouble(), 0.0)
+        labels = scene.avatars.filter { it.arrival == LobbyAvatar.Arrival.LANDED && !it.dismissed && inSight(scene.level, eye, look, it) }.map { avatar ->
             val head = avatar.position().add(0.0, avatar.bbHeight + HEAD_LABEL_OFFSET, 0.0)
             val screen = LobbyCompat.project(renderer, head, currentFov)
             Label(avatar.displayName, screen.x.toFloat(), screen.y.toFloat(), avatar.isLocal, avatar.uuid.toString().takeIf { scene.stage.background.any { it === avatar.rest } }, avatar.whereabouts)
@@ -1758,11 +1807,20 @@ object LobbyScene {
         overlayAlpha = (((time - overlayDelay) / OVERLAY_FADE_SECONDS).toFloat()).coerceIn(0f, 1f) * (1f - departProgress * 4f).coerceIn(0f, 1f)
         scene.extracted = true
         scene.frames++
-        if (!scene.started && scene.frames > 30 && sectionsSettled(mc)) {
+        if (!scene.started && scene.frames > 30 && (sectionsSettled(mc) || Util.getNanos() - scene.builtNanos > START_WAIT_NANOS)) {
             scene.started = true
             scene.startNanos = Util.getNanos()
             LobbyCompat.setGameTime(scene.level, 0L)
             if (skipPending) jumpOpening(scene)
+        }
+    }
+
+    private fun inSight(level: ClientLevel, eye: Vec3, look: Vec3, avatar: LobbyAvatar): Boolean {
+        val base = avatar.position()
+        val head = base.add(0.0, avatar.bbHeight * LABEL_HEAD_SHARE, 0.0)
+        if (head.subtract(eye).dot(look) <= 0.0) return false
+        return listOf(head, base.add(0.0, avatar.bbHeight * LABEL_BODY_SHARE, 0.0)).any { point ->
+            LobbyStage.reach(level, eye, point) >= eye.distanceTo(point) - LABEL_SIGHT_SLACK
         }
     }
 
@@ -1835,7 +1893,9 @@ object LobbyScene {
         val inside = embedded
         swapped(scene) {
             if (!inside) mc.gameRenderer.tick()
-            if (driven == null) scene.level.tickEntities()
+            //? if > 1.8.9
+            stageProps(scene)
+            if (driven == null) tickSceneEntities(scene.level)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()
             //? if > 1.8.9 {
@@ -1861,6 +1921,21 @@ object LobbyScene {
             *///?}
         }
     }
+
+    //? if > 1.8.9 {
+    private fun stageProps(scene: Live) {
+        val props = scene.props
+        var index = props.size - 1
+        while (index >= 0) {
+            val prop = props[index]
+            if (!unrevealed(prop.blockX, prop.blockZ)) {
+                props.removeAt(index)
+                LobbyEntities.enter(scene.level, prop)
+            }
+            index--
+        }
+    }
+    //?}
 
     private fun syncLocalCosmetics(scene: Live) {
         val ids = CosmeticCatalog.localEquipped().ids()

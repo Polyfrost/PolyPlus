@@ -13,6 +13,7 @@ import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.core.SectionPos
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
 import net.minecraft.network.Connection
 import net.minecraft.tags.BlockTags
 //? if >= 1.21.11 {
@@ -20,6 +21,8 @@ import net.minecraft.util.Util
 //?} else {
 /*import net.minecraft.Util
 *///?}
+//? if > 1.8.9
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.LightLayer
 import net.minecraft.world.level.block.Blocks
@@ -98,6 +101,9 @@ object LobbyCapture {
         var nextSection = 0
         var blockEntities: Iterator<BlockEntity>? = null
         var topSection = minSection
+        val entities = ListTag()
+        //? if > 1.8.9
+        var props: ArrayDeque<Entity>? = null
     }
 
     private class Outcome(
@@ -535,13 +541,13 @@ object LobbyCapture {
         while (Util.getNanos() - start < STEP_NANOS) {
             val chunk = job.chunk
             if (chunk == null) {
-                if (!nextChunk(level, job)) break
+                if (!nextChunk(level, job) && !nextProp(level, job)) break
                 continue
             }
             copyStep(level, chunk, job)
         }
         job.timing.add(Util.getNanos() - start)
-        if (job.pending.isEmpty() && job.chunk == null) {
+        if (job.pending.isEmpty() && job.chunk == null && propsDone(job)) {
             copying = null
             finishCopy(level, job)
         }
@@ -565,6 +571,25 @@ object LobbyCapture {
         job.chunks += copy
         return true
     }
+
+    //? if > 1.8.9 {
+    private fun nextProp(level: ClientLevel, job: Copying): Boolean {
+        val props = job.props
+        if (props == null) {
+            job.props = LobbyEntities.gather(level, job.anchor, job.minSection, job.topSection, job.source.privacy)
+            return true
+        }
+        val entity = props.removeFirstOrNull() ?: return false
+        LobbyEntities.save(level, entity, job.source.privacy)?.let { job.entities.add(it) }
+        return true
+    }
+
+    private fun propsDone(job: Copying): Boolean = job.props?.isEmpty() == true
+    //?} else {
+    /*private fun nextProp(level: ClientLevel, job: Copying): Boolean = false
+
+    private fun propsDone(job: Copying): Boolean = true
+    *///?}
 
     private fun copyStep(level: ClientLevel, chunk: LevelChunk, job: Copying) {
         val copy = job.copy ?: return
@@ -644,7 +669,7 @@ object LobbyCapture {
                 }
                 val encodeStart = Util.getNanos()
                 val packs = LobbyPacks.record(job.source.stack)
-                val meta = LobbySnapshot.Meta(anchor, clock, job.radius, job.minSection, job.topSection, biome, job.source.privacy, stage.toTag(), packs)
+                val meta = LobbySnapshot.Meta(anchor, clock, job.radius, job.minSection, job.topSection, biome, job.source.privacy, stage.toTag(), packs, job.entities)
                 //? if > 1.8.9 {
                 val root = LobbySnapshot.encode(job.chunks, meta, factory)
                 //?} else {
@@ -720,12 +745,13 @@ object LobbyCapture {
         report(
             source,
             outcome.anchor,
-            "${if (kept) "kept" else "rejected WEAKER"} score=%.1f biome=%s size=%dKB chunks=%d survey[%s] copy[%s] solve=%dms encode=%dms compress=%dms".format(
+            "${if (kept) "kept" else "rejected WEAKER"} score=%.1f biome=%s size=%dKB chunks=%d entities=%d survey[%s] copy[%s] solve=%dms encode=%dms compress=%dms".format(
                 Locale.ROOT,
                 outcome.score,
                 outcome.biome,
                 data.size / 1024,
                 job.chunks.size,
+                job.entities.size,
                 job.surveyTiming.describe(),
                 job.timing.describe(),
                 outcome.solveMillis,

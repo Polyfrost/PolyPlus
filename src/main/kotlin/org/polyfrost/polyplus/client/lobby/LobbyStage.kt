@@ -38,6 +38,7 @@ data class LobbyStage(
     val spot: BlockPos,
     val heading: Double,
     val background: List<LobbySlot> = emptyList(),
+    val cranePitch: Double = CRANE_PITCH,
 ) {
     fun forward(): Vec3 {
         val radians = Math.toRadians(yaw.toDouble())
@@ -294,7 +295,7 @@ data class LobbyStage(
         private const val LANTERN_GAP = 1.6
         private const val POST_HEIGHT = 3.0
         const val CRANE_PITCH = 46.0
-        private const val CRANE_SAMPLES = 8
+        private const val CRANE_SAMPLES = 24
         private const val CRANE_MARGIN = 1.5
         private const val SKY_CHECK = 24
         private const val SKY_RADIUS = 5
@@ -303,6 +304,8 @@ data class LobbyStage(
         private const val WALK_CELLS = 9000
         private const val FOREGROUND_SHARE = 0.62
         private const val MAX_LEAF_SHARE = 0.3
+        private const val MAX_NEAR_SHARE = 0.35
+        private const val GROUND_RAY = -0.4
 
         private val PORTRAIT_ORBITS = listOf(8f, -8f, 20f, -20f, 34f, -34f, 50f, -50f)
         private val PORTRAIT_PITCHES = listOf(5f, 9f, 14f, 20f)
@@ -525,6 +528,8 @@ data class LobbyStage(
         private fun backdrop(level: BlockGetter, view: LobbyEntrance.View, distance: Double): Double? {
             var total = 0.0
             var leaves = 0
+            var near = 0
+            var raised = 0
             for ((x, y) in BACKDROP_RAYS) {
                 val direction = view.look.add(view.right.scale(x * view.tanHalf * view.aspect)).add(view.up.scale(y * view.tanHalf)).normalize()
                 val end = view.camera.add(direction.scale(BACKDROP_REACH))
@@ -534,13 +539,19 @@ data class LobbyStage(
                 if (hit.type != HitResult.Type.MISS && canopy(level, hit.blockPos)) leaves++
                 total += length / BACKDROP_REACH
                 if (length < distance) total -= BLOCKED_NEAR_COST / BACKDROP_RAYS.size
+                if (y > GROUND_RAY) {
+                    raised++
+                    if (length < distance) near++
+                }
             }
-            if (leaves > BACKDROP_RAYS.size * MAX_LEAF_SHARE) return null
+            if (leaves > BACKDROP_RAYS.size * MAX_LEAF_SHARE || near > raised * MAX_NEAR_SHARE) return null
             return total / BACKDROP_RAYS.size
         }
 
         private fun canopy(level: BlockGetter, pos: BlockPos): Boolean {
             val state = level.getBlockState(pos)
+            //? if > 1.8.9
+            if (state.`is`(Blocks.MANGROVE_ROOTS) || state.`is`(Blocks.MUDDY_MANGROVE_ROOTS)) return true
             return state.`is`(BlockTags.LEAVES) || state.`is`(BlockTags.LOGS) || (state.`is`(Blocks.SNOW) && level.getBlockState(pos.below()).`is`(BlockTags.LEAVES))
         }
 
@@ -552,8 +563,8 @@ data class LobbyStage(
                 val post = post(view, cell)
                 stage.slots.none { depthOf(view, it.pos) > depthOf(view, Vec3(cell.x + 0.5, cell.y.toDouble(), cell.z + 0.5)) && post.hits(figure(view, it.pos).body) }
             }
-            val (orbit, reach) = crane(level, stage)
-            return stage.copy(lanterns = lanterns, craneOrbit = orbit, craneDistance = reach, background = crowd(solver, frame, view, stage, lanterns))
+            val (orbit, reach, cranePitch) = crane(level, stage)
+            return stage.copy(lanterns = lanterns, craneOrbit = orbit, craneDistance = reach, cranePitch = cranePitch, background = crowd(solver, frame, view, stage, lanterns))
         }
 
         private class Crowd(val solver: Solver, val frame: Frame, val view: LobbyEntrance.View, val stage: LobbyStage, val lanterns: List<BlockPos>) {
@@ -634,23 +645,23 @@ data class LobbyStage(
             return Box(low.first - half, high.second, low.first + half, low.second)
         }
 
-        private fun crane(level: BlockGetter, stage: LobbyStage): Pair<Double, Double> {
+        private fun crane(level: BlockGetter, stage: LobbyStage): Triple<Double, Double, Double> {
             for (reach in CRANE_REACH) {
                 for (orbit in CRANE_ORBITS) {
-                    if ((0..CRANE_SAMPLES).all { craneClear(level, stage, orbit, reach, it.toDouble() / CRANE_SAMPLES) }) return orbit to reach
+                    if ((0..CRANE_SAMPLES).all { craneClear(level, stage, orbit, reach, CRANE_PITCH, it.toDouble() / CRANE_SAMPLES) }) return Triple(orbit, reach, CRANE_PITCH)
                 }
             }
-            return 0.0 to stage.distance
+            return Triple(0.0, stage.distance, stage.pitch.toDouble())
         }
 
-        private fun craneClear(level: BlockGetter, stage: LobbyStage, orbit: Double, reach: Double, progress: Double): Boolean {
+        private fun craneClear(level: BlockGetter, stage: LobbyStage, orbit: Double, reach: Double, startPitch: Double, progress: Double): Boolean {
             val eased = 1.0 - (1.0 - progress) * (1.0 - progress) * (1.0 - progress)
             val distance = reach + (stage.distance - reach) * eased
-            val pitch = Math.toRadians(CRANE_PITCH + (stage.pitch - CRANE_PITCH) * eased)
+            val pitch = Math.toRadians(startPitch + (stage.pitch - startPitch) * eased)
             val yaw = Math.toRadians(stage.yaw + orbit * (1.0 - eased))
             val look = Vec3(-sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
             val camera = stage.aim.subtract(look.scale(distance))
-            return reach(level, camera, stage.aim) >= distance - CRANE_MARGIN
+            return clearAir(level, camera) && reach(level, camera, stage.aim) >= distance - CRANE_MARGIN
         }
 
         private fun lookYaw(from: Vec3, to: Vec3): Float =

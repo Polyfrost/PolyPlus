@@ -57,13 +57,13 @@ import java.util.zip.GZIPOutputStream
 
 //? if > 1.8.9 {
 enum class LobbyPrivacy(val kept: Set<String>) {
-    OWN_WORLD(setOf("id", "x", "y", "z", "front_text", "back_text", "is_waxed", "patterns", "sherds")),
-    SERVER(setOf("id", "x", "y", "z", "patterns", "sherds")),
+    OWN_WORLD(setOf("id", "x", "y", "z", "front_text", "back_text", "is_waxed", "patterns", "sherds", "blockState", "facing", "progress", "extending", "source")),
+    SERVER(setOf("id", "x", "y", "z", "patterns", "sherds", "blockState", "facing", "progress", "extending", "source")),
 }
 //?} else {
 /*enum class LobbyPrivacy(val kept: Set<String>) {
-    OWN_WORLD(setOf("id", "x", "y", "z", "Text1", "Text2", "Text3", "Text4", "Base", "Patterns", "Item", "Data", "SkullType", "Rot")),
-    SERVER(setOf("id", "x", "y", "z", "Base", "Patterns", "Item", "Data", "SkullType", "Rot")),
+    OWN_WORLD(setOf("id", "x", "y", "z", "Text1", "Text2", "Text3", "Text4", "Base", "Patterns", "Item", "Data", "SkullType", "Rot", "blockId", "blockData", "facing", "progress", "extending")),
+    SERVER(setOf("id", "x", "y", "z", "Base", "Patterns", "Item", "Data", "SkullType", "Rot", "blockId", "blockData", "facing", "progress", "extending")),
 }
 *///?}
 
@@ -131,9 +131,11 @@ class LobbyCopyView(chunks: Collection<LobbyChunkCopy>, private val minY: Int, p
 
 object LobbySnapshot {
     //? if > 1.8.9 {
-    const val FORMAT = 2
+    const val FORMAT = 4
+    private val READABLE = intArrayOf(2, FORMAT)
     //?} else {
     /*const val FORMAT = 3
+    private val READABLE = intArrayOf(FORMAT)
     *///?}
     const val DEFAULT_RADIUS = 6
     const val MIN_RADIUS = 4
@@ -161,6 +163,7 @@ object LobbySnapshot {
         val privacy: LobbyPrivacy,
         val stage: CompoundTag?,
         val packs: List<LobbyScenePack> = emptyList(),
+        val entities: ListTag? = null,
     )
 
     //? if = 1.8.9 {
@@ -248,6 +251,7 @@ object LobbySnapshot {
             putString("biome", meta.biome)
             putString("privacy", meta.privacy.name)
             meta.stage?.let { put("stage", it) }
+            meta.entities?.let { if (it.size > 0) put("entities", it) }
             if (meta.packs.isNotEmpty()) {
                 put("packs", LobbyPacks.write(meta.packs))
                 putString("game_version", PartyScene.mcVersion)
@@ -404,7 +408,7 @@ object LobbySnapshot {
     fun native(root: CompoundTag): Boolean = root.getIntOr("data_version", 0) == dataVersion
 
     fun compatible(root: CompoundTag, bundled: Boolean = false): Boolean =
-        root.getIntOr("format", 0) == FORMAT && (bundled || native(root)) && packProblem(root) == null
+        root.getIntOr("format", 0) in READABLE && (bundled || native(root)) && packProblem(root) == null
 
     private fun packProblem(root: CompoundTag): String? =
         LobbyPacks.problem(LobbyPacks.read(root.getListOrEmpty("packs")), root.getStringOr("game_version", ""))

@@ -100,6 +100,8 @@ object LobbySky {
     private const val DEPTH_COMPONENT24 = 0x81A6
     private var depthTexture = 0
     private var depthSize = 0 to 0
+    private var depthFresh = false
+    private const val FLAGS_DEPTH_AT = 7 * 4 * Float.SIZE_BYTES + 3 * Float.SIZE_BYTES
     *///?}
     private val data = MemoryUtil.memAlloc(BYTES)
     private val glass = MemoryUtil.memAlloc(LobbyGlass.BLOCK_BYTES)
@@ -267,6 +269,8 @@ object LobbySky {
         glass.clear()
         LobbyGlass.write(glass)
         glass.flip()
+        //? if = 1.8.9
+        /*if (!depthFresh) data.putFloat(FLAGS_DEPTH_AT, DEPTH_UNKNOWN.toFloat())*/
         for (pass in (loaded as PostChainAccessor).`polyplus$passes`()) {
             setAll(pass.effect, SKY_NAMES, data)
             setAll(pass.effect, GLASS_NAMES, glass)
@@ -280,6 +284,7 @@ object LobbySky {
         GlStateManager.popMatrix()
         GlStateManager.matrixMode(GL11.GL_MODELVIEW)
         GlStateManager.enableCull()
+        depthFresh = false
         *///?} else {
         loaded.process(0f)
         //?}
@@ -306,6 +311,7 @@ object LobbySky {
         }
         GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
         GlStateManager.bindTexture(0)
+        depthFresh = true
     }
     *///?}
 
