@@ -4,9 +4,10 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
+import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.SocialOverlayScreen
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 object SocialOverlay {
@@ -34,19 +35,16 @@ object SocialOverlay {
         /*val current = mc.screen
         *///?}
 
-        when (current) {
-            is SocialOverlayScreen -> close()
-            null, is TitleScreen, is PolyPlusMainMenuScreen -> open(current)
+        when {
+            current is SocialOverlayScreen -> close()
+            current is PolyPlusLobbyScreen -> current.showPage(if (current.lobby.page == LobbyPage.Social) LobbyPage.Home else LobbyPage.Social)
+            current == null || current is TitleScreen || MainMenuReplacement.isMenu(current) -> open(current)
             else -> logger.debug("Ignoring Shift+P: {} is open and isn't safe to interrupt", current.javaClass.simpleName)
         }
     }
 
     /** Explicit open, e.g. from a button - always allowed regardless of the current screen. */
     fun open(from: Screen? = currentScreen()) {
-        if (!PrivacyConsent.allowsOnlineServices()) {
-            logger.debug("Ignoring social overlay open: online services are disabled (ToS not accepted)")
-            return
-        }
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
         mc.gui.setScreen(SocialOverlayScreen(from))
@@ -54,11 +52,26 @@ object SocialOverlay {
         /*mc.setScreen(SocialOverlayScreen(from))
         *///?}
 
-        SocialRefresh.refreshAll()
+        if (PrivacyConsent.allowsOnlineServices()) SocialRefresh.refreshAll()
     }
 
     fun close() {
         (currentScreen() as? SocialOverlayScreen)?.dismiss()
+    }
+
+    fun isShowing(): Boolean = when (val screen = currentScreen()) {
+        is SocialOverlayScreen -> true
+        is PolyPlusLobbyScreen -> screen.lobby.page == LobbyPage.Social
+        else -> false
+    }
+
+    fun showsChat(): Boolean {
+        if (!Minecraft.getInstance().isWindowActive) return false
+        return when (val screen = currentScreen()) {
+            is SocialOverlayScreen -> true
+            is PolyPlusLobbyScreen -> !screen.lobby.accountsOpen
+            else -> false
+        }
     }
 
     private fun currentScreen(): Screen? {

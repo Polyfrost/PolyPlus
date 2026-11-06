@@ -36,9 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -58,6 +58,7 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -283,9 +284,9 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
     val art = remember(variant.id, swatchVersion) { CosmeticSwatches.get(variant.id) }
     Row(
         modifier = Modifier.height(28.dp)
-            .alpha(if (dimmed) 0.55f else 1f)
+            .graphicsLayer { alpha = if (dimmed) 0.55f else 1f }
             .clip(ppShape(6.dp))
-            .background(if (selected) OneConfigTheme.accent else theme.componentBackground)
+            .background(if (selected) OneConfigTheme.accent else SocialOffStateBackground)
             .border(
                 1.dp,
                 when {

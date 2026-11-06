@@ -1,0 +1,272 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
+package org.polyfrost.polyplus.client.gui.serveredit
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.resolver.ServerAddress
+import net.minecraft.client.resources.language.I18n
+import org.polyfrost.oneconfig.api.platform.v1.Platform
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialBorderColor
+import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialDropdown
+import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.polyplus.client.gui.SocialScrim
+import org.polyfrost.polyplus.client.gui.SocialTextValueField
+import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.lobbyshell.DangerButton
+import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
+import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
+import org.polyfrost.polyplus.client.gui.lobbyshell.popup
+
+private const val NAME_MAX_LENGTH = 32
+private const val ADDRESS_MAX_LENGTH = 128
+private const val DEFAULT_NAME_KEY = "selectServer.defaultName"
+private const val PING_DEBOUNCE_MILLIS = 450L
+private const val PROBE_TICK_MILLIS = 50L
+
+private val DialogWidth = 720.dp
+private val BodyHeight = 280.dp
+private val PreviewWidth = 268.dp
+private val ButtonWidth = 96.dp
+
+private class ServerEditForm(server: ServerData?) {
+    val initialAddress = server?.ip.orEmpty()
+    var name by mutableStateOf(fieldValue(server?.name.orEmpty().take(NAME_MAX_LENGTH)))
+    var address by mutableStateOf(fieldValue(initialAddress.take(ADDRESS_MAX_LENGTH)))
+    var packStatus by mutableStateOf(server?.resourcePackStatus ?: ServerData.ServerPackStatus.PROMPT)
+    var confirmingDelete by mutableStateOf(false)
+    val packOpen = mutableStateOf(false)
+    var finished = false
+
+    val addressValid: Boolean get() = ServerAddress.isValidAddress(address.text)
+    val displayName: String get() = name.text.ifEmpty { I18n.get(DEFAULT_NAME_KEY) }
+}
+
+private fun fieldValue(text: String) = TextFieldValue(text, TextRange(text.length))
+
+private fun TextFieldValue.limited(maxLength: Int) = if (text.length > maxLength) copy(text = text.take(maxLength)) else this
+
+@Composable
+internal fun ServerEditDialog(
+    server: ServerData?,
+    onDone: () -> Unit,
+    onDelete: (() -> Unit)?,
+    onDismiss: () -> Unit,
+) {
+    val form = remember(server) { ServerEditForm(server) }
+    val probe = remember(server) { ServerStatusProbe(Minecraft.getInstance(), server) }
+    val nameFocus = remember { FocusRequester() }
+
+    val cancel: () -> Unit = {
+        if (form.confirmingDelete) form.confirmingDelete = false else onDismiss()
+    }
+    val save: () -> Unit = save@{
+        if (form.finished || form.confirmingDelete || !form.addressValid) return@save
+        form.finished = true
+        ServerEditStore.save(server, form.displayName, form.address.text, form.packStatus)
+        onDone()
+    }
+    val delete: () -> Unit = delete@{
+        if (form.finished || server == null) return@delete
+        form.finished = true
+        ServerEditStore.delete(server)
+        onDelete?.invoke()
+    }
+
+    if (form.confirmingDelete) EscapeCloses { form.confirmingDelete = false }
+    if (form.packOpen.value) EscapeCloses { form.packOpen.value = false }
+    DisposableEffect(probe) { onDispose(probe::close) }
+    LaunchedEffect(probe) {
+        while (isActive) {
+            probe.tick()
+            delay(PROBE_TICK_MILLIS)
+        }
+    }
+    LaunchedEffect(probe, form.address.text) {
+        probe.reset(form.address.text)
+        if (!form.addressValid) return@LaunchedEffect
+        if (form.address.text != form.initialAddress) delay(PING_DEBOUNCE_MILLIS)
+        probe.ping()
+    }
+
+    Popup(alignment = Alignment.Center, onDismissRequest = cancel, properties = PopupProperties(focusable = true, dismissOnClickOutside = false)) {
+        LaunchedEffect(Unit) { nameFocus.requestFocus() }
+        Box(Modifier.fillMaxSize().background(SocialScrim), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier
+                    .width(DialogWidth)
+                    .popup()
+                    .onPreviewKeyEvent { event -> dialogKey(event, cancel, save) },
+            ) {
+                DialogHeader(if (server == null) "Add server" else "Edit server", onDismiss)
+                Hairline()
+                Row(
+                    Modifier.fillMaxWidth().height(BodyHeight).padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ServerFields(form, nameFocus)
+                    }
+                    ServerPreviewCard(form.displayName, form.addressValid, probe, Modifier.width(PreviewWidth).fillMaxHeight())
+                }
+                Hairline()
+                DialogFooter(form, server != null && onDelete != null, onDismiss, save, delete)
+            }
+        }
+    }
+}
+
+private fun dialogKey(event: KeyEvent, cancel: () -> Unit, save: () -> Unit): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    return when (event.key) {
+        Key.Escape -> {
+            cancel()
+            true
+        }
+        Key.Enter, Key.NumPadEnter -> {
+            save()
+            true
+        }
+        else -> false
+    }
+}
+
+@Composable
+private fun Hairline() {
+    Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+}
+
+@Composable
+private fun DialogHeader(title: String, onDismiss: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(60.dp).padding(start = 18.dp, end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PanelTitle(title, Modifier.weight(1f))
+        SocialIconButton(LobbyIcons.CLOSE, Modifier.focusProperties { canFocus = false }, onClick = onDismiss)
+    }
+}
+
+@Composable
+private fun ServerFields(form: ServerEditForm, nameFocus: FocusRequester) {
+    val invalid = form.address.text.isNotEmpty() && !form.addressValid
+    FormField("Server name") {
+        SocialTextValueField(
+            value = form.name,
+            onValueChange = { form.name = it.limited(NAME_MAX_LENGTH) },
+            placeholder = Platform.i18n().getUnformattedText(I18n.get(DEFAULT_NAME_KEY)),
+            focusRequester = nameFocus,
+        )
+    }
+    FormField("Server address", helper = "Enter a valid server address.".takeIf { invalid }, helperColor = SocialDangerText) {
+        SocialTextValueField(
+            value = form.address,
+            onValueChange = { form.address = it.limited(ADDRESS_MAX_LENGTH) },
+            placeholder = "play.example.net",
+            invalid = invalid,
+        )
+    }
+    FormField("Server resource packs", helper = packHelp(form.packStatus)) {
+        SocialDropdown(
+            "Use",
+            ServerData.ServerPackStatus.entries,
+            form.packStatus,
+            { Platform.i18n().getUnformattedText(it.getName()) },
+            Modifier.fillMaxWidth(),
+            form.packOpen,
+        ) { form.packStatus = it }
+    }
+}
+
+private fun packHelp(status: ServerData.ServerPackStatus) = when (status) {
+    ServerData.ServerPackStatus.ENABLED -> "Use the server's resource pack without asking."
+    ServerData.ServerPackStatus.DISABLED -> "Never use the server's resource pack."
+    ServerData.ServerPackStatus.PROMPT -> "Ask each time the server offers a resource pack."
+}
+
+@Composable
+private fun FormField(label: String, helper: String? = null, helperColor: Color = MutedText, control: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        SocialText(label, 12.sp, color = MutedText, fontWeight = FontWeight.Medium, maxLines = 1)
+        control()
+        Box(Modifier.height(14.dp)) {
+            helper?.let { SocialText(it, 11.sp, color = helperColor, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+    }
+}
+
+@Composable
+private fun DialogFooter(
+    form: ServerEditForm,
+    canDelete: Boolean,
+    onDismiss: () -> Unit,
+    save: () -> Unit,
+    delete: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 18.dp).focusProperties { canFocus = false },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (form.confirmingDelete) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                SocialText("Delete this server?", 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                SocialText("It will be removed from your server list.", 12.sp, color = MutedText, maxLines = 1)
+            }
+            SocialButton("Keep server", onClick = { form.confirmingDelete = false })
+            DangerButton("Delete server", onClick = delete)
+            return@Row
+        }
+        if (canDelete) DangerButton("Delete") { form.confirmingDelete = true }
+        Spacer(Modifier.weight(1f))
+        SocialButton("Cancel", modifier = Modifier.widthIn(min = ButtonWidth), onClick = onDismiss)
+        SocialButton("Save", modifier = Modifier.widthIn(min = ButtonWidth), filled = true, enabled = form.addressValid, onClick = save)
+    }
+}

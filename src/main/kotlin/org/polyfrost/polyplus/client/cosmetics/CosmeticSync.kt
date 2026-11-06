@@ -24,6 +24,8 @@ import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
@@ -48,6 +50,7 @@ object CosmeticSync {
         subscribePlayers(players.toList())
     }
     private val subscribedPlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val watchedFriends: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private val pendingSubscriptions = ConcurrentHashMap<Long, List<String>>()
     private val nextRequestId = AtomicLong()
@@ -83,8 +86,10 @@ object CosmeticSync {
 
     fun earlyInitialize() {
         eventHandler<WorldEvent.Load> {
-            PolyPlusClient.refreshCosmetics()
-            refreshVisibleSubscriptions()
+            if (!LobbyScene.building) {
+                PolyPlusClient.refreshCosmetics()
+                refreshVisibleSubscriptions()
+            }
             Unit
         }
 
@@ -138,7 +143,7 @@ object CosmeticSync {
                 PolyPlusClient.refreshCosmetics()
             }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
-            val configUiOpen = OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
+            val configUiOpen = previewUiOpen()
             if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
             configUiWasOpen = configUiOpen
             if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
@@ -266,9 +271,20 @@ object CosmeticSync {
             normalizePlayerUuid(uuid.toString())?.let(visible::add)
         }
 
-        val stale = subscribedPlayers.filter { it !in visible }
+        val stale = subscribedPlayers.filter { it !in visible && it !in watchedFriends }
         unsubscribePlayers(stale)
         return subscribePlayers(visible)
+    }
+
+    fun subscribeFriends(players: Collection<String>): Result<Unit> = subscribePlayers(players)
+
+    fun watchFriends(players: Collection<String>): Result<Unit> {
+        val friends = players.mapNotNull(::normalizePlayerUuid).toSet()
+        val dropped = watchedFriends.filter { it !in friends }
+        watchedFriends.retainAll(friends)
+        watchedFriends.addAll(friends)
+        unsubscribePlayers(dropped)
+        return subscribePlayers(friends)
     }
 
     fun resubscribeVisiblePlayers(): Result<Unit> {
@@ -487,9 +503,11 @@ object CosmeticSync {
     //?}
 
     //? if >= 1.21.1 {
+    private fun previewUiOpen(): Boolean = ClientPlatform.currentScreen().let { OneConfigUI.isOneConfigScreen(it) || MainMenuReplacement.isMenu(it) }
+
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog - closing it calls trim again
-        if (OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return
+        if (previewUiOpen()) return
         val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
             CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
         val inUse = HashSet<Identifier>()
@@ -503,6 +521,7 @@ object CosmeticSync {
                 is PetEntity -> entity.definition?.let { inUse += it.texture }
             }
         }
+        inUse += LobbyScene.wornTextures()
         CosmeticAssetCache.trim(keep, inUse)
     }
     //?}
@@ -610,7 +629,9 @@ object CosmeticSync {
         for (uuidString in removed) {
             CosmeticCatalog.clearPolyPlusUser(UUID.fromString(uuidString))
         }
-        return PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
+        val result = PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
+        subscribePlayers(removed.filter(watchedFriends::contains))
+        return result
     }
 
     private fun unsubscribeAllPlayers() {
@@ -621,6 +642,7 @@ object CosmeticSync {
         if (players.isNotEmpty()) {
             PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(players))
         }
+        subscribePlayers(watchedFriends.toList())
     }
 
     private fun findPlayer(uuid: UUID): AbstractClientPlayer? {

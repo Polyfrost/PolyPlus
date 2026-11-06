@@ -43,10 +43,11 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRecents
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
+import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 
 private const val PICKER_COLUMNS = 8
 private val PickerWidth = 296.dp
@@ -80,10 +81,11 @@ internal fun EmojiPickerButton(onPick: (String) -> Unit) {
             if (buttonGlyph != null) {
                 EmojiGlyph(buttonGlyph, Modifier.size(18.dp))
             } else {
-                Icon(SOCIAL_ASSETS + "stars.svg", if (open) OneConfigTheme.accent else SocialTextSecondary, Modifier.size(16.dp))
+                ThemedIcon(SOCIAL_ASSETS + "stars.svg", if (open) OneConfigTheme.accent else SocialTextSecondary, 16.dp)
             }
         }
         if (open) {
+            EscapeCloses { open = false }
             Popup(
                 popupPositionProvider = remember { EmojiPickerPositionProvider },
                 onDismissRequest = { open = false },
@@ -130,6 +132,7 @@ private fun EmojiPickerPanel(onPick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .width(PickerWidth)
+            .sceneFrost(16.dp)
             .clip(SocialPanelShape)
             .background(SocialPopupBackground)
             .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)

@@ -6,7 +6,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
-import org.polyfrost.polyplus.client.gui.PolyPlusPauseScreen;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseStage;
+import org.polyfrost.polyplus.client.lobby.LobbyScene;
+import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
@@ -60,18 +63,22 @@ public class MixinGui {
             return;
         }
         *///?}
-        screen = PolyPlusPauseScreen.replace(screen);
+        screen = PauseRouter.replace(screen);
+        PauseStage.onScreen(screen);
+        screen = MainMenuReplacement.replaceLists(screen);
         if (MainMenuReplacement.enabled() && polyplus$opensTitleScreen(screen)) {
             if (!MainMenuReplacement.alreadyOpen()) {
                 original.call(MainMenuReplacement.create());
             }
             return;
         }
+        boolean leavingPause = PauseRouter.leaving(screen);
         original.call(screen);
+        if (leavingPause) ((MinecraftAccessor) Minecraft.getInstance()).polyplus$setAttackDelay(0);
     }
 
     @Unique
     private static boolean polyplus$opensTitleScreen(Screen screen) {
-        return screen instanceof TitleScreen || (screen == null && Minecraft.getInstance().player == null);
+        return screen instanceof TitleScreen || (screen == null && !LobbyScene.hasRealPlayer());
     }
 }

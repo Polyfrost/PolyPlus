@@ -46,8 +46,8 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
         require(localAddress is EosP2PAddress) { "EosP2PServerChannel can only bind to an EosP2PAddress, got $localAddress" }
 
         localSocket = localAddress.socket
-        bridge.addConnectionRequestHandler(localAddress.socket) { remote ->
-            onConnectionRequest(localAddress.socket, remote)
+        bridge.addSessionRequestHandler(localAddress.socket) { socket, remote ->
+            onConnectionRequest(socket, remote)
         }
         active = true
         LOGGER.info("Hosting an EOS P2P session on socket {}", localAddress.socket)
@@ -56,8 +56,12 @@ class EosP2PServerChannel internal constructor() : AbstractServerChannel() {
     override fun doClose() {
         open = false
         active = false
+        P2PChannelRegistry.allChannels().filter { it.parent() === this }.forEach { it.close() }
         val bridge = bridgeOrNull ?: return
-        localSocket?.let { socket -> bridge.closeConnection(socket, null) }
+        localSocket?.let { socket ->
+            bridge.removeSessionRequestHandler(socket)
+            bridge.closeConnection(socket, null)
+        }
     }
 
     override fun doBeginRead() {

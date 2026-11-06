@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -42,10 +43,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,11 +57,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
+import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
+import org.polyfrost.polyplus.client.social.PlayerStatusRepository
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 @Composable
 internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit) {
@@ -219,7 +225,7 @@ fun AccountButton(
             .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
             .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
-            .alpha(if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f)
+            .graphicsLayer { alpha = if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f }
             .fillMaxWidth()
             .border(1.dp, borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -239,6 +245,7 @@ fun AccountButton(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
+                if (account.active && account.microsoft && PrivacyConsent.allowsOnlineServices()) AccountStatusBadge()
                 if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
             }
             SocialText(
@@ -272,6 +279,25 @@ fun AccountButton(
 }
 
 @Composable
+private fun AccountStatusBadge() {
+    val status by PlayerStatusRepository.status.collectAsState()
+    val hidden = status == PlayerStatus.Offline
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(OneConfigTheme.current.componentBackground)
+            .border(1.dp, OneConfigTheme.current.borderColor, RoundedCornerShape(50))
+            .clickableWithSound { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        PresenceDot(!hidden, 8.dp)
+        SocialText(selfStatusLabel(status), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = OneConfigTheme.current.textColor)
+    }
+}
+
+@Composable
 private fun AccountBadge(icon: String, text: String, color: Color) {
     Row(
         modifier = Modifier
@@ -282,7 +308,7 @@ private fun AccountBadge(icon: String, text: String, color: Color) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(icon, color, Modifier.size(12.dp))
+        ThemedIcon(icon, color, 12.dp)
         SocialText(text, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
     }
 }
@@ -302,11 +328,32 @@ private fun RefreshAccountButton(color: Color, enabled: Boolean, spinning: Boole
         modifier = Modifier
             .size(30.dp)
             .clip(ppShape(6.dp))
-            .alpha(if (enabled || spinning) 1f else 0.4f)
+            .graphicsLayer { alpha = if (enabled || spinning) 1f else 0.4f }
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(ASSETS + "refresh-cw-01.svg", color, Modifier.size(18.dp).rotate(rotation))
+        ThemedIcon(ASSETS + "refresh-cw-01.svg", color, 18.dp, Modifier.rotate(rotation))
+    }
+}
+
+@Composable
+private fun Modifier.socialGlow(opacity: Float = 0.25f): Modifier {
+    val accent = OneConfigTheme.accent
+    return this.drawBehind {
+        val glowRadius = size.maxDimension * 0.7f
+        val topLeft = Offset(size.width * 0.12f, -size.height * 0.15f)
+        val bottomRight = Offset(size.width * 0.88f, size.height * 1.15f)
+        for (center in listOf(topLeft, bottomRight)) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(accent.copy(alpha = opacity), accent.copy(alpha = 0f)),
+                    center = center,
+                    radius = glowRadius,
+                ),
+                radius = glowRadius,
+                center = center,
+            )
+        }
     }
 }
 

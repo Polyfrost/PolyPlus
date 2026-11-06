@@ -85,7 +85,7 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
                 /^gameRenderer.processBlurEffect()
                 ^///?}
             }
-            MenuBackgroundPass.renderInline(ctx, true)
+            MenuBackgroundPass.renderInline(ctx)
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
@@ -107,7 +107,7 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
                 .extractRenderState(ctx, width, height, true)
                 *///?}
             ctx.blurBeforeThisStratum()
-            MenuBackgroundPass.renderInline(ctx, true)
+            MenuBackgroundPass.renderInline(ctx)
         }
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }

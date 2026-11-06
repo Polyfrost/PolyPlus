@@ -30,9 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
@@ -123,7 +123,7 @@ private fun SectionChip(section: WardrobeSection, selected: Boolean, onClick: ()
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(section.icon, color = color, modifier = Modifier.size(14.dp))
+        ThemedIcon(section.icon, color, 14.dp)
         SocialText(section.label, color = color, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal)
     }
 }
@@ -166,7 +166,7 @@ private fun HeaderIconButton(iconPath: String, tooltip: String, onClick: () -> U
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
+        ThemedIcon(iconPath, theme.textColor, 14.dp)
         if (hovered) TooltipPopup(tooltip)
     }
 }
@@ -198,7 +198,7 @@ internal fun PreviewModeOption(label: String, iconPath: String?, selected: Boole
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (iconPath != null) Icon(iconPath, color = color, modifier = Modifier.size(14.dp))
+        if (iconPath != null) ThemedIcon(iconPath, color, 14.dp)
         SocialText(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }

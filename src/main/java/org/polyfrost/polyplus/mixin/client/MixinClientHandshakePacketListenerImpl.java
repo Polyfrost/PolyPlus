@@ -30,17 +30,26 @@ public class MixinClientHandshakePacketListenerImpl {
         try {
             Component error = original.call(digest);
             boolean disconnects = this.serverData == null || !this.serverData.isLan();
-            if (error == null || !disconnects || !SessionRefresh.isInvalidSession(error)) {
+            if (!disconnects) {
                 return error;
             }
-            while (SessionRefresh.refreshAfterRejection()) {
-                error = original.call(digest);
-                if (error == null || !SessionRefresh.isInvalidSession(error)) {
+            while (error != null) {
+                if (SessionRefresh.isInvalidSession(error)) {
+                    if (!SessionRefresh.refreshAfterRejection()) {
+                        SessionRefresh.onInvalidSession();
+                        return error;
+                    }
+                } else if (SessionRefresh.isServersUnavailable(error)) {
+                    if (!SessionRefresh.retryAfterUnavailable()) {
+                        SessionRefresh.onServersUnavailable();
+                        return error;
+                    }
+                } else {
                     return error;
                 }
+                error = original.call(digest);
             }
-            SessionRefresh.onInvalidSession();
-            return error;
+            return null;
         } finally {
             MinecraftLoginGate.end(this.connection, held);
         }
@@ -51,6 +60,7 @@ public class MixinClientHandshakePacketListenerImpl {
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.exceptions.AuthenticationUnavailableException;
 import com.mojang.authlib.exceptions.InvalidCredentialsException;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import net.minecraft.client.Minecraft;
@@ -109,25 +119,30 @@ public class MixinClientHandshakePacketListenerImpl {
             original.call(service, profile, accessToken, serverId);
             return;
         }
-        try {
-            original.call(service, profile, accessToken, serverId);
-        } catch (Exception rejected) {
-            if (!(rejected instanceof InvalidCredentialsException)) {
-                throw rejected;
-            }
-            while (SessionRefresh.refreshAfterRejection()) {
-                Session session = this.minecraft.getSession();
-                try {
-                    original.call(service, session.getProfile(), session.getAccessToken(), serverId);
-                    return;
-                } catch (Exception again) {
-                    if (!(again instanceof InvalidCredentialsException)) {
-                        throw again;
+        GameProfile joining = profile;
+        String token = accessToken;
+        while (true) {
+            try {
+                original.call(service, joining, token, serverId);
+                return;
+            } catch (Exception failed) {
+                if (failed instanceof InvalidCredentialsException) {
+                    if (!SessionRefresh.refreshAfterRejection()) {
+                        SessionRefresh.onInvalidSession();
+                        throw failed;
                     }
+                } else if (failed instanceof AuthenticationUnavailableException) {
+                    if (!SessionRefresh.retryAfterUnavailable()) {
+                        SessionRefresh.onServersUnavailable();
+                        throw failed;
+                    }
+                } else {
+                    throw failed;
                 }
             }
-            SessionRefresh.onInvalidSession();
-            throw rejected;
+            Session session = this.minecraft.getSession();
+            joining = session.getProfile();
+            token = session.getAccessToken();
         }
     }
 

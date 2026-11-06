@@ -21,7 +21,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusSentry
-import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
 import org.polyfrost.polyplus.client.network.eos.EosFailureDiagnosis
 import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
@@ -35,6 +35,8 @@ import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
 import org.polyfrost.polyplus.client.network.reconnectDelay
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
+import org.polyfrost.polyplus.client.party.PartyMesh
+import org.polyfrost.polyplus.client.party.SceneTransfer
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.resourcepack.P2PPackTransport
 import org.polyfrost.polyplus.client.resourcepack.PackHttpBridge
@@ -44,6 +46,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -68,6 +71,19 @@ object P2PSessionManager {
     @Volatile private var bridge: EosSdkBridge? = null
     @Volatile private var sessionOwner: UUID? = null
 
+    internal val activeBridge: EosSdkBridge? get() = bridge
+
+    @Volatile var joinedSessionId: String? = null
+        private set
+
+    private val _rejoinSessionId = MutableStateFlow<String?>(null)
+    val rejoinSessionId = _rejoinSessionId.asStateFlow()
+
+    @Volatile private var lastRejoinMs = 0L
+
+    @Volatile private var hostingRelay = false
+    @Volatile private var voiceRelay = false
+
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionIdFlow = _currentSessionId.asStateFlow()
     val currentSessionId: String? get() = _currentSessionId.value
@@ -91,6 +107,7 @@ object P2PSessionManager {
     // EOS Connect auth expires after an hour, and gg.sona.eos doesn't expose EOS_Connect_AddNotifyAuthExpiration
     private const val AUTH_REFRESH_INTERVAL_MS = 50 * 60_000L
     private const val JOIN_HANDSHAKE_TIMEOUT_MS = 15_000L
+    private const val REJOIN_COOLDOWN_MS = 2_000L
     private const val CHANNEL_CLOSE_TIMEOUT_MS = 250L
     private const val MAX_STALL_RECOVERIES = 2
     private const val STALL_RESTART_READY_TIMEOUT_MS = 20_000L
@@ -118,8 +135,10 @@ object P2PSessionManager {
 
         //? if > 1.8.9 {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
+            joinedSessionId = null
             stopHosting()
             PackHttpBridge.setPackSource(null)
+            if (_rejoinSessionId.value != null) SessionsRepository.refreshIncoming()
         }
         //?}
 
@@ -129,8 +148,10 @@ object P2PSessionManager {
     //? if = 1.8.9 {
     /*@JvmStatic
     fun onClientDisconnected() {
+        joinedSessionId = null
         stopHosting()
         PackHttpBridge.setPackSource(null)
+        if (_rejoinSessionId.value != null) SessionsRepository.refreshIncoming()
     }
     *///?}
 
@@ -234,9 +255,11 @@ object P2PSessionManager {
         this.bridge = bridge
         EosP2PChannel.Holder.bridge = bridge
 
-        bridge.setRelayControl(forceRelays = false)
+        bridge.setRelayControl(forceRelays = hostingRelay || voiceRelay)
         bridge.setInboundPacketHandler { received ->
             if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
+            if (PartyMesh.handlePacket(received)) return@setInboundPacketHandler
+            if (SceneTransfer.handlePacket(received)) return@setInboundPacketHandler
             //? if > 1.8.9
             if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
 
@@ -460,8 +483,34 @@ object P2PSessionManager {
 
     fun socketFor(sessionId: String): EosP2PSocketId = EosP2PSocketId(sessionId.replace("-", "").take(32))
 
+    private fun joinSocketFor(session: EosP2PSocketId): EosP2PSocketId =
+        EosP2PSocketId(session.name.take(EosSdkBridge.SESSION_SOCKET_PREFIX_LENGTH) + "%04x".format(Random.nextInt(0x10000)))
+
+    @JvmStatic
+    fun canRejoin(): Boolean = _rejoinSessionId.value != null
+
+    @JvmStatic
+    fun rejoin() {
+        val session = _rejoinSessionId.value ?: return
+        val now = EosTickHealth.monotonicMs()
+        if (now - lastRejoinMs < REJOIN_COOLDOWN_MS) return
+        lastRejoinMs = now
+        SessionsRepository.rejoin(session)
+    }
+
+    fun forgetRejoin() {
+        _rejoinSessionId.value = null
+    }
+
     fun setPrivateRelay(enabled: Boolean) {
-        bridge?.setRelayControl(forceRelays = enabled)
+        hostingRelay = enabled
+        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay)
+    }
+
+    fun setVoiceRelay(enabled: Boolean) {
+        if (voiceRelay == enabled) return
+        voiceRelay = enabled
+        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay)
     }
 
     suspend fun beginHostingSession(privateRelay: Boolean = false, autoShareResourcePack: Boolean = false): Result<SessionResponse> {
@@ -475,6 +524,7 @@ object P2PSessionManager {
             if (autoShareResourcePack) HostSharedPack.enable() else HostSharedPack.disable()
             _currentSessionId.value = session.id
             sessionOwner = localProfileId()
+            forgetRejoin()
             val socket = socketFor(session.id)
             P2PListenContext.setPendingListen(socket, localUser)
             SessionsApi.updateEosSessionId(session.id, socket.name)
@@ -497,9 +547,10 @@ object P2PSessionManager {
     private fun registerLaunchInviteJoin() {
         val inviteId = System.getProperty(JOIN_INVITE_PROPERTY)?.toIntOrNull() ?: return
         val handler: (FramebufferRenderEvent.End) -> Boolean = {
-            val onMainMenu = when (ClientPlatform.currentScreen()) {
-                is PolyPlusMainMenuScreen -> true
-                is TitleScreen -> PolyPlusMainMenuConfig.useVanillaMainMenu
+            val screen = ClientPlatform.currentScreen()
+            val onMainMenu = when {
+                MainMenuReplacement.isMenu(screen) -> true
+                screen is TitleScreen -> PolyPlusMainMenuConfig.useVanillaMainMenu
                 else -> false
             }
             if (onMainMenu) PolyPlusClient.SCOPE.launch { joinLaunchInvite(inviteId) }
@@ -561,8 +612,10 @@ object P2PSessionManager {
             return
         }
 
-        val socket = socketFor(invite.eosSessionId ?: invite.sessionId)
+        val socket = joinSocketFor(socketFor(invite.eosSessionId ?: invite.sessionId))
         val target = JoinTarget(EosProductUserId(hostPuid), socket)
+        joinedSessionId = invite.sessionId
+        _rejoinSessionId.value = invite.sessionId
         LOGGER.info("Resolved join target for session {}: host={} socket={}", invite.sessionId, hostPuid, socket)
         attemptJoin(bridge, target)
     }
@@ -583,7 +636,7 @@ object P2PSessionManager {
         if (established.get()) return
 
         LOGGER.error("The host never accepted our P2P connection on socket {} within {}ms", target.socket, JOIN_HANDSHAKE_TIMEOUT_MS)
-        P2PConnectionContext.clearPendingJoin()
+        P2PConnectionContext.clearPendingJoin(target)
         bridge.closeConnection(target.socket, target.host)
     }
 

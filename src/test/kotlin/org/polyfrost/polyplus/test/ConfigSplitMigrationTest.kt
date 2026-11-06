@@ -10,7 +10,7 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.MainMenuFpsLimitMode
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
-import org.polyfrost.polyplus.client.gui.MainMenuBackground
+import org.polyfrost.polyplus.client.lobby.LobbyTime
 import java.nio.file.Files
 
 class ConfigSplitMigrationTest {
@@ -25,7 +25,7 @@ class ConfigSplitMigrationTest {
                     "class": "org.polyfrost.polyplus.client.MainMenuFpsLimitMode",
                     "value": "CUSTOM"
                 },
-                "mainMenuBackground": "not a backdrop at all",
+                "lobbyTime": "not a time at all",
                 "mainMenuFpsLimit": 120,
                 "panoramaInAllMenus": false,
                 "customPanorama": false,
@@ -75,7 +75,7 @@ class ConfigSplitMigrationTest {
     /** One value the split config cannot read must not cost the options copied after it. */
     @Test
     fun `an unreadable value does not abort the rest of the migration`() {
-        assertEquals(MainMenuBackground.PANORAMA, PolyPlusMainMenuConfig.mainMenuBackground)
+        assertEquals(LobbyTime.CAPTURED, PolyPlusMainMenuConfig.lobbyTime)
         assertFalse(PolyPlusMainMenuConfig.panoramaInAllMenus)
     }
 

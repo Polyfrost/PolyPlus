@@ -6,9 +6,12 @@ import org.polyfrost.polyplus.libs.ktor.client.request.parameter
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleSearchResponse
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
+
+class FeaturedBundle(val info: BundleInfo, val cosmetics: List<Int>)
 
 object BundleCatalog {
     private val LOGGER = LogManager.getLogger()
@@ -30,4 +33,9 @@ object BundleCatalog {
     suspend fun view(id: Int): Result<BundleViewResponse> = runSuspendCatching {
         PolyPlusClient.HTTP.get("${PolyPlusConfig.apiUrl}/bundles/view/$id").body<BundleViewResponse>()
     }.onFailure { LOGGER.error("Failed to view bundle {}", id, it) }
+
+    suspend fun featured(): FeaturedBundle? {
+        val info = search(perPage = 1).getOrNull()?.bundles?.firstOrNull { it.purchasable } ?: return null
+        return FeaturedBundle(info, view(info.id).getOrNull()?.cosmetics.orEmpty())
+    }
 }

@@ -28,6 +28,15 @@ internal class WardrobeStoreData {
 
     val all: List<CosmeticStoreInfo> get() = byType.values.flatten() + popular + newest
 
+    fun coversByVariant(): Map<Int, Int> {
+        val covers = HashMap<Int, Int>()
+        for (info in all) {
+            val cover = info.coverAssetId ?: continue
+            for (variant in info.variantList) covers.putIfAbsent(variant.id, cover)
+        }
+        return covers
+    }
+
     suspend fun load() {
         loading = true
         featuredLoading = true

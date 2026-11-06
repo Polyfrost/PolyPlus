@@ -15,6 +15,11 @@ object P2PConnectionContext {
     @JvmStatic
     fun clearPendingJoin() {
         pendingTarget = null
+        P2PSessionManager.forgetRejoin()
+    }
+
+    fun clearPendingJoin(target: P2PSessionManager.JoinTarget) {
+        if (pendingTarget == target) pendingTarget = null
     }
 
     @JvmStatic

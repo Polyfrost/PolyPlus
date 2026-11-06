@@ -27,10 +27,17 @@ import net.minecraft.world.entity.player.PlayerModelType
 /*import net.minecraft.client.resources.PlayerSkin
 *///?}
 
+//? if < 1.21.4 && > 1.8.9 {
+/*import org.lwjgl.glfw.GLFW
+*///?} elif = 1.8.9 {
+/*import org.lwjgl.opengl.Display
+*///?}
+
 object ClientPlatform {
     private const val MAIN_SYNC_TIMEOUT_SECONDS = 30L
     private const val VANILLA_UNLIMITED_FRAMERATE = 260
     private const val MAX_UNLIMITED_FRAMERATE = 10_000
+    private const val MINIMIZED_FRAME_LIMIT = 10
 
     val isWindows: Boolean
         get() = System.getProperty("os.name").lowercase().contains("windows")
@@ -62,6 +69,25 @@ object ClientPlatform {
         Minecraft.getInstance().window.activeVideoMode?.refreshRate?.toInt() ?: 0
         //?} else {
         /*Minecraft.getInstance().window.refreshRate
+        *///?}
+
+    fun windowMinimized(): Boolean =
+        //? if >= 1.21.4 {
+        Minecraft.getInstance().window.isIconified
+        //?} elif > 1.8.9 {
+        /*GLFW.glfwGetWindowAttrib(Minecraft.getInstance().window.window, GLFW.GLFW_ICONIFIED) == GLFW.GLFW_TRUE
+        *///?} else {
+        /*!Display.isVisible()
+        *///?}
+
+    fun menuFrameLimit(limit: Int): Int =
+        if (!inWorld() && windowMinimized()) minOf(limit, MINIMIZED_FRAME_LIMIT) else limit
+
+    fun inWorld(): Boolean =
+        //? if > 1.8.9 {
+        Minecraft.getInstance().level != null
+        //?} else {
+        /*Minecraft.getInstance().world != null
         *///?}
 
     fun runOnMain(action: () -> Unit) {

@@ -1,0 +1,29 @@
+{
+  "vertex": "polyplus:post/lobby_quad",
+  "fragment": "polyplus:post/lobby_blit",
+  "samplers": [
+    {
+      "name": "InSampler"
+    }
+  ],
+  "uniforms": [
+    {
+      "name": "OutSize",
+      "type": "float",
+      "count": 2,
+      "values": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "name": "InSize",
+      "type": "float",
+      "count": 2,
+      "values": [
+        1.0,
+        1.0
+      ]
+    }
+  ]
+}

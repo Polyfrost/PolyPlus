@@ -1,0 +1,300 @@
+package org.polyfrost.polyplus.client.gui.lobbyshell
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+//? if > 1.8.9
+import com.mojang.realmsclient.RealmsMainScreen
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.ConnectScreen
+//? if = 1.8.9 {
+/*import net.minecraft.realms.RealmsBridge
+*///?}
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.resolver.ServerAddress
+import net.minecraft.client.resources.language.I18n
+import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
+import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.gui.AccountActions
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.host.HostWorldManager
+import org.polyfrost.polyplus.client.lobby.LobbyFraming
+import org.polyfrost.polyplus.client.lobby.LobbyScene
+import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
+
+internal enum class LobbyPage(val frosted: Boolean) {
+    Home(false),
+    Wardrobe(false),
+    Multiplayer(true),
+    Singleplayer(true),
+    Marketplace(true),
+    Social(true),
+    Stats(true),
+    ;
+
+    val hidden: Boolean
+        get() = when (this) {
+            Wardrobe -> PolyPlusMainMenuConfig.hideMainMenuCosmetics
+            Social -> PolyPlusMainMenuConfig.hideMainMenuSocial
+            else -> false
+        }
+}
+
+internal enum class PlaySource {
+    Singleplayer,
+    Multiplayer,
+}
+
+internal class ServerEdit(val server: ServerData?)
+
+private class PlayChoice(val source: PlaySource, val server: ServerData?, val worldId: String?)
+
+internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : SocialHost {
+    private val mc = Minecraft.getInstance()
+
+    val servers = LobbyServers(mc)
+    val worlds = LobbyWorlds(mc)
+
+    var page by mutableStateOf(firstPage)
+        private set
+    var source by mutableStateOf(choice.source)
+    var editing by mutableStateOf<ServerEdit?>(null)
+    var directOpen by mutableStateOf(false)
+    var deleting by mutableStateOf<ServerEntry?>(null)
+    var hostWorldId by mutableStateOf<String?>(null)
+    var selectedWorldId by mutableStateOf(choice.worldId)
+        private set
+    private var selectedServer by mutableStateOf(choice.server)
+    var setup by mutableStateOf(onboardingPending())
+        private set
+    private val firstRun = !PolyPlusConfig.onboardingCompleted
+    var tour by mutableStateOf<LobbyTour?>(null)
+    val anchors = mutableStateMapOf<TourAnchor, Rect>()
+    var accountsOpen by mutableStateOf(false)
+        private set
+    var accountActions by mutableStateOf<AccountActions?>(null)
+    var profileVersion by mutableIntStateOf(0)
+        private set
+    private var profileId = ClientPlatform.localPlayerUuid()
+
+    fun open() {
+        if (setup && !onboardingPending()) finishSetup()
+        LobbyFraming.onboarding = setup
+        LobbyScene.arrive()
+        HostWorldManager.worldOpener = ::depart
+        servers.open()
+        selectedServer = selectedServer?.let(servers::resolve)
+        worlds.reload()
+        show(page)
+    }
+
+    fun close() {
+        choice = PlayChoice(source, selectedServer, selectedWorldId)
+        servers.close()
+        SocialChatLink.close()
+        HostWorldManager.worldOpener = { it() }
+    }
+
+    fun tick() = servers.tick()
+
+    fun finishSetup() {
+        setup = false
+        LobbyFraming.onboarding = false
+        if (firstRun) tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+    }
+
+    fun skipIntro(): Boolean = (!setup || LobbyScene.overlayAlpha <= 0f) && !LobbyWardrobe.open && LobbyScene.skipIntro()
+
+    fun show(target: LobbyPage) {
+        val shown = if (target.hidden) LobbyPage.Home else target
+        page = shown
+        LobbyWardrobe.open = shown == LobbyPage.Wardrobe
+    }
+
+    fun openAccounts() {
+        if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) accountsOpen = true
+    }
+
+    fun closeAccounts() {
+        if (accountActions?.idle != false) accountsOpen = false
+    }
+
+    fun syncAccount() = ClientPlatform.runOnMain {
+        val id = ClientPlatform.localPlayerUuid()
+        if (id != profileId) {
+            profileId = id
+            profileVersion++
+            if (page == LobbyPage.Wardrobe) show(LobbyPage.Home)
+            LobbyScene.reload()
+        }
+    }
+
+    private fun escapeAccounts() {
+        val actions = accountActions
+        when {
+            actions?.loginSession != null -> actions.cancelLogin()
+            actions?.offlineEntry == true -> if (actions.idle) actions.cancelOfflineEntry()
+            else -> closeAccounts()
+        }
+    }
+
+    fun quickServers(): List<ServerEntry> = servers.quickRows(selectedServer)
+
+    fun quickWorlds(): List<LobbyWorld> {
+        val rows = worlds.saved.filter { it.playable }.take(LobbyServers.QUICK_ROWS)
+        val pinned = activeWorld()?.takeIf { it.playable }
+        if (pinned == null || rows.any { it.id == pinned.id }) return rows
+        return (listOf(pinned) + rows).take(LobbyServers.QUICK_ROWS)
+    }
+
+    fun isSelected(data: ServerData): Boolean = data.ip.equals(activeServer()?.ip, ignoreCase = true)
+
+    fun isSelected(world: LobbyWorld): Boolean = world.id == activeWorld()?.id
+
+    fun select(data: ServerData) {
+        selectedServer = data
+        source = PlaySource.Multiplayer
+    }
+
+    fun select(world: LobbyWorld) {
+        selectedWorldId = world.id
+        source = PlaySource.Singleplayer
+    }
+
+    fun selectWorld(id: String) {
+        worlds.saved.firstOrNull { it.id == id }?.let(::select)
+    }
+
+    fun activeServer(): ServerData? = selectedServer ?: quickServers().firstOrNull()?.data
+
+    fun activeWorld(): LobbyWorld? = worlds.saved.firstOrNull { it.id == selectedWorldId } ?: worlds.saved.firstOrNull { it.playable }
+
+    fun play() {
+        when (source) {
+            PlaySource.Multiplayer -> activeServer()?.let(::join) ?: show(LobbyPage.Multiplayer)
+            PlaySource.Singleplayer -> activeWorld()?.takeIf { it.playable }?.let(::enter) ?: show(LobbyPage.Singleplayer)
+        }
+    }
+
+    //? if > 1.8.9 {
+    fun openRealms() = ClientPlatform.setScreen(RealmsMainScreen(screen))
+    //?} else {
+    /*fun openRealms() = RealmsBridge().createMainMenuScreen(screen)
+    *///?}
+
+    val hostedWorldName: String? get() = SocialHosting.hostedName
+
+    fun host(worldId: String) {
+        SocialHosting.starting(worlds.saved.firstOrNull { it.id == worldId }?.name)
+        hostWorldId = worldId
+    }
+
+    fun stopHosting() = SocialHosting.stop()
+
+    override fun join(data: ServerData) = depart {
+        //? if > 1.8.9 {
+        ConnectScreen.startConnecting(screen, mc, ServerAddress.parseString(data.ip), data, false, null)
+        //?} else {
+        /*ClientPlatform.setScreen(ConnectScreen(screen, mc, data.entry))
+        *///?}
+    }
+
+    fun enter(world: LobbyWorld) = depart {
+        //? if > 1.8.9 {
+        mc.createWorldOpenFlows().openWorld(world.id) { ClientPlatform.setScreen(screen) }
+        //?} else {
+        /*HostWorldManager.openWorld(world.id)
+        *///?}
+    }
+
+    private fun depart(action: () -> Unit) {
+        if (page == LobbyPage.Wardrobe) show(LobbyPage.Home)
+        LobbyScene.depart(action)
+    }
+
+    fun directConnect(address: String): Boolean {
+        val trimmed = address.trim()
+        if (!ServerAddress.isValidAddress(trimmed)) return false
+        val list = servers.serverList
+        val known = list.get(trimmed)
+        if (known != null) {
+            join(known)
+            return true
+        }
+        val draft = ServerData(I18n.get("selectServer.defaultName"), trimmed, ServerData.Type.OTHER)
+        list.add(draft, true)
+        list.save()
+        join(draft)
+        return true
+    }
+
+    fun addServer() {
+        editing = ServerEdit(null)
+    }
+
+    fun editServer(entry: ServerEntry) {
+        editing = ServerEdit(entry.data)
+    }
+
+    private fun escapeForm(): Boolean {
+        when {
+            hostWorldId != null -> hostWorldId = null
+            editing != null -> editing = null
+            deleting != null -> deleting = null
+            directOpen -> directOpen = false
+            else -> return false
+        }
+        return true
+    }
+
+    fun escape(): Boolean {
+        when {
+            accountsOpen -> escapeAccounts()
+            SocialEscape.back(::escapeForm) -> Unit
+            page != LobbyPage.Home -> show(LobbyPage.Home)
+            else -> return false
+        }
+        return true
+    }
+
+    fun openSocial(): Boolean {
+        val covered = accountsOpen || SocialEscape.popupOpen || hostWorldId != null || editing != null || deleting != null || directOpen
+        if (setup || page == LobbyPage.Social || covered || TextInputFocus.isTyping) return false
+        show(LobbyPage.Social)
+        return true
+    }
+
+    fun finishEdit() {
+        editing = null
+        servers.reload()
+    }
+
+    fun finishDelete() {
+        selectedServer = null
+        finishEdit()
+    }
+
+    fun forget(entry: ServerEntry) {
+        FeaturedServers.dismissMultiplayerByAddress(entry.data.ip)
+        servers.serverList.remove(entry.data)
+        servers.serverList.save()
+        selectedServer = null
+        deleting = null
+        servers.rebuild()
+    }
+
+    private companion object {
+        var choice = PlayChoice(PlaySource.Multiplayer, null, null)
+    }
+}

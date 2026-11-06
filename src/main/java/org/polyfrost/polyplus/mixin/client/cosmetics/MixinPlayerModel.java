@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 
 //? if > 1.8.9 {
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.polyfrost.polyplus.client.render.PlayerRenderContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -56,17 +57,25 @@ public class MixinPlayerModel
     public ModelPart polyplus$root() {
         return polyplus$root;
     }
+
+    @Inject(method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V", at = @At("HEAD"))
+    private void polyplus$resetRoot(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float yRot, float xRot, CallbackInfo ci) {
+        polyplus$root.resetPose();
+    }
     *///?}
 
     //? if >= 1.21.10 {
     @Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("RETURN"))
     private void polyplus$applyEmote(AvatarRenderState state, CallbackInfo ci) {
+        PauseAvatar.breathe((PlayerModel) (Object) this, state);
     //?} elif >= 1.21.4 {
     /*@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;)V", at = @At("RETURN"))
     private void polyplus$applyEmote(PlayerRenderState state, CallbackInfo ci) {
+        PauseAvatar.breathe((PlayerModel) (Object) this, state);
     *///?} else {
     /*@Inject(method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V", at = @At("RETURN"))
     private void polyplus$applyEmote(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float yRot, float xRot, CallbackInfo ci) {
+        PauseAvatar.breathe((PlayerModel) (Object) this, entity);
         if (!(entity instanceof AbstractClientPlayer player) || !(player instanceof PlayerEmotesAccess playerAccess))
             return;
 
@@ -97,6 +106,7 @@ import net.minecraft.client.render.model.entity.HumanoidModel;
 import net.minecraft.entity.Entity;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess;
 import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -159,6 +169,11 @@ public abstract class MixinPlayerModel implements PlayerModelRootAccess {
     @Override
     public void polyplus$markPosed() {
         polyplus$posed = true;
+    }
+
+    @Inject(method = "setupAnimation", at = @At("RETURN"))
+    private void polyplus$breathePauseAvatar(float walkAnimationProgress, float walkAnimationSpeed, float bob, float yaw, float pitch, float scale, Entity entity, CallbackInfo ci) {
+        PauseAvatar.breathe((HumanoidModel) (Object) this, entity);
     }
 
     @Inject(method = "setupAnimation", at = @At("HEAD"))

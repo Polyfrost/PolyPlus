@@ -3,10 +3,12 @@ package org.polyfrost.polyplus.mixin.client;
 //? if = 1.8.9 {
 /*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiElement;
 import net.minecraft.client.render.ProgressRenderer;
 import net.minecraft.client.render.Window;
 import net.minecraft.client.render.pipeline.RenderTarget;
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,6 +29,10 @@ public class MixinProgressRenderer {
     @Inject(method = "progressStagePercentage", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/vertex/Tesselator;end()V", ordinal = 0, shift = At.Shift.AFTER))
     private void polyplus$drawBackdrop(int percentage, CallbackInfo ci) {
         Window window = new Window(this.minecraft);
+        if (MainMenuReplacement.enabled()) {
+            GuiElement.fill(0, 0, window.getWidth(), window.getHeight(), 0xFF0B1013);
+            return;
+        }
         MenuPanorama.drawLoadingBackdrop(window.getWidth(), window.getHeight());
     }
 }

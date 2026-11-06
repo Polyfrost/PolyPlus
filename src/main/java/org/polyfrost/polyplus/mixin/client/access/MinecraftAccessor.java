@@ -7,6 +7,7 @@ import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 //?} else {
 /*import com.mojang.authlib.properties.PropertyMap;
 import net.minecraft.client.Session;
+import net.minecraft.network.Connection;
 import net.minecraft.client.render.pipeline.RenderTarget;
 *///?}
 import net.minecraft.client.Minecraft;
@@ -23,12 +24,23 @@ import com.mojang.authlib.services.ProfileResult;
 /*import com.mojang.authlib.yggdrasil.ProfileResult;
 *///?}
 
+//? if >= 1.21.10
+import net.minecraft.client.particle.ParticleEngine;
+
 //? if < 1.21.8 && > 1.8.9 {
 /*import com.mojang.blaze3d.pipeline.RenderTarget;
 *///?}
 
 @Mixin(Minecraft.class)
 public interface MinecraftAccessor {
+    //? if > 1.8.9 {
+    @Accessor("missTime")
+    void polyplus$setAttackDelay(int ticks);
+    //?} else {
+    /*@Accessor("attackCooldown")
+    void polyplus$setAttackDelay(int ticks);
+    *///?}
+
     //? if > 1.8.9 {
     @Mutable
     @Accessor("user")
@@ -60,7 +72,16 @@ public interface MinecraftAccessor {
 
     @Accessor("renderTarget")
     void polyplus$setMainRenderTarget(RenderTarget target);
+
+    @Accessor("connection")
+    Connection polyplus$getConnection();
     *///?}
+
+    //? if >= 1.21.10 {
+    @Mutable
+    @Accessor("particleEngine")
+    void polyplus$setParticleEngine(ParticleEngine engine);
+    //?}
 
     //? if < 1.21.8 && > 1.8.9 {
     /*@Mutable

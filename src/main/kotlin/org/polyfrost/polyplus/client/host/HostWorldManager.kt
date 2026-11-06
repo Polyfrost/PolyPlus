@@ -81,6 +81,9 @@ object HostWorldManager {
     @Volatile
     private var pending: PendingHost? = null
 
+    @Volatile
+    var worldOpener: (() -> Unit) -> Unit = { it() }
+
     //? if = 1.8.9 {
     /*suspend fun loadWorlds(): List<HostWorldEntry> = withContext(Dispatchers.IO) {
         val source = Minecraft.getInstance().worldStorageSource
@@ -158,13 +161,15 @@ object HostWorldManager {
         //? if = 1.8.9 {
         /*openWorld(entry.id)
         *///?} else {
-        mc.createWorldOpenFlows().openWorld(entry.id) {
-            pending = null
-            //? if >= 26.2 {
-            mc.gui.setScreen(returnScreen)
-            //?} else {
-            /*mc.setScreen(returnScreen)
-            *///?}
+        worldOpener {
+            mc.createWorldOpenFlows().openWorld(entry.id) {
+                pending = null
+                //? if >= 26.2 {
+                mc.gui.setScreen(returnScreen)
+                //?} else {
+                /*mc.setScreen(returnScreen)
+                *///?}
+            }
         }
         //?}
     }
@@ -182,13 +187,15 @@ object HostWorldManager {
         //? if = 1.8.9 {
         /*openWorld(entry.id)
         *///?} else {
-        mc.createWorldOpenFlows().openWorld(entry.id) {
-            abandonP2PHost()
-            //? if >= 26.2 {
-            mc.gui.setScreen(returnScreen)
-            //?} else {
-            /*mc.setScreen(returnScreen)
-            *///?}
+        worldOpener {
+            mc.createWorldOpenFlows().openWorld(entry.id) {
+                abandonP2PHost()
+                //? if >= 26.2 {
+                mc.gui.setScreen(returnScreen)
+                //?} else {
+                /*mc.setScreen(returnScreen)
+                *///?}
+            }
         }
         //?}
         LOGGER.info("Hosting {} over EOS P2P as session {}", entry.name, session.id)

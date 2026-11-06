@@ -13,9 +13,7 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.MenuPanorama
-import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusOnboardingScreen
-import org.polyfrost.polyplus.client.gui.mainMenuPanoramaEnabled
 import org.polyfrost.polyplus.client.render.NativeImage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.ByteArrayInputStream
@@ -158,11 +156,7 @@ object CustomPanorama {
             //?} else {
             /*Minecraft.getInstance().screen
             *///?}
-        return when (screen) {
-            is PolyPlusMainMenuScreen -> mainMenuPanoramaEnabled()
-            is PolyPlusOnboardingScreen -> true
-            else -> MenuPanorama.menusActive() && mainMenuPanoramaEnabled()
-        }
+        return screen is PolyPlusOnboardingScreen || MenuPanorama.menusActive()
     }
 
     private suspend fun prepare(pack: PanoramaPack): Boolean {

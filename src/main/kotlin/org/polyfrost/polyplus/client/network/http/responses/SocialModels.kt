@@ -18,12 +18,30 @@ enum class RelationshipKind(val serializedName: String) {
     )
 }
 
+@Serializable(with = PlayerStatus.Serializer::class)
+enum class PlayerStatus(val serializedName: String) {
+    Online("online"),
+    Offline("offline"),
+    Unknown("unknown");
+
+    internal object Serializer : KSerializer<PlayerStatus> by ApiEnumSerializer(
+        "PlayerStatus",
+        PlayerStatus.entries,
+        Unknown,
+        PlayerStatus::serializedName,
+    )
+}
+
+@Serializable
+data class PlayerStatusBody(val status: PlayerStatus)
+
 @Serializable
 data class Friend(
     val player: String,
     val kind: RelationshipKind,
     val since: String,
     val online: Boolean = false,
+    val status: PlayerStatus = PlayerStatus.Unknown,
 )
 
 @Serializable

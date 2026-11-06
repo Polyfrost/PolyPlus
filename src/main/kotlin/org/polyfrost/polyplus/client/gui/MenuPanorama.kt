@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.GenericMessageScreen
@@ -34,13 +35,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 object MenuPanorama {
     @JvmField
-    val BASE_COLOR: Int = 0xFF11171C.toInt()
-
-    @JvmField
     val LIST_TINT: Int = 0x990D1116.toInt()
-
-    @JvmStatic
-    fun panoramaBackdrop(): Boolean = mainMenuPanoramaEnabled()
 
     @JvmStatic
     fun menusActive(): Boolean = menusActive(currentScreen())
@@ -73,46 +68,31 @@ object MenuPanorama {
     fun active(screen: Screen): Boolean = menusActive(screen) && screen !is ComposeScreen
 
     @JvmStatic
-    fun panoramaPassNeedsBackdrop(screen: Screen): Boolean = !panoramaBackdrop() || screen is ComposeScreen
+    fun panoramaPassNeedsBackdrop(screen: Screen): Boolean = screen is ComposeScreen
 
     private fun backdropWanted(screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
+        if (LobbyScene.showing()) return false
         if (!onPanoramaPass && !menusActive(screen)) return false
-        return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
+        return !MainMenuReplacement.isMenu(screen) && screen !is PolyPlusOnboardingScreen
     }
 
     private var drawnThisPass = false
-    private var filledThisFrame = false
 
     @JvmStatic
     fun beginPass() {
         drawnThisPass = false
-        filledThisFrame = false
     }
 
     @JvmStatic
     fun backdropDrawn(): Boolean = drawnThisPass
-
-    @JvmStatic
-    fun backdropFilled(): Boolean = filledThisFrame
-
-    @JvmStatic
-    fun suppressPanorama(): Boolean {
-        if (!PolyPlusMainMenuConfig.panoramaInAllMenus || panoramaBackdrop()) return false
-        val screen = currentScreen() ?: return false
-        return screen !is PolyPlusMainMenuScreen && screen !is PolyPlusOnboardingScreen
-    }
 
     //? if >= 26.1 {
     @JvmStatic
     fun drawBackdrop(ctx: GuiGraphicsExtractor, screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
-        if (!panoramaBackdrop()) {
-            ctx.fill(0, 0, screen.width, screen.height, BASE_COLOR)
-            filledThisFrame = true
-        }
-        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop())
+        val drew = MenuBackgroundPass.renderInline(ctx)
         if (drew) drawnThisPass = true
         return drew
     }
@@ -121,11 +101,7 @@ object MenuPanorama {
     fun drawBackdrop(ctx: GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
-        if (!panoramaBackdrop()) {
-            ctx.fill(0, 0, screen.width, screen.height, BASE_COLOR)
-            filledThisFrame = true
-        }
-        val drew = MenuBackgroundPass.renderInline(ctx, panoramaBackdrop())
+        val drew = MenuBackgroundPass.renderInline(ctx)
         if (drew) drawnThisPass = true
         return drew
     }
@@ -134,11 +110,10 @@ object MenuPanorama {
     fun drawBackdrop(screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
-        if (!panoramaBackdrop() || !drawLegacyPanorama(screen.width, screen.height)) {
+        if (!drawLegacyPanorama(screen.width, screen.height)) {
             GuiElement.fill(0, 0, screen.width, screen.height, BASE_COLOR)
-            filledThisFrame = true
         }
-        val drew = MenuBackgroundPass.renderInline(panoramaBackdrop())
+        val drew = MenuBackgroundPass.renderInline()
         if (drew) drawnThisPass = true
         return drew
     }
@@ -146,12 +121,13 @@ object MenuPanorama {
     @JvmStatic
     fun drawLoadingBackdrop(width: Int, height: Int) {
         if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return
-        if (!panoramaBackdrop() || !drawLegacyPanorama(width, height)) {
+        if (!drawLegacyPanorama(width, height)) {
             GuiElement.fill(0, 0, width, height, BASE_COLOR)
         }
-        MenuBackgroundPass.renderInline(panoramaBackdrop())
+        MenuBackgroundPass.renderInline()
     }
 
+    private const val BASE_COLOR = 0xFF11171C.toInt()
     private const val WASH_TOP = 0x80FFFFFF.toInt()
     private const val WASH_BOTTOM = 0x00FFFFFF
     private const val SHADE_TOP = 0x00000000
