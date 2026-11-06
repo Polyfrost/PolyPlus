@@ -18,6 +18,7 @@ import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.render.InputConstants
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -25,8 +26,6 @@ import kotlin.io.path.writeText
 
 object DefaultSettings {
     private val logger = LogManager.getLogger("PolyPlus/DefaultSettings")
-
-    private const val UNLIMITED_FRAMERATE = 260
 
     private const val TICK_SCAN_INTERVAL = 20
     private const val RETRY_SCAN_LIMIT = 100
@@ -98,6 +97,17 @@ object DefaultSettings {
 
     private val TICK_TASKS = buildList {
         add(Task("vanilla-options", "Minecraft options", { true }, ::applyVanillaOptions))
+        //? if > 1.8.9 {
+        add(
+            Task(
+                id = "vanilla-framerate-unlimited",
+                label = "Minecraft options",
+                isPresent = { true },
+                apply = ::liftRealFramerateCap,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        //?}
         //? if >= 1.21.11 {
         add(
             Task(
@@ -316,16 +326,25 @@ object DefaultSettings {
         val options = Minecraft.getInstance().options ?: return
         //? if > 1.8.9 {
         options.enableVsync().set(false)
-        options.framerateLimit().set(UNLIMITED_FRAMERATE)
+        options.framerateLimit().set(ClientPlatform.unlimitedFramerate)
         options.entityShadows().set(false)
         //?} else {
         /*options.vsync = false
         Display.setVSyncEnabled(false)
-        options.fpsLimit = UNLIMITED_FRAMERATE
+        options.fpsLimit = ClientPlatform.unlimitedFramerate
         options.entityShadows = false
         *///?}
         options.save()
     }
+
+    //? if > 1.8.9 {
+    private fun liftRealFramerateCap() {
+        val option = Minecraft.getInstance().options.framerateLimit()
+        if (option.get() != 260 || ClientPlatform.unlimitedFramerate == 260) return
+        option.set(ClientPlatform.unlimitedFramerate)
+        Minecraft.getInstance().options.save()
+    }
+    //?}
 
     //? if >= 1.21.11 {
     private fun disableTextureFiltering() {

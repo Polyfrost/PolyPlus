@@ -1,7 +1,10 @@
 package org.polyfrost.polyplus.client.utils
 
-//? if > 1.8.9
+//? if > 1.8.9 {
+import com.google.gson.JsonPrimitive
 import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.serialization.JsonOps
+//?}
 //? if = 1.8.9
 //import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.Minecraft
@@ -26,12 +29,33 @@ import net.minecraft.world.entity.player.PlayerModelType
 
 object ClientPlatform {
     private const val MAIN_SYNC_TIMEOUT_SECONDS = 30L
+    private const val VANILLA_UNLIMITED_FRAMERATE = 260
+    private const val MAX_UNLIMITED_FRAMERATE = 10_000
 
     val isWindows: Boolean
         get() = System.getProperty("os.name").lowercase().contains("windows")
 
     val isMac: Boolean
         get() = System.getProperty("os.name").lowercase().contains("mac")
+
+    val unlimitedFramerate: Int by lazy {
+        //? if > 1.8.9 {
+        val codec = Minecraft.getInstance().options.framerateLimit().codec()
+        highestAccepted(VANILLA_UNLIMITED_FRAMERATE, MAX_UNLIMITED_FRAMERATE) { codec.parse(JsonOps.INSTANCE, JsonPrimitive(it)).result().isPresent }
+        //?} else {
+        /*VANILLA_UNLIMITED_FRAMERATE
+        *///?}
+    }
+
+    internal fun highestAccepted(floor: Int, ceiling: Int, accepts: (Int) -> Boolean): Int {
+        var low = floor
+        var high = ceiling
+        while (low < high) {
+            val mid = low + (high - low + 1) / 2
+            if (accepts(mid)) low = mid else high = mid - 1
+        }
+        return low
+    }
 
     fun monitorRefreshRate(): Int =
         //? if >= 26.3 {
