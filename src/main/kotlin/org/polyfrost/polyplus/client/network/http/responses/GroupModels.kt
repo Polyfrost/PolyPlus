@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 enum class GroupKind(val serializedName: String) {
     Dm("dm"),
     Group("group"),
+    Party("party"),
     Unknown("unknown");
 
     internal object Serializer : KSerializer<GroupKind> by ApiEnumSerializer(

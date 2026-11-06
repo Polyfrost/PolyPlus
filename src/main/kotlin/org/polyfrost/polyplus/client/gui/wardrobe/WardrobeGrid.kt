@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -49,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -75,7 +75,10 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.ppShapeOf
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -111,9 +114,10 @@ internal fun WardrobeGrid(
     onSelectOutfit: (OutfitInfo) -> Unit,
     onSelectSkin: (PlayerSkinInfo) -> Unit,
     onStatus: (String) -> Unit,
+    columns: Int = 4,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Fixed(columns),
         state = state,
         modifier = modifier,
         contentPadding = PaddingValues(bottom = 12.dp),
@@ -392,9 +396,6 @@ private fun cosmeticCountLabel(count: Int): String = when (count) {
 
 private val CARD_SUCCESS = Color(0xFF239A60)
 private val CARD_NEUTRAL_CHIP = Color(0xFFD9D9D9)
-private val CARD_FRAME = Color(0xFF232D32)
-private val CARD_HAIRLINE = Color(0x1AFFFFFF)
-private val CARD_STRIP = Color(0xB3232D32)
 private val CARD_HIGHLIGHT = Color(0x0DFFFFFF)
 
 @Composable
@@ -430,7 +431,7 @@ private fun WardrobeCard(
     }
     Box(
         modifier = Modifier.fillMaxWidth()
-            .alpha(if (enabled) 1f else 0.6f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(12.dp))
             .background(theme.modCardBackground)
             .drawBehind {
@@ -451,8 +452,8 @@ private fun WardrobeCard(
                 Box(
                     modifier = Modifier.fillMaxWidth().height(maxWidth)
                         .clip(ppShape(5.dp))
-                        .background(CARD_FRAME)
-                        .border(1.dp, CARD_HAIRLINE, ppShape(5.dp)),
+                        .background(OneConfigTheme.current.chipBackground)
+                        .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)),
                 ) {
                     thumbnail(Modifier.fillMaxSize())
                     if (hovered && variants.size > 1) {
@@ -550,7 +551,7 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
                 when {
                     selected -> OneConfigTheme.accent
                     hovered -> theme.textColorSecondary
-                    else -> CARD_HAIRLINE
+                    else -> OneConfigTheme.current.borderColor
                 },
                 ppShape(5.dp),
             ),
@@ -584,7 +585,7 @@ private fun CardMenuButton(
 }
 
 @Composable
-private fun rememberDropdownPosition(): PopupPositionProvider {
+internal fun rememberDropdownPosition(): PopupPositionProvider {
     val gap = with(LocalDensity.current) { 4.dp.roundToPx() }
     return remember(gap) {
         object : PopupPositionProvider {
@@ -611,6 +612,7 @@ private fun rememberDropdownPosition(): PopupPositionProvider {
 @Composable
 private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
     val theme = OneConfigTheme.current
+    EscapeCloses(onDismiss)
     Popup(
         popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
@@ -618,6 +620,7 @@ private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDis
     ) {
         Column(
             modifier = Modifier.widthIn(min = 160.dp).width(IntrinsicSize.Max)
+                .sceneFrost(16.dp)
                 .clip(ppShape(16.dp))
                 .background(theme.popupBackground)
                 .border(1.dp, theme.borderColor, ppShape(16.dp))
@@ -640,7 +643,7 @@ private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
     val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier = Modifier.fillMaxWidth().height(32.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(8.dp))
             .background(if (hovered && enabled) theme.chipBackground else Color.Transparent)
             .hoverable(interaction)
@@ -664,6 +667,7 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
             if (name != current) onSave(name)
         }
     }
+    EscapeCloses(onDismiss)
     Popup(
         popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
@@ -671,6 +675,7 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
     ) {
         Column(
             modifier = Modifier.width(240.dp)
+                .sceneFrost(16.dp)
                 .clip(ppShape(16.dp))
                 .background(theme.popupBackground)
                 .border(1.dp, theme.borderColor, ppShape(16.dp))
@@ -707,7 +712,7 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
     Box(Modifier.fillMaxWidth().height(36.dp)) {
         Row(
             modifier = Modifier.fillMaxSize()
-                .background(if (active) OneConfigTheme.accent else CARD_STRIP)
+                .background(if (active) OneConfigTheme.accent else OneConfigTheme.current.chipBackground)
                 .hoverable(interaction)
                 .clickable(enabled = enabled, onClick = onAction),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -719,7 +724,7 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
         if (!active) {
             Box(
                 Modifier.fillMaxWidth().height(1.dp)
-                    .background(if (hovered && enabled) theme.textColorSecondary else CARD_HAIRLINE),
+                    .background(if (hovered && enabled) theme.textColorSecondary else theme.borderColor),
             )
         }
     }
@@ -758,7 +763,7 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
 }
 
 @Composable
-private fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
+internal fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
     val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().wardrobePanel().padding(horizontal = 12.dp, vertical = 10.dp),

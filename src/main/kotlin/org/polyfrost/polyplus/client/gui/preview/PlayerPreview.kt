@@ -48,9 +48,13 @@ fun PlayerPreview(
     live: Boolean = false,
     bottomFadeFraction: Float = 0f,
     rotation: PreviewRotation? = null,
+    fadeEdges: Boolean = true,
+    maxTextureSize: Int = PlayerPreviewOffscreen.MAX_DIM,
+    cameraTiltDeg: Float = 0f,
+    lights: PreviewLights? = null,
 ) {
     if (live) {
-        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction, rotation)
+        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction, rotation, fadeEdges, maxTextureSize, cameraTiltDeg, lights)
         return
     }
     PlayerPreviewBitmap(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey)
@@ -68,6 +72,10 @@ private fun PlayerPreviewLive(
     previewKey: Any,
     bottomFadeFraction: Float,
     rotation: PreviewRotation?,
+    fadeEdges: Boolean,
+    maxTextureSize: Int,
+    cameraTiltDeg: Float,
+    lights: PreviewLights?,
 ) {
     val entry = remember { PlayerPreviewOffscreen.register() }
     DisposableEffect(entry) {
@@ -88,6 +96,9 @@ private fun PlayerPreviewLive(
         entry.modelScale = modelScale
         entry.verticalAnchor = verticalAnchor
         entry.autoSpin = autoSpin
+        entry.maxTextureSize = maxTextureSize
+        entry.cameraTiltDeg = cameraTiltDeg
+        entry.lights = lights
         entry.initialYaw = sharedYaw ?: initialYaw
         if (sharedPitch != null) {
             entry.dragYaw = 0f
@@ -145,7 +156,7 @@ private fun PlayerPreviewLive(
                 val w = size.width
                 val h = size.height
                 drawPoly { PlayerPreviewOffscreen.draw(entry, it, w, h) }
-                drawRect(edgeFade, blendMode = BlendMode.DstIn)
+                if (fadeEdges) drawRect(edgeFade, blendMode = BlendMode.DstIn)
                 bottomFade?.let { drawRect(it, blendMode = BlendMode.DstIn) }
             },
     )

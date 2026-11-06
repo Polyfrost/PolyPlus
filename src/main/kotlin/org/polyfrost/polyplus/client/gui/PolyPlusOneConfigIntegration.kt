@@ -14,6 +14,7 @@ import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.api.ui.v1.page.PageGroup
 import org.polyfrost.oneconfig.api.ui.v1.page.PageText
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object PolyPlusOneConfigIntegration {
@@ -56,9 +57,11 @@ object PolyPlusOneConfigIntegration {
     fun openCosmetics() = OneConfigUI.open(wardrobePage)
 
     fun openCosmeticsFromKeybind() {
-        when (ClientPlatform.currentScreen()) {
-            null, is TitleScreen, is PolyPlusMainMenuScreen -> openCosmetics()
-            else -> Unit
+        val screen = ClientPlatform.currentScreen()
+        if (screen is PolyPlusLobbyScreen) {
+            screen.showPage(LobbyPage.Wardrobe)
+        } else if (screen == null || screen is TitleScreen || MainMenuReplacement.isMenu(screen)) {
+            openCosmetics()
         }
     }
 

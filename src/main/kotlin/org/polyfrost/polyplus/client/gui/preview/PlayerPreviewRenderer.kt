@@ -27,6 +27,12 @@ import java.lang.invoke.MethodType
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
+//? if >= 1.21.8
+import org.polyfrost.polyplus.mixin.client.access.LightingInvoker
+//? if < 1.21.10
+/*import org.polyfrost.polyplus.client.lobby.LobbyPipelines*/
+//? if < 26.2 && > 1.8.9
+/*import org.joml.Vector3f*/
 //? if >= 26.3 {
 import com.mojang.renderpearl.api.GpuFormat
 import com.mojang.renderpearl.api.buffers.GpuBuffer
@@ -216,6 +222,12 @@ object PlayerPreviewRenderer {
     @JvmStatic
     fun isDirectPreview(): Boolean = directPreview
 
+    @Volatile
+    private var buildingLevel = false
+
+    @JvmStatic
+    fun isBuildingLevel(): Boolean = buildingLevel
+
     //? if >= 1.21.10 {
     @Volatile
     private var previewCape: Identifier? = null
@@ -373,6 +385,8 @@ object PlayerPreviewRenderer {
     }
 
     private var target: TextureTarget? = null
+    private var poseTiltDeg = 0f
+    private var poseLights: PreviewLights? = null
     //? if >= 26.3 {
     private var passColorView: GpuTextureView? = null
     private var passDepthView: GpuTextureView? = null
@@ -433,8 +447,23 @@ object PlayerPreviewRenderer {
         readback(colorTex, w, h, key)
     }
 
-    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
+    //? if < 1.21.10 {
+    /*fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
+        LobbyPipelines.previewing = true
+        try {
+            return drawInto(fbo, source, yawDeg, pitchDeg, w, h, modelScale, verticalAnchor, cameraTiltDeg, lights)
+        } finally {
+            LobbyPipelines.previewing = false
+        }
+    }
+
+    private fun drawInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float, lights: PreviewLights?): Boolean {
+    *///?} else {
+    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
+    //?}
         val mc = Minecraft.getInstance()
+        poseTiltDeg = cameraTiltDeg
+        poseLights = lights
         val colorTex = fbo.colorTexture ?: return false
         val depthTex = fbo.depthTexture ?: return false
         val colorView = fbo.colorTextureView ?: return false
@@ -532,11 +561,24 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
+        if (poseTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(poseTiltDeg.toDouble()).toFloat()))
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
         return pose
     }
 
     private fun setupUiLighting(mc: Minecraft) {
+        val lights = poseLights
+        if (lights != null) {
+            //? if >= 26.2 {
+            val lighting = mc.gameRenderer.lighting()
+            (lighting as LightingInvoker).`polyplus$updateBuffer`(Lighting.Entry.LEVEL, lights.key, lights.fill)
+            //?} else {
+            /*val lighting = mc.gameRenderer.lighting
+            (lighting as LightingInvoker).`polyplus$updateBuffer`(Lighting.Entry.LEVEL, Vector3f(lights.key), Vector3f(lights.fill))
+            *///?}
+            lighting.setupFor(Lighting.Entry.LEVEL)
+            return
+        }
         //? if >= 26.2 {
         mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
         //?} else {
@@ -1007,7 +1049,9 @@ object PlayerPreviewRenderer {
 
         fun level(): ClientLevel? {
             cached?.let { return it }
+            buildingLevel = true
             return runCatching { build() }
+                .also { buildingLevel = false }
                 .onFailure { LEGACY_LOG.error("[preview] standalone level build failed", it) }
                 .getOrNull()?.also { cached = it }
         }
@@ -1180,7 +1224,7 @@ object PlayerPreviewRenderer {
     }
     //?}
 
-    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
+    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
         val mc = Minecraft.getInstance()
 
         //? if >= 1.21.4 {
@@ -1251,19 +1295,22 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
+        if (cameraTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(cameraTiltDeg.toDouble()).toFloat()))
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         Lighting.setupForEntityInInventory()
+        lights?.let { RenderSystem.setShaderLights(Vector3f(it.key), Vector3f(it.fill)) }
         val dispatcher = mc.entityRenderDispatcher
-        dispatcher.setRenderShadow(false)
-        val bufferSource = mc.renderBuffers().bufferSource()
         //? if < 1.21.4 {
         /*val prevCamera = dispatcher.camera
         *///?}
         val realMainTarget = mc.mainRenderTarget
-        (mc as MinecraftAccessor)
-            .`polyplus$setMainRenderTarget`(fbo)
         try {
+            LobbyPipelines.previewing = true
+            dispatcher.setRenderShadow(false)
+            val bufferSource = mc.renderBuffers().bufferSource()
+            (mc as MinecraftAccessor)
+                .`polyplus$setMainRenderTarget`(fbo)
             //? if >= 1.21.4 {
             renderer.render(state, pose, bufferSource, 0xF000F0)
             //?}
@@ -1277,6 +1324,7 @@ object PlayerPreviewRenderer {
             //fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
+            LobbyPipelines.previewing = false
             (mc as MinecraftAccessor)
                 .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
@@ -1347,14 +1395,12 @@ object PlayerPreviewRenderer {
 /*import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import net.minecraft.client.Minecraft
-import net.minecraft.client.render.vertex.Tesselator
 import net.minecraft.client.render.model.Model
 import net.minecraft.client.render.model.entity.PlayerModel
 import net.minecraft.client.render.pipeline.RenderTarget
 import net.minecraft.client.render.platform.GLX
 import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.client.render.platform.Lighting
-import net.minecraft.client.render.vertex.DefaultVertexFormat
 import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.resources.Identifier
 import com.mojang.authlib.minecraft.MinecraftProfileTexture

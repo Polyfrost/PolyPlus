@@ -35,7 +35,7 @@ import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
 import org.polyfrost.polyplus.client.network.http.responses.TransactionStatus
 
 @Composable
-internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
+internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int, framed: Boolean = true) {
     var transactions by remember { mutableStateOf<List<TransactionInfo>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -46,15 +46,21 @@ internal fun HistoryScreen(ownedIds: Set<Int>, reloadKey: Int) {
         loadError = null
         BillingService.fetchTransactions()
             .onSuccess { transactions = it }
-            .onFailure { loadError = "Couldn't load transactions: ${it.message}" }
+            .onFailure { loadError = wardrobeFailure(it, "load your purchase history") }
         loading = false
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
-            .padding(18.dp),
+        modifier = Modifier.fillMaxSize().then(
+            if (framed) {
+                Modifier.clip(ppShape(12.dp))
+                    .background(cardBrush())
+                    .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+                    .padding(18.dp)
+            } else {
+                Modifier
+            },
+        ),
     ) {
         when {
             loading && transactions.isEmpty() -> CenteredNote("Loading transactions...")

@@ -28,6 +28,9 @@ object PlayerPreviewOffscreen {
         var modelScale = 0.5f
         var verticalAnchor = 0.5f
         var autoSpin = false
+        var maxTextureSize = MAX_DIM
+        var cameraTiltDeg = 0f
+        var lights: PreviewLights? = null
         var initialYaw = 0f
         var dragYaw = 0f
         var dragPitch = 0f
@@ -47,7 +50,7 @@ object PlayerPreviewOffscreen {
         internal var hasContent = false
     }
 
-    private const val MAX_DIM = 1024
+    internal const val MAX_DIM = 1024
     private const val SPIN_DEG_PER_SEC = 37.5f
     private const val MAX_SPIN_STEP_SEC = 0.1
 
@@ -97,7 +100,7 @@ object PlayerPreviewOffscreen {
             val rectW = (e.fw * main.width).toInt()
             val rectH = (e.fh * main.height).toInt()
             if (rectW <= 0 || rectH <= 0) continue
-            val fit = minOf(1f, MAX_DIM.toFloat() / maxOf(rectW, rectH))
+            val fit = minOf(1f, e.maxTextureSize.toFloat() / maxOf(rectW, rectH))
             val w = (rectW * fit).toInt().coerceAtLeast(1)
             val h = (rectH * fit).toInt().coerceAtLeast(1)
 
@@ -114,8 +117,10 @@ object PlayerPreviewOffscreen {
             val target = offscreen.target ?: continue
             runCatching {
                 //? if >= 1.21.8 {
-                val drawn = PlayerPreviewRenderer.renderInto(target, e.source, yaw, e.dragPitch, w, h, e.modelScale, e.verticalAnchor)
-                //?} else
+                val drawn = PlayerPreviewRenderer.renderInto(target, e.source, yaw, e.dragPitch, w, h, e.modelScale, e.verticalAnchor, e.cameraTiltDeg, e.lights)
+                //?} elif > 1.8.9 {
+                /*val drawn = PlayerPreviewRenderer.renderInto(target, e.source, yaw, w, h, e.modelScale, e.verticalAnchor, e.cameraTiltDeg, e.lights)
+                *///?} else
                 //val drawn = PlayerPreviewRenderer.renderInto(target, e.source, yaw, w, h, e.modelScale, e.verticalAnchor)
                 if (!drawn) {
                     e.hasContent = false

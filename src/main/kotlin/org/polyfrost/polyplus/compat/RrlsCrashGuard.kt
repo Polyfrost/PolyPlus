@@ -8,7 +8,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
-import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 // https://github.com/dima-dencep/rrls/issues/254
@@ -33,7 +33,7 @@ object RrlsCrashGuard {
         eventHandler<TickEvent.End> {
             if (notified || !tripped) return@eventHandler
             val screen = ClientPlatform.currentScreen()
-            if (screen !is TitleScreen && screen !is PolyPlusMainMenuScreen) return@eventHandler
+            if (screen !is TitleScreen && !MainMenuReplacement.isMenu(screen)) return@eventHandler
             if (Minecraft.getInstance().gui.overlay() != null) return@eventHandler
             notified = true
             Notifications.error("PolyPlus", "Remove Reloading Screen (RRLS) has been disabled to prevent a crash.")

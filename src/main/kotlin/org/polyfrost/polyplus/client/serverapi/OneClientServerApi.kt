@@ -30,6 +30,10 @@ object OneClientServerApi {
     var serverApiVersion: String? = null
         private set
 
+    @Volatile
+    var scenePolicy = ServerApiProtocol.ScenePolicy.UNSET
+        private set
+
     val isConnected: Boolean
         get() = serverApiVersion != null
 
@@ -78,6 +82,7 @@ object OneClientServerApi {
     fun reset() {
         helloSent.set(false)
         serverApiVersion = null
+        scenePolicy = ServerApiProtocol.ScenePolicy.UNSET
     }
 
     private fun sendHello() {
@@ -107,6 +112,10 @@ object OneClientServerApi {
             is ServerApiProtocol.Welcome -> {
                 serverApiVersion = packet.serverApiVersion
                 LOGGER.info("Server supports the OneClient server API {} (protocol {})", packet.serverApiVersion, packet.protocolVersion)
+            }
+            is ServerApiProtocol.LobbyScenes -> {
+                scenePolicy = packet.policy
+                LOGGER.info("Server set lobby scene capture to {}", packet.policy)
             }
             null -> Unit
         }

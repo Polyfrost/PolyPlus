@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client
 
+import org.polyfrost.polyplus.client.lobby.StartupSounds
 import org.polyfrost.polyplus.libs.ktor.client.HttpClient
 import org.polyfrost.polyplus.libs.ktor.client.engine.cio.CIO
 import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
@@ -56,6 +57,9 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
 import org.polyfrost.polyplus.client.social.SessionsRepository
+import org.polyfrost.polyplus.client.party.Parties
+import org.polyfrost.polyplus.client.party.PartyRepository
+import org.polyfrost.polyplus.client.stats.PlaySessions
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -80,9 +84,13 @@ import org.polyfrost.polyplus.compat.WWaypointsCompat
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
+//? if < 1.21.4 && > 1.8.9
+/*import org.polyfrost.polyplus.client.lobby.LobbyPipelines*/
+
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
     private val cosmeticsRefreshInProgress = AtomicBoolean(false)
+    private val cosmeticsRefreshQueued = AtomicBoolean(false)
 
     private val EXCEPTION_HANDLER = CoroutineExceptionHandler { _, throwable ->
         LOGGER.error("Uncaught exception in PolyPlus coroutine", throwable)
@@ -157,8 +165,12 @@ object PolyPlusClient {
         step("sentry") { PolyPlusSentry.initialize() }
         step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
+        step("pause screen config preload") { PolyPlusPauseConfig.preload() }
+        step("lobby config preload") { PolyPlusLobbyConfig.preload() }
+        step("party config preload") { PolyPlusPartyConfig.preload() }
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
+        step("startup sounds") { StartupSounds.prepare() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("pylon raw input") { PylonRawInput.initialize() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
@@ -173,6 +185,8 @@ object PolyPlusClient {
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
+        //? if < 1.21.4 && > 1.8.9
+        /*step("lobby shaders") { LobbyPipelines.register() }*/
         //? if >= 26.2
         step("rrls crash guard") { RrlsCrashGuard.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
@@ -194,6 +208,7 @@ object PolyPlusClient {
         // step("early init GlobalChatRepository") { GlobalChatRepository.earlyInitialize() }
         step("early init SessionsRepository") { SessionsRepository.earlyInitialize() }
         step("early init P2PSessionManager") { P2PSessionManager.earlyInitialize() }
+        step("parties") { Parties.initialize() }
 
         //? if >= 1.21.1
         step("pet entities") { PetEntities.register() }
@@ -218,11 +233,13 @@ object PolyPlusClient {
                     GroupsRepository.refreshGroups()
                     // GlobalChatRepository.refreshHistory() // Global chat is disabled for now.
                     SessionsRepository.refreshIncoming()
+                    PartyRepository.refresh()
                 }
             }
         }
 
         step("session accounts") { SessionAccounts.capture() }
+        step("play sessions") { PlaySessions.initialize() }
 
         step("cosmetics prefetch") { refreshCosmetics() }
         step("commands") { PolyPlusCommands.register() }
@@ -256,15 +273,17 @@ object PolyPlusClient {
     fun refreshCosmetics() {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
+            cosmeticsRefreshQueued.set(true)
             return
         }
 
         SCOPE.launch {
             try {
-                refreshCosmeticsInternal()
+                do refreshCosmeticsInternal() while (cosmeticsRefreshQueued.getAndSet(false))
             } finally {
                 cosmeticsRefreshInProgress.set(false)
             }
+            if (cosmeticsRefreshQueued.get()) refreshCosmetics()
         }
     }
 

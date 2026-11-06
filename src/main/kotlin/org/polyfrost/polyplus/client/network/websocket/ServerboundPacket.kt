@@ -1,6 +1,10 @@
 package org.polyfrost.polyplus.client.network.websocket
 
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.MemberState
+import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
+import org.polyfrost.polyplus.client.network.http.responses.PlayReason
+import org.polyfrost.polyplus.client.network.http.responses.PlayResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -45,4 +49,24 @@ sealed interface ServerboundPacket {
     @Serializable
     @SerialName("StopEmote")
     data object StopEmote : ServerboundPacket
+
+    @Serializable
+    @SerialName("SetPartyState")
+    data class SetPartyState(val state: MemberState) : ServerboundPacket
+
+    @Serializable
+    @SerialName("StartPlayTogether")
+    data class StartPlayTogether(val destination: PlayDestination) : ServerboundPacket
+
+    @Serializable
+    @SerialName("CancelPlayTogether")
+    data class CancelPlayTogether(val id: String) : ServerboundPacket
+
+    @Serializable
+    @SerialName("PlayTogetherResponse")
+    data class PlayTogetherResponse(
+        val id: String,
+        val response: PlayResponse,
+        val reason: PlayReason? = null,
+    ) : ServerboundPacket
 }

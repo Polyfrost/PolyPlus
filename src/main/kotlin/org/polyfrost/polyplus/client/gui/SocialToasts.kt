@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,15 +22,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.social.SocialErrors
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.delay
 
 private val nextToastId = AtomicLong(0)
 
-private data class SocialToast(val id: Long, val message: String)
+private data class SocialToast(val id: Long, val message: String, val success: Boolean = false)
+
+object SocialNotices {
+    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val events = _events.asSharedFlow()
+
+    fun emit(message: String) {
+        _events.tryEmit(message)
+    }
+}
 
 @Composable
 internal fun SocialToastHost(modifier: Modifier = Modifier) {
@@ -43,6 +53,12 @@ internal fun SocialToastHost(modifier: Modifier = Modifier) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        SocialNotices.events.collect { message ->
+            toasts = toasts + SocialToast(nextToastId.incrementAndGet(), message, success = true)
+        }
+    }
+
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         toasts.forEach { toast ->
             key(toast.id) {
@@ -50,26 +66,31 @@ internal fun SocialToastHost(modifier: Modifier = Modifier) {
                     delay(5000)
                     toasts = toasts.filterNot { it.id == toast.id }
                 }
-                SocialToastBubble(toast.message) { toasts = toasts.filterNot { it.id == toast.id } }
+                SocialToastBubble(toast.message, toast.success) { toasts = toasts.filterNot { it.id == toast.id } }
             }
         }
     }
 }
 
 @Composable
-private fun SocialToastBubble(message: String, onDismiss: () -> Unit) {
+private fun SocialToastBubble(message: String, success: Boolean, onDismiss: () -> Unit) {
     Row(
         modifier = Modifier
             .widthIn(max = 340.dp)
+            .sceneFrost(16.dp)
             .clip(SocialPanelShape)
             .background(SocialPopupBackground)
-            .border(SocialBorderWidth, SocialDangerColor, SocialPanelShape)
+            .border(SocialBorderWidth, if (success) SocialBorderColor else SocialDangerColor, SocialPanelShape)
             .clickableWithSound(onDismiss)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(SOCIAL_ASSETS + "x-close.svg", SocialDangerColor, Modifier.padding(top = 1.dp).size(16.dp))
+        if (success) {
+            ThemedIcon(SOCIAL_ASSETS + "check-circle.svg", SocialSuccessText, 16.dp, Modifier.padding(top = 1.dp))
+        } else {
+            ThemedIcon(SOCIAL_ASSETS + "x-close.svg", SocialDangerColor, 16.dp, Modifier.padding(top = 1.dp))
+        }
         SocialText(message, fontSize = 13.sp, color = OneConfigTheme.current.textColor)
     }
 }

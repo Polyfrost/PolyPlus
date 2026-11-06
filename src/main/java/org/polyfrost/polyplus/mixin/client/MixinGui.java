@@ -6,7 +6,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
-import org.polyfrost.polyplus.client.gui.PolyPlusPauseScreen;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseStage;
+import org.polyfrost.polyplus.client.lobby.LobbyScene;
+import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
@@ -19,7 +22,7 @@ import net.minecraft.client.gui.Gui;
 *///?}
 
 //? if < 26.3 {
-/*import org.polyfrost.polyplus.client.PolyPlusConfig;
+/*import org.polyfrost.polyplus.client.PolyPlusPauseConfig;
 import org.polyfrost.polyplus.client.social.SocialOverlay;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
@@ -45,33 +48,37 @@ public class MixinGui {
     private void polyplus$replaceScreen(Screen screen, Operation<Void> original) {
         // on 26.3+ the LAN controls live inside World Options, so MixinWorldOptionsScreen handles them instead
         //? if = 26.2 {
-        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof MultiplayerOptionsScreen) {
+        /*if (PolyPlusPauseConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof MultiplayerOptionsScreen) {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }
         *///?} elif < 26.2 && > 1.8.9 {
-        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof ShareToLanScreen) {
+        /*if (PolyPlusPauseConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof ShareToLanScreen) {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }
         *///?} elif = 1.8.9 {
-        /*if (PolyPlusConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof OpenToLanScreen) {
+        /*if (PolyPlusPauseConfig.getReplacePauseLanButton() && PrivacyConsent.allowsOnlineServices() && screen instanceof OpenToLanScreen) {
             SocialOverlay.INSTANCE.openHostCurrentWorld(ClientPlatform.INSTANCE.currentScreen());
             return;
         }
         *///?}
-        screen = PolyPlusPauseScreen.replace(screen);
+        screen = PauseRouter.replace(screen);
+        PauseStage.onScreen(screen);
+        screen = MainMenuReplacement.replaceLists(screen);
         if (MainMenuReplacement.enabled() && polyplus$opensTitleScreen(screen)) {
             if (!MainMenuReplacement.alreadyOpen()) {
                 original.call(MainMenuReplacement.create());
             }
             return;
         }
+        boolean leavingPause = PauseRouter.leaving(screen);
         original.call(screen);
+        if (leavingPause) ((MinecraftAccessor) Minecraft.getInstance()).polyplus$setAttackDelay(0);
     }
 
     @Unique
     private static boolean polyplus$opensTitleScreen(Screen screen) {
-        return screen instanceof TitleScreen || (screen == null && Minecraft.getInstance().player == null);
+        return screen instanceof TitleScreen || (screen == null && !LobbyScene.hasRealPlayer());
     }
 }

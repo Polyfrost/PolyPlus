@@ -10,10 +10,22 @@ object ServerApiProtocol {
 
     private const val SERVERBOUND_HELLO = 0x00
     private const val CLIENTBOUND_WELCOME = 0x00
+    private const val CLIENTBOUND_LOBBY_SCENES = 0x01
     private const val MAX_STRING_BYTES = 256
+
+    enum class ScenePolicy {
+        UNSET,
+        ALLOW,
+        DENY;
+
+        companion object {
+            fun fromWire(value: Int): ScenePolicy = entries.getOrElse(value) { UNSET }
+        }
+    }
 
     sealed interface Clientbound
     data class Welcome(val protocolVersion: Int, val serverApiVersion: String) : Clientbound
+    data class LobbyScenes(val policy: ScenePolicy) : Clientbound
 
     fun encodeHello(clientVersion: String, minecraftVersion: String): ByteArray =
         Writer()
@@ -27,6 +39,7 @@ object ServerApiProtocol {
         val reader = Reader(data)
         return when (reader.varInt()) {
             CLIENTBOUND_WELCOME -> Welcome(reader.varInt(), reader.string())
+            CLIENTBOUND_LOBBY_SCENES -> LobbyScenes(ScenePolicy.fromWire(reader.varInt()))
             else -> null
         }
     }

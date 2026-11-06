@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.gui.preview
 
 import net.minecraft.resources.Identifier
+import org.joml.Vector3fc
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 
@@ -20,3 +21,5 @@ sealed interface PlayerPreviewSource {
 data class PreviewSkin(val texture: Identifier, val slim: Boolean)
 
 data class PreviewTint(val particleColor: Int?)
+
+class PreviewLights(val key: Vector3fc, val fill: Vector3fc)

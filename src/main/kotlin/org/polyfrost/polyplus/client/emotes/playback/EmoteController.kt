@@ -7,6 +7,7 @@ import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.Minecraft
 *///?}
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
+import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.LoopMode
 import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
@@ -34,6 +35,10 @@ private const val BLEND_MS = 140f
 class EmoteController {
     private var phase: Phase = Phase.Inactive
 
+    var clock: (() -> Long)? = null
+
+    private fun now(): Long = clock?.invoke() ?: Util.getMillis()
+
     val isActive: Boolean
         get() = phase !is Phase.Inactive
 
@@ -53,7 +58,7 @@ class EmoteController {
     }
 
     private fun blendWeight(startTimeMs: Long): Float {
-        return ((Util.getMillis() - startTimeMs) / BLEND_MS).coerceIn(0f, 1f)
+        return ((now() - startTimeMs) / BLEND_MS).coerceIn(0f, 1f)
     }
 
     fun play(emote: Emote) {
@@ -61,7 +66,7 @@ class EmoteController {
         AnimationSampler.runInitialize(emote.animation, molangVariables)
         phase = Phase.BlendingIn(
             emote = emote,
-            startTimeMs = Util.getMillis(),
+            startTimeMs = now(),
             molangVariables = molangVariables,
         )
     }
@@ -92,7 +97,7 @@ class EmoteController {
     }
 
     private fun applyBlendingIn(model: PlayerModel, renderContext: PlayerRenderContext, blending: Phase.BlendingIn): Map<String, BoneTransform> {
-        val elapsedMs = Util.getMillis() - blending.startTimeMs
+        val elapsedMs = now() - blending.startTimeMs
         val progress = (elapsedMs / BLEND_MS).coerceIn(0f, 1f)
 
         val sample = sampleAnimation(blending.emote.animation, resolvePlayingTime(blending.emote.animation, blending.startTimeMs), renderContext, blending.molangVariables)
@@ -128,7 +133,7 @@ class EmoteController {
     }
 
     private fun applyBlendingOut(model: PlayerModel, blending: Phase.BlendingOut): Map<String, BoneTransform> {
-        val elapsedMs = Util.getMillis() - blending.startTimeMs
+        val elapsedMs = now() - blending.startTimeMs
         val progress = (elapsedMs / BLEND_MS).coerceIn(0f, 1f)
         val playerWeight = 1f - progress
 
@@ -158,7 +163,7 @@ class EmoteController {
         phase = Phase.BlendingOut(
             emote = emote,
             lastSample = lastSample,
-            startTimeMs = Util.getMillis(),
+            startTimeMs = now(),
         )
     }
 
@@ -172,7 +177,7 @@ class EmoteController {
     private fun resolvePlayingTime(animation: BedrockAnimation, startTimeMs: Long): Float {
         return BedrockAnimationPlayback.resolveTimeTicks(
             animation = animation,
-            elapsedTicks = BedrockAnimationPlayback.elapsedTicksSince(startTimeMs),
+            elapsedTicks = (now() - startTimeMs) / BedrockConstants.MS_PER_TICK,
         )
     }
 

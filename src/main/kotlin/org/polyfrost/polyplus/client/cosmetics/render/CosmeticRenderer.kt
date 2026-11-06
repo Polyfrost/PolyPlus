@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.render.BedrockAttachedModelRenderer
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.playback.CosmeticPlayback
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
@@ -111,7 +112,7 @@ object CosmeticRenderer {
         chestplateEquipped: Boolean,
         hiddenSlots: Set<BodySlot>,
     ): List<BedrockAttachedModelRenderer.DrawCall> =
-        equipment.equipped().filterNot { it.cosmetic.slot in hiddenSlots }.map { entry ->
+        equipment.equipped().filter { it.cosmetic.slot !in hiddenSlots && RemoteTextures.isRegistered(it.cosmetic.texture) }.map { entry ->
             val tinted = entry.cosmetic.slot == BodySlot.Aura && particleColor != null
             val color = if (tinted) particleColor!! else -1
             val translucent = tinted && (color ushr 24) != 0xFF

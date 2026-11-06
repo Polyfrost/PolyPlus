@@ -3,7 +3,12 @@ package org.polyfrost.polyplus.mixin.client;
 //? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.Screen;
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,6 +26,31 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 @Mixin(Screen.class)
 public class MixinScreen {
+    @Inject(
+        //? if >= 26.1 {
+        method = "extractBackground",
+        //?} else {
+        /*method = "renderBackground",
+        *///?}
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void polyplus$darkJoinLeaveBackground(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int mouseX, int mouseY, float tickDelta, CallbackInfo ci
+    ) {
+        Screen self = (Screen) (Object) this;
+        if (!MainMenuReplacement.enabled() || Minecraft.getInstance().level != null) return;
+        if (self instanceof ConnectScreen || self instanceof DisconnectedScreen || self instanceof GenericMessageScreen) {
+            graphics.fill(0, 0, self.width, self.height, 0xFF0B1013);
+            ci.cancel();
+        }
+    }
+
     @Inject(
         //? if >= 26.1 {
         method = "extractBackground",
@@ -102,9 +132,14 @@ public class MixinScreen {
     }
 }
 //?} else {
-/*import net.minecraft.client.gui.screens.Screen;
+/*import net.minecraft.client.gui.GuiElement;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screen.game.inventory.InventoryMenuScreen;
+import net.minecraft.client.gui.screen.menu.multiplayer.DownloadingTerrainScreen;
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig;
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker;
@@ -136,6 +171,11 @@ public class MixinScreen {
     @Inject(method = "drawBackgroundTexture", at = @At("HEAD"), cancellable = true)
     private void polyplus$replaceMenuBackground(int offset, CallbackInfo ci) {
         Screen self = (Screen) (Object) this;
+        if (MainMenuReplacement.enabled() && (self instanceof ConnectScreen || self instanceof DisconnectedScreen || self instanceof DownloadingTerrainScreen)) {
+            GuiElement.fill(0, 0, self.width, self.height, 0xFF0B1013);
+            ci.cancel();
+            return;
+        }
         if (MenuPanorama.active(self) && MenuPanorama.drawBackdrop(self, false)) {
             ci.cancel();
             return;

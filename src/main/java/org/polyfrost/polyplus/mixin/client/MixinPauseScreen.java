@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.Component;
 import org.objectweb.asm.Opcodes;
-import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,7 +16,7 @@ import net.minecraft.client.gui.screen.menu.GameMenuScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.resource.language.I18n;
-import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig;
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel;
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor;
 import org.polyfrost.polyplus.privacy.PrivacyConsent;
@@ -52,7 +52,7 @@ public class MixinPauseScreen {
     private Component polyplus$hostWorldLabel(Component original) {
         // on a server this button is vanilla's disabled LAN entry; the host flow only ever opens the local world
         return Minecraft.getInstance().hasSingleplayerServer()
-            && PolyPlusConfig.getReplacePauseLanButton()
+            && PolyPlusPauseConfig.getReplacePauseLanButton()
             && PrivacyConsent.allowsOnlineServices()
             ? Component.translatable("polyplus.hostWorld")
             : original;
@@ -62,7 +62,7 @@ public class MixinPauseScreen {
     private void polyplus$hostWorldLabel(CallbackInfo ci) {
         // on a server this button is vanilla's disabled LAN entry; the host flow only ever opens the local world
         if (Minecraft.getInstance().getServer() == null) return;
-        if (!PolyPlusConfig.getReplacePauseLanButton() || !PrivacyConsent.allowsOnlineServices()) return;
+        if (!PolyPlusPauseConfig.getReplacePauseLanButton() || !PrivacyConsent.allowsOnlineServices()) return;
         for (ButtonWidget button : ((ScreenAccessor) this).polyplus$buttons()) {
             if (button.id == 7) button.message = I18n.translate("polyplus.hostWorld");
         }

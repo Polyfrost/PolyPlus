@@ -23,9 +23,10 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.FramebufferRenderEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.BadModsScreen
+import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -179,9 +180,10 @@ object BadMods {
     private fun showWhenReady(): Boolean {
         if (warnings.isEmpty()) return true
         return when (val screen = ClientPlatform.currentScreen()) {
+            is PolyPlusLobbyScreen -> true
             is PolyPlusMainMenuScreen -> true
             is TitleScreen -> {
-                if (!PolyPlusMainMenuConfig.useVanillaMainMenu) return false
+                if (MainMenuReplacement.replacesTitleScreen()) return false
                 //? if > 1.8.9 {
                 Minecraft.getInstance().execute { ClientPlatform.setScreen(BadModsScreen(screen)) }
                 //?} else {

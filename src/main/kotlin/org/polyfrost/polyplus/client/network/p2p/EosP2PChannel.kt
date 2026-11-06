@@ -10,6 +10,7 @@ import io.netty.channel.ChannelOutboundBuffer
 import io.netty.channel.ChannelPromise
 import io.netty.channel.DefaultChannelConfig
 import io.netty.channel.EventLoop
+import io.netty.handler.timeout.ReadTimeoutException
 import io.netty.handler.timeout.ReadTimeoutHandler
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.network.eos.EosNotificationHandle
@@ -19,6 +20,7 @@ import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import java.io.IOException
 import java.net.SocketAddress
 import java.nio.ByteBuffer
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(parent) {
@@ -42,6 +44,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     @Volatile private var active = false
 
     private var connectionStateHandle: EosNotificationHandle? = null
+    private var interruptExpiry: ScheduledFuture<*>? = null
 
     companion object {
         private val METADATA = ChannelMetadata(false)
@@ -55,6 +58,8 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
 
         private const val TIMEOUT_INSTALL_ATTEMPTS = 5
         private const val TIMEOUT_INSTALL_RETRY_MS = 100L
+
+        private const val HOST_INTERRUPT_GRACE_MS = 10_000L
     }
 
     internal fun setupAccepted(socket: EosP2PSocketId, remote: EosProductUserId) {
@@ -118,9 +123,11 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
                         socket,
                         if (event.direct) "direct" else "relayed",
                     )
+                    eventLoop().execute { cancelInterruptExpiry() }
                 }
                 is EosSdkBridge.ConnectionStateEvent.Interrupted -> {
                     LOGGER.warn("EOS P2P connection on socket {} interrupted, attempting to recover", socket)
+                    if (parent() != null) eventLoop().execute { armInterruptExpiry() }
                 }
                 is EosSdkBridge.ConnectionStateEvent.Closed -> {
                     LOGGER.info("EOS P2P connection on socket {} closed: {}", socket, event.reason)
@@ -130,6 +137,24 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
         }
 
         active = true
+    }
+
+    private fun armInterruptExpiry() {
+        if (interruptExpiry != null || !isOpen) return
+        interruptExpiry = eventLoop().schedule({ expireInterruptedPeer() }, HOST_INTERRUPT_GRACE_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelInterruptExpiry() {
+        interruptExpiry?.cancel(false)
+        interruptExpiry = null
+    }
+
+    private fun expireInterruptedPeer() {
+        interruptExpiry = null
+        if (!isOpen) return
+        LOGGER.warn("EOS P2P peer {} did not recover within {}ms; dropping them", remoteUser, HOST_INTERRUPT_GRACE_MS)
+        pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE)
+        close()
     }
 
     override fun doRegister() {
@@ -163,6 +188,7 @@ class EosP2PChannel internal constructor(parent: Channel?) : AbstractChannel(par
     override fun doClose() {
         open = false
         active = false
+        cancelInterruptExpiry()
 
         val socket = localSocket
         val remote = remoteUser

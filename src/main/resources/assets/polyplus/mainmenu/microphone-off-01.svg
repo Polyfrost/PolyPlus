@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="microphone-off-01">
+<path id="Icon" d="M13.5 3.375C11.6361 3.375 10.125 4.88604 10.125 6.75V12.375C10.125 14.239 11.6361 15.75 13.5 15.75C15.364 15.75 16.875 14.239 16.875 12.375V6.75C16.875 4.88604 15.364 3.375 13.5 3.375Z M21.375 11.25V12.375C21.375 16.7242 17.8492 20.25 13.5 20.25M5.625 11.25V12.375C5.625 16.7242 9.15076 20.25 13.5 20.25M13.5 20.25V23.625M9 23.625H18" stroke="var(--stroke-0, white)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Slash" d="M3.375 3.375L23.625 23.625" stroke="var(--stroke-0, white)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

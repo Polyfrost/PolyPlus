@@ -1,5 +1,7 @@
 package org.polyfrost.polyplus.client.launcher
 
+import com.mojang.authlib.exceptions.AuthenticationUnavailableException
+import com.mojang.authlib.exceptions.InvalidCredentialsException
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
@@ -19,11 +21,14 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -35,17 +40,30 @@ object SessionRefresh {
 
     private const val LOGIN_FAILED_KEY = "disconnect.loginFailedInfo"
     private const val INVALID_SESSION_KEY = "disconnect.loginFailedInfo.invalidSession"
+    private const val SERVERS_UNAVAILABLE_KEY = "disconnect.loginFailedInfo.serversUnavailable"
     private const val REFRESH_TIMEOUT_MS = 30_000L
 
-    private const val PREJOIN_WAIT_MS = 1_000L
+    private const val PREJOIN_WAIT_MS = 8_000L
 
-    private const val REJOIN_REFRESH_WAIT_MS = 2_500L
+    private const val REJOIN_REFRESH_WAIT_MS = 12_000L
+
+    private const val UNAVAILABLE_RETRY_WINDOW_MS = 12_000L
+
+    private const val UNAVAILABLE_RETRY_DELAY_MS = 1_500L
+
+    private const val PREPARE_TIMEOUT_MS = 20_000L
+
+    private const val PREPARE_PROBES = 3
+
+    private const val PROBE_QUEUE_MS = 5_000L
 
     private const val REFRESH_COOLDOWN_MS = 5 * 60 * 1000L
 
     private const val REJECTION_COOLDOWN_MS = 30 * 1000L
 
     private val refreshLock = Any()
+
+    internal enum class LoginFailure { INVALID_SESSION, SERVERS_UNAVAILABLE }
 
     private data class RefreshTarget(
         val id: UUID,
@@ -71,8 +89,13 @@ object SessionRefresh {
     /*internal class ConnectionAttempt(val parent: Screen, val server: ServerData)
     *///?}
 
+    internal class EndedAttempt(val attempt: ConnectionAttempt, val failure: LoginFailure?)
+
     @Volatile
     private var lastAttempt: ConnectionAttempt? = null
+
+    @Volatile
+    private var endedAttempt: EndedAttempt? = null
 
     /** Whether PolyPlus itself is attempting a reconnection */
     @Volatile
@@ -82,7 +105,10 @@ object SessionRefresh {
     private var refreshedForAttempt = false
 
     @Volatile
-    private var invalidSessionPending = false
+    private var pendingFailure: LoginFailure? = null
+
+    @Volatile
+    private var unavailableSinceMs = 0L
 
     fun register() {
         //? if > 1.8.9 {
@@ -100,14 +126,16 @@ object SessionRefresh {
         quickPlay: Boolean,
         transferState: TransferState?,
     ) {
-        invalidSessionPending = false
+        pendingFailure = null
+        endedAttempt = null
         if (parent != null && address != null && server != null) {
             lastAttempt = ConnectionAttempt(parent, address, server, quickPlay, transferState)
         }
     //?} else {
     /*@JvmStatic
     fun onConnectStarted(parent: Screen?, server: ServerData?) {
-        invalidSessionPending = false
+        pendingFailure = null
+        endedAttempt = null
         if (parent != null && server != null) {
             lastAttempt = ConnectionAttempt(parent, server)
         }
@@ -131,6 +159,7 @@ object SessionRefresh {
 
     @JvmStatic
     fun beforeAuthenticate() {
+        unavailableSinceMs = 0L
         if (!hasPendingRefresh()) {
             refreshedForAttempt = false
             startRefreshIfExpired()
@@ -165,6 +194,64 @@ object SessionRefresh {
         }
     }
 
+    @JvmStatic
+    fun retryAfterUnavailable(): Boolean {
+        val now = System.currentTimeMillis()
+        if (unavailableSinceMs == 0L) unavailableSinceMs = now
+        if (now - unavailableSinceMs >= UNAVAILABLE_RETRY_WINDOW_MS) return false
+        LOGGER.info("The session server is unavailable; retrying the join")
+        return failOpenIfInterrupted(false) {
+            Thread.sleep(UNAVAILABLE_RETRY_DELAY_MS)
+            true
+        }
+    }
+
+    internal fun prepareForJoin(): Job = PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
+        if (!PolyPlusConfig.autoRefreshSession) return@launch
+        val target = refreshableActiveTarget() ?: return@launch
+        withTimeoutOrNull(PREPARE_TIMEOUT_MS) {
+            if (LauncherAccountStore.isExpired(target.account.expires)) {
+                automaticRefresh(target)?.let { awaitRefresh(target, it) }
+            }
+            repeat(PREPARE_PROBES) {
+                when (MinecraftLoginGate.whileNotLoggingIn(PROBE_QUEUE_MS) { probeSession() }) {
+                    null -> return@withTimeoutOrNull
+                    LoginFailure.SERVERS_UNAVAILABLE -> delay(UNAVAILABLE_RETRY_DELAY_MS)
+                    LoginFailure.INVALID_SESSION -> {
+                        val refresh = automaticRefresh(target, REJECTION_COOLDOWN_MS, reuseCompleted = true)
+                            ?: return@withTimeoutOrNull
+                        if (!awaitRefresh(target, refresh)) return@withTimeoutOrNull
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun awaitRefresh(target: RefreshTarget, refresh: Deferred<Result<Unit>>): Boolean =
+        refresh.await().also { consumeRefreshResult(target.id, refresh) }.isSuccess
+
+    private fun probeSession(): LoginFailure? {
+        val mc = Minecraft.getInstance()
+        val serverId = UUID.randomUUID().toString().replace("-", "")
+        return try {
+            //? if >= 1.21.10 {
+            mc.services().sessionService().joinServer(mc.user.profileId, mc.user.accessToken, serverId)
+            //?} elif > 1.8.9 {
+            /*mc.minecraftSessionService.joinServer(mc.user.profileId, mc.user.accessToken, serverId)
+            *///?} else {
+            /*mc.sessionService.joinServer(mc.session.profile, mc.session.accessToken, serverId)
+            *///?}
+            null
+        } catch (_: InvalidCredentialsException) {
+            LoginFailure.INVALID_SESSION
+        } catch (_: AuthenticationUnavailableException) {
+            LoginFailure.SERVERS_UNAVAILABLE
+        } catch (other: Exception) {
+            LOGGER.warn("Could not check the session before joining", other)
+            null
+        }
+    }
+
     private fun hasPendingRefresh(): Boolean = synchronized(refreshLock) {
         val id = activeProfileId() ?: return@synchronized false
         pendingRefreshes[id]?.isActive == true
@@ -181,16 +268,26 @@ object SessionRefresh {
 
     @JvmStatic
     fun onInvalidSession() {
-        invalidSessionPending = true
+        pendingFailure = LoginFailure.INVALID_SESSION
+    }
+
+    @JvmStatic
+    fun onServersUnavailable() {
+        pendingFailure = LoginFailure.SERVERS_UNAVAILABLE
     }
 
     //? if > 1.8.9 {
     @JvmStatic
-    fun isInvalidSession(reason: Component): Boolean {
+    fun isInvalidSession(reason: Component): Boolean = hasLoginFailure(reason, INVALID_SESSION_KEY)
+
+    @JvmStatic
+    fun isServersUnavailable(reason: Component): Boolean = hasLoginFailure(reason, SERVERS_UNAVAILABLE_KEY)
+
+    private fun hasLoginFailure(reason: Component, key: String): Boolean {
         val contents = reason.contents as? TranslatableContents ?: return false
         if (contents.key != LOGIN_FAILED_KEY) return false
         return contents.args.any { arg ->
-            arg is Component && (arg.contents as? TranslatableContents)?.key == INVALID_SESSION_KEY
+            arg is Component && (arg.contents as? TranslatableContents)?.key == key
         }
     }
     //?} else {
@@ -206,11 +303,19 @@ object SessionRefresh {
         // a disconnect screen ends the attempt either way, only its refresh prompt may still need it
         val attempt = lastAttempt
         lastAttempt = null
-        if (!invalidSessionPending) return null
-        invalidSessionPending = false
+        val failure = pendingFailure
+        pendingFailure = null
+        if (attempt != null) {
+            endedAttempt = EndedAttempt(attempt, failure ?: LoginFailure.INVALID_SESSION.takeIf { refreshedForAttempt })
+        }
+        if (failure != LoginFailure.INVALID_SESSION) return null
         if (attempt == null || refreshableActiveTarget() == null) return null
         return SessionRefreshPrompt(attempt)
     }
+
+    internal fun takeEndedAttempt(): EndedAttempt? = endedAttempt.also { endedAttempt = null }
+
+    internal fun refreshSettled(): Boolean = !hasPendingRefresh()
 
     internal fun reconnect(attempt: ConnectionAttempt): Boolean {
         reconnecting = true

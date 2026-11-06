@@ -1,15 +1,29 @@
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import net.minecraft.client.Minecraft
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
+
+//? if = 1.8.9
+//import org.lwjgl.input.Mouse
+
+private const val PARALLAX_EASE = 0.02f
 
 private val GlowA = Color(0xFF1878F1)
 private val GlowB = Color(0xFF24D3EE)
@@ -53,6 +67,38 @@ private fun softRadial(color: Color, alpha: Float, center: Offset, radius: Float
         t to color.copy(alpha = alpha * s * s * (3f - 2f * s))
     }
     return Brush.radialGradient(colorStops = stops, center = center, radius = radius)
+}
+
+@Composable
+internal fun MenuBackdrop(modifier: Modifier) {
+    var time by remember { mutableFloatStateOf(0f) }
+    val eased = remember { floatArrayOf(0.5f, 0.5f) }
+    LaunchedEffect(Unit) {
+        val start = withFrameNanos { it }
+        while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
+    }
+    Canvas(modifier) {
+        val target = menuMouse()
+        eased[0] += (target.x - eased[0]) * PARALLAX_EASE
+        eased[1] += (target.y - eased[1]) * PARALLAX_EASE
+        drawMenuBackground(time, Offset(eased[0], eased[1]))
+    }
+}
+
+private fun menuMouse(): Offset {
+    val mc = Minecraft.getInstance()
+    //? if > 1.8.9 {
+    val screenW = mc.window.screenWidth.coerceAtLeast(1)
+    val screenH = mc.window.screenHeight.coerceAtLeast(1)
+    val x = (mc.mouseHandler.xpos() / screenW).toFloat()
+    val y = (mc.mouseHandler.ypos() / screenH).toFloat()
+    //?} else {
+    /*val w = mc.window.width.coerceAtLeast(1)
+    val h = mc.window.height.coerceAtLeast(1)
+    val x = Mouse.getX().toFloat() / w
+    val y = (h - Mouse.getY()).toFloat() / h
+    *///?}
+    return Offset(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
 }
 
 fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
@@ -124,50 +170,6 @@ private fun DrawScope.drawParticles(time: Float, mouse: Offset) {
         val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
         val r = p.size * 3f
         drawCircle(brush = softRadial(Color.White, alpha, center, r), radius = r, center = center)
-    }
-}
-
-private val PanoramaBlackFlat = Color(0xFF11171C)
-private val PanoramaBlackGradient = Color(0xFF10161B)
-private val PanoramaGlowBlue = Color(0xFF1878F1)
-
-private class GlowSpot(
-    val ax: Float,
-    val ay: Float,
-    val radiusF: Float,
-    val alpha: Float,
-)
-
-private val GlowMask = listOf(
-    GlowSpot(0.177f, -0.080f, 0.401f, 0.15f),
-    GlowSpot(-0.117f, 1.023f, 0.401f, 0.15f),
-    GlowSpot(1.024f, 0.190f, 0.322f, 0.10f),
-    GlowSpot(0.699f, 1.119f, 0.295f, 0.10f),
-)
-
-fun DrawScope.drawPanoramaOverlay() {
-    if (PolyPlusMainMenuConfig.hidePanoramaOverlay) return
-    drawPanoramaBlackBackground()
-    drawPanoramaGlowMask()
-}
-
-private fun DrawScope.drawPanoramaBlackBackground() {
-    drawRect(PanoramaBlackFlat.copy(alpha = 0.10f))
-    drawRect(
-        brush = Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.199f to Color.Transparent,
-                0.960f to PanoramaBlackGradient.copy(alpha = 0.25f),
-            ),
-        ),
-    )
-}
-
-private fun DrawScope.drawPanoramaGlowMask() {
-    for (g in GlowMask) {
-        val center = Offset(size.width * g.ax, size.height * g.ay)
-        val radius = size.width * g.radiusF
-        drawCircle(brush = softRadial(PanoramaGlowBlue, g.alpha, center, radius), radius = radius, center = center)
     }
 }
 

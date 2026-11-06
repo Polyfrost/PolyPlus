@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmExtension
 
 plugins {
     java
+    `maven-publish`
     kotlin("jvm")
     kotlin("plugin.compose")
     kotlin("plugin.serialization")
@@ -63,7 +64,10 @@ val minecraftPredicate = property("mod.mc_compat") as String
 
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
+    put("sodium_config", optionalProperty("deps.sodium") != null && stonecutter.current.parsed >= "1.21.11")
     put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
+    put("iris", optionalProperty("deps.iris") != null)
+    put("dh", optionalProperty("deps.distanthorizons") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -92,11 +96,18 @@ val flkProvidedModules = setOf(
 )
 
 group = property("mod.group") as String
-version = "${property("mod.version")}+${stonecutter.current.version}"
+val testerBuild = (optionalProperty("polyplus.tester") ?: System.getenv("POLYPLUS_TESTER"))?.trim().equals("true", ignoreCase = true)
+version = "${property("mod.version")}+${stonecutter.current.version}${if (testerBuild) "-tester" else ""}"
 base.archivesName = property("mod.id") as String
 val oneconfigVersion = property("deps.oneconfig") as String
 
 repositories {
+    if (isOrnithe) {
+        exclusiveContent {
+            forRepository { mavenCentral() }
+            filter { includeGroup("org.lwjgl") }
+        }
+    }
     fun strictMaven(url: String, alias: String, vararg groups: String) = exclusiveContent {
         forRepository { maven(url) { name = alias } }
         filter { groups.forEach(::includeGroup) }
@@ -124,7 +135,6 @@ repositories {
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
     strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
-    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
     strictMaven("https://maven.taumc.org/releases", "TauMC", "org.embeddedt.celeritas")
 }
 
@@ -165,11 +175,9 @@ configurations.all {
 if (isOrnithe) {
     sourceSets.main {
         val excluded = listOf(
-            "**/client/network/p2p/P2PVoicechatPlugin.kt",
             "**/mixin/client/MixinGameNarrator.java",
             "**/mixin/client/access/HolderReferenceInvoker.java",
             "**/mixin/client/MixinGuiMessage.java",
-            "**/client/network/p2p/EosVoicechat*.kt",
             "**/mixin/compat/animatium/**",
             "**/mixin/compat/essential/**",
             "**/mixin/compat/euphoria/**",
@@ -177,10 +185,17 @@ if (isOrnithe) {
             "**/mixin/compat/polytone/**",
             "**/mixin/compat/rrls/**",
             "**/mixin/compat/sodium/**",
-            "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",
             "**/mixin/compat/wwaypoints/**",
         )
+        java.exclude(excluded)
+        kotlin.exclude(excluded)
+    }
+}
+
+if (optionalProperty("deps.iris") == null) {
+    sourceSets.main {
+        val excluded = listOf("**/compat/iris/**")
         java.exclude(excluded)
         kotlin.exclude(excluded)
     }
@@ -328,7 +343,6 @@ dependencies {
     if (!isOrnithe) {
         modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
         modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
-        modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
         include("org.polyfrost:polydium:${property("deps.polydium")}+$mcVersion")
     }
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
@@ -342,6 +356,14 @@ dependencies {
 
     optionalProperty("deps.wwaypoints")?.let {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.iris")?.let {
+        modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.distanthorizons")?.let {
+        modCompileOnly("maven.modrinth:distanthorizons:$it") { isTransitive = false }
     }
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
@@ -378,6 +400,7 @@ dependencies {
     }
 
     implementation(include("gg.sona:eos:2.2.0")!!)
+    implementation(include("io.github.jaredmdobson:concentus:1.0.2")!!)
 
     implementation(include("com.moulberry:mixinconstraints:1.1.0")!!)
 
@@ -434,7 +457,55 @@ tasks.test {
     }
 }
 
+val generateTesterFlag = tasks.register("generateTesterFlag") {
+    val output = layout.buildDirectory.file("generated/tester/polyplus-tester.properties")
+    inputs.property("tester", testerBuild)
+    outputs.file(output)
+    doLast {
+        output.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText("tester=$testerBuild\n")
+        }
+    }
+}
+
 tasks.withType<ProcessResources>().configureEach {
+    from(generateTesterFlag)
+    val keptChain = when {
+        stonecutter.eval(mcVersion, ">= 1.21.8") -> "lobby.json"
+        stonecutter.eval(mcVersion, ">= 1.21.5") -> "lobby_uniforms.json"
+        else -> "lobby_program.json"
+    }
+    val oldEffects = stonecutter.eval(mcVersion, "< 1.21.4")
+    val shaders = "assets/polyplus/shaders"
+    includeEmptyDirs = false
+    if (oldEffects) {
+        exclude("assets/polyplus/post_effect/**", "$shaders/core/lobby_lightmap.*")
+    } else {
+        (listOf("lobby.json", "lobby_uniforms.json", "lobby_program.json") - keptChain).forEach { exclude("assets/polyplus/post_effect/$it") }
+        exclude("$shaders/effect/**")
+    }
+    if (!stonecutter.eval(mcVersion, "= 1.21.4")) exclude("$shaders/core/*.json", "$shaders/post/*.json")
+    if (stonecutter.eval(mcVersion, ">= 1.21.10")) exclude("$shaders/core/lobby_entity.*", "$shaders/core/lobby_lightmap.*")
+    if (isOrnithe) {
+        exclude("$shaders/core/**", "$shaders/effect/core/**", "$shaders/effect/lobby_chain.json", "assets/polyplus/lobby/scenes/**")
+    } else {
+        exclude("$shaders/legacy/**", "assets/polyplus/lobby/scenes_legacy/**")
+    }
+    filesMatching(listOf("$shaders/**/*.fsh", "$shaders/**/*.vsh")) {
+        var inactive = false
+        filter { line ->
+            val trimmed = line.trimStart()
+            val block = inactive || trimmed.startsWith("/*")
+            if (block) inactive = "*/" !in if (inactive) line else trimmed.drop(2)
+            line.takeUnless { block || trimmed.startsWith("//") }
+        }
+    }
+    if (oldEffects) {
+        filesMatching(listOf("$shaders/effect/lobby_chain.json", "$shaders/legacy/lobby_chain.json")) { path = "$shaders/post/lobby_chain.json" }
+        filesMatching("$shaders/effect/core/*") { path = "$shaders/core/$name" }
+        filesMatching(listOf("$shaders/effect/program/*", "$shaders/post/*")) { path = "assets/minecraft/shaders/program/polyplus_$name" }
+    }
     val modName = project.property("mod.name") as String
     val modVersion = project.property("mod.version") as String
     inputs.property("modId", modId)
@@ -520,6 +591,32 @@ publishMods {
 
             requires("oneconfig")
             requires("fabric-language-kotlin")
+        }
+    }
+}
+
+val snapshotRelease = modVersion.endsWith("-SNAPSHOT")
+
+publishing {
+    repositories {
+        val repoName = if (snapshotRelease) "snapshots" else "releases"
+        maven("https://repo.polyfrost.org/$repoName") {
+            name = repoName
+            credentials {
+                username = providers.gradleProperty("polyfrostRepoUsername")
+                    .orElse(providers.environmentVariable("POLYFROST_REPO_USERNAME")).orNull
+                password = providers.gradleProperty("polyfrostRepoToken")
+                    .orElse(providers.environmentVariable("POLYFROST_REPO_TOKEN")).orNull
+            }
+            authentication { create<BasicAuthentication>("basic") }
+        }
+    }
+    publications {
+        create<MavenPublication>("mavenJava") {
+            artifactId = modId
+            if (snapshotRelease) version = "${modVersion.removeSuffix("-SNAPSHOT")}+$mcVersion-SNAPSHOT"
+            artifact(loomx.modJar.flatMap { it.archiveFile })
+            artifact(loomx.modSourcesJar.flatMap { it.archiveFile }) { classifier = "sources" }
         }
     }
 }

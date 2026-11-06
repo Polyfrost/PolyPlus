@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
@@ -49,10 +48,11 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.ThemedIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
@@ -72,7 +72,7 @@ internal fun SmallButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(iconPath, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, modifier = Modifier.size(14.dp))
+        ThemedIcon(iconPath, if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, 14.dp)
         Spacer(Modifier.width(8.dp))
         SocialText(label, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
@@ -177,6 +177,7 @@ internal fun TooltipPopup(text: String) {
     ) {
         Box(
             modifier = Modifier.widthIn(max = 240.dp)
+                .sceneFrost(6.dp)
                 .clip(ppShape(6.dp))
                 .background(OneConfigTheme.current.popupBackground)
                 .border(1.dp, OneConfigTheme.current.borderColor, ppShape(6.dp))

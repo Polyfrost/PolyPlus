@@ -26,6 +26,7 @@ import org.polyfrost.polyplus.client.cosmetics.render.PreviewCapeLayer;
 import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 //?}
 
 //? if < 1.21.11 {
@@ -91,6 +92,7 @@ public class MixinAvatarRenderer {
     )
     private void polyplus$bindEmoteState(AbstractClientPlayer entity, PlayerRenderState state, float partialTicks, CallbackInfo ci) {
     *///?}
+        PauseAvatar.apply(entity, state);
         if (!(state instanceof AvatarEmoteRenderAccess renderAccess)) {
             return;
         }

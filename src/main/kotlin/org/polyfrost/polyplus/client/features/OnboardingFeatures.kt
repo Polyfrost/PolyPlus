@@ -17,6 +17,8 @@ import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.gui.familyVariant
+import org.polyfrost.polyplus.client.gui.isMinecraftStyle
 import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
@@ -375,7 +377,8 @@ object OnboardingFeatures {
     }.getOrDefault(4).coerceAtLeast(1)
 
     fun applyTheme(light: Boolean, style: Int) {
-        val theme = when {
+        val sameFamily = OneConfigTheme.active?.takeIf { it.isMinecraftStyle == (style == 1) }?.familyVariant(light)
+        val theme = sameFamily ?: when {
             style == 1 && light -> OneConfigTheme.MINECRAFT_LIGHT
             style == 1 -> OneConfigTheme.MINECRAFT_DARK
             light -> OneConfigTheme.POLY_GLASS_LIGHT

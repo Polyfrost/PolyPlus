@@ -2,10 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.wardrobe
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,7 +32,10 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver
+import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
+import org.polyfrost.polyplus.client.gui.SocialSwitch
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.ppShape
 
@@ -57,7 +54,7 @@ internal fun CapeGroupHeading(title: String, note: String, forceToggle: Boolean)
 }
 
 @Composable
-private fun ForceCapesToggle() {
+internal fun ForceCapesToggle() {
     var forced by remember { mutableStateOf(PolyPlusCosmeticsConfig.forcePolyPlusCapes) }
     val modName = CapeResolver.localOverrideModName
     val interaction = remember { MutableInteractionSource() }
@@ -92,26 +89,8 @@ private fun ForceCapesToggle() {
                 )
             }
         }
-        CapeSwitch(forced)
-    }
-}
-
-@Composable
-private fun CapeSwitch(checked: Boolean) {
-    val theme = OneConfigTheme.current
-    val track by animateColorAsState(if (checked) OneConfigTheme.accent else CAPE_SWITCH_TRACK)
-    val thumbOffset by animateDpAsState(if (checked) 19.dp else 3.dp, animationSpec = spring())
-    Box(
-        modifier = Modifier.size(width = 34.dp, height = 18.dp)
-            .clip(theme.circleShape)
-            .background(track),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier.offset(x = thumbOffset)
-                .size(12.dp)
-                .background(theme.controlThumbColor, theme.circleShape),
-        )
+        SocialText(if (forced) "On" else "Off", color = SocialTextSecondary, fontSize = 12.sp)
+        SocialSwitch(forced, 42.dp, 21.dp, SocialOffStateBackground)
     }
 }
 
@@ -138,5 +117,3 @@ internal fun CapeSectionNote(text: String) {
         SocialText(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
     }
 }
-
-private val CAPE_SWITCH_TRACK = Color(0xFF74777F)

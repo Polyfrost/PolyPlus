@@ -16,9 +16,6 @@
         "client": [
             "org.polyfrost.polyplus.PolyPlusEntrypoint"
         ],
-        "voicechat": [
-            "org.polyfrost.polyplus.client.network.p2p.P2PVoicechatPlugin"
-        ],
         "debugify": [
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
         ]

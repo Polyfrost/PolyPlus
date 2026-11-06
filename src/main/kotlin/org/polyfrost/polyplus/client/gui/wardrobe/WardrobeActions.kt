@@ -16,6 +16,8 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.atomic.AtomicBoolean
@@ -173,6 +175,38 @@ internal fun deleteSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
     ) { "Deleted ${skin.name}." }
 }
 
+internal fun selectAuraColor(color: Int?, onStatus: (String) -> Unit) {
+    launchLibraryCall(
+        onStatus,
+        if (color != null) "Updating aura color..." else "Clearing aura color...",
+        { CosmeticService.setParticleColor(color) },
+        { wardrobeFailure(it, "update your aura color") },
+    ) { if (color != null) "Aura color updated." else "Aura color cleared." }
+}
+
+internal fun addEmoteToWheel(item: CosmeticUiItem, targetSlot: Int?, onStatus: (String) -> Unit) {
+    val wheel = EmoteWheels.activeIndex
+    val placed = if (targetSlot != null) {
+        EmoteWheels.assign(wheel, targetSlot, item.groupId)
+        targetSlot
+    } else {
+        EmoteWheels.addToFirstEmpty(wheel, item.groupId)
+    }
+    onStatus(
+        if (placed == null) {
+            "Wheel ${wheel + 1} is full. Pick a slot to replace."
+        } else {
+            "Added ${item.name} to wheel ${wheel + 1}."
+        },
+    )
+}
+
+internal fun emoteKeybindWarning(): String? = when {
+    !EmoteWheelKeybind.isBound() -> "The emote wheel has no keybind yet, so it can't be opened in game."
+    else -> EmoteWheelKeybind.conflictingKeybindNames().takeIf { it.isNotEmpty() }
+        ?.let { "The emote wheel keybind is also used by ${it.joinToString()}." }
+}
+
 @Composable
 internal fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
     remember(refreshKey) {
@@ -239,7 +273,7 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
             onComplete(
                 result.fold(
                     onSuccess = { "Equipped ${item.name}." },
-                    onFailure = { "Failed to equip ${item.name}: ${it.message}" },
+                    onFailure = { wardrobeFailure(it, "equip ${item.name}") },
                 ),
             )
         }
@@ -265,7 +299,7 @@ internal fun unequip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
             onComplete(
                 result.fold(
                     onSuccess = { "Unequipped ${item.name}." },
-                    onFailure = { "Failed to unequip ${item.name}: ${it.message}" },
+                    onFailure = { wardrobeFailure(it, "unequip ${item.name}") },
                 ),
             )
         }

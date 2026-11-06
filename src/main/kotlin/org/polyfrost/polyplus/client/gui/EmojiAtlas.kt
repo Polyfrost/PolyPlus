@@ -3,29 +3,26 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import kotlin.math.roundToInt
 
@@ -68,6 +65,7 @@ internal fun EmojiGlyph(glyph: String, modifier: Modifier) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SocialEmojiText(
     text: String,
@@ -80,47 +78,35 @@ internal fun SocialEmojiText(
     val segments = remember(text) {
         if (EmojiRegistry.enabled()) EmojiRegistry.segments(text) else listOf(EmojiRegistry.Segment.Text(text))
     }
-    val glyphs = remember(segments) {
-        segments.filterIsInstance<EmojiRegistry.Segment.Emoji>().map { it.glyph }.distinct()
-    }
-    if (glyphs.isEmpty() || EmojiAtlas.bitmap == null) {
+    if (segments.none { it is EmojiRegistry.Segment.Emoji } || EmojiAtlas.bitmap == null) {
         SocialText(text, fontSize, modifier, color, fontWeight, maxLines = maxLines)
         return
     }
 
-    val annotated = remember(segments) {
-        buildAnnotatedString {
+    val glyphSize = with(LocalDensity.current) { (fontSize * GLYPH_SCALE).toDp() }
+    if (maxLines == 1) {
+        Row(modifier.clipToBounds(), verticalAlignment = Alignment.CenterVertically) {
             segments.forEach { segment ->
                 when (segment) {
-                    is EmojiRegistry.Segment.Text -> append(segment.text)
-                    is EmojiRegistry.Segment.Emoji -> appendInlineContent(segment.glyph, PLACEHOLDER)
+                    is EmojiRegistry.Segment.Text -> SocialText(segment.text, fontSize, color = color, fontWeight = fontWeight, maxLines = 1)
+                    is EmojiRegistry.Segment.Emoji -> EmojiGlyph(segment.glyph, Modifier.size(glyphSize))
                 }
             }
         }
+        return
     }
-    val glyphSize = fontSize * 1.25f
-    val inlineContent = remember(glyphs, glyphSize) {
-        glyphs.associateWith { glyph ->
-            InlineTextContent(Placeholder(glyphSize, glyphSize, PlaceholderVerticalAlign.Center)) {
-                EmojiGlyph(glyph, Modifier.fillMaxSize())
+
+    FlowRow(modifier, maxLines = maxLines) {
+        segments.forEach { segment ->
+            when (segment) {
+                is EmojiRegistry.Segment.Text -> WORD.findAll(segment.text).forEach {
+                    SocialText(it.value, fontSize, Modifier.align(Alignment.CenterVertically), color, fontWeight, maxLines = 1)
+                }
+                is EmojiRegistry.Segment.Emoji -> EmojiGlyph(segment.glyph, Modifier.align(Alignment.CenterVertically).size(glyphSize))
             }
         }
     }
-
-    BasicText(
-        text = annotated,
-        modifier = modifier,
-        maxLines = maxLines,
-        softWrap = maxLines != 1,
-        inlineContent = inlineContent,
-        style = TextStyle(
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            fontFamily = OneConfigTheme.current.fontFamily,
-            textAlign = TextAlign.Start,
-        ),
-    )
 }
 
-private const val PLACEHOLDER = "�"
+private const val GLYPH_SCALE = 1.25f
+private val WORD = Regex("\\S+\\s*|\\s+")

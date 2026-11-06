@@ -35,12 +35,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,9 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -62,8 +64,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -73,6 +78,7 @@ import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
@@ -80,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.TitleScreen
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -104,8 +111,14 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures.ModCard
 import org.polyfrost.polyplus.client.gui.preview.BlockHighlightRenderer
 import org.polyfrost.polyplus.client.gui.preview.UnityMotionBlur
 import org.polyfrost.polyplus.client.gui.preview.VanillaTextures
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
+import org.polyfrost.polyplus.client.gui.lobbyshell.StartupAccessibility
+import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.legal.LegalDocument
+import org.polyfrost.polyplus.client.lobby.LobbyFraming
 import org.polyfrost.polyplus.client.legal.LegalDocuments
+import org.polyfrost.polyplus.client.lobby.StartupOverlay
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -125,21 +138,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     private var firstFrameDrawn = false
 
     // consuming Escape here rather than via shouldCloseOnEsc, since OneConfig hands unhandled keys straight to Screen on 1.8.9
-    override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
-        val capture = OnboardingKeyCapture.pending ?: return key == InputConstants.KEY_ESCAPE
-        capture(
-            if (key == InputConstants.KEY_ESCAPE) {
-                null
-            } else {
-                //? if >= 26.3 || = 1.8.9 {
-                InputConstants.Type.KEYBOARD.getOrCreate(key)
-                //?} else {
-                /*InputConstants.Type.KEYSYM.getOrCreate(key)
-                *///?}
-            },
-        )
-        return true
-    }
+    override fun handleKeyPressed(key: Int, modifiers: Int): Boolean =
+        StartupAccessibility.handleKey(key, modifiers) || OnboardingKeyCapture.capture(key) || key == InputConstants.KEY_ESCAPE
 
     //? if = 1.8.9 {
     /*override fun init() {
@@ -149,7 +149,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         super.render(mouseX, mouseY, tickDelta)
-        MenuBackgroundPass.renderInline(true)
+        MenuBackgroundPass.renderInline()
+        StartupAccessibility.frame()
     }
     *///?} elif <26.1 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
@@ -162,9 +163,10 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             /*gameRenderer.processBlurEffect()
             *///?}
         }
-        MenuBackgroundPass.renderInline(ctx, true)
+        MenuBackgroundPass.renderInline(ctx)
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true
+        StartupAccessibility.frame()
     }
 
     override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
@@ -179,8 +181,9 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             .extractRenderState(ctx, width, height, true)
             *///?}
         ctx.blurBeforeThisStratum()
-        MenuBackgroundPass.renderInline(ctx, true)
+        MenuBackgroundPass.renderInline(ctx)
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
+        StartupAccessibility.frame()
     }
 
     override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
@@ -188,380 +191,465 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
     @Composable
     override fun compose() {
-        val needsTerms = remember { PrivacyConsent.needsPrompt() }
-        val needsSettings = remember { !PolyPlusConfig.onboardingCompleted }
-        val needsModSettings = remember { OnboardingFeatures.needsModSettingsChoice() }
-        val needsBlurChoice = remember { OnboardingFeatures.needsMotionBlurChoice() }
-        val owedGuides = remember { OnboardingFeatures.pendingGuides().mapNotNull(ModGuide::of).toSet() }
-        val showsModSettings = remember {
-            (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
-        }
-        val modReads = remember { ModReads.read(showsModSettings) }
-        val offeredCards = remember {
-            OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
-        }
-        val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
-        var guides by remember { mutableStateOf(owedGuides) }
-        val pages = remember(guides) {
-            buildList {
-                if (needsTerms) add(OnboardingStep.Terms)
-                if (needsSettings) add(OnboardingStep.LookAndFeel)
-                if (needsSettings) add(OnboardingStep.ModOrder)
-                if (showsModSettings) {
-                    if (sprintStep) add(OnboardingStep.Sprint)
-                    offeredCards.filter { it != ModCard.BLOCK_HIGHLIGHT }
-                        .chunked(MOD_CARDS_PER_PAGE)
-                        .forEach { add(OnboardingStep.Mods(it)) }
-                    if (ModCard.BLOCK_HIGHLIGHT in offeredCards) add(OnboardingStep.BlockHighlight)
-                }
-                if (needsBlurChoice) add(OnboardingStep.MotionBlur)
-                guides.sortedBy { it.ordinal }.forEach { add(OnboardingStep.Guide(it)) }
-                if (needsSettings || needsModSettings) add(OnboardingStep.Done)
-            }.ifEmpty { listOf(OnboardingStep.Done) }
-        }
-        var page by remember { mutableIntStateOf(0) }
-        var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
-        var termsAccepted by remember { mutableStateOf(false) }
-        var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
-        var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
-        var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
-        var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
-        var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
-        var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
-        var fireOpacity by remember {
-            mutableStateOf(modReads.fireOpacity ?: PolyPlusConfig.onboardingFireOverlayOpacity)
-        }
-        var shieldHeight by remember { mutableStateOf(modReads.shield ?: PolyPlusConfig.onboardingShieldHeight) }
-        var horseOpacity by remember { mutableStateOf(modReads.horse ?: PolyPlusConfig.onboardingHorseOpacity) }
-        var waveyCapes by remember { mutableStateOf(false) }
-        var skinLayers by remember { mutableStateOf(false) }
-        var dynamicLights by remember { mutableIntStateOf(PolyPlusConfig.onboardingDynamicLightsMode) }
-        var gamma by remember {
-            mutableStateOf((modReads.gamma ?: PolyPlusConfig.onboardingGamma).clampGamma())
-        }
-        var gammaToggled by remember {
-            mutableStateOf((modReads.gammaToggled ?: PolyPlusConfig.onboardingGammaToggled).clampGamma())
-        }
-        var gammaSmooth by remember { mutableStateOf(modReads.gammaSmooth ?: PolyPlusConfig.onboardingGammaSmooth) }
-        val blockHighlightPresets = remember {
-            if (modReads.blockHighlight != null) BlockHighlightPresets.presetJsons() else emptyMap()
-        }
-        var blockHighlight by remember {
-            mutableStateOf(modReads.blockHighlight ?: PolyPlusConfig.onboardingBlockHighlightConfig)
-        }
-        var blockHighlightBase by remember {
-            mutableIntStateOf(
-                BlockHighlightPresets.NAMES.indexOfFirst { name ->
-                    blockHighlightPresets[name]?.let { runCatching { BlockHighlightDraft(blockHighlight).matches(it) }.getOrNull() } == true
-                }.coerceAtLeast(0),
-            )
-        }
-        val touched = remember { mutableSetOf<ModCard>() }
-        fun markTouched(card: ModCard) {
-            touched += card
-            ModGuide.of(card)?.let { guides = guides + it }
-        }
-        fun <T> touch(card: ModCard, old: T, new: T) {
-            if (old != new) markTouched(card)
-        }
-        var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(1, MOTION_BLUR_MAX)) }
-        var blurMode by remember { mutableIntStateOf(OnboardingFeatures.MOTION_BLUR_UNSET) }
-        val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
-        var guiScale by remember {
-            mutableIntStateOf(
-                //? if > 1.8.9 {
-                Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
-                //?} else {
-                /*Minecraft.getInstance().options.guiScale.coerceIn(0, maxGuiScale),
-                *///?}
-            )
-        }
-        LaunchedEffect(lightTheme, uiStyle) {
-            if (needsSettings) OnboardingFeatures.applyTheme(lightTheme, uiStyle)
-        }
-        val finish = {
-            if (needsSettings) {
-                PolyPlusConfig.onboardingLightTheme = lightTheme
-                PolyPlusConfig.onboardingUiStyle = uiStyle
-                PolyPlusConfig.onboardingGuiScale = guiScale
-                PolyPlusConfig.onboardingToggleSprint = toggleSprint
-                if (alphabeticalMods != PolyPlusConfig.alphabeticalModOrder) {
-                    PolyPlusConfig.alphabeticalModOrder = alphabeticalMods
-                    DefaultModOrder.apply()
-                }
-            }
-            if (showsModSettings) {
-                val startedAtVersion = PolyPlusConfig.onboardingModSettingsVersion
-                fun <T> chosen(card: ModCard, value: T, stored: T): T = if (card in offeredCards) value else stored
-                PolyPlusConfig.onboardingBetterGrassMode =
-                    chosen(ModCard.GRASS, grassMode, PolyPlusConfig.onboardingBetterGrassMode)
-                PolyPlusConfig.onboardingFireOverlayHeight =
-                    chosen(ModCard.FIRE_OVERLAY, fireHeight, PolyPlusConfig.onboardingFireOverlayHeight)
-                PolyPlusConfig.onboardingFireOverlayOpacity =
-                    chosen(ModCard.FIRE_OVERLAY, fireOpacity, PolyPlusConfig.onboardingFireOverlayOpacity)
-                PolyPlusConfig.onboardingShieldHeight =
-                    chosen(ModCard.SHIELD_HEIGHT, shieldHeight, PolyPlusConfig.onboardingShieldHeight)
-                PolyPlusConfig.onboardingHorseOpacity =
-                    chosen(ModCard.MOUNT, horseOpacity, PolyPlusConfig.onboardingHorseOpacity)
-                PolyPlusConfig.onboardingWaveyCapes =
-                    chosen(ModCard.CAPES, waveyCapes, PolyPlusConfig.onboardingWaveyCapes)
-                PolyPlusConfig.onboardingSkinLayers =
-                    chosen(ModCard.SKIN_LAYERS, skinLayers, PolyPlusConfig.onboardingSkinLayers)
-                if (grassMode != modReads.grass) touched += ModCard.GRASS
-                if (waveyCapes != modReads.capes) touched += ModCard.CAPES
-                if (skinLayers != modReads.layers) touched += ModCard.SKIN_LAYERS
-                PolyPlusConfig.onboardingGamma =
-                    chosen(ModCard.GAMMA, gamma, PolyPlusConfig.onboardingGamma)
-                PolyPlusConfig.onboardingGammaToggled =
-                    chosen(ModCard.GAMMA, gammaToggled, PolyPlusConfig.onboardingGammaToggled)
-                PolyPlusConfig.onboardingGammaSmooth =
-                    chosen(ModCard.GAMMA, gammaSmooth, PolyPlusConfig.onboardingGammaSmooth)
-                PolyPlusConfig.onboardingDynamicLightsMode =
-                    chosen(ModCard.DYNAMIC_LIGHTS, dynamicLights, PolyPlusConfig.onboardingDynamicLightsMode)
-                if (dynamicLights != modReads.dynamicLights) touched += ModCard.DYNAMIC_LIGHTS
-                PolyPlusConfig.onboardingBlockHighlightConfig = chosen(
-                    ModCard.BLOCK_HIGHLIGHT,
-                    blockHighlight,
-                    PolyPlusConfig.onboardingBlockHighlightConfig,
-                )
-                val available = OnboardingFeatures.availableCards
-                fun settled(card: ModCard, current: Boolean) =
-                    OnboardingFeatures.settledAfterRun(
-                        card, offeredCards, available, touched, current, startedAtVersion,
-                    )
-                PolyPlusConfig.onboardingBetterGrassSettled =
-                    settled(ModCard.GRASS, PolyPlusConfig.onboardingBetterGrassSettled)
-                PolyPlusConfig.onboardingFireOverlaySettled =
-                    settled(ModCard.FIRE_OVERLAY, PolyPlusConfig.onboardingFireOverlaySettled)
-                PolyPlusConfig.onboardingShieldHeightSettled =
-                    settled(ModCard.SHIELD_HEIGHT, PolyPlusConfig.onboardingShieldHeightSettled)
-                PolyPlusConfig.onboardingMountOpacitySettled =
-                    settled(ModCard.MOUNT, PolyPlusConfig.onboardingMountOpacitySettled)
-                PolyPlusConfig.onboardingWaveyCapesSettled =
-                    settled(ModCard.CAPES, PolyPlusConfig.onboardingWaveyCapesSettled)
-                PolyPlusConfig.onboardingSkinLayersSettled =
-                    settled(ModCard.SKIN_LAYERS, PolyPlusConfig.onboardingSkinLayersSettled)
-                PolyPlusConfig.onboardingGammaSettled =
-                    settled(ModCard.GAMMA, PolyPlusConfig.onboardingGammaSettled)
-                PolyPlusConfig.onboardingBlockHighlightSettled =
-                    settled(ModCard.BLOCK_HIGHLIGHT, PolyPlusConfig.onboardingBlockHighlightSettled)
-                PolyPlusConfig.onboardingDynamicLightsSettled =
-                    settled(ModCard.DYNAMIC_LIGHTS, PolyPlusConfig.onboardingDynamicLightsSettled)
-                PolyPlusConfig.onboardingModSettingsVersion =
-                    OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
-            }
-            if (needsBlurChoice && blurMode != OnboardingFeatures.MOTION_BLUR_UNSET) {
-                PolyPlusConfig.onboardingMotionBlurMode = blurMode
-                PolyPlusConfig.onboardingMotionBlur = motionBlur
-                PolyPlusConfig.onboardingPolyBlurApplied = false
-                PolyPlusConfig.adaptiveBlurApplied = true
-            }
-            OnboardingFeatures.markGuidesShown(guides.map { it.card })
-            PolyPlusConfig.onboardingCompleted = true
-            PolyPlusConfig.save()
-            if (needsSettings) {
-                OnboardingFeatures.applySavedSettings()
-            } else {
-                if (showsModSettings) OnboardingFeatures.applySavedModSettings()
-                if (needsBlurChoice) OnboardingFeatures.applySavedMotionBlur()
-            }
-            val mc = Minecraft.getInstance()
-            //? if >= 26.2 {
-            mc.gui.setScreen(PolyPlusMainMenuScreen())
-            //?} elif > 1.8.9 {
-            /*mc.setScreen(PolyPlusMainMenuScreen())
-            *///?} else {
-            /*mc.openScreen(PolyPlusMainMenuScreen())
-            *///?}
-        }
-
-        val waitingForOptimization =
-            pages[page] == OnboardingStep.MotionBlur && !AdaptiveBlurDefaults.sampled
-
-        val recordLegalChoice = { accepted: Boolean ->
-            val document = legalDocument
-            if (accepted) {
-                PrivacyConsent.accept(document?.version ?: 0, document?.resolvedPrivacyVersion ?: 0)
-            } else {
-                PrivacyConsent.decline()
-            }
-            PrivacyEnforcement.syncConfig()
-            PrivacyEnforcement.apply()
-        }
-        val advance: () -> Unit = {
-            if (page == pages.size - 1) finish() else page++
-        }
-        val answerTerms = { accepted: Boolean ->
-            recordLegalChoice(accepted)
-            advance()
-        }
-
         ProvideOneConfigTheme {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val effectiveGuiScale = if (guiScale <= 0) maxGuiScale else guiScale
-                val containFit = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
-                    .takeIf { it.isFinite() && it > 0f } ?: 1f
-                val scale = minOf(effectiveGuiScale / REFERENCE_GUI_SCALE, containFit) * UI_SCALE * GUI_DENSITY_TRIM
-                val compact = pages[page] == OnboardingStep.Terms
-                val panelWidth by animateFloatAsState(
-                    if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
-                    animationSpec = spring(),
+            OnboardingFlow(OnboardingHost.Screen) { ClientPlatform.setScreen(TitleScreen()) }
+        }
+    }
+}
+
+internal enum class OnboardingHost { Screen, Lobby }
+
+@Composable
+internal fun OnboardingFlow(
+    host: OnboardingHost,
+    modifier: Modifier = Modifier,
+    withTerms: Boolean = true,
+    onFinished: () -> Unit,
+) {
+    val lobbyHost = host == OnboardingHost.Lobby
+    val accessibilityStep = remember { StartupAccessibility.pending() }
+    val needsTerms = remember { withTerms && PrivacyConsent.needsPrompt() }
+    val needsSettings = remember { !PolyPlusConfig.onboardingCompleted }
+    val needsModSettings = remember { OnboardingFeatures.needsModSettingsChoice() }
+    val needsBlurChoice = remember { OnboardingFeatures.needsMotionBlurChoice() }
+    val owedGuides = remember { OnboardingFeatures.pendingGuides().mapNotNull(ModGuide::of).toSet() }
+    val showsModSettings = remember {
+        (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
+    }
+    val modReads = remember { ModReads.read(showsModSettings) }
+    val offeredCards = remember {
+        OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
+    }
+    val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
+    var guides by remember { mutableStateOf(owedGuides) }
+    val pages = remember(guides) {
+        buildList {
+            if (accessibilityStep) add(OnboardingStep.Accessibility)
+            if (needsTerms) add(OnboardingStep.Terms)
+            if (needsSettings) add(OnboardingStep.LookAndFeel)
+            if (needsSettings) add(OnboardingStep.ModOrder)
+            if (showsModSettings) {
+                if (sprintStep) add(OnboardingStep.Sprint)
+                offeredCards.filter { it != ModCard.BLOCK_HIGHLIGHT }
+                    .chunked(MOD_CARDS_PER_PAGE)
+                    .forEach { add(OnboardingStep.Mods(it)) }
+                if (ModCard.BLOCK_HIGHLIGHT in offeredCards) add(OnboardingStep.BlockHighlight)
+            }
+            if (needsBlurChoice) add(OnboardingStep.MotionBlur)
+            guides.sortedBy { it.ordinal }.forEach { add(OnboardingStep.Guide(it)) }
+            if (!lobbyHost && (needsSettings || needsModSettings)) add(OnboardingStep.Done)
+        }.ifEmpty { listOf(OnboardingStep.Done) }
+    }
+    var page by remember { mutableIntStateOf(0) }
+    var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
+    var termsAccepted by remember { mutableStateOf(false) }
+    var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
+    var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
+    var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
+    var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
+    var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
+    var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
+    var fireOpacity by remember {
+        mutableStateOf(modReads.fireOpacity ?: PolyPlusConfig.onboardingFireOverlayOpacity)
+    }
+    var shieldHeight by remember { mutableStateOf(modReads.shield ?: PolyPlusConfig.onboardingShieldHeight) }
+    var horseOpacity by remember { mutableStateOf(modReads.horse ?: PolyPlusConfig.onboardingHorseOpacity) }
+    var waveyCapes by remember { mutableStateOf(false) }
+    var skinLayers by remember { mutableStateOf(false) }
+    var dynamicLights by remember { mutableIntStateOf(PolyPlusConfig.onboardingDynamicLightsMode) }
+    var gamma by remember {
+        mutableStateOf((modReads.gamma ?: PolyPlusConfig.onboardingGamma).clampGamma())
+    }
+    var gammaToggled by remember {
+        mutableStateOf((modReads.gammaToggled ?: PolyPlusConfig.onboardingGammaToggled).clampGamma())
+    }
+    var gammaSmooth by remember { mutableStateOf(modReads.gammaSmooth ?: PolyPlusConfig.onboardingGammaSmooth) }
+    val blockHighlightPresets = remember {
+        if (modReads.blockHighlight != null) BlockHighlightPresets.presetJsons() else emptyMap()
+    }
+    var blockHighlight by remember {
+        mutableStateOf(modReads.blockHighlight ?: PolyPlusConfig.onboardingBlockHighlightConfig)
+    }
+    var blockHighlightBase by remember {
+        mutableIntStateOf(
+            BlockHighlightPresets.NAMES.indexOfFirst { name ->
+                blockHighlightPresets[name]?.let { runCatching { BlockHighlightDraft(blockHighlight).matches(it) }.getOrNull() } == true
+            }.coerceAtLeast(0),
+        )
+    }
+    val touched = remember { mutableSetOf<ModCard>() }
+    fun markTouched(card: ModCard) {
+        touched += card
+        ModGuide.of(card)?.let { guides = guides + it }
+    }
+    fun <T> touch(card: ModCard, old: T, new: T) {
+        if (old != new) markTouched(card)
+    }
+    var motionBlur by remember { mutableIntStateOf(PolyPlusConfig.onboardingMotionBlur.coerceIn(1, MOTION_BLUR_MAX)) }
+    var blurMode by remember { mutableIntStateOf(OnboardingFeatures.MOTION_BLUR_UNSET) }
+    val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
+    var guiScale by remember {
+        mutableIntStateOf(
+            //? if > 1.8.9 {
+            Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+            //?} else {
+            /*Minecraft.getInstance().options.guiScale.coerceIn(0, maxGuiScale),
+            *///?}
+        )
+    }
+    var themeShown by remember { mutableStateOf(false) }
+    LaunchedEffect(lightTheme, uiStyle) {
+        if (needsSettings) OnboardingFeatures.applyTheme(lightTheme, uiStyle)
+        if (lobbyHost && themeShown) LobbyFraming.react(LobbyFraming.Reaction.GLANCE)
+        themeShown = true
+    }
+    val finish = {
+        if (needsSettings) {
+            PolyPlusConfig.onboardingLightTheme = lightTheme
+            PolyPlusConfig.onboardingUiStyle = uiStyle
+            PolyPlusConfig.onboardingGuiScale = guiScale
+            PolyPlusConfig.onboardingToggleSprint = toggleSprint
+            if (alphabeticalMods != PolyPlusConfig.alphabeticalModOrder) {
+                PolyPlusConfig.alphabeticalModOrder = alphabeticalMods
+                DefaultModOrder.apply()
+            }
+        }
+        if (showsModSettings) {
+            val startedAtVersion = PolyPlusConfig.onboardingModSettingsVersion
+            fun <T> chosen(card: ModCard, value: T, stored: T): T = if (card in offeredCards) value else stored
+            PolyPlusConfig.onboardingBetterGrassMode =
+                chosen(ModCard.GRASS, grassMode, PolyPlusConfig.onboardingBetterGrassMode)
+            PolyPlusConfig.onboardingFireOverlayHeight =
+                chosen(ModCard.FIRE_OVERLAY, fireHeight, PolyPlusConfig.onboardingFireOverlayHeight)
+            PolyPlusConfig.onboardingFireOverlayOpacity =
+                chosen(ModCard.FIRE_OVERLAY, fireOpacity, PolyPlusConfig.onboardingFireOverlayOpacity)
+            PolyPlusConfig.onboardingShieldHeight =
+                chosen(ModCard.SHIELD_HEIGHT, shieldHeight, PolyPlusConfig.onboardingShieldHeight)
+            PolyPlusConfig.onboardingHorseOpacity =
+                chosen(ModCard.MOUNT, horseOpacity, PolyPlusConfig.onboardingHorseOpacity)
+            PolyPlusConfig.onboardingWaveyCapes =
+                chosen(ModCard.CAPES, waveyCapes, PolyPlusConfig.onboardingWaveyCapes)
+            PolyPlusConfig.onboardingSkinLayers =
+                chosen(ModCard.SKIN_LAYERS, skinLayers, PolyPlusConfig.onboardingSkinLayers)
+            if (grassMode != modReads.grass) touched += ModCard.GRASS
+            if (waveyCapes != modReads.capes) touched += ModCard.CAPES
+            if (skinLayers != modReads.layers) touched += ModCard.SKIN_LAYERS
+            PolyPlusConfig.onboardingGamma =
+                chosen(ModCard.GAMMA, gamma, PolyPlusConfig.onboardingGamma)
+            PolyPlusConfig.onboardingGammaToggled =
+                chosen(ModCard.GAMMA, gammaToggled, PolyPlusConfig.onboardingGammaToggled)
+            PolyPlusConfig.onboardingGammaSmooth =
+                chosen(ModCard.GAMMA, gammaSmooth, PolyPlusConfig.onboardingGammaSmooth)
+            PolyPlusConfig.onboardingDynamicLightsMode =
+                chosen(ModCard.DYNAMIC_LIGHTS, dynamicLights, PolyPlusConfig.onboardingDynamicLightsMode)
+            if (dynamicLights != modReads.dynamicLights) touched += ModCard.DYNAMIC_LIGHTS
+            PolyPlusConfig.onboardingBlockHighlightConfig = chosen(
+                ModCard.BLOCK_HIGHLIGHT,
+                blockHighlight,
+                PolyPlusConfig.onboardingBlockHighlightConfig,
+            )
+            val available = OnboardingFeatures.availableCards
+            fun settled(card: ModCard, current: Boolean) =
+                OnboardingFeatures.settledAfterRun(
+                    card, offeredCards, available, touched, current, startedAtVersion,
                 )
-                val panelHeight by animateFloatAsState(
-                    if (compact) TERMS_PANEL_HEIGHT else PANEL_HEIGHT,
-                    animationSpec = spring(),
+            PolyPlusConfig.onboardingBetterGrassSettled =
+                settled(ModCard.GRASS, PolyPlusConfig.onboardingBetterGrassSettled)
+            PolyPlusConfig.onboardingFireOverlaySettled =
+                settled(ModCard.FIRE_OVERLAY, PolyPlusConfig.onboardingFireOverlaySettled)
+            PolyPlusConfig.onboardingShieldHeightSettled =
+                settled(ModCard.SHIELD_HEIGHT, PolyPlusConfig.onboardingShieldHeightSettled)
+            PolyPlusConfig.onboardingMountOpacitySettled =
+                settled(ModCard.MOUNT, PolyPlusConfig.onboardingMountOpacitySettled)
+            PolyPlusConfig.onboardingWaveyCapesSettled =
+                settled(ModCard.CAPES, PolyPlusConfig.onboardingWaveyCapesSettled)
+            PolyPlusConfig.onboardingSkinLayersSettled =
+                settled(ModCard.SKIN_LAYERS, PolyPlusConfig.onboardingSkinLayersSettled)
+            PolyPlusConfig.onboardingGammaSettled =
+                settled(ModCard.GAMMA, PolyPlusConfig.onboardingGammaSettled)
+            PolyPlusConfig.onboardingBlockHighlightSettled =
+                settled(ModCard.BLOCK_HIGHLIGHT, PolyPlusConfig.onboardingBlockHighlightSettled)
+            PolyPlusConfig.onboardingDynamicLightsSettled =
+                settled(ModCard.DYNAMIC_LIGHTS, PolyPlusConfig.onboardingDynamicLightsSettled)
+            PolyPlusConfig.onboardingModSettingsVersion =
+                OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
+        }
+        if (needsBlurChoice && blurMode != OnboardingFeatures.MOTION_BLUR_UNSET) {
+            PolyPlusConfig.onboardingMotionBlurMode = blurMode
+            PolyPlusConfig.onboardingMotionBlur = motionBlur
+            PolyPlusConfig.onboardingPolyBlurApplied = false
+            PolyPlusConfig.adaptiveBlurApplied = true
+        }
+        OnboardingFeatures.markGuidesShown(guides.map { it.card })
+        PolyPlusConfig.onboardingCompleted = true
+        PolyPlusConfig.save()
+        if (needsSettings) {
+            OnboardingFeatures.applySavedSettings()
+        } else {
+            if (showsModSettings) OnboardingFeatures.applySavedModSettings()
+            if (needsBlurChoice) OnboardingFeatures.applySavedMotionBlur()
+        }
+        onFinished()
+    }
+
+    val waitingForOptimization =
+        pages[page] == OnboardingStep.MotionBlur && !AdaptiveBlurDefaults.sampled
+
+    val recordLegalChoice = { accepted: Boolean ->
+        val document = legalDocument
+        if (accepted) {
+            PrivacyConsent.accept(document?.version ?: 0, document?.resolvedPrivacyVersion ?: 0)
+        } else {
+            PrivacyConsent.decline()
+        }
+        PrivacyEnforcement.syncConfig()
+        PrivacyEnforcement.apply()
+        if (lobbyHost) LobbyFraming.react(if (accepted) LobbyFraming.Reaction.WAVE else LobbyFraming.Reaction.NOD)
+    }
+    val advance: () -> Unit = {
+        if (lobbyHost && page < pages.size - 1 && pages[page] != OnboardingStep.Terms) LobbyFraming.react(LobbyFraming.Reaction.NOD)
+        if (page == pages.size - 1) finish() else page++
+    }
+    val answerTerms = { accepted: Boolean ->
+        recordLegalChoice(accepted)
+        advance()
+    }
+    val leaveAccessibility = {
+        StartupAccessibility.finish()
+        advance()
+    }
+
+    val content: @Composable () -> Unit = {
+        when (val step = pages[page]) {
+            OnboardingStep.Accessibility -> AccessibilityPage(leaveAccessibility)
+            OnboardingStep.Terms ->
+                TermsPage(
+                    legalDocument,
+                    termsAccepted,
+                    { termsAccepted = it },
+                    { legalDocument = it },
+                    if (lobbyHost) LOBBY_TERMS_TOP else TERMS_CONTENT_TOP,
                 )
-                CompositionLocalProvider(
-                    LocalDensity provides scaledDensity(scale),
-                    LocalPanelWidth provides panelWidth,
-                    LocalPanelHeight provides panelHeight,
-                ) {
+            OnboardingStep.LookAndFeel ->
+                LookAndFeelPage(
+                    lightTheme, { lightTheme = it },
+                    uiStyle, { uiStyle = it },
+                    guiScale, maxGuiScale, { guiScale = it },
+                )
+            OnboardingStep.ModOrder -> ModOrderPage(alphabeticalMods) { alphabeticalMods = it }
+            OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
+            is OnboardingStep.Mods -> {
+                Header("Continuing with", "Mods")
+                ModCardRow(step.cards.size) {
+                    step.cards.forEach { card ->
+                        when (card) {
+                            ModCard.GRASS ->
+                                BetterGrassCard(grassMode) {
+                                    touch(ModCard.GRASS, grassMode, it)
+                                    grassMode = it
+                                }
+                            ModCard.FIRE_OVERLAY ->
+                                FireOverlayCard(
+                                    fireHeight,
+                                    { touch(ModCard.FIRE_OVERLAY, fireHeight, it); fireHeight = it },
+                                    fireOpacity,
+                                    {
+                                        touch(ModCard.FIRE_OVERLAY, fireOpacity, it)
+                                        fireOpacity = it
+                                    },
+                                )
+                            ModCard.SHIELD_HEIGHT ->
+                                ShieldHeightCard(shieldHeight) {
+                                    touch(ModCard.SHIELD_HEIGHT, shieldHeight, it)
+                                    shieldHeight = it
+                                }
+                            ModCard.MOUNT ->
+                                MountOpacityCard(horseOpacity) {
+                                    touch(ModCard.MOUNT, horseOpacity, it)
+                                    horseOpacity = it
+                                }
+                            ModCard.CAPES ->
+                                WaveyCapesCard(waveyCapes) {
+                                    touch(ModCard.CAPES, waveyCapes, it)
+                                    waveyCapes = it
+                                }
+                            ModCard.SKIN_LAYERS ->
+                                SkinLayersCard(skinLayers) {
+                                    touch(ModCard.SKIN_LAYERS, skinLayers, it)
+                                    skinLayers = it
+                                }
+                            ModCard.GAMMA ->
+                                FullbrightCard(
+                                    gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
+                                    gammaToggled,
+                                    {
+                                        touch(ModCard.GAMMA, gammaToggled, it)
+                                        gammaToggled = it
+                                    },
+                                    gammaSmooth,
+                                    {
+                                        touch(ModCard.GAMMA, gammaSmooth, it)
+                                        gammaSmooth = it
+                                    },
+                                )
+                            ModCard.DYNAMIC_LIGHTS ->
+                                DynamicLightsCard(dynamicLights) {
+                                    touch(ModCard.DYNAMIC_LIGHTS, dynamicLights, it)
+                                    dynamicLights = it
+                                }
+                            ModCard.BLOCK_HIGHLIGHT -> Unit
+                        }
+                    }
+                }
+            }
+            OnboardingStep.MotionBlur ->
+                if (waitingForOptimization) {
+                    OptimizingPage()
+                } else {
+                    MotionBlurPage(
+                        blurMode,
+                        { blurMode = it },
+                        motionBlur,
+                        { motionBlur = it },
+                    )
+                }
+            OnboardingStep.BlockHighlight ->
+                BlockHighlightPage(
+                    blockHighlight,
+                    blockHighlightBase,
+                    blockHighlightPresets,
+                    onEdit = {
+                        touch(ModCard.BLOCK_HIGHLIGHT, blockHighlight, it)
+                        blockHighlight = it
+                    },
+                    onBase = { blockHighlightBase = it },
+                )
+            is OnboardingStep.Guide -> GuidePage(step.guide)
+            OnboardingStep.Done -> DonePage()
+        }
+        val terms = pages[page] == OnboardingStep.Terms
+        val accessibility = pages[page] == OnboardingStep.Accessibility
+        val guidePage = pages[page] as? OnboardingStep.Guide
+        val blurUnanswered = pages[page] == OnboardingStep.MotionBlur &&
+            blurMode == OnboardingFeatures.MOTION_BLUR_UNSET
+        BottomNavigation(
+            page,
+            pages.size,
+            onSkip = if (accessibility) leaveAccessibility else finish,
+            onBack = { page-- },
+            onNext = when {
+                terms -> ({ answerTerms(true) })
+                accessibility -> leaveAccessibility
+                else -> advance
+            },
+            nextEnabled = !waitingForOptimization && !blurUnanswered && (!terms || termsAccepted),
+            allowSkip = accessibility || (!terms && guidePage == null && !needsBlurChoice),
+            nextLabel = when {
+                accessibility -> StartupAccessibility.continueLabel()
+                terms -> "Agree"
+                guidePage != null -> "Got it"
+                else -> null
+            },
+            secondaryLabel = if (terms) "Decline" else null,
+            onSecondary = { answerTerms(false) },
+            skipFocused = accessibility && StartupAccessibility.focused(StartupAccessibility.Control.Skip),
+            nextFocused = accessibility && StartupAccessibility.focused(StartupAccessibility.Control.Continue),
+        )
+    }
+
+    if (lobbyHost) {
+        val outer = LocalDensity.current
+        val accessibility = pages[page] == OnboardingStep.Accessibility
+        val compact = pages[page] == OnboardingStep.Terms || accessibility
+        val panelWidth by animateFloatAsState(if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH, animationSpec = spring())
+        val panelHeight by animateFloatAsState(
+            when {
+                accessibility -> ACCESSIBILITY_PANEL_HEIGHT
+                compact -> LOBBY_TERMS_HEIGHT
+                else -> PANEL_HEIGHT
+            },
+            animationSpec = spring(),
+        )
+        CompositionLocalProvider(
+            LocalDensity provides Density(usableScale(outer.density * LOBBY_PANEL_SCALE), usableScale(outer.fontScale)),
+            LocalPanelWidth provides panelWidth,
+            LocalPanelHeight provides panelHeight,
+        ) {
+            var grow by remember { mutableStateOf(StartupOverlay.cardGrow) }
+            LaunchedEffect(Unit) {
+                while (grow < 1f) {
+                    withFrameNanos { }
+                    grow = StartupOverlay.cardGrow
+                }
+            }
+            val shownWidth = CARD_PILL_WIDTH + (panelWidth - CARD_PILL_WIDTH) * grow
+            val shownHeight = CARD_PILL_HEIGHT + (panelHeight - CARD_PILL_HEIGHT) * grow
+            val rise = (1f - grow) * (CARD_PILL_CENTER - panelHeight / 2f)
+            Box(modifier.width(PANEL_WIDTH.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.offset(0.dp, rise.dp).size(shownWidth.dp, shownHeight.dp).panel()) {
                     Box(
                         Modifier
-                            .align(Alignment.Center)
-                            .requiredSize(DESIGN_WIDTH.dp, DESIGN_HEIGHT.dp),
-                    ) {
-                        Box(
-                            Modifier
-                                .offset(((DESIGN_WIDTH - panelWidth) / 2f).dp, ((DESIGN_HEIGHT - panelHeight) / 2f).dp)
-                                .size(panelWidth.dp, panelHeight.dp)
-                                .shadow(
+                            .wrapContentSize(Alignment.TopStart, unbounded = true)
+                            .offset(((shownWidth - panelWidth) / 2f).dp, ((shownHeight - panelHeight) / 2f - rise).dp)
+                            .size(panelWidth.dp, panelHeight.dp)
+                            .graphicsLayer { alpha = ((grow - CARD_CONTENT_DELAY) / (1f - CARD_CONTENT_DELAY)).coerceIn(0f, 1f) },
+                    ) { content() }
+                }
+            }
+        }
+        return
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val effectiveGuiScale = if (guiScale <= 0) maxGuiScale else guiScale
+        val containFit = minOf(maxWidth.value / DESIGN_WIDTH, maxHeight.value / DESIGN_HEIGHT)
+            .takeIf { it.isFinite() && it > 0f } ?: 1f
+        val scale = minOf(effectiveGuiScale / REFERENCE_GUI_SCALE, containFit) * UI_SCALE * GUI_DENSITY_TRIM
+        val accessibility = pages[page] == OnboardingStep.Accessibility
+        val compact = pages[page] == OnboardingStep.Terms || accessibility
+        val panelWidth by animateFloatAsState(
+            if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
+            animationSpec = spring(),
+        )
+        val panelHeight by animateFloatAsState(
+            when {
+                accessibility -> ACCESSIBILITY_PANEL_HEIGHT
+                compact -> TERMS_PANEL_HEIGHT
+                else -> PANEL_HEIGHT
+            },
+            animationSpec = spring(),
+        )
+        CompositionLocalProvider(
+            LocalDensity provides scaledDensity(scale),
+            LocalPanelWidth provides panelWidth,
+            LocalPanelHeight provides panelHeight,
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .requiredSize(DESIGN_WIDTH.dp, DESIGN_HEIGHT.dp),
+            ) {
+                Box(
+                    Modifier
+                        .offset(((DESIGN_WIDTH - panelWidth) / 2f).dp, ((DESIGN_HEIGHT - panelHeight) / 2f).dp)
+                        .size(panelWidth.dp, panelHeight.dp)
+                        .then(
+                            if (OneConfigTheme.current.shadowEnabled) {
+                                Modifier.shadow(
                                     elevation = 29.dp,
                                     shape = ButtonShape,
                                     ambientColor = ShadowColor,
                                     spotColor = ShadowColor,
                                 )
-                                .clip(ButtonShape)
-                                .background(PageBackground.copy(alpha = 0.9f))
-                                .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, ButtonShape),
-                        ) {
-                            when (val step = pages[page]) {
-                                OnboardingStep.Terms ->
-                                    TermsPage(
-                                        legalDocument,
-                                        termsAccepted,
-                                        { termsAccepted = it },
-                                        { legalDocument = it },
-                                    )
-                                OnboardingStep.LookAndFeel ->
-                                    LookAndFeelPage(
-                                        lightTheme, { lightTheme = it },
-                                        uiStyle, { uiStyle = it },
-                                        guiScale, maxGuiScale, { guiScale = it },
-                                    )
-                                OnboardingStep.ModOrder -> ModOrderPage(alphabeticalMods) { alphabeticalMods = it }
-                                OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
-                                is OnboardingStep.Mods -> {
-                                    Header("Continuing with", "Mods")
-                                    ModCardRow(step.cards.size) {
-                                        step.cards.forEach { card ->
-                                            when (card) {
-                                                ModCard.GRASS ->
-                                                    BetterGrassCard(grassMode) {
-                                                        touch(ModCard.GRASS, grassMode, it)
-                                                        grassMode = it
-                                                    }
-                                                ModCard.FIRE_OVERLAY ->
-                                                    FireOverlayCard(
-                                                        fireHeight,
-                                                        { touch(ModCard.FIRE_OVERLAY, fireHeight, it); fireHeight = it },
-                                                        fireOpacity,
-                                                        {
-                                                            touch(ModCard.FIRE_OVERLAY, fireOpacity, it)
-                                                            fireOpacity = it
-                                                        },
-                                                    )
-                                                ModCard.SHIELD_HEIGHT ->
-                                                    ShieldHeightCard(shieldHeight) {
-                                                        touch(ModCard.SHIELD_HEIGHT, shieldHeight, it)
-                                                        shieldHeight = it
-                                                    }
-                                                ModCard.MOUNT ->
-                                                    MountOpacityCard(horseOpacity) {
-                                                        touch(ModCard.MOUNT, horseOpacity, it)
-                                                        horseOpacity = it
-                                                    }
-                                                ModCard.CAPES ->
-                                                    WaveyCapesCard(waveyCapes) {
-                                                        touch(ModCard.CAPES, waveyCapes, it)
-                                                        waveyCapes = it
-                                                    }
-                                                ModCard.SKIN_LAYERS ->
-                                                    SkinLayersCard(skinLayers) {
-                                                        touch(ModCard.SKIN_LAYERS, skinLayers, it)
-                                                        skinLayers = it
-                                                    }
-                                                ModCard.GAMMA ->
-                                                    FullbrightCard(
-                                                        gamma, { touch(ModCard.GAMMA, gamma, it); gamma = it },
-                                                        gammaToggled,
-                                                        {
-                                                            touch(ModCard.GAMMA, gammaToggled, it)
-                                                            gammaToggled = it
-                                                        },
-                                                        gammaSmooth,
-                                                        {
-                                                            touch(ModCard.GAMMA, gammaSmooth, it)
-                                                            gammaSmooth = it
-                                                        },
-                                                    )
-                                                ModCard.DYNAMIC_LIGHTS ->
-                                                    DynamicLightsCard(dynamicLights) {
-                                                        touch(ModCard.DYNAMIC_LIGHTS, dynamicLights, it)
-                                                        dynamicLights = it
-                                                    }
-                                                ModCard.BLOCK_HIGHLIGHT -> Unit
-                                            }
-                                        }
-                                    }
-                                }
-                                OnboardingStep.MotionBlur ->
-                                    if (waitingForOptimization) {
-                                        OptimizingPage()
-                                    } else {
-                                        MotionBlurPage(
-                                            blurMode,
-                                            { blurMode = it },
-                                            motionBlur,
-                                            { motionBlur = it },
-                                        )
-                                    }
-                                OnboardingStep.BlockHighlight ->
-                                    BlockHighlightPage(
-                                        blockHighlight,
-                                        blockHighlightBase,
-                                        blockHighlightPresets,
-                                        onEdit = {
-                                            touch(ModCard.BLOCK_HIGHLIGHT, blockHighlight, it)
-                                            blockHighlight = it
-                                        },
-                                        onBase = { blockHighlightBase = it },
-                                    )
-                                is OnboardingStep.Guide -> GuidePage(step.guide)
-                                OnboardingStep.Done -> DonePage()
-                            }
-                            val terms = pages[page] == OnboardingStep.Terms
-                            val guidePage = pages[page] as? OnboardingStep.Guide
-                            val blurUnanswered = pages[page] == OnboardingStep.MotionBlur &&
-                                blurMode == OnboardingFeatures.MOTION_BLUR_UNSET
-                            BottomNavigation(
-                                page,
-                                pages.size,
-                                onSkip = finish,
-                                onBack = { page-- },
-                                onNext = if (terms) ({ answerTerms(true) }) else advance,
-                                nextEnabled = !waitingForOptimization && !blurUnanswered && (!terms || termsAccepted),
-                                allowSkip = !terms && guidePage == null && !needsBlurChoice,
-                                nextLabel = when {
-                                    terms -> "Agree"
-                                    guidePage != null -> "Got it"
-                                    else -> null
-                                },
-                                secondaryLabel = if (terms) "Decline" else null,
-                                onSecondary = { answerTerms(false) },
-                            )
-                        }
-                    }
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .clip(ButtonShape)
+                        .background(PageBackground.copy(alpha = 0.9f))
+                        .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, ButtonShape),
+                ) {
+                    content()
                 }
             }
         }
@@ -1105,7 +1193,7 @@ private fun BlockHighlightPage(
             CardToggle("See-through", draft.seeThrough) { change { seeThrough = it } }
             CardToggle("Fill", draft.fill) { change { fill = it } }
             Column(
-                Modifier.alpha(if (draft.fill) 1f else DISABLED_ALPHA),
+                Modifier.graphicsLayer { alpha = if (draft.fill) 1f else DISABLED_ALPHA },
                 verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp),
             ) {
                 SwatchRow(
@@ -1170,7 +1258,7 @@ private fun SwatchRow(
     val clickable = enabled && interactive
     var editingEnd by remember { mutableStateOf(false) }
     Row(
-        Modifier.height(CARD_ROW_HEIGHT.dp).alpha(if (enabled) 1f else DISABLED_ALPHA),
+        Modifier.height(CARD_ROW_HEIGHT.dp).graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CardLabel(label)
@@ -1243,7 +1331,7 @@ private fun fireHeightLabel(height: Float): String =
     if (height >= -0.001f) "Vanilla" else "%.2f".fmt(height)
 
 @Composable
-private fun OnboardingSlider(
+internal fun OnboardingSlider(
     progress: Float,
     width: Float,
     thumbSize: Dp = 11.dp,
@@ -1421,7 +1509,7 @@ private fun MotionBlurPage(
     MotionBlurPreview(
         if (blurOff) 0 else motionBlur,
         Modifier.offset(233.5.dp, BLUR_PREVIEW_Y.dp).size(413.dp, BLUR_PREVIEW_HEIGHT.dp)
-            .alpha(if (blurOff) 0.4f else 1f),
+            .graphicsLayer { alpha = if (blurOff) 0.4f else 1f },
     )
 }
 
@@ -1429,7 +1517,7 @@ private fun MotionBlurPage(
 private fun BlurStrengthSlider(motionBlur: Int, disabled: Boolean, onMotionBlur: (Int) -> Unit) {
     val steps = MOTION_BLUR_MAX - MOTION_BLUR_MIN
     Row(
-        Modifier.offset(232.dp, BLUR_SLIDER_Y.dp).alpha(if (disabled) 0.4f else 1f),
+        Modifier.offset(232.dp, BLUR_SLIDER_Y.dp).graphicsLayer { alpha = if (disabled) 0.4f else 1f },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OnboardingSlider(
@@ -1575,6 +1663,99 @@ private fun Header(kicker: String, title: String) {
 }
 
 @Composable
+private fun LockupHeader() {
+    val width = LocalPanelWidth.current
+    val ink = SocialTextPrimary.toArgb()
+    SideEffect { StartupOverlay.cardInk = ink }
+    SocialText("Welcome to", 15.sp, Modifier.offset(0.dp, 28.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
+    Row(
+        Modifier.offset(0.dp, 56.dp).width(width.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.onGloballyPositioned { StartupOverlay.cardMark = StartupOverlay.place(it) }) { LobbyIcon("logo", size = 36.dp) }
+        Box(Modifier.onGloballyPositioned { StartupOverlay.cardWord = StartupOverlay.place(it) }) {
+            SocialText("ONECLIENT", 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.2.sp, fontFamily = Outfit, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun AccessibilityPage(onLeave: () -> Unit) {
+    val leave by rememberUpdatedState(onLeave)
+    DisposableEffect(Unit) {
+        StartupAccessibility.attach { leave() }
+        onDispose { StartupAccessibility.detach() }
+    }
+    val panelWidth = LocalPanelWidth.current
+    val prompt = StartupAccessibility.promptText()
+    val settings = remember {
+        StartupAccessibility.controls().filter {
+            it != StartupAccessibility.Control.Standard && it != StartupAccessibility.Control.Skip && it != StartupAccessibility.Control.Continue
+        }
+    }
+    val rows = remember(settings) {
+        if (settings.size % 2 == 1) listOf(settings.take(1)) + settings.drop(1).chunked(2) else settings.chunked(2)
+    }
+    val rowWidth = panelWidth - ACCESSIBILITY_MARGIN * 2f
+    LockupHeader()
+    if (prompt.isNotEmpty()) {
+        SocialText(
+            prompt,
+            14.sp,
+            Modifier.offset(ACCESSIBILITY_MARGIN.dp, ACCESSIBILITY_TEXT_Y.dp).width(rowWidth.dp),
+            SocialTextSecondary,
+            FontWeight.Normal,
+            textAlign = TextAlign.Center,
+        )
+    }
+    Column(Modifier.offset(ACCESSIBILITY_MARGIN.dp, ACCESSIBILITY_ROWS_Y.dp), verticalArrangement = Arrangement.spacedBy(ACCESSIBILITY_GAP.dp)) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(ACCESSIBILITY_GAP.dp)) {
+                row.forEach { control ->
+                    ChoiceButton(
+                        StartupAccessibility.label(control),
+                        accessibilityIcon(control),
+                        false,
+                        (rowWidth - ACCESSIBILITY_GAP * (row.size - 1)) / row.size,
+                        enabled = control != StartupAccessibility.Control.Narrator || StartupAccessibility.narratorAvailable(),
+                        focused = StartupAccessibility.focused(control),
+                    ) { StartupAccessibility.activate(control) }
+                }
+            }
+        }
+    }
+    StandardStartupLink(Modifier.offset(0.dp, (LocalPanelHeight.current - NAV_BOTTOM_INSET - ACCESSIBILITY_LINK_INSET).dp))
+}
+
+private fun accessibilityIcon(control: StartupAccessibility.Control): String = MAIN_MENU_ASSETS + when (control) {
+    StartupAccessibility.Control.Narrator -> "message-chat-circle.svg"
+    StartupAccessibility.Control.Sounds -> "headphones-02.svg"
+    StartupAccessibility.Control.Accessibility -> "settings-02.svg"
+    else -> "globe-01.svg"
+}
+
+@Composable
+private fun StandardStartupLink(modifier: Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val focused = StartupAccessibility.focused(StartupAccessibility.Control.Standard)
+    Box(modifier.width(LocalPanelWidth.current.dp), contentAlignment = Alignment.Center) {
+        BasicText(
+            StartupAccessibility.label(StartupAccessibility.Control.Standard),
+            Modifier.hoverable(interactionSource).clickableTextWithSound { StartupAccessibility.activate(StartupAccessibility.Control.Standard) },
+            TextStyle(
+                color = if (hovered || focused) SocialTextPrimary else SocialTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Light,
+                fontFamily = OneConfigTheme.current.fontFamily,
+                textDecoration = if (focused) TextDecoration.Underline else TextDecoration.None,
+            ),
+        )
+    }
+}
+
+@Composable
 private fun SectionLabel(label: String, y: Float) {
     SocialText(label, 15.sp, Modifier.offset(232.dp, y.dp).width(198.dp), SocialTextPrimary, FontWeight.Normal, TextAlign.Start)
 }
@@ -1588,6 +1769,7 @@ private fun ChoiceButton(
     modifier: Modifier = Modifier,
     primary: Boolean = false,
     enabled: Boolean = true,
+    focused: Boolean = false,
     onClick: () -> Unit,
 ) {
     val contentColor = if (primary) Color.White else SocialTextPrimary
@@ -1595,7 +1777,7 @@ private fun ChoiceButton(
         modifier
             .width(width.dp)
             .height(32.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ButtonShape)
             .background(
                 when {
@@ -1604,7 +1786,15 @@ private fun ChoiceButton(
                     else -> ChoiceBackground
                 },
             )
-            .border(SocialPanelBorderWidth, if (selected || primary) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
+            .border(
+                if (focused) FOCUS_BORDER_WIDTH.dp else SocialPanelBorderWidth,
+                when {
+                    focused -> SolidColor(SocialTextPrimary)
+                    selected || primary -> SolidColor(OneConfigTheme.accent)
+                    else -> SocialPanelBorderBrush
+                },
+                ButtonShape,
+            )
             .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -1660,13 +1850,15 @@ private fun BottomNavigation(
     nextLabel: String? = null,
     secondaryLabel: String? = null,
     onSecondary: () -> Unit = {},
+    skipFocused: Boolean = false,
+    nextFocused: Boolean = false,
 ) {
     val panelWidth = LocalPanelWidth.current
     val buttonY = LocalPanelHeight.current - NAV_BOTTOM_INSET
     val nextX = panelWidth - 26f - 100f
     if (page == 0) {
         if (allowSkip) {
-            ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, buttonY.dp), onClick = onSkip)
+            ChoiceButton("Skip", MAIN_MENU_ASSETS + "x-close.svg", false, 100f, Modifier.offset(26.dp, buttonY.dp), focused = skipFocused, onClick = onSkip)
         }
     } else {
         ChoiceButton("Back", "assets/polyplus/ico/left-arrow.svg", false, 100f, Modifier.offset(26.dp, buttonY.dp), onClick = onBack)
@@ -1698,6 +1890,7 @@ private fun BottomNavigation(
         Modifier.offset(nextX.dp, buttonY.dp),
         primary = true,
         enabled = nextEnabled,
+        focused = nextFocused,
         onClick = onNext,
     )
     Row(
@@ -2006,16 +2199,20 @@ private fun TermsPage(
     accepted: Boolean,
     onAccepted: (Boolean) -> Unit,
     onDocument: (LegalDocument) -> Unit,
+    top: Float,
 ) {
     LaunchedEffect(Unit) {
         if (document == null) LegalDocuments.load().onSuccess(onDocument)
     }
 
     val panelWidth = LocalPanelWidth.current
+    if (top > TERMS_CONTENT_TOP) {
+        if (StartupOverlay.enabled()) LockupHeader() else Header("Welcome to", "OneClient")
+    }
     Box(
         Modifier
-            .offset(0.dp, TERMS_CONTENT_TOP.dp)
-            .size(panelWidth.dp, (LocalPanelHeight.current - NAV_BOTTOM_INSET - 14f - TERMS_CONTENT_TOP).dp),
+            .offset(0.dp, top.dp)
+            .size(panelWidth.dp, (LocalPanelHeight.current - NAV_BOTTOM_INSET - 14f - top).dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -2065,7 +2262,7 @@ private fun CheckBox(checked: Boolean) {
             .size(24.dp)
             .hoverable(interactionSource)
             .clip(theme.checkBoxShape)
-            .background(if (checked) OneConfigTheme.accent else theme.componentBackground)
+            .background(if (checked) OneConfigTheme.accent else SocialOffStateBackground)
             .border(
                 1.5.dp,
                 when {
@@ -2099,6 +2296,22 @@ private fun TermsLink(label: String, onClick: () -> Unit) {
 internal object OnboardingKeyCapture {
     @Volatile
     var pending: ((InputConstants.Key?) -> Unit)? = null
+
+    fun capture(key: Int): Boolean {
+        val capture = pending ?: return false
+        capture(
+            if (key == InputConstants.KEY_ESCAPE) {
+                null
+            } else {
+                //? if >= 26.3 || = 1.8.9 {
+                InputConstants.Type.KEYBOARD.getOrCreate(key)
+                //?} else {
+                /*InputConstants.Type.KEYSYM.getOrCreate(key)
+                *///?}
+            },
+        )
+        return true
+    }
 }
 
 private enum class ModGuide(
@@ -2153,6 +2366,7 @@ private enum class ModGuide(
 }
 
 private sealed interface OnboardingStep {
+    data object Accessibility : OnboardingStep
     data object Terms : OnboardingStep
     data object LookAndFeel : OnboardingStep
     data object ModOrder : OnboardingStep
@@ -2311,7 +2525,6 @@ private const val SHIELD_DROP_PER_UNIT = 1.0f
 private const val BLOCK_SPIN_PER_MS = 0.0004f
 private const val CBH_WIDTH_MIN = 1f
 private const val CBH_WIDTH_MAX = 10f
-private const val DISABLED_ALPHA = 0.4f
 private const val SWATCH_SIZE = 20f
 private const val SWATCH_GAP = 3f
 private const val SWATCH_GROUP_GAP = 12f
@@ -2339,6 +2552,20 @@ private const val BLUR_SLIDER_Y = BLUR_STRENGTH_LABEL_Y + LABEL_HEIGHT
 private const val BLUR_PREVIEW_Y = BLUR_SLIDER_Y + 26f + 16f
 private const val BLUR_PREVIEW_HEIGHT = CONTENT_BOTTOM - BLUR_PREVIEW_Y
 private const val TERMS_PANEL_WIDTH = 620f
+private const val ACCESSIBILITY_PANEL_HEIGHT = 348f
+private const val ACCESSIBILITY_MARGIN = 26f
+private const val ACCESSIBILITY_GAP = 8f
+private const val ACCESSIBILITY_TEXT_Y = 112f
+private const val ACCESSIBILITY_ROWS_Y = 156f
+private const val ACCESSIBILITY_LINK_INSET = 26f
+private const val FOCUS_BORDER_WIDTH = 2f
+private const val CARD_PILL_WIDTH = 300f
+private const val CARD_PILL_HEIGHT = 84f
+private const val CARD_PILL_CENTER = 74f
+private const val CARD_CONTENT_DELAY = 0.35f
+private const val LOBBY_PANEL_SCALE = UI_SCALE * GUI_DENSITY_TRIM * LobbyLayout.DESIGN_WIDTH / DESIGN_WIDTH
+private const val LOBBY_TERMS_HEIGHT = 300f
+private const val LOBBY_TERMS_TOP = 118f
 private const val TERMS_PANEL_HEIGHT = 170f
 private const val TERMS_CONTENT_TOP = 30f
 private const val NAV_BOTTOM_INSET = 56f
@@ -2379,7 +2606,7 @@ private val ShadowColor = Color(0x26000000)
 private val ChoiceBackground: Color
     @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
 private val MenuBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground
+    @Composable get() = SocialDropdownBackground
 
 private const val HUD_TEXT_SIZE = 21f
 private const val HUD_PADDING = HUD_TEXT_SIZE * (4f / 9f)
