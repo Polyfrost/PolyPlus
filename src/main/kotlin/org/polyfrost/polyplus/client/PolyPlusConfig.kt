@@ -457,7 +457,11 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @Dropdown(title = "API URL", description = "The URL used for the PolyPlus API. Only change if you know what you're doing.")
     var apiUrl: BackendUrl = BackendUrl.PRODUCTION
-        get() = if (PolyPlusConstants.IS_DEV_ENV) field else BackendUrl.PRODUCTION
+        get() = when {
+            PolyPlusConstants.IS_DEV_ENV -> field
+            PolyPlusConstants.IS_TESTER -> BackendUrl.STAGING
+            else -> BackendUrl.PRODUCTION
+        }
 
     init {
         hideIf("apiUrl") { !PolyPlusConstants.IS_DEV_ENV }

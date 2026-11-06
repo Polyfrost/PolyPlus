@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.network.eos
 
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusConfig
 
 object EosConstants {
@@ -36,7 +37,7 @@ enum class EosMode(
             when (System.getProperty("polyplus.eosMode")?.trim()?.lowercase()) {
                 "production" -> PRODUCTION
                 "testing" -> TESTING
-                else -> if (PolyPlusConfig.apiUrl.url == STAGING_URL) TESTING else PRODUCTION
+                else -> if (PolyPlusConstants.IS_TESTER || PolyPlusConfig.apiUrl.url == STAGING_URL) TESTING else PRODUCTION
             }
         }
     }

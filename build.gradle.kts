@@ -96,7 +96,8 @@ val flkProvidedModules = setOf(
 )
 
 group = property("mod.group") as String
-version = "${property("mod.version")}+${stonecutter.current.version}"
+val testerBuild = (optionalProperty("polyplus.tester") ?: System.getenv("POLYPLUS_TESTER"))?.trim().equals("true", ignoreCase = true)
+version = "${property("mod.version")}+${stonecutter.current.version}${if (testerBuild) "-tester" else ""}"
 base.archivesName = property("mod.id") as String
 val oneconfigVersion = property("deps.oneconfig") as String
 
@@ -456,7 +457,20 @@ tasks.test {
     }
 }
 
+val generateTesterFlag = tasks.register("generateTesterFlag") {
+    val output = layout.buildDirectory.file("generated/tester/polyplus-tester.properties")
+    inputs.property("tester", testerBuild)
+    outputs.file(output)
+    doLast {
+        output.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText("tester=$testerBuild\n")
+        }
+    }
+}
+
 tasks.withType<ProcessResources>().configureEach {
+    from(generateTesterFlag)
     val keptChain = when {
         stonecutter.eval(mcVersion, ">= 1.21.8") -> "lobby.json"
         stonecutter.eval(mcVersion, ">= 1.21.5") -> "lobby_uniforms.json"
