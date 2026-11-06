@@ -55,6 +55,7 @@ import kotlin.math.roundToInt
 
 private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
+private const val FLAT_DIM = 0.45f
 
 private object PauseHost : SocialHost {
     override fun join(data: ServerData) = PartyJoin.server(data)
@@ -67,6 +68,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
     val state = rememberPauseState()
     LobbyDarkChrome {
         val ink = OneConfigTheme.current.pageBackground.copy(alpha = 1f)
+        if (!screen.staged) Box(Modifier.matchParentSize().graphicsLayer { alpha = reveal }.background(ink.copy(alpha = FLAT_DIM)))
         Box(
             Modifier
                 .matchParentSize()
@@ -77,7 +79,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
     }
     Box(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
-        AvatarTag(place.title)
+        if (screen.staged) AvatarTag(place.title)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
             Column(

@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -75,22 +76,6 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
     val party by PartyRepository.party.collectAsState()
     val groups by GroupsRepository.groups.collectAsState()
     Box(Modifier.fillMaxSize().clickableTextWithSound(screen::resume))
-    Row(
-        Modifier
-            .align(Alignment.Center)
-            .offset(y = 40.dp)
-            .graphicsLayer { alpha = reveal }
-            .height(30.dp)
-            .pauseGlass(8.dp)
-            .padding(start = 6.dp, end = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Keycap("Esc")
-        Label("or click anywhere to resume", 12.sp, color = MutedText)
-        Box(Modifier.width(1.dp).height(14.dp).background(SocialBorderColor))
-        PauseStateLine(state)
-    }
     Column(
         Modifier
             .align(Alignment.BottomCenter)
@@ -102,9 +87,24 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (screen.moreOpen) MorePanel(screen)
+        if (screen.moreOpen) MorePanel(screen, Modifier.blockPointer())
         Row(
-            Modifier.height(72.dp).pauseGlass().padding(horizontal = 8.dp),
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .blockPointer()
+                .height(30.dp)
+                .pauseGlass(8.dp)
+                .padding(start = 6.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Keycap("Esc")
+            Label("or click anywhere to resume", 12.sp, color = MutedText)
+            Box(Modifier.width(1.dp).height(14.dp).background(SocialBorderColor))
+            PauseStateLine(state)
+        }
+        Row(
+            Modifier.blockPointer().height(72.dp).pauseGlass().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (narrow) 2.dp else 4.dp),
         ) {
@@ -126,6 +126,12 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             DockRule()
             screen.capture.entry(PauseSlot.QUIT)?.let { DockItem(it.glyph, if (PauseWorldAccess.singleplayer) "Quit" else "Leave", danger = true, enabled = it.enabled, onClick = it.press) }
         }
+    }
+}
+
+private fun Modifier.blockPointer(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent()
     }
 }
 

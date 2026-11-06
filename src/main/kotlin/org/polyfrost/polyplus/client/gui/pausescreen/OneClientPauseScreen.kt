@@ -8,9 +8,10 @@ import androidx.compose.ui.geometry.Rect
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -36,10 +37,12 @@ import net.minecraft.client.input.MouseButtonEvent
 
 class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: PauseScreenStyle) : ComposeScreen(RenderMode.CONTINUOUS) {
     internal val capture = PauseCapture(vanilla)
-    internal var stepBack by mutableStateOf(style == PauseScreenStyle.STEP_BACK)
+    internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
+    internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)
     private var decided = false
+    private var openedAt = 0L
     internal var resumeBounds = Rect.Zero
     private var resumeArmed = false
 
@@ -56,8 +59,14 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
         capture.sync(width, height)
         if (!decided) {
             decided = true
-            stepBack = style == PauseScreenStyle.STEP_BACK && PauseStage.enter()
+            staged = style == PauseScreenStyle.STEP_BACK && PauseStage.enter()
+            openedAt = System.currentTimeMillis()
         }
+    }
+
+    override fun blurAlpha(): Float {
+        if (!stepBack || staged || !OneConfigConfig.enableBackgroundBlur) return 0f
+        return ((System.currentTimeMillis() - openedAt).toFloat() / FLAT_BLUR_MS).coerceIn(0f, 1f)
     }
 
     private fun keepUp() {
@@ -170,6 +179,10 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
             PauseRoot(this)
         }
     }
+
+    private companion object {
+        const val FLAT_BLUR_MS = 160f
+    }
 }
 
 object PauseRouter {
@@ -191,7 +204,7 @@ object PauseRouter {
             return screen
         }
         if (!showsMenu(screen)) return screen
-        val style = PolyPlusConfig.pauseScreenStyle
+        val style = PolyPlusPauseConfig.pauseScreenStyle
         return if (style == PauseScreenStyle.VANILLA) screen else OneClientPauseScreen(screen, style)
     }
 
