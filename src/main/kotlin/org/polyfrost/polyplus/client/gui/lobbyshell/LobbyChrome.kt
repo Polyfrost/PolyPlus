@@ -434,7 +434,7 @@ private fun NotificationsButton() {
 @Composable
 private fun QuitButton() {
     val mc = Minecraft.getInstance()
-    if (PolyPlusMainMenuConfig.quitWithoutConfirmation) {
+    if (PolyPlusLobbyConfig.quitWithoutConfirmation) {
         SocialIconButton(QUIT_ICON, tooltip = "Quit game", onClick = mc::stop)
     } else {
         LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PlaySessions.log(ClientPlatform.localPlayerUuid()) } }

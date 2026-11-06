@@ -5,7 +5,7 @@ package org.polyfrost.polyplus.client.lobby
 import androidx.compose.ui.graphics.luminance
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.party.PartyScene
 import java.time.LocalTime
 
@@ -33,7 +33,7 @@ enum class LobbyTime(private val label: String) {
         private var realCheckedNanos: Long? = null
 
         fun clock(captured: Long): Long = Math.floorMod(
-            PartyScene.followedClock() ?: when (PolyPlusMainMenuConfig.lobbyTime) {
+            PartyScene.followedClock() ?: when (PolyPlusLobbyConfig.lobbyTime) {
                 CAPTURED -> captured
                 THEME -> if (lightTheme()) DAY_CLOCK else NIGHT_CLOCK
                 REAL -> realClock()

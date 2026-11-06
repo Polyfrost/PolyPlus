@@ -13,8 +13,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -109,7 +108,7 @@ object PauseMenuPanel {
      * playtime as its top row, right under the preview.
      */
     fun layout(screenWidth: Int, screenHeight: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
-        if (!PolyPlusMainMenuConfig.vanillaPausePlayerPanel) return null
+        if (!PolyPlusPauseConfig.vanillaPausePlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
         val rightRoom = screenWidth - menuRight - MENU_GAP
         val rightWidth = minOf(WIDTH, rightRoom - MIN_EDGE_MARGIN)
@@ -140,7 +139,7 @@ object PauseMenuPanel {
         *///?}
         // MixinPauseScreen already turns the menu's Open to LAN button into Host World; 26.3 moved LAN into World Options
         //? if < 26.3 {
-        /*val menuHostsWorld = PolyPlusConfig.replacePauseLanButton
+        /*val menuHostsWorld = PolyPlusPauseConfig.replacePauseLanButton
         *///?} else {
         val menuHostsWorld = false
         //?}
@@ -245,7 +244,7 @@ object PauseMenuPanel {
     }
 
     // the Compose pause menu mirrors a hidden vanilla one, which must not get these buttons too
-    private fun vanillaMenuShown(): Boolean = PolyPlusConfig.pauseScreenStyle == PauseScreenStyle.VANILLA
+    private fun vanillaMenuShown(): Boolean = PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA
 
     // Essential's pause menu adds proxy Buttons for the player and buttons it draws on either side of the menu
     fun drawnElsewhere(widget: Any): Boolean = widget.javaClass.name.startsWith("gg.essential.")

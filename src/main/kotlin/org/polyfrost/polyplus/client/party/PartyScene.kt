@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbySceneEntry
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
@@ -65,13 +65,13 @@ object PartyScene {
     val keepOwnBackdrop: Boolean
         get() {
             keepRevision
-            return PolyPlusConfig.partyKeepOwnBackdrop
+            return PolyPlusPartyConfig.partyKeepOwnBackdrop
         }
 
     fun setKeepOwnBackdrop(keep: Boolean) {
-        if (PolyPlusConfig.partyKeepOwnBackdrop == keep) return
-        PolyPlusConfig.partyKeepOwnBackdrop = keep
-        PolyPlusConfig.save()
+        if (PolyPlusPartyConfig.partyKeepOwnBackdrop == keep) return
+        PolyPlusPartyConfig.partyKeepOwnBackdrop = keep
+        PolyPlusPartyConfig.save()
         keepRevision++
         appliedAt = 0L
     }
@@ -85,7 +85,7 @@ object PartyScene {
         return bundledEntry(scene.id)?.label
     }
 
-    private var consents: Map<String, Boolean> = parseConsents(PolyPlusConfig.partySceneConsents)
+    private var consents: Map<String, Boolean> = parseConsents(PolyPlusPartyConfig.partySceneConsents)
 
     fun localScene(): MemberScene? {
         followed()?.let { return it }
@@ -128,7 +128,7 @@ object PartyScene {
     private fun shares(entry: LobbySceneEntry, hash: String): Boolean {
         val party = PartyRepository.party.value
         if (party == null || party.members.size < 2 || !PartyRepository.isLeader(party)) return false
-        return when (PolyPlusConfig.partySceneSharing) {
+        return when (PolyPlusPartyConfig.partySceneSharing) {
             SceneSharing.ALWAYS -> true
             SceneSharing.NEVER -> false
             SceneSharing.ASK -> consents[hash] ?: run {
@@ -143,8 +143,8 @@ object PartyScene {
         consentPrompt = null
         val hash = hashes[entry.id] ?: return
         consents = consents + (hash to share)
-        PolyPlusConfig.partySceneConsents = consents.entries.joinToString(",") { "${it.key}=${if (it.value) 1 else 0}" }
-        PolyPlusConfig.save()
+        PolyPlusPartyConfig.partySceneConsents = consents.entries.joinToString(",") { "${it.key}=${if (it.value) 1 else 0}" }
+        PolyPlusPartyConfig.save()
     }
 
     private fun parseConsents(raw: String): Map<String, Boolean> = raw.split(',').mapNotNull { pair ->
@@ -197,7 +197,7 @@ object PartyScene {
 
     fun followed(): MemberScene? {
         val party = PartyRepository.party.value ?: return null
-        if (party.members.size < 2 || PartyRepository.isLeader(party) || PolyPlusConfig.partyKeepOwnBackdrop) return null
+        if (party.members.size < 2 || PartyRepository.isLeader(party) || PolyPlusPartyConfig.partyKeepOwnBackdrop) return null
         val leader = party.member(party.leader) ?: return null
         if (!leader.online) return null
         return leader.state?.scene

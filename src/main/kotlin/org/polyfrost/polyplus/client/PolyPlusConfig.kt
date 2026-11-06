@@ -18,15 +18,13 @@ import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
-import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.party.PartyVoice
-import org.polyfrost.polyplus.client.party.SceneSharing
-import org.polyfrost.polyplus.client.party.SvcHandoff
 import org.polyfrost.polyplus.client.party.VoiceInputMode
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import java.nio.file.Files
 import java.nio.file.Path
 
 object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConstants.NAME} (OneClient)", Category.OTHER) {
@@ -191,22 +189,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var onboardingBlockHighlightSettled = false
 
     @JvmStatic
-    @Dropdown(
-        title = "Pause Screen",
-        description = "Step Back shows your player in your world. Compact keeps the world in view with a bar above the hotbar. Vanilla is the normal Minecraft pause screen.",
-        options = ["Step Back", "Compact", "Vanilla"],
-    )
-    var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK
-
-    @JvmStatic
-    @Switch(
-        title = "Replace Pause Menu LAN Button",
-        description = "Replace the vanilla 'Open to LAN' pause menu button with the PolyPlus Host World flow, for hosting your current world over EOS P2P.",
-        category = "Multiplayer",
-    )
-    var replacePauseLanButton = true
-
-    @JvmStatic
     @Switch(
         title = "PolyPlus User Indicators",
         description = "Show a badge on the nametag and tab list of players who are using PolyPlus.",
@@ -348,56 +330,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var voiceHideIp = true
 
-    @JvmStatic
-    @Dropdown(
-        title = "Switch Nearby Members to Simple Voice Chat",
-        description = "When a party member is on Simple Voice Chat with you, ask first, always switch to it, or always keep party voice.",
-        options = ["Ask", "Always", "Never"],
-        category = "Multiplayer",
-        subcategory = "Voice",
-    )
-    var voiceSvcHandoff: SvcHandoff = SvcHandoff.ASK
-
-    @JvmStatic
-    @Switch(
-        title = "Share My Server With Party",
-        description = "Show your party which server you're on, so they can join you.",
-        category = "Multiplayer",
-        subcategory = "Voice",
-    )
-    var partyShareServer = true
-
-    @JvmStatic
-    @Switch(
-        title = "Keep My Own Backdrop in Parties",
-        description = "Keep your own lobby scene and time instead of your party leader's. Party members still stand in it.",
-        category = "Multiplayer",
-        subcategory = "Party",
-    )
-    var partyKeepOwnBackdrop = false
-
-    @JvmStatic
-    @Dropdown(
-        title = "Share My Captured Scenes With My Party",
-        description = "When you lead a party, let members see lobby scenes captured in your own worlds.",
-        options = ["Ask", "Always", "Never"],
-        category = "Multiplayer",
-        subcategory = "Party",
-    )
-    var partySceneSharing: SceneSharing = SceneSharing.ASK
-
-    @JvmStatic
-    @Switch(
-        title = "Join When My Leader Presses Play Together",
-        description = "Join your party leader after a 5 second countdown you can cancel. When off, you get a prompt instead.",
-        category = "Multiplayer",
-        subcategory = "Party",
-    )
-    var partyPlayTogetherJoin = true
-
-    @JvmStatic @Include
-    var partySceneConsents = ""
-
     @JvmStatic @Include
     var voiceInputDevice = ""
 
@@ -472,10 +404,6 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
         hideIf("voiceLinuxRtc") { !EosRtcSupport.isLinux }
 
-        //? if = 1.8.9 {
-        /*hideIf("voiceSvcHandoff") { true }
-        *///?}
-
         addCallback("voiceJavaSound") { PartyVoice.onSettingsChanged(restartAudio = true) }
 
         for (option in listOf("voiceInputVolume", "voiceOutputVolume", "voiceProximityRange", "voiceHideIp", "voiceInputMode")) {
@@ -491,14 +419,19 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 }
 
 /** Folds the pre-split polyplus.json into one of the configs made out of it. */
-internal fun loadLegacyPolyPlusOptions(label: String, logger: Logger, load: (Path) -> Unit) {
+internal fun loadLegacyPolyPlusOptions(label: String, logger: Logger, load: (Path) -> Unit) =
+    loadPolyPlusOptions("${PolyPlusConstants.ID}.json", label, logger, load)
+
+internal fun loadPolyPlusOptions(fileName: String, label: String, logger: Logger, load: (Path) -> Unit) {
     runCatching {
+        val file = ConfigManager.active().folder.resolve(fileName)
+        if (!Files.exists(file)) return
         Tree.beginFailureCollection()
         try {
-            load(ConfigManager.active().folder.resolve("${PolyPlusConstants.ID}.json"))
+            load(file)
         } finally {
             val failed = Tree.endFailureCollection()
-            if (failed.isNotEmpty()) logger.warn("Left {} $label option(s) at their default", failed)
+            if (failed.isNotEmpty()) logger.warn("Left {} $label option(s) from {} at their default", failed, fileName)
         }
-    }.onFailure { logger.warn("Could not migrate $label options from the legacy PolyPlus config", it) }
+    }.onFailure { logger.warn("Could not migrate $label options from {}", fileName, it) }
 }

@@ -5,7 +5,7 @@ import net.minecraft.client.Minecraft
 /*import org.polyfrost.polyplus.client.lobby.currentServer
 import org.polyfrost.polyplus.client.lobby.level
 *///?}
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.http.responses.LocationKind
 import org.polyfrost.polyplus.client.network.http.responses.MemberLocation
@@ -33,7 +33,7 @@ object PartyPresence {
     }
 
     fun tick() {
-        val next = MemberState(location(), PartyVoice.memberVoice(), PartySvc.linked, PartyScene.localScene())
+        val next = MemberState(location(), PartyVoice.memberVoice(), scene = PartyScene.localScene())
         local = next
         if (PartyRepository.party.value == null) {
             lastSent = null
@@ -65,7 +65,7 @@ object PartyPresence {
             val joined = P2PSessionManager.joinedSessionId ?: return MemberLocation(LocationKind.HostedWorld)
             return hosted(joined)
         }
-        val display = address.take(MAX_DISPLAY).takeIf { PolyPlusConfig.partyShareServer }
+        val display = address.take(MAX_DISPLAY).takeIf { PolyPlusPartyConfig.partyShareServer }
         return MemberLocation(LocationKind.Server, serverKey(address), display)
     }
 

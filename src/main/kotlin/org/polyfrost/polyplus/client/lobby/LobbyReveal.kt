@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.lobby
 
 import org.apache.logging.log4j.LogManager
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 
 enum class LobbyReveal(val id: String, private val label: String, private val shader: Float) {
     RANDOM("random", "Random", 0f),
@@ -18,13 +18,13 @@ enum class LobbyReveal(val id: String, private val label: String, private val sh
         private var picked = roll(null)
 
         val active: LobbyReveal
-            get() = LobbyScene.drivenReveal() ?: PolyPlusMainMenuConfig.lobbyReveal.let { if (it == RANDOM) picked else it }
+            get() = LobbyScene.drivenReveal() ?: PolyPlusLobbyConfig.lobbyReveal.let { if (it == RANDOM) picked else it }
 
         fun byId(id: String?): LobbyReveal? = entries.firstOrNull { it != RANDOM && it.id == id }
 
         fun next() {
             picked = if (StartupOverlay.active) WAVE else roll(picked)
-            if (PolyPlusMainMenuConfig.lobbyReveal == RANDOM) LOGGER.info("Lobby reveal: {}", picked)
+            if (PolyPlusLobbyConfig.lobbyReveal == RANDOM) LOGGER.info("Lobby reveal: {}", picked)
         }
 
         fun shaderMode(progress: Float): Float = if (progress < 1f) active.shader else 0f

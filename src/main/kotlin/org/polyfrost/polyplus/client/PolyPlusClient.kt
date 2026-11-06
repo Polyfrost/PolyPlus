@@ -165,6 +165,9 @@ object PolyPlusClient {
         step("sentry") { PolyPlusSentry.initialize() }
         step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
+        step("pause screen config preload") { PolyPlusPauseConfig.preload() }
+        step("lobby config preload") { PolyPlusLobbyConfig.preload() }
+        step("party config preload") { PolyPlusPartyConfig.preload() }
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("startup sounds") { StartupSounds.prepare() }

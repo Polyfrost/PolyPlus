@@ -8,7 +8,7 @@ import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.WorldOptionsScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
-import org.polyfrost.polyplus.client.PolyPlusConfig;
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig;
 import org.polyfrost.polyplus.client.social.SocialOverlay;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,7 +26,7 @@ public class MixinWorldOptionsScreen {
     @WrapMethod(method = "multiplayerOptions")
     private void polyplus$replaceMultiplayerOptions(LinearLayout content, IntegratedServer server, Operation<Void> original) {
         // once published, vanilla's section is the only way to change the port, guest access, or stop hosting
-        if (!PolyPlusConfig.getReplacePauseLanButton() || server.isPublished()) {
+        if (!PolyPlusPauseConfig.getReplacePauseLanButton() || server.isPublished()) {
             original.call(content, server);
             return;
         }

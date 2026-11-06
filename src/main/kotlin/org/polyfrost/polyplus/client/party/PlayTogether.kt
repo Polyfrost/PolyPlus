@@ -11,6 +11,7 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionRefresh
 import org.polyfrost.polyplus.client.network.http.PartyApi
@@ -185,7 +186,7 @@ object PlayTogether {
             Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where. Open Social to join.")
             return
         }
-        if (!PolyPlusConfig.partyPlayTogetherJoin) {
+        if (!PolyPlusPartyConfig.partyPlayTogetherJoin) {
             respond(current, PlayResponse.Cancelled)
             current.stage = Stage.DONE
             current.message = "${current.leaderName} started Play together on $where"
