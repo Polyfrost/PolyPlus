@@ -238,6 +238,7 @@
     "compat.distanthorizons.MixinDhSharedApi",
     "compat.distanthorizons.MixinDhVanillaFog",
     //?}
+    "compat.dynamicfps.MixinDynamicFPSMod",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
     //? if > 1.8.9

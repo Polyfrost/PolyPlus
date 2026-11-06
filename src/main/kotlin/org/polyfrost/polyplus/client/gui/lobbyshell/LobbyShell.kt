@@ -32,6 +32,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import org.polyfrost.polyplus.client.utils.AnimationActivity
 
 internal enum class LobbyPage(val frosted: Boolean) {
     Home(false),
@@ -118,6 +119,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     fun show(target: LobbyPage) {
         val shown = if (target.hidden) LobbyPage.Home else target
+        if (shown != page) AnimationActivity.hold(0.6)
         page = shown
         LobbyWardrobe.open = shown == LobbyPage.Wardrobe
     }

@@ -126,6 +126,9 @@ object PauseStage {
     fun hidesHud(): Boolean = phase == Phase.STAGED && seconds >= HAND_SECONDS
 
     @JvmStatic
+    fun animating(): Boolean = phase == Phase.RETURNING || (phase == Phase.STAGED && seconds < PULL_SECONDS)
+
+    @JvmStatic
     fun handSink(): Float = when (phase) {
         Phase.IDLE -> 0f
         Phase.STAGED -> smooth(seconds / HAND_SECONDS)
