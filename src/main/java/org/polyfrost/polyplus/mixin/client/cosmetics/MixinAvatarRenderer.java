@@ -8,6 +8,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
+import org.polyfrost.polyplus.compat.EntityModelFeaturesCompat;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -59,6 +60,7 @@ import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 public class MixinAvatarRenderer {
     @Inject(method = "<init>", at = @At("RETURN"))
     private void polyplus$addEffectLayer(EntityRendererProvider.Context context, boolean slimSteve, CallbackInfo ci) {
+        EntityModelFeaturesCompat.register();
         LivingEntityRendererInvoker invoker = (LivingEntityRendererInvoker) this;
 
         //? if >= 1.21.10 {

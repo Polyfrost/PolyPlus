@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.layers.CapeLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import org.polyfrost.polyplus.compat.EntityModelFeaturesCompat;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -27,6 +28,7 @@ public abstract class MixinCapeLayer {
     private void polyplus$followRoot(PoseStack poseStack, MultiBufferSource buffers, int light, PlayerRenderState state, float yRot, float xRot, CallbackInfo ci) {
     *///?}
         poseStack.pushPose();
+        if (EntityModelFeaturesCompat.animatesRoot(((RenderLayer<?, ?>) (Object) this).getParentModel())) return;
         ((RenderLayer<?, ?>) (Object) this).getParentModel().root().translateAndRotate(poseStack);
     }
 
