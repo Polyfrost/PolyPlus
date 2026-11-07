@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.components.fadingEdges
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -61,24 +61,24 @@ private const val NIGHT_END = 22500L
 private const val KILOBYTE = 1024L
 
 @Composable
-internal fun BoxScope.SceneControl(lobby: LobbyShell) {
+internal fun SceneButton(lobby: LobbyShell) {
     if (lobby.page != LobbyPage.Home) return
-    var open by remember { mutableStateOf(false) }
-    Column(
+    Box(Modifier.size(LobbyLayout.BarHeight).panel(), contentAlignment = Alignment.Center) {
+        SocialIconButton(SOCIAL_ASSETS + "image-01.svg", tooltip = "Change scene") { lobby.sceneOpen = !lobby.sceneOpen }
+    }
+}
+
+@Composable
+internal fun BoxScope.SceneControl(lobby: LobbyShell) {
+    if (lobby.page != LobbyPage.Home || !lobby.sceneOpen) return
+    Box(
         Modifier
-            .align(Alignment.TopEnd)
-            .padding(top = LobbyLayout.NavbarHeight + 8.dp, end = LobbyLayout.Margin)
+            .align(Alignment.BottomStart)
+            .padding(start = LobbyLayout.BarStart, bottom = LobbyLayout.PageBottom)
             .width(LobbyLayout.UnitWidth),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier) {
-            SocialButton("Change scene", SOCIAL_ASSETS + "image-01.svg", onClick = { open = !open })
-        }
-        if (open) {
-            EscapeCloses { open = false }
-            ScenePicker(lobby) { open = false }
-        }
+        EscapeCloses { lobby.sceneOpen = false }
+        ScenePicker(lobby) { lobby.sceneOpen = false }
     }
 }
 
@@ -196,17 +196,16 @@ private fun ServerRows(lobby: LobbyShell) {
         val policy = LobbySceneStore.serverPolicy(address)
         val blocked = policy == ServerApiProtocol.ScenePolicy.DENY
         SwitchRow(entry.data.name, policyText(policy, LobbySceneStore.serverChoice(address)), LobbySceneStore.serverAllows(address, policy), !blocked) {
-            LobbySceneStore.setServerChoice(address, !LobbySceneStore.serverAllows(address, policy))
+            LobbySceneStore.setServerChoice(address, if (LobbySceneStore.serverAllows(address, policy)) false else null)
         }
     }
 }
 
 private fun policyText(policy: ServerApiProtocol.ScenePolicy, choice: Boolean?): String = when {
     policy == ServerApiProtocol.ScenePolicy.DENY -> "Blocked by this server"
-    choice == false -> "Off for this server"
-    choice == true -> "On for this server"
+    choice == false -> "You turned this off"
     policy == ServerApiProtocol.ScenePolicy.ALLOW -> "Allowed by this server"
-    else -> "On unless you turn it off"
+    else -> "Captures while you play here"
 }
 
 @Composable

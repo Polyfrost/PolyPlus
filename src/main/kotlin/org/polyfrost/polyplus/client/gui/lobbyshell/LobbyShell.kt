@@ -72,6 +72,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     var source by mutableStateOf(choice.source)
     var editing by mutableStateOf<ServerEdit?>(null)
     var directOpen by mutableStateOf(false)
+    var sceneOpen by mutableStateOf(false)
     var deleting by mutableStateOf<ServerEntry?>(null)
     var hostWorldId by mutableStateOf<String?>(null)
     var selectedWorldId by mutableStateOf(choice.worldId)

@@ -261,6 +261,10 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
             }
             Spacer(Modifier.width(chatWidth.coerceAtMost(LobbyLayout.Gap)))
             key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false)) }
+            if (lobby.page == LobbyPage.Home) {
+                Spacer(Modifier.width(LobbyLayout.Gap))
+                SceneButton(lobby)
+            }
         }
         PlayUnit(
             lobby,
