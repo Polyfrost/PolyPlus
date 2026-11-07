@@ -2,7 +2,6 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 
 //? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-//? if >= 1.21.10
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
@@ -76,7 +75,6 @@ public class MixinAvatarRenderer {
 
         invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer(parent));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer(parent));
-        //? if >= 1.21.10
         invoker.polyplus$invokeAddLayer(new LobbyHerobrineLayer(parent));
 
         //? if >= 1.21.10 {
@@ -132,6 +130,7 @@ import net.minecraft.client.render.entity.PlayerRenderer;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
 import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -144,6 +143,7 @@ public class MixinAvatarRenderer {
         LivingEntityRendererInvoker invoker = (LivingEntityRendererInvoker) this;
         invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer((PlayerRenderer) (Object) this));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer((PlayerRenderer) (Object) this));
+        invoker.polyplus$invokeAddLayer(new LobbyHerobrineLayer((PlayerRenderer) (Object) this));
     }
 
     @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("HEAD"))

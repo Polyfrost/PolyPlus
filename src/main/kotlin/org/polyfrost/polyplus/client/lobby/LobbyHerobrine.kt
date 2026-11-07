@@ -1,16 +1,24 @@
 package org.polyfrost.polyplus.client.lobby
 
+import com.mojang.authlib.GameProfile
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
-//? if >= 1.21.10 {
-import com.mojang.authlib.GameProfile
 import net.minecraft.client.player.RemotePlayer
+//? if > 1.8.9 {
 import net.minecraft.client.resources.DefaultPlayerSkin
+//?} else {
+/*import net.minecraft.client.resource.skin.DefaultSkinUtils
+*///?}
 import net.minecraft.core.Direction
 import net.minecraft.resources.Identifier
 import net.minecraft.tags.BlockTags
-import net.minecraft.world.entity.Entity
+//? if >= 1.21.10 {
 import net.minecraft.world.entity.player.PlayerSkin
+//?} elif > 1.8.9 {
+/*import net.minecraft.client.resources.PlayerSkin
+*///?} else {
+/*import org.polyfrost.oneconfig.internal.legacy.PlayerSkin
+*///?}
 import net.minecraft.world.phys.Vec3
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -60,14 +68,36 @@ object LobbyHerobrine {
     private enum class State { IDLE, WAITING, STANDING, GONE }
 
     private class Figure(level: ClientLevel, profile: GameProfile, private val skin: PlayerSkin) : RemotePlayer(level, profile) {
+        //? if > 1.8.9 {
         override fun getSkin(): PlayerSkin = skin
+        //?} else {
+        /*override fun getSkinTextureLocation(): Identifier = skin.texture()
+
+        override fun getModelType(): String = "default"
+
+        override fun hasSkinTexture(): Boolean = true
+        *///?}
     }
 
     private val profile: Pair<GameProfile, PlayerSkin>? by lazy {
         (0L until UUID_TRIES).asSequence().map { UUID(UUID_HIGH, it) }.firstNotNullOfOrNull { uuid ->
-            DefaultPlayerSkin.get(uuid).takeIf { it.body().texturePath().path.contains("wide/steve") }?.let { GameProfile(uuid, NAME) to it }
+            defaultSkin(uuid).takeIf(::isSteve)?.let { GameProfile(uuid, NAME) to it }
         }
     }
+
+    //? if >= 1.21.10 {
+    private fun defaultSkin(uuid: UUID): PlayerSkin = DefaultPlayerSkin.get(uuid)
+
+    private fun isSteve(skin: PlayerSkin): Boolean = skin.body().texturePath().path.contains("wide/steve")
+    //?} elif > 1.8.9 {
+    /*private fun defaultSkin(uuid: UUID): PlayerSkin = DefaultPlayerSkin.get(uuid)
+
+    private fun isSteve(skin: PlayerSkin): Boolean = skin.texture().path.contains("wide/steve")
+    *///?} else {
+    /*private fun defaultSkin(uuid: UUID): PlayerSkin = PlayerSkin(DefaultSkinUtils.getDefaultSkin(uuid))
+
+    private fun isSteve(skin: PlayerSkin): Boolean = skin.texture().getPath().endsWith("/steve.png")
+    *///?}
 
     private var state = State.IDLE
     private var spot: Vec3? = null
@@ -148,8 +178,13 @@ object LobbyHerobrine {
         body.isSilent = true
         LobbyCompat.snapEntity(body, feet, 0f)
         face(body, eye)
+        //? if > 1.8.9 {
         level.addEntity(body)
         level.scoreboard.getPlayerTeam(TEAM)?.let { level.scoreboard.addPlayerToTeam(body.scoreboardName, it) }
+        //?} else {
+        /*level.forceEntity(body.id, body)
+        level.scoreboard.addMemberToTeam(body.name, TEAM)
+        *///?}
         figure = body
         shownLook = look
         stayTicks = 0
@@ -160,8 +195,12 @@ object LobbyHerobrine {
     private fun vanish(level: ClientLevel) {
         figure?.let { body ->
             runCatching {
-                level.removeEntity(body.id, Entity.RemovalReason.DISCARDED)
+                LobbyCompat.removeEntity(level, body)
+                //? if > 1.8.9 {
                 level.scoreboard.removePlayerFromTeam(body.scoreboardName)
+                //?} else {
+                /*level.scoreboard.removeMemberFromTeam(body.name)
+                *///?}
             }
         }
         figure = null
@@ -269,14 +308,3 @@ object LobbyHerobrine {
         return null
     }
 }
-//?} else {
-/*object LobbyHerobrine {
-    fun shows(entityId: Int): Boolean = false
-
-    fun onSceneShown(level: ClientLevel, stage: LobbyStage) {}
-
-    fun tick(level: ClientLevel, rig: LocalPlayer, calm: Boolean) {}
-
-    fun stop() {}
-}
-*///?}
