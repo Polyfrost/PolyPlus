@@ -18,7 +18,7 @@ import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
-import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.gui.AccountActions
@@ -80,7 +80,6 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     private var selectedServer by mutableStateOf(choice.server)
     var setup by mutableStateOf(onboardingPending())
         private set
-    private val firstRun = !PolyPlusConfig.onboardingCompleted
     var tour by mutableStateOf<LobbyTour?>(null)
     val anchors = mutableStateMapOf<TourAnchor, Rect>()
     var accountsOpen by mutableStateOf(false)
@@ -91,7 +90,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     private var profileId = ClientPlatform.localPlayerUuid()
 
     fun open() {
-        if (setup && !onboardingPending()) finishSetup()
+        if (setup && !onboardingPending()) finishSetup() else if (!setup) startTour()
         LobbyFraming.onboarding = setup
         LobbyScene.arrive()
         HostWorldManager.worldOpener = ::depart
@@ -113,7 +112,14 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     fun finishSetup() {
         setup = false
         LobbyFraming.onboarding = false
-        if (firstRun) tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+        startTour()
+    }
+
+    private fun startTour() {
+        if (PolyPlusLobbyConfig.tourSeen || tour != null) return
+        tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+        PolyPlusLobbyConfig.tourSeen = true
+        PolyPlusLobbyConfig.save()
     }
 
     fun skipIntro(): Boolean = (!setup || LobbyScene.overlayAlpha <= 0f) && !LobbyWardrobe.open && LobbyScene.skipIntro()

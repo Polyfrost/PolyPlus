@@ -20,6 +20,9 @@ object PolyPlusLobbyConfig : Config(
     @JvmStatic @Include
     var migratedFromSplitConfigs = false
 
+    @JvmStatic @Include
+    var tourSeen = false
+
     @JvmStatic
     @Dropdown(
         title = "Lobby Reveal",
