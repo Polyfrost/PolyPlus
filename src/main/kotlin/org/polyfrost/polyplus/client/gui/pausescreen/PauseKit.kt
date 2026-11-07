@@ -83,6 +83,7 @@ private const val OPAQUE_FLOOR = 0.94f
 private const val MENU_REVEAL_NANOS = 160_000_000f
 private const val DISABLED_ALPHA = 0.4f
 
+import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
 @Composable
@@ -162,7 +163,7 @@ internal fun NavTab(label: String, active: Boolean, unread: Boolean = false, onC
         Modifier.height(38.dp).hoverable(interaction).clickableWithSound(onClick).padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Label(label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = 0.6f), weight = FontWeight.Bold)
+        Label(label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = 0.6f), weight = if (isMinecraftTheme) FontWeight.Bold else FontWeight.Medium)
         if (active) Box(Modifier.align(Alignment.BottomCenter).width(27.dp).height(2.dp).background(OneConfigTheme.accent))
         if (unread) {
             Box(Modifier.align(Alignment.CenterEnd).offset(x = 12.dp).size(8.dp).background(OneConfigTheme.accent, OneConfigTheme.current.circleShape))

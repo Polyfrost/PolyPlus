@@ -4,12 +4,28 @@ package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.HoverInteraction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.invalidateDraw
+import kotlinx.coroutines.launch
+import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -240,3 +256,59 @@ internal fun PlayButton(modifier: Modifier, label: String, sub: String?, onClick
 }
 
 private const val PLAY_HOVER_LIFT = 0.1f
+
+private const val HIGHLIGHT_HOVER_ALPHA = 0.08f
+private const val HIGHLIGHT_PRESS_ALPHA = 0.14f
+private const val HIGHLIGHT_FADE_MILLIS = 120
+
+@Composable
+internal fun LobbyHighlight(shape: Shape = SocialFieldShape, content: @Composable () -> Unit) {
+    val tint = SocialTextPrimary
+    val indication = remember(shape, tint) { ShapedHighlight(shape, tint) }
+    CompositionLocalProvider(LocalIndication provides indication, content = content)
+}
+
+private class ShapedHighlight(private val shape: Shape, private val tint: Color) : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode = HighlightNode(interactionSource, shape, tint)
+
+    override fun equals(other: Any?): Boolean = other is ShapedHighlight && other.shape == shape && other.tint == tint
+
+    override fun hashCode(): Int = 31 * shape.hashCode() + tint.hashCode()
+}
+
+private class HighlightNode(
+    private val interactionSource: InteractionSource,
+    private val shape: Shape,
+    private val tint: Color,
+) : Modifier.Node(), DrawModifierNode {
+    private val level = Animatable(0f)
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            var presses = 0
+            var hovers = 0
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> presses++
+                    is PressInteraction.Release -> presses = (presses - 1).coerceAtLeast(0)
+                    is PressInteraction.Cancel -> presses = (presses - 1).coerceAtLeast(0)
+                    is HoverInteraction.Enter -> hovers++
+                    is HoverInteraction.Exit -> hovers = (hovers - 1).coerceAtLeast(0)
+                    else -> return@collect
+                }
+                val target = when {
+                    presses > 0 -> HIGHLIGHT_PRESS_ALPHA
+                    hovers > 0 -> HIGHLIGHT_HOVER_ALPHA
+                    else -> 0f
+                }
+                coroutineScope.launch { level.animateTo(target, tween(HIGHLIGHT_FADE_MILLIS)) { invalidateDraw() } }
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val alpha = level.value
+        if (alpha > 0f) drawOutline(shape.createOutline(size, layoutDirection, this), tint.copy(alpha = alpha * tint.alpha))
+    }
+}
