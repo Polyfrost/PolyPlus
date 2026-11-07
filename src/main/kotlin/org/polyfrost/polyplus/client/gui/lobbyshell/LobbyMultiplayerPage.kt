@@ -334,7 +334,10 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 ServerText(entry, revision, 16)
-                SocialButton("Join", filled = true) { lobby.join(data) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    SocialButton("Join", filled = true) { lobby.join(data) }
+                    ServerMoreMenu(lobby, entry, canReorder, onDelete, vertical = false)
+                }
             }
         }
         Box(Modifier.offset(x = 12.dp, y = banner - icon + overhang)) { ServerIcon(data, revision, icon) }
@@ -370,7 +373,8 @@ internal fun serverMenuItems(
     vertical: Boolean = false,
     onDelete: ((ServerEntry) -> Unit)? = null,
 ): List<ContextItem> =
-    listOf(ContextItem("Join", SOCIAL_ASSETS + "log-in-04.svg") { lobby.join(entry.data) }) + serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
+    listOf(ContextItem("Join", SOCIAL_ASSETS + "log-in-04.svg") { lobby.join(entry.data) }) +
+        serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
 
 @Composable
 private fun CardActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {

@@ -102,7 +102,7 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
 }
 
 @Composable
-private fun ServerMoreMenu(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit) {
+internal fun ServerMoreMenu(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, vertical: Boolean = true) {
     var open by remember { mutableStateOf(false) }
     val drop = with(LocalDensity.current) { MENU_OFFSET.roundToPx() }
     Box {
@@ -115,7 +115,7 @@ private fun ServerMoreMenu(lobby: LobbyShell, entry: ServerEntry, canReorder: Bo
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
-                ContextMenuList(serverMenuItems(lobby, entry, canReorder, vertical = true, onDelete = onDelete)) { open = false }
+                ContextMenuList(serverMenuItems(lobby, entry, canReorder, vertical = vertical, onDelete = onDelete)) { open = false }
             }
         }
     }

@@ -64,6 +64,17 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
+import org.polyfrost.polyplus.client.gui.lobbyshell.Label
+import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
+import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
+import org.polyfrost.polyplus.client.gui.SocialSwitch
+import org.polyfrost.polyplus.client.gui.SocialTextSecondary
+import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.polyplus.client.lobby.LobbySceneStore
+import org.polyfrost.polyplus.client.serverapi.ServerApiProtocol
+import androidx.compose.foundation.hoverable
+import androidx.compose.ui.graphics.graphicsLayer
 
 private const val NAME_MAX_LENGTH = 32
 private const val ADDRESS_MAX_LENGTH = 128
@@ -75,18 +86,33 @@ private val DialogWidth = 720.dp
 private val BodyHeight = 280.dp
 private val PreviewWidth = 268.dp
 private val ButtonWidth = 96.dp
+private val CaptureRowSpace = 54.dp
 
 private class ServerEditForm(server: ServerData?) {
     val initialAddress = server?.ip.orEmpty()
+    val isNew = server == null
     var name by mutableStateOf(fieldValue(server?.name.orEmpty().take(NAME_MAX_LENGTH)))
     var address by mutableStateOf(fieldValue(initialAddress.take(ADDRESS_MAX_LENGTH)))
     var packStatus by mutableStateOf(server?.resourcePackStatus ?: ServerData.ServerPackStatus.PROMPT)
     var confirmingDelete by mutableStateOf(false)
     val packOpen = mutableStateOf(false)
     var finished = false
+    val showCapture = server?.isLan != true && LobbySceneStore.captureEnabled
+    var captureDraft by mutableStateOf<Boolean?>(null)
 
     val addressValid: Boolean get() = ServerAddress.isValidAddress(address.text)
     val displayName: String get() = name.text.ifEmpty { I18n.get(DEFAULT_NAME_KEY) }
+    val captureBlocked: Boolean get() = LobbySceneStore.serverPolicy(address.text) == ServerApiProtocol.ScenePolicy.DENY
+    val captureOn: Boolean get() = !captureBlocked && (captureDraft ?: (LobbySceneStore.serverChoice(if (isNew) address.text else initialAddress) != false))
+
+    fun applyCapture() {
+        val target = address.text
+        val draft = captureDraft
+        when {
+            draft != null && !captureBlocked -> LobbySceneStore.setServerChoice(target, if (draft) null else false)
+            !isNew && target != initialAddress -> LobbySceneStore.setServerChoice(target, LobbySceneStore.serverChoice(initialAddress))
+        }
+    }
 }
 
 private fun fieldValue(text: String) = TextFieldValue(text, TextRange(text.length))
@@ -111,6 +137,7 @@ internal fun ServerEditDialog(
         if (form.finished || form.confirmingDelete || !form.addressValid) return@save
         form.finished = true
         ServerEditStore.save(server, form.displayName, form.address.text, form.packStatus)
+        if (form.showCapture) form.applyCapture()
         onDone()
     }
     val delete: () -> Unit = delete@{
@@ -148,7 +175,7 @@ internal fun ServerEditDialog(
                 DialogHeader(if (server == null) "Add server" else "Edit server", onDismiss)
                 Hairline()
                 Row(
-                    Modifier.fillMaxWidth().height(BodyHeight).padding(18.dp),
+                    Modifier.fillMaxWidth().height(if (form.showCapture) BodyHeight + CaptureRowSpace else BodyHeight).padding(18.dp),
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -222,6 +249,42 @@ private fun ServerFields(form: ServerEditForm, nameFocus: FocusRequester) {
             Modifier.fillMaxWidth(),
             form.packOpen,
         ) { form.packStatus = it }
+    }
+    if (form.showCapture) CaptureRow(form)
+}
+
+@Composable
+private fun CaptureRow(form: ServerEditForm) {
+    val blocked = form.captureBlocked
+    val on = form.captureOn
+    val (interaction, hovered) = rememberSocialHover()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .graphicsLayer { alpha = if (blocked) 0.5f else 1f }
+            .rowFrame(false, hovered && !blocked)
+            .hoverable(interaction, !blocked)
+            .focusProperties { canFocus = false }
+            .then(if (blocked) Modifier else Modifier.clickableWithSound { form.captureDraft = !on })
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Label("Capture scenes here", 14.sp)
+            Label(
+                when {
+                    blocked -> "Blocked by this server"
+                    on -> "Saves good spots while you play here"
+                    else -> "Not saving spots on this server"
+                },
+                12.sp,
+                color = SocialTextSecondary,
+            )
+        }
+        Label(if (on) "On" else "Off", 12.sp, color = SocialTextSecondary)
+        SocialSwitch(on, 42.dp, 21.dp, SocialOffStateBackground)
     }
 }
 
