@@ -234,8 +234,11 @@ internal fun Head(seed: UUID, size: Dp, modifier: Modifier = Modifier, realSkin:
 }
 
 @Composable
-internal fun PlayButton(modifier: Modifier, label: String, sub: String?, onClick: () -> Unit) {
-    val focus = lobbyHover(ClientPlatform.localPlayerName())
+internal fun PlayButton(modifier: Modifier, label: String, sub: String?, onClick: () -> Unit) = PlayButton(modifier, label, sub, true, onClick)
+
+@Composable
+internal fun PlayButton(modifier: Modifier, label: String, sub: String?, zoom: Boolean, onClick: () -> Unit) {
+    val focus = lobbyHover(if (zoom) ClientPlatform.localPlayerName() else null)
     val (interaction, hovered) = rememberSocialHover()
     val fill by animateColorAsState(if (hovered) lerp(OneConfigTheme.accent, Color.White, PLAY_HOVER_LIFT) else OneConfigTheme.accent)
     Column(

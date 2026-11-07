@@ -433,7 +433,7 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
             PlayButton(Modifier.weight(1f), hosted.status ?: "Join $leader", "$leader is hosting a world", LeaderFollow::joinHosted)
             if (ready) HostTile(if (singleplayer) "minecraft-block" else "globe-01", "Play", lobby::play)
         } else {
-            PlayButton(Modifier.weight(1f), label, null, lobby::play)
+            PlayButton(Modifier.weight(1f), label, null, zoom = ready, onClick = lobby::play)
             if (together) {
                 HostTile("users-01", "Play together") { startPlayTogether(if (singleplayer) world else lobby.activeServer()) }
             } else if (singleplayer && world != null && hostable(world, session)) {

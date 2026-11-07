@@ -96,10 +96,12 @@ layout(location = 0) out vec4 fragColor;
 out vec4 fragColor;
 *///?}
 
-const int GATHER_TAPS = 16;
+const int GATHER_TAPS = 32;
 const float GOLDEN_ANGLE = 2.39996;
-const float DOF_RADIUS = 10.0;
+const float DOF_RADIUS = 12.0;
 const float SKY_RADIUS = 34.0;
+const float REFERENCE_HEIGHT = 1080.0;
+const float COC_DEADZONE = 0.04;
 const float DITHER = 1.3 / 255.0;
 
 bool finiteColor(vec3 color) {
@@ -179,18 +181,50 @@ bool skyAt(vec2 uv, float depth) {
     return isSkyDepth(depth) || masked(uv, depth);
 }
 
-float isSky(vec2 uv) {
-    return isSkyDepth(textureLod(DepthSampler, uv, 0.0).r) ? 1.0 : 0.0;
+float pixelScale() {
+    return max(OutSize.y, 1.0) / REFERENCE_HEIGHT;
 }
 
-vec3 gather(float radius, float seed, float sky) {
-    vec3 total = vec3(0.0);
-    float weight = 0.0;
+float dofRadius() {
+    return DOF_RADIUS * pixelScale();
+}
+
+float skyRadius() {
+    return SKY_RADIUS * pixelScale();
+}
+
+float focusDistance() {
+    return max(Lens.x, 0.001);
+}
+
+float lensCoc(float depth) {
+    float z = linearDepth(depth);
+    float focus = focusDistance();
+    if (z < focus) {
+        return smoothstep(0.45, 1.5, (focus - z) / focus) * Lens.y;
+    }
+    return smoothstep(COC_DEADZONE, 1.0, (z - focus) / max(z, 0.001)) * Lens.y;
+}
+
+float tapReach(vec2 uv) {
+    float depth = textureLod(DepthSampler, uv, 0.0).r;
+    if (!validDepth(depth)) {
+        return 0.0;
+    }
+    if (skyAt(uv, depth)) {
+        return skyRadius();
+    }
+    return clamp(lensCoc(depth), 0.0, 1.0) * dofRadius();
+}
+
+vec3 gather(vec3 center, float radius, float seed) {
+    vec3 total = center;
+    float weight = 1.0;
     for (int i = 0; i < GATHER_TAPS; i++) {
         float angle = float(i) * GOLDEN_ANGLE + seed * 6.28318;
         float reach = sqrt((float(i) + 0.5) / float(GATHER_TAPS)) * radius;
         vec2 uv = texCoord + vec2(cos(angle), sin(angle)) * reach / OutSize;
-        float tap = 1.0 - abs(sky - isSky(uv));
+        float tap = clamp(tapReach(uv) - reach + 1.0, 0.0, 1.0);
         vec3 taken = textureLod(InSampler, uv, 0.0).rgb;
         if (!finiteColor(taken)) {
             continue;
@@ -198,7 +232,7 @@ vec3 gather(float radius, float seed, float sky) {
         total += taken * tap;
         weight += tap;
     }
-    return weight > 0.0 ? total / weight : textureLod(InSampler, texCoord, 0.0).rgb;
+    return total / weight;
 }
 
 float panelCoverage(int index, vec2 pixel) {
@@ -240,10 +274,6 @@ int revealMode() {
     return int(Lens.z + 0.5);
 }
 
-float focusDistance() {
-    return max(Lens.x, 0.001);
-}
-
 float focusPullBlur(float depth) {
     float focus = focusDistance() * mix(PULL_FAR, 1.0, smoothstep(PULL_START, PULL_END, Lens.w));
     float aperture = mix(PULL_APERTURE, 1.0, smoothstep(PULL_END, 1.0, Lens.w));
@@ -273,19 +303,15 @@ vec3 scene() {
     bool known = depthKnown() && validDepth(depth);
     bool sky = known && skyAt(texCoord, depth);
     if (known && !sky) {
-        float focus = focusDistance();
-        float offset = linearDepth(depth) - focus;
-        blur = clamp((offset > 0.0 ? smoothstep(focus * 0.9, focus * 3.0, offset) : smoothstep(focus * 0.45, focus * 1.5, -offset)) * Lens.y, 0.0, 1.0);
-        if (revealMode() == 1) {
-            blur = clamp(focusPullBlur(depth), 0.0, 1.0);
+        blur = clamp(revealMode() == 1 ? focusPullBlur(depth) : lensCoc(depth), 0.0, 1.0);
+        vec3 soft = mix(color, textureLod(SoftSampler, texCoord, 0.0).rgb, blur);
+        float radius = blur * dofRadius();
+        if (day > 0.01 && radius > 0.5) {
+            soft = mix(soft, gather(color, radius, seed), day);
         }
-        vec3 soft = textureLod(SoftSampler, texCoord, 0.0).rgb;
-        if (day > 0.01 && blur > 0.01) {
-            soft = mix(soft, gather(DOF_RADIUS, seed, 0.0), day);
-        }
-        color = mix(color, soft, blur);
+        color = soft;
     } else if (sky && day > 0.01) {
-        color = mix(color, gather(SKY_RADIUS, seed, 1.0), day);
+        color = mix(color, gather(color, skyRadius(), seed), day);
     }
     if (revealMode() == 2) {
         color *= firstLightGain(depth);

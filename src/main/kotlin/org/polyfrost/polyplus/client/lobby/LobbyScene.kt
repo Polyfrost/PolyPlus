@@ -271,7 +271,7 @@ object LobbyScene {
     private const val FOCUS_RATE = 5.5
     private const val FOCUS_RETURN_RATE = 4.2
     private const val FOCUS_DEPART_RATE = 9.0
-    private const val FOCUS_SNAP_BLEND = 0.01
+    private const val MIN_LENS_DEPTH = 0.5
     private const val DEPART_SECONDS = 0.75
     private const val LOOP_TICK = 23000L
     private const val LOOP_RESUME = 3000L
@@ -345,7 +345,6 @@ object LobbyScene {
     private val focusAimY = LobbyEase()
     private val focusAimZ = LobbyEase()
     private val focusReach = LobbyEase()
-    private val focusRange = LobbyEase()
     private var focusSubject: Vec3? = null
     private var lensRange = 0.0
     private val parallaxX = LobbyEase()
@@ -1583,7 +1582,7 @@ object LobbyScene {
         val look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
         val camera = aim.subtract(look.scale(distance))
         currentDistance = distance.toFloat()
-        settleLens(camera, stage, elapsed)
+        settleLens(camera, look, stage)
         LobbyWaveState.view(look, currentFov)
         LobbyFraming.viewed(camera, look, currentFov.toDouble(), viewAspect(mc))
         rig.setPos(camera.x, camera.y - rig.eyeHeight, camera.z)
@@ -1623,15 +1622,18 @@ object LobbyScene {
         focusAimY.step(shot?.let { it.aim.y - stage.aim.y } ?: 0.0, rate, elapsed)
         focusAimZ.step(shot?.let { it.aim.z - stage.aim.z } ?: 0.0, rate, elapsed)
         focusReach.step(shot?.let { it.distance - stage.distance } ?: 0.0, rate, elapsed)
-        focusSubject = shot?.subject
+        shot?.let { focusSubject = it.subject }
     }
 
-    private fun settleLens(camera: Vec3, stage: LobbyStage, elapsed: Double) {
-        focusSubject?.let { subject ->
-            val range = camera.distanceTo(subject)
-            if (focusBlend.value < FOCUS_SNAP_BLEND) focusRange.snap(range) else focusRange.step(range, FOCUS_RATE, elapsed)
-        }
-        lensRange = lerp(camera.distanceTo(stage.anchor), focusRange.value, focusBlend.value)
+    private fun settleLens(camera: Vec3, look: Vec3, stage: LobbyStage) {
+        val rest = viewDepth(camera, look, stage.anchor)
+        val subject = focusSubject?.let { viewDepth(camera, look, it) } ?: rest
+        lensRange = lerp(rest, subject, focusBlend.value)
+    }
+
+    private fun viewDepth(camera: Vec3, look: Vec3, point: Vec3): Double {
+        val depth = point.subtract(camera).dot(look)
+        return if (depth.isFinite()) depth.coerceAtLeast(MIN_LENS_DEPTH) else MIN_LENS_DEPTH
     }
 
     //? if >= 26.1 {
@@ -2071,7 +2073,7 @@ object LobbyScene {
         departDone = null
         selected = null
         currentFov = CAMERA_FOV
-        for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, focusRange, parallaxX, parallaxY)) ease.snap(0.0)
+        for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, parallaxX, parallaxY)) ease.snap(0.0)
         focusSubject = null
         focusPointer = null
         releasing = false
