@@ -22,7 +22,7 @@ internal object PauseWorld {
     private val hosted: Boolean get() = P2PSessionManager.currentSessionId != null
 
     fun state(): PauseState = when {
-        PausePlatform.gamePaused() -> PauseState(true, "Game paused", null)
+        PausePlatform.gamePaused() || (singleplayer && !SocialHosting.lanOpen && !hosted && ClientPlatform.currentScreen() is OneClientPauseScreen) -> PauseState(true, "Game paused", null)
         singleplayer && hosted -> PauseState(false, "Not paused", "Hosting for friends")
         singleplayer && SocialHosting.lanOpen -> PauseState(false, "Not paused", "Open to LAN")
         singleplayer -> PauseState(false, "Not paused", null)
