@@ -29,6 +29,12 @@ import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 //?}
 
+import org.polyfrost.polyplus.client.lobby.LobbyAvatar;
+import org.polyfrost.polyplus.compat.NotEnoughAnimationsCompat;
+//?}
+
+//? if >= 1.21.10 {
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
 //? if < 1.21.11 {
 /*import net.minecraft.client.model.PlayerModel;
 *///?}
@@ -97,6 +103,13 @@ public class MixinAvatarRenderer {
             return;
         }
 
+        //? if >= 1.21.10 {
+        if (entity instanceof LobbyAvatar || PlayerPreviewRenderer.isPreviewEntity(entity)) {
+        //?} else {
+        /*if (entity instanceof LobbyAvatar) {
+        *///?}
+            NotEnoughAnimationsCompat.detach(state);
+        }
         EmoteController controller = entity instanceof PlayerEmotesAccess playerAccess
             ? playerAccess.polyplus$emoteController()
             : null;

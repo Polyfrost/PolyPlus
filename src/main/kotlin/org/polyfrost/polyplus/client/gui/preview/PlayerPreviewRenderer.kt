@@ -409,6 +409,9 @@ object PlayerPreviewRenderer {
     //?}
     private var dummy: AbstractClientPlayer? = null
     private var dummyProfileId: UUID? = null
+
+    @JvmStatic
+    fun isPreviewEntity(entity: Any?): Boolean = entity != null && entity === dummy
     //? if < 26.1 {
     /*private val projection by lazy { CachedOrthoProjectionMatrixBuffer("polyplus_preview", -1000f, 1000f, true) }
     *///?}
