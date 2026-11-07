@@ -78,6 +78,7 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import java.util.UUID
+import androidx.compose.ui.graphics.Shape
 
 @Composable
 internal fun SocialModalScrim(onDismiss: () -> Unit, content: @Composable BoxScope.() -> Unit) {
@@ -551,20 +552,21 @@ internal fun SocialMenuItem(
     selected: Boolean = false,
     height: Dp = 32.dp,
     horizontalPadding: Dp = 8.dp,
+    enabled: Boolean = true,
+    shape: Shape = SocialFieldShape,
     onClick: () -> Unit,
 ) {
     val (interaction, hovered) = rememberSocialHover()
     val background by animateColorAsState(if (selected) OneConfigTheme.accent else Color.Transparent)
-    val hairline by animateColorAsState(SocialBorderColor.copy(alpha = if (hovered && !selected) SocialBorderColor.alpha else 0f))
+    val hairline by animateColorAsState(SocialBorderColor.copy(alpha = if (enabled && hovered && !selected) SocialBorderColor.alpha else 0f))
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
-            .clip(SocialFieldShape)
+            .clip(shape)
             .background(background)
-            .border(SocialBorderWidth, hairline, SocialFieldShape)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .border(SocialBorderWidth, hairline, shape)
+            .then(if (enabled) Modifier.hoverable(interaction).clickableWithSound(onClick) else Modifier.graphicsLayer { alpha = DISABLED_ALPHA })
             .padding(horizontal = horizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
