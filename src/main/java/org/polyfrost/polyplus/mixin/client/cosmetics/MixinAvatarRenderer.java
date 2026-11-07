@@ -2,6 +2,8 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 
 //? if > 1.8.9 {
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+//? if >= 1.21.10
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
@@ -27,14 +29,14 @@ import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
-//?}
-
 import org.polyfrost.polyplus.client.lobby.LobbyAvatar;
 import org.polyfrost.polyplus.compat.NotEnoughAnimationsCompat;
 //?}
 
 //? if >= 1.21.10 {
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
+//?}
+
 //? if < 1.21.11 {
 /*import net.minecraft.client.model.PlayerModel;
 *///?}
@@ -74,6 +76,8 @@ public class MixinAvatarRenderer {
 
         invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer(parent));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer(parent));
+        //? if >= 1.21.10
+        invoker.polyplus$invokeAddLayer(new LobbyHerobrineLayer(parent));
 
         //? if >= 1.21.10 {
         if (FabricLoader.getInstance().isModLoaded("waveycapes")) {
@@ -99,10 +103,6 @@ public class MixinAvatarRenderer {
     private void polyplus$bindEmoteState(AbstractClientPlayer entity, PlayerRenderState state, float partialTicks, CallbackInfo ci) {
     *///?}
         PauseAvatar.apply(entity, state);
-        if (!(state instanceof AvatarEmoteRenderAccess renderAccess)) {
-            return;
-        }
-
         //? if >= 1.21.10 {
         if (entity instanceof LobbyAvatar || PlayerPreviewRenderer.isPreviewEntity(entity)) {
         //?} else {
@@ -110,6 +110,10 @@ public class MixinAvatarRenderer {
         *///?}
             NotEnoughAnimationsCompat.detach(state);
         }
+        if (!(state instanceof AvatarEmoteRenderAccess renderAccess)) {
+            return;
+        }
+
         EmoteController controller = entity instanceof PlayerEmotesAccess playerAccess
             ? playerAccess.polyplus$emoteController()
             : null;

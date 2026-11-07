@@ -991,6 +991,7 @@ object LobbyScene {
         val built = Live(listener, level, gameMode, rig, stage, stage.portraitShot(level), avatars, mood, captured, posts)
         //? if > 1.8.9
         built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
+        runCatching { LobbyHerobrine.onSceneShown(level, stage) }
         return built
     }
 
@@ -1896,6 +1897,7 @@ object LobbyScene {
             //? if > 1.8.9
             stageProps(scene)
             if (driven == null) tickSceneEntities(scene.level)
+            LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()
             //? if > 1.8.9 {
@@ -2080,6 +2082,7 @@ object LobbyScene {
         hoveredTag = null
         leftTag = null
         LobbyWardrobe.reset()
+        LobbyHerobrine.stop()
         if (!inside) scene.avatars.firstOrNull { it.isLocal }?.let { PetManager.despawn(it.uuid) }
         detach(mc)
         session = null
