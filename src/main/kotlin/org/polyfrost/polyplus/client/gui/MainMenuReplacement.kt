@@ -108,6 +108,7 @@ object MainMenuReplacement {
             screen.showPage(LobbyPage.Home)
             return screen
         }
+        if (inWorld) return screen
         when (screen?.javaClass) {
             JoinMultiplayerScreen::class.java -> {
                 if (!left) return lobbyPage(LobbyPage.Multiplayer)
