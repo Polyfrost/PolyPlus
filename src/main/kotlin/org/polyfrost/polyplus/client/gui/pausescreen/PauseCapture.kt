@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.replay.ReplayProviders
 
 //? if > 1.8.9 {
 import net.minecraft.client.gui.components.AbstractButton
@@ -83,6 +84,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         //?} else {
         /*vanilla.init(Minecraft.getInstance(), width, height)
         *///?}
+        ReplayProviders.available.forEach { runCatching { it.detachPauseOverlay(vanilla) } }
         store(read())
     }
 
@@ -106,7 +108,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
 
     //? if > 1.8.9 {
     private fun read(): List<PauseEntry> {
-        val shown = vanilla.children().filterIsInstance<AbstractWidget>().filter { it.visible && !PauseMenuPanel.drawnElsewhere(it) }
+        val shown = vanilla.children().filterIsInstance<AbstractWidget>().filter { it.visible && !PauseMenuPanel.drawnElsewhere(it) && !shownAsRecording(it) }
         val mirrored = shown.filter(::mirrorable)
         uncaptured = shown.count { !mirrored.contains(it) && it !is AbstractStringWidget }
         val resolved = mirrored.map { it to slotOf(it) }.toMutableList()
@@ -117,6 +119,18 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
             }
         }
         return resolved.map { (widget, slotted) -> entryFor(widget, slotted) }
+    }
+
+    private fun shownAsRecording(widget: AbstractWidget): Boolean {
+        val prefixes = ReplayProviders.available.flatMap { runCatching { it.controlKeyPrefixes }.getOrDefault(emptyList()) }
+        if (prefixes.isEmpty()) return false
+        val keys = listOfNotNull((widget.message.contents as? TranslatableContents)?.key, tooltipKey(widget))
+        return keys.any { key -> prefixes.any(key::startsWith) }
+    }
+
+    private fun tooltipKey(widget: AbstractWidget): String? {
+        val tooltip = (widget as AbstractWidgetAccessor).`polyplus$tooltip`().get() ?: return null
+        return ((tooltip as TooltipAccessor).`polyplus$message`().contents as? TranslatableContents)?.key
     }
 
     private fun mirrorable(widget: AbstractWidget): Boolean =

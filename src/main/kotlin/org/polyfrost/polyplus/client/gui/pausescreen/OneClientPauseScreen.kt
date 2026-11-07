@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
@@ -205,7 +206,7 @@ object PauseRouter {
             classic = null
             return screen
         }
-        if (!showsMenu(screen)) return screen
+        if (!showsMenu(screen) || ReplayProviders.inReplay) return screen
         val style = PolyPlusPauseConfig.pauseScreenStyle
         return if (style == PauseScreenStyle.VANILLA) screen else OneClientPauseScreen(screen, style)
     }

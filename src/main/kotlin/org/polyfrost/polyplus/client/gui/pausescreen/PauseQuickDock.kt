@@ -15,9 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,7 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -44,6 +53,8 @@ import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.Head
 import org.polyfrost.polyplus.client.gui.lobbyshell.InviteButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
+import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.VoiceButtons
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
@@ -59,6 +70,11 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 private const val HUD_GUI_PIXELS = 48
 private const val RISE_PIXELS = 24f
+private val DOCK_HEIGHT = 72.dp
+private val CARD_MARGIN = 20.dp
+private val CARD_WIDTH = 236.dp
+private val DOCK_ITEM_WIDTH = 64.dp
+private val DOCK_ITEM_HEIGHT = 56.dp
 
 private fun guiScale(): Int {
     //? if > 1.8.9 {
@@ -107,7 +123,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             PauseStateLine(state)
         }
         Row(
-            Modifier.blockPointer().height(72.dp).pauseGlass().padding(horizontal = 8.dp),
+            Modifier.blockPointer().height(DOCK_HEIGHT).pauseGlass().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (narrow) 2.dp else 4.dp),
         ) {
@@ -135,6 +151,37 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             DockItem(asset("dots-vertical"), "More", active = screen.moreOpen) { screen.moreOpen = !screen.moreOpen }
             DockRule()
             screen.capture.entry(PauseSlot.QUIT)?.let { DockItem(it.glyph, if (PauseWorldAccess.singleplayer) "Quit" else "Leave", danger = true, enabled = it.enabled, onClick = it.press) }
+        }
+    }
+    ToolsCard(screen, reveal, rise)
+}
+
+@Composable
+private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, reveal: Float, rise: Float) {
+    val tools = rememberPauseTools()
+    if (tools.isEmpty()) return
+    Column(
+        Modifier
+            .align(Alignment.TopEnd)
+            .padding(top = CARD_MARGIN, end = CARD_MARGIN)
+            .graphicsLayer {
+                alpha = reveal
+                translationY = -rise * density
+            }
+            .blockPointer()
+            .width(CARD_WIDTH)
+            .pauseGlass(16.dp)
+            .padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        tools.forEach { tool ->
+            key(tool) {
+                when (tool) {
+                    PauseTool.RECORDING -> RecordingCardTool(screen)
+                    PauseTool.PERFORMANCE -> PerformanceCardTool(screen)
+                    PauseTool.SCENE -> SceneCardTool()
+                }
+            }
         }
     }
 }
@@ -185,25 +232,45 @@ private fun DockItem(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    val ink = if (danger && hovered) SocialDangerText else SocialTextPrimary
-    Box(
-        Modifier
-            .width(width)
-            .height(56.dp)
-            .rowFrame(false, hovered && enabled, ppShape(12.dp))
-            .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
-            PauseGlyph(icon, ink, 20.dp)
-            Label(label, 11.sp, color = if (hovered || active) SocialTextPrimary else MutedText)
-        }
-        if (active) Box(Modifier.align(Alignment.BottomCenter).width(18.dp).height(2.dp).background(OneConfigTheme.accent))
+    DockTile(width, active, enabled, onClick = onClick) { hovered ->
+        DockGlyphLabel(label, hovered || active) { PauseGlyph(icon, if (danger && hovered) SocialDangerText else SocialTextPrimary, 20.dp) }
         if (badge) {
             Box(Modifier.align(Alignment.TopEnd).offset(x = (-14).dp, y = 8.dp).width(8.dp).height(8.dp).background(OneConfigTheme.accent, OneConfigTheme.current.circleShape))
         }
+    }
+}
+
+@Composable
+private fun DockTile(
+    width: Dp? = DOCK_ITEM_WIDTH,
+    active: Boolean = false,
+    enabled: Boolean = true,
+    tooltip: String? = null,
+    onClick: (() -> Unit)?,
+    content: @Composable BoxScope.(hovered: Boolean) -> Unit,
+) {
+    val (interaction, hovered) = rememberSocialHover()
+    val live = enabled && onClick != null
+    Box(
+        Modifier
+            .then(if (width != null) Modifier.width(width) else Modifier.widthIn(min = DOCK_ITEM_WIDTH))
+            .height(DOCK_ITEM_HEIGHT)
+            .rowFrame(false, hovered && live, ppShape(12.dp))
+            .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
+            .hoverable(interaction)
+            .then(if (live && onClick != null) Modifier.clickableWithSound(onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        content(hovered)
+        if (active) Box(Modifier.align(Alignment.BottomCenter).width(18.dp).height(2.dp).background(OneConfigTheme.accent))
+        if (tooltip != null && hovered) PauseTooltip(tooltip)
+    }
+}
+
+@Composable
+private fun DockGlyphLabel(label: String, highlighted: Boolean, glyph: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
+        glyph()
+        Label(label, 11.sp, color = if (highlighted) SocialTextPrimary else MutedText)
     }
 }

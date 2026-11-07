@@ -5,6 +5,8 @@ package org.polyfrost.polyplus.client.gui.pausescreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,12 +23,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -43,12 +52,21 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.delay
+import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.HoverTooltip
@@ -61,29 +79,30 @@ import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.TooltipPlacement
-import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.clickableTextWithSound
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.playButtonClickSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.party.PartyJoin
 import net.minecraft.client.multiplayer.ServerData
+import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
+import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import kotlin.math.max
 import kotlin.math.min
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
+import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 
 private const val MIN_SCALE = 0.72f
-import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 private const val COMPACT_WIDTH = 1300f
 private const val OPAQUE_FLOOR = 0.94f
 private const val MENU_REVEAL_NANOS = 160_000_000f
@@ -91,12 +110,12 @@ private const val DISABLED_ALPHA = 0.4f
 
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
-@Composable
-internal fun rememberFrame(): State<Long> = produceState(0L) { while (true) withFrameNanos { value = it } }
 internal object PauseHost : SocialHost {
     override fun join(data: ServerData) = PartyJoin.server(data)
 }
 
+@Composable
+internal fun rememberFrame(): State<Long> = produceState(0L) { while (true) withFrameNanos { value = it } }
 
 @Composable
 internal fun rememberReveal(): Float {
@@ -135,10 +154,10 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
             Box(Modifier.fillMaxSize()) {
                 val narrow = widthPx / scale < COMPACT_WIDTH
                 if (screen.stepBack) StepBackScreen(screen, narrow) else QuickDockScreen(screen, narrow)
-                Curtain()
-            }
                 SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = if (screen.stepBack) LobbyLayout.Top else 24.dp))
                 PlayTogetherHooks(PauseHost)
+                Curtain()
+            }
         }
     }
 }
@@ -346,4 +365,167 @@ private fun uncapturedHint(count: Int): String? = when (count) {
 @Composable
 internal fun BoxScope.MoreDismiss(screen: OneClientPauseScreen) {
     Box(Modifier.matchParentSize().clickableTextWithSound { screen.moreOpen = false })
+}
+
+private const val TOOLS_TICK_MILLIS = 500L
+internal val POPUP_EDGE = 20.dp
+private val SIDE_GAP = 14.dp
+private val BAR_INSET = 6.dp
+private val BAR_INNER_RADIUS = 14.dp
+
+internal enum class PauseTool { RECORDING, PERFORMANCE, SCENE }
+
+private fun toolsShown(): List<PauseTool> = buildList {
+    if (runCatching { recordingShown() }.getOrDefault(false)) add(PauseTool.RECORDING)
+    if (runCatching { performanceShown() }.getOrDefault(false)) add(PauseTool.PERFORMANCE)
+    if (runCatching { sceneShown() }.getOrDefault(false)) add(PauseTool.SCENE)
+}
+
+@Composable
+internal fun rememberPauseTools(): List<PauseTool> {
+    var shown by remember { mutableStateOf(toolsShown()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(TOOLS_TICK_MILLIS)
+            shown = toolsShown()
+        }
+    }
+    return shown
+}
+
+@Composable
+internal fun BarTile(
+    modifier: Modifier = Modifier,
+    tooltip: String? = null,
+    active: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    glass: Boolean = true,
+    content: @Composable BoxScope.(hovered: Boolean) -> Unit,
+) {
+    val (interaction, hovered) = rememberSocialHover()
+    Box(
+        modifier
+            .height(LobbyLayout.BarHeight)
+            .widthIn(min = LobbyLayout.BarHeight)
+            .then(if (glass) Modifier.pauseGlass() else Modifier)
+            .hoverable(interaction)
+            .then(if (onClick != null) Modifier.quietClick(interaction, onClick) else Modifier)
+            .padding(BAR_INSET),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (onClick != null) Box(Modifier.matchParentSize().rowFrame(false, hovered || active, ppShape(BAR_INNER_RADIUS)))
+        content(hovered)
+        if (tooltip != null && hovered) PauseTooltip(tooltip)
+    }
+}
+
+private val CARD_ROW = 34.dp
+
+@Composable
+internal fun CardRow(
+    modifier: Modifier = Modifier,
+    tooltip: String? = null,
+    active: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    content: @Composable RowScope.(lit: Boolean) -> Unit,
+) {
+    val (interaction, hovered) = rememberSocialHover()
+    val lit = (hovered || active) && onClick != null
+    Box {
+        Row(
+            modifier
+                .fillMaxWidth()
+                .height(CARD_ROW)
+                .rowFrame(false, lit, ppShape(10.dp))
+                .hoverable(interaction)
+                .then(if (onClick != null) Modifier.quietClick(interaction, onClick) else Modifier)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            content(lit)
+        }
+        if (tooltip != null && hovered) PauseTooltip(tooltip)
+    }
+}
+
+@Composable
+internal fun TabularLabel(
+    text: String,
+    size: TextUnit,
+    color: Color = SocialTextPrimary,
+    weight: FontWeight = FontWeight.Medium,
+    modifier: Modifier = Modifier,
+    align: TextAlign = TextAlign.Start,
+) {
+    BasicText(
+        text,
+        modifier,
+        style = TextStyle(color = color, fontSize = size, fontWeight = weight, fontFamily = OneConfigTheme.current.fontFamily, textAlign = align, fontFeatureSettings = "tnum"),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+    )
+}
+
+private class SideAnchor(private val gap: Int, private val margin: Int) : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+        val maxX = (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)
+        val maxY = (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)
+        val x = (anchorBounds.left - gap - popupContentSize.width).coerceIn(margin, maxX)
+        return IntOffset(x, anchorBounds.top.coerceIn(margin, maxY))
+    }
+}
+
+@Composable
+internal fun rememberToolAnchor(side: Boolean): PopupPositionProvider {
+    val density = LocalDensity.current
+    val gap = with(density) { SIDE_GAP.roundToPx() }
+    val margin = with(density) { POPUP_EDGE.roundToPx() }
+    val rise = rememberRiseAnchor()
+    val beside = remember(gap, margin) { SideAnchor(gap, margin) }
+    return if (side) beside else rise
+}
+
+internal fun Modifier.quietClick(interaction: MutableInteractionSource, onClick: () -> Unit): Modifier =
+    clickable(interactionSource = interaction, indication = null) {
+        playButtonClickSound()
+        onClick()
+    }
+
+private class RiseAnchor(private val gap: Int, private val centered: Boolean) : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+        val above = anchorBounds.top - gap - popupContentSize.height
+        val y = if (above >= 0) above else anchorBounds.bottom + gap
+        val x = if (centered) anchorBounds.center.x - popupContentSize.width / 2 else anchorBounds.left
+        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+        val maxY = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
+        return IntOffset(x.coerceIn(0, maxX), y.coerceIn(0, maxY))
+    }
+}
+
+@Composable
+internal fun rememberRiseAnchor(gap: Dp = 10.dp, centered: Boolean = false): PopupPositionProvider {
+    val px = with(LocalDensity.current) { gap.roundToPx() }
+    return remember(px, centered) { RiseAnchor(px, centered) }
+}
+
+@Composable
+internal fun popupMaxHeight(margin: Dp = 16.dp): Dp {
+    val root = LocalRootSize.current
+    val density = LocalDensity.current
+    if (root.height <= 0f) return Dp.Infinity
+    return (with(density) { root.height.toDp() } - margin * 2).coerceAtLeast(120.dp)
+}
+
+@Composable
+internal fun PauseTooltip(text: String, maxWidth: Dp = 240.dp) {
+    Popup(
+        popupPositionProvider = rememberRiseAnchor(8.dp, centered = true),
+        properties = PopupProperties(focusable = false, clippingEnabled = false),
+    ) {
+        Box(Modifier.widthIn(max = maxWidth).popup().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+            SocialText(text, 13.sp, textAlign = TextAlign.Center)
+        }
+    }
 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +36,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
+import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbyshell.Head
@@ -55,6 +57,8 @@ import kotlin.math.roundToInt
 private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
 private const val FLAT_DIM = 0.45f
+private val TOOLS_GAP = 8.dp
+private val TOOLS_RULE = 24.dp
 
 @Composable
 internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean) {
@@ -96,12 +100,42 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
             }
         }
-        PartyBar(screen, Modifier.align(Alignment.BottomStart).padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin))
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = LobbyLayout.Margin, end = (if (narrow) 368.dp else 472.dp) + LobbyLayout.Gap, bottom = LobbyLayout.Margin),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(TOOLS_GAP),
+        ) {
+            PartyBar(screen, Modifier.weight(1f, fill = false))
+            StepBackTools(screen)
+        }
     }
     if (screen.moreOpen) {
         MoreDismiss(screen)
         LobbyDarkChrome {
             MorePanel(screen, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 376.dp else 488.dp, top = 68.dp))
+        }
+    }
+}
+
+@Composable
+private fun StepBackTools(screen: OneClientPauseScreen) {
+    val tools = rememberPauseTools()
+    if (tools.isEmpty()) return
+    Row(
+        Modifier.height(LobbyLayout.BarHeight).pauseGlass(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tools.forEachIndexed { index, tool ->
+            key(tool) {
+                if (index > 0) Box(Modifier.width(1.dp).height(TOOLS_RULE).background(SocialBorderColor))
+                when (tool) {
+                    PauseTool.RECORDING -> RecordingBarTool(screen, glass = false)
+                    PauseTool.PERFORMANCE -> PerformanceBarTool(screen, glass = false)
+                    PauseTool.SCENE -> SceneBarTool(glass = false)
+                }
+            }
         }
     }
 }
