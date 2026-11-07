@@ -192,6 +192,16 @@
     //"client.lobby.MixinWorld",
     //? if = 1.8.9
     //"client.lobby.MixinWorldRenderer",
+    //? if >= 26.3
+    "compat.polytime.MixinPolyTimeClockInstance",
+    //? if >= 26.1 && < 26.3
+    //"compat.polytime.MixinPolyTimeClockManager",
+    //? if >= 26.1 && < 26.3
+    //"compat.polytime.PolyTimeClockInstanceAccessor",
+    //? if < 26.1 && > 1.8.9
+    //"compat.polytime.MixinPolyTimeLevelData",
+    //? if = 1.8.9
+    //"compat.polytime.MixinPolyTimeWorldData",
     //? if > 1.8.9
     "client.pause.MixinPauseCamera",
     "client.pause.MixinPauseHand",
