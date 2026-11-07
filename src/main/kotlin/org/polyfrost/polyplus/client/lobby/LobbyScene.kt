@@ -547,6 +547,7 @@ object LobbyScene {
         departProgress = 0f
         departDone = null
         departed = null
+        clearFocus()
     }
 
     @JvmStatic
@@ -1577,6 +1578,15 @@ object LobbyScene {
             }
         }
 
+        if (!finite(aim) || !distance.isFinite() || !yaw.isFinite() || !pitch.isFinite() || !currentFov.isFinite()) {
+            LOGGER.warn("Lobby camera pose was not finite, resetting it")
+            calmCamera()
+            aim = stage.aim
+            distance = stage.distance
+            yaw = stage.yaw.toDouble()
+            pitch = stage.pitch.toDouble()
+            currentFov = CAMERA_FOV
+        }
         val yawRad = Math.toRadians(yaw)
         val pitchRad = Math.toRadians(pitch)
         val look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
@@ -1611,7 +1621,9 @@ object LobbyScene {
         val stage = scene.stage
         val avatar = selected
         val leaving = departNanos != 0L
-        val shot = avatar?.let { LobbyFraming.shot(restingView(mc, stage, CRANE_SECONDS), it.position(), it.bbHeight.toDouble(), leaving) }
+        val shot = avatar?.takeIf { finite(it.position()) }
+            ?.let { LobbyFraming.shot(restingView(mc, stage, CRANE_SECONDS), it.position(), it.bbHeight.toDouble(), leaving) }
+            ?.takeIf { finite(it.aim) && finite(it.subject) && it.distance.isFinite() }
         val rate = when {
             leaving -> FOCUS_DEPART_RATE
             avatar != null -> FOCUS_RATE
@@ -1636,6 +1648,27 @@ object LobbyScene {
         return if (depth.isFinite()) depth.coerceAtLeast(MIN_LENS_DEPTH) else MIN_LENS_DEPTH
     }
 
+    private fun finite(point: Vec3): Boolean = point.x.isFinite() && point.y.isFinite() && point.z.isFinite()
+
+    private fun calmCamera() {
+        for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, parallaxX, parallaxY)) ease.snap(0.0)
+        focusSubject = null
+    }
+
+    //? if >= 26.1 {
+    private fun rigFinite(scene: Live): Boolean = finite(scene.rig.position()) && scene.rig.yRot.isFinite() && scene.rig.xRot.isFinite()
+
+    private fun restRig(mc: Minecraft, scene: Live) {
+        calmCamera()
+        val view = restingView(mc, scene.stage, CRANE_SECONDS)
+        val rig = scene.rig
+        rig.setPos(view.camera.x, view.camera.y - rig.eyeHeight, view.camera.z)
+        rig.setYRot(scene.stage.yaw)
+        rig.setXRot(scene.stage.pitch)
+        rig.setOldPosAndRot()
+    }
+    //?}
+
     //? if >= 26.1 {
     @JvmStatic
     fun onExtractEnd(renderer: GameRenderer, deltaTracker: DeltaTracker) {
@@ -1646,6 +1679,7 @@ object LobbyScene {
             advanceDriven(mc, scene)
             val time = elapsed()
             val look = poseRig(scene, time)
+            if (!rigFinite(scene)) restRig(mc, scene)
             scene.level.update()
             val camera = LobbyCompat.camera(renderer)
             camera.update(deltaTracker)
@@ -2109,6 +2143,7 @@ object LobbyFraming {
     private const val EYE = 1.62
     private const val RATE = 4.0
     private const val FOCUS_ZOOM = 0.42
+    private const val MIN_SHOT_DEPTH = 0.5
     private const val FOCUS_CENTER_PULL = 0.2
     private const val FOCUS_SUBJECT_SHARE = 0.6
     private const val FOCUS_BODY_HALF = 0.45
@@ -2166,11 +2201,12 @@ object LobbyFraming {
         return amount * eased
     }
 
-    fun shot(view: LobbyEntrance.View, feet: Vec3, height: Double, diving: Boolean): Shot {
+    fun shot(view: LobbyEntrance.View, feet: Vec3, height: Double, diving: Boolean): Shot? {
         val raise = height * FOCUS_SUBJECT_SHARE
         val subject = feet.add(0.0, raise, 0.0)
         val offset = subject.subtract(view.camera)
         val depth = offset.dot(view.look)
+        if (!(depth > MIN_SHOT_DEPTH) || !(view.aspect > 0.0) || !(view.tanHalf > 0.0)) return null
         val reach = depth * (1.0 - FOCUS_ZOOM)
         if (diving) return Shot(subject, reach, subject)
         val span = reach * view.tanHalf
