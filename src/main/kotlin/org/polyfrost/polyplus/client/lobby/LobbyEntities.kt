@@ -55,6 +55,8 @@ object LobbyEntities {
     private val STAND_IN_OWNER = intArrayOf(0, 0, 0, 1)
     private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val reported = HashSet<String>()
+    private const val FIRST_PROP_ID = 0x50524F50
+    private var nextPropId = FIRST_PROP_ID
 
     fun gather(level: ClientLevel, anchor: BlockPos, minSection: Int, topSection: Int, privacy: LobbyPrivacy): ArrayDeque<Entity> {
         val centerX = anchor.x + 0.5
@@ -105,6 +107,7 @@ object LobbyEntities {
     }
 
     fun enter(level: ClientLevel, entity: Entity) {
+        entity.id = nextPropId++
         //? if >= 26.1
         if (!renders(entity, 1f)) return
         level.addEntity(entity)
