@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 //? if > 1.8.9 {
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.render.PlayerRenderContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -62,6 +63,31 @@ public class MixinPlayerModel
     private void polyplus$resetRoot(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float yRot, float xRot, CallbackInfo ci) {
         polyplus$root.resetPose();
     }
+
+    @Unique
+    private boolean polyplus$tilted;
+
+    @Inject(method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V", at = @At("RETURN"))
+    private void polyplus$tiltHerobrine(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float yRot, float xRot, CallbackInfo ci) {
+        PlayerModel model = (PlayerModel) (Object) this;
+        float tilt = entity == null ? 0f : LobbyHerobrine.tilt(entity.getId());
+        if (tilt == 0f && !polyplus$tilted) return;
+        polyplus$tilted = tilt != 0f;
+        model.head.zRot = tilt;
+        model.hat.zRot = tilt;
+    }
+    *///?}
+
+    //? if >= 1.21.10 {
+    @Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("RETURN"))
+    private void polyplus$tiltHerobrine(AvatarRenderState state, CallbackInfo ci) {
+        ((PlayerModel) (Object) this).head.zRot += LobbyHerobrine.tilt(state.id);
+    }
+    //?} elif >= 1.21.4 {
+    /*@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;)V", at = @At("RETURN"))
+    private void polyplus$tiltHerobrine(PlayerRenderState state, CallbackInfo ci) {
+        ((PlayerModel) (Object) this).head.zRot += LobbyHerobrine.tilt(state.id);
+    }
     *///?}
 
     //? if >= 1.21.10 {
@@ -107,6 +133,7 @@ import net.minecraft.entity.Entity;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess;
 import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -132,6 +159,9 @@ public abstract class MixinPlayerModel implements PlayerModelRootAccess {
 
     @Unique
     private boolean polyplus$posed;
+
+    @Unique
+    private boolean polyplus$tilted;
 
     @Unique
     private ModelPart[] polyplus$parts() {
@@ -191,6 +221,15 @@ public abstract class MixinPlayerModel implements PlayerModelRootAccess {
         polyplus$posed = false;
         for (ModelPart part : parts) polyplus$resetPart(part);
         polyplus$resetPart(polyplus$root());
+    }
+
+    @Inject(method = "setupAnimation", at = @At("RETURN"))
+    private void polyplus$tiltHerobrine(float walkAnimationProgress, float walkAnimationSpeed, float bob, float yaw, float pitch, float scale, Entity entity, CallbackInfo ci) {
+        float tilt = entity == null ? 0f : LobbyHerobrine.tilt(entity.getNetworkId());
+        if (tilt == 0f && !polyplus$tilted) return;
+        polyplus$tilted = tilt != 0f;
+        head.rotationZ = tilt;
+        hat.rotationZ = tilt;
     }
 
     @Inject(method = "setupAnimation", at = @At("RETURN"))

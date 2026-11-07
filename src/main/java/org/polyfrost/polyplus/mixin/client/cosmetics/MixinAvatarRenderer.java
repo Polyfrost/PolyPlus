@@ -1,7 +1,9 @@
 package org.polyfrost.polyplus.mixin.client.cosmetics;
 
 //? if > 1.8.9 {
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
@@ -121,12 +123,40 @@ public class MixinAvatarRenderer {
         }
     }
     //?}
+
+    //? if >= 1.21.10 {
+    @Inject(
+        method = "setupRotations(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;FF)V",
+        at = @At("HEAD")
+    )
+    private void polyplus$leanHerobrine(AvatarRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
+        LobbyHerobrine.lean(state.id, poseStack);
+    }
+    //?} elif >= 1.21.4 {
+    /*@Inject(
+        method = "setupRotations(Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;FF)V",
+        at = @At("HEAD")
+    )
+    private void polyplus$leanHerobrine(PlayerRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
+        LobbyHerobrine.lean(state.id, poseStack);
+    }
+    *///?} elif > 1.8.9 {
+    /*@Inject(
+        method = "setupRotations(Lnet/minecraft/client/player/AbstractClientPlayer;Lcom/mojang/blaze3d/vertex/PoseStack;FFFF)V",
+        at = @At("HEAD")
+    )
+    private void polyplus$leanHerobrine(AbstractClientPlayer player, PoseStack poseStack, float bob, float bodyRot, float partialTick, float scale, CallbackInfo ci) {
+        LobbyHerobrine.lean(player.getId(), poseStack);
+    }
+    *///?}
 //? if > 1.8.9
 }
 
 //? if = 1.8.9 {
-/*import net.minecraft.client.render.entity.EntityRenderDispatcher;
+/*import net.minecraft.client.entity.living.player.ClientPlayerEntity;
+import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.render.entity.PlayerRenderer;
+import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
 import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
@@ -154,6 +184,11 @@ public class MixinAvatarRenderer {
     @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("RETURN"))
     private void polyplus$exitFirstPersonHand(CallbackInfo ci) {
         ModelPoseApplicator.firstPersonHand = false;
+    }
+
+    @Inject(method = "applyRotation(Lnet/minecraft/client/entity/living/player/ClientPlayerEntity;FFF)V", at = @At("HEAD"))
+    private void polyplus$leanHerobrine(ClientPlayerEntity player, float bob, float bodyYaw, float tickDelta, CallbackInfo ci) {
+        LobbyHerobrine.lean(player.getNetworkId());
     }
 }
 *///?}
