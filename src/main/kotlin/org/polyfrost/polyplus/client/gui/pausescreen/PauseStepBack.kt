@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
@@ -44,22 +43,18 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyDarkChrome
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyActions
+import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyRoster
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayButton
-import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
-import org.polyfrost.polyplus.client.party.PartyJoin
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.roundToInt
 
 private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
 private const val FLAT_DIM = 0.45f
-
-private object PauseHost : SocialHost {
-    override fun join(data: ServerData) = PartyJoin.server(data)
-}
 
 @Composable
 internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean) {
@@ -101,7 +96,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
             }
         }
-        PartyBar(Modifier.align(Alignment.BottomStart).padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin))
+        PartyBar(screen, Modifier.align(Alignment.BottomStart).padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin))
     }
     if (screen.moreOpen) {
         MoreDismiss(screen)
@@ -132,6 +127,7 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
 @Composable
 private fun StepBackNav(screen: OneClientPauseScreen) {
     val groups by GroupsRepository.groups.collectAsState()
+    val invites by PartyRepository.incomingInvites.collectAsState()
     Row(
         Modifier.fillMaxWidth().height(LobbyLayout.NavbarHeight).padding(horizontal = LobbyLayout.Margin),
         verticalAlignment = Alignment.CenterVertically,
@@ -140,7 +136,7 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             NavTab("Game", active = true) { }
             NavTab("Wardrobe", active = false, onClick = screen::openWardrobe)
-            if (screen.online) NavTab("Social", active = false, unread = groups.any { it.unread }, onClick = screen::openSocial)
+            if (screen.online) NavTab("Social", active = false, unread = groups.any { it.unread } || invites.isNotEmpty(), onClick = screen::openSocial)
         }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
             SocialIconButton("settings", tooltip = "Settings", onClick = screen::openSettings)
@@ -152,7 +148,7 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
 }
 
 @Composable
-private fun PartyBar(modifier: Modifier) {
+private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
     val party by PartyRepository.party.collectAsState()
     Row(
         modifier.height(LobbyLayout.BarHeight).pauseGlass().padding(horizontal = 12.dp),
@@ -173,7 +169,8 @@ private fun PartyBar(modifier: Modifier) {
                 }
             }
         }
-        PartyActions(current)
+        PartyActions(current, onVoice = { SocialOverlay.openVoice(screen) }.takeIf { screen.online })
+        if (screen.online) PartyInviteCards(PauseHost)
     }
 }
 

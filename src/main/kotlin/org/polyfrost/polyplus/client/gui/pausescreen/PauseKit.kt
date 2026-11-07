@@ -63,6 +63,7 @@ import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.TooltipPlacement
+import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.clickableTextWithSound
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
@@ -71,6 +72,10 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
+import org.polyfrost.polyplus.client.party.PartyJoin
+import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import kotlin.math.max
 import kotlin.math.min
@@ -78,16 +83,20 @@ import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
 
 private const val MIN_SCALE = 0.72f
+import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 private const val COMPACT_WIDTH = 1300f
 private const val OPAQUE_FLOOR = 0.94f
 private const val MENU_REVEAL_NANOS = 160_000_000f
 private const val DISABLED_ALPHA = 0.4f
 
-import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
 @Composable
 internal fun rememberFrame(): State<Long> = produceState(0L) { while (true) withFrameNanos { value = it } }
+internal object PauseHost : SocialHost {
+    override fun join(data: ServerData) = PartyJoin.server(data)
+}
+
 
 @Composable
 internal fun rememberReveal(): Float {
@@ -128,6 +137,8 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
                 if (screen.stepBack) StepBackScreen(screen, narrow) else QuickDockScreen(screen, narrow)
                 Curtain()
             }
+                SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = if (screen.stepBack) LobbyLayout.Top else 24.dp))
+                PlayTogetherHooks(PauseHost)
         }
     }
 }

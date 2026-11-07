@@ -42,7 +42,9 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableTextWithSound
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.Head
+import org.polyfrost.polyplus.client.gui.lobbyshell.InviteButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
+import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.VoiceButtons
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -75,6 +77,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
     val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
     val party by PartyRepository.party.collectAsState()
     val groups by GroupsRepository.groups.collectAsState()
+    val invites by PartyRepository.incomingInvites.collectAsState()
     Box(Modifier.fillMaxSize().clickableTextWithSound(screen::resume))
     Column(
         Modifier
@@ -108,16 +111,23 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (narrow) 2.dp else 4.dp),
         ) {
-            party?.let {
+            val current = party
+            if (current != null || screen.online) {
                 Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Head(ClientPlatform.localPlayerUuid(), 30.dp, realSkin = true)
-                    VoiceButtons(it, leave = false)
+                    if (current != null) {
+                        Head(ClientPlatform.localPlayerUuid(), 30.dp, realSkin = true)
+                        VoiceButtons(current)
+                    }
+                    if (screen.online) {
+                        InviteButton(current)
+                        PartyInviteCards(PauseHost)
+                    }
                 }
                 DockRule()
             }
             DockResume(screen, place.title, narrow)
             DockRule()
-            if (screen.online) DockItem(asset("message-chat-circle"), "Social", badge = groups.any { it.unread }, onClick = screen::openSocial)
+            if (screen.online) DockItem(asset("message-chat-circle"), "Social", badge = groups.any { it.unread } || invites.isNotEmpty(), onClick = screen::openSocial)
             DockItem(asset("diamond-01"), "Wardrobe", onClick = screen::openWardrobe)
             screen.capture.entry(PauseSlot.OPTIONS)?.let { DockItem(it.glyph, "Options", enabled = it.enabled, onClick = it.press) }
             screen.capture.entry(PauseSlot.WORLD)?.let { DockItem(it.glyph, "World", enabled = it.enabled, onClick = it.press) }

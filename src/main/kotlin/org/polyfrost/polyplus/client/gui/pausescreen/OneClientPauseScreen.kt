@@ -13,6 +13,7 @@ import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -141,6 +142,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     *///?}
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
+        if (key == InputConstants.KEY_ESCAPE && SocialEscape.closePopup()) return true
         if (key == InputConstants.KEY_ESCAPE && moreOpen) {
             moreOpen = false
             return true

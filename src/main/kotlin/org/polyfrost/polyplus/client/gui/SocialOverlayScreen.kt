@@ -10,6 +10,10 @@ import org.polyfrost.polyplus.client.social.SocialOverlay
 class SocialOverlayScreen(private val previousScreen: Screen?) : OverlayScreen(previousScreen) {
     private val window = SocialWindowState(this, SocialOverlay.consumeAutoHostCurrentWorld())
 
+    init {
+        if (SocialOverlay.consumeOpenVoice()) window.showVoice()
+    }
+
     //? if > 1.8.9 {
     override fun isPauseScreen(): Boolean = previousScreen?.isPauseScreen == true
     //?} else {

@@ -8,13 +8,23 @@ import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.SocialOverlayScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
+import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+
+//? if > 1.8.9 {
+import net.minecraft.client.gui.screens.PauseScreen
+//?} else {
+/*import net.minecraft.client.gui.screen.menu.GameMenuScreen as PauseScreen
+*///?}
 
 object SocialOverlay {
     private val logger = LogManager.getLogger("polyplus/social-overlay")
 
     @Volatile
     private var pendingAutoHostCurrentWorld = false
+
+    @Volatile
+    private var pendingVoice = false
 
     fun openHostCurrentWorld(from: Screen? = currentScreen()) {
         pendingAutoHostCurrentWorld = true
@@ -24,6 +34,17 @@ object SocialOverlay {
     fun consumeAutoHostCurrentWorld(): Boolean {
         val was = pendingAutoHostCurrentWorld
         pendingAutoHostCurrentWorld = false
+        return was
+    }
+
+    fun openVoice(from: Screen? = currentScreen()) {
+        pendingVoice = true
+        open(from)
+    }
+
+    fun consumeOpenVoice(): Boolean {
+        val was = pendingVoice
+        pendingVoice = false
         return was
     }
 
@@ -39,6 +60,7 @@ object SocialOverlay {
             current is SocialOverlayScreen -> close()
             current is PolyPlusLobbyScreen -> current.showPage(if (current.lobby.page == LobbyPage.Social) LobbyPage.Home else LobbyPage.Social)
             current == null || current is TitleScreen || MainMenuReplacement.isMenu(current) -> open(current)
+            current is OneClientPauseScreen || current is PauseScreen -> if (PrivacyConsent.allowsOnlineServices()) open(current)
             else -> logger.debug("Ignoring Shift+P: {} is open and isn't safe to interrupt", current.javaClass.simpleName)
         }
     }
