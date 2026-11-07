@@ -56,6 +56,8 @@ import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.HostWorldFlow
 import org.polyfrost.polyplus.client.gui.HoverTooltip
 import org.polyfrost.polyplus.client.gui.LIGHT_TEXT_LIMIT
@@ -72,6 +74,7 @@ import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
@@ -120,26 +123,28 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
     val quick = !PolyPlusMainMenuConfig.hideMainMenuQuickplay
     val target: Any? = if (singleplayer) lobby.activeWorld() else lobby.activeServer()
     Box((if (quick) modifier.height(LobbyLayout.UnitHeight) else modifier).panel()) {
-        HeroWash(lobby, target)
-        Column(Modifier.fillMaxWidth().then(if (quick) Modifier.fillMaxSize() else Modifier)) {
-            SourceSwitch(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = PanelGutter))
-            Box(
-                Modifier.fillMaxWidth().then(if (quick) Modifier.weight(1f) else Modifier.padding(vertical = 16.dp)).padding(horizontal = PanelGutter),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Crossfade(target) { shown ->
-                    when (shown) {
-                        is ServerData -> ServerHero(lobby, shown)
-                        is LobbyWorld -> WorldHero(shown)
-                        else -> EmptyHero(lobby, singleplayer)
+        ContextMenuHost {
+            HeroWash(lobby, target)
+            Column(Modifier.fillMaxWidth().then(if (quick) Modifier.fillMaxSize() else Modifier)) {
+                SourceSwitch(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = PanelGutter))
+                Box(
+                    Modifier.fillMaxWidth().then(if (quick) Modifier.weight(1f) else Modifier.padding(vertical = 16.dp)).padding(horizontal = PanelGutter),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Crossfade(target) { shown ->
+                        when (shown) {
+                            is ServerData -> ServerHero(lobby, shown)
+                            is LobbyWorld -> WorldHero(shown)
+                            else -> EmptyHero(lobby, singleplayer)
+                        }
                     }
                 }
+                PlayRow(lobby, singleplayer)
+                HostingStrip(lobby)
+                Spacer(Modifier.height(PanelGutter))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+                Footer(lobby, singleplayer, quick)
             }
-            PlayRow(lobby, singleplayer)
-            HostingStrip(lobby)
-            Spacer(Modifier.height(PanelGutter))
-            Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-            Footer(lobby, singleplayer, quick)
         }
     }
 }
@@ -281,8 +286,16 @@ private fun SourceSwitch(lobby: LobbyShell, modifier: Modifier) {
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         PlaySource.entries.forEach { entry ->
-            SourceTab(entry.name, entry == lobby.source, Modifier.weight(1f)) { lobby.source = entry }
+            SourceTab(entry.name, entry == lobby.source, Modifier.weight(1f)) { lobby.chooseSource(entry) }
         }
+    }
+}
+
+private fun LobbyShell.chooseSource(entry: PlaySource) {
+    source = entry
+    when (page) {
+        LobbyPage.Singleplayer, LobbyPage.Multiplayer -> show(if (entry == PlaySource.Singleplayer) LobbyPage.Singleplayer else LobbyPage.Multiplayer)
+        else -> Unit
     }
 }
 
@@ -414,11 +427,18 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
         PlayButton(Modifier.weight(1f), label, null, lobby::play)
         if (together) {
             HostTile("users-01", "Play together") { startPlayTogether(if (singleplayer) world else lobby.activeServer()) }
-        } else if (singleplayer && world != null && session == null && hostWorldAllowed()) {
+        } else if (singleplayer && world != null && hostable(world, session)) {
             HostTile("log-in-04", "Host world") { lobby.host(world.id) }
         }
     }
 }
+
+private fun hostable(world: LobbyWorld, session: String?): Boolean = world.playable && session == null && hostWorldAllowed()
+
+private fun worldMenuItems(lobby: LobbyShell, world: LobbyWorld): List<ContextItem> = listOfNotNull(
+    ContextItem("Play", SOCIAL_ASSETS + "minecraft-block.svg", enabled = world.playable) { lobby.enter(world) },
+    ContextItem("Host world", SOCIAL_ASSETS + "log-in-04.svg") { lobby.host(world.id) }.takeIf { hostable(world, P2PSessionManager.currentSessionId) },
+)
 
 @Composable
 private fun HostTile(icon: String, label: String, onClick: () -> Unit) {
@@ -483,15 +503,16 @@ private fun Footer(lobby: LobbyShell, singleplayer: Boolean, quick: Boolean) {
         } else {
             Label("Recent", 12.sp, Modifier.padding(end = 4.dp), color = MutedText)
             worlds.forEach { world ->
-                RecentTile(world.name, lobby.isSelected(world), { lobby.select(world) }) { WorldIcon(world, TileSize) }
+                RecentTile(world.name, lobby.isSelected(world), { lobby.select(world) }, { worldMenuItems(lobby, world) }) { WorldIcon(world, TileSize) }
             }
             rows.forEach { entry ->
                 LaunchedEffect(entry.data) { servers.ping(entry.data) }
-                RecentTile(entry.data.name, lobby.isSelected(entry.data), { lobby.select(entry.data) }) { ServerIcon(entry.data, servers.revision, TileSize) }
+                RecentTile(entry.data.name, lobby.isSelected(entry.data), { lobby.select(entry.data) }, { serverMenuItems(lobby, entry) }) { ServerIcon(entry.data, servers.revision, TileSize) }
             }
             Spacer(Modifier.weight(1f))
         }
         when {
+            lobby.page == page -> if (listed) Label("$saved saved", 12.sp, color = MutedText)
             listed -> AllButton("All", "$saved") { lobby.show(page) }
             singleplayer -> AllButton("All worlds", null) { lobby.show(page) }
             else -> AllButton("All servers", null) { lobby.show(page) }
@@ -500,7 +521,7 @@ private fun Footer(lobby: LobbyShell, singleplayer: Boolean, quick: Boolean) {
 }
 
 @Composable
-private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, icon: @Composable () -> Unit) {
+private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, menu: () -> List<ContextItem>, icon: @Composable () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val ring by animateColorAsState(
         when {
@@ -509,7 +530,7 @@ private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, ico
             else -> Color.Transparent
         },
     )
-    Box(Modifier.size(TileSize).hoverable(interaction).clickableWithSound(onClick)) {
+    Box(Modifier.size(TileSize).contextMenu(menu).hoverable(interaction).clickableWithSound(onClick)) {
         icon()
         Box(Modifier.matchParentSize().border(1.dp, ring, SocialFieldShape))
         if (hovered) HoverTooltip(name, TooltipPlacement.ABOVE_CENTER)
