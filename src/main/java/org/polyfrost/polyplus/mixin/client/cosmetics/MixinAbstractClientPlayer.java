@@ -11,6 +11,7 @@ import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
+import org.polyfrost.polyplus.compat.LinkedModOutfits;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -61,7 +62,9 @@ public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, P
 
     @Inject(method = "tick", at = @At("RETURN"))
     private void polyplus$tickEmote(CallbackInfo ci) {
-        polyplus$emoteController().tick((AbstractClientPlayer) (Object) this);
+        AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+        polyplus$emoteController().tick(self);
+        LinkedModOutfits.tick(self, self.getUUID(), self.tickCount);
     }
 
     @ModifyReturnValue(method = "getSkin", at = @At("RETURN"))
