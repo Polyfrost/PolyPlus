@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.party
 
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
@@ -9,6 +10,7 @@ import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.VoiceTransport
 import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.social.SocialOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -112,6 +114,37 @@ object PartyVoice {
         deafened = !deafened
         PartyMesh.sendState(muted, deafened)
         publish()
+    }
+
+    fun onToggleMuteKey() {
+        if (!inVoice) return
+        toggleMute()
+        notifyKey(if (muted) "Muted" else "Unmuted")
+    }
+
+    fun onToggleDeafenKey() {
+        if (!inVoice) return
+        toggleDeafen()
+        notifyKey(if (deafened) "Deafened" else "Undeafened")
+    }
+
+    fun onJoinLeaveKey() {
+        if (inVoice) {
+            leave()
+            notifyKey("Left party voice")
+            return
+        }
+        if (PartyRepository.party.value == null) return
+        join()
+        when {
+            noticeOpen -> SocialOverlay.open()
+            inVoice -> notifyKey("Joined party voice")
+        }
+    }
+
+    private fun notifyKey(message: String) {
+        runCatching { Notifications.builder("Party Voice", message).duration(1500f).send() }
+            .onFailure { LOGGER.warn("Could not show the party voice notification", it) }
     }
 
     fun retryMic() {

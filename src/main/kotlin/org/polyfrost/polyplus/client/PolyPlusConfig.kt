@@ -387,6 +387,42 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         true
     }
 
+    @Keybind(
+        title = "Toggle Mute",
+        subcategory = "Keybinds",
+        description = "Mute or unmute your microphone in party voice",
+    )
+    var toggleMuteKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) {
+            PartyVoice.onToggleMuteKey()
+        }
+        true
+    }
+
+    @Keybind(
+        title = "Toggle Deafen",
+        subcategory = "Keybinds",
+        description = "Deafen or undeafen yourself in party voice",
+    )
+    var toggleDeafenKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) {
+            PartyVoice.onToggleDeafenKey()
+        }
+        true
+    }
+
+    @Keybind(
+        title = "Join/Leave Voice",
+        subcategory = "Keybinds",
+        description = "Join or leave party voice",
+    )
+    var joinLeaveVoiceKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) {
+            PartyVoice.onJoinLeaveKey()
+        }
+        true
+    }
+
     @Dropdown(title = "API URL", description = "The URL used for the PolyPlus API. Only change if you know what you're doing.")
     var apiUrl: BackendUrl = BackendUrl.PRODUCTION
         get() = when {
