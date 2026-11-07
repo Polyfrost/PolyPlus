@@ -36,6 +36,7 @@ import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.components.fadingEdges
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.ContextItem
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.OnboardingSlider
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -44,6 +45,7 @@ import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialMenuItem
 import org.polyfrost.polyplus.client.gui.SocialModalScrim
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Head
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
@@ -70,6 +72,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.roundToInt
+import org.polyfrost.polyplus.client.party.LeaderFollow
 
 internal val PartyPopoverWidth = 260.dp
 private val MenuWidth = 280.dp
@@ -197,9 +200,62 @@ private fun joinable(cell: PartyCell): String? {
     return display
 }
 
+internal fun memberJoinItem(host: SocialHost, cell: PartyCell, onClose: () -> Unit = {}): ContextItem? {
+    LeaderFollow.hostedFor(cell.id)?.let { hosted ->
+        return ContextItem(hosted.status ?: "Join ${cell.name}'s world", SOCIAL_ASSETS + "log-in-04.svg", enabled = !hosted.busy) {
+            onClose()
+            LeaderFollow.joinHosted()
+        }
+    }
+    val address = joinable(cell) ?: return null
+    return ContextItem("Join ${cell.name}", SOCIAL_ASSETS + "log-in-04.svg") {
+        onClose()
+        host.joinAddress(address)
+    }
+}
+
+internal fun memberMuteItem(cell: PartyCell): ContextItem? {
+    if (cell.self) return null
+    val mutedForMe = cell.id.lowercase() in PartyVoiceSettings.memberMutes
+    return ContextItem(if (mutedForMe) "Unmute for me" else "Mute for me", if (mutedForMe) PartyIcons.MIC else PartyIcons.MIC_OFF) {
+        PartyVoiceSettings.toggleMute(cell.id)
+    }
+}
+
+internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Unit = {}): List<ContextItem> {
+    if (!PartyRepository.isLeader(party) || cell.self) return emptyList()
+    val hardMuted = cell.member?.voiceHardMuted == true
+    return listOf(
+        ContextItem("Make leader") {
+            onClose()
+            PartyRepository.makeLeader(cell.id)
+        },
+        ContextItem(if (hardMuted) "Let them talk" else "Mute their voice for everyone") {
+            PartyRepository.setHardMuted(cell.id, !hardMuted)
+        },
+        ContextItem("Remove from party", danger = true) {
+            onClose()
+            PartyRepository.kick(cell.id)
+        },
+    )
+}
+
+internal fun memberMenuItems(host: SocialHost, party: Party, cell: PartyCell): List<ContextItem> =
+    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell)) + memberLeaderItems(party, cell)
+
+internal fun partyInviteItem(
+    friendId: String,
+    party: Party? = PartyRepository.party.value,
+    outgoing: List<PartyInvite> = PartyRepository.outgoingInvites.value,
+): ContextItem? = when {
+    party?.members?.any { PartyRepository.samePlayer(it.player, friendId) } == true -> ContextItem("In your party", enabled = false) {}
+    outgoing.any { PartyRepository.samePlayer(it.recipient, friendId) } -> ContextItem("Invited to party", enabled = false) {}
+    PartyRepository.canInvite(party) -> ContextItem("Invite to party", PartyIcons.INVITE) { PartyRepository.invite(friendId) }
+    else -> null
+}
+
 @Composable
 internal fun MemberPopover(host: SocialHost, party: Party, cell: PartyCell, onClose: () -> Unit) {
-    val leader = PartyRepository.isLeader(party)
     AbovePopup(onDismiss = onClose) {
         Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -210,32 +266,18 @@ internal fun MemberPopover(host: SocialHost, party: Party, cell: PartyCell, onCl
                     voiceLabel(cell.member, cell.state)?.let { Label(it, 12.sp, color = MutedText) }
                 }
             }
-            joinable(cell)?.let { address ->
-                SocialButton("Join ${cell.name}", SOCIAL_ASSETS + "log-in-04.svg", Modifier.fillMaxWidth(), filled = true) {
-                    onClose()
-                    host.joinAddress(address)
-                }
+            memberJoinItem(host, cell, onClose)?.let { join ->
+                SocialButton(join.label, join.icon, Modifier.fillMaxWidth(), filled = true, onClick = join.onClick)
             }
-            if (!cell.self) {
+            memberMuteItem(cell)?.let { mute ->
                 MemberVolume(cell.id)
-                val mutedForMe = cell.id.lowercase() in PartyVoiceSettings.memberMutes
-                SocialButton(if (mutedForMe) "Unmute for me" else "Mute for me", if (mutedForMe) PartyIcons.MIC else PartyIcons.MIC_OFF, Modifier.fillMaxWidth()) {
-                    PartyVoiceSettings.toggleMute(cell.id)
-                }
+                SocialButton(mute.label, mute.icon, Modifier.fillMaxWidth(), onClick = mute.onClick)
             }
-            if (leader && !cell.self) {
-                val hardMuted = cell.member?.voiceHardMuted == true
+            val leaderItems = memberLeaderItems(party, cell, onClose)
+            if (leaderItems.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    SocialMenuItem("Make leader") {
-                        onClose()
-                        PartyRepository.makeLeader(cell.id)
-                    }
-                    SocialMenuItem(if (hardMuted) "Let them talk" else "Mute their voice for everyone") {
-                        PartyRepository.setHardMuted(cell.id, !hardMuted)
-                    }
-                    SocialMenuItem("Remove from party", color = SocialDangerText) {
-                        onClose()
-                        PartyRepository.kick(cell.id)
+                    leaderItems.forEach { item ->
+                        SocialMenuItem(item.label, color = if (item.danger) SocialDangerText else SocialTextPrimary, onClick = item.onClick)
                     }
                 }
             }
@@ -491,16 +533,12 @@ private fun VoiceNoticeDialog() {
 internal fun PartyInvitePrompt(friendId: String, modifier: Modifier = Modifier, filled: Boolean = false) {
     val party by PartyRepository.party.collectAsState()
     val outgoing by PartyRepository.outgoingInvites.collectAsState()
-    val current = party
-    when {
-        current?.members?.any { PartyRepository.samePlayer(it.player, friendId) } == true ->
-            SocialButton("In your party", modifier = modifier, enabled = false)
-        outgoing.any { PartyRepository.samePlayer(it.recipient, friendId) } ->
-            SocialButton("Invited to party", modifier = modifier, enabled = false)
-        PartyRepository.canInvite(current) ->
-            SocialButton("Invite to party", PartyIcons.INVITE.takeUnless { filled }, modifier, filled = filled) { PartyRepository.invite(friendId) }
-        else -> Spacer(Modifier)
+    val item = partyInviteItem(friendId, party, outgoing)
+    if (item == null) {
+        Spacer(Modifier)
+        return
     }
+    SocialButton(item.label, item.icon.takeUnless { filled }, modifier, filled = filled && item.enabled, enabled = item.enabled, onClick = item.onClick)
 }
 
 @Composable

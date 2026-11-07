@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
@@ -75,14 +76,16 @@ internal fun SocialPage(onBack: () -> Unit) {
     val state = rememberSocialPageState()
     val availability = rememberAvailability()
     Box(Modifier.fillMaxSize()) {
-        PageScrim()
-        if (availability == SocialAvailability.Ready) {
-            SocialDirectory(state, state.source.snapshot(), onBack)
-        } else {
-            BlockedMessage(availability, state.source, onBack, centerColumn())
+        ContextMenuHost {
+            PageScrim()
+            if (availability == SocialAvailability.Ready) {
+                SocialDirectory(state, state.source.snapshot(), onBack)
+            } else {
+                BlockedMessage(availability, state.source, onBack, centerColumn())
+            }
+            SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = LobbyLayout.Top, end = LobbyLayout.Margin))
+            SocialDialogHost(state)
         }
-        SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = LobbyLayout.Top, end = LobbyLayout.Margin))
-        SocialDialogHost(state)
     }
 }
 

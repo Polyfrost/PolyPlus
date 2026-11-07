@@ -38,12 +38,14 @@ import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxItem
 import org.polyfrost.polyplus.client.gui.lobbysocial.PersonHead
+import org.polyfrost.polyplus.client.gui.lobbysocial.menuItems
 
 private val InviteRowHeight = 52.dp
 private val RoomyRowHeight = 60.dp
@@ -98,7 +100,7 @@ internal fun InvitesBell(items: List<InboxItem>) {
 internal fun InviteRow(item: InboxItem, divided: Boolean, roomy: Boolean = false) {
     if (divided) PaneRule()
     Row(
-        Modifier.fillMaxWidth().height(if (roomy) RoomyRowHeight else InviteRowHeight).padding(start = if (roomy) 16.dp else 12.dp, end = if (roomy) 12.dp else 6.dp),
+        Modifier.fillMaxWidth().height(if (roomy) RoomyRowHeight else InviteRowHeight).contextMenu(item::menuItems).padding(start = if (roomy) 16.dp else 12.dp, end = if (roomy) 12.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (roomy) 12.dp else 8.dp),
     ) {

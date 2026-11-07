@@ -42,6 +42,7 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
+import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.LocalComposerFocus
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
@@ -263,18 +264,20 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
                     .background(SocialWindowScrim)
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClose),
             ) {
-                val snapshot = state.source.snapshot()
-                if (blocked) {
-                    BlockedWindow(window, layout, availability, state, snapshot, onClose)
-                } else {
-                    FollowSocialChanges(state, snapshot)
-                    SelectionEffects(window, state)
-                    TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                ContextMenuHost {
+                    val snapshot = state.source.snapshot()
+                    if (blocked) {
+                        BlockedWindow(window, layout, availability, state, snapshot, onClose)
+                    } else {
+                        FollowSocialChanges(state, snapshot)
+                        SelectionEffects(window, state)
+                        TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                    }
+                    SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
+                    SocialDialogHost(state)
+                    PlayTogetherHooks(WindowHost)
+                    LeaderJoinEffect(WindowHost)
                 }
-                SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
-                SocialDialogHost(state)
-                PlayTogetherHooks(WindowHost)
-                LeaderJoinEffect(WindowHost)
             }
         }
     }

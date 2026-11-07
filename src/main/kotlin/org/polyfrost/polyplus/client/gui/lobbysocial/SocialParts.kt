@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -38,13 +37,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.polyplus.client.gui.ContextMenuList
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialIconButton
-import org.polyfrost.polyplus.client.gui.SocialMenuItem
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -55,19 +54,19 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.destinationLabel
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.party.HostJoinRequests
 import org.polyfrost.polyplus.client.party.LeaderFollow
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PlayTogether
 import org.polyfrost.polyplus.client.party.ServerCheck
 import org.polyfrost.polyplus.client.social.ChatIdentity
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 
 private const val GROUP_FACE_SCALE = 0.68f
 private const val FADE_HEIGHT = 32
 
 internal val MENU_OFFSET = 40.dp
-private val MENU_WIDTH = 170.dp
 
 @Composable
 internal fun ScrollFade(modifier: Modifier, spacing: Dp = 6.dp, content: @Composable ColumnScope.() -> Unit) {
@@ -218,6 +217,22 @@ private fun leaderMovedItem(): InboxItem? {
     )
 }
 
+private fun leaderHostedItem(): InboxItem? {
+    val hosted = LeaderFollow.hosted?.takeUnless { it.here || it.dismissed } ?: return null
+    val leader = SocialPerson(hosted.leader, hosted.name, seedOf(hosted.leader), realSkin = true, online = true)
+    return InboxItem(
+        "hosted-${hosted.sessionId}",
+        "Party",
+        leader,
+        "${hosted.name}'s world",
+        "${hosted.name} is hosting a world",
+        hosted.status ?: "Join",
+        LeaderFollow::joinHosted,
+        "Dismiss",
+        LeaderFollow::dismissHosted,
+    )
+}
+
 private fun playTogetherItem(): InboxItem? {
     val play = PlayTogether.active?.takeUnless { it.leading } ?: return null
     val leader = SocialPerson(play.leader, play.leaderName, seedOf(play.leader), realSkin = true, online = true)
@@ -237,8 +252,53 @@ private fun playTogetherItem(): InboxItem? {
 internal fun partyMoveItems(): List<InboxItem> {
     val play = PlayTogether.active?.destination?.address
     val moved = leaderMovedItem()?.takeUnless { LeaderFollow.card?.address == play }
-    return listOfNotNull(moved, playTogetherItem())
+    return hostJoinItems() + listOfNotNull(moved, leaderHostedItem(), playTogetherItem())
 }
+
+private fun hostJoinItems(): List<InboxItem> = HostJoinRequests.pending.map { request ->
+    InboxItem(
+        "join-${request.id}",
+        "Party",
+        SocialPerson(request.player, request.name, seedOf(request.player), realSkin = true, online = true),
+        request.name,
+        "Wants to join your world",
+        "Allow".takeUnless { request.answering },
+        { HostJoinRequests.allow(request.id) },
+        "Deny",
+        { HostJoinRequests.deny(request.id) },
+    )
+}
+
+internal fun InboxItem.menuItems(): List<ContextItem> = listOfNotNull(
+    acceptLabel?.let { ContextItem(it, onClick = accept) },
+    ContextItem(dismissLabel, onClick = dismiss),
+)
+
+internal fun friendMenuItems(state: SocialPageState, person: SocialPerson): List<ContextItem> = listOf(
+    ContextItem("Remove friend") {
+        state.selected = null
+        state.source.remove(person)
+    },
+    ContextItem("Block", danger = true) {
+        state.selected = null
+        state.source.block(person)
+    },
+)
+
+internal fun worldInviteItem(state: SocialPageState, person: SocialPerson, hosting: Boolean = P2PSessionManager.currentSessionId != null): ContextItem? {
+    if (!hosting) return null
+    return ContextItem(
+        if (person.worldInvited) "Invited to world" else "Invite to world",
+        SOCIAL_ASSETS + "globe-01.svg",
+        enabled = !person.worldInvited,
+    ) { state.source.inviteToWorld(person) }
+}
+
+internal fun friendRowItems(state: SocialPageState, person: SocialPerson): List<ContextItem> = listOfNotNull(
+    ContextItem("Message", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.message(person) },
+    partyInviteItem(person.id).takeIf { person.online },
+    worldInviteItem(state, person),
+) + friendMenuItems(state, person)
 
 @Composable
 internal fun FriendMenu(state: SocialPageState, person: SocialPerson) {
@@ -254,21 +314,7 @@ internal fun FriendMenu(state: SocialPageState, person: SocialPerson) {
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
-                Column(
-                    Modifier.width(MENU_WIDTH).popup().padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    SocialMenuItem("Remove friend") {
-                        open = false
-                        state.selected = null
-                        state.source.remove(person)
-                    }
-                    SocialMenuItem("Block", color = SocialDangerText) {
-                        open = false
-                        state.selected = null
-                        state.source.block(person)
-                    }
-                }
+                ContextMenuList(friendMenuItems(state, person)) { open = false }
             }
         }
     }
@@ -276,14 +322,15 @@ internal fun FriendMenu(state: SocialPageState, person: SocialPerson) {
 
 @Composable
 internal fun WorldAction(state: SocialPageState, snapshot: SocialSnapshot, person: SocialPerson, modifier: Modifier = Modifier, filled: Boolean = false) {
-    if (snapshot.hosting == null) return
+    val item = worldInviteItem(state, person, snapshot.hosting != null) ?: return
     SocialButton(
-        if (person.worldInvited) "Invited to world" else "Invite to world",
-        icon = (SOCIAL_ASSETS + "globe-01.svg").takeUnless { filled },
+        item.label,
+        icon = item.icon.takeUnless { filled },
         modifier = modifier,
         filled = filled,
-        enabled = !person.worldInvited,
-    ) { state.source.inviteToWorld(person) }
+        enabled = item.enabled,
+        onClick = item.onClick,
+    )
 }
 
 @Composable

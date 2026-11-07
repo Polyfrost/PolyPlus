@@ -27,6 +27,8 @@ import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.contextMenu
+import org.polyfrost.polyplus.client.gui.lobbysocial.friendRowItems
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyActions
@@ -127,6 +129,7 @@ private fun FriendCell(state: SocialPageState, person: SocialPerson, modifier: M
         modifier
             .height(52.dp)
             .socialRow(false, hovered)
+            .contextMenu { friendRowItems(state, person) }
             .hoverable(interaction)
             .clickableWithSound { state.toggle(person) }
             .padding(start = 8.dp, end = 2.dp),

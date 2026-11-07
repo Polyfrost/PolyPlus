@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.ContextItem
 import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDropdown
@@ -91,13 +93,13 @@ internal fun ThreadList(state: SocialPageState, list: SocialListState, snapshot:
     }
     ScrollFade(modifier, 2.dp) {
         threads.forEach { thread ->
-            ThreadRow(thread, activeId == thread.id) { state.source.open(thread) }
+            ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, thread) }) { state.source.open(thread) }
         }
     }
 }
 
 @Composable
-internal fun ThreadRow(thread: SocialThread, selected: Boolean, onClick: () -> Unit) {
+internal fun ThreadRow(thread: SocialThread, selected: Boolean, menu: () -> List<ContextItem> = { emptyList() }, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val narrow = LocalSocialLook.current.narrowLists
     val dot: @Composable () -> Unit = {
@@ -108,6 +110,7 @@ internal fun ThreadRow(thread: SocialThread, selected: Boolean, onClick: () -> U
             .fillMaxWidth()
             .height(58.dp)
             .socialRow(selected, hovered)
+            .contextMenu(menu)
             .hoverable(interaction)
             .clickableWithSound(onClick)
             .padding(horizontal = 8.dp),
@@ -162,6 +165,7 @@ internal fun RosterRow(state: SocialPageState, person: SocialPerson) {
             .fillMaxWidth()
             .height(if (narrow) NarrowRowHeight else RowHeight)
             .socialRow(selected, hovered)
+            .contextMenu { friendRowItems(state, person) }
             .hoverable(interaction)
             .clickableWithSound { state.toggle(person) }
             .padding(horizontal = if (narrow) 8.dp else 10.dp),
@@ -199,7 +203,7 @@ internal fun RequestList(state: SocialPageState, snapshot: SocialSnapshot, modif
     ScrollFade(modifier.padding(12.dp), 0.dp) {
         requests.forEach { request ->
             Row(
-                Modifier.fillMaxWidth().height(RowHeight + 8.dp).padding(horizontal = 10.dp),
+                Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { requestMenuItems(state, request) }.padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -212,13 +216,19 @@ internal fun RequestList(state: SocialPageState, snapshot: SocialSnapshot, modif
     }
 }
 
+internal fun requestMenuItems(state: SocialPageState, request: SocialRequest): List<ContextItem> = if (request.incoming) {
+    listOf(ContextItem("Accept") { state.source.accept(request) }, ContextItem("Decline") { state.source.dismiss(request) })
+} else {
+    listOf(ContextItem("Cancel request") { state.source.dismiss(request) })
+}
+
+internal fun blockedMenuItems(state: SocialPageState, person: SocialPerson): List<ContextItem> =
+    listOf(ContextItem("Unblock") { state.source.unblock(person) })
+
 @Composable
 private fun RowScope.RequestActions(state: SocialPageState, request: SocialRequest) {
-    if (request.incoming) {
-        SocialButton("Accept", filled = true) { state.source.accept(request) }
-        SocialButton("Decline") { state.source.dismiss(request) }
-    } else {
-        SocialButton("Cancel request") { state.source.dismiss(request) }
+    requestMenuItems(state, request).forEachIndexed { index, item ->
+        SocialButton(item.label, filled = request.incoming && index == 0, onClick = item.onClick)
     }
 }
 
@@ -232,13 +242,13 @@ internal fun BlockedList(state: SocialPageState, snapshot: SocialSnapshot, modif
     ScrollFade(modifier.padding(12.dp), 0.dp) {
         blocked.forEach { person ->
             Row(
-                Modifier.fillMaxWidth().height(RowHeight + 8.dp).padding(horizontal = 10.dp),
+                Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { blockedMenuItems(state, person) }.padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 PersonHead(person, 32.dp)
                 Label(person.name, 14.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-                SocialButton("Unblock") { state.source.unblock(person) }
+                blockedMenuItems(state, person).forEach { SocialButton(it.label, onClick = it.onClick) }
             }
         }
     }
@@ -247,7 +257,7 @@ internal fun BlockedList(state: SocialPageState, snapshot: SocialSnapshot, modif
 @Composable
 internal fun InboxLine(item: InboxItem) {
     Row(
-        Modifier.fillMaxWidth().height(46.dp),
+        Modifier.fillMaxWidth().height(46.dp).contextMenu(item::menuItems),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

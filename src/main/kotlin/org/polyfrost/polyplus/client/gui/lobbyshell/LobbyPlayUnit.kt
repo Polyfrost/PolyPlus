@@ -80,7 +80,9 @@ import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.party.LeaderFollow
 import org.polyfrost.polyplus.client.social.ChatIdentity
+import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -423,12 +425,20 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
         else -> "Choose a server"
     }
     val together = ready && canPlayTogether()
+    val hosted = leaderHostedWorld()
+    val names by PlayerNamesRepository.names.collectAsState()
     Row(Modifier.padding(horizontal = PanelGutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PlayButton(Modifier.weight(1f), label, null, lobby::play)
-        if (together) {
-            HostTile("users-01", "Play together") { startPlayTogether(if (singleplayer) world else lobby.activeServer()) }
-        } else if (singleplayer && world != null && hostable(world, session)) {
-            HostTile("log-in-04", "Host world") { lobby.host(world.id) }
+        if (hosted != null) {
+            val leader = names[hosted.leader] ?: hosted.name
+            PlayButton(Modifier.weight(1f), hosted.status ?: "Join $leader", "$leader is hosting a world", LeaderFollow::joinHosted)
+            if (ready) HostTile(if (singleplayer) "minecraft-block" else "globe-01", "Play", lobby::play)
+        } else {
+            PlayButton(Modifier.weight(1f), label, null, lobby::play)
+            if (together) {
+                HostTile("users-01", "Play together") { startPlayTogether(if (singleplayer) world else lobby.activeServer()) }
+            } else if (singleplayer && world != null && hostable(world, session)) {
+                HostTile("log-in-04", "Host world") { lobby.host(world.id) }
+            }
         }
     }
 }

@@ -68,10 +68,13 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.socialHover
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyVoiceMode
+import org.polyfrost.polyplus.client.party.HostJoinRequests
 import org.polyfrost.polyplus.client.party.LeaderFollow
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
+import org.polyfrost.polyplus.client.gui.contextMenu
+import org.polyfrost.polyplus.client.gui.lobbysocial.memberMenuItems
 
 private val EntryHead = 30.dp
 private val OverflowWidth = 32.dp
@@ -163,6 +166,7 @@ private fun PartyEntry(host: SocialHost, party: Party, cell: PartyCell, tier: Ro
         Row(
             modifier
                 .rowFrame(false, hovered, ppShape(8.dp))
+                .contextMenu { memberMenuItems(host, party, cell) }
                 .hoverable(interaction)
                 .then(socialHover(cell.name))
                 .clickableWithSound { open = !open },
@@ -290,7 +294,7 @@ private fun MicBlockedButton(notice: String) {
 }
 
 @Composable
-private fun InviteButton(party: Party?) {
+internal fun InviteButton(party: Party?) {
     var open by remember { mutableStateOf(false) }
     if (!PartyRepository.canInvite(party)) return
     Box {
@@ -331,12 +335,16 @@ private fun PartyMenuButton(party: Party, onVoice: (() -> Unit)?) {
 }
 
 @Composable
-private fun PartyInviteCards(host: SocialHost) {
+internal fun PartyInviteCards(host: SocialHost) {
     val invites by PartyRepository.incomingInvites.collectAsState()
-    val rejoin = rejoinableWorld()
-    if (invites.isEmpty() && LeaderFollow.card == null && rejoin == null) return
+    val hosted = leaderHostedWorld()?.takeUnless { it.dismissed }
+    val rejoin = rejoinableWorld()?.takeUnless { hosted?.sessionId == it.sessionId }
+    val requests = HostJoinRequests.pending
+    if (invites.isEmpty() && LeaderFollow.card == null && rejoin == null && hosted == null && requests.isEmpty()) return
     Popup(popupPositionProvider = rememberAbove(alignEnd = true), properties = PopupProperties(focusable = false)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            requests.takeLast(MAX_INVITE_CARDS).forEach { request -> key(request.id) { HostJoinRequestCard(request) } }
+            hosted?.let { LeaderHostingCard(it) }
             rejoin?.let { RejoinWorldCard(it) }
             LeaderMovedCard(host)
             invites.takeLast(MAX_INVITE_CARDS).forEach { invite -> key(invite.id) { PartyInviteCard(invite) } }

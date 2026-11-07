@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.polyplus.client.gui.GroupOverflowMenu
+import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.polyplus.client.gui.ContextMenuList
 import org.polyfrost.polyplus.client.gui.MessageComposer
 import org.polyfrost.polyplus.client.gui.MessageTimeline
 import org.polyfrost.polyplus.client.gui.MutedText
@@ -66,12 +67,11 @@ internal fun ConversationPane(
 ) {
     val groups by GroupsRepository.groups.collectAsState()
     val group = groups.firstOrNull { it.id == thread.id } ?: return
-    val self = ChatIdentity.selfId()
     val look = LocalSocialLook.current
     val framed = look.surface == SocialSurface.None
     if (look.backButton) EscapeCloses { if (SocialPageState.dialogOpen) SocialPageState.closeDialog() else SocialChatLink.close() }
     Column(modifier.socialSurface()) {
-        ConversationHeader(state, thread, group, self, subtitle, actions, trailing)
+        ConversationHeader(state, thread, group, subtitle, actions, trailing)
         if (framed) Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
         ConversationBody(conversation, thread, group, if (framed) "Message ${thread.title}" else "Message ${thread.title}...", offlineReason)
     }
@@ -102,7 +102,6 @@ private fun ConversationHeader(
     state: SocialPageState,
     thread: SocialThread,
     group: GroupSummary,
-    self: String,
     subtitle: String?,
     actions: @Composable RowScope.(GroupSummary) -> Unit,
     trailing: @Composable RowScope.() -> Unit,
@@ -143,7 +142,7 @@ private fun ConversationHeader(
         if (muted) ThemedIcon(SOCIAL_ASSETS + "volume-x.svg", MutedText, 16.dp)
         actions(group)
         if (thread.group) {
-            GroupMenu(state, group, self, muted) {
+            GroupMenu(state, group) {
                 draft = ""
                 renaming = true
             }
@@ -152,8 +151,38 @@ private fun ConversationHeader(
     }
 }
 
+internal fun groupMenuItems(
+    state: SocialPageState,
+    group: GroupSummary,
+    onRename: (() -> Unit)? = null,
+    specialTarget: Boolean = SpecialChatRepository.status.value?.isSpecialChatTarget == true,
+): List<ContextItem> {
+    val self = ChatIdentity.selfId()
+    val muted = group.id in SocialChatLink.muted
+    val convertible = group.special && specialTarget
+    return listOfNotNull(
+        ContextItem("Invite Friends", SOCIAL_ASSETS + "user-plus-01.svg") { state.dialog = SocialDialog.InviteToGroup(group.id) },
+        ContextItem("Invite Group to Session", SOCIAL_ASSETS + "log-in-04.svg") { SocialHosting.inviteGroup(group, self) },
+        onRename?.let { ContextItem("Rename Group", SOCIAL_ASSETS + "edit-02.svg", onClick = it) },
+        ContextItem(if (muted) "Unmute Group" else "Mute Group", SOCIAL_ASSETS + "volume-x.svg") { SocialChatLink.toggleMute(group.id) },
+        ContextItem("Convert to Normal Chat", SOCIAL_ASSETS + "check.svg") { GroupsRepository.claimSpecialChatGroup(group.id) }.takeIf { convertible },
+        ContextItem("Leave Group", SOCIAL_ASSETS + "x-close.svg", danger = true) {
+            if (SocialChatLink.active?.id == group.id) SocialChatLink.close()
+            GroupsRepository.removeMember(group.id, self)
+        }.takeIf { !group.special },
+    )
+}
+
+internal fun threadMenuItems(state: SocialPageState, thread: SocialThread): List<ContextItem> {
+    val open = ContextItem("Open chat", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.open(thread) }
+    val group = GroupsRepository.groups.value.firstOrNull { it.id == thread.id }
+    if (thread.group && !thread.party && group != null) return listOf(open) + groupMenuItems(state, group)
+    val muted = thread.id in SocialChatLink.muted
+    return listOf(open, ContextItem(if (muted) "Unmute chat" else "Mute chat", SOCIAL_ASSETS + "volume-x.svg") { SocialChatLink.toggleMute(thread.id) })
+}
+
 @Composable
-private fun GroupMenu(state: SocialPageState, group: GroupSummary, self: String, muted: Boolean, onRename: () -> Unit) {
+private fun GroupMenu(state: SocialPageState, group: GroupSummary, onRename: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val status by SpecialChatRepository.status.collectAsState()
     val drop = with(LocalDensity.current) { MENU_OFFSET.roundToPx() }
@@ -168,36 +197,7 @@ private fun GroupMenu(state: SocialPageState, group: GroupSummary, self: String,
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
-                GroupOverflowMenu(
-                    onInvite = {
-                        open = false
-                        state.dialog = SocialDialog.InviteToGroup(group.id)
-                    },
-                    onInviteToSession = {
-                        open = false
-                        SocialHosting.inviteGroup(group, self)
-                    },
-                    onRename = {
-                        open = false
-                        onRename()
-                    }.takeIf { canRename },
-                    onMute = {
-                        open = false
-                        SocialChatLink.toggleMute(group.id)
-                    },
-                    onLeave = {
-                        open = false
-                        SocialChatLink.close()
-                        GroupsRepository.removeMember(group.id, self)
-                    },
-                    onConvertToNormal = {
-                        open = false
-                        GroupsRepository.claimSpecialChatGroup(group.id)
-                    },
-                    muted = muted,
-                    canConvertToNormal = group.special && status?.isSpecialChatTarget == true,
-                    canLeave = !group.special,
-                )
+                ContextMenuList(groupMenuItems(state, group, onRename.takeIf { canRename }, status?.isSpecialChatTarget == true)) { open = false }
             }
         }
     }

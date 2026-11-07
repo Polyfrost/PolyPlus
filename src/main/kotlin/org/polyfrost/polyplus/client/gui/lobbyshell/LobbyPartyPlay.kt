@@ -44,6 +44,7 @@ import org.polyfrost.polyplus.client.network.http.responses.PlayReason
 import org.polyfrost.polyplus.client.network.http.responses.PlayResponse
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.party.HostJoinRequests
 import org.polyfrost.polyplus.client.party.LeaderFollow
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
@@ -88,6 +89,51 @@ internal fun LeaderMovedCard(host: SocialHost) {
             SocialButton(if (card.checking) "Checking..." else "Join", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !incompatible && !card.checking && !card.cleared) {
                 LeaderFollow.requestJoin()
             }
+        }
+    }
+}
+
+@Composable
+internal fun leaderHostedWorld(): LeaderFollow.Hosted? {
+    val hosted = LeaderFollow.hosted?.takeIf { !it.here } ?: return null
+    val party by PartyRepository.party.collectAsState()
+    return hosted.takeIf { party != null && !PartyRepository.isLeader(party) }
+}
+
+@Composable
+internal fun LeaderHostingCard(hosted: LeaderFollow.Hosted) {
+    val names by PlayerNamesRepository.names.collectAsState()
+    val name = names[hosted.leader] ?: hosted.name
+    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Head(seedOf(hosted.leader), 34.dp, realSkin = true)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Label("$name is hosting", 12.sp, color = MutedText)
+                Label("$name's world", 14.sp, weight = FontWeight.Medium)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SocialButton("Dismiss", modifier = Modifier.weight(1f), onClick = LeaderFollow::dismissHosted)
+            SocialButton(hosted.status ?: "Join", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !hosted.busy, onClick = LeaderFollow::joinHosted)
+        }
+    }
+}
+
+@Composable
+internal fun HostJoinRequestCard(request: HostJoinRequests.Request) {
+    val names by PlayerNamesRepository.names.collectAsState()
+    val name = names[request.player] ?: request.name
+    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Head(seedOf(request.player), 34.dp, realSkin = true)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Label(name, 14.sp, weight = FontWeight.Medium)
+                Label("Wants to join your world", 12.sp, color = MutedText)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SocialButton("Deny", modifier = Modifier.weight(1f), enabled = !request.answering) { HostJoinRequests.deny(request.id) }
+            SocialButton("Allow", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !request.answering) { HostJoinRequests.allow(request.id) }
         }
     }
 }

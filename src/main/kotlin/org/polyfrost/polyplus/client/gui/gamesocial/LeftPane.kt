@@ -76,6 +76,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialSnapshot
 import org.polyfrost.polyplus.client.gui.lobbysocial.ThreadFilter
 import org.polyfrost.polyplus.client.gui.lobbysocial.ThreadList
 import org.polyfrost.polyplus.client.gui.lobbysocial.ThreadRow
+import org.polyfrost.polyplus.client.gui.lobbysocial.threadMenuItems
 import org.polyfrost.polyplus.client.gui.lobbysocial.ToggleIconButton
 import org.polyfrost.polyplus.client.gui.lobbysocial.partyCells
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberSocialListState
@@ -384,7 +385,7 @@ private fun SearchResults(state: SocialPageState, list: SocialListState, snapsho
     val activeId = SocialChatLink.active?.id
     ScrollFade(modifier, 2.dp) {
         if (threads.isNotEmpty()) SectionHeading("Chats", Modifier.padding(start = Inset, top = 6.dp))
-        threads.forEach { thread -> ThreadRow(thread, activeId == thread.id) { state.source.open(thread) } }
+        threads.forEach { thread -> ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, thread) }) { state.source.open(thread) } }
         if (friends.isNotEmpty()) SectionHeading("Friends", Modifier.padding(start = Inset, top = 6.dp))
         friends.forEach { RosterRow(state, it) }
     }

@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.polyplus.client.gui.ContextItem
 import org.polyfrost.polyplus.client.gui.HostFlowState
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.HostFlowSteps
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -37,6 +39,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
+import org.polyfrost.polyplus.client.gui.lobbysocial.friendRowItems
 import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
 import org.polyfrost.polyplus.client.gui.lobbysocial.PersonHead
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
@@ -166,7 +169,7 @@ private fun PeopleSection(title: String, people: List<SocialPerson>, state: Soci
     if (people.isEmpty()) return
     SectionHeading(title, Modifier.padding(top = 10.dp, bottom = 6.dp))
     people.forEach { person ->
-        InviteRow(person.name, person.status, { PersonHead(person, RowHead) }) {
+        InviteRow(person.name, person.status, { PersonHead(person, RowHead) }, { friendRowItems(state, person) }) {
             WorldAction(state, snapshot, person, filled = true)
         }
     }
@@ -176,15 +179,16 @@ private fun PeopleSection(title: String, people: List<SocialPerson>, state: Soci
 private fun GroupRow(group: GroupSummary) {
     val self = ChatIdentity.selfId()
     val members = group.members.filterNot { it == self }
-    InviteRow(group.name ?: "Group", "${members.size} members", { SocialGroupAvatar(members, RowHead, ringColor = Color.Transparent, grid = true) }) {
-        SocialButton("Invite group", filled = true) { SocialHosting.inviteGroup(group, self) }
+    val invite = ContextItem("Invite group") { SocialHosting.inviteGroup(group, self) }
+    InviteRow(group.name ?: "Group", "${members.size} members", { SocialGroupAvatar(members, RowHead, ringColor = Color.Transparent, grid = true) }, { listOf(invite) }) {
+        SocialButton(invite.label, filled = true, onClick = invite.onClick)
     }
 }
 
 @Composable
-private fun InviteRow(title: String, detail: String, face: @Composable () -> Unit, action: @Composable () -> Unit) {
+private fun InviteRow(title: String, detail: String, face: @Composable () -> Unit, menu: () -> List<ContextItem>, action: @Composable () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(RowHeight),
+        Modifier.fillMaxWidth().height(RowHeight).contextMenu(menu),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
