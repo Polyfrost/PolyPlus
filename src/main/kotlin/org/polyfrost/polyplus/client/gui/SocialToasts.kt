@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -46,6 +47,11 @@ object SocialNotices {
 @Composable
 internal fun SocialToastHost(modifier: Modifier = Modifier) {
     var toasts by remember { mutableStateOf(listOf<SocialToast>()) }
+
+    DisposableEffect(Unit) {
+        SocialErrors.hostShown()
+        onDispose { SocialErrors.hostHidden() }
+    }
 
     LaunchedEffect(Unit) {
         SocialErrors.events.collect { message ->

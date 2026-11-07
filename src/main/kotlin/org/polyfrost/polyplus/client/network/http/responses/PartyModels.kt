@@ -297,3 +297,28 @@ data class PartyAcceptRequest(@SerialName("leave_current") val leaveCurrent: Boo
 
 @Serializable
 data class ApiErrorBody(val error: String, val message: String? = null)
+
+@Serializable(with = HostedJoinResult.Serializer::class)
+enum class HostedJoinResult(val serializedName: String) {
+    Allowed("allowed"),
+    Denied("denied"),
+    Expired("expired"),
+    Cancelled("cancelled"),
+    Unknown("unknown");
+
+    internal object Serializer : KSerializer<HostedJoinResult> by ApiEnumSerializer(
+        "HostedJoinResult",
+        HostedJoinResult.entries,
+        Unknown,
+        HostedJoinResult::serializedName,
+    )
+}
+
+@Serializable
+data class HostedJoinRequest(
+    val id: String,
+    @SerialName("session_id") val sessionId: String,
+    val host: String,
+    val player: String,
+    @SerialName("expires_at") val expiresAt: String,
+)

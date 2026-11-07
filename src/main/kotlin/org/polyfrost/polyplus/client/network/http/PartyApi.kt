@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.libs.ktor.http.isSuccess
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.responses.ApiErrorBody
+import org.polyfrost.polyplus.client.network.http.responses.HostedJoinRequest
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyAcceptRequest
 import org.polyfrost.polyplus.client.network.http.responses.PartyHardMuteRequest
@@ -92,4 +93,10 @@ object PartyApi {
     suspend fun voicePass(): Result<VoicePass> = call("/voice/pass", HttpMethod.Post)
 
     suspend fun inviteSession(sessionId: String): Result<List<SessionInvite>> = call("/sessions/$sessionId/invite", HttpMethod.Post)
+
+    suspend fun requestHostedJoin(sessionId: String): Result<HostedJoinRequest> = call("/sessions/$sessionId/join-requests", HttpMethod.Post)
+
+    suspend fun allowHostedJoin(requestId: String): Result<Unit> = unit("/join-requests/$requestId/allow", HttpMethod.Post)
+
+    suspend fun denyHostedJoin(requestId: String): Result<Unit> = unit("/join-requests/$requestId/deny", HttpMethod.Post)
 }

@@ -17,6 +17,7 @@ object Parties {
         SceneTransfer::tick,
         PartyScene::tick,
         LeaderFollow::tick,
+        HostJoinRequests::tick,
         PlayTogether::tick,
         PartyPresence::tick,
         PartyJoin::tick,
@@ -25,6 +26,8 @@ object Parties {
     fun initialize() {
         PartyRepository.earlyInitialize()
         PlayTogether.earlyInitialize()
+        LeaderFollow.earlyInitialize()
+        HostJoinRequests.earlyInitialize()
         HudManager.register(PartyVoiceHud(), PolyPlusConstants.ID, "assets/polyplus/brand/oneclient.svg")
         PartyRepository.refreshed.onEach { PartyPresence.forceSend() }.launchIn(PolyPlusClient.SCOPE)
         eventHandler<TickEvent.End> {

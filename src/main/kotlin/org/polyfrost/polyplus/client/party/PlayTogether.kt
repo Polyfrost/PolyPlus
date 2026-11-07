@@ -141,6 +141,12 @@ object PlayTogether {
         }
     }
 
+    private fun joinFromNotice(current: Active) {
+        if (active !== current) return
+        joinLate()
+        if (PartyJoin.pending != null) PartyNotices.showDialogs()
+    }
+
     fun cancel() {
         val current = active ?: return
         if (current.leading) {
@@ -183,7 +189,11 @@ object PlayTogether {
         if (PartyPresence.local.location.kind != LocationKind.Menu) {
             respond(current, PlayResponse.Busy)
             current.stage = Stage.DONE
-            Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where. Open Social to join.")
+            if (canJoinLate(current)) {
+                PartyNotices.send("${current.leaderName} started Play together on $where", PartyNotices.MOVE_MS, "Join", { joinFromNotice(current) })
+            } else {
+                Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where. Open Social to join.")
+            }
             return
         }
         if (!PolyPlusPartyConfig.partyPlayTogetherJoin) {

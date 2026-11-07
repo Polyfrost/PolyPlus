@@ -27,6 +27,15 @@ object PartyErrors {
         EOS_NOT_LINKED to "Voice isn't ready yet. Try again in a moment",
         VOICE_UNAVAILABLE to "Voice is unavailable right now",
         RATE_LIMITED to "Too many tries. Wait a moment",
+        "session_not_found" to "That world has closed",
+        "own_session" to "That's your own world",
+        "host_not_in_party" to "The host isn't in your party",
+        "host_offline" to "The host is offline",
+        "already_in_session" to "You're already in that world",
+        "already_invited_to_session" to "You already have an invite to that world",
+        "join_request_pending" to "You already asked to join",
+        "join_request_not_found" to "That join request is gone",
+        "not_host" to "Only the host can do that",
     )
 
     fun message(error: Throwable, fallback: String): String {

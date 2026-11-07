@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.network.websocket
 
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.HostedJoinResult
 import org.polyfrost.polyplus.client.network.http.responses.MemberState
 import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
 import org.polyfrost.polyplus.client.network.http.responses.PlayEndReason
@@ -219,5 +220,32 @@ sealed interface ClientboundPacket {
     data class PlayTogetherEnded(
         val id: String,
         val reason: PlayEndReason,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinRequested")
+    data class HostedJoinRequested(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val player: String,
+        @SerialName("expires_at") val expiresAt: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinRequestSent")
+    data class HostedJoinRequestSent(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val host: String,
+        @SerialName("expires_at") val expiresAt: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinResolved")
+    data class HostedJoinResolved(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val result: HostedJoinResult,
+        @SerialName("invite_id") val inviteId: Int? = null,
     ) : ClientboundPacket
 }

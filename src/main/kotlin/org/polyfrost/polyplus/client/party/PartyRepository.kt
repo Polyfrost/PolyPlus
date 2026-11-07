@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.party
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
-import org.polyfrost.oneconfig.api.notifications.v1.Notifications
+import org.polyfrost.oneconfig.api.notifications.v1.Notification
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.PartyApi
 import org.polyfrost.polyplus.client.network.http.PartyApiException
@@ -52,6 +52,8 @@ object PartyRepository {
 
     private val _refreshed = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
     val refreshed = _refreshed.asSharedFlow()
+
+    private val inviteNotices = ConcurrentHashMap<String, Notification>()
 
     fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
@@ -115,6 +117,7 @@ object PartyRepository {
         _incomingInvites.value = emptyList()
         _outgoingInvites.value = emptyList()
         _confirmLeave.value = null
+        inviteNotices.keys.toList().forEach(::retireNotice)
     }
 
     private fun applyParty(party: Party?) {
@@ -152,7 +155,28 @@ object PartyRepository {
         if (!NotificationDedup.shouldNotify("party_invite:${invite.id}")) return
         PlayerNamesRepository.resolve(listOf(invite.sender))
         val name = PlayerNamesRepository.nameOr(invite.sender)
-        Notifications.info("PolyPlus", "$name invited you to their party")
+        val notice = PartyNotices.send(
+            "$name invited you to their party",
+            PartyNotices.INVITE_MS,
+            "Join party",
+            { acceptFromNotice(invite) },
+            "Decline",
+            { decline(invite) },
+        )
+        inviteNotices.put(invite.id, notice)?.let(PartyNotices::retire)
+    }
+
+    private fun retireNotice(inviteId: String) {
+        inviteNotices.remove(inviteId)?.let(PartyNotices::retire)
+    }
+
+    private fun acceptFromNotice(invite: PartyInvite) {
+        if (_party.value != null) {
+            _confirmLeave.value = invite
+            PartyNotices.showDialogs()
+            return
+        }
+        acceptNow(invite, leaveCurrent = false, fromNotice = true)
     }
 
     private fun onInviteUpdated(inviteId: String, status: PartyInviteStatus) {
@@ -160,6 +184,7 @@ object PartyRepository {
         _incomingInvites.update { list -> list.filterNot { it.id == inviteId } }
         _outgoingInvites.update { list -> list.filterNot { it.id == inviteId } }
         if (_confirmLeave.value?.id == inviteId) _confirmLeave.value = null
+        retireNotice(inviteId)
     }
 
     private fun report(action: String, fallback: String, error: Throwable) {
@@ -198,24 +223,26 @@ object PartyRepository {
 
     private val accepting = ConcurrentHashMap.newKeySet<String>()
 
-    private fun acceptNow(invite: PartyInvite, leaveCurrent: Boolean) = PolyPlusClient.SCOPE.launch {
+    private fun acceptNow(invite: PartyInvite, leaveCurrent: Boolean, fromNotice: Boolean = false) = PolyPlusClient.SCOPE.launch {
         if (!accepting.add(invite.id)) return@launch
         try {
-            acceptInvite(invite, leaveCurrent)
+            acceptInvite(invite, leaveCurrent, fromNotice)
         } finally {
             accepting.remove(invite.id)
         }
     }
 
-    private suspend fun acceptInvite(invite: PartyInvite, leaveCurrent: Boolean) {
+    private suspend fun acceptInvite(invite: PartyInvite, leaveCurrent: Boolean, fromNotice: Boolean) {
         PartyApi.acceptInvite(invite.id, leaveCurrent)
             .onSuccess { party ->
                 _incomingInvites.update { list -> list.filterNot { it.id == invite.id } }
+                retireNotice(invite.id)
                 applyParty(party)
             }
             .onFailure { error ->
                 if (error is PartyApiException && error.code == PartyErrors.ALREADY_IN_PARTY && !leaveCurrent) {
                     _confirmLeave.value = invite
+                    if (fromNotice) PartyNotices.showDialogs()
                     refresh()
                     return@onFailure
                 }
@@ -228,6 +255,7 @@ object PartyRepository {
 
     fun decline(invite: PartyInvite) = PolyPlusClient.SCOPE.launch {
         _incomingInvites.update { list -> list.filterNot { it.id == invite.id } }
+        retireNotice(invite.id)
         PartyApi.declineInvite(invite.id).onFailure { error ->
             if (error is PartyApiException && (error.status == 404 || error.status == 410)) return@onFailure
             report("decline", "Couldn't decline the invite", error)

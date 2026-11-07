@@ -6,6 +6,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.party.HostJoinPolicy
 import org.polyfrost.polyplus.client.party.SceneSharing
 
 object PolyPlusPartyConfig : Config(
@@ -40,6 +41,14 @@ object PolyPlusPartyConfig : Config(
         options = ["Ask", "Always", "Never"],
     )
     var partySceneSharing: SceneSharing = SceneSharing.ASK
+
+    @JvmStatic
+    @Dropdown(
+        title = "Let Party Members Join My Hosted World",
+        description = "When you lead a party and host a world, choose what happens when a member asks to join.",
+        options = ["Ask", "Always", "Never"],
+    )
+    var partyHostJoin: HostJoinPolicy = HostJoinPolicy.ASK
 
     @JvmStatic
     @Switch(
