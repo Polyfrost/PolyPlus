@@ -7,6 +7,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -178,15 +182,22 @@ private fun Modifier.placed(at: (IntSize) -> IntOffset): Modifier = layout { mea
 private fun Spotlight(hole: Rect) {
     val root = LocalRootSize.current
     val scrim = OneConfigTheme.current.pageBackground.copy(alpha = SCRIM_ALPHA)
-    listOf(
-        Rect(0f, 0f, root.width, hole.top),
-        Rect(0f, hole.bottom, root.width, root.height),
-        Rect(0f, hole.top, hole.left, hole.bottom),
-        Rect(hole.right, hole.top, root.width, hole.bottom),
-    ).filter { it.width > 0f && it.height > 0f }.forEach { part ->
-        Box(Modifier.pixels(part).background(scrim).pointerInput(Unit) { detectTapGestures { } })
-    }
-    Box(Modifier.pixels(hole).border(1.dp, OneConfigTheme.accent, ppShape(16.dp)).pointerInput(Unit) { detectTapGestures { } })
+    val shape = ppShape(16.dp)
+    Box(
+        Modifier.pixels(Rect(0f, 0f, root.width, root.height)).pointerInput(Unit) { detectTapGestures { } }.drawBehind {
+            val cut = Path().apply {
+                addOutline(shape.createOutline(hole.size, layoutDirection, this@drawBehind))
+                translate(hole.topLeft)
+            }
+            val mask = Path().apply {
+                fillType = PathFillType.EvenOdd
+                addRect(Rect(0f, 0f, size.width, size.height))
+                addPath(cut)
+            }
+            drawPath(mask, scrim)
+        },
+    )
+    Box(Modifier.pixels(hole).border(1.dp, OneConfigTheme.accent, shape).pointerInput(Unit) { detectTapGestures { } })
 }
 
 @Composable
