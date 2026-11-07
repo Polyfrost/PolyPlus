@@ -152,8 +152,9 @@ object PauseStage {
     internal val frameDelta: Float get() = frameSeconds
 
     internal fun pointer(x: Float, y: Float) {
-        pointerNowX = x.toDouble()
-        pointerNowY = y.toDouble()
+        if (!x.isFinite() || !y.isFinite()) return
+        pointerNowX = x.toDouble().coerceIn(-1.0, 1.0)
+        pointerNowY = y.toDouble().coerceIn(-1.0, 1.0)
     }
 
     private fun curve(t: Float): Float {

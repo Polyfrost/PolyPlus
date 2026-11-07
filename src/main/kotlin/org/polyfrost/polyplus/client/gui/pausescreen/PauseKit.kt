@@ -109,7 +109,8 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val at = event.changes.firstOrNull()?.position ?: continue
                         val box = size
-                        if (box.width > 0 && box.height > 0) PauseStage.pointer(at.x / box.width * 2f - 1f, 1f - at.y / box.height * 2f)
+                        val inside = at.x.isFinite() && at.y.isFinite() && at.x in 0f..box.width.toFloat() && at.y in 0f..box.height.toFloat()
+                        if (inside && box.width > 0 && box.height > 0) PauseStage.pointer(at.x / box.width * 2f - 1f, 1f - at.y / box.height * 2f)
                     }
                 }
             },
