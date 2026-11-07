@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialTextField
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
@@ -35,10 +36,9 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
-private const val ROW_GAP = 12
+private val CardGap = 12.dp
 private const val COLUMNS = 3
-private const val PEEK = 30
-private const val MIN_CARD_HEIGHT = 280
+private const val ROWS = 2
 
 @Composable
 internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSelect: (String) -> Unit, onHost: (String) -> Unit) {
@@ -50,19 +50,21 @@ internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSe
     LaunchedEffect(selectedWorldId) {
         if (selectedWorldId != null) state.selectedId = selectedWorldId
     }
-    Row(
-        Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
-        horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
-    ) {
-        FeaturedWorldSlot(state, Modifier.width(LobbyLayout.ChatWidth).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom))
-        Column(
-            Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
-            verticalArrangement = Arrangement.spacedBy(ROW_GAP.dp),
+    ContextMenuHost {
+        Row(
+            Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
+            horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
         ) {
-            WorldsHeader(state, onBack)
-            WorldsBody(state, Modifier.weight(1f).fillMaxWidth())
+            Column(
+                Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
+                verticalArrangement = Arrangement.spacedBy(CardGap),
+            ) {
+                WorldsHeader(state, onBack)
+                LastPlayedWorldStrip(state, onHost)
+                WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
+            }
+            WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
         }
-        WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
     }
 }
 
@@ -90,7 +92,7 @@ private fun WorldsHeader(state: SingleplayerState, onBack: () -> Unit) {
 }
 
 @Composable
-private fun WorldsBody(state: SingleplayerState, modifier: Modifier) {
+private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modifier: Modifier) {
     when {
         state.phase == WorldListPhase.Failed -> EmptyState("Unable to load worlds", modifier.panel(), state.failure.orEmpty()) {
             SocialButton("Try again", icon = LobbyIcons.REFRESH, filled = true, onClick = state::reload)
@@ -102,30 +104,26 @@ private fun WorldsBody(state: SingleplayerState, modifier: Modifier) {
         else -> {
             val visible = state.visible()
             when {
-                visible.isNotEmpty() -> WorldGrid(state, visible, modifier)
+                visible.isNotEmpty() -> WorldGrid(state, visible, onHost, modifier)
                 state.narrowed -> EmptyState("No worlds match that filter", modifier.panel())
-                else -> EmptyState("No other worlds", modifier.panel(), "Your last played world is on the left.")
+                else -> EmptyState("No other worlds", modifier.panel(), "Your last played world is above.")
             }
         }
     }
 }
 
 @Composable
-private fun WorldGrid(state: SingleplayerState, worlds: List<SingleplayerWorld>, modifier: Modifier) {
+private fun WorldGrid(state: SingleplayerState, worlds: List<SingleplayerWorld>, onHost: (String) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
-        val available = maxHeight.value
-        val visibleRows = ((available + ROW_GAP) / (MIN_CARD_HEIGHT + ROW_GAP)).toInt().coerceAtLeast(1)
-        val totalRows = (worlds.size + COLUMNS - 1) / COLUMNS
-        val reserved = ROW_GAP * (visibleRows - 1) + if (totalRows > visibleRows) ROW_GAP + PEEK else 0
-        val cardHeight = ((available - reserved) / visibleRows).dp
+        val rowHeight = (maxHeight - CardGap * (ROWS - 1)) / ROWS
         LazyVerticalGrid(
             GridCells.Fixed(COLUMNS),
             Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(ROW_GAP.dp),
-            verticalArrangement = Arrangement.spacedBy(ROW_GAP.dp),
+            horizontalArrangement = Arrangement.spacedBy(CardGap),
+            verticalArrangement = Arrangement.spacedBy(CardGap),
         ) {
             items(worlds, key = { it.id }) { world ->
-                WorldCard(state, world, Modifier.fillMaxWidth().height(cardHeight))
+                WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
             }
         }
     }

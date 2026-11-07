@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.network.chat.Component
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.ContextItem
 import org.polyfrost.polyplus.client.gui.HoverTooltip
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -45,6 +47,7 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.lobbyshell.DangerButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
@@ -63,6 +66,8 @@ private const val BANNER_FALLBACK_ALPHA = 0.22f
 private const val TOOLTIP_WIDTH = 240
 
 private const val CARD_TAGS = 2
+private const val STRIP_HEIGHT = 60
+private const val STRIP_WASH_ALPHA = 0.35f
 
 private val WorldTone.color: Color
     @Composable get() = when (this) {
@@ -128,14 +133,29 @@ private fun WorldCardText(world: SingleplayerWorld, titleSize: Int = 16) {
     }
 }
 
+private fun worldMenuItems(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit): List<ContextItem> = listOfNotNull(
+    ContextItem(world.primaryLabel, SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { state.flows.play(world) },
+    ContextItem("Host", SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { onHost(world.id) }.takeIf { hostWorldAllowed() },
+    ContextItem("Edit", SOCIAL_ASSETS + "edit-02.svg", enabled = world.canEdit) { state.flows.edit(world) },
+    ContextItem("Backup", LobbyIcons.COPY, enabled = world.canBackup) { state.flows.backup(world) },
+    ContextItem("Recreate", LobbyIcons.REFRESH, enabled = world.canRecreate) { state.flows.recreate(world) },
+    ContextItem("Delete", LobbyIcons.TRASH, danger = true, enabled = world.canDelete) { state.flows.delete(world) },
+)
+
 @Composable
-internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, modifier: Modifier) {
-    val banner = 140.dp
+internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit, modifier: Modifier) {
+    val banner = 104.dp
     val tile = 52.dp
     val overhang = 12.dp
     val icon = state.icons[world.id]
     val (interaction, hovered) = rememberSocialHover()
-    Box(modifier.cardFrame(state.selected === world, hovered).hoverable(interaction).clickableWithSound(rememberCardClick(state, world))) {
+    Box(
+        modifier
+            .cardFrame(state.selected === world, hovered)
+            .contextMenu { worldMenuItems(state, world, onHost) }
+            .hoverable(interaction)
+            .clickableWithSound(rememberCardClick(state, world)),
+    ) {
         Column(Modifier.fillMaxSize()) {
             WorldBanner(icon, banner)
             Column(
@@ -152,31 +172,37 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, modif
 }
 
 @Composable
-internal fun FeaturedWorldSlot(state: SingleplayerState, modifier: Modifier) {
-    val world = state.featured
-    if (world == null) {
-        val loading = state.phase == WorldListPhase.Loading
-        EmptyState("Last played", modifier.panel(), if (loading) "" else "Your last played world shows here.")
-        return
-    }
-    val banner = 244.dp
-    val tile = 72.dp
-    val overhang = 18.dp
+internal fun LastPlayedWorldStrip(state: SingleplayerState, onHost: (String) -> Unit) {
+    val world = state.lastPlayedWorld ?: return
     val icon = state.icons[world.id]
     val (interaction, hovered) = rememberSocialHover()
-    Box(modifier.cardFrame(state.selected === world, hovered).hoverable(interaction).clickableWithSound(rememberCardClick(state, world))) {
-        Column(Modifier.fillMaxSize()) {
-            WorldBanner(icon, banner)
-            Column(
-                Modifier.fillMaxWidth().weight(1f).padding(start = 18.dp, end = 18.dp, top = overhang + 12.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                WorldCardText(world, titleSize = 22)
-                SocialButton(world.primaryLabel, modifier = Modifier.fillMaxWidth(), filled = true, enabled = world.canPlay) { state.flows.play(world) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(STRIP_HEIGHT.dp)
+            .cardFrame(state.selected === world, hovered)
+            .background(Brush.horizontalGradient(listOf(OneConfigTheme.accent.copy(alpha = STRIP_WASH_ALPHA), Color.Transparent)))
+            .contextMenu { worldMenuItems(state, world, onHost) }
+            .hoverable(interaction)
+            .clickableWithSound(rememberCardClick(state, world))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        WorldTile(icon, 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WorldTags(world) { Tag("Last played", TagTone.Accent) }
+                Label(world.name, 15.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
+            }
+            val status = world.status
+            if (status != null) {
+                Label(status, 12.sp, color = world.statusTone.color)
+            } else {
+                Label(world.meta, 12.sp, color = MutedText)
             }
         }
-        WorldTags(world, Modifier.padding(12.dp)) { Tag("Last played", TagTone.Accent) }
-        Box(Modifier.offset(x = 18.dp, y = banner - tile + overhang)) { WorldTile(icon, tile) }
+        SocialButton(world.primaryLabel, filled = true, enabled = world.canPlay) { state.flows.play(world) }
     }
 }
 

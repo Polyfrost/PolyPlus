@@ -202,6 +202,9 @@ internal class SingleplayerState {
     val featured: SingleplayerWorld?
         get() = worlds.firstOrNull { it.canPlay && !it.broken && it.lastPlayed > 0L } ?: worlds.firstOrNull { it.canPlay && !it.broken } ?: worlds.firstOrNull()
 
+    val lastPlayedWorld: SingleplayerWorld?
+        get() = worlds.firstOrNull { it.canPlay && !it.broken && it.lastPlayed > 0L }
+
     val selected: SingleplayerWorld?
         get() = worlds.firstOrNull { it.id == selectedId } ?: featured
 
@@ -210,7 +213,7 @@ internal class SingleplayerState {
 
     fun visible(): List<SingleplayerWorld> {
         val matching = worlds.filter { it.matches(filter) && it.matches(query) }
-        return if (narrowed) matching else matching.filter { it !== featured }
+        return if (narrowed) matching else lastPlayedWorld.let { last -> matching.filter { it !== last } }
     }
 
     fun reload() {
