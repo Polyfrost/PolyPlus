@@ -82,6 +82,7 @@ object LobbySky {
     private const val MOONLIGHT = 0.34f
     private const val DEPTH_OF_FIELD = 0.9f
     private const val PACK_DEPTH_OF_FIELD = 0.35f
+    private const val INTERIOR_DEPTH_OF_FIELD = 0.45f
     private const val DEPTH_FORWARD = 1
     private const val DEPTH_REVERSE = 2
     private const val DEPTH_UNKNOWN = 3
@@ -107,12 +108,12 @@ object LobbySky {
     private val glass = MemoryUtil.memAlloc(LobbyGlass.BLOCK_BYTES)
     private val fogSeen = Vector3f(1f, 1f, 1f)
 
-    private fun skyLight(color: Vector3f): Vector3f = color.lerp(NIGHT_LIGHT, 0.34f * mood.night)
+    private fun skyLight(color: Vector3f): Vector3f = if (mood.interior) color else color.lerp(NIGHT_LIGHT, 0.34f * mood.night)
 
-    private fun sky(color: Vector3f): Vector3f = color.add(Vector3f(NIGHT_SKY).mul(mood.night))
+    private fun sky(color: Vector3f): Vector3f = if (mood.interior) color else color.add(Vector3f(NIGHT_SKY).mul(mood.night))
 
     private fun fog(color: Vector3f): Vector3f =
-        color.lerp(DAY_HAZE, 0.45f * (1f - mood.night) * (1f - mood.golden)).lerp(NIGHT_FOG, 0.7f * mood.night).also { fogSeen.set(it) }
+        if (mood.interior) color.also { fogSeen.set(it) } else color.lerp(DAY_HAZE, 0.45f * (1f - mood.night) * (1f - mood.golden)).lerp(NIGHT_FOG, 0.7f * mood.night).also { fogSeen.set(it) }
 
     @JvmStatic
     fun skyLightFactor(value: Float): Float = value.coerceAtLeast(MOONLIGHT * mood.night)
@@ -196,7 +197,8 @@ object LobbySky {
         }
         data.putFloat(mood.aurora).putFloat(mood.night).putFloat(mood.exposure).putFloat(mood.golden)
         val lens = if (pack && bridge.packDepthOfField()) DEPTH_OF_FIELD * PACK_DEPTH_OF_FIELD else DEPTH_OF_FIELD
-        data.putFloat(focus).putFloat(lens).putFloat(LobbyReveal.shaderMode(LobbyScene.introProgress())).putFloat(LobbyScene.introProgress())
+        val depthOfField = if (mood.interior) lens * INTERIOR_DEPTH_OF_FIELD else lens
+        data.putFloat(focus).putFloat(depthOfField).putFloat(LobbyReveal.shaderMode(LobbyScene.introProgress())).putFloat(LobbyScene.introProgress())
         val wave = LobbyWaveState.vector()
         data.putFloat(wave.x).putFloat(wave.y).putFloat(wave.z).putFloat(wave.w)
         if (pack) {

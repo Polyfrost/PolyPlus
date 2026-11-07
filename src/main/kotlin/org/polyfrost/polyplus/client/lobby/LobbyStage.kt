@@ -39,6 +39,7 @@ data class LobbyStage(
     val heading: Double,
     val background: List<LobbySlot> = emptyList(),
     val cranePitch: Double = CRANE_PITCH,
+    val interior: Boolean = false,
 ) {
     fun forward(): Vec3 {
         val radians = Math.toRadians(yaw.toDouble())
@@ -76,9 +77,13 @@ data class LobbyStage(
         putDouble("heading", heading)
         putFloat("pitch", pitch)
         putDouble("distance", distance)
+        if (interior) putByte("interior", 1)
     }
 
-    private class Solver(val level: BlockGetter) {
+    private class Solver(val level: BlockGetter, val interior: Boolean = false) {
+        val shots = if (interior) INTERIOR_SHOTS else SHOTS
+        val base = if (interior) INTERIOR_BASE else SHOTS.first()
+
         private val standing = HashMap<Long, Boolean>()
         private val open = HashMap<Long, Boolean>()
         private val walkable = HashMap<Long, Set<Long>>()
@@ -89,7 +94,7 @@ data class LobbyStage(
             (above downTo -below).firstNotNullOfOrNull { dy -> near.offset(0, dy, 0).takeIf(::canStand) }
 
         fun open(pos: BlockPos): Boolean = open.getOrPut(pos.asLong()) {
-            (2..SKY_CHECK).all { level.getBlockState(pos.above(it)).isAir }
+            if (interior) (2..INTERIOR_HEADROOM).all { clear(level, pos.above(it)) } else (2..SKY_CHECK).all { level.getBlockState(pos.above(it)).isAir }
         }
 
         fun settled(cell: BlockPos, loose: Boolean): Boolean {
@@ -143,12 +148,12 @@ data class LobbyStage(
             body.hits(other.body) || label.hits(other.label.grown(TAG_GAP)) || label.hits(other.head) || head.hits(other.label)
     }
 
-    private class Frame(val spot: BlockPos, val heading: Double, val pitchDegrees: Double, val distance: Double) {
+    private class Frame(val spot: BlockPos, val heading: Double, val pitchDegrees: Double, val distance: Double, base: Pair<Double, Double> = SHOTS.first()) {
         val forwardX = sin(heading)
         val forwardZ = cos(heading)
         val pitch = Math.toRadians(pitchDegrees)
-        val spread = distance / SHOTS.first().second
-        val rows = spread * sin(Math.toRadians(SHOTS.first().first)) / sin(pitch)
+        val spread = distance / base.second
+        val rows = spread * sin(Math.toRadians(base.first)) / sin(pitch)
 
         fun project(lateral: Double, depth: Double, y: Double): Vec3 = Vec3(
             spot.x + 0.5 + forwardZ * lateral + forwardX * depth,
@@ -306,10 +311,15 @@ data class LobbyStage(
         private const val MAX_LEAF_SHARE = 0.3
         private const val MAX_NEAR_SHARE = 0.35
         private const val GROUND_RAY = -0.4
+        private const val INTERIOR_HEADROOM = 3
+        private const val INTERIOR_FOREGROUND_SHARE = 0.45
+        private const val INTERIOR_NEAR_SHARE = 0.6
 
         private val PORTRAIT_ORBITS = listOf(8f, -8f, 20f, -20f, 34f, -34f, 50f, -50f)
         private val PORTRAIT_PITCHES = listOf(5f, 9f, 14f, 20f)
         private val SHOTS = listOf(16.0 to 18.5, 20.0 to 18.5, 12.0 to 20.5, 24.0 to 17.0, 16.0 to 22.0)
+        private val INTERIOR_SHOTS = listOf(10.0 to 10.5, 8.0 to 9.0, 14.0 to 12.0, 6.0 to 8.0, 12.0 to 14.0)
+        private val INTERIOR_BASE = 10.0 to 14.0
         private val CRANE_REACH = listOf(46.0, 38.0, 30.0, 24.0)
         private val CRANE_ORBITS = listOf(38.0, -38.0, 22.0, -22.0, 0.0)
         private val SIGHT_POINTS = listOf(
@@ -367,15 +377,15 @@ data class LobbyStage(
             8.5 to 8.0,
         )
 
-        fun build(level: BlockGetter, anchor: BlockPos): LobbyStage? {
-            val solver = Solver(level)
+        fun build(level: BlockGetter, anchor: BlockPos, interior: Boolean = false): LobbyStage? {
+            val solver = Solver(level, interior)
             val frames = ArrayList<Candidate>()
             for ((spot, open) in openSpots(solver, anchor)) {
                 val drift = hypot((spot.x - anchor.x).toDouble(), (spot.z - anchor.z).toDouble()) * ANCHOR_DISTANCE_COST
                 for (index in 0 until YAW_CANDIDATES) {
                     val heading = index * Math.PI * 2.0 / YAW_CANDIDATES
-                    for ((pitch, distance) in SHOTS) {
-                        val frame = Frame(spot, heading, pitch, distance)
+                    for ((pitch, distance) in solver.shots) {
+                        val frame = Frame(spot, heading, pitch, distance, solver.base)
                         val stage = solve(solver, frame, PARTY_MIN, false) ?: continue
                         val bonus = open * OPEN_WEIGHT - drift
                         frames += Candidate(frame, stage.quality + bonus, bonus)
@@ -390,12 +400,13 @@ data class LobbyStage(
 
         fun restore(level: BlockGetter, tag: CompoundTag): LobbyStage? {
             val spot = tag.optIntArray("spot") ?: return null
-            val solver = Solver(level)
+            val solver = Solver(level, tag.optByte("interior") == 1.toByte())
             val frame = Frame(
                 BlockPos(spot[0], spot[1], spot[2]),
                 tag.getDoubleOr("heading", 0.0),
                 tag.getFloatOr("pitch", 16f).toDouble(),
                 tag.getDoubleOr("distance", 18.5),
+                solver.base,
             )
             return solve(solver, frame, 1, true)?.let { finish(solver, it) }
         }
@@ -431,7 +442,7 @@ data class LobbyStage(
                 final.fill(false)
                 final.fill(true)
             }
-            val backdrop = backdrop(level, view, frame.distance) ?: return null
+            val backdrop = backdrop(level, view, frame.distance, solver.interior) ?: return null
             val feet = final.feet()
             val player = feet.first()
             val slots = feet.mapIndexed { index, pos ->
@@ -439,7 +450,8 @@ data class LobbyStage(
                 LobbySlot(pos, if (index == 0) front else front + Mth.wrapDegrees(lookYaw(pos, player) - front) * TURN_IN)
             }
             val rise = feet.sumOf { abs(it.y - rest) }
-            val shotCost = abs(frame.distance - SHOTS.first().second) * SHOT_DISTANCE_COST + abs(frame.pitchDegrees - SHOTS.first().first) * SHOT_PITCH_COST
+            val shot = solver.shots.first()
+            val shotCost = abs(frame.distance - shot.second) * SHOT_DISTANCE_COST + abs(frame.pitchDegrees - shot.first) * SHOT_PITCH_COST
             val quality = backdrop * BACKDROP_WEIGHT - drift * DRIFT_COST - rise * RISE_COST + feet.size * PARTY_WEIGHT - shotCost
             return LobbyStage(
                 Vec3(spot.x + 0.5, spot.y.toDouble(), spot.z + 0.5),
@@ -454,6 +466,7 @@ data class LobbyStage(
                 quality,
                 spot,
                 frame.heading,
+                interior = solver.interior,
             )
         }
 
@@ -525,7 +538,9 @@ data class LobbyStage(
             return (x + 1.0) * 0.5 * SCREEN_WIDTH to (1.0 - y) * 0.5 * SCREEN_HEIGHT
         }
 
-        private fun backdrop(level: BlockGetter, view: LobbyEntrance.View, distance: Double): Double? {
+        private fun backdrop(level: BlockGetter, view: LobbyEntrance.View, distance: Double, interior: Boolean): Double? {
+            val foreground = if (interior) INTERIOR_FOREGROUND_SHARE else FOREGROUND_SHARE
+            val nearShare = if (interior) INTERIOR_NEAR_SHARE else MAX_NEAR_SHARE
             var total = 0.0
             var leaves = 0
             var near = 0
@@ -535,7 +550,7 @@ data class LobbyStage(
                 val end = view.camera.add(direction.scale(BACKDROP_REACH))
                 val hit = clip(level, view.camera, end)
                 val length = if (hit.type == HitResult.Type.MISS) BACKDROP_REACH else view.camera.distanceTo(hit.location)
-                if (length < distance * FOREGROUND_SHARE) return null
+                if (length < distance * foreground) return null
                 if (hit.type != HitResult.Type.MISS && canopy(level, hit.blockPos)) leaves++
                 total += length / BACKDROP_REACH
                 if (length < distance) total -= BLOCKED_NEAR_COST / BACKDROP_RAYS.size
@@ -544,7 +559,7 @@ data class LobbyStage(
                     if (length < distance) near++
                 }
             }
-            if (leaves > BACKDROP_RAYS.size * MAX_LEAF_SHARE || near > raised * MAX_NEAR_SHARE) return null
+            if (leaves > BACKDROP_RAYS.size * MAX_LEAF_SHARE || near > raised * nearShare) return null
             return total / BACKDROP_RAYS.size
         }
 
@@ -557,13 +572,13 @@ data class LobbyStage(
 
         private fun finish(solver: Solver, stage: LobbyStage): LobbyStage {
             val level = solver.level
-            val frame = Frame(stage.spot, stage.heading, stage.pitch.toDouble(), stage.distance)
+            val frame = Frame(stage.spot, stage.heading, stage.pitch.toDouble(), stage.distance, solver.base)
             val view = viewOf(frame, frame.camera(stage.aim))
-            val lanterns = lanternCells(solver, frame, stage).filter { cell ->
+            val lanterns = if (stage.interior) emptyList() else lanternCells(solver, frame, stage).filter { cell ->
                 val post = post(view, cell)
                 stage.slots.none { depthOf(view, it.pos) > depthOf(view, Vec3(cell.x + 0.5, cell.y.toDouble(), cell.z + 0.5)) && post.hits(figure(view, it.pos).body) }
             }
-            val (orbit, reach, cranePitch) = crane(level, stage)
+            val (orbit, reach, cranePitch) = if (stage.interior) Triple(0.0, stage.distance, stage.pitch.toDouble()) else crane(level, stage)
             return stage.copy(lanterns = lanterns, craneOrbit = orbit, craneDistance = reach, cranePitch = cranePitch, background = crowd(solver, frame, view, stage, lanterns))
         }
 
@@ -722,6 +737,9 @@ data class LobbyStage(
                 level.getBlockState(it).getCollisionShape(level, it).isEmpty && level.getFluidState(it).isEmpty
             }
         }
+
+        private fun clear(level: BlockGetter, pos: BlockPos): Boolean =
+            level.getBlockState(pos).getCollisionShape(level, pos).isEmpty && level.getFluidState(pos).isEmpty
 
         private fun firmGround(level: BlockGetter, pos: BlockPos): Boolean {
             val below = level.getBlockState(pos.below())

@@ -50,9 +50,15 @@ data class LobbySceneEntry(
     val origin: String,
     val packs: List<LobbyScenePack> = emptyList(),
     val gameVersion: String = "",
+    val points: Int? = null,
+    val manual: Boolean = false,
+    val profile: String = "outdoor",
 ) {
     val bundled: Boolean
         get() = origin == ORIGIN_BUNDLED
+
+    val setting: LobbySceneScore.Profile
+        get() = LobbySceneScore.Profile.of(profile)
 
     companion object {
         const val ORIGIN_WORLD = "world"
@@ -200,7 +206,7 @@ object LobbySceneStore {
     }
 
     fun wouldKeep(world: String, x: Int, z: Int, score: Double, stack: Set<String>): Boolean {
-        val rivals = scenes.filter { it.world == world && it.dataVersion == LobbySnapshot.dataVersion && stackOf(it) == stack }
+        val rivals = scenes.filter { !it.manual && it.world == world && it.dataVersion == LobbySnapshot.dataVersion && stackOf(it) == stack }
         val near = rivals.filter { hypot((it.x - x).toDouble(), (it.z - z).toDouble()) < SAME_SPOT_BLOCKS }
         if (near.any { it.score >= score }) return false
         return near.isNotEmpty() || rivals.size < MAX_PER_WORLD || rivals.any { it.score < score }
@@ -208,14 +214,17 @@ object LobbySceneStore {
 
     fun admit(candidate: LobbySceneEntry, data: ByteArray): Boolean {
         val stack = stackOf(candidate)
-        if (!wouldKeep(candidate.world, candidate.x, candidate.z, candidate.score, stack)) return false
+        if (!candidate.manual && !wouldKeep(candidate.world, candidate.x, candidate.z, candidate.score, stack)) return false
         val inWorld = state.scenes.filter { it.world == candidate.world }
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
-        val rivals = current.filter { stackOf(it) == stack }
+        val rivals = current.filter { !it.manual && stackOf(it) == stack }
         val replaced = (inWorld - current.toSet()).toMutableList()
-        replaced += rivals.filter { hypot((it.x - candidate.x).toDouble(), (it.z - candidate.z).toDouble()) < SAME_SPOT_BLOCKS }
-        val left = rivals - replaced.toSet()
-        if (left.size >= MAX_PER_WORLD) replaced += left.sortedBy { it.score }.take(left.size - MAX_PER_WORLD + 1)
+        replaced += state.scenes.filter { it.file == fileName(candidate) }
+        if (!candidate.manual) {
+            replaced += rivals.filter { hypot((it.x - candidate.x).toDouble(), (it.z - candidate.z).toDouble()) < SAME_SPOT_BLOCKS }
+            val left = rivals - replaced.toSet()
+            if (left.size >= MAX_PER_WORLD) replaced += left.sortedBy { it.score }.take(left.size - MAX_PER_WORLD + 1)
+        }
         var kept = state.scenes - replaced.toSet()
         var total = kept.sumOf { it.bytes } + data.size
         val spare = kept.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, ::rank)).toMutableList()
@@ -268,7 +277,8 @@ object LobbySceneStore {
 
     private fun fileName(entry: LobbySceneEntry): String {
         val stack = entry.packs.joinToString("") { "|${it.id}" }
-        val digest = MessageDigest.getInstance("SHA-1").digest("${entry.world}|${entry.x}|${entry.z}$stack".toByteArray(Charsets.UTF_8))
+        val kind = if (entry.manual) "|manual" else ""
+        val digest = MessageDigest.getInstance("SHA-1").digest("${entry.world}|${entry.x}|${entry.z}$stack$kind".toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest, 0, NAME_BYTES) + ".nbt.gz"
     }
 

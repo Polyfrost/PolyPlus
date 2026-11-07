@@ -14,6 +14,7 @@ data class LobbyMood(
     val exposure: Float,
     val snow: Boolean,
     val lanterns: Int,
+    val interior: Boolean = false,
 ) {
     val dark: Boolean get() = night > LANTERN_NIGHT
 
@@ -32,11 +33,16 @@ data class LobbyMood(
         private const val LIT_RADIUS = 14
         private const val LIT_SEEN = 2500
         private const val LANTERN_NIGHT = 0.5f
+        private const val FILL_RADIUS = 8
+        private const val FILL_RISE = 4
+        private const val BRIGHT_ROOM = 11f
+        private const val MAX_FILL = 1.6f
 
         val NEUTRAL = LobbyMood(6000L, 0f, 0f, 0f, DAY_EXPOSURE, false, 0)
 
-        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long): LobbyMood {
+        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long, interior: Boolean = false): LobbyMood {
             val clock = Math.floorMod(capturedClock, DAY_TICKS)
+            if (interior) return LobbyMood(clock, 0f, 0f, 0f, DAY_EXPOSURE * fill(level, aim), false, 0, true)
             val night = nightAmount(clock.toFloat())
             val biome = level.getBiome(aim).value()
             val cold = 1f - Mth.clamp(biome.baseTemperature / COLD_MAX, 0f, 1f)
@@ -66,6 +72,18 @@ data class LobbyMood(
             val toSunset = abs(clock - SUNSET)
             val toSunrise = minOf(abs(clock - SUNRISE), abs(clock + DAY_TICKS - SUNRISE))
             return (1f - minOf(toSunset, toSunrise) / GOLDEN_SPAN).coerceAtLeast(0f)
+        }
+
+        private fun fill(level: ClientLevel, aim: BlockPos): Float {
+            var cells = 0
+            var light = 0
+            for (pos in LobbyCompat.between(aim.offset(-FILL_RADIUS, -FILL_RISE, -FILL_RADIUS), aim.offset(FILL_RADIUS, FILL_RISE, FILL_RADIUS))) {
+                if (!level.getBlockState(pos).isAir) continue
+                cells++
+                light += maxOf(level.getBrightness(LightLayer.BLOCK, pos), level.getBrightness(LightLayer.SKY, pos))
+            }
+            val average = if (cells == 0) 0f else light.toFloat() / cells
+            return Mth.lerp(Mth.clamp(average / BRIGHT_ROOM, 0f, 1f), MAX_FILL, 1f)
         }
 
         private fun litCells(level: ClientLevel, aim: BlockPos): Int {

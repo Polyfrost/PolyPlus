@@ -272,6 +272,9 @@ object LobbyScene {
     private const val FOCUS_RETURN_RATE = 4.2
     private const val FOCUS_DEPART_RATE = 9.0
     private const val MIN_LENS_DEPTH = 0.5
+    private const val WALL_MARGIN = 0.4
+    private const val MIN_WALL_DISTANCE = 1.5
+    private const val WALL_RELEASE_RATE = 2.0
     private const val DEPART_SECONDS = 0.75
     private const val LOOP_TICK = 23000L
     private const val LOOP_RESUME = 3000L
@@ -360,6 +363,7 @@ object LobbyScene {
     private var switching = false
     private var quietSwitch = false
     private var lastPoseTime = 0.0
+    private var wallReach = Double.POSITIVE_INFINITY
     private var departDone: (() -> Unit)? = null
     private var departed: (() -> Unit)? = null
     private var overlayDelay = OVERLAY_SECONDS
@@ -982,7 +986,7 @@ object LobbyScene {
             ?: LobbyStage.build(level, anchor)
             ?: error("Scene ${loaded.entry.id} has no place for the party")
         val captured = root.getLongOr("time", 0L)
-        val mood = LobbyMood.of(level, LobbyCompat.blockAt(stage.aim), sceneClock(captured))
+        val mood = LobbyMood.of(level, LobbyCompat.blockAt(stage.aim), sceneClock(captured), stage.interior)
         applyTime(level, mood)
         LobbySky.mood = mood
         val posts = dress(level, stage, mood)
@@ -1001,7 +1005,7 @@ object LobbyScene {
         val clock = sceneClock(scene.captured)
         if (clock == scene.mood.clock) return
         val level = scene.level
-        val next = LobbyMood.of(level, LobbyCompat.blockAt(scene.stage.aim), clock)
+        val next = if (scene.stage.interior) scene.mood.copy(clock = clock) else LobbyMood.of(level, LobbyCompat.blockAt(scene.stage.aim), clock)
         val mood = if (next.dark == scene.mood.dark) next.copy(lanterns = scene.mood.lanterns) else next
         if (next.dark != scene.mood.dark) {
             for ((pos, state) in scene.posts.asReversed()) level.setBlock(pos, state, DRESS_FLAGS)
@@ -1590,6 +1594,7 @@ object LobbyScene {
         val yawRad = Math.toRadians(yaw)
         val pitchRad = Math.toRadians(pitch)
         val look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
+        if (stage.interior) distance = wallClamp(scene, aim, look, distance, elapsed)
         val camera = aim.subtract(look.scale(distance))
         currentDistance = distance.toFloat()
         settleLens(camera, look, stage)
@@ -1600,6 +1605,13 @@ object LobbyScene {
         rig.setXRot(pitch.toFloat())
         rig.setOldPosAndRot()
         return look
+    }
+
+    private fun wallClamp(scene: Live, aim: Vec3, look: Vec3, distance: Double, elapsed: Double): Double {
+        val reach = LobbyStage.reach(scene.level, aim, aim.subtract(look.scale(distance + WALL_MARGIN))) - WALL_MARGIN
+        val limit = reach.coerceAtLeast(MIN_WALL_DISTANCE)
+        wallReach = if (limit < wallReach || !wallReach.isFinite()) limit else wallReach + (limit - wallReach) * (elapsed * WALL_RELEASE_RATE).coerceIn(0.0, 1.0)
+        return minOf(distance, wallReach)
     }
 
     private fun settlePointer(mc: Minecraft, scene: Live, elapsed: Double) {
@@ -1652,6 +1664,7 @@ object LobbyScene {
 
     private fun calmCamera() {
         for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, parallaxX, parallaxY)) ease.snap(0.0)
+        wallReach = Double.POSITIVE_INFINITY
         focusSubject = null
     }
 
@@ -2110,6 +2123,7 @@ object LobbyScene {
         for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, parallaxX, parallaxY)) ease.snap(0.0)
         focusSubject = null
         focusPointer = null
+        wallReach = Double.POSITIVE_INFINITY
         releasing = false
         phase = Phase.IDLE
         focused = null

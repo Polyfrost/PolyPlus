@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -28,13 +29,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.oneconfig.api.ui.v1.components.fadingEdges
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialIconButton
@@ -49,10 +53,10 @@ import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbyPacks
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbySceneEntry
+import org.polyfrost.polyplus.client.lobby.LobbySceneScore
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
-import org.polyfrost.polyplus.client.serverapi.ServerApiProtocol
 import java.util.Locale
 
 private const val SUNSET_START = 11500L
@@ -78,14 +82,34 @@ internal fun BoxScope.SceneControl(lobby: LobbyShell) {
             .width(LobbyLayout.UnitWidth),
     ) {
         EscapeCloses { lobby.sceneOpen = false }
-        ScenePicker(lobby) { lobby.sceneOpen = false }
+        ScenePicker { lobby.sceneOpen = false }
     }
 }
 
 private val PickerHeight = 320.dp
+private val FadeHeight = 24.dp
+
+private fun Modifier.scrollMask(scroll: ScrollState, edge: Dp): Modifier = this
+    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .drawWithContent {
+        drawContent()
+        val top = scroll.canScrollBackward
+        val bottom = scroll.canScrollForward
+        if (!top && !bottom || size.height <= 0f) return@drawWithContent
+        val stop = (edge.toPx() / size.height).coerceIn(0f, 0.5f)
+        drawRect(
+            Brush.verticalGradient(
+                0f to if (top) Color.Transparent else Color.Black,
+                stop to Color.Black,
+                1f - stop to Color.Black,
+                1f to if (bottom) Color.Transparent else Color.Black,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
+    }
 
 @Composable
-private fun ScenePicker(lobby: LobbyShell, onClose: () -> Unit) {
+private fun ScenePicker(onClose: () -> Unit) {
     val party by PartyRepository.party.collectAsState()
     val member = PartyScene.isMember(party)
     val keepOwn = PartyScene.keepOwnBackdrop
@@ -112,7 +136,7 @@ private fun ScenePicker(lobby: LobbyShell, onClose: () -> Unit) {
         }
         val scroll = rememberScrollState()
         Column(
-            Modifier.heightIn(max = PickerHeight).fadingEdges(scroll, OneConfigTheme.current.pageBackground, 32.dp).verticalScroll(scroll),
+            Modifier.heightIn(max = PickerHeight).scrollMask(scroll, FadeHeight).verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SceneRow("Automatic", "Best recent scene", !following && LobbySceneStore.pinned == null, { pick(null) }, enabled = !following)
@@ -130,7 +154,6 @@ private fun ScenePicker(lobby: LobbyShell, onClose: () -> Unit) {
             }
             Heading("Capture")
             CaptureSwitchRow()
-            ServerRows(lobby)
         }
     }
 }
@@ -179,33 +202,9 @@ private fun SceneRow(
 
 @Composable
 private fun CaptureSwitchRow() {
-    SwitchRow("Capture scenes", "Saves good spots from your own worlds.", LobbySceneStore.captureEnabled, true) {
+    SwitchRow("Capture scenes", "Saves good spots while you play", LobbySceneStore.captureEnabled, true) {
         LobbySceneStore.captureEnabled = !LobbySceneStore.captureEnabled
     }
-}
-
-@Composable
-private fun ServerRows(lobby: LobbyShell) {
-    val servers = lobby.servers.saved
-    if (servers.isEmpty()) {
-        Note("Saved servers appear here. Capture stays on unless you or the server turn it off.")
-        return
-    }
-    servers.forEach { entry ->
-        val address = entry.data.ip
-        val policy = LobbySceneStore.serverPolicy(address)
-        val blocked = policy == ServerApiProtocol.ScenePolicy.DENY
-        SwitchRow(entry.data.name, policyText(policy, LobbySceneStore.serverChoice(address)), LobbySceneStore.serverAllows(address, policy), !blocked) {
-            LobbySceneStore.setServerChoice(address, if (LobbySceneStore.serverAllows(address, policy)) false else null)
-        }
-    }
-}
-
-private fun policyText(policy: ServerApiProtocol.ScenePolicy, choice: Boolean?): String = when {
-    policy == ServerApiProtocol.ScenePolicy.DENY -> "Blocked by this server"
-    choice == false -> "You turned this off"
-    policy == ServerApiProtocol.ScenePolicy.ALLOW -> "Allowed by this server"
-    else -> "Captures while you play here"
 }
 
 @Composable
@@ -258,5 +257,18 @@ private fun describe(entry: LobbySceneEntry): String {
         in NIGHT_START until NIGHT_END -> "Night"
         else -> "Day"
     }
-    return if (entry.bytes > 0L) "$biome, $time, ${entry.bytes / KILOBYTE} KB" else "$biome, $time"
+    val points = entry.points?.let { "$it pts" }
+    val size = if (entry.bytes > 0L) "${entry.bytes / KILOBYTE} KB" else null
+    return when (entry.setting) {
+        LobbySceneScore.Profile.CAVE -> listOfNotNull(caveName(entry.biome), points, size)
+        LobbySceneScore.Profile.INDOOR -> listOfNotNull(biome, "Indoors", points, size)
+        LobbySceneScore.Profile.OUTDOOR -> listOfNotNull(biome, time, points, size)
+    }.joinToString(", ")
+}
+
+private fun caveName(biome: String): String = when (biome) {
+    "minecraft:lush_caves" -> "Lush cave"
+    "minecraft:dripstone_caves" -> "Dripstone cave"
+    "minecraft:deep_dark" -> "Deep dark"
+    else -> "Cave"
 }
