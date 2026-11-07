@@ -79,6 +79,13 @@ import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.ThemedIcon
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
+import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
+import org.polyfrost.polyplus.client.gui.replays.ReplayThumb
+import org.polyfrost.polyplus.client.gui.replays.problem
+import org.polyfrost.polyplus.client.gui.replays.replayMenuItems
+import org.polyfrost.polyplus.client.gui.replays.summaryText
+import org.polyfrost.polyplus.compat.replay.ReplayEntry
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.party.LeaderFollow
 import org.polyfrost.polyplus.client.social.ChatIdentity
@@ -121,9 +128,15 @@ internal fun hostWorldAllowed(): Boolean =
 
 @Composable
 internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
-    val singleplayer = lobby.source == PlaySource.Singleplayer
+    val source = lobby.source.takeIf { it.shown } ?: PlaySource.Multiplayer
+    val singleplayer = source == PlaySource.Singleplayer
     val quick = !PolyPlusMainMenuConfig.hideMainMenuQuickplay
-    val target: Any? = if (singleplayer) lobby.activeWorld() else lobby.activeServer()
+    val target: Any? = when (source) {
+        PlaySource.Singleplayer -> lobby.activeWorld()
+        PlaySource.Multiplayer -> lobby.activeServer()
+        PlaySource.Replays -> lobby.activeReplay()
+    }
+    if (source == PlaySource.Replays) LaunchedEffect(Unit) { ReplayLibrary.reload() }
     Box((if (quick) modifier.height(LobbyLayout.UnitHeight) else modifier).panel()) {
         ContextMenuHost {
             HeroWash(lobby, target)
@@ -137,15 +150,16 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
                         when (shown) {
                             is ServerData -> ServerHero(lobby, shown)
                             is LobbyWorld -> WorldHero(shown)
-                            else -> EmptyHero(lobby, singleplayer)
+                            is ReplayEntry -> ReplayHero(shown)
+                            else -> EmptyHero(lobby, source)
                         }
                     }
                 }
-                PlayRow(lobby, singleplayer)
+                if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, singleplayer)
                 HostingStrip(lobby)
                 Spacer(Modifier.height(PanelGutter))
                 Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-                Footer(lobby, singleplayer, quick)
+                Footer(lobby, source, quick)
             }
         }
     }
@@ -159,6 +173,7 @@ private fun BoxScope.HeroWash(lobby: LobbyShell, target: Any?) {
             when (shown) {
                 is ServerData -> WashImage(rememberBackdrop(shown.iconBytes, fallbackArt(shown.ip)))
                 is LobbyWorld -> WashImage(rememberBackdrop(shown.icon, fallbackArt("")))
+                is ReplayEntry -> WashImage(rememberBackdrop(shown.icon, fallbackArt("")))
                 else -> WashImage(null)
             }
         }
@@ -287,7 +302,7 @@ private fun SourceSwitch(lobby: LobbyShell, modifier: Modifier) {
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        PlaySource.entries.forEach { entry ->
+        PlaySource.entries.filter { it.shown }.forEach { entry ->
             SourceTab(entry.name, entry == lobby.source, Modifier.weight(1f)) { lobby.chooseSource(entry) }
         }
     }
@@ -295,10 +310,7 @@ private fun SourceSwitch(lobby: LobbyShell, modifier: Modifier) {
 
 private fun LobbyShell.chooseSource(entry: PlaySource) {
     source = entry
-    when (page) {
-        LobbyPage.Singleplayer, LobbyPage.Multiplayer -> show(if (entry == PlaySource.Singleplayer) LobbyPage.Singleplayer else LobbyPage.Multiplayer)
-        else -> Unit
-    }
+    if (PlaySource.entries.any { it.page == page }) show(entry.page)
 }
 
 @Composable
@@ -389,15 +401,36 @@ private fun WorldHero(world: LobbyWorld) {
 }
 
 @Composable
-private fun EmptyHero(lobby: LobbyShell, singleplayer: Boolean) {
+private fun ReplayHero(entry: ReplayEntry) {
+    HeroLayout({ ReplayThumb(entry, HeroIconSize, HeroIconSize) }) {
+        HeroName(entry.name)
+        entry.world?.takeIf { it.isNotBlank() }?.let { HeroDetail(it) }
+        HeroDetail(entry.summaryText)
+        if (!entry.playable) HeroDetail(entry.problem, SocialDangerText)
+    }
+}
+
+@Composable
+private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
+    val singleplayer = source == PlaySource.Singleplayer
     val title = when {
+        source == PlaySource.Replays -> if (ReplayLibrary.loaded) "No replays yet" else "Loading replays..."
         !singleplayer -> "No servers yet"
         !lobby.worlds.loaded -> "Loading worlds..."
         lobby.worlds.saved.isEmpty() -> "No worlds yet"
         else -> "No playable worlds"
     }
-    val detail = if (singleplayer) "Create one to start playing" else "Add one to start playing"
-    HeroLayout({ EmptyIcon(if (singleplayer) "minecraft-block" else "globe-01") }) {
+    val detail = when (source) {
+        PlaySource.Replays -> "Start recording from the pause menu"
+        PlaySource.Singleplayer -> "Create one to start playing"
+        PlaySource.Multiplayer -> "Add one to start playing"
+    }
+    val icon = when (source) {
+        PlaySource.Replays -> "video-recorder"
+        PlaySource.Singleplayer -> "minecraft-block"
+        PlaySource.Multiplayer -> "globe-01"
+    }
+    HeroLayout({ EmptyIcon(icon) }) {
         HeroName(title)
         HeroDetail(detail)
     }
@@ -430,7 +463,7 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
     Row(Modifier.padding(horizontal = PanelGutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (hosted != null) {
             val leader = names[hosted.leader] ?: hosted.name
-            PlayButton(Modifier.weight(1f), hosted.status ?: "Join $leader", "$leader is hosting a world", LeaderFollow::joinHosted)
+            PlayButton(Modifier.weight(1f), hosted.status ?: "Join $leader", "$leader is hosting a world", onClick = LeaderFollow::joinHosted)
             if (ready) HostTile(if (singleplayer) "minecraft-block" else "globe-01", "Play", lobby::play)
         } else {
             PlayButton(Modifier.weight(1f), label, null, zoom = ready, onClick = lobby::play)
@@ -439,6 +472,24 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
             } else if (singleplayer && world != null && hostable(world, session)) {
                 HostTile("log-in-04", "Host world") { lobby.host(world.id) }
             }
+        }
+    }
+}
+
+@Composable
+private fun WatchRow(lobby: LobbyShell) {
+    val entry = lobby.activeReplay()
+    val blocked = entry != null && !entry.playable
+    val (interaction, hovered) = rememberSocialHover()
+    Row(Modifier.padding(horizontal = PanelGutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f).hoverable(interaction)) {
+            PlayButton(
+                Modifier.fillMaxWidth().graphicsLayer { alpha = if (blocked) DISABLED_ALPHA else 1f },
+                if (entry == null) "Choose a replay" else "Watch",
+                null,
+                zoom = entry != null && !blocked,
+            ) { if (!blocked) lobby.play() }
+            if (blocked && hovered && entry != null) HoverTooltip(entry.problem, TooltipPlacement.ABOVE_CENTER)
         }
     }
 }
@@ -496,18 +547,23 @@ private fun HostingStrip(lobby: LobbyShell) {
 }
 
 @Composable
-private fun Footer(lobby: LobbyShell, singleplayer: Boolean, quick: Boolean) {
-    val page = if (singleplayer) LobbyPage.Singleplayer else LobbyPage.Multiplayer
+private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
+    val page = source.page
     val servers = lobby.servers
-    val worlds = if (quick && singleplayer) lobby.quickWorlds() else emptyList()
-    val rows = if (quick && !singleplayer) lobby.quickServers() else emptyList()
-    val saved = if (singleplayer) lobby.worlds.saved.size else servers.saved.size
+    val worlds = if (quick && source == PlaySource.Singleplayer) lobby.quickWorlds() else emptyList()
+    val rows = if (quick && source == PlaySource.Multiplayer) lobby.quickServers() else emptyList()
+    val replays = if (quick && source == PlaySource.Replays) lobby.quickReplays() else emptyList()
+    val saved = when (source) {
+        PlaySource.Singleplayer -> lobby.worlds.saved.size
+        PlaySource.Multiplayer -> servers.saved.size
+        PlaySource.Replays -> ReplayLibrary.entries.size
+    }
     Row(
         Modifier.fillMaxWidth().height(FooterHeight).padding(horizontal = PanelGutter),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val listed = worlds.isNotEmpty() || rows.isNotEmpty()
+        val listed = worlds.isNotEmpty() || rows.isNotEmpty() || replays.isNotEmpty()
         if (!listed) {
             Label("$saved saved", 12.sp, Modifier.weight(1f), color = MutedText)
         } else {
@@ -519,12 +575,16 @@ private fun Footer(lobby: LobbyShell, singleplayer: Boolean, quick: Boolean) {
                 LaunchedEffect(entry.data) { servers.ping(entry.data) }
                 RecentTile(entry.data.name, lobby.isSelected(entry.data), { lobby.select(entry.data) }, { serverMenuItems(lobby, entry) }) { ServerIcon(entry.data, servers.revision, TileSize) }
             }
+            replays.forEach { entry ->
+                RecentTile(entry.name, lobby.isSelected(entry), { lobby.select(entry) }, { replayMenuItems(entry, lobby::watch) }) { ReplayThumb(entry, TileSize, TileSize) }
+            }
             Spacer(Modifier.weight(1f))
         }
         when {
             lobby.page == page -> if (listed) Label("$saved saved", 12.sp, color = MutedText)
             listed -> AllButton("All", "$saved") { lobby.show(page) }
-            singleplayer -> AllButton("All worlds", null) { lobby.show(page) }
+            source == PlaySource.Singleplayer -> AllButton("All worlds", null) { lobby.show(page) }
+            source == PlaySource.Replays -> AllButton("All replays", null) { lobby.show(page) }
             else -> AllButton("All servers", null) { lobby.show(page) }
         }
     }

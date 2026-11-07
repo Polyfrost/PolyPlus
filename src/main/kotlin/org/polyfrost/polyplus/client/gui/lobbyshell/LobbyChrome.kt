@@ -106,6 +106,7 @@ import org.polyfrost.polyplus.client.gui.platformLabel
 import org.polyfrost.polyplus.client.gui.rememberAccountActions
 import org.polyfrost.polyplus.client.gui.serveredit.ServerEditDialog
 import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerPage
+import org.polyfrost.polyplus.client.gui.replays.ReplaysPage
 import org.polyfrost.polyplus.client.gui.stats.StatsPage
 import org.polyfrost.polyplus.client.gui.stats.formatDuration
 import org.polyfrost.polyplus.client.gui.switchToVanillaMenu
@@ -241,6 +242,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
                 onSelect = lobby::selectWorld,
                 onHost = lobby::host,
             )
+            LobbyPage.Replays -> ReplaysPage(lobby.activeReplay(), onBack = { lobby.show(LobbyPage.Home) }, onSelect = lobby::select, onWatch = lobby::watch)
             LobbyPage.Marketplace -> MarketplacePage(onBack = { lobby.show(LobbyPage.Home) }, onWardrobe = { lobby.show(LobbyPage.Wardrobe) })
             LobbyPage.Social -> SocialPage { lobby.show(LobbyPage.Home) }
             LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }

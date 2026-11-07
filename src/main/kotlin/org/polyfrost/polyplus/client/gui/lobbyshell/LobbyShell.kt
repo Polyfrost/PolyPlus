@@ -26,6 +26,8 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
+import org.polyfrost.polyplus.client.gui.replays.watchSafely
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.lobby.LobbyFraming
 import org.polyfrost.polyplus.client.lobby.LobbyScene
@@ -33,12 +35,15 @@ import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.polyplus.client.utils.AnimationActivity
+import org.polyfrost.polyplus.compat.replay.ReplayEntry
+import java.nio.file.Path
 
 internal enum class LobbyPage(val frosted: Boolean) {
     Home(false),
     Wardrobe(false),
     Multiplayer(true),
     Singleplayer(true),
+    Replays(true),
     Marketplace(true),
     Social(true),
     Stats(true),
@@ -48,18 +53,24 @@ internal enum class LobbyPage(val frosted: Boolean) {
         get() = when (this) {
             Wardrobe -> PolyPlusMainMenuConfig.hideMainMenuCosmetics
             Social -> PolyPlusMainMenuConfig.hideMainMenuSocial
+            Replays -> !ReplayLibrary.enabled
             else -> false
         }
 }
 
-internal enum class PlaySource {
-    Singleplayer,
-    Multiplayer,
+internal enum class PlaySource(val page: LobbyPage) {
+    Singleplayer(LobbyPage.Singleplayer),
+    Multiplayer(LobbyPage.Multiplayer),
+    Replays(LobbyPage.Replays),
+    ;
+
+    val shown: Boolean
+        get() = this != Replays || ReplayLibrary.enabled
 }
 
 internal class ServerEdit(val server: ServerData?)
 
-private class PlayChoice(val source: PlaySource, val server: ServerData?, val worldId: String?)
+private class PlayChoice(val source: PlaySource, val server: ServerData?, val worldId: String?, val replay: Path?)
 
 internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : SocialHost {
     private val mc = Minecraft.getInstance()
@@ -78,6 +89,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     var selectedWorldId by mutableStateOf(choice.worldId)
         private set
     private var selectedServer by mutableStateOf(choice.server)
+    private var selectedReplay by mutableStateOf(choice.replay)
     var setup by mutableStateOf(onboardingPending())
         private set
     var tour by mutableStateOf<LobbyTour?>(null)
@@ -97,11 +109,13 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         servers.open()
         selectedServer = selectedServer?.let(servers::resolve)
         worlds.reload()
+        if (!source.shown) source = PlaySource.Multiplayer
+        if (ReplayLibrary.enabled) ReplayLibrary.reload()
         show(page)
     }
 
     fun close() {
-        choice = PlayChoice(source, selectedServer, selectedWorldId)
+        choice = PlayChoice(source, selectedServer, selectedWorldId, selectedReplay)
         servers.close()
         SocialChatLink.close()
         HostWorldManager.worldOpener = { it() }
@@ -167,9 +181,20 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         return (listOf(pinned) + rows).take(LobbyServers.QUICK_ROWS)
     }
 
+    fun quickReplays(): List<ReplayEntry> {
+        val rows = ReplayLibrary.entries.take(LobbyServers.QUICK_ROWS)
+        val pinned = activeReplay()
+        if (pinned == null || rows.any { it.path == pinned.path }) return rows
+        return (listOf(pinned) + rows).take(LobbyServers.QUICK_ROWS)
+    }
+
     fun isSelected(data: ServerData): Boolean = data.ip.equals(activeServer()?.ip, ignoreCase = true)
 
     fun isSelected(world: LobbyWorld): Boolean = world.id == activeWorld()?.id
+
+    fun isSelected(entry: ReplayEntry): Boolean = entry.path == activeReplay()?.path
+
+    val selectedReplayPath: Path? get() = selectedReplay
 
     fun select(data: ServerData) {
         selectedServer = data
@@ -181,6 +206,12 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         source = PlaySource.Singleplayer
     }
 
+    fun select(entry: ReplayEntry) {
+        if (!ReplayLibrary.enabled) return
+        selectedReplay = entry.path
+        source = PlaySource.Replays
+    }
+
     fun selectWorld(id: String) {
         worlds.saved.firstOrNull { it.id == id }?.let(::select)
     }
@@ -189,10 +220,17 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     fun activeWorld(): LobbyWorld? = worlds.saved.firstOrNull { it.id == selectedWorldId } ?: worlds.saved.firstOrNull { it.playable }
 
+    fun activeReplay(): ReplayEntry? =
+        if (ReplayLibrary.enabled) ReplayLibrary.find(selectedReplay) ?: ReplayLibrary.entries.firstOrNull { it.playable } ?: ReplayLibrary.entries.firstOrNull() else null
+
     fun play() {
         when (source) {
             PlaySource.Multiplayer -> activeServer()?.let(::join) ?: show(LobbyPage.Multiplayer)
             PlaySource.Singleplayer -> activeWorld()?.takeIf { it.playable }?.let(::enter) ?: show(LobbyPage.Singleplayer)
+            PlaySource.Replays -> when (val entry = activeReplay()) {
+                null -> show(LobbyPage.Replays)
+                else -> if (entry.playable) watch(entry)
+            }
         }
     }
 
@@ -225,6 +263,10 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         //?} else {
         /*HostWorldManager.openWorld(world.id)
         *///?}
+    }
+
+    fun watch(entry: ReplayEntry) {
+        if (entry.playable) depart(entry::watchSafely)
     }
 
     private fun depart(action: () -> Unit) {
@@ -304,6 +346,6 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     private companion object {
-        var choice = PlayChoice(PlaySource.Multiplayer, null, null)
+        var choice = PlayChoice(PlaySource.Multiplayer, null, null, null)
     }
 }

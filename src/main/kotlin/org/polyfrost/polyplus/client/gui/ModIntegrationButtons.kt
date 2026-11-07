@@ -34,7 +34,6 @@ internal object ModIntegrationButtons {
         "assets/modmenu/textures/gui/mods_button.png",
     )
 
-    private val flashback = ParentScreenFactory("com.moulberry.flashback.screen.select_replay.SelectReplayScreen")
     private val modMenu = ParentScreenFactory("com.terraformersmc.modmenu.gui.ModsScreen")
 
     private val modMenuButton = ModIntegrationButton(
@@ -45,15 +44,7 @@ internal object ModIntegrationButtons {
         logo = ::modMenuGlyph,
     )
 
-    private val all: List<ModIntegrationButton> = listOf(
-        ModIntegrationButton(
-            icon = ASSETS + "video-recorder.svg",
-            tooltip = "Flashback replays",
-            isPresent = { modLoaded("flashback") && flashback.isUsable },
-            onClick = { parent -> flashback.open(parent) },
-        ),
-        modMenuButton,
-    )
+    private val all: List<ModIntegrationButton> = listOf(modMenuButton)
 
     fun available(): List<ModIntegrationButton> = all.filter(::isAvailable)
 
