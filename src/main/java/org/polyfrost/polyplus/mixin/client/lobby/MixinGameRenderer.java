@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.mixin.client.access.GameRendererAccessor;
 *///?}
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -60,12 +61,27 @@ public class MixinGameRenderer {
     //?}
 
     //? if >= 26.2 && < 26.3 {
-    /*@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;render", shift = At.Shift.AFTER))
+    /*@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;render", shift = At.Shift.AFTER), require = 0)
     *///?} elif < 26.2 {
-    /*@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;renderLevel", shift = At.Shift.AFTER))
+    /*@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;renderLevel", shift = At.Shift.AFTER), require = 0)
     *///?}
     //? if < 26.3 {
     /*private void polyplus$processLobbyPost(CallbackInfo ci) {
+        polyplus$lobbyPostDone = true;
+        polyplus$lobbyPost();
+    }
+
+    @Inject(method = "renderLevel", at = @At("RETURN"))
+    private void polyplus$processLobbyPostFallback(CallbackInfo ci) {
+        if (!polyplus$lobbyPostDone) polyplus$lobbyPost();
+        polyplus$lobbyPostDone = false;
+    }
+
+    @Unique
+    private boolean polyplus$lobbyPostDone;
+
+    @Unique
+    private void polyplus$lobbyPost() {
         GameRenderer renderer = (GameRenderer) (Object) this;
         if (!LobbyScene.terrainActive()) return;
         LobbyScene.drawHolograms(renderer);
