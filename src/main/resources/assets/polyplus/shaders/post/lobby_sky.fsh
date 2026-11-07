@@ -47,8 +47,7 @@ layout(location = 0) out vec4 fragColor;
 out vec4 fragColor;
 *///?}
 
-const float WASH_STRENGTH = 0.55;
-const float AURORA_STRENGTH = 0.72;
+const float AURORA_STRENGTH = 0.6;
 const float AURORA_SATURATION = 0.72;
 const float RING_GAIN = 0.6;
 const float RING_WIDTH = 7.0;
@@ -118,7 +117,7 @@ float hash(vec2 p) {
 float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
     return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 
@@ -128,7 +127,15 @@ float ribbon(vec2 p, float t) {
     float wave = noise(q * vec2(0.55, 0.22) + vec2(0.0, t * 0.09));
     float ridge = 1.0 - abs(2.0 * wave - 1.0);
     float fine = noise(q * vec2(5.5, 0.6) + vec2(t * 0.35, 0.0));
-    return (pow(ridge, 9.0) * 1.7 + pow(ridge, 3.0) * 0.3) * (0.55 + 0.75 * fine);
+    return (pow(ridge, 6.0) * 1.4 + pow(ridge, 2.0) * 0.25) * (0.7 + 0.45 * fine);
+}
+
+float auroraBand(vec3 dir, float t) {
+    float rise = smoothstep(0.08, 0.3, dir.y);
+    float fall = 1.0 - smoothstep(0.55, 0.9, dir.y);
+    vec2 heading = dir.xz / max(length(dir.xz), 0.001);
+    float sweep = noise(heading * 2.2 + vec2(t * 0.015, 7.3));
+    return rise * fall * smoothstep(0.2, 0.75, sweep);
 }
 
 vec3 aurora(vec3 dir, float t, float jitter) {
@@ -143,19 +150,7 @@ vec3 aurora(vec3 dir, float t, float jitter) {
         tint = mix(tint, vec3(0.92, 0.16, 0.86), smoothstep(0.5, 1.0, f));
         total += band * tint * pow(1.0 - f, 1.6);
     }
-    return total * 0.3 * smoothstep(0.01, 0.12, dir.y);
-}
-
-vec3 auroraWash(vec3 dir, float t) {
-    vec3 total = vec3(0.0);
-    const int STEPS = 6;
-    for (int i = 0; i < STEPS; i++) {
-        float f = (float(i) + 0.5) / float(STEPS);
-        vec2 p = dir.xz / (dir.y + 0.3) * (1.1 + f * 1.5) * 0.95;
-        vec3 tint = mix(vec3(0.08, 1.0, 0.52), vec3(0.16, 0.5, 1.0), smoothstep(0.1, 0.55, f));
-        total += ribbon(p, t) * tint * (1.0 - f);
-    }
-    return total * 0.6;
+    return total * 0.3 * auroraBand(dir, t);
 }
 
 vec3 ringGlow(float front) {
@@ -179,23 +174,14 @@ void main() {
         float front = behindFront(texCoord, depth);
         if (ringMode() == 2 && front <= 0.0) {
             color = Flags.rgb;
-            sky = true;
         } else if (front > 0.0) {
             color += ringGlow(front);
         }
     }
-    if (sky) {
-        if (dir.y > 0.0 && Mood.x > 0.01) {
-            vec3 glow = aurora(dir, Up.w, hash(texCoord + fract(Up.w)));
-            float glowLuma = dot(glow, vec3(0.2126, 0.7152, 0.0722));
-            color += mix(vec3(glowLuma), glow, AURORA_SATURATION) * AURORA_STRENGTH * Mood.x;
-        }
-    } else if (Mood.x > 0.01) {
-        vec3 mirrored = normalize(vec3(dir.x, abs(dir.y) * 0.9 + 0.08, dir.z));
-        float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-        vec3 wash = auroraWash(mirrored, Up.w);
-        float washLuma = dot(wash, vec3(0.2126, 0.7152, 0.0722));
-        color += mix(vec3(washLuma), wash, AURORA_SATURATION) * luma * luma * WASH_STRENGTH * Mood.x;
+    if (sky && dir.y > 0.08 && Mood.x > 0.01) {
+        vec3 glow = aurora(dir, Up.w, hash(texCoord + fract(Up.w)));
+        float glowLuma = dot(glow, vec3(0.2126, 0.7152, 0.0722));
+        color += mix(vec3(glowLuma), glow, AURORA_SATURATION) * AURORA_STRENGTH * Mood.x;
     }
     fragColor = vec4(color, 1.0);
 }
