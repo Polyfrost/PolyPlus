@@ -21,6 +21,9 @@ object PolyPlusLobbyConfig : Config(
     var migratedFromSplitConfigs = false
 
     @JvmStatic @Include
+    var serverListView = false
+
+    @JvmStatic @Include
     var tourSeen = false
 
     @JvmStatic

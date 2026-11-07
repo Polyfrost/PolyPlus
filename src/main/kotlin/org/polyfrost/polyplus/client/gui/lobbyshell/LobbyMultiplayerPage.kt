@@ -25,8 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,11 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.resolver.ServerAddress
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.lobby.LobbyMotd*/
 import net.minecraft.network.chat.Component
@@ -63,10 +66,12 @@ import net.minecraft.util.StringDecomposer
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.gui.ASSETS
-import org.polyfrost.polyplus.client.gui.CardSurface
+import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.ModalPanel
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.RasterImage
@@ -78,13 +83,17 @@ import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialModalScrim
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialTextField
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.polyplus.client.gui.serveredit.ServerPreviewCard
+import org.polyfrost.polyplus.client.gui.serveredit.ServerStatusProbe
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -95,43 +104,44 @@ private enum class ServerFilter { All, Recent }
 private class OnlineFriend(val name: String, val seed: UUID, val realSkin: Boolean, val detail: String)
 
 private val CardGap = 12.dp
+private val StripHeight = 60.dp
 private const val GRID_COLUMNS = 3
 private const val GRID_ROWS = 2
 private const val HERO_FACES = 3
 private const val SEPARATOR = " · "
+private const val GRID_ICON = "dots-grid"
+private const val LIST_ICON = "align-left"
+private const val DIRECT_PING_DEBOUNCE_MILLIS = 500L
+private const val PROBE_TICK_MILLIS = 50L
+private val DirectPreviewHeight = 220.dp
 
 @Composable
 internal fun BoxScope.MultiplayerPage(lobby: LobbyShell) {
-    val friends = rememberOnlineFriends()
-    PageScrim()
-    HeroCard(
-        lobby,
-        friends,
-        Modifier
-            .padding(start = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
-            .width(LobbyLayout.ChatWidth)
-            .fillMaxHeight(),
-    )
-    ServerBrowser(
-        lobby,
-        onBack = { lobby.show(LobbyPage.Home) },
-        onDirect = { lobby.directOpen = true },
-        onDelete = { lobby.deleting = it },
-        modifier = Modifier
-            .padding(start = LobbyLayout.BarStart, end = LobbyLayout.BarEnd, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
-            .fillMaxSize(),
-    )
-    FriendsPanel(
-        friends,
-        Modifier
-            .align(Alignment.TopEnd)
-            .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.RightColumnBottom)
-            .width(LobbyLayout.UnitWidth)
-            .fillMaxHeight(),
-    )
-    if (lobby.directOpen) DirectConnectDialog(lobby) { lobby.directOpen = false }
-    lobby.deleting?.let { entry ->
-        DeleteServerDialog(entry, onConfirm = { lobby.forget(entry) }, onDismiss = { lobby.deleting = null })
+    ContextMenuHost {
+        val friends = rememberOnlineFriends()
+        PageScrim()
+        ServerBrowser(
+            lobby,
+            friends,
+            onBack = { lobby.show(LobbyPage.Home) },
+            onDirect = { lobby.directOpen = true },
+            onDelete = { lobby.deleting = it },
+            modifier = Modifier
+                .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
+                .fillMaxSize(),
+        )
+        FriendsPanel(
+            friends,
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.RightColumnBottom)
+                .width(LobbyLayout.UnitWidth)
+                .fillMaxHeight(),
+        )
+        if (lobby.directOpen) DirectConnectDialog(lobby) { lobby.directOpen = false }
+        lobby.deleting?.let { entry ->
+            DeleteServerDialog(entry, onConfirm = { lobby.forget(entry) }, onDismiss = { lobby.deleting = null })
+        }
     }
 }
 
@@ -172,10 +182,11 @@ private fun FriendsPanel(friends: List<OnlineFriend>, modifier: Modifier) {
 }
 
 @Composable
-private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () -> Unit, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
+private fun ServerBrowser(lobby: LobbyShell, friends: List<OnlineFriend>, onBack: () -> Unit, onDirect: () -> Unit, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
     val servers = lobby.servers
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ServerFilter.All) }
+    var listView by remember { mutableStateOf(PolyPlusLobbyConfig.serverListView) }
     val hideAddress = Minecraft.getInstance().options.hideServerAddress
     val base = when (filter) {
         ServerFilter.All -> servers.featured + servers.saved + servers.lan + servers.sponsored
@@ -201,6 +212,11 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             ServerFilter.entries.forEach { entry ->
                 Box(Modifier) { Chip(entry.name, selected = entry == filter) { filter = entry } }
             }
+            LayoutToggle(listView) {
+                listView = it
+                PolyPlusLobbyConfig.serverListView = it
+                PolyPlusLobbyConfig.save()
+            }
             SocialButton("Add server", onClick = lobby::addServer)
             SocialButton("Direct connect", onClick = onDirect)
             if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
@@ -208,6 +224,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             }
             SocialIconButton(LobbyIcons.REFRESH, tooltip = "Refresh", onClick = servers::refresh)
         }
+        LastPlayedStrip(lobby, friends)
         if (shown.isEmpty()) {
             val body = Modifier.fillMaxWidth().weight(1f).panel(16.dp)
             when {
@@ -217,18 +234,54 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
                     SocialButton("Add server", icon = LobbyIcons.PLUS, filled = true, onClick = lobby::addServer)
                 }
             }
+        } else if (listView) {
+            ServerList(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
         } else {
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                val rowHeight = (maxHeight - CardGap * (GRID_ROWS - 1)) / GRID_ROWS
-                LazyVerticalGrid(
-                    GridCells.Fixed(GRID_COLUMNS),
-                    Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(CardGap),
-                    verticalArrangement = Arrangement.spacedBy(CardGap),
-                ) {
-                    items(shown, key = { it.key }) { entry -> ServerCard(lobby, entry, canReorder, onDelete, Modifier.height(rowHeight)) }
+            ServerGrid(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun LayoutToggle(listView: Boolean, onChange: (Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        LayoutOption(GRID_ICON, "Grid view", !listView) { onChange(false) }
+        LayoutOption(LIST_ICON, "List view", listView) { onChange(true) }
+    }
+}
+
+@Composable
+private fun LayoutOption(icon: String, tooltip: String, selected: Boolean, onClick: () -> Unit) {
+    val theme = OneConfigTheme.current
+    SocialIconButton(
+        icon,
+        background = if (selected) theme.componentBackground else null,
+        tint = if (selected) SocialTextPrimary else MutedText,
+        tooltip = tooltip,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun ServerGrid(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val rowHeight = (maxHeight - CardGap * (GRID_ROWS - 1)) / GRID_ROWS
+        val gridState = rememberLazyGridState()
+        val viewport = remember(gridState) { GridReorderViewport(gridState) }
+        val reorder = rememberServerReorder(lobby, shown, canReorder, viewport)
+        Box(Modifier.fillMaxSize().serverReorderContainer(reorder)) {
+            LazyVerticalGrid(
+                GridCells.Fixed(GRID_COLUMNS),
+                Modifier.fillMaxSize(),
+                gridState,
+                horizontalArrangement = Arrangement.spacedBy(CardGap),
+                verticalArrangement = Arrangement.spacedBy(CardGap),
+            ) {
+                items(reorder.entries, key = { it.key }) { entry ->
+                    ServerCard(lobby, entry, canReorder, onDelete, Modifier.height(rowHeight).animateItem().serverReorderItem(reorder, entry.key))
                 }
             }
+            reorder.overlayEntry?.let { entry -> ServerCard(lobby, entry, canReorder, onDelete, Modifier.serverReorderOverlay(reorder)) }
         }
     }
 }
@@ -236,14 +289,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
 @Composable
 internal fun ServerBanner(data: ServerData, revision: Int, height: Dp) {
     @Suppress("UNUSED_EXPRESSION") revision
-    val favicon = rememberFavicon(data.iconBytes)
-    val ink = CardSurface
-    Box(Modifier.fillMaxWidth().height(height).background(OneConfigTheme.accent.copy(alpha = 0.22f))) {
-        if (favicon != null) {
-            Image(favicon, null, Modifier.fillMaxSize().alpha(0.6f), contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
-        }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, ink))))
-    }
+    ServerBackdrop(data, Modifier.fillMaxWidth().height(height))
 }
 
 @Composable
@@ -264,7 +310,7 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     val servers = lobby.servers
     val data = entry.data
     val revision = servers.revision
-    val banner = 140.dp
+    val banner = 104.dp
     val icon = 52.dp
     val overhang = 12.dp
     val (interaction, hovered) = rememberSocialHover()
@@ -274,6 +320,7 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     Box(
         modifier
             .cardFrame(selected, hovered)
+            .contextMenu { serverMenuItems(lobby, entry, canReorder, onDelete = onDelete) }
             .hoverable(interaction)
             .clickableWithSound {
                 doubleClick()
@@ -295,36 +342,55 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     }
 }
 
+internal class ServerAction(val item: ContextItem, val rotation: Float? = null)
+
+internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: ((ServerEntry) -> Unit)?, vertical: Boolean = false): List<ServerAction> {
+    val servers = lobby.servers
+    val save = ServerAction(ContextItem("Save to list", LobbyIcons.PLUS) { servers.saveUnsaved(entry) })
+    return when (entry.kind) {
+        ServerKind.SAVED -> listOfNotNull(
+            ServerAction(ContextItem(if (vertical) "Move up" else "Move left", enabled = entry.savedIndex > 0) { servers.move(entry, -1) }, if (vertical) 0f else -90f).takeIf { canReorder },
+            ServerAction(ContextItem(if (vertical) "Move down" else "Move right", enabled = entry.savedIndex < servers.saved.lastIndex) { servers.move(entry, 1) }, if (vertical) 180f else 90f).takeIf { canReorder },
+            ServerAction(ContextItem("Edit", SOCIAL_ASSETS + "edit-02.svg") { lobby.editServer(entry) }),
+            onDelete?.let { delete -> ServerAction(ContextItem("Delete", LobbyIcons.TRASH, danger = true) { delete(entry) }) },
+        )
+        ServerKind.UNSAVED -> listOf(save)
+        ServerKind.FEATURED, ServerKind.SPONSORED -> {
+            val campaign = entry.featured?.featured?.takeIf { it.dismissibleInServerList }
+            listOfNotNull(save, campaign?.let { ServerAction(ContextItem("Dismiss", LobbyIcons.CLOSE) { FeaturedServers.dismissMultiplayer(it.campaignId) }) })
+        }
+        ServerKind.LAN -> emptyList()
+    }
+}
+
+internal fun serverMenuItems(
+    lobby: LobbyShell,
+    entry: ServerEntry,
+    canReorder: Boolean = false,
+    vertical: Boolean = false,
+    onDelete: ((ServerEntry) -> Unit)? = null,
+): List<ContextItem> =
+    listOf(ContextItem("Join", SOCIAL_ASSETS + "log-in-04.svg") { lobby.join(entry.data) }) + serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
+
 @Composable
 private fun CardActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
-    val servers = lobby.servers
     val small = Modifier.size(28.dp)
     val fill = OneConfigTheme.current.popupBackground
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        when (entry.kind) {
-            ServerKind.SAVED -> {
-                if (canReorder) {
-                    MoveArrow(entry.savedIndex > 0, -90f) { servers.move(entry, -1) }
-                    MoveArrow(entry.savedIndex < servers.saved.lastIndex, 90f) { servers.move(entry, 1) }
-                }
-                SocialIconButton(SOCIAL_ASSETS + "edit-02.svg", small, background = fill, tooltip = "Edit") { lobby.editServer(entry) }
-                SocialIconButton(LobbyIcons.TRASH, small, background = fill, tooltip = "Delete") { onDelete(entry) }
+        serverActions(lobby, entry, canReorder, onDelete).forEach { action ->
+            val item = action.item
+            val rotation = action.rotation
+            val icon = item.icon
+            when {
+                rotation != null -> MoveArrow(item.enabled, rotation, item.onClick)
+                icon != null -> SocialIconButton(icon, small, background = fill, tooltip = item.label, onClick = item.onClick)
             }
-            ServerKind.UNSAVED -> SocialIconButton(LobbyIcons.PLUS, small, background = fill, tooltip = "Save to list") { servers.saveUnsaved(entry) }
-            ServerKind.FEATURED, ServerKind.SPONSORED -> {
-                SocialIconButton(LobbyIcons.PLUS, small, background = fill, tooltip = "Save to list") { servers.saveUnsaved(entry) }
-                val campaign = entry.featured?.featured
-                if (campaign != null && campaign.dismissibleInServerList) {
-                    SocialIconButton(LobbyIcons.CLOSE, small, background = fill, tooltip = "Dismiss") { FeaturedServers.dismissMultiplayer(campaign.campaignId) }
-                }
-            }
-            ServerKind.LAN -> Unit
         }
     }
 }
 
 @Composable
-private fun MoveArrow(enabled: Boolean, rotation: Float, onClick: () -> Unit) {
+internal fun MoveArrow(enabled: Boolean, rotation: Float, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
     IconButton(
         LobbyIcons.UP,
@@ -351,7 +417,7 @@ private fun ServerText(entry: ServerEntry, revision: Int, titleSize: Int) {
     }
 }
 
-private fun serverMeta(data: ServerData): String {
+internal fun serverMeta(data: ServerData): String {
     val answered = data.state() == ServerData.State.SUCCESSFUL || data.state() == ServerData.State.INCOMPATIBLE
     return when {
         data.isLan -> "Local network"
@@ -362,7 +428,7 @@ private fun serverMeta(data: ServerData): String {
 }
 
 @Composable
-private fun MotdText(entry: ServerEntry, revision: Int) {
+internal fun MotdText(entry: ServerEntry, revision: Int, maxLines: Int = 2) {
     @Suppress("UNUSED_EXPRESSION") revision
     val data = entry.data
     val muted = MutedText
@@ -372,7 +438,7 @@ private fun MotdText(entry: ServerEntry, revision: Int) {
     }
     BasicText(
         text,
-        maxLines = 2,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         style = TextStyle(color = muted, fontSize = 12.sp, fontFamily = OneConfigTheme.current.fontFamily),
     )
@@ -413,39 +479,42 @@ internal fun motdText(component: Component?, fallback: Color): AnnotatedString {
 }
 
 @Composable
-private fun HeroCard(lobby: LobbyShell, friends: List<OnlineFriend>, modifier: Modifier) {
+private fun LastPlayedStrip(lobby: LobbyShell, friends: List<OnlineFriend>) {
     val servers = lobby.servers
-    val hero = servers.hero
-    val banner = 244.dp
-    val icon = 72.dp
-    val overhang = 18.dp
-    if (hero == null) {
-        EmptyState("Last played", modifier.cardFrame(selected = false, hovered = false), "The server you last joined shows here.")
-        return
-    }
+    val hero = servers.hero ?: return
+    val data = hero.data
+    val revision = servers.revision
     val played = servers.recent.isNotEmpty()
-    LaunchedEffect(hero.data) { servers.ping(hero.data) }
-    Box(modifier.cardFrame(lobby.isSelected(hero.data), hovered = false).clickableWithSound { lobby.select(hero.data) }) {
-        Column(Modifier.fillMaxSize()) {
-            ServerBanner(hero.data, servers.revision, banner)
-            Column(
-                Modifier.fillMaxWidth().weight(1f).padding(start = 18.dp, end = 18.dp, top = overhang + 12.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                ServerText(hero, servers.revision, 22)
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (friends.isNotEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            friends.take(HERO_FACES).forEach { Head(it.seed, 30.dp, realSkin = it.realSkin) }
-                            Label("${friends.size} friend${if (friends.size == 1) "" else "s"} online", 12.sp, color = MutedText)
-                        }
-                    }
-                    SocialButton(if (played) "Rejoin" else "Join", modifier = Modifier.fillMaxWidth(), filled = true) { lobby.join(hero.data) }
-                }
+    val (interaction, hovered) = rememberSocialHover()
+    LaunchedEffect(data) { servers.ping(data) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(StripHeight)
+            .cardFrame(lobby.isSelected(data), hovered)
+            .serverWash(data, 0.35f)
+            .contextMenu { serverMenuItems(lobby, hero) { lobby.deleting = it } }
+            .hoverable(interaction)
+            .clickableWithSound { lobby.select(data) }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ServerIcon(data, revision, 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Tag(if (played) "Last played" else "Top of your list", TagTone.Accent)
+                Label(data.name, 15.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
+            }
+            Label(serverMeta(data), 12.sp, color = if (LobbyServers.failed(data)) SocialDangerText else MutedText)
+        }
+        if (friends.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                friends.take(HERO_FACES).forEach { Head(it.seed, 24.dp, realSkin = it.realSkin) }
+                Label("${friends.size} friend${if (friends.size == 1) "" else "s"} online", 12.sp, color = MutedText)
             }
         }
-        Tag(if (played) "Last played" else "Top of your list", TagTone.Accent, Modifier.padding(12.dp))
-        Box(Modifier.offset(x = 18.dp, y = banner - icon + overhang)) { ServerIcon(hero.data, servers.revision, icon) }
+        SocialButton(if (played) "Rejoin" else "Join", filled = true) { lobby.join(data) }
     }
 }
 
@@ -454,12 +523,28 @@ private fun DirectConnectDialog(lobby: LobbyShell, onDismiss: () -> Unit) {
     var address by remember { mutableStateOf("") }
     var invalid by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
+    val probe = remember { ServerStatusProbe(Minecraft.getInstance(), null) }
+    val target = address.trim()
+    val valid = ServerAddress.isValidAddress(target)
     fun connect() {
         if (lobby.directConnect(address)) onDismiss() else invalid = true
     }
+    DisposableEffect(probe) { onDispose(probe::close) }
+    LaunchedEffect(probe) {
+        while (isActive) {
+            probe.tick()
+            delay(PROBE_TICK_MILLIS)
+        }
+    }
+    LaunchedEffect(probe, target) {
+        probe.reset(target)
+        if (!valid) return@LaunchedEffect
+        delay(DIRECT_PING_DEBOUNCE_MILLIS)
+        probe.ping()
+    }
     SocialModalScrim(onDismiss) {
         LaunchedEffect(Unit) { focus.requestFocus() }
-        ModalPanel(width = 420.dp) {
+        ModalPanel(width = 440.dp) {
             PanelTitle("Direct connect")
             SocialTextField(
                 value = address,
@@ -476,6 +561,7 @@ private fun DirectConnectDialog(lobby: LobbyShell, onDismiss: () -> Unit) {
                 onSubmit = ::connect,
             )
             if (invalid) Label("Invalid address", 12.sp, color = SocialDangerText)
+            ServerPreviewCard(target.ifEmpty { "Server address" }, valid, probe, Modifier.fillMaxWidth().height(DirectPreviewHeight))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 SocialButton("Cancel", onClick = onDismiss)
                 SocialButton("Connect", filled = true, enabled = address.isNotBlank(), onClick = ::connect)

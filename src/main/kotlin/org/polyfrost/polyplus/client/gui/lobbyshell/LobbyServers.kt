@@ -35,7 +35,7 @@ internal class ServerEntry(
     val savedIndex: Int = -1,
     val featured: FeaturedServer? = null,
 ) {
-    val key: String get() = "$kind:$savedIndex:${data.ip}"
+    val key: String get() = "$kind:${System.identityHashCode(data)}:${data.ip}"
 }
 
 internal class LobbyServers(private val minecraft: Minecraft) {
@@ -129,6 +129,18 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         val target = entry.savedIndex + direction
         if (entry.savedIndex < 0 || target !in 0 until list.size()) return
         list.swap(entry.savedIndex, target)
+        rebuild()
+    }
+
+    fun moveTo(entry: ServerEntry, target: Int) {
+        var from = (0 until list.size()).firstOrNull { list.get(it) === entry.data } ?: return
+        val to = target.coerceIn(0, list.size() - 1)
+        if (from == to) return
+        val step = if (to > from) 1 else -1
+        while (from != to) {
+            list.swap(from, from + step)
+            from += step
+        }
         rebuild()
     }
 
