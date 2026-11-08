@@ -124,6 +124,10 @@
     //? if = 1.8.9
     //"compat.argentum.MixinArgentumOptionPages",
     //? if = 1.8.9
+    //"compat.argentum.MixinEntityRendererArgentum",
+    //? if = 1.8.9
+    //"compat.argentum.MixinNameTagBatch",
+    //? if = 1.8.9
     //"compat.argentum.MixinTextBatcher",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
