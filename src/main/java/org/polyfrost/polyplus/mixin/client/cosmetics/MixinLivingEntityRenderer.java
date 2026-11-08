@@ -3,6 +3,8 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 //? if = 1.21.1 {
 /*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.EntityModel;
@@ -23,14 +25,14 @@ public abstract class MixinLivingEntityRenderer {
     @Shadow
     protected EntityModel<?> model;
 
-    @Inject(method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V", at = @At("HEAD"))
-    private void polyplus$posePauseAvatar(LivingEntity entity, float yaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffers, int light, CallbackInfo ci) {
-        PauseAvatar.beginLegacy(entity);
-    }
-
-    @Inject(method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V", at = @At("RETURN"))
-    private void polyplus$unposePauseAvatar(LivingEntity entity, float yaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffers, int light, CallbackInfo ci) {
-        PauseAvatar.endLegacy(entity);
+    @WrapMethod(method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V")
+    private void polyplus$posePauseAvatar(LivingEntity entity, float yaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffers, int light, Operation<Void> original) {
+        float[] kept = PauseAvatar.beginLegacy(entity);
+        try {
+            original.call(entity, yaw, partialTicks, poseStack, buffers, light);
+        } finally {
+            if (kept != null) PauseAvatar.endLegacy(entity, kept);
+        }
     }
 
     @ModifyReturnValue(method = "getBob", at = @At("RETURN"))
@@ -64,6 +66,8 @@ public abstract class MixinLivingEntityRenderer {
 }
 *///?} elif = 1.8.9 {
 /*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.model.Model;
 import net.minecraft.client.render.model.entity.PlayerModel;
@@ -81,14 +85,14 @@ public abstract class MixinLivingEntityRenderer {
     @Shadow
     protected Model model;
 
-    @Inject(method = "render(Lnet/minecraft/entity/living/LivingEntity;DDDFF)V", at = @At("HEAD"))
-    private void polyplus$posePauseAvatar(LivingEntity entity, double x, double y, double z, float yaw, float tickDelta, CallbackInfo ci) {
-        PauseAvatar.beginLegacy(entity);
-    }
-
-    @Inject(method = "render(Lnet/minecraft/entity/living/LivingEntity;DDDFF)V", at = @At("RETURN"))
-    private void polyplus$unposePauseAvatar(LivingEntity entity, double x, double y, double z, float yaw, float tickDelta, CallbackInfo ci) {
-        PauseAvatar.endLegacy(entity);
+    @WrapMethod(method = "render(Lnet/minecraft/entity/living/LivingEntity;DDDFF)V")
+    private void polyplus$posePauseAvatar(LivingEntity entity, double x, double y, double z, float yaw, float tickDelta, Operation<Void> original) {
+        float[] kept = PauseAvatar.beginLegacy(entity);
+        try {
+            original.call(entity, x, y, z, yaw, tickDelta);
+        } finally {
+            if (kept != null) PauseAvatar.endLegacy(entity, kept);
+        }
     }
 
     @ModifyReturnValue(method = "getBob", at = @At("RETURN"))
