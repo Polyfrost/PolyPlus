@@ -35,11 +35,14 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.contextMenu
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
@@ -77,7 +80,7 @@ internal fun InvitesBell(items: List<InboxItem>) {
     val density = LocalDensity.current
     val offset = with(density) { IntOffset(BellReach.roundToPx(), BellDrop.roundToPx()) }
     Box {
-        SocialIconButton(SOCIAL_ASSETS + "bell-01.svg", tint = OneConfigTheme.accent, tooltip = "Invites") { open = !open }
+        IconButton(themedIcon(SOCIAL_ASSETS + "bell-01.svg"), "Invites", null, Modifier, null, OneConfigTheme.accent, TooltipPlacement.BelowStart) { open = !open }
         CountPill(items.size, Modifier.align(Alignment.TopEnd))
         if (open) {
             EscapeCloses { open = false }
@@ -109,7 +112,7 @@ internal fun InviteRow(item: InboxItem, divided: Boolean, roomy: Boolean = false
             Label(item.title, 14.sp, weight = FontWeight.Medium)
             Label(item.brief, 12.sp, color = MutedText)
         }
-        item.verb?.let { verb -> SocialButton(verb, modifier = Modifier.height(34.dp), filled = true, onClick = item.accept) }
-        SocialIconButton(LobbyIcons.CLOSE, tooltip = item.dismissLabel, onClick = item.dismiss)
+        item.verb?.let { verb -> TextButton(verb, Modifier.height(34.dp), ButtonStyle.Primary, item.accept) }
+        IconButton(themedIcon(LobbyIcons.CLOSE), item.dismissLabel, Modifier, item.dismiss)
     }
 }

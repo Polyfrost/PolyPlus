@@ -42,13 +42,15 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.LocalComposerFocus
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialBorderWidth
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.SocialWindowScrim
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
@@ -387,7 +389,7 @@ private fun DetailPane(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 PanelTitle("Blocked", Modifier.weight(1f))
-                SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close") { window.blockedOpen = false }
+                IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier) { window.blockedOpen = false }
             }
             PaneRule()
             BlockedList(state, snapshot, Modifier.fillMaxWidth().weight(1f))
@@ -402,7 +404,7 @@ private fun DetailPane(
             offlineReason = "Reconnecting".takeIf { reconnecting },
             actions = { group -> HeaderAction(window, state, snapshot, detail.thread, group) },
             trailing = {
-                if (!layout.singlePane) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close chat") { SocialChatLink.close() }
+                if (!layout.singlePane) IconButton(themedIcon(LobbyIcons.CLOSE), "Close chat", Modifier) { SocialChatLink.close() }
             },
         )
         else -> OverviewPane(WindowHost, state, snapshot, invites, window::showVoice, modifier)
@@ -432,10 +434,10 @@ private fun RowScope.HeaderAction(window: SocialWindowState, state: SocialPageSt
 
 @Composable
 private fun InviteGroupButton(group: GroupSummary) {
-    SocialButton("Invite to world", filled = true) { SocialHosting.inviteGroup(group, ChatIdentity.selfId()) }
+    TextButton("Invite to world", Modifier.height(38.dp), ButtonStyle.Primary) { SocialHosting.inviteGroup(group, ChatIdentity.selfId()) }
 }
 
 @Composable
 private fun StartHostingButton(window: SocialWindowState, group: GroupSummary) {
-    SocialButton("Invite to world", filled = true) { window.showWorld(group.members.filterNot { it == ChatIdentity.selfId() }) }
+    TextButton("Invite to world", Modifier.height(38.dp), ButtonStyle.Primary) { window.showWorld(group.members.filterNot { it == ChatIdentity.selfId() }) }
 }

@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
+import androidx.compose.foundation.layout.height
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,8 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentWidth
@@ -100,8 +103,8 @@ internal fun BlockedMessage(availability: SocialAvailability, source: SocialSour
                 "Friends, messages and hosted worlds need a signed-in Minecraft account and a connection to OneClient.",
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SocialButton("Back", onClick = onBack)
-                    SocialButton("Try again", icon = LobbyIcons.REFRESH, filled = true) {
+                    TextButton("Back", Modifier.height(38.dp), onBack)
+                    TextButton("Try again", themedIcon(LobbyIcons.REFRESH), Modifier.height(38.dp), ButtonStyle.Primary, true) {
                         PolyConnection.reconnect()
                         source.refresh()
                     }

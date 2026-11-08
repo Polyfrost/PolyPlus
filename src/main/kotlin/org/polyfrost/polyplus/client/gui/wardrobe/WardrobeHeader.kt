@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
@@ -167,7 +169,7 @@ private fun HeaderIconButton(iconPath: String, tooltip: String, onClick: () -> U
         contentAlignment = Alignment.Center,
     ) {
         ThemedIcon(iconPath, theme.textColor, 14.dp)
-        if (hovered) TooltipPopup(tooltip)
+        if (hovered) TooltipPopup(tooltip, TooltipPlacement.AboveStart)
     }
 }
 

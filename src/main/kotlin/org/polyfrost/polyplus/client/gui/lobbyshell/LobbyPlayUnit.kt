@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -54,12 +55,18 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
+import org.polyfrost.polyplus.client.gui.ConfirmPrompt
 import org.polyfrost.polyplus.client.gui.HostWorldFlow
-import org.polyfrost.polyplus.client.gui.HoverTooltip
 import org.polyfrost.polyplus.client.gui.LIGHT_TEXT_LIMIT
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -72,15 +79,15 @@ import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.ThemedIcon
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
+import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerFlows
 import org.polyfrost.polyplus.client.gui.replays.ReplayThumb
 import org.polyfrost.polyplus.client.gui.replays.problem
 import org.polyfrost.polyplus.client.gui.replays.replayMenuItems
@@ -171,9 +178,12 @@ private fun BoxScope.HeroWash(lobby: LobbyShell, target: Any?) {
     Box(Modifier.matchParentSize()) {
         Crossfade(target, Modifier.fillMaxWidth().height(HeroWashHeight)) { shown ->
             when (shown) {
-                is ServerData -> WashImage(rememberBackdrop(shown.iconBytes, fallbackArt(shown.ip)))
+                is ServerData -> {
+                    ServerRevisions.of(shown)
+                    WashImage(rememberBackdrop(shown.iconBytes, fallbackArt(shown.ip)))
+                }
                 is LobbyWorld -> WashImage(rememberBackdrop(shown.icon, fallbackArt("")))
-                is ReplayEntry -> WashImage(rememberBackdrop(shown.icon, fallbackArt("")))
+                is ReplayEntry -> WashImage(rememberReplayBackdrop(shown))
                 else -> WashImage(null)
             }
         }
@@ -231,6 +241,18 @@ private fun rememberBackdrop(bytes: ByteArray?, fallback: String): ImageBitmap? 
     val key = bytes?.contentHashCode() ?: fallback.hashCode()
     val backdrop by produceState(BackdropCache[key], key) {
         value = withContext(Dispatchers.IO) { backdropFor(key, bytes, fallback) }
+    }
+    return backdrop
+}
+
+@Composable
+private fun rememberReplayBackdrop(entry: ReplayEntry): ImageBitmap? {
+    val fallback = fallbackArt("")
+    val backdrop by produceState<ImageBitmap?>(null, entry) {
+        value = withContext(Dispatchers.IO) {
+            val bytes = entry.icon
+            backdropFor(bytes?.contentHashCode() ?: fallback.hashCode(), bytes, fallback)
+        }
     }
     return backdrop
 }
@@ -326,7 +348,7 @@ private fun SourceTab(label: String, selected: Boolean, modifier: Modifier, onCl
         },
     )
     Box(
-        modifier.fillMaxSize().clip(shape).background(fill).hoverable(interaction).clickableWithSound(onClick),
+        modifier.fillMaxSize().clip(shape).background(fill).hoverable(interaction).clickableWithSound(label, A11yRole.Tab, selected = selected, shape = shape, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Label(label, 14.sp, color = ink, weight = FontWeight.Medium)
@@ -334,7 +356,7 @@ private fun SourceTab(label: String, selected: Boolean, modifier: Modifier, onCl
 }
 
 @Composable
-private fun HeroLayout(icon: @Composable () -> Unit, text: @Composable ColumnScope.() -> Unit) {
+private fun HeroLayout(icon: @Composable () -> Unit, trailing: (@Composable () -> Unit)? = null, text: @Composable ColumnScope.() -> Unit) {
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -342,6 +364,7 @@ private fun HeroLayout(icon: @Composable () -> Unit, text: @Composable ColumnSco
     ) {
         Box(if (OneConfigTheme.current.shadowEnabled) Modifier.shadow(10.dp, ppShape(12.dp), ambientColor = OneConfigTheme.current.shadowColor, spotColor = OneConfigTheme.current.shadowColor) else Modifier) { icon() }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp), content = text)
+        trailing?.invoke()
     }
 }
 
@@ -369,6 +392,7 @@ private fun ServerHero(lobby: LobbyShell, data: ServerData) {
 @Composable
 private fun ServerStatus(data: ServerData, revision: Int) {
     @Suppress("UNUSED_EXPRESSION") revision
+    ServerRevisions.of(data)
     when {
         LobbyServers.failed(data) -> StatusLine(SocialDangerColor, "Offline", SocialDangerText)
         data.state() == ServerData.State.INCOMPATIBLE -> StatusLine(SocialDangerColor, "Incompatible, ${Platform.i18n().getUnformattedText(data.version)}")
@@ -414,7 +438,7 @@ private fun ReplayHero(entry: ReplayEntry) {
 private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
     val singleplayer = source == PlaySource.Singleplayer
     val title = when {
-        source == PlaySource.Replays -> if (ReplayLibrary.loaded) "No replays yet" else "Loading replays..."
+        source == PlaySource.Replays -> if (!ReplayLibrary.loaded) "Loading replays..." else if (ReplayLibrary.failed && ReplayLibrary.entries.isEmpty()) "Couldn't load replays" else "No replays yet"
         !singleplayer -> "No servers yet"
         !lobby.worlds.loaded -> "Loading worlds..."
         lobby.worlds.saved.isEmpty() -> "No worlds yet"
@@ -430,7 +454,13 @@ private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
         PlaySource.Singleplayer -> "minecraft-block"
         PlaySource.Multiplayer -> "globe-01"
     }
-    HeroLayout({ EmptyIcon(icon) }) {
+    val flows = remember { SingleplayerFlows() }
+    val action: (@Composable () -> Unit)? = when {
+        source == PlaySource.Multiplayer -> { { TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, lobby::addServer) } }
+        singleplayer && lobby.worlds.loaded -> { { TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, flows::create) } }
+        else -> null
+    }
+    HeroLayout({ EmptyIcon(icon) }, action) {
         HeroName(title)
         HeroDetail(detail)
     }
@@ -489,16 +519,16 @@ private fun WatchRow(lobby: LobbyShell) {
                 null,
                 zoom = entry != null && !blocked,
             ) { if (!blocked) lobby.play() }
-            if (blocked && hovered && entry != null) HoverTooltip(entry.problem, TooltipPlacement.ABOVE_CENTER)
+            if (blocked && hovered && entry != null) TooltipPopup(entry.problem, TooltipPlacement.AboveCenter, Dp.Unspecified)
         }
     }
 }
 
 private fun hostable(world: LobbyWorld, session: String?): Boolean = world.playable && session == null && hostWorldAllowed()
 
-private fun worldMenuItems(lobby: LobbyShell, world: LobbyWorld): List<ContextItem> = listOfNotNull(
-    ContextItem("Play", SOCIAL_ASSETS + "minecraft-block.svg", enabled = world.playable) { lobby.enter(world) },
-    ContextItem("Host world", SOCIAL_ASSETS + "log-in-04.svg") { lobby.host(world.id) }.takeIf { hostable(world, P2PSessionManager.currentSessionId) },
+private fun worldMenuItems(lobby: LobbyShell, world: LobbyWorld): List<MenuAction> = listOfNotNull(
+    MenuAction("Play", SOCIAL_ASSETS + "minecraft-block.svg", enabled = world.playable) { lobby.enter(world) },
+    MenuAction("Host world", SOCIAL_ASSETS + "log-in-04.svg") { lobby.host(world.id) }.takeIf { hostable(world, P2PSessionManager.currentSessionId) },
 )
 
 @Composable
@@ -510,7 +540,7 @@ private fun HostTile(icon: String, label: String, onClick: () -> Unit) {
             .height(LobbyLayout.PlayHeight)
             .cardFrame(false, hovered)
             .hoverable(interaction)
-            .clickableWithSound(onClick),
+            .clickableWithSound(label, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
@@ -538,7 +568,7 @@ private fun HostingStrip(lobby: LobbyShell) {
         Label("Hosting", 14.sp, weight = FontWeight.Medium)
         Label(lobby.hostedWorldName.orEmpty(), 12.sp, Modifier.weight(1f), color = MutedText)
         Box(
-            Modifier.height(26.dp).rowFrame(false, stopHovered, ppShape(6.dp)).hoverable(stopInteraction).clickableWithSound(lobby::stopHosting).padding(horizontal = 10.dp),
+            Modifier.height(26.dp).rowFrame(false, stopHovered, ppShape(6.dp)).hoverable(stopInteraction).clickableWithSound("Stop hosting", shape = ppShape(6.dp)) { ConfirmPrompt.ask("Stop hosting?", "Your world closes for everyone in it.", "Stop hosting", SOCIAL_ASSETS + "x-close.svg", lobby::stopHosting) }.padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
             Label("Stop", 12.sp, color = SocialDangerText, weight = FontWeight.Medium)
@@ -591,7 +621,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
 }
 
 @Composable
-private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, menu: () -> List<ContextItem>, icon: @Composable () -> Unit) {
+private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, menu: () -> List<MenuAction>, icon: @Composable () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val ring by animateColorAsState(
         when {
@@ -600,10 +630,10 @@ private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, men
             else -> Color.Transparent
         },
     )
-    Box(Modifier.size(TileSize).contextMenu(menu).hoverable(interaction).clickableWithSound(onClick)) {
+    Box(Modifier.size(TileSize).contextMenu(menu).hoverable(interaction).clickableWithSound(name, selected = selected.takeIf { it }, onClick = onClick)) {
         icon()
         Box(Modifier.matchParentSize().border(1.dp, ring, SocialFieldShape))
-        if (hovered) HoverTooltip(name, TooltipPlacement.ABOVE_CENTER)
+        if (hovered) TooltipPopup(name, TooltipPlacement.AboveCenter, Dp.Unspecified)
     }
 }
 
@@ -618,7 +648,7 @@ private fun AllButton(label: String, count: String?, onClick: () -> Unit) {
             .background(SocialControlBackground)
             .border(1.dp, border, SocialFieldShape)
             .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .clickableWithSound(if (count == null) label else "$label, $count", shape = SocialFieldShape, onClick = onClick)
             .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

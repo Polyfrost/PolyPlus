@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
@@ -20,23 +23,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -49,12 +47,17 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ReorderState
+import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
+import org.polyfrost.polyplus.client.gui.awaitReorderSlop
+import org.polyfrost.polyplus.client.gui.followReorderDrag
+import org.polyfrost.polyplus.client.gui.pastTouchSlop
 import kotlin.math.abs
 
 private val AutoScrollZone = 40.dp
 private val AutoScrollRamp = 240.dp
 private val AutoScrollMaxSpeed = 2400.dp
-private const val SCROLL_LIFT_THRESHOLD = 1f
 private const val LIFT_SCALE = 1.04f
 
 private val SettleSpec = spring(
@@ -91,20 +94,48 @@ internal class GridReorderViewport(private val state: LazyGridState) : ReorderVi
     }
 }
 
-internal class ListReorderViewport(private val state: LazyListState) : ReorderViewport {
-    override fun slots(): List<ReorderSlot> {
-        val width = state.layoutInfo.viewportSize.width
-        return state.layoutInfo.visibleItemsInfo.map { ReorderSlot(it.key, it.index, Offset(0f, it.offset.toFloat()), IntSize(width, it.size)) }
-    }
+private class EdgePointer {
+    var y: Float? = null
+    var height = 0f
+}
 
-    override val viewportStart: Int get() = state.layoutInfo.viewportStartOffset
-    override val viewportEnd: Int get() = state.layoutInfo.viewportEndOffset
-    override val firstIndex: Int get() = state.firstVisibleItemIndex
-    override val firstOffset: Int get() = state.firstVisibleItemScrollOffset
-    override fun keepScroll(index: Int, offset: Int) = state.requestScrollToItem(index, offset)
-    override fun scrollBy(delta: Float) {
-        state.dispatchRawDelta(delta)
+@Composable
+internal fun Modifier.reorderAutoScroll(reorder: ReorderState, list: LazyListState): Modifier {
+    val pointer = remember { EdgePointer() }
+    val density = LocalDensity.current
+    val dragging = reorder.isDragging
+    LaunchedEffect(dragging, list, density) {
+        if (!dragging) return@LaunchedEffect
+        val origin = pointer.y ?: return@LaunchedEffect
+        val zone = with(density) { AutoScrollZone.toPx() }
+        val rampDistance = with(density) { AutoScrollRamp.toPx() }
+        val maxSpeed = with(density) { AutoScrollMaxSpeed.toPx() }
+        var lastFrame = withFrameNanos { it }
+        while (isActive) {
+            val frame = withFrameNanos { it }
+            val seconds = ((frame - lastFrame) / 1e9f).coerceAtMost(1 / 30f)
+            lastFrame = frame
+            val y = pointer.y ?: continue
+            val intoTop = minOf(zone, origin) - y
+            val intoBottom = y - maxOf(pointer.height - zone, origin)
+            val depth = when {
+                intoTop > 0f && list.canScrollBackward -> -intoTop
+                intoBottom > 0f && list.canScrollForward -> intoBottom
+                else -> 0f
+            }
+            val ramp = (depth / rampDistance).coerceIn(-1f, 1f)
+            if (depth != 0f) list.dispatchRawDelta(ramp * abs(ramp) * maxSpeed * seconds)
+        }
     }
+    return this
+        .onSizeChanged { pointer.height = it.height.toFloat() }
+        .pointerInput(pointer) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull()?.let { pointer.y = it.position.y }
+                }
+            }
+        }
 }
 
 internal class ServerReorderState(
@@ -116,7 +147,7 @@ internal class ServerReorderState(
     internal val onClick: (ServerEntry) -> Unit,
     private val density: () -> Density,
 ) {
-    private var dragOrder by mutableStateOf<SnapshotStateList<ServerEntry>?>(null)
+    private var dragOrder by mutableStateOf<List<ServerEntry>?>(null)
 
     val entries: List<ServerEntry> get() = dragOrder ?: source()
 
@@ -198,7 +229,7 @@ internal class ServerReorderState(
         val from = if (settling && overlayKey == key) overlayOffset else drawnBounds(info).topLeft
         settle?.cancel()
         settling = false
-        dragOrder = source().toMutableStateList()
+        dragOrder = source()
         draggingKey = key
         overlayKey = key
         overlaySize = info.size
@@ -228,7 +259,7 @@ internal class ServerReorderState(
         settling = true
         settle = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             settleOffset.snapTo(fromSlot)
-            settleOffset.animateTo(Offset.Zero, SettleSpec)
+            settleOffset.animateTo(Offset.Zero, Motion.spec(SettleSpec))
             settling = false
             if (overlayKey == key) overlayKey = null
         }
@@ -247,12 +278,6 @@ internal class ServerReorderState(
         draggingKey = null
         draggingIndex = -1
         dragDelta = Offset.Zero
-    }
-
-    private fun move(from: Int, to: Int) {
-        val order = dragOrder ?: return
-        if (from !in order.indices || to !in order.indices) return
-        order.add(to, order.removeAt(from))
     }
 
     private fun settleOnHoveredItem() {
@@ -281,7 +306,7 @@ internal class ServerReorderState(
         if (first in minOf(draggingIndex, target.index)..maxOf(draggingIndex, target.index)) {
             viewport.keepScroll(first, viewport.firstOffset)
         }
-        move(draggingIndex, target.index)
+        dragOrder?.withItemMoved(draggingIndex, target.index)?.let { dragOrder = it }
         draggingIndex = target.index
     }
 
@@ -350,34 +375,19 @@ internal fun Modifier.serverReorderContainer(state: ServerReorderState): Modifie
         val key = state.draggableKeyAt(down.position) ?: return@awaitEachGesture
         val caught = state.isOverSettlingItem(down.position)
         val caughtEntry = if (caught) state.settlingEntry() else null
-        var last = down.position
-        if (caught) {
+        val start = if (caught) {
             down.consume()
+            down.position
         } else {
-            var scrolled = 0f
-            do {
-                val change = awaitPressedChange(down.id, consume = false) ?: return@awaitEachGesture
-                val scroll = currentEvent.type == PointerEventType.Scroll
-                if (scroll) scrolled += abs(change.scrollDelta.y)
-                val passedSlop = scrolled >= SCROLL_LIFT_THRESHOLD ||
-                    (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-                if (passedSlop) {
-                    if (!scroll) change.consume()
-                    last = change.position
-                }
-            } while (!passedSlop)
+            awaitReorderSlop(down.id, down.position, PointerEventPass.Initial, liftOnScroll = true) ?: return@awaitEachGesture
         }
         if (!state.onDragStart(key)) return@awaitEachGesture
-        state.onDrag(last - down.position)
+        state.onDrag(start - down.position)
         var click = caught
         try {
-            while (true) {
-                val change = awaitPressedChange(down.id, consume = true) ?: break
-                if (currentEvent.type == PointerEventType.Scroll ||
-                    (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-                ) click = false
-                state.onDrag(change.position - last)
-                last = change.position
+            followReorderDrag(down.id, start, PointerEventPass.Initial) { delta, at, scroll ->
+                if (scroll || pastTouchSlop(down.position, at)) click = false
+                state.onDrag(delta)
             }
         } finally {
             state.onDragEnd()
@@ -385,13 +395,6 @@ internal fun Modifier.serverReorderContainer(state: ServerReorderState): Modifie
         if (click) caughtEntry?.let(state.onClick)
     }
 }.onPlaced { state.containerCoordinates = it }
-
-private suspend fun AwaitPointerEventScope.awaitPressedChange(id: PointerId, consume: Boolean): PointerInputChange? {
-    val event = awaitPointerEvent(PointerEventPass.Initial)
-    val change = event.changes.firstOrNull { it.id == id } ?: return null
-    if (consume && event.type != PointerEventType.Scroll) change.consume()
-    return change.takeIf { it.pressed }
-}
 
 internal fun Modifier.serverReorderItem(state: ServerReorderState, key: Any): Modifier = this
     .onPlaced { state.itemCoordinates[key] = it }
@@ -402,7 +405,7 @@ internal fun Modifier.serverReorderOverlay(state: ServerReorderState): Modifier 
     val density = LocalDensity.current
     val width = with(density) { state.overlaySize.width.toDp() }
     val height = with(density) { state.overlaySize.height.toDp() }
-    val scale by animateFloatAsState(if (state.draggingKey != null) LIFT_SCALE else 1f)
+    val scale by animateFloatAsState(if (state.draggingKey != null) LIFT_SCALE else 1f, Motion.spec(spring()))
     return this
         .zIndex(1f)
         .offset { state.overlayOffset.round() }

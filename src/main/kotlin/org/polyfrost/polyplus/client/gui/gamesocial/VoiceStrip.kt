@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LeaveVoiceButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.VoiceButtons
@@ -47,7 +48,7 @@ internal fun VoiceStrip(window: SocialWindowState, modifier: Modifier = Modifier
                 Label(stripDetail(party), 12.sp, color = MutedText)
             }
             VoiceButtons(party, leave = false)
-            SocialIconButton(PartyIcons.SETTINGS, tooltip = "Voice and devices", onClick = window::showVoice)
+            IconButton(themedIcon(PartyIcons.SETTINGS), "Voice and devices", Modifier, window::showVoice)
             LeaveVoiceButton()
         }
     }

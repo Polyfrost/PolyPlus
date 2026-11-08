@@ -3,53 +3,45 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.animation.animateColorAsState
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.CardSurface
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
+import org.polyfrost.polyplus.client.gui.LocalAnnounceTitles
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 
 private const val PAGE_SCRIM_ALPHA = 0.35f
-private const val DANGER_REST_ALPHA = 0.12f
-private const val DANGER_HOVER_ALPHA = 0.2f
 private const val SELECTED_MUTED_ALPHA = 0.8f
 private const val TAG_HAIRLINE_ALPHA = 0.7f
 private const val TAG_FILL_ALPHA = 0.6f
@@ -82,12 +74,13 @@ internal fun PageTitle(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun PanelTitle(text: String, modifier: Modifier = Modifier) {
+    if (LocalAnnounceTitles.current) Announce(text)
     Label(text, 18.sp, modifier, weight = FontWeight.Medium)
 }
 
 @Composable
 internal fun BackButton(onBack: () -> Unit) {
-    SocialIconButton(LobbyIcons.BACK, tooltip = "Back", onClick = onBack)
+    IconButton("Back", null, Modifier, null, TooltipPlacement.BelowStart, onBack) { ThemedIcon(LobbyIcons.BACK, SocialTextPrimary, 16.dp) }
 }
 
 @Composable
@@ -129,27 +122,6 @@ internal fun rowInk(selected: Boolean): Color = if (selected) OneConfigTheme.cur
 @Composable
 internal fun rowMuted(selected: Boolean): Color =
     if (selected) OneConfigTheme.current.accentTextColor.copy(alpha = SELECTED_MUTED_ALPHA) else MutedText
-
-@Composable
-internal fun DangerButton(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, icon: String = LobbyIcons.TRASH, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val fill by animateColorAsState(SocialDangerColor.copy(alpha = if (hovered) DANGER_HOVER_ALPHA else DANGER_REST_ALPHA))
-    Row(
-        modifier
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .height(38.dp)
-            .clip(SocialFieldShape)
-            .background(fill)
-            .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ThemedIcon(icon, SocialDangerText, 16.dp)
-        SocialText(label, 14.sp, color = SocialDangerText, maxLines = 1)
-    }
-}
 
 internal fun leftColumn(): Modifier = Modifier
     .padding(start = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)

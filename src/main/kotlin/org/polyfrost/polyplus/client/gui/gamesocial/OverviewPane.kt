@@ -22,12 +22,14 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.polyplus.client.gui.lobbysocial.friendRowItems
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
@@ -85,7 +87,7 @@ private fun QuietOverview(state: SocialPageState, snapshot: SocialSnapshot, modi
 
 @Composable
 private fun AddFriendButton(state: SocialPageState) {
-    SocialButton("Add friend", SOCIAL_ASSETS + "user-plus-01.svg", filled = true) { state.dialog = SocialDialog.AddFriend }
+    TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.dialog = SocialDialog.AddFriend }
 }
 
 @Composable
@@ -141,7 +143,7 @@ private fun FriendCell(state: SocialPageState, person: SocialPerson, modifier: M
             Label(person.name, 14.sp, weight = FontWeight.Medium)
             Label(person.status, 12.sp, color = MutedText)
         }
-        SocialIconButton(SOCIAL_ASSETS + "message-chat-circle.svg", tooltip = "Message") { state.source.message(person) }
+        IconButton(themedIcon(SOCIAL_ASSETS + "message-chat-circle.svg"), "Message", Modifier) { state.source.message(person) }
     }
 }
 
@@ -156,7 +158,7 @@ private fun HostingSection(name: String) {
         ) {
             ThemedIcon(SOCIAL_ASSETS + "globe-01.svg", SocialTextPrimary, 18.dp)
             Label(name, 14.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            SocialButton("Stop hosting", onClick = SocialHosting::stop)
+            TextButton("Stop hosting", Modifier.height(38.dp), SocialHosting::stop)
         }
     }
 }

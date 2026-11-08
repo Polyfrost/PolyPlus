@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
@@ -86,6 +88,7 @@ internal fun ForceCapesToggle() {
                     } else {
                         "When another mod sets your cape, its cape is shown. Turn this on to show your PolyPlus cape instead, or your Minecraft cape if you have none."
                     },
+                    TooltipPlacement.AboveStart,
                 )
             }
         }
@@ -101,7 +104,7 @@ private fun InfoTip(text: String) {
     val theme = OneConfigTheme.current
     Box(Modifier.size(16.dp).hoverable(interaction), contentAlignment = Alignment.Center) {
         Icon("info", color = if (hovered) theme.textColor else theme.textColorSecondary, modifier = Modifier.size(14.dp))
-        if (hovered) TooltipPopup(text)
+        if (hovered) TooltipPopup(text, TooltipPlacement.AboveStart)
     }
 }
 

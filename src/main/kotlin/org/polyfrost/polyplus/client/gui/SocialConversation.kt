@@ -38,6 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
@@ -111,8 +119,8 @@ internal fun WorldInviteBanner(invite: SessionInvite) {
             SocialText("${PlayerNamesRepository.displayName(invite.sender)} invited you to their world", fontSize = 13.sp)
             SocialText("Session invite", fontSize = 11.sp, color = SocialTextSecondary)
         }
-        SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(invite) })
-        SocialButton("Join", icon = SOCIAL_ASSETS + "log-in-04.svg", filled = true, modifier = Modifier.height(34.dp), onClick = { SessionsRepository.accept(invite) })
+        TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(invite) }
+        TextButton("Join", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), Modifier.height(34.dp), ButtonStyle.Primary, true) { SessionsRepository.accept(invite) }
     }
 }
 
@@ -128,24 +136,16 @@ internal fun GroupOverflowMenu(
     canConvertToNormal: Boolean,
     canLeave: Boolean,
 ) {
-    Column(
-        modifier = Modifier
-            .width(200.dp)
-            .clip(SocialPanelShape)
-            .background(SocialPopupBackground)
-            .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        SocialMenuItem(icon = SOCIAL_ASSETS + "user-plus-01.svg", label = "Invite Friends", height = 34.dp, onClick = onInvite)
-        SocialMenuItem(icon = SOCIAL_ASSETS + "log-in-04.svg", label = "Invite Group to Session", height = 34.dp, onClick = onInviteToSession)
-        if (onRename != null) SocialMenuItem(icon = SOCIAL_ASSETS + "edit-02.svg", label = "Rename Group", height = 34.dp, onClick = onRename)
-        SocialMenuItem(icon = SOCIAL_ASSETS + "volume-x.svg", label = if (muted) "Unmute Group" else "Mute Group", height = 34.dp, onClick = onMute)
+    MenuSurface(Modifier.width(200.dp)) {
+        MenuItem("Invite Friends", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInvite)
+        MenuItem("Invite Group to Session", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInviteToSession)
+        if (onRename != null) MenuItem("Rename Group", themedIcon(SOCIAL_ASSETS + "edit-02.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onRename)
+        MenuItem(if (muted) "Unmute Group" else "Mute Group", themedIcon(SOCIAL_ASSETS + "volume-x.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onMute)
         if (canConvertToNormal) {
-            SocialMenuItem(icon = SOCIAL_ASSETS + "check.svg", label = "Convert to Normal Chat", height = 34.dp, onClick = onConvertToNormal)
+            MenuItem("Convert to Normal Chat", themedIcon(SOCIAL_ASSETS + "check.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onConvertToNormal)
         }
         if (canLeave) {
-            SocialMenuItem(icon = SOCIAL_ASSETS + "x-close.svg", label = "Leave Group", color = SocialDangerColor, height = 34.dp, onClick = onLeave)
+            MenuItem("Leave Group", themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, MenuItemSize.Regular, true, false, true, null, Modifier, null, onLeave)
         }
     }
 }
@@ -387,14 +387,14 @@ private fun InviteMessageCard(
             )
         }
         if (!outgoing && live != null) {
-            SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(live) })
-            SocialButton(
+            TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(live) }
+            TextButton(
                 if (live.status == "accepted") "Re-join" else "Join",
-                icon = SOCIAL_ASSETS + "log-in-04.svg",
-                filled = true,
-                modifier = Modifier.height(34.dp),
-                onClick = { SessionsRepository.accept(live) },
-            )
+                themedIcon(SOCIAL_ASSETS + "log-in-04.svg"),
+                Modifier.height(34.dp),
+                ButtonStyle.Primary,
+                true,
+            ) { SessionsRepository.accept(live) }
         }
     }
 }
@@ -437,22 +437,34 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 emoji()
-                SocialTextField(
+                TextField(
                     value = value,
                     onValueChange = { if (!disabled) value = it },
-                    modifier = Modifier.weight(1f).height(34.dp),
+                    modifier = Modifier.weight(1f).height(34.dp).padding(start = 6.dp, end = 12.dp),
                     placeholder = if (disabled) "Message unavailable" else placeholder,
+                    leadingIcon = null,
                     maxLength = 500,
+                    invalid = false,
+                    enabled = true,
+                    singleLine = true,
+                    framed = false,
+                    fontSize = 14.sp,
+                    label = null,
+                    masked = false,
                     focusRequester = focus,
-                    bare = true,
+                    interactionSource = null,
+                    trailing = null,
                     onSubmit = trySend,
                 )
-                SocialIconButton(
-                    SOCIAL_ASSETS + "chevron-right.svg",
-                    background = if (disabled) null else OneConfigTheme.accent,
-                    tint = if (disabled) SocialTextSecondary else OneConfigTheme.current.accentTextColor,
-                    tooltip = "Send",
-                    onClick = trySend,
+                IconButton(
+                    themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
+                    "Send",
+                    null,
+                    Modifier,
+                    if (disabled) null else OneConfigTheme.accent,
+                    if (disabled) SocialTextSecondary else OneConfigTheme.current.accentTextColor,
+                    TooltipPlacement.BelowStart,
+                    trySend,
                 )
             }
             return@Column
@@ -462,23 +474,35 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SocialTextField(
+            TextField(
                 value = value,
                 onValueChange = { if (!disabled) value = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(38.dp),
                 placeholder = if (disabled) "Message unavailable" else placeholder,
-                leadingIcon = SOCIAL_ASSETS + "edit-02.svg",
+                leadingIcon = themedIcon(SOCIAL_ASSETS + "edit-02.svg"),
                 maxLength = 500,
+                invalid = false,
+                enabled = true,
+                singleLine = true,
+                framed = true,
+                fontSize = 14.sp,
+                label = null,
+                masked = false,
                 focusRequester = focus,
+                interactionSource = null,
+                trailing = null,
                 onSubmit = trySend,
             )
             emoji()
-            SocialIconButton(
-                SOCIAL_ASSETS + "chevron-right.svg",
-                background = if (ready) OneConfigTheme.accent.asSocialSelected else null,
-                tint = if (ready) OneConfigTheme.accent else SocialTextSecondary,
-                tooltip = "Send",
-                onClick = trySend,
+            IconButton(
+                themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
+                "Send",
+                null,
+                Modifier,
+                if (ready) OneConfigTheme.accent.asSocialSelected else null,
+                if (ready) OneConfigTheme.accent else SocialTextSecondary,
+                TooltipPlacement.BelowStart,
+                trySend,
             )
         }
     }

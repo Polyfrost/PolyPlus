@@ -9,12 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,31 +27,29 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
-import org.polyfrost.polyplus.client.gui.SocialTextField
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SelfStatusPicker
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.lobbyshell.leftColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
-import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.centerColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rightColumn
 
-private fun threadsColumn(): Modifier = Modifier
-    .padding(start = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
-    .width(LobbyLayout.ChatWidth)
-    .fillMaxHeight()
-
 @Composable
 internal fun BoxScope.SocialDirectory(state: SocialPageState, snapshot: SocialSnapshot, onBack: () -> Unit) {
     FollowSocialChanges(state, snapshot)
-    ThreadsColumn(state, snapshot, threadsColumn())
+    ThreadsColumn(state, snapshot, leftColumn())
     val conversation = state.conversation(snapshot)
     if (conversation != null) {
         ConversationPane(state, conversation.chat, conversation.thread, centerColumn())
@@ -79,18 +75,12 @@ private fun ThreadsColumn(state: SocialPageState, snapshot: SocialSnapshot, modi
                 list::toggleUnread,
             )
             ToggleIconButton(LobbyIcons.SEARCH, list.searching, if (list.searching) "Close search" else "Search conversations", list::toggleSearch)
-            SocialIconButton(LobbyIcons.PLUS, tooltip = "New group") {
+            IconButton(themedIcon(LobbyIcons.PLUS), "New group", Modifier) {
                 state.dialog = SocialDialog.NewGroup
             }
         }
         if (list.searching) {
-            SocialTextField(
-                value = list.query,
-                onValueChange = { list.query = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = "Search conversations",
-                leadingIcon = LobbyIcons.SEARCH,
-            )
+            TextField(list.query, { list.query = it }, Modifier.fillMaxWidth().height(38.dp), "Search conversations", themedIcon(LobbyIcons.SEARCH), 64, false)
         }
         SelfStatusPicker(Modifier.fillMaxWidth())
         if (snapshot.delegations.isNotEmpty()) ChatAsPicker(state, snapshot)
@@ -108,12 +98,15 @@ private fun ThreadsColumn(state: SocialPageState, snapshot: SocialSnapshot, modi
 
 @Composable
 internal fun ToggleIconButton(icon: String, active: Boolean, tooltip: String, onClick: () -> Unit) {
-    SocialIconButton(
-        icon,
-        background = if (active) OneConfigTheme.accent else null,
-        tint = if (active) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
-        tooltip = tooltip,
-        onClick = onClick,
+    IconButton(
+        themedIcon(icon),
+        tooltip,
+        null,
+        Modifier,
+        if (active) OneConfigTheme.accent else null,
+        if (active) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
+        TooltipPlacement.BelowStart,
+        onClick,
     )
 }
 
@@ -142,13 +135,7 @@ private fun RosterHeader(state: SocialPageState, snapshot: SocialSnapshot, filte
     ) {
         BackButton(onBack)
         PageTitle("Friends", Modifier.padding(end = 2.dp))
-        SocialTextField(
-            value = state.query,
-            onValueChange = { state.query = it },
-            modifier = Modifier.weight(1f),
-            placeholder = "Search friends",
-            leadingIcon = LobbyIcons.SEARCH,
-        )
+        TextField(state.query, { state.query = it }, Modifier.weight(1f).height(38.dp), "Search friends", themedIcon(LobbyIcons.SEARCH), 64, false)
         FriendFilter.entries.forEach { entry ->
             val label = when {
                 entry == FriendFilter.Requests && requests > 0 -> "Requests $requests"
@@ -157,7 +144,7 @@ private fun RosterHeader(state: SocialPageState, snapshot: SocialSnapshot, filte
             }
             Box(Modifier) { Chip(label, selected = entry == filter) { onFilter(entry) } }
         }
-        SocialButton("Add friend", icon = SOCIAL_ASSETS + "user-plus-01.svg", onClick = { state.dialog = SocialDialog.AddFriend })
+        TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), Modifier.height(38.dp), ButtonStyle.Secondary, true) { state.dialog = SocialDialog.AddFriend }
     }
 }
 

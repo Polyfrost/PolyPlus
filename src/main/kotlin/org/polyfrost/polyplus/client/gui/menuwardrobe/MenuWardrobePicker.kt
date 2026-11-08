@@ -3,6 +3,9 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -56,11 +59,9 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
 import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
@@ -164,7 +165,7 @@ internal fun CarouselPicker(model: PickerModel, modifier: Modifier) {
                 if (model.forceToggle) ForceCapesToggle()
                 model.target?.let { target ->
                     Label(target.name, 12.sp, Modifier.widthIn(max = 130.dp), color = OneConfigTheme.current.textColorSecondary)
-                    SocialButton(if (model.unequips) "Unequip" else "Equip", filled = !model.unequips, onClick = model.onApply)
+                    TextButton(if (model.unequips) "Unequip" else "Equip", Modifier.height(38.dp), if (model.unequips) ButtonStyle.Secondary else ButtonStyle.Primary, model.onApply)
                 }
                 OutlineIconButton("close.svg", Modifier, model.onClose)
             }

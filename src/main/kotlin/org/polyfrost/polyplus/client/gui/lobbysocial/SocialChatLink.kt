@@ -42,19 +42,6 @@ internal object SocialChatLink {
         active = null
     }
 
-    var renamed by mutableStateOf(emptyMap<Int, String>())
-        private set
-
-    var muted by mutableStateOf(emptySet<Int>())
-        private set
-
-    fun rename(id: Int, name: String) {
-        renamed = renamed + (id to name)
-    }
-
-    fun toggleMute(id: Int) {
-        muted = if (id in muted) muted - id else muted + id
-    }
 }
 
 @Composable

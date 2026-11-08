@@ -25,9 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LeaveVoiceButton
@@ -115,9 +117,9 @@ private fun RoomHeader(window: SocialWindowState, party: Party, narrow: Boolean)
             Label("${party.members.size} of ${PartyRepository.MAX_MEMBERS} · ${party.members.count { it.online }} online", 12.sp, color = MutedText)
         }
         BringPartyButton(party)
-        if (!narrow) SocialButton("Leave", onClick = { PartyRepository.leave() })
+        if (!narrow) TextButton("Leave", Modifier.height(38.dp)) { PartyRepository.leave() }
         PartyButtons(party, window::showVoice)
-        if (!back) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close party", onClick = window::closeParty)
+        if (!back) IconButton(themedIcon(LobbyIcons.CLOSE), "Close party", Modifier, window::closeParty)
     }
 }
 
@@ -129,7 +131,7 @@ private fun BringPartyButton(party: Party) {
     val play = PlayTogether.active
     val running = play != null && play.stage != PlayTogether.Stage.DONE
     if (!away && !running) return
-    SocialButton(if (running) "Bringing party" else "Bring party here", filled = true, enabled = !running, onClick = PlayTogether::bringHere)
+    TextButton(if (running) "Bringing party" else "Bring party here", null, Modifier.height(38.dp), ButtonStyle.Primary, !running, PlayTogether::bringHere)
 }
 
 @Composable
@@ -144,7 +146,7 @@ private fun RoomVoice(window: SocialWindowState, party: Party) {
         VoiceModeChips(party)
         Spacer(Modifier.weight(1f))
         if (!voice.inVoice || window.singlePane) VoiceButtons(party, leave = false)
-        SocialIconButton(PartyIcons.SETTINGS, tooltip = "Voice and devices", onClick = window::showVoice)
+        IconButton(themedIcon(PartyIcons.SETTINGS), "Voice and devices", Modifier, window::showVoice)
         if (voice.inVoice && window.singlePane) LeaveVoiceButton()
     }
 }

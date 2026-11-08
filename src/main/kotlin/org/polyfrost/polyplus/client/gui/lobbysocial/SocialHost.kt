@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import net.minecraft.client.multiplayer.ServerData
-import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyOverlay
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
 import org.polyfrost.polyplus.client.party.LeaderFollow
 
 internal interface SocialHost {
@@ -25,13 +28,9 @@ internal fun LeaderJoinEffect(host: SocialHost) {
 
 internal object SocialEscape {
     val popupOpen: Boolean
-        get() = LobbyOverlay.close != null
+        get() = EscapeStack.hasOpen
 
-    fun closePopup(): Boolean {
-        val close = LobbyOverlay.close ?: return false
-        close()
-        return true
-    }
+    fun closePopup(): Boolean = EscapeStack.closeTop()
 
     fun closeDialog(): Boolean {
         if (!SocialPageState.dialogOpen) return false

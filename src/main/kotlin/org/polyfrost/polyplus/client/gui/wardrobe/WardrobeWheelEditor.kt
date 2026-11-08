@@ -30,6 +30,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -180,6 +184,7 @@ private fun WheelSlotCell(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp)
                         .clip(ppShape(6.dp))
                         .background(theme.popupBackground)
+                        .a11y("Clear slot", A11yRole.Button)
                         .clickable(onClick = onClear),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -213,6 +218,6 @@ internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String
         contentAlignment = Alignment.Center,
     ) {
         Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
-        if (tooltip != null && hovered) TooltipPopup(tooltip)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveStart)
     }
 }

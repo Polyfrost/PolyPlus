@@ -2,6 +2,8 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -50,7 +52,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -62,22 +63,29 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.options.OptionsScreen
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.AccountSwitcherContent
@@ -91,19 +99,20 @@ import org.polyfrost.polyplus.client.gui.Outfit
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDangerColor
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialPopupBackground
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
-import org.polyfrost.polyplus.client.gui.SocialWindowShape
-import org.polyfrost.oneconfig.api.ui.v1.theme.concentric
 import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.polyplus.client.gui.A11yRegion
+import org.polyfrost.polyplus.client.gui.SocialNotices
+import org.polyfrost.polyplus.client.gui.a11yRegion
+import org.polyfrost.polyplus.client.gui.a11yRoot
+import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPage
 import org.polyfrost.polyplus.client.gui.marketplace.MarketplacePage
@@ -115,16 +124,18 @@ import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerPage
 import org.polyfrost.polyplus.client.gui.replays.ReplaysPage
 import org.polyfrost.polyplus.client.gui.stats.StatsPage
 import org.polyfrost.polyplus.client.gui.stats.formatDuration
-import org.polyfrost.polyplus.client.gui.switchToVanillaMenu
 import org.polyfrost.polyplus.client.gui.themeToggle
-import org.polyfrost.polyplus.client.gui.ThemedIcon
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.toggleFullscreen
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import org.polyfrost.polyplus.client.lobby.LobbyHologram
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
+import org.polyfrost.polyplus.client.party.PartyRepository
+import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.stats.PlaySessions
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.time.LocalDate
@@ -132,23 +143,21 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
-import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 
 private const val FROST_MILLIS = 220
 private const val REVEAL_MILLIS = 700
 
-private class NavTab(val label: String, val page: LobbyPage)
+private class LobbyTab(val label: String, val page: LobbyPage)
 
 private val TABS = listOf(
-    NavTab("Play", LobbyPage.Home),
-    NavTab("Wardrobe", LobbyPage.Wardrobe),
-    NavTab("Marketplace", LobbyPage.Marketplace),
-    NavTab("Social", LobbyPage.Social),
-    NavTab("Stats", LobbyPage.Stats),
+    LobbyTab("Play", LobbyPage.Home),
+    LobbyTab("Wardrobe", LobbyPage.Wardrobe),
+    LobbyTab("Marketplace", LobbyPage.Marketplace),
+    LobbyTab("Social", LobbyPage.Social),
+    LobbyTab("Stats", LobbyPage.Stats),
 )
 
-private fun NavTab.activeOn(page: LobbyPage): Boolean = when (this.page) {
+private fun LobbyTab.activeOn(page: LobbyPage): Boolean = when (this.page) {
     LobbyPage.Home -> page != LobbyPage.Wardrobe && page != LobbyPage.Social && page != LobbyPage.Marketplace && page != LobbyPage.Stats
     else -> this.page == page
 }
@@ -174,8 +183,9 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
             LobbyGlass.chrome = if (lobby.setup) chrome else chrome * reveal.value
         }
     }
+    LaunchedEffect(Unit) { launch { SocialErrors.events.collect(A11y::announce) }; SocialNotices.events.collect(A11y::announce) }
     var measured by remember { mutableStateOf(IntSize.Zero) }
-    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }) {
+    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }.a11yRoot()) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
@@ -192,7 +202,7 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome * reveal.value }) {
                     LobbyChrome(lobby, screen, labels, IntSize(widthPx.roundToInt(), heightPx.roundToInt()))
                 }
-                lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors) { lobby.tour = null } }
+                lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors, lobby::endTour) }
             }
             if (lobby.accountsOpen) AccountsDialog(lobby)
             if (depart > 0f) {
@@ -235,7 +245,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
                     .background(Brush.verticalGradient(listOf(sceneScrim.copy(alpha = 0f), sceneScrim.copy(alpha = 0.6f)))),
             )
         }
-        when (lobby.page) {
+        Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page)) { when (lobby.page) {
             LobbyPage.Home -> {
                 SceneTags(labels, root)
                 LobbyCornerCard(lobby, Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top))
@@ -252,19 +262,20 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
             LobbyPage.Marketplace -> MarketplacePage(onBack = { lobby.show(LobbyPage.Home) }, onWardrobe = { lobby.show(LobbyPage.Wardrobe) })
             LobbyPage.Social -> SocialPage { lobby.show(LobbyPage.Home) }
             LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }
-        }
+        } }
         var barStart by remember { mutableFloatStateOf(Float.NaN) }
-        SceneControl(lobby) { barStart }
+        Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) { SceneControl(lobby) { barStart } }
         LobbyDarkChrome { Navbar(lobby, screen) }
         val chatShown = lobby.page != LobbyPage.Social && !LobbyPage.Social.hidden
         val chatWidth by animateDpAsState(
             if (chatShown) LobbyLayout.ChatWidth else 0.dp,
-            if (PolyPlusConfig.reducedMotion) snap() else spring(visibilityThreshold = Dp.VisibilityThreshold),
+            if (Motion.reduced) snap() else spring(visibilityThreshold = Dp.VisibilityThreshold),
         )
         Row(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, bottom = LobbyLayout.Margin),
+                .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, bottom = LobbyLayout.Margin)
+                .a11yRegion(A11yRegion.Bar),
             verticalAlignment = Alignment.Bottom,
         ) {
             Column(Modifier.widthIn(max = chatWidth), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
@@ -284,13 +295,14 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
                 .align(Alignment.BottomEnd)
                 .padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
                 .width(LobbyLayout.UnitWidth)
-                .tourAnchor(lobby.anchors, TourAnchor.Play),
+                .tourAnchor(lobby.anchors, TourAnchor.Play)
+                .a11yRegion(A11yRegion.Play),
         )
         if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer() }
         if (lobby.page != LobbyPage.Social) {
             SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top))
         }
-        PlayTogetherBanner(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top + LobbyLayout.Gap, start = LobbyLayout.Margin, end = LobbyLayout.Margin))
+        PlayTogetherBanner(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top + LobbyLayout.Gap, start = LobbyLayout.Margin, end = LobbyLayout.Margin).a11yRegion(A11yRegion.Banner))
         PlayTogetherHooks(lobby)
         lobby.hostWorldId?.let { worldId -> HostWorldDialog(worldId, screen) { lobby.hostWorldId = null } }
         lobby.editing?.let { edit ->
@@ -325,7 +337,11 @@ private fun BoxScope.Footer() {
 @Composable
 private fun Navbar(lobby: LobbyShell, screen: Screen) {
     val groups by GroupsRepository.groups.collectAsState()
-    LobbyHighlight { NavbarRow(lobby, screen, groups.any { it.unread }) }
+    val requests by FriendsRepository.incomingRequests.collectAsState()
+    val invites by SessionsRepository.incomingInvites.collectAsState()
+    val partyInvites by PartyRepository.incomingInvites.collectAsState()
+    val unread = groups.any { it.unread } || requests.isNotEmpty() || partyInvites.isNotEmpty() || invites.any { it.status == INVITE_PENDING }
+    LobbyHighlight { NavbarRow(lobby, screen, unread) }
 }
 
 @Composable
@@ -337,14 +353,13 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
             .padding(horizontal = LobbyLayout.Margin),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.width(NAV_SIDE.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) }) { LobbyIcon("logo", size = 28.dp) }
-            Box(Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) }) {
-                SocialText("ONECLIENT", 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit, maxLines = 1)
-            }
-        }
+        Wordmark(
+            Modifier.width(NAV_SIDE.dp),
+            mark = Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) },
+            word = Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) },
+        )
         Row(
-            Modifier.weight(1f),
+            Modifier.weight(1f).a11yRegion(A11yRegion.Nav),
             horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -354,7 +369,13 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
                     LobbyPage.Social -> Modifier.tourAnchor(lobby.anchors, TourAnchor.Social)
                     else -> Modifier
                 }
-                NavButton(tab, tab.activeOn(lobby.page), tab.page == LobbyPage.Social && unread, anchor) { lobby.show(tab.page) }
+                NavTab(
+                    tab.label,
+                    tab.activeOn(lobby.page),
+                    anchor,
+                    unread = tab.page == LobbyPage.Social && unread,
+                    underline = if (tab.page == LobbyPage.Home) Modifier.onGloballyPositioned { StartupOverlay.navLine = StartupOverlay.place(it) } else Modifier,
+                ) { lobby.show(tab.page) }
             }
         }
         Box(Modifier.width(NAV_SIDE.dp), contentAlignment = Alignment.CenterEnd) {
@@ -364,68 +385,37 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
 }
 
 private const val NAV_SIDE = 490
-private const val NAV_INACTIVE_ALPHA = 0.6f
-private const val NAV_UNDERLINE_WIDTH = 27
-
-@Composable
-private fun NavButton(tab: NavTab, active: Boolean, unread: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Box(
-        modifier
-            .height(38.dp)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Label(tab.label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = NAV_INACTIVE_ALPHA), weight = if (isMinecraftTheme) FontWeight.Bold else FontWeight.Medium)
-        if (active) {
-            Box(Modifier.align(Alignment.BottomCenter).width(NAV_UNDERLINE_WIDTH.dp).height(2.dp).background(OneConfigTheme.accent).onGloballyPositioned { if (tab.page == LobbyPage.Home) StartupOverlay.navLine = StartupOverlay.place(it) })
-        }
-        if (unread) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .offset(x = 12.dp)
-                    .size(8.dp)
-                    .clip(OneConfigTheme.current.circleShape)
-                    .background(OneConfigTheme.accent),
-            )
-        }
-    }
-}
+private const val INVITE_PENDING = "pending"
 
 @Composable
 private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
-    Row(Modifier.tourAnchor(lobby.anchors, TourAnchor.Tools), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.tourAnchor(lobby.anchors, TourAnchor.Tools).a11yRegion(A11yRegion.Tools), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val mc = Minecraft.getInstance()
         NotificationsButton()
         ModMenuSlot(screen)
-        SocialIconButton("settings", tooltip = "Mods") { PolyPlusOneConfigIntegration.openMods() }
-        SocialIconButton("cog", tooltip = "Minecraft settings") {
+        IconButton(themedIcon("settings"), "Mods", Modifier) { PolyPlusOneConfigIntegration.openMods() }
+        IconButton(themedIcon("cog"), "Minecraft settings", Modifier) {
             //? if >= 26.3 || < 26.1 {
             ClientPlatform.setScreen(OptionsScreen(screen, mc.options))
             //?} else {
             /*ClientPlatform.setScreen(OptionsScreen(screen, mc.options, false))
             *///?}
         }
-        MoreButton(screen)
+        MoreButton(lobby, screen)
         Spacer(Modifier.width(2.dp))
         ProfileChip(lobby, Modifier.weight(1f, fill = false))
-        if (!ClientPlatform.isMac) SocialIconButton("maximise", tooltip = "Toggle fullscreen", onClick = ::toggleFullscreen)
+        if (!ClientPlatform.isMac) IconButton(themedIcon("maximise"), "Toggle fullscreen", Modifier, ::toggleFullscreen)
         QuitButton()
     }
 }
 
 @Composable
 private fun ModMenuSlot(screen: Screen) {
-    val modMenu = if (PolyPlusMainMenuConfig.hideMainMenuModButtons) null else ModIntegrationButtons.availableModMenu()
-    if (modMenu != null) {
-        val logo = remember(modMenu) { decodeModLogo(modMenu.logo) }
+    rememberModMenu()?.let { (modMenu, logo) ->
         if (logo == null) {
-            SocialIconButton(modMenu.icon, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
+            IconButton(themedIcon(modMenu.icon), modMenu.tooltip, Modifier) { modMenu.onClick(screen) }
         } else {
-            SocialIconButton(tooltip = modMenu.tooltip, onClick = { modMenu.onClick(screen) }) { ModLogo(logo, MOD_LOGO_SIZE.dp, SocialTextPrimary) }
+            IconButton(modMenu.tooltip, null, Modifier, null, TooltipPlacement.BelowStart, { modMenu.onClick(screen) }) { ModLogo(logo, MOD_LOGO_SIZE.dp, SocialTextPrimary) }
         }
     }
 }
@@ -438,13 +428,13 @@ private fun ProfileChip(lobby: LobbyShell, modifier: Modifier) {
         modifier
             .rowFrame(false, hovered && switcher)
             .hoverable(interaction)
-            .then(if (switcher) Modifier.clickableWithSound(lobby::openAccounts) else Modifier)
+            .then(if (switcher) Modifier.clickableWithSound("Accounts, ${ClientPlatform.localPlayerName()}", onClick = lobby::openAccounts) else Modifier)
             .padding(start = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Label(ClientPlatform.localPlayerName(), 14.sp, Modifier.weight(1f, fill = false).widthIn(max = PROFILE_NAME_WIDTH.dp), weight = FontWeight.Medium)
-        Head(ClientPlatform.localPlayerUuid(), 38.dp, realSkin = true)
+        PlayerHead(ClientPlatform.localPlayerUuid(), 38.dp, Modifier, headShape(38.dp))
     }
 }
 
@@ -454,25 +444,25 @@ private const val TAG_EASE_MILLIS = 160
 private const val TAG_TWO_LINE_HEIGHT = 46
 private const val TAG_WHEREABOUTS_WIDTH = 180
 private const val TAG_FOCUS_SCALE = 1.08f
-private const val MORE_MENU_WIDTH = 300
-private const val MORE_MENU_INSET = 8
 private const val QUIT_ICON = SOCIAL_ASSETS + "x-close.svg"
 private const val QUIT_CARD_WIDTH = 330
+private const val MORE_MENU_WIDTH = 300
 private const val MIN_SHOWN_PLAYTIME = 60_000L
+private val BAR_POPUP_GAP = 12.dp
 
 @Composable
 private fun NotificationsButton() {
-    BarPopupButton("bell", "Notifications") { NotificationsCenter() }
+    AnchoredPopupButton(themedIcon("bell"), "Notifications", Modifier, Alignment.End, BAR_POPUP_GAP) { LobbyUserTheme { NotificationsCenter() } }
 }
 
 @Composable
 private fun QuitButton() {
     val mc = Minecraft.getInstance()
     if (PolyPlusLobbyConfig.quitWithoutConfirmation) {
-        SocialIconButton(QUIT_ICON, tooltip = "Quit game", onClick = mc::stop)
+        IconButton(themedIcon(QUIT_ICON), "Quit game", Modifier, mc::stop)
     } else {
         LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PlaySessions.log(ClientPlatform.localPlayerUuid()) } }
-        BarPopupButton(QUIT_ICON, "Quit game") { close -> QuitConfirm(mc::stop, close) }
+        AnchoredPopupButton(themedIcon(QUIT_ICON), "Quit game", Modifier, Alignment.End, BAR_POPUP_GAP) { close -> LobbyUserTheme { QuitConfirm(mc::stop, close) } }
     }
 }
 
@@ -490,15 +480,15 @@ private fun QuitConfirm(onQuit: () -> Unit, onCancel: () -> Unit) {
         ) {
             QuitPortrait(player)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                PanelTitle("Quit the game?")
+                DialogTitle("Quit the game?")
                 Label(ClientPlatform.localPlayerName(), 12.sp, color = MutedText)
             }
         }
         Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (today != null || lastPlace != null) QuitRecap(today, lastPlace)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SocialButton("Cancel", modifier = Modifier.weight(1f), onClick = onCancel)
-                DangerButton("Quit", Modifier.weight(1f), icon = QUIT_ICON, onClick = onQuit)
+                TextButton("Cancel", Modifier.weight(1f).height(38.dp), onCancel)
+                TextButton("Quit", themedIcon(QUIT_ICON), Modifier.weight(1f).height(38.dp), ButtonStyle.Danger, true, onQuit)
             }
         }
     }
@@ -507,7 +497,7 @@ private fun QuitConfirm(onQuit: () -> Unit, onCancel: () -> Unit) {
 @Composable
 private fun QuitPortrait(player: UUID) {
     Box {
-        Head(player, 58.dp, realSkin = true)
+        PlayerHead(player, 58.dp, Modifier, headShape(58.dp))
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
@@ -546,77 +536,34 @@ private fun QuitStat(label: String, value: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun MoreButton(screen: Screen) {
-    BarPopupButton(SOCIAL_ASSETS + "dots-vertical.svg", "More") { close -> MoreMenu(screen, close) }
+private fun MoreButton(lobby: LobbyShell, screen: Screen) {
+    AnchoredPopupButton(themedIcon(SOCIAL_ASSETS + "dots-vertical.svg"), "More", Modifier, Alignment.End, BAR_POPUP_GAP) { close -> LobbyUserTheme { MoreMenu(lobby, screen, close) } }
 }
 
 @Composable
-private fun BarPopupButton(icon: String, tooltip: String, content: @Composable (close: () -> Unit) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    Box {
-        SocialIconButton(
-            icon,
-            Modifier.onSizeChanged { size = it },
-            tooltip = if (open) null else tooltip,
-            onClick = { open = !open },
-        )
-        if (open) {
-            EscapeCloses { open = false }
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, size.height + with(LocalDensity.current) { 12.dp.roundToPx() }),
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                LobbyUserTheme { LobbyHighlight { content { open = false } } }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoreMenu(screen: Screen, onClose: () -> Unit) {
+private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     val theme = themeToggle()
-    val row = SocialWindowShape.concentric(MORE_MENU_INSET.dp)
-    Column(Modifier.width(MORE_MENU_WIDTH.dp).popup().padding(MORE_MENU_INSET.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        MoreRow(theme.icon, theme.label, row, theme.toggle)
-        MoreRow(SOCIAL_ASSETS + "logo.svg", "Switch to PolyPlus main menu", row) {
+    MenuSurface(Modifier.width(MORE_MENU_WIDTH.dp)) {
+        MenuItem(theme.label, themedIcon(theme.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, theme.toggle)
+        MenuItem("Switch to PolyPlus main menu", themedIcon(SOCIAL_ASSETS + "logo.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
             MainMenuReplacement.switchToPolyPlusMenu()
         }
-        MoreRow(SOCIAL_ASSETS + "minecraft-block.svg", "Switch to vanilla main menu", row) {
+        MenuItem("Use vanilla Minecraft menus", themedIcon(SOCIAL_ASSETS + "minecraft-block.svg"), "Main menu, pause screen and startup go back to Minecraft's own", MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
-            switchToVanillaMenu()
+            MainMenuReplacement.returnToVanilla()
+        }
+        MenuItem("Replay tour", themedIcon(SOCIAL_ASSETS + "play-circle.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
+            onClose()
+            lobby.replayTour()
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
             ModIntegrationButtons.withoutModMenu().forEach { button ->
-                MoreRow(button.icon, button.tooltip, row) {
+                MenuItem(button.tooltip, themedIcon(button.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
                     onClose()
                     button.onClick(screen)
                 }
             }
-        }
-    }
-}
-
-@Composable
-internal fun MoreRow(icon: String, label: String, shape: Shape = SocialFieldShape, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    LobbyHighlight(shape) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(38.dp)
-                .rowFrame(false, hovered, shape)
-                .hoverable(interaction)
-                .clickableWithSound(onClick)
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ThemedIcon(icon, SocialTextPrimary, 18.dp)
-            Label(label, 14.sp, Modifier.weight(1f))
         }
     }
 }
@@ -650,7 +597,7 @@ private fun SceneTag(label: LobbyScene.Label, modifier: Modifier) {
         if (speaking) SocialSuccessColor else if (label.isLocal || focused) OneConfigTheme.accent else SocialBorderColor,
         tween(TAG_EASE_MILLIS, easing = FastOutSlowInEasing),
     )
-    val lift by animateFloatAsState(if (focused) TAG_FOCUS_SCALE else 1f, tween(TAG_EASE_MILLIS, easing = FastOutSlowInEasing))
+    val lift by animateFloatAsState(if (focused) TAG_FOCUS_SCALE else 1f, Motion.spec(tween(TAG_EASE_MILLIS, easing = FastOutSlowInEasing)))
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             hover

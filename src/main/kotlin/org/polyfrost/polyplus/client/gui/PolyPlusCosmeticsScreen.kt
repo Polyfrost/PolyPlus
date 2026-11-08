@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.gui.wardrobe.CartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticsLoadingScreen
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberOnlineConsent
 import org.polyfrost.polyplus.client.gui.wardrobe.MinecraftCapesOnlyScreen
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeShell
 import org.polyfrost.polyplus.client.gui.wardrobe.cartName
@@ -31,12 +32,12 @@ import org.polyfrost.polyplus.client.gui.wardrobe.selectedVariantId
 import org.polyfrost.polyplus.client.gui.wardrobe.toCartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.unequip
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 @Composable
 internal fun PolyPlusCosmeticsScreen() {
-    if (!PrivacyConsent.allowsOnlineServices()) {
-        MinecraftCapesOnlyScreen()
+    var consent by rememberOnlineConsent()
+    if (!consent) {
+        MinecraftCapesOnlyScreen { consent = true }
         return
     }
     var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }

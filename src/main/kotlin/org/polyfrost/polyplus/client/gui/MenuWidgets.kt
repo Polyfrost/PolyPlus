@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,16 +39,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
@@ -60,7 +52,6 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
@@ -126,7 +117,6 @@ internal fun scaledDensity(scale: Float): Density {
     return remember(density, scale) { Density(usableScale(density.density * scale), usableScale(density.fontScale)) }
 }
 
-/** Sizing of the title screen's player preview, which grows to fit a hat cosmetic. */
 internal class MenuPreviewSpec(val height: Dp, val modelScale: Float, val fadeStart: Float)
 
 internal fun menuPreviewSpec(): MenuPreviewSpec {
@@ -191,7 +181,6 @@ internal fun switchToVanillaMenu() = MainMenuReplacement.switchToVanilla()
 internal fun toggleFullscreen() {
     val mc = Minecraft.getInstance()
     //? if >= 26.3 {
-    // the window follows the option now
     mc.options.fullscreen().set(!mc.options.fullscreen().get())
     mc.options.save()
     //?} elif > 1.8.9 {
@@ -242,12 +231,12 @@ internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, prima
 }
 
 @Composable
-internal fun Modifier.pillSurface(onClick: (() -> Unit)?, borderBrush: Brush = SocialPanelBorderBrush, enabled: Boolean = true): Modifier =
+internal fun Modifier.pillSurface(onClick: (() -> Unit)?, borderBrush: Brush = SocialPanelBorderBrush, enabled: Boolean = true, label: String? = null): Modifier =
     clip(PanelShape)
         .background(PanelBackground)
         .border(SocialPanelBorderWidth, borderBrush, PanelShape)
         .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
-        .then(if (enabled && onClick != null) Modifier.clickableWithSound(onClick) else Modifier)
+        .then(if (enabled && onClick != null) Modifier.clickableWithSound(label, shape = PanelShape, onClick = onClick) else Modifier)
 
 @Composable
 internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, borderBrush: Brush = SocialPanelBorderBrush, badge: Boolean = false) {
@@ -256,7 +245,7 @@ internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifi
             modifier = Modifier
                 .fillMaxWidth()
                 .height(45.dp)
-                .pillSurface(onClick, borderBrush)
+                .pillSurface(onClick, borderBrush, label = label)
                 .padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
@@ -273,53 +262,6 @@ internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifi
                     .background(OneConfigTheme.accent),
             )
         }
-    }
-}
-
-internal enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
-
-/** A tooltip bubble placed against the composable it's called in, wrapping at [maxWidth]. */
-@Composable
-internal fun HoverTooltip(text: String, placement: TooltipPlacement, maxWidth: Dp = Dp.Unspecified) {
-    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val positionProvider = remember(gap, placement) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset = when (placement) {
-                TooltipPlacement.BELOW_END ->
-                    IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
-                TooltipPlacement.ABOVE_CENTER -> IntOffset(
-                    anchorBounds.center.x - popupContentSize.width / 2,
-                    anchorBounds.top - gap - popupContentSize.height,
-                )
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        TooltipBubble(text, maxWidth)
-    }
-}
-
-@Composable
-private fun TooltipBubble(text: String, maxWidth: Dp) {
-    Box(
-        modifier = Modifier
-            .widthIn(max = maxWidth)
-            .sceneFrost(9.dp)
-            .clip(PanelShape)
-            .background(OneConfigTheme.current.popupBackground)
-            .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, PanelShape)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(text, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 

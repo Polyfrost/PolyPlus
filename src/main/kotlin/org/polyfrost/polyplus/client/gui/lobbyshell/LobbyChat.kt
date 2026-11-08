@@ -2,9 +2,17 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.animation.animateContentSize
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -27,24 +35,27 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.constrain
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import org.polyfrost.polyplus.client.gui.EmojiPickerButton
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialEmojiText
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.SocialTextField
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbysocial.ChatLine
 import org.polyfrost.polyplus.client.gui.lobbysocial.ConversationChip
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
@@ -53,6 +64,7 @@ import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberPartyConversation
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import kotlinx.coroutines.launch
 
 private const val MESSAGE_LIMIT = 500
 
@@ -81,7 +93,7 @@ internal fun PlayerBar(lobby: LobbyShell, modifier: Modifier) {
 
 @Composable
 private fun SoloRoster() {
-    BarEntry(ClientPlatform.localPlayerName(), "You") { Head(ClientPlatform.localPlayerUuid(), BarHeadSize, realSkin = true) }
+    BarEntry(ClientPlatform.localPlayerName(), "You") { PlayerHead(ClientPlatform.localPlayerUuid(), BarHeadSize, Modifier, headShape(BarHeadSize)) }
 }
 
 @Composable
@@ -108,14 +120,14 @@ internal fun ChatPanel(open: Boolean) {
     val conversation = active.takeIf { open }
     LaunchedEffect(active?.id) { draft = "" }
     val lines = conversation?.lines().orEmpty()
-    val resize = if (PolyPlusConfig.reducedMotion) snap<IntSize>() else spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow, IntSize.VisibilityThreshold)
+    val resize = if (Motion.reduced) snap<IntSize>() else spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow, IntSize.VisibilityThreshold)
     val size = if (conversation != null) {
         Modifier.width(LobbyLayout.ChatWidth).height(LobbyLayout.ChatHeight)
     } else {
         Modifier.widthIn(max = LobbyLayout.ChatWidth).height(LobbyLayout.BarHeight)
     }
     Column(
-        Modifier.panel().animateContentSize(resize, Alignment.BottomStart).then(size).padding(12.dp),
+        Modifier.panel().springResize(resize).then(size).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (conversation == null) {
@@ -138,12 +150,23 @@ internal fun ChatPanel(open: Boolean) {
         }
         val cooldown = cooldownReason(conversation.id)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SocialTextField(
+            TextField(
                 value = draft,
                 onValueChange = { if (cooldown == null) draft = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(38.dp),
                 placeholder = cooldown ?: "Message ${conversation.title}",
+                leadingIcon = null,
                 maxLength = MESSAGE_LIMIT,
+                invalid = false,
+                enabled = true,
+                singleLine = true,
+                framed = true,
+                fontSize = 14.sp,
+                label = null,
+                masked = false,
+                focusRequester = null,
+                interactionSource = null,
+                trailing = null,
                 onSubmit = {
                     val text = draft.trim()
                     if (cooldown == null && text.isNotEmpty()) {
@@ -160,16 +183,44 @@ internal fun ChatPanel(open: Boolean) {
     }
 }
 
+private class PanelSize {
+    var anim: Animatable<IntSize, AnimationVector2D>? = null
+}
+
+@Composable
+private fun Modifier.springResize(spec: AnimationSpec<IntSize>): Modifier {
+    val scope = rememberCoroutineScope()
+    val state = remember { PanelSize() }
+    return clipToBounds().layout { measurable, constraints ->
+        val targetWidth = constraints.constrainWidth(measurable.maxIntrinsicWidth(constraints.maxHeight))
+        val anim = state.anim
+        val shownWidth = constraints.constrainWidth(anim?.value?.width ?: targetWidth)
+        val placeable = measurable.measure(constraints.copy(minWidth = shownWidth, maxWidth = shownWidth))
+        val target = IntSize(targetWidth, placeable.height)
+        val current = if (anim == null) {
+            state.anim = Animatable(target, IntSize.VectorConverter, IntSize.VisibilityThreshold)
+            target
+        } else {
+            if (anim.targetValue != target) scope.launch { anim.animateTo(target, spec) }
+            IntSize(shownWidth, anim.value.height)
+        }
+        val shown = constraints.constrain(current)
+        layout(shown.width, shown.height) { placeable.place(0, shown.height - placeable.height) }
+    }
+}
+
 @Composable
 private fun DockCloseButton() {
     val (interaction, hovered) = rememberSocialHover()
-    SocialIconButton(
-        LobbyIcons.CLOSE,
+    IconButton(
+        themedIcon(LobbyIcons.CLOSE),
+        "Close conversation",
+        null,
         Modifier.size(DockCloseSize).hoverable(interaction),
-        background = SocialControlBackground,
-        tint = if (hovered) SocialDangerText else SocialTextPrimary,
-        tooltip = "Close conversation",
-        onClick = SocialChatLink::close,
+        SocialControlBackground,
+        if (hovered) SocialDangerText else SocialTextPrimary,
+        TooltipPlacement.BelowStart,
+        SocialChatLink::close,
     )
 }
 

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,28 +30,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
@@ -148,42 +140,7 @@ internal fun CardLabel(
             onTextLayout = { truncated = it.hasVisualOverflow },
         )
         if (truncated && hovered) {
-            TooltipPopup(text)
-        }
-    }
-}
-
-@Composable
-internal fun TooltipPopup(text: String) {
-    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
-    val positionProvider = remember(gap) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                val above = anchorBounds.top - gap - popupContentSize.height
-                val y = if (above >= 0) above else anchorBounds.bottom + gap
-                return IntOffset(x, y)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        Box(
-            modifier = Modifier.widthIn(max = 240.dp)
-                .sceneFrost(6.dp)
-                .clip(ppShape(6.dp))
-                .background(OneConfigTheme.current.popupBackground)
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 5.dp),
-        ) {
-            SocialText(text, color = OneConfigTheme.current.textColor, fontSize = 12.sp)
+            TooltipPopup(text, TooltipPlacement.AboveStart)
         }
     }
 }

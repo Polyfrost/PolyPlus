@@ -32,16 +32,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
 import org.polyfrost.polyplus.client.social.PlayerStatusRepository
 
 private val SELECTABLE_STATUSES = listOf(PlayerStatus.Online, PlayerStatus.Offline)
 private const val CLOSED_CHEVRON_ANGLE = 180f
-private val STATUS_MENU_WIDTH = 170.dp
 private val STATUS_MENU_OFFSET = 22.dp
+private val STATUS_MENU_WIDTH = 170.dp
 
 internal fun selfStatusLabel(status: PlayerStatus): String = if (status == PlayerStatus.Offline) "Appear offline" else "Online"
 
@@ -76,17 +78,12 @@ internal fun CompactStatusPicker(extra: @Composable ColumnScope.(close: () -> Un
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
-                Column(Modifier.width(STATUS_MENU_WIDTH).popup().padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MenuSurface(Modifier.width(STATUS_MENU_WIDTH)) {
                     SELECTABLE_STATUSES.forEach { option ->
-                        SocialMenuItem(
-                            label = selfStatusLabel(option),
-                            color = if (option == status) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
-                            selected = option == status,
-                            onClick = {
-                                close()
-                                PlayerStatusRepository.set(option)
-                            },
-                        )
+                        MenuItem(selfStatusLabel(option), null, null, MenuItemSize.Compact, false, option == status, true, null, Modifier, null) {
+                            close()
+                            PlayerStatusRepository.set(option)
+                        }
                     }
                     extra(close)
                 }

@@ -23,16 +23,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.HostFlowState
-import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.HostFlowSteps
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
-import org.polyfrost.polyplus.client.gui.SocialIconButton
-import org.polyfrost.polyplus.client.gui.SocialTextField
 import org.polyfrost.polyplus.client.gui.inviteableGroups
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
@@ -90,8 +92,8 @@ internal fun WorldPane(window: SocialWindowState, state: SocialPageState, snapsh
                 PanelTitle(heading.title)
                 Label(heading.status, 12.sp, color = MutedText)
             }
-            if (hosting != null) SocialButton("Stop hosting", onClick = SocialHosting::stop)
-            if (closable && !back) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close world", onClick = window::closeWorld)
+            if (hosting != null) TextButton("Stop hosting", Modifier.height(38.dp), SocialHosting::stop)
+            if (closable && !back) IconButton(themedIcon(LobbyIcons.CLOSE), "Close world", Modifier, window::closeWorld)
         }
         PaneRule()
         val body = Modifier.fillMaxWidth().weight(1f)
@@ -107,7 +109,7 @@ internal fun WorldPane(window: SocialWindowState, state: SocialPageState, snapsh
 @Composable
 private fun LanStatus(flow: HostFlowState, modifier: Modifier) {
     EmptyState("Open on your network", modifier, "Players on your network can join from Multiplayer. Host for friends to invite people anywhere.") {
-        SocialButton("Host for friends", filled = true) { flow.forFriends = true }
+        TextButton("Host for friends", Modifier.height(38.dp), ButtonStyle.Primary) { flow.forFriends = true }
     }
 }
 
@@ -130,13 +132,7 @@ private fun InviteFriends(state: SocialPageState, snapshot: SocialSnapshot, modi
     val found = snapshot.friends.filter { it.name.contains(query, ignoreCase = true) }
     val (online, offline) = found.partition { it.online }
     Column(modifier.padding(start = Edge, end = Edge, top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SocialTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = "Search friends",
-            leadingIcon = LobbyIcons.SEARCH,
-        )
+        TextField(query, { query = it }, Modifier.fillMaxWidth().height(38.dp), "Search friends", themedIcon(LobbyIcons.SEARCH), 64, false)
         val list = Modifier.fillMaxWidth().weight(1f)
         if (found.isEmpty() && invitable.isEmpty()) {
             NoInvitees(state, query.isBlank(), list)
@@ -160,7 +156,7 @@ private fun NoInvitees(state: SocialPageState, noFriends: Boolean, modifier: Mod
         return
     }
     EmptyState("No friends to invite yet", modifier) {
-        SocialButton("Add friend", SOCIAL_ASSETS + "user-plus-01.svg", filled = true) { state.dialog = SocialDialog.AddFriend }
+        TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.dialog = SocialDialog.AddFriend }
     }
 }
 
@@ -179,14 +175,14 @@ private fun PeopleSection(title: String, people: List<SocialPerson>, state: Soci
 private fun GroupRow(group: GroupSummary) {
     val self = ChatIdentity.selfId()
     val members = group.members.filterNot { it == self }
-    val invite = ContextItem("Invite group") { SocialHosting.inviteGroup(group, self) }
+    val invite = MenuAction("Invite group") { SocialHosting.inviteGroup(group, self) }
     InviteRow(group.name ?: "Group", "${members.size} members", { SocialGroupAvatar(members, RowHead, ringColor = Color.Transparent, grid = true) }, { listOf(invite) }) {
-        SocialButton(invite.label, filled = true, onClick = invite.onClick)
+        TextButton(invite.label, Modifier.height(38.dp), ButtonStyle.Primary, invite.onClick)
     }
 }
 
 @Composable
-private fun InviteRow(title: String, detail: String, face: @Composable () -> Unit, menu: () -> List<ContextItem>, action: @Composable () -> Unit) {
+private fun InviteRow(title: String, detail: String, face: @Composable () -> Unit, menu: () -> List<MenuAction>, action: @Composable () -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(RowHeight).contextMenu(menu),
         verticalAlignment = Alignment.CenterVertically,

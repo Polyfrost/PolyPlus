@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import androidx.compose.runtime.getValue
@@ -17,6 +19,9 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -48,6 +53,9 @@ internal enum class LobbyPage(val frosted: Boolean) {
     Social(true),
     Stats(true),
     ;
+
+    val spokenName: String
+        get() = if (this == Home) "Play" else name
 
     val hidden: Boolean
         get() = when (this) {
@@ -132,6 +140,17 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     private fun startTour() {
         if (PolyPlusLobbyConfig.tourSeen || tour != null) return
         tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+    }
+
+    fun replayTour() {
+        if (setup) return
+        show(LobbyPage.Home)
+        tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+    }
+
+    fun endTour() {
+        tour = null
+        if (PolyPlusLobbyConfig.tourSeen) return
         PolyPlusLobbyConfig.tourSeen = true
         PolyPlusLobbyConfig.save()
     }
@@ -140,7 +159,10 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     fun show(target: LobbyPage) {
         val shown = if (target.hidden) LobbyPage.Home else target
-        if (shown != page) AnimationActivity.hold(0.6)
+        if (shown != page) {
+            AnimationActivity.hold(0.6)
+            A11y.announce(shown.spokenName + " page")
+        }
         page = shown
         LobbyWardrobe.open = shown == LobbyPage.Wardrobe
     }
@@ -312,7 +334,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     fun escape(): Boolean {
         when {
             accountsOpen -> escapeAccounts()
-            SocialEscape.back(::escapeForm) -> Unit
+            EscapeStack.closeTop() || escapeForm() || SocialEscape.closeDialog() -> Unit
             page != LobbyPage.Home -> show(LobbyPage.Home)
             else -> return false
         }
@@ -320,7 +342,12 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     fun openSocial(): Boolean {
-        val covered = accountsOpen || SocialEscape.popupOpen || hostWorldId != null || editing != null || deleting != null || directOpen
+        tour?.let { current ->
+            if (TextInputFocus.isTyping) return false
+            if (!current.next()) endTour()
+            return true
+        }
+        val covered = accountsOpen || EscapeStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
         if (setup || page == LobbyPage.Social || covered || TextInputFocus.isTyping) return false
         show(LobbyPage.Social)
         return true

@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -50,7 +51,6 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberOnlineConsent

@@ -62,6 +62,12 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -77,7 +83,7 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.ppShapeOf
@@ -115,6 +121,7 @@ internal fun WardrobeGrid(
     onSelectSkin: (PlayerSkinInfo) -> Unit,
     onStatus: (String) -> Unit,
     columns: Int = 4,
+    onConsent: () -> Unit = {},
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
@@ -132,7 +139,7 @@ internal fun WardrobeGrid(
             when (entry) {
                 is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
                 is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
-                is WardrobeEntry.Note -> CapeSectionNote(entry.text)
+                is WardrobeEntry.Note -> if (entry.id == CONSENT_NOTE_ID) ConsentNote(entry.text, onConsent) else CapeSectionNote(entry.text)
                 is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
@@ -285,6 +292,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Outfit -> {
                     val outfit = entry.outfit
                     var renaming by remember { mutableStateOf(false) }
+                    var deleting by remember { mutableStateOf(false) }
                     WardrobeCard(
                         name = outfit.name,
                         detail = {
@@ -294,6 +302,18 @@ internal fun WardrobeGrid(
                                     current = outfit.name,
                                     onSave = { renameOutfit(outfit, it, onStatus) },
                                     onDismiss = { renaming = false },
+                                )
+                            }
+                            if (deleting) {
+                                ConfirmDialog(
+                                    title = "Delete ${outfit.name}?",
+                                    text = "This outfit will be removed from your wardrobe.",
+                                    confirmLabel = "Delete",
+                                    onConfirm = {
+                                        deleting = false
+                                        deleteOutfit(outfit, onStatus)
+                                    },
+                                    onDismiss = { deleting = false },
                                 )
                             }
                         },
@@ -308,7 +328,7 @@ internal fun WardrobeGrid(
                             CardMenuAction("Wear", enabled = !entry.active) { wearOutfit(outfit, onStatus) },
                             CardMenuAction("Rename") { renaming = true },
                             CardMenuAction(favoriteMenuLabel(outfit.favorite)) { toggleOutfitFavorite(outfit, onStatus) },
-                            CardMenuAction("Delete") { deleteOutfit(outfit, onStatus) },
+                            CardMenuAction("Delete") { deleting = true },
                         ),
                     ) { modifier ->
                         OutfitThumbnail(outfit, modifier)
@@ -317,6 +337,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Skin -> {
                     val skin = entry.skin
                     var renaming by remember { mutableStateOf(false) }
+                    var deleting by remember { mutableStateOf(false) }
                     WardrobeCard(
                         name = skin.name,
                         detail = {
@@ -326,6 +347,18 @@ internal fun WardrobeGrid(
                                     current = skin.name,
                                     onSave = { renameSkin(skin, it, onStatus) },
                                     onDismiss = { renaming = false },
+                                )
+                            }
+                            if (deleting) {
+                                ConfirmDialog(
+                                    title = "Delete ${skin.name}?",
+                                    text = "This skin will be removed from your wardrobe.",
+                                    confirmLabel = "Delete",
+                                    onConfirm = {
+                                        deleting = false
+                                        deleteSkin(skin, onStatus)
+                                    },
+                                    onDismiss = { deleting = false },
                                 )
                             }
                         },
@@ -343,7 +376,7 @@ internal fun WardrobeGrid(
                             CardMenuAction(
                                 if (skin.model == SkinModel.Slim) "Switch to classic arms" else "Switch to slim arms",
                             ) { switchSkinModel(skin, onStatus) },
-                            CardMenuAction("Delete") { deleteSkin(skin, onStatus) },
+                            CardMenuAction("Delete") { deleting = true },
                         ),
                     ) { modifier ->
                         SkinThumbnail(skin, modifier)
@@ -557,7 +590,7 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
             ),
         )
         if (hovered) {
-            TooltipPopup(variant.name)
+            TooltipPopup(variant.name, TooltipPlacement.AboveStart)
         }
     }
 }
@@ -787,5 +820,28 @@ private fun LibraryIntro(note: String, action: String?, onAction: () -> Unit) {
         if (action != null) {
             SmallButton(action, iconPath = "plus", primary = false, onClick = onAction)
         }
+    }
+}
+
+@Composable
+private fun ConsentNote(text: String, onConsent: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    if (open) {
+        ConsentStep("PolyPlus capes and cosmetics need online services.", Modifier.fillMaxWidth(), { open = false }) {
+            open = false
+            onConsent()
+        }
+        return
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().height(57.dp)
+            .clip(ppShape(16.dp))
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SocialText(text, 12.sp, Modifier.weight(1f), color = OneConfigTheme.current.textColorSecondary)
+        TextButton("Turn on online services", Modifier.height(38.dp), ButtonStyle.Primary) { open = true }
     }
 }

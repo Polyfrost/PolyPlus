@@ -38,7 +38,6 @@ internal data class SocialLook(
     val backButton: Boolean,
     val inviteBanner: Boolean,
     val narrowLists: Boolean,
-    val rename: Boolean,
 ) {
     companion object {
         val Lobby = SocialLook(
@@ -51,7 +50,6 @@ internal data class SocialLook(
             backButton = true,
             inviteBanner = true,
             narrowLists = false,
-            rename = true,
         )
 
         val InGame = SocialLook(
@@ -64,7 +62,6 @@ internal data class SocialLook(
             backButton = false,
             inviteBanner = false,
             narrowLists = true,
-            rename = false,
         )
     }
 }

@@ -60,6 +60,7 @@ internal fun WardrobeShell(
     onRemoveFromCart: (String) -> Unit,
     onCheckout: () -> Unit,
     polyPlusAvailable: Boolean = true,
+    onConsent: () -> Unit = {},
 ) {
     val store = remember { WardrobeStoreData() }
     var storeReloadKey by remember { mutableIntStateOf(0) }
@@ -228,6 +229,7 @@ internal fun WardrobeShell(
                     storeVariantPicks = storeVariantPicks,
                     mojangBusy = MojangCapeService.busy,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
+                    onConsent = onConsent,
                     coverFor = { item -> item.variants.firstNotNullOfOrNull { coverByVariant[it.id] } },
                     onOwned = { item ->
                         if (wheelMode && item.type == CosmeticType.Emote) {
@@ -397,7 +399,7 @@ internal fun WardrobeShell(
 }
 
 @Composable
-internal fun MinecraftCapesOnlyScreen() {
+internal fun MinecraftCapesOnlyScreen(onConsent: () -> Unit = {}) {
     var status by remember { mutableStateOf<String?>(null) }
     WardrobeShell(
         items = emptyList(),
@@ -419,6 +421,7 @@ internal fun MinecraftCapesOnlyScreen() {
         onRemoveFromCart = {},
         onCheckout = {},
         polyPlusAvailable = false,
+        onConsent = onConsent,
     )
 }
 

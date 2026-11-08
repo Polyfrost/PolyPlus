@@ -27,6 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
@@ -36,69 +41,78 @@ internal fun CreateGroupDialog(friends: List<Friend>, onCreate: (name: String, m
     var name by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(setOf<String>()) }
 
-    SocialModalScrim(onDismiss) {
-        ModalPanel(width = 420.dp) {
-            SocialText("New Group", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            SocialTextField(
-                value = name,
-                onValueChange = { name = it },
-                placeholder = "Group name",
-                leadingIcon = SOCIAL_ASSETS + "edit-02.svg",
-                maxLength = 32,
-            )
-            SocialText("Members", fontSize = 12.sp, color = SocialTextSecondary)
-            if (friends.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                    SocialText("Add some friends first", fontSize = 13.sp, color = SocialTextSecondary)
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().height(240.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    friends.forEach { friend ->
-                        val checked = friend.player in selected
-                        val (interaction, hovered) = rememberSocialHover()
-                        val border by animateColorAsState(if (checked) OneConfigTheme.accent else if (hovered) SocialHoverBorder else SocialBorderColor)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .clip(SocialFieldShape)
-                                .background(if (checked) OneConfigTheme.accent else SocialOffStateBackground)
-                                .border(SocialBorderWidth, border, SocialFieldShape)
-                                .hoverable(interaction)
-                                .clickableWithSound {
-                                    selected = if (checked) selected - friend.player else selected + friend.player
-                                }
-                                .padding(horizontal = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            SocialAvatar(friend.player, 26.dp)
-                            SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 13.sp, color = if (checked) OneConfigTheme.current.accentTextColor else SocialTextPrimary, modifier = Modifier.weight(1f))
-                            if (checked) {
-                                ThemedIcon(
-                                    SOCIAL_ASSETS + "check.svg",
-                                    OneConfigTheme.current.accentTextColor,
-                                    16.dp,
-                                )
+    ModalDialog(onDismiss) {
+        DialogTitle("New Group")
+        TextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.height(38.dp),
+            placeholder = "Group name",
+            leadingIcon = themedIcon(SOCIAL_ASSETS + "edit-02.svg"),
+            maxLength = 32,
+            invalid = false,
+            enabled = true,
+            singleLine = true,
+            framed = true,
+            fontSize = 14.sp,
+            label = null,
+            masked = false,
+            focusRequester = null,
+            interactionSource = null,
+            trailing = null,
+            onSubmit = null,
+        )
+        SocialText("Members", fontSize = 12.sp, color = SocialTextSecondary)
+        if (friends.isEmpty()) {
+            Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                SocialText("Add some friends first", fontSize = 13.sp, color = SocialTextSecondary)
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().height(240.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                friends.forEach { friend ->
+                    val checked = friend.player in selected
+                    val (interaction, hovered) = rememberSocialHover()
+                    val border by animateColorAsState(if (checked) OneConfigTheme.accent else if (hovered) SocialHoverBorder else SocialBorderColor)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(SocialFieldShape)
+                            .background(if (checked) OneConfigTheme.accent else SocialOffStateBackground)
+                            .border(SocialBorderWidth, border, SocialFieldShape)
+                            .hoverable(interaction)
+                            .clickableWithSound {
+                                selected = if (checked) selected - friend.player else selected + friend.player
                             }
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        SocialAvatar(friend.player, 26.dp)
+                        SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 13.sp, color = if (checked) OneConfigTheme.current.accentTextColor else SocialTextPrimary, modifier = Modifier.weight(1f))
+                        if (checked) {
+                            ThemedIcon(
+                                SOCIAL_ASSETS + "check.svg",
+                                OneConfigTheme.current.accentTextColor,
+                                16.dp,
+                            )
                         }
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SocialButton("Cancel", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.weight(1f), onClick = onDismiss)
-                SocialButton(
-                    "Create",
-                    icon = SOCIAL_ASSETS + "user-plus-01.svg",
-                    modifier = Modifier.weight(1f),
-                    filled = true,
-                    enabled = name.isNotBlank() && selected.isNotEmpty(),
-                    onClick = { onCreate(name.trim(), selected.toList()) },
-                )
-            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton("Cancel", themedIcon(SOCIAL_ASSETS + "x-close.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onDismiss)
+            TextButton(
+                "Create",
+                themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"),
+                Modifier.weight(1f).height(38.dp),
+                ButtonStyle.Primary,
+                name.isNotBlank() && selected.isNotEmpty(),
+            ) { onCreate(name.trim(), selected.toList()) }
         }
     }
 }

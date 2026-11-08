@@ -5,9 +5,11 @@ package org.polyfrost.polyplus.client.gui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -16,11 +18,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.features.BadMods
@@ -43,7 +50,7 @@ class BadModsScreen(private val parent: Screen?) : ComposeScreen(RenderMode.CONT
     override fun compose() {
         ProvideOneConfigTheme {
             val dismiss = { BadMods.dismiss(); onClose() }
-            SocialScrimBox(dismiss) {
+            ModalDialog(dismiss, 480.dp, Dp.Unspecified, PaddingValues(24.dp), 16.dp, true) {
                 BadModsContent(BadMods.warnings, onDismiss = dismiss, onDisable = { BadMods.ignoreShown(); onClose() })
             }
         }
@@ -54,37 +61,31 @@ class BadModsScreen(private val parent: Screen?) : ComposeScreen(RenderMode.CONT
 internal fun BadModsDialog() {
     val warnings = BadMods.warnings
     if (warnings.isEmpty()) return
-    SocialModalScrim(onDismiss = BadMods::dismiss) {
+    ModalDialog(BadMods::dismiss, 480.dp, Dp.Unspecified, PaddingValues(24.dp), 16.dp, true) {
         BadModsContent(warnings, onDismiss = BadMods::dismiss, onDisable = BadMods::ignoreShown)
     }
 }
 
 @Composable
-private fun BadModsContent(warnings: List<BadMods.Warning>, onDismiss: () -> Unit, onDisable: () -> Unit) {
-    ModalPanel(width = 480.dp, padding = PaddingValues(24.dp), spacing = 16.dp) {
-        SocialText(
-            if (warnings.size == 1) "Problematic mod detected" else "${warnings.size} problematic mods detected",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        SocialText(
-            "These mods are known to cause crashes or conflicts with OneClient. We recommend removing them.",
-            fontSize = 13.sp,
-            color = SocialTextSecondary,
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            warnings.forEach { BadModCard(it) }
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialButton("Don't show again", modifier = Modifier.weight(1f), onClick = onDisable)
-            SocialButton("OK", modifier = Modifier.weight(1f), filled = true, onClick = onDismiss)
-        }
+private fun ColumnScope.BadModsContent(warnings: List<BadMods.Warning>, onDismiss: () -> Unit, onDisable: () -> Unit) {
+    DialogTitle(if (warnings.size == 1) "Problematic mod detected" else "${warnings.size} problematic mods detected")
+    SocialText(
+        "These mods are known to cause crashes or conflicts with OneClient. We recommend removing them.",
+        fontSize = 13.sp,
+        color = SocialTextSecondary,
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 320.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        warnings.forEach { BadModCard(it) }
+    }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton("Don't show again", Modifier.weight(1f).height(38.dp), onDisable)
+        TextButton("OK", Modifier.weight(1f).height(38.dp), ButtonStyle.Primary, onDismiss)
     }
 }
 
@@ -101,9 +102,9 @@ private fun BadModCard(warning: BadMods.Warning) {
         SocialText(warning.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         SocialText(warning.message, fontSize = 12.sp, color = SocialTextSecondary)
         warning.alternative?.let { (title, slug) ->
-            SocialButton(
+            TextButton(
                 "Get $title",
-                modifier = Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().height(38.dp),
                 onClick = { ClientPlatform.openUri("https://modrinth.com/mod/$slug") },
             )
         }

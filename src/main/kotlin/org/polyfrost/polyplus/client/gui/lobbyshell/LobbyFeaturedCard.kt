@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.multiplayer.ServerData
@@ -47,7 +48,8 @@ import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -59,6 +61,7 @@ import org.polyfrost.polyplus.client.gui.rememberSocialHover
 private val CardIconSize = 56.dp
 private val CardActionHeight = 40.dp
 private val CardGutter = 12.dp
+private val OfferActionSize = 14.sp
 
 private const val CARD_ACTION_ALPHA = 0.16f
 private const val CARD_ACTION_HOVER_ALPHA = 0.28f
@@ -83,13 +86,13 @@ private fun VanillaOfferCard(modifier: Modifier, onDismiss: () -> Unit) {
     Box(modifier.width(LobbyLayout.UnitWidth).panel()) {
         Column(Modifier.fillMaxWidth().padding(CardGutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
-                SocialText("Not liking the new UI?", 16.sp, Modifier.weight(1f), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                SocialIconButton(SOCIAL_ASSETS + "x-close.svg", Modifier.size(28.dp), tooltip = "Dismiss", onClick = onDismiss)
+                SocialText("Prefer vanilla Minecraft?", 16.sp, Modifier.weight(1f), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), "Dismiss", Modifier.size(28.dp), onDismiss)
             }
-            SocialText("Use the PolyPlus main menu, or go back to Minecraft's own menus, pause screen and startup. You can switch back any time in PolyPlus settings.", 12.sp, color = MutedText)
+            SocialText("Switch back to Minecraft's own main menu, pause screen and startup. To return, press the OneClient button in the top right of the title screen.", 12.sp, color = MutedText)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CardAction("PolyPlus menu", Modifier.weight(1f), MainMenuReplacement::offerPolyPlusMenu)
-                CardAction("Return to vanilla", Modifier.weight(1f), MainMenuReplacement::returnToVanilla)
+                CardAction("Keep OneClient", Modifier.weight(1f), OfferActionSize, onDismiss)
+                CardAction("Use vanilla Minecraft", Modifier.weight(1f), OfferActionSize, MainMenuReplacement::returnToVanilla)
             }
         }
     }
@@ -111,7 +114,7 @@ private fun FeaturedLobbyCard(lobby: LobbyShell, modifier: Modifier) {
             Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
                 SocialText("SPONSORED", 11.sp, Modifier.weight(1f), color = MutedText, fontWeight = FontWeight.Medium, letterSpacing = 0.2.sp, maxLines = 1)
                 if (MainMenuFeaturedServer.isDismissible(server)) {
-                    SocialIconButton(SOCIAL_ASSETS + "x-close.svg", Modifier.size(28.dp), tooltip = "Dismiss") { MainMenuFeaturedServer.dismiss(server) }
+                    IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), "Dismiss", Modifier.size(28.dp)) { MainMenuFeaturedServer.dismiss(server) }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -145,6 +148,7 @@ private fun FeaturedLobbyCard(lobby: LobbyShell, modifier: Modifier) {
 @Composable
 private fun CardStatus(data: ServerData, revision: Int) {
     @Suppress("UNUSED_EXPRESSION") revision
+    ServerRevisions.of(data)
     when {
         LobbyServers.failed(data) -> CardStatusLine(SocialDangerColor, "Offline", SocialDangerText)
         data.state() == ServerData.State.INCOMPATIBLE -> CardStatusLine(SocialDangerColor, "Incompatible, ${Platform.i18n().getUnformattedText(data.version)}")
@@ -168,7 +172,7 @@ private fun CardStatusLine(dot: Color, text: String, color: Color = SocialTextPr
 }
 
 @Composable
-private fun CardAction(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun CardAction(label: String, modifier: Modifier = Modifier, size: TextUnit = 15.sp, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val accent = OneConfigTheme.accent
     val shape = ppShape(12.dp)
@@ -182,9 +186,9 @@ private fun CardAction(label: String, modifier: Modifier = Modifier, onClick: ()
             .background(fill)
             .border(1.dp, edge, shape)
             .hoverable(interaction)
-            .clickableWithSound(onClick),
+            .clickableWithSound(label, shape = shape, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Label(label, 15.sp, weight = FontWeight.Medium)
+        Label(label, size, weight = FontWeight.Medium)
     }
 }

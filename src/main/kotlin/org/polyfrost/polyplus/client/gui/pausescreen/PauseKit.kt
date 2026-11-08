@@ -12,14 +12,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,38 +60,36 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.HoverTooltip
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.Outfit
 import org.polyfrost.polyplus.client.gui.PanelSurface
+import org.polyfrost.polyplus.client.gui.liquidGlassTheme
+import org.polyfrost.oneconfig.internal.ui.components.liquidGlass
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
-import org.polyfrost.polyplus.client.gui.ModIntegrationButton
-import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.lobbyshell.ModLogo
-import org.polyfrost.polyplus.client.gui.lobbyshell.decodeModLogo
+import org.polyfrost.polyplus.client.gui.lobbyshell.MoreMenuPanel
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModMenu
 import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.TooltipPlacement
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.clickableTextWithSound
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.playButtonClickSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
-import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
@@ -107,7 +103,6 @@ import kotlin.math.max
 import kotlin.math.min
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
-import org.polyfrost.polyplus.client.gui.isMinecraftTheme
 
 private const val MIN_SCALE = 0.72f
 private const val COMPACT_WIDTH = 1300f
@@ -117,6 +112,7 @@ private const val DISABLED_ALPHA = 0.4f
 private const val DANGER_REST_TINT = 0.1f
 private const val DANGER_HOVER_TINT = 0.2f
 private val MOD_LOGO_SIZE = 16.dp
+private val MENU_ICON_SIZE = 18.dp
 
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
@@ -183,32 +179,11 @@ private fun BoxScope.Curtain() {
 internal fun Modifier.pauseGlass(radius: Dp = 20.dp): Modifier {
     val shape = ppShape(radius)
     val surface = PanelSurface
+    val glass = liquidGlassTheme
     return this
-        .background(surface.copy(alpha = max(surface.alpha, OPAQUE_FLOOR)), shape)
+        .then(if (glass) Modifier.liquidGlass(shape, frosted = true) else Modifier)
+        .background(if (glass) surface else surface.copy(alpha = max(surface.alpha, OPAQUE_FLOOR)), shape)
         .border(1.dp, SocialBorderColor, shape)
-}
-
-@Composable
-internal fun Wordmark() {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        LobbyIcon("logo", size = 28.dp)
-        SocialText("ONECLIENT", 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit, maxLines = 1)
-    }
-}
-
-@Composable
-internal fun NavTab(label: String, active: Boolean, unread: Boolean = false, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Box(
-        Modifier.height(38.dp).hoverable(interaction).clickableWithSound(onClick).padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Label(label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = 0.6f), weight = if (isMinecraftTheme) FontWeight.Bold else FontWeight.Medium)
-        if (active) Box(Modifier.align(Alignment.BottomCenter).width(27.dp).height(2.dp).background(OneConfigTheme.accent))
-        if (unread) {
-            Box(Modifier.align(Alignment.CenterEnd).offset(x = 12.dp).size(8.dp).background(OneConfigTheme.accent, OneConfigTheme.current.circleShape))
-        }
-    }
 }
 
 @Composable
@@ -268,16 +243,6 @@ internal fun PauseGlyph(icon: String, tint: Color = SocialTextPrimary, size: Dp 
 }
 
 @Composable
-private fun EntryGlyph(entry: PauseEntry, size: Dp = 18.dp) {
-    val sprite = entry.sprite
-    if (sprite != null) {
-        Image(sprite, entry.label, Modifier.size(size), filterQuality = FilterQuality.None)
-    } else {
-        PauseGlyph(entry.glyph, size = size)
-    }
-}
-
-@Composable
 internal fun MenuRow(
     icon: String,
     label: String,
@@ -293,7 +258,7 @@ internal fun MenuRow(
     val (interaction, hovered) = rememberSocialHover()
     val ink = if (danger) SocialDangerText else SocialTextPrimary
     Box {
-        if (tooltip != null && hovered) HoverTooltip(tooltip, TooltipPlacement.ABOVE_CENTER, 320.dp)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter, 320.dp)
         Row(
             Modifier
                 .fillMaxWidth()
@@ -302,12 +267,12 @@ internal fun MenuRow(
                 .rowFrame(false, hovered && enabled)
                 .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
                 .hoverable(interaction)
-                .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
+                .then(if (enabled) Modifier.clickableWithSound(label, onClick = onClick) else Modifier)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (logo != null) Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) { ModLogo(logo, MOD_LOGO_SIZE, ink) } else PauseGlyph(icon, ink)
+            if (logo != null) ModMenuLogo(logo, ink) else PauseGlyph(icon, ink)
             Label(label, size, Modifier.weight(1f), color = ink, weight = FontWeight.Medium)
             detail?.let { Label(it, 12.sp, color = MutedText) }
         }
@@ -316,63 +281,52 @@ internal fun MenuRow(
 
 @Composable
 private fun MoreEntry(entry: PauseEntry, onDone: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Box {
-        if (entry.tooltip != null && hovered) HoverTooltip(entry.tooltip, TooltipPlacement.ABOVE_CENTER, 320.dp)
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(38.dp)
-                .rowFrame(false, hovered && entry.enabled)
-                .graphicsLayer { alpha = if (entry.enabled) 1f else DISABLED_ALPHA }
-                .hoverable(interaction)
-                .then(
-                    if (entry.enabled) {
-                        Modifier.clickableWithSound {
-                            onDone()
-                            entry.press()
-                        }
-                    } else {
-                        Modifier
-                    },
-                )
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            EntryGlyph(entry)
-            Label(entry.label, 14.sp, Modifier.weight(1f))
-        }
+    val sprite = entry.sprite
+    MenuItem(
+        entry.label,
+        themedIcon(entry.glyph),
+        null,
+        MenuItemSize.Regular,
+        false,
+        false,
+        entry.enabled,
+        entry.tooltip,
+        Modifier,
+        sprite?.let { { Image(it, null, Modifier.size(MENU_ICON_SIZE), filterQuality = FilterQuality.None) } },
+    ) {
+        onDone()
+        entry.press()
     }
 }
 
 @Composable
-internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
-    val modMenuShown = rememberPauseModMenu() != null
-    val entries = screen.capture.more.filterNot { modMenuShown && it.modMenu }
+internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier, routes: Boolean = false) {
+    val modMenu = rememberModMenu()
+    val entries = screen.capture.more.filterNot { modMenu != null && it.modMenu }
     val close = { screen.moreOpen = false }
-    Column(
-        modifier
-            .width(300.dp)
-            .heightIn(max = 560.dp)
-            .pauseGlass()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    val game = if (routes) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
+    val mods = modMenu.takeIf { routes }
+    MoreMenuPanel(Modifier.heightIn(max = 560.dp).pauseGlass().verticalScroll(rememberScrollState()), modifier) {
+        game.forEach { MoreEntry(it, close) }
+        mods?.let { (button, logo) ->
+            MenuItem("Mods", themedIcon(button.icon), null, MenuItemSize.Regular, false, false, true, button.tooltip, Modifier, logo?.let { { ModMenuLogo(it, SocialTextPrimary) } }) {
+                close()
+                button.onClick(screen)
+            }
+        }
+        if ((game.isNotEmpty() || mods != null) && entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
         entries.groupBy { it.section }.forEach { (section, rows) ->
             Label(section, 11.sp, Modifier.padding(start = 10.dp, top = 6.dp, bottom = 2.dp), color = MutedText, weight = FontWeight.Medium)
             rows.forEach { MoreEntry(it, close) }
         }
         if (entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
-        MenuRow("dots-grid", "Classic pause menu", height = 38.dp, size = 14.sp, tooltip = uncapturedHint(screen.capture.uncaptured), onClick = screen::openClassic)
+        MenuItem("Classic pause menu", themedIcon("dots-grid"), null, MenuItemSize.Regular, false, false, true, uncapturedHint(screen.capture.uncaptured), Modifier, null, screen::openClassic)
     }
 }
 
 @Composable
-internal fun rememberPauseModMenu(): Pair<ModIntegrationButton, ImageBitmap?>? = remember {
-    val button = if (PolyPlusMainMenuConfig.hideMainMenuModButtons) null else ModIntegrationButtons.availableModMenu()
-    button?.let { it to decodeModLogo(it.logo) }
+private fun ModMenuLogo(logo: ImageBitmap, tint: Color) {
+    Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) { ModLogo(logo, MOD_LOGO_SIZE, tint) }
 }
 
 private fun uncapturedHint(count: Int): String? = when (count) {
@@ -413,7 +367,7 @@ internal fun BarTile(
     ) {
         if (onClick != null) Box(Modifier.matchParentSize().rowFrame(false, hovered || active, ppShape(BAR_INNER_RADIUS)))
         content(hovered)
-        if (tooltip != null && hovered) PauseTooltip(tooltip)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }
 
@@ -443,7 +397,7 @@ internal fun CardRow(
         ) {
             content(lit)
         }
-        if (tooltip != null && hovered) PauseTooltip(tooltip)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }
 
@@ -514,16 +468,4 @@ internal fun popupMaxHeight(margin: Dp = 16.dp): Dp {
     val density = LocalDensity.current
     if (root.height <= 0f) return Dp.Infinity
     return (with(density) { root.height.toDp() } - margin * 2).coerceAtLeast(120.dp)
-}
-
-@Composable
-internal fun PauseTooltip(text: String, maxWidth: Dp = 240.dp) {
-    Popup(
-        popupPositionProvider = rememberRiseAnchor(8.dp, centered = true),
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        Box(Modifier.widthIn(max = maxWidth).popup().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-            SocialText(text, 13.sp, textAlign = TextAlign.Center)
-        }
-    }
 }

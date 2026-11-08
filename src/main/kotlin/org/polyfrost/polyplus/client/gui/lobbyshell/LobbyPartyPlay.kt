@@ -2,13 +2,14 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import androidx.compose.foundation.layout.height
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -27,13 +28,15 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbysocial.LeaderJoinEffect
 import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
+import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCard
+import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCardText
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyDialogs
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialSurface
@@ -55,7 +58,6 @@ import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 private val BannerWidth = 640.dp
-private val CardWidth = 300.dp
 private const val TICK_MS = 200L
 private const val SECOND_MS = 1000L
 
@@ -72,25 +74,20 @@ internal fun PlayTogetherHooks(host: SocialHost) {
 @Composable
 internal fun LeaderMovedCard(host: SocialHost) {
     val card = LeaderFollow.card ?: return
-    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Head(seedOf(card.leader), 34.dp, realSkin = true)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label("${card.name} is playing on", 12.sp, color = MutedText)
-                Label(card.address, 14.sp, weight = FontWeight.Medium)
-            }
-        }
-        val needs = card.needs
-        val incompatible = card.check == ServerCheck.Result.INCOMPATIBLE
-        LeaderJoinEffect(host)
-        if (incompatible) Label(needs?.let { "Needs Minecraft $it" } ?: "Needs another Minecraft version", 12.sp, color = SocialDangerText)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialButton("Dismiss", modifier = Modifier.weight(1f), onClick = LeaderFollow::dismiss)
-            SocialButton(if (card.checking) "Checking..." else "Join", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !incompatible && !card.checking && !card.cleared) {
-                LeaderFollow.requestJoin()
-            }
-        }
-    }
+    val incompatible = card.check == ServerCheck.Result.INCOMPATIBLE
+    LeaderJoinEffect(host)
+    PartyCard(
+        card.leader,
+        card.address,
+        "${card.name} is playing on",
+        PartyCardText.DISMISS,
+        LeaderFollow::dismiss,
+        if (card.checking) PartyCardText.CHECKING else PartyCardText.JOIN,
+        LeaderFollow::requestJoin,
+        captionFirst = true,
+        acceptEnabled = !incompatible && !card.checking && !card.cleared,
+        warning = if (incompatible) PartyCardText.needs(card.needs) else null,
+    )
 }
 
 @Composable
@@ -104,38 +101,33 @@ internal fun leaderHostedWorld(): LeaderFollow.Hosted? {
 internal fun LeaderHostingCard(hosted: LeaderFollow.Hosted) {
     val names by PlayerNamesRepository.names.collectAsState()
     val name = names[hosted.leader] ?: hosted.name
-    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Head(seedOf(hosted.leader), 34.dp, realSkin = true)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label("$name is hosting", 12.sp, color = MutedText)
-                Label("$name's world", 14.sp, weight = FontWeight.Medium)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialButton("Dismiss", modifier = Modifier.weight(1f), onClick = LeaderFollow::dismissHosted)
-            SocialButton(hosted.status ?: "Join", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !hosted.busy, onClick = LeaderFollow::joinHosted)
-        }
-    }
+    PartyCard(
+        hosted.leader,
+        PartyCardText.world(name),
+        "$name is hosting",
+        PartyCardText.DISMISS,
+        LeaderFollow::dismissHosted,
+        hosted.status ?: PartyCardText.JOIN,
+        LeaderFollow::joinHosted,
+        captionFirst = true,
+        acceptEnabled = !hosted.busy,
+    )
 }
 
 @Composable
 internal fun HostJoinRequestCard(request: HostJoinRequests.Request) {
     val names by PlayerNamesRepository.names.collectAsState()
-    val name = names[request.player] ?: request.name
-    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Head(seedOf(request.player), 34.dp, realSkin = true)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label(name, 14.sp, weight = FontWeight.Medium)
-                Label("Wants to join your world", 12.sp, color = MutedText)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialButton("Deny", modifier = Modifier.weight(1f), enabled = !request.answering) { HostJoinRequests.deny(request.id) }
-            SocialButton("Allow", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, enabled = !request.answering) { HostJoinRequests.allow(request.id) }
-        }
-    }
+    PartyCard(
+        request.player,
+        names[request.player] ?: request.name,
+        PartyCardText.WANTS_TO_JOIN,
+        PartyCardText.DENY,
+        { HostJoinRequests.deny(request.id) },
+        PartyCardText.ALLOW,
+        { HostJoinRequests.allow(request.id) },
+        acceptEnabled = !request.answering,
+        dismissEnabled = !request.answering,
+    )
 }
 
 @Composable
@@ -147,20 +139,15 @@ internal fun rejoinableWorld(): SessionInvite? {
 
 @Composable
 internal fun RejoinWorldCard(invite: SessionInvite) {
-    val name = PlayerNamesRepository.nameOr(invite.sender)
-    Column(Modifier.width(CardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Head(seedOf(invite.sender), 34.dp, realSkin = true)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label("$name's world", 14.sp, weight = FontWeight.Medium)
-                Label("Still running", 12.sp, color = MutedText)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SocialButton("Dismiss", modifier = Modifier.weight(1f), onClick = P2PSessionManager::forgetRejoin)
-            SocialButton("Rejoin", SOCIAL_ASSETS + "log-in-04.svg", Modifier.weight(1f), filled = true, onClick = P2PSessionManager::rejoin)
-        }
-    }
+    PartyCard(
+        invite.sender,
+        PartyCardText.world(PlayerNamesRepository.nameOr(invite.sender)),
+        "Still running",
+        PartyCardText.DISMISS,
+        P2PSessionManager::forgetRejoin,
+        "Rejoin",
+        P2PSessionManager::rejoin,
+    )
 }
 
 @Composable
@@ -185,9 +172,10 @@ internal fun PlayTogetherBanner(modifier: Modifier) {
     val where = destinationLabel(current.destination.kind, current.destination.name)
     val framed = LocalSocialLook.current.surface == SocialSurface.None
     val shell = modifier.widthIn(max = BannerWidth).fillMaxWidth()
+    LaunchedEffect(current.stage) { A11y.announce(bannerTitle(current, seconds, where)) }
     Column((if (framed) shell.card() else shell.panel()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Head(seedOf(current.leader), 36.dp, realSkin = true)
+            PlayerHead(seedOf(current.leader), 36.dp, Modifier, headShape(36.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Label(bannerTitle(current, seconds, where), 16.sp, weight = FontWeight.Medium)
                 bannerDetail(current)?.let { Label(it, 12.sp, color = MutedText) }
@@ -219,10 +207,10 @@ private fun bannerDetail(current: PlayTogether.Active): String? = when {
 @Composable
 private fun BannerActions(current: PlayTogether.Active) {
     when {
-        current.stage == PlayTogether.Stage.DONE -> SocialButton("Close", onClick = PlayTogether::dismiss)
-        current.leading -> SocialButton("Cancel", onClick = PlayTogether::cancel)
+        current.stage == PlayTogether.Stage.DONE -> TextButton("Close", Modifier.height(38.dp), PlayTogether::dismiss)
+        current.leading -> TextButton("Cancel", Modifier.height(38.dp), PlayTogether::cancel)
         current.stage == PlayTogether.Stage.CONNECTING -> Unit
-        else -> SocialButton("Not now", onClick = PlayTogether::cancel)
+        else -> TextButton("Not now", Modifier.height(38.dp), PlayTogether::cancel)
     }
 }
 
@@ -236,7 +224,7 @@ private fun LeaderStatus(play: PlayTogether.Active) {
             key(member.player) {
                 val status = play.responses[member.player]
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Head(seedOf(member.player), 22.dp, realSkin = true)
+                    PlayerHead(seedOf(member.player), 22.dp, Modifier, headShape(22.dp))
                     Column {
                         Label(names[member.player] ?: PlayerNamesRepository.nameOr(member.player), 12.sp, weight = FontWeight.Medium)
                         Label(statusText(status?.first, status?.second), 11.sp, color = statusColor(status?.first))

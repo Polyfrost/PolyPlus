@@ -40,14 +40,13 @@ import net.minecraft.client.Minecraft
 /*import net.minecraft.client.gui.screens.Screen
 *///?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 @Composable
 internal fun ColumnScope.AccountStatusText(busy: String?, error: String?, errorSteps: List<String>?) {
-//    if (busy != null) {
-//        SocialText(busy, fontSize = 12.sp, color = SocialTextSecondary, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
-//    }
     if (error != null) {
         SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
     }
@@ -90,7 +89,7 @@ fun AddAccountButton(
             .clip(ppShape(8.dp))
             .background(if (hovered && enabled) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
+            .then(if (enabled) Modifier.clickableWithSound(text, onClick = onClick) else Modifier)
             .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
             .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -123,6 +122,7 @@ internal fun MicrosoftLoginPopup(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Announce("Sign in to Microsoft")
             SocialText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
             SocialText(
                 "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
@@ -191,7 +191,7 @@ internal fun MicrosoftLoginPopup(
             Box(
                 modifier = Modifier
                     .clip(ppShape(6.dp))
-                    .clickableWithSound(onCancel)
+                    .clickableWithSound("Cancel", onClick = onCancel)
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 SocialText("Cancel", fontSize = 14.sp, color = SocialTextPrimary, textAlign = TextAlign.Center)
@@ -212,7 +212,6 @@ internal fun OfflineAccountPopup(
     val validChars = trimmed.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }
     val valid = trimmed.length in 3..16 && validChars
     val idle = busy == null
-    // the error belongs to the last name tried, so hide it once the user edits
     var submitted by remember { mutableStateOf<String?>(null) }
     val submit = {
         if (valid && idle) {
@@ -233,14 +232,25 @@ internal fun OfflineAccountPopup(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Announce("Add offline account")
             SocialText("Add offline account", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
-            SocialTextField(
+            TextField(
                 value = username,
                 onValueChange = { username = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(38.dp),
                 placeholder = "Username",
-                leadingIcon = ASSETS + "user-01.svg",
+                leadingIcon = themedIcon(ASSETS + "user-01.svg"),
                 maxLength = 16,
+                invalid = false,
+                enabled = true,
+                singleLine = true,
+                framed = true,
+                fontSize = 14.sp,
+                label = null,
+                masked = false,
+                focusRequester = null,
+                interactionSource = null,
+                trailing = null,
                 onSubmit = submit,
             )
             val hint = when {
@@ -296,7 +306,7 @@ private fun LoginModalButton(
             .clip(PanelShape)
             .background(if (filled) OneConfigTheme.accent else PanelBackground)
             .border(SocialPanelBorderWidth, if (filled) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
+            .clickableWithSound(label, onClick = onClick)
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -325,13 +335,13 @@ private fun LoadingSpinner(size: Dp) {
 }
 
 @Composable
-internal fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
+internal fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, label: String? = null, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(30.dp)
             .clip(ppShape(6.dp))
             .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
+            .then(if (enabled) Modifier.clickableWithSound(label, onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         ThemedIcon(icon, color, 18.dp)

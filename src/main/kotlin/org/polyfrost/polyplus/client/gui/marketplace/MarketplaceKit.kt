@@ -47,13 +47,14 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.SocialTextField
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
@@ -62,6 +63,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowInk
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticVariantUi
 import org.polyfrost.polyplus.client.gui.wardrobe.PriceLabel
@@ -125,15 +127,17 @@ internal fun MarketBody(state: MarketplaceState, grid: LazyGridState, entries: L
         ) {
             BackButton(onBack)
             PageTitle("Marketplace", Modifier.weight(1f))
-            SocialTextField(
+            TextField(
                 value = state.query,
                 onValueChange = { state.query = it },
-                modifier = Modifier.width(SearchWidth),
+                modifier = Modifier.width(SearchWidth).height(38.dp),
                 placeholder = "Search cosmetics",
-                leadingIcon = LobbyIcons.SEARCH,
+                leadingIcon = themedIcon(LobbyIcons.SEARCH),
+                maxLength = 64,
+                invalid = false,
             )
             FilterButton(state)
-            SocialButton("Cart (${state.cart.size})", icon = CART_ICON, filled = true) { state.showCart = !state.showCart }
+            TextButton("Cart (${state.cart.size})", themedIcon(CART_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.showCart = !state.showCart }
         }
         if (entries.isEmpty()) {
             MarketEmpty(state, Modifier.weight(1f).fillMaxWidth())
@@ -174,7 +178,7 @@ internal fun MarketBody(state: MarketplaceState, grid: LazyGridState, entries: L
 private fun MarketEmpty(state: MarketplaceState, modifier: Modifier) {
     if (state.narrowed) {
         EmptyState("No cosmetics match that filter", modifier) {
-            SocialButton("Clear filters", icon = LobbyIcons.CLOSE, onClick = state::clearSearch)
+            TextButton("Clear filters", themedIcon(LobbyIcons.CLOSE), Modifier.height(38.dp), ButtonStyle.Secondary, true, state::clearSearch)
         }
     } else {
         EmptyState("The store is empty", modifier, "There are no cosmetics for sale right now.")
@@ -186,7 +190,7 @@ private fun FilterButton(state: MarketplaceState) {
     var open by remember { mutableStateOf(false) }
     val count = state.activeFilters
     Box(Modifier) {
-        SocialButton(if (count > 0) "Filter ($count)" else "Filter", icon = LobbyIcons.FILTER) { open = !open }
+        TextButton(if (count > 0) "Filter ($count)" else "Filter", themedIcon(LobbyIcons.FILTER), Modifier.height(38.dp), ButtonStyle.Secondary, true) { open = !open }
         if (open) {
             EscapeCloses { open = false }
             FilterPopup(state) { open = false }
@@ -228,7 +232,7 @@ private fun FilterPopup(state: MarketplaceState, onDismiss: () -> Unit) {
                 }
             }
             if (state.activeFilters > 0) {
-                SocialButton("Clear filters", icon = LobbyIcons.CLOSE, modifier = Modifier.fillMaxWidth(), onClick = state::clearFilters)
+                TextButton("Clear filters", themedIcon(LobbyIcons.CLOSE), Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Secondary, true, state::clearFilters)
             }
         }
     }
@@ -321,14 +325,16 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
     info.description?.takeIf { it.isNotBlank() }?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (owned) {
-            SocialButton("Open in Wardrobe", icon = "profiles", filled = true, onClick = onWardrobe)
+            TextButton("Open in Wardrobe", themedIcon("profiles"), Modifier.height(38.dp), ButtonStyle.Primary, true, onWardrobe)
         } else {
-            SocialButton(
+            TextButton(
                 if (inCart) "In cart" else "Add to cart",
-                icon = if (inCart) LobbyIcons.TICK else CART_ICON,
-                enabled = !inCart,
+                themedIcon(if (inCart) LobbyIcons.TICK else CART_ICON),
+                Modifier.height(38.dp),
+                ButtonStyle.Secondary,
+                !inCart,
             ) { state.addToCart(info, variant) }
-            SocialButton("Buy now", icon = BAG_ICON, filled = true) { state.buy(info, variant) }
+            TextButton("Buy now", themedIcon(BAG_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.buy(info, variant) }
         }
     }
 }
@@ -389,7 +395,7 @@ private fun BundleDetail(state: MarketplaceState, bundle: MarketBundle) {
     bundle.info.description?.takeIf { it.isNotBlank() }?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     SocialText(bundle.pieces.joinToString { it.info.name }, 12.sp, color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        SocialButton("Buy now", icon = BAG_ICON, filled = true) { state.buyBundle(bundle.info) }
+        TextButton("Buy now", themedIcon(BAG_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.buyBundle(bundle.info) }
         if (owned > 0) Label("You own $owned of ${bundle.pieces.size}", 12.sp, color = MutedText)
     }
 }

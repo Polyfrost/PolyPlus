@@ -40,18 +40,21 @@ import org.polyfrost.polyplus.client.gui.CompactStatusPicker
 import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
-import org.polyfrost.polyplus.client.gui.SocialIconButton
-import org.polyfrost.polyplus.client.gui.SocialMenuItem
-import org.polyfrost.polyplus.client.gui.SocialTextField
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
@@ -123,16 +126,27 @@ internal fun LeftPane(
     Column(modifier.padding(start = Inset, end = Inset, top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val inset = Modifier.padding(horizontal = Inset)
         SelfHeader(state, snapshot, reconnecting, onClose, inset, invites)
-        SocialTextField(
-            value = list.query,
-            onValueChange = {
+        TextField(
+            list.query,
+            {
                 list.query = it
                 state.query = it
             },
-            modifier = inset.fillMaxWidth(),
-            placeholder = "Search friends and chats",
-            leadingIcon = LobbyIcons.SEARCH,
-            trailing = { SearchAction(list, snapshot, tab) },
+            inset.fillMaxWidth().height(38.dp),
+            "Search friends and chats",
+            themedIcon(LobbyIcons.SEARCH),
+            64,
+            false,
+            true,
+            true,
+            true,
+            14.sp,
+            null,
+            false,
+            null,
+            null,
+            { SearchAction(list, snapshot, tab) },
+            null,
         )
         Row(inset.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Inset)) {
             PartyChip(window, snapshot, Modifier.weight(1f))
@@ -179,7 +193,7 @@ internal fun SelfHeader(
             }
         }
         InvitesBell(invites)
-        SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close", onClick = onClose)
+        IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier, onClose)
     }
 }
 
@@ -189,15 +203,21 @@ private fun ChatAsItems(state: SocialPageState, snapshot: SocialSnapshot, close:
     SectionHeading("Chat as", Modifier.padding(start = Inset, top = Inset))
     (listOf<SocialPerson?>(null) + snapshot.delegations).forEach { person ->
         val selected = person?.id == snapshot.actAs
-        SocialMenuItem(
-            label = person?.name ?: ClientPlatform.localPlayerName(),
-            color = if (selected) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
-            selected = selected,
-            onClick = {
-                close()
-                state.source.chatAs(person?.id)
-            },
-        )
+        MenuItem(
+            person?.name ?: ClientPlatform.localPlayerName(),
+            null,
+            null,
+            MenuItemSize.Compact,
+            false,
+            selected,
+            true,
+            null,
+            Modifier,
+            null,
+        ) {
+            close()
+            state.source.chatAs(person?.id)
+        }
     }
 }
 
@@ -371,7 +391,7 @@ internal fun SegmentButton(
 
 @Composable
 private fun AddFriendButton(state: SocialPageState, modifier: Modifier = Modifier) {
-    SocialButton("Add friend", SOCIAL_ASSETS + "user-plus-01.svg", modifier, filled = true) { state.dialog = SocialDialog.AddFriend }
+    TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), modifier.height(38.dp), ButtonStyle.Primary, true) { state.dialog = SocialDialog.AddFriend }
 }
 
 @Composable
@@ -394,7 +414,7 @@ private fun SearchResults(state: SocialPageState, list: SocialListState, snapsho
 @Composable
 private fun GroupsBody(state: SocialPageState, list: SocialListState, snapshot: SocialSnapshot, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Inset)) {
-        SocialButton("New group", LobbyIcons.PLUS, Modifier.padding(horizontal = Inset).fillMaxWidth()) { state.dialog = SocialDialog.NewGroup }
+        TextButton("New group", themedIcon(LobbyIcons.PLUS), Modifier.padding(horizontal = Inset).fillMaxWidth().height(38.dp), ButtonStyle.Secondary, true) { state.dialog = SocialDialog.NewGroup }
         ThreadList(state, list, snapshot, Modifier.fillMaxWidth().weight(1f))
     }
 }
@@ -409,7 +429,7 @@ private fun FriendsBody(window: SocialWindowState, state: SocialPageState, snaps
     ScrollFade(modifier, 0.dp) {
         Row(Modifier.fillMaxWidth().padding(horizontal = Inset), horizontalArrangement = Arrangement.spacedBy(Inset)) {
             AddFriendButton(state, Modifier.weight(1f))
-            if (snapshot.blocked.isNotEmpty()) SocialButton("Blocked ${snapshot.blocked.size}", onClick = window::showBlocked)
+            if (snapshot.blocked.isNotEmpty()) TextButton("Blocked ${snapshot.blocked.size}", Modifier.height(38.dp), window::showBlocked)
         }
         if (requests.isNotEmpty()) {
             SectionHeading("Requests ${requests.size}", Modifier.padding(start = Inset, top = 12.dp, bottom = 6.dp))

@@ -41,9 +41,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialSwitch
@@ -51,6 +55,7 @@ import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbyPacks
 import org.polyfrost.polyplus.client.lobby.LobbyScene
@@ -71,7 +76,7 @@ private const val KILOBYTE = 1024L
 internal fun SceneButton(lobby: LobbyShell) {
     if (lobby.page != LobbyPage.Home) return
     Box(Modifier.size(LobbyLayout.BarHeight).panel(), contentAlignment = Alignment.Center) {
-        SocialIconButton(SOCIAL_ASSETS + "image-01.svg", tooltip = "Change scene") { lobby.sceneOpen = !lobby.sceneOpen }
+        IconButton(themedIcon(SOCIAL_ASSETS + "image-01.svg"), "Change scene", Modifier) { lobby.sceneOpen = !lobby.sceneOpen }
     }
 }
 
@@ -124,7 +129,7 @@ private fun ScenePicker(onClose: () -> Unit) {
     Column(Modifier.fillMaxWidth().panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Label("Lobby scene", 16.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            SocialIconButton(SOCIAL_ASSETS + "x-close.svg", onClick = onClose)
+            IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, "Close", Modifier, null, SocialTextPrimary, TooltipPlacement.BelowStart, onClose)
         }
         if (member) {
             if (following) {
@@ -167,12 +172,27 @@ private fun ScenePicker(onClose: () -> Unit) {
 
 @Composable
 private fun CaptureRow(entry: LobbySceneEntry, following: Boolean, locked: String? = null) {
+    var deleting by remember { mutableStateOf(false) }
     SceneRow(entry.label, locked ?: describe(entry), !following && LobbySceneStore.pinned == entry.id, { pick(entry.id) }, enabled = locked == null && !following) {
-        SocialIconButton(SOCIAL_ASSETS + "trash-01.svg", tooltip = "Delete capture") {
-            val showing = LobbyScene.currentId == entry.id
-            LobbySceneStore.delete(entry)
-            if (showing) LobbyScene.reload()
-        }
+        IconButton(themedIcon(SOCIAL_ASSETS + "trash-01.svg"), "Delete capture", Modifier) { deleting = true }
+    }
+    if (deleting) {
+        ConfirmDialog(
+            title = "Delete ${entry.label}?",
+            text = "This capture will be deleted from your computer.",
+            confirmLabel = "Delete",
+            dismissLabel = "Cancel",
+            icon = themedIcon(LobbyIcons.TRASH),
+            danger = true,
+            confirmEnabled = true,
+            onConfirm = {
+                deleting = false
+                val showing = LobbyScene.currentId == entry.id
+                LobbySceneStore.delete(entry)
+                if (showing) LobbyScene.reload()
+            },
+            onDismiss = { deleting = false },
+        )
     }
 }
 
@@ -194,7 +214,7 @@ private fun SceneRow(
             .card(8.dp, selected)
             .border(1.dp, if (hovered && !selected && enabled) SocialHoverBorder else Color.Transparent, shape)
             .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
+            .then(if (enabled) Modifier.clickableWithSound("$title, $detail", selected = selected.takeIf { it }, shape = shape, onClick = onClick) else Modifier)
             .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -224,7 +244,7 @@ private fun SwitchRow(title: String, detail: String, checked: Boolean, enabled: 
             .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
             .rowFrame(false, hovered && enabled)
             .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound(onToggle) else Modifier)
+            .then(if (enabled) Modifier.clickableWithSound("$title, $detail", A11yRole.Switch, checked = checked, onClick = onToggle) else Modifier)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

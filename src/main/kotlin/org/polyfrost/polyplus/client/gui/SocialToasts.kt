@@ -87,7 +87,7 @@ private fun SocialToastBubble(message: String, success: Boolean, onDismiss: () -
             .clip(SocialPanelShape)
             .background(SocialPopupBackground)
             .border(SocialBorderWidth, if (success) SocialBorderColor else SocialDangerColor, SocialPanelShape)
-            .clickableWithSound(onDismiss)
+            .clickableWithSound("Dismiss: $message", onClick = onDismiss)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

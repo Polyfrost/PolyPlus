@@ -5,18 +5,17 @@ package org.polyfrost.polyplus.client.gui.serveredit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,37 +37,38 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialDropdown
-import org.polyfrost.polyplus.client.gui.SocialIconButton
-import org.polyfrost.polyplus.client.gui.SocialScrim
-import org.polyfrost.polyplus.client.gui.SocialTextValueField
 import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.lobbyshell.DangerButton
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
-import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
 import org.polyfrost.polyplus.client.gui.SocialSwitch
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
+import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
@@ -79,13 +79,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 private const val NAME_MAX_LENGTH = 32
 private const val ADDRESS_MAX_LENGTH = 128
 private const val DEFAULT_NAME_KEY = "selectServer.defaultName"
-private const val PING_DEBOUNCE_MILLIS = 450L
-private const val PROBE_TICK_MILLIS = 50L
 
 private val DialogWidth = 720.dp
 private val BodyHeight = 280.dp
 private val PreviewWidth = 268.dp
 private val ButtonWidth = 96.dp
+private val ButtonHeight = 38.dp
 private val CaptureRowSpace = 54.dp
 
 private class ServerEditForm(server: ServerData?) {
@@ -147,46 +146,38 @@ internal fun ServerEditDialog(
         onDelete?.invoke()
     }
 
-    if (form.confirmingDelete) EscapeCloses { form.confirmingDelete = false }
     if (form.packOpen.value) EscapeCloses { form.packOpen.value = false }
-    DisposableEffect(probe) { onDispose(probe::close) }
-    LaunchedEffect(probe) {
-        while (isActive) {
-            probe.tick()
-            delay(PROBE_TICK_MILLIS)
-        }
-    }
-    LaunchedEffect(probe, form.address.text) {
-        probe.reset(form.address.text)
-        if (!form.addressValid) return@LaunchedEffect
-        if (form.address.text != form.initialAddress) delay(PING_DEBOUNCE_MILLIS)
-        probe.ping()
-    }
+    DriveServerProbe(probe, form.address.text, form.addressValid, debounce = form.address.text != form.initialAddress)
 
-    Popup(alignment = Alignment.Center, onDismissRequest = cancel, properties = PopupProperties(focusable = true, dismissOnClickOutside = false)) {
+    ModalDialog(cancel, DialogWidth, Dp.Unspecified, PaddingValues(0.dp), 0.dp, false) {
         LaunchedEffect(Unit) { nameFocus.requestFocus() }
-        Box(Modifier.fillMaxSize().background(SocialScrim), contentAlignment = Alignment.Center) {
-            Column(
-                Modifier
-                    .width(DialogWidth)
-                    .popup()
-                    .onPreviewKeyEvent { event -> dialogKey(event, cancel, save) },
+        Column(Modifier.fillMaxWidth().onPreviewKeyEvent { event -> dialogKey(event, cancel, save) }) {
+            DialogHeader(if (server == null) "Add server" else "Edit server", onDismiss)
+            Hairline()
+            Row(
+                Modifier.fillMaxWidth().height(if (form.showCapture) BodyHeight + CaptureRowSpace else BodyHeight).padding(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                DialogHeader(if (server == null) "Add server" else "Edit server", onDismiss)
-                Hairline()
-                Row(
-                    Modifier.fillMaxWidth().height(if (form.showCapture) BodyHeight + CaptureRowSpace else BodyHeight).padding(18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ServerFields(form, nameFocus)
-                    }
-                    ServerPreviewCard(form.displayName, form.addressValid, probe, Modifier.width(PreviewWidth).fillMaxHeight())
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ServerFields(form, nameFocus)
                 }
-                Hairline()
-                DialogFooter(form, server != null && onDelete != null, onDismiss, save, delete)
+                ServerPreviewCard(form.displayName, form.addressValid, probe, Modifier.width(PreviewWidth).fillMaxHeight())
             }
+            Hairline()
+            DialogFooter(form, server != null && onDelete != null, onDismiss, save)
         }
+    }
+    if (form.confirmingDelete) {
+        ConfirmDialog(
+            "Delete this server?",
+            "It will be removed from your server list.",
+            "Delete server",
+            "Keep server",
+            themedIcon(LobbyIcons.TRASH),
+            true,
+            true,
+            delete,
+        ) { form.confirmingDelete = false }
     }
 }
 
@@ -216,8 +207,8 @@ private fun DialogHeader(title: String, onDismiss: () -> Unit) {
         Modifier.fillMaxWidth().height(60.dp).padding(start = 18.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PanelTitle(title, Modifier.weight(1f))
-        SocialIconButton(LobbyIcons.CLOSE, Modifier.focusProperties { canFocus = false }, onClick = onDismiss)
+        Box(Modifier.weight(1f)) { DialogTitle(title) }
+        IconButton(themedIcon(LobbyIcons.CLOSE), null, "Close", Modifier.focusProperties { canFocus = false }, null, SocialTextPrimary, TooltipPlacement.BelowStart, onDismiss)
     }
 }
 
@@ -225,19 +216,45 @@ private fun DialogHeader(title: String, onDismiss: () -> Unit) {
 private fun ServerFields(form: ServerEditForm, nameFocus: FocusRequester) {
     val invalid = form.address.text.isNotEmpty() && !form.addressValid
     FormField("Server name") {
-        SocialTextValueField(
-            value = form.name,
-            onValueChange = { form.name = it.limited(NAME_MAX_LENGTH) },
-            placeholder = Platform.i18n().getUnformattedText(I18n.get(DEFAULT_NAME_KEY)),
-            focusRequester = nameFocus,
+        TextField(
+            form.name,
+            { form.name = it.limited(NAME_MAX_LENGTH) },
+            Modifier.fillMaxWidth().height(38.dp),
+            Platform.i18n().getUnformattedText(I18n.get(DEFAULT_NAME_KEY)),
+            null,
+            Int.MAX_VALUE,
+            false,
+            true,
+            true,
+            true,
+            14.sp,
+            "Server name",
+            false,
+            nameFocus,
+            null,
+            null,
+            null,
         )
     }
     FormField("Server address", helper = "Enter a valid server address.".takeIf { invalid }, helperColor = SocialDangerText) {
-        SocialTextValueField(
-            value = form.address,
-            onValueChange = { form.address = it.limited(ADDRESS_MAX_LENGTH) },
-            placeholder = "play.example.net",
-            invalid = invalid,
+        TextField(
+            form.address,
+            { form.address = it.limited(ADDRESS_MAX_LENGTH) },
+            Modifier.fillMaxWidth().height(38.dp),
+            "play.example.net",
+            null,
+            Int.MAX_VALUE,
+            invalid,
+            true,
+            true,
+            true,
+            14.sp,
+            "Server address",
+            false,
+            null,
+            null,
+            null,
+            null,
         )
     }
     FormField("Server resource packs", helper = packHelp(form.packStatus)) {
@@ -266,7 +283,7 @@ private fun CaptureRow(form: ServerEditForm) {
             .rowFrame(false, hovered && !blocked)
             .hoverable(interaction, !blocked)
             .focusProperties { canFocus = false }
-            .then(if (blocked) Modifier else Modifier.clickableWithSound { form.captureDraft = !on })
+            .then(if (blocked) Modifier else Modifier.clickableWithSound("Capture scenes here", A11yRole.Switch, checked = on) { form.captureDraft = !on })
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -311,25 +328,15 @@ private fun DialogFooter(
     canDelete: Boolean,
     onDismiss: () -> Unit,
     save: () -> Unit,
-    delete: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 18.dp).focusProperties { canFocus = false },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (form.confirmingDelete) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SocialText("Delete this server?", 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                SocialText("It will be removed from your server list.", 12.sp, color = MutedText, maxLines = 1)
-            }
-            SocialButton("Keep server", onClick = { form.confirmingDelete = false })
-            DangerButton("Delete server", onClick = delete)
-            return@Row
-        }
-        if (canDelete) DangerButton("Delete") { form.confirmingDelete = true }
+        if (canDelete) TextButton("Delete", themedIcon(LobbyIcons.TRASH), Modifier.height(ButtonHeight), ButtonStyle.Danger, true) { form.confirmingDelete = true }
         Spacer(Modifier.weight(1f))
-        SocialButton("Cancel", modifier = Modifier.widthIn(min = ButtonWidth), onClick = onDismiss)
-        SocialButton("Save", modifier = Modifier.widthIn(min = ButtonWidth), filled = true, enabled = form.addressValid, onClick = save)
+        TextButton("Cancel", null, Modifier.widthIn(min = ButtonWidth).height(ButtonHeight), ButtonStyle.Secondary, true, onDismiss)
+        TextButton("Save", null, Modifier.widthIn(min = ButtonWidth).height(ButtonHeight), ButtonStyle.Primary, form.addressValid, save)
     }
 }

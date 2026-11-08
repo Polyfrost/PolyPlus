@@ -2,6 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
+import androidx.compose.foundation.layout.height
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyUserTheme
+import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,7 +16,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,36 +24,32 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.oneconfig.api.ui.v1.components.fadingEdges
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.ContextMenuList
+import org.polyfrost.polyplus.client.gui.ConfirmPrompt
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
-import org.polyfrost.polyplus.client.gui.lobbyshell.Head
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
@@ -66,23 +66,21 @@ import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 private const val GROUP_FACE_SCALE = 0.68f
 private const val FADE_HEIGHT = 32
 
-internal val MENU_OFFSET = 40.dp
-
 @Composable
-internal fun ScrollFade(modifier: Modifier, spacing: Dp = 6.dp, content: @Composable ColumnScope.() -> Unit) {
+internal fun ScrollFade(
+    modifier: Modifier,
+    spacing: Dp = 6.dp,
+    maxHeight: Dp = Dp.Unspecified,
+    ink: Color = if (LocalSocialLook.current.surface == SocialSurface.None) PanelSurface else OneConfigTheme.current.pageBackground,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val scroll = rememberScrollState()
-    val framed = LocalSocialLook.current.surface == SocialSurface.None
-    val ink = if (framed) PanelSurface else OneConfigTheme.current.pageBackground
-    val clear = if (framed) ink.copy(alpha = 0f) else Color.Transparent
-    Box(modifier) {
-        Column(Modifier.fillMaxSize().verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(spacing), content = content)
-        if (scroll.canScrollBackward) {
-            Box(Modifier.fillMaxWidth().height(FADE_HEIGHT.dp).background(Brush.verticalGradient(listOf(ink, clear))))
-        }
-        if (scroll.canScrollForward) {
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(FADE_HEIGHT.dp).background(Brush.verticalGradient(listOf(clear, ink))))
-        }
-    }
+    val bounds = if (maxHeight == Dp.Unspecified) modifier.fillMaxSize() else modifier.heightIn(max = maxHeight)
+    Column(
+        bounds.fadingEdges(scroll, ink, FADE_HEIGHT.dp).verticalScroll(scroll),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        content = content,
+    )
 }
 
 @Composable
@@ -96,7 +94,7 @@ internal fun PersonHead(person: SocialPerson, size: Dp, modifier: Modifier = Mod
     val circle = OneConfigTheme.current.circleShape
     val invited = person.pendingInvite && LocalSocialLook.current.narrowLists
     Box(modifier.size(size)) {
-        Head(person.seed, size, realSkin = person.realSkin)
+        PlayerHead(person.seed, size, Modifier, headShape(size))
         if (person.online || invited) {
             Box(
                 Modifier
@@ -123,10 +121,10 @@ internal fun ThreadFace(thread: SocialThread, size: Dp) {
     when {
         first == null -> Box(Modifier.size(size).clip(ppShape(size / 5)).background(OneConfigTheme.current.componentBackground))
         !thread.group -> PersonHead(first, size)
-        second == null -> Head(first.seed, size, realSkin = first.realSkin)
+        second == null -> PlayerHead(first.seed, size, Modifier, headShape(size))
         else -> Box(Modifier.size(size)) {
-            Head(first.seed, size * GROUP_FACE_SCALE, realSkin = first.realSkin)
-            Head(second.seed, size * GROUP_FACE_SCALE, Modifier.align(Alignment.BottomEnd), realSkin = second.realSkin)
+            PlayerHead(first.seed, size * GROUP_FACE_SCALE, Modifier, headShape(size * GROUP_FACE_SCALE))
+            PlayerHead(second.seed, size * GROUP_FACE_SCALE, Modifier.align(Alignment.BottomEnd), headShape(size * GROUP_FACE_SCALE))
         }
     }
 }
@@ -157,10 +155,10 @@ internal fun inviteItems(snapshot: SocialSnapshot, source: SocialSource): List<I
             "Party invites",
             party.host,
             party.host.name,
-            "Party, ${party.invite.partySize} of ${PartyRepository.MAX_MEMBERS}",
-            "Join party",
+            "Party, ${PartyCardText.partySize(party.invite.partySize)}",
+            PartyCardText.JOIN_PARTY,
             { PartyRepository.accept(party.invite) },
-            "Decline",
+            PartyCardText.DECLINE,
             { PartyRepository.decline(party.invite) },
         )
     }
@@ -205,14 +203,14 @@ private fun leaderMovedItem(): InboxItem? {
         "Party",
         leader,
         card.address,
-        if (incompatible) card.needs?.let { "Needs Minecraft $it" } ?: "Needs another Minecraft version" else "${card.name} is playing here",
+        if (incompatible) PartyCardText.needs(card.needs) else "${card.name} is playing here",
         when {
             incompatible -> null
-            card.checking -> "Checking..."
-            else -> "Join"
+            card.checking -> PartyCardText.CHECKING
+            else -> PartyCardText.JOIN
         },
         LeaderFollow::requestJoin,
-        "Dismiss",
+        PartyCardText.DISMISS,
         LeaderFollow::dismiss,
     )
 }
@@ -224,11 +222,11 @@ private fun leaderHostedItem(): InboxItem? {
         "hosted-${hosted.sessionId}",
         "Party",
         leader,
-        "${hosted.name}'s world",
+        PartyCardText.world(hosted.name),
         "${hosted.name} is hosting a world",
-        hosted.status ?: "Join",
+        hosted.status ?: PartyCardText.JOIN,
         LeaderFollow::joinHosted,
-        "Dismiss",
+        PartyCardText.DISMISS,
         LeaderFollow::dismissHosted,
     )
 }
@@ -242,7 +240,7 @@ private fun playTogetherItem(): InboxItem? {
         leader,
         destinationLabel(play.destination.kind, play.destination.name),
         "${play.leaderName} started Play together",
-        "Join".takeIf { PlayTogether.canJoinLate(play) },
+        PartyCardText.JOIN.takeIf { PlayTogether.canJoinLate(play) },
         PlayTogether::joinLate,
         "Not now",
         PlayTogether::cancel,
@@ -261,75 +259,64 @@ private fun hostJoinItems(): List<InboxItem> = HostJoinRequests.pending.map { re
         "Party",
         SocialPerson(request.player, request.name, seedOf(request.player), realSkin = true, online = true),
         request.name,
-        "Wants to join your world",
-        "Allow".takeUnless { request.answering },
+        PartyCardText.WANTS_TO_JOIN,
+        PartyCardText.ALLOW.takeUnless { request.answering },
         { HostJoinRequests.allow(request.id) },
-        "Deny",
+        PartyCardText.DENY,
         { HostJoinRequests.deny(request.id) },
     )
 }
 
-internal fun InboxItem.menuItems(): List<ContextItem> = listOfNotNull(
-    acceptLabel?.let { ContextItem(it, onClick = accept) },
-    ContextItem(dismissLabel, onClick = dismiss),
+internal fun InboxItem.menuItems(): List<MenuAction> = listOfNotNull(
+    acceptLabel?.let { MenuAction(it, onClick = accept) },
+    MenuAction(dismissLabel, onClick = dismiss),
 )
 
-internal fun friendMenuItems(state: SocialPageState, person: SocialPerson): List<ContextItem> = listOf(
-    ContextItem("Remove friend") {
-        state.selected = null
-        state.source.remove(person)
+internal fun friendMenuItems(state: SocialPageState, person: SocialPerson): List<MenuAction> = listOf(
+    MenuAction("Remove friend") {
+        ConfirmPrompt.ask("Remove ${person.name}?", "They will be removed from your friends list.", "Remove friend", SOCIAL_ASSETS + "x-close.svg") {
+            state.selected = null
+            state.source.remove(person)
+        }
     },
-    ContextItem("Block", danger = true) {
-        state.selected = null
-        state.source.block(person)
+    MenuAction("Block", danger = true) {
+        ConfirmPrompt.ask("Block ${person.name}?", "You won't see their messages or requests. You can unblock them later.", "Block", SOCIAL_ASSETS + "x-close.svg") {
+            state.selected = null
+            state.source.block(person)
+        }
     },
 )
 
-internal fun worldInviteItem(state: SocialPageState, person: SocialPerson, hosting: Boolean = P2PSessionManager.currentSessionId != null): ContextItem? {
+internal fun worldInviteItem(state: SocialPageState, person: SocialPerson, hosting: Boolean = P2PSessionManager.currentSessionId != null): MenuAction? {
     if (!hosting) return null
-    return ContextItem(
+    return MenuAction(
         if (person.worldInvited) "Invited to world" else "Invite to world",
         SOCIAL_ASSETS + "globe-01.svg",
         enabled = !person.worldInvited,
     ) { state.source.inviteToWorld(person) }
 }
 
-internal fun friendRowItems(state: SocialPageState, person: SocialPerson): List<ContextItem> = listOfNotNull(
-    ContextItem("Message", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.message(person) },
+internal fun friendRowItems(state: SocialPageState, person: SocialPerson): List<MenuAction> = listOfNotNull(
+    MenuAction("Message", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.message(person) },
     partyInviteItem(person.id).takeIf { person.online },
     worldInviteItem(state, person),
 ) + friendMenuItems(state, person)
 
 @Composable
 internal fun FriendMenu(state: SocialPageState, person: SocialPerson) {
-    var open by remember { mutableStateOf(false) }
-    val drop = with(LocalDensity.current) { MENU_OFFSET.roundToPx() }
-    Box {
-        SocialIconButton(LobbyIcons.MORE, tooltip = "More") { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, drop),
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                ContextMenuList(friendMenuItems(state, person)) { open = false }
-            }
-        }
-    }
+    AnchoredPopupButton(themedIcon(LobbyIcons.MORE), "More") { close -> LobbyUserTheme { MenuList(friendMenuItems(state, person), close) } }
 }
 
 @Composable
 internal fun WorldAction(state: SocialPageState, snapshot: SocialSnapshot, person: SocialPerson, modifier: Modifier = Modifier, filled: Boolean = false) {
     val item = worldInviteItem(state, person, snapshot.hosting != null) ?: return
-    SocialButton(
+    TextButton(
         item.label,
-        icon = item.icon.takeUnless { filled },
-        modifier = modifier,
-        filled = filled,
-        enabled = item.enabled,
-        onClick = item.onClick,
+        item.icon.takeUnless { filled }?.let { themedIcon(it) },
+        modifier.height(38.dp),
+        if (filled) ButtonStyle.Primary else ButtonStyle.Secondary,
+        item.enabled,
+        item.onClick,
     )
 }
 
@@ -344,14 +331,15 @@ internal fun FriendDetailPanel(state: SocialPageState, snapshot: SocialSnapshot,
                 Label(person.status, 14.sp, color = if (person.online) SocialTextPrimary else MutedText)
             }
             FriendMenu(state, person)
-            SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close") { state.selected = null }
+            IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier) { state.selected = null }
         }
         person.since?.let { Label("Friends since $it", 12.sp, color = MutedText) }
-        SocialButton(
+        TextButton(
             "Message",
-            icon = SOCIAL_ASSETS + "message-chat-circle.svg",
-            modifier = Modifier.fillMaxWidth(),
-            filled = true,
+            themedIcon(SOCIAL_ASSETS + "message-chat-circle.svg"),
+            Modifier.fillMaxWidth().height(38.dp),
+            ButtonStyle.Primary,
+            true,
         ) { state.source.message(person) }
         WorldAction(state, snapshot, person, Modifier.fillMaxWidth())
         if (person.online) PartyInvitePrompt(person.id, Modifier.fillMaxWidth())
@@ -370,11 +358,12 @@ internal fun FriendDetailPanel(state: SocialPageState, snapshot: SocialSnapshot,
 @Composable
 internal fun NoFriendsMessage(state: SocialPageState, modifier: Modifier) {
     EmptyState("No friends yet", modifier.fillMaxSize(), "Add a friend by username to see when they are online.") {
-        SocialButton(
+        TextButton(
             "Add friend",
-            icon = SOCIAL_ASSETS + "user-plus-01.svg",
-            filled = true,
-            onClick = { state.dialog = SocialDialog.AddFriend },
-        )
+            themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"),
+            Modifier.height(38.dp),
+            ButtonStyle.Primary,
+            true,
+        ) { state.dialog = SocialDialog.AddFriend }
     }
 }

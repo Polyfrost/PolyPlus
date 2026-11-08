@@ -45,12 +45,13 @@ import org.polyfrost.polyplus.client.gui.SocialBorderWidth
 import org.polyfrost.polyplus.client.gui.SocialDropdownBackground
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
@@ -98,7 +99,7 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
                 Label(voiceStatus(party, voice.inVoice), 12.sp, color = MutedText)
             }
             if (party != null) VoiceButtons(party)
-            if (!back) SocialIconButton(LobbyIcons.CLOSE, tooltip = "Close voice settings", onClick = window::closeVoice)
+            if (!back) IconButton(themedIcon(LobbyIcons.CLOSE), "Close voice settings", Modifier, window::closeVoice)
         }
         PaneRule()
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {

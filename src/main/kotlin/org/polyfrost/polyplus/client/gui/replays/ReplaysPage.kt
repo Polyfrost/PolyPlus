@@ -3,6 +3,11 @@
 package org.polyfrost.polyplus.client.gui.replays
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -22,25 +27,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import org.polyfrost.oneconfig.api.ui.v1.components.Chip
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialTextField
-import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
-import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
+import org.polyfrost.polyplus.client.gui.lobbyshell.NoMatchState
+import org.polyfrost.polyplus.client.gui.lobbyshell.PageGrid
+import org.polyfrost.polyplus.client.gui.lobbyshell.PageHeader
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.compat.replay.ReplayEntry
 import org.polyfrost.polyplus.compat.replay.ReplayProvider
-
-private val CardGap = 12.dp
-private const val COLUMNS = 3
-private const val ROWS = 2
 
 private class ReplaysView {
     var query by mutableStateOf("")
@@ -72,7 +68,7 @@ internal fun ReplaysPage(selected: ReplayEntry?, onBack: () -> Unit, onSelect: (
         ) {
             Column(
                 Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
-                verticalArrangement = Arrangement.spacedBy(CardGap),
+                verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
             ) {
                 ReplaysHeader(view, onBack)
                 val latest = ReplayLibrary.entries.firstOrNull()
@@ -88,32 +84,24 @@ internal fun ReplaysPage(selected: ReplayEntry?, onBack: () -> Unit, onSelect: (
 private fun ReplaysHeader(view: ReplaysView, onBack: () -> Unit) {
     val providers = ReplayLibrary.providers
     val focus = view.provider(providers)
-    Row(
-        Modifier.fillMaxWidth().height(54.dp).panel(16.dp).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    PageHeader(
+        "Replays",
+        view.query,
+        { view.query = it },
+        "Search replays",
+        onBack,
+        filters = if (providers.size > 1) {
+            { TabRow(listOf(TabItem<String?>(null, "All")) + providers.map { TabItem<String?>(it.id, it.name) }, view.providerId, Modifier) { view.providerId = it } }
+        } else {
+            null
+        },
     ) {
-        BackButton(onBack)
-        PageTitle("Replays", Modifier.padding(end = 2.dp))
-        SocialTextField(
-            value = view.query,
-            onValueChange = { view.query = it },
-            modifier = Modifier.weight(1f),
-            placeholder = "Search replays",
-            leadingIcon = LobbyIcons.SEARCH,
-        )
-        if (providers.size > 1) {
-            Chip("All", selected = view.providerId == null) { view.providerId = null }
-            providers.forEach { provider ->
-                Chip(provider.name, selected = view.providerId == provider.id) { view.providerId = provider.id }
-            }
-        }
         if (focus != null) {
-            SocialButton("Open folder", icon = FOLDER_ICON) { focus.openFolderSafely() }
-            SocialButton("Open ${focus.name}", icon = VIDEO_ICON) { focus.openBrowserSafely() }
+            TextButton("Open folder", themedIcon(FOLDER_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openFolderSafely() }
+            TextButton("Open ${focus.name}", themedIcon(VIDEO_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openBrowserSafely() }
         } else {
             providers.forEach { provider ->
-                SocialButton("Open ${provider.name}", icon = VIDEO_ICON) { provider.openBrowserSafely() }
+                TextButton("Open ${provider.name}", themedIcon(VIDEO_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { provider.openBrowserSafely() }
             }
         }
     }
@@ -131,9 +119,12 @@ private fun ReplaysBody(
     val entries = ReplayLibrary.entries
     when {
         entries.isEmpty() && (ReplayLibrary.loading || !ReplayLibrary.loaded) -> EmptyState("Loading replays", modifier.panel())
+        entries.isEmpty() && ReplayLibrary.failed -> EmptyState("Couldn't load replays", modifier.panel(), "Your replay folder couldn't be read.") {
+            TextButton("Try again", null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true) { ReplayLibrary.reload() }
+        }
         entries.isEmpty() -> EmptyState("No replays yet", modifier.panel(), "Start recording from the pause menu.") {
             view.provider(ReplayLibrary.providers)?.let { provider ->
-                SocialButton("Open folder", icon = FOLDER_ICON, filled = true) { provider.openFolderSafely() }
+                TextButton("Open folder", themedIcon(FOLDER_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true) { provider.openFolderSafely() }
             }
         }
         else -> {
@@ -141,7 +132,7 @@ private fun ReplaysBody(
             val visible = if (view.narrowed) matching else matching.filter { it !== latest }
             when {
                 visible.isNotEmpty() -> ReplayGrid(visible, selected, onSelect, onWatch, modifier)
-                view.narrowed -> EmptyState("No replays match that search", modifier.panel())
+                view.narrowed -> NoMatchState("replays", ReplayLibrary.providers.firstOrNull { it.id == view.providerId }?.name, view.query, modifier.panel())
                 else -> EmptyState("No other replays", modifier.panel(), "Your latest replay is above.")
             }
         }
@@ -151,12 +142,12 @@ private fun ReplaysBody(
 @Composable
 private fun ReplayGrid(entries: List<ReplayEntry>, selected: ReplayEntry?, onSelect: (ReplayEntry) -> Unit, onWatch: (ReplayEntry) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
-        val rowHeight = (maxHeight - CardGap * (ROWS - 1)) / ROWS
+        val rowHeight = PageGrid.rowHeight(maxHeight)
         LazyVerticalGrid(
-            GridCells.Fixed(COLUMNS),
+            GridCells.Fixed(PageGrid.COLUMNS),
             Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(CardGap),
-            verticalArrangement = Arrangement.spacedBy(CardGap),
+            horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
         ) {
             items(entries, key = { "${it.provider.id}:${it.path}" }) { entry ->
                 ReplayCard(entry, entry.path == selected?.path, onSelect, onWatch, Modifier.fillMaxWidth().height(rowHeight))

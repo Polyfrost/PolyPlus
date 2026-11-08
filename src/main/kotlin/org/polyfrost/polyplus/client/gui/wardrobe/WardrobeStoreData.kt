@@ -104,6 +104,8 @@ private const val STORE_LOADING = "Loading the store..."
 
 private const val STORE_FAILED = "Couldn't reach the PolyPlus store."
 
+internal const val CONSENT_NOTE_ID = "polyplus-consent"
+
 internal fun buildWardrobeEntries(
     section: WardrobeSection,
     items: List<CosmeticUiItem>,
@@ -263,10 +265,7 @@ internal fun buildWardrobeEntries(
                     forceToggle = polyPlusAvailable,
                 )
                 if (!polyPlusAvailable) {
-                    entries += WardrobeEntry.Note(
-                        "polyplus",
-                        "PolyPlus capes need the Terms of Service and Privacy Policy. Accept them under Privacy in the PolyPlus settings.",
-                    )
+                    entries += WardrobeEntry.Note(CONSENT_NOTE_ID, "PolyPlus capes need online services.")
                 } else if (ownedItems.isEmpty() && shopItems.isEmpty()) {
                     entries += WardrobeEntry.Note(
                         "polyplus",

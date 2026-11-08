@@ -57,6 +57,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -100,9 +103,10 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
+                    Announce("Accounts")
                     SocialText(text = "Accounts", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    SocialIconButton(SOCIAL_ASSETS + "x-close.svg", tooltip = "Close", onClick = onClose)
+                    IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), "Close", Modifier, onClose)
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
                 Row(Modifier.fillMaxWidth().weight(1f)) {
@@ -213,6 +217,7 @@ fun AccountButton(
     val hovered by interaction.collectIsHoveredAsState()
     var confirmRemove by remember { mutableStateOf(false) }
     val clickable = enabled && !account.active && !confirmRemove
+    val accountLabel = account.username + ", " + if (account.microsoft) "Microsoft account" else "Offline account"
     val borderColor = when {
         account.expired -> SocialDangerColor
         account.active -> OneConfigTheme.accent
@@ -224,7 +229,7 @@ fun AccountButton(
             .clip(ppShape(8.dp))
             .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
             .hoverable(interaction)
-            .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
+            .then(if (clickable) Modifier.clickableWithSound(accountLabel, selected = account.active.takeIf { it }, onClick = onClick) else Modifier)
             .graphicsLayer { alpha = if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f }
             .fillMaxWidth()
             .border(1.dp, borderColor, ppShape(8.dp))
@@ -232,7 +237,7 @@ fun AccountButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SocialAvatar(account.id.toString(), 36.dp)
+        PlayerHead(account.id, 36.dp, Modifier)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceEvenly) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SocialText(
@@ -259,11 +264,11 @@ fun AccountButton(
             )
         }
         if (confirmRemove) {
-            AccountActionIcon(ASSETS + "check-circle.svg", SocialDangerColor, enabled) {
+            AccountActionIcon(ASSETS + "check-circle.svg", SocialDangerColor, enabled, "Confirm remove ${account.username}") {
                 confirmRemove = false
                 onRemove()
             }
-            AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
+            AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled, "Keep ${account.username}") { confirmRemove = false }
         } else {
             if (account.refreshable) {
                 RefreshAccountButton(
@@ -273,7 +278,7 @@ fun AccountButton(
                     onClick = onRefresh,
                 )
             }
-            AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
+            AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled, "Remove ${account.username}") { confirmRemove = true }
         }
     }
 }
@@ -287,7 +292,7 @@ private fun AccountStatusBadge() {
             .clip(RoundedCornerShape(50))
             .background(OneConfigTheme.current.componentBackground)
             .border(1.dp, OneConfigTheme.current.borderColor, RoundedCornerShape(50))
-            .clickableWithSound { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
+            .clickableWithSound(selfStatusLabel(status)) { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -329,7 +334,7 @@ private fun RefreshAccountButton(color: Color, enabled: Boolean, spinning: Boole
             .size(30.dp)
             .clip(ppShape(6.dp))
             .graphicsLayer { alpha = if (enabled || spinning) 1f else 0.4f }
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
+            .then(if (enabled) Modifier.clickableWithSound("Refresh account", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         ThemedIcon(ASSETS + "refresh-cw-01.svg", color, 18.dp, Modifier.rotate(rotation))

@@ -3,6 +3,10 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -43,6 +47,7 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.compat.LinkedModMenus
 import org.polyfrost.polyplus.compat.LinkedModMenus.Entry
@@ -100,7 +105,7 @@ internal fun LinkedModButton(modifier: Modifier) {
             .panel()
             .border(1.dp, if (hovered) SocialHoverBorder else Color.Transparent, ppShape(20.dp))
             .hoverable(interaction)
-            .clickableWithSound { open = !open }
+            .clickableWithSound(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, shape = ppShape(20.dp)) { open = !open }
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -124,9 +129,9 @@ internal fun LinkedModButton(modifier: Modifier) {
 
 @Composable
 private fun LinkedModMenu(entries: List<Entry>, onClose: () -> Unit) {
-    Column(Modifier.width(MENU_WIDTH.dp).popup().padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    MenuSurface(Modifier.width(MENU_WIDTH.dp)) {
         entries.forEach { entry ->
-            MoreRow(entry.icon, entry.label) {
+            MenuItem(entry.label, themedIcon(entry.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
                 onClose()
                 LinkedModMenus.open(entry)
             }

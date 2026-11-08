@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -81,6 +82,9 @@ import net.minecraft.realms.RealmsBridge
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
@@ -465,8 +469,8 @@ private fun LeftColumn(
         @Suppress("UNUSED_EXPRESSION") pingTick
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
+            enter = Motion.enter(expandVertically() + fadeIn()),
+            exit = Motion.exit(shrinkVertically() + fadeOut()),
         ) {
             Column {
                 if (entries?.isEmpty() == true) {
@@ -559,7 +563,7 @@ private fun ModIntegrationBar(
             IconButton(
                 icon = button.icon,
                 tooltip = button.tooltip,
-                tooltipPlacement = TooltipPlacement.ABOVE_CENTER,
+                tooltipPlacement = TooltipPlacement.AboveCenter,
                 onClick = { button.onClick(screen) },
             )
         }
@@ -765,7 +769,6 @@ private fun ServerRow(
 @Composable
 private fun AccountPill(name: String, onClick: () -> Unit) {
     val localId = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
-    val head = localId?.let { MenuHeadCache.get(it) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -777,11 +780,10 @@ private fun AccountPill(name: String, onClick: () -> Unit) {
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val avatarModifier = Modifier.align(Alignment.CenterStart).size(28.dp).clip(ppShape(3.dp))
-        if (head != null) {
-            Image(head, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)
+        if (localId != null) {
+            PlayerHead(localId, 28.dp, Modifier.align(Alignment.CenterStart), ppShape(3.dp))
         } else {
-            RasterImage(ASSETS + "avatar.png", avatarModifier, contentScale = ContentScale.Crop)
+            RasterImage(ASSETS + "avatar.png", Modifier.align(Alignment.CenterStart).size(28.dp).clip(ppShape(3.dp)), contentScale = ContentScale.Crop)
         }
         SocialText(name, fontSize = 16.sp, textAlign = TextAlign.Center)
         Icon(
@@ -804,7 +806,7 @@ private fun IconButton(
     background: Color = PanelBackground,
     modifier: Modifier = Modifier,
     tooltip: String? = null,
-    tooltipPlacement: TooltipPlacement = TooltipPlacement.BELOW_END,
+    tooltipPlacement: TooltipPlacement = TooltipPlacement.BelowEnd,
     onClick: () -> Unit = {},
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -820,7 +822,7 @@ private fun IconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-        if (tooltip != null && hovered) HoverTooltip(tooltip, tooltipPlacement)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, tooltipPlacement, Dp.Unspecified)
     }
 }
 @Composable

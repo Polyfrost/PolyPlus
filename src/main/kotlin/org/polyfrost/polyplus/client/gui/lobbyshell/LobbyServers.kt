@@ -1,10 +1,13 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.gui.serveredit.CANT_CONNECT_KEY
 import org.polyfrost.polyplus.client.gui.serveredit.CANT_RESOLVE_KEY
@@ -18,14 +21,15 @@ import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.contents.TranslatableContents
 //? if >= 1.21.11
 import net.minecraft.server.network.EventLoopGroupHolder
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.RecentServer
 import org.polyfrost.polyplus.client.featured.FeaturedServer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.util.WeakHashMap
 
 internal enum class ServerKind { SAVED, UNSAVED, LAN, FEATURED, SPONSORED }
 
@@ -38,8 +42,27 @@ internal class ServerEntry(
     val key: String get() = "$kind:${System.identityHashCode(data)}:${data.ip}"
 }
 
+internal object ServerRevisions {
+    private val states = WeakHashMap<ServerData, MutableIntState>()
+
+    fun of(data: ServerData): Int = state(data).intValue
+
+    fun bump(data: ServerData) {
+        state(data).intValue++
+    }
+
+    private fun state(data: ServerData): MutableIntState = states.getOrPut(data) { mutableIntStateOf(0) }
+}
+
 internal class LobbyServers(private val minecraft: Minecraft) {
-    private val pinger = ServerStatusPinger()
+    @Volatile
+    private var pinger = ServerStatusPinger()
+    private var pings: Job = SupervisorJob(PolyPlusClient.SCOPE.coroutineContext[Job])
+    private val signatures = WeakHashMap<ServerData, Int>()
+    private val watching = LinkedHashSet<ServerData>()
+
+    @Volatile
+    private var closed = true
     private val list = ServerList(minecraft)
     private val unsaved = HashMap<String, ServerData>()
     private var lanList: LanServerDetection.LanServerList? = null
@@ -64,6 +87,10 @@ internal class LobbyServers(private val minecraft: Minecraft) {
     val serverList: ServerList get() = list
 
     fun open() {
+        closed = false
+        pings = SupervisorJob(PolyPlusClient.SCOPE.coroutineContext[Job])
+        pinger = ServerStatusPinger()
+        watching.clear()
         list.load()
         unsaved.clear()
         lan = emptyList()
@@ -74,10 +101,12 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         lanList = detected
         runCatching {
             lanDetector = LanServerDetection.LanServerDetector(detected).also { it.start() }
-        }.onFailure { LOGGER.warn("Unable to start LAN server detection", it) }
+        }.onFailure { LOBBY_LOGGER.warn("Unable to start LAN server detection", it) }
     }
 
     fun close() {
+        closed = true
+        pings.cancel()
         lanDetector?.interrupt()
         lanDetector = null
         pinger.removeAll()
@@ -94,16 +123,24 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         }
         pinger.tick()
         if (FeaturedServers.revision() != featuredRevision) rebuildFeatured()
-        if (anyPinging()) revision++
+        if (watching.isNotEmpty()) {
+            watching.toList().forEach(::checkChanged)
+            watching.removeAll { it.state() != ServerData.State.PINGING }
+        }
     }
 
     fun ping(data: ServerData) {
-        if (data.state() != ServerData.State.INITIAL || data.isLan) return
+        if (closed || data.state() != ServerData.State.INITIAL || data.isLan) return
         data.setState(ServerData.State.PINGING)
         data.motd = CommonComponents.EMPTY
         data.status = CommonComponents.EMPTY
-        PolyPlusClient.SCOPE.launch(PING_DISPATCHER) {
-            pinger.pingInto(data, { ClientPlatform.runOnMain { persist() } }) { revision++ }
+        ServerRevisions.bump(data)
+        watching += data
+        val owner = pinger
+        PolyPlusClient.SCOPE.launch(pings + PING_DISPATCHER) {
+            if (closed || owner !== pinger) return@launch
+            owner.pingInto(data, { ClientPlatform.runOnMain { if (!closed) persist(data) } }) { ServerRevisions.bump(data) }
+            if (closed || owner !== pinger) owner.removeAll()
         }
     }
 
@@ -129,7 +166,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         val target = entry.savedIndex + direction
         if (entry.savedIndex < 0 || target !in 0 until list.size()) return
         list.swap(entry.savedIndex, target)
-        rebuild()
+        persistAndRebuild()
     }
 
     fun moveTo(entry: ServerEntry, target: Int) {
@@ -141,7 +178,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
             list.swap(from, from + step)
             from += step
         }
-        rebuild()
+        persistAndRebuild()
     }
 
     fun saveUnsaved(entry: ServerEntry) {
@@ -187,19 +224,28 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         sponsored = rows(snapshot.sponsoredServers(now), ServerKind.SPONSORED)
     }
 
-    private fun persist() {
+    private fun persist(data: ServerData) {
         list.save()
-        revision++
+        ServerRevisions.bump(data)
     }
 
-    private fun anyPinging(): Boolean =
-        saved.any(::pinging) || recent.any(::pinging) || featured.any(::pinging) || sponsored.any(::pinging)
+    private fun checkChanged(data: ServerData) {
+        val signature = signature(data)
+        if (signatures.put(data, signature) != signature) ServerRevisions.bump(data)
+    }
 
-    private fun pinging(entry: ServerEntry) = entry.data.state() == ServerData.State.PINGING
+    private fun signature(data: ServerData): Int {
+        var hash = data.state().ordinal
+        hash = hash * 31 + System.identityHashCode(data.motd)
+        hash = hash * 31 + System.identityHashCode(data.status)
+        hash = hash * 31 + data.ping.hashCode()
+        hash = hash * 31 + (data.players?.online() ?: -1)
+        hash = hash * 31 + (data.iconBytes?.contentHashCode() ?: 0)
+        return hash
+    }
 
     companion object {
         const val QUICK_ROWS = 3
-        private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
         private val PING_DISPATCHER = Dispatchers.IO.limitedParallelism(5)
 
         fun failed(data: ServerData): Boolean {

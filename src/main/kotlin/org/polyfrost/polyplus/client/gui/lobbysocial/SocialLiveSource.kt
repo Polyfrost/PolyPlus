@@ -81,10 +81,7 @@ private fun buildLabel(invite: SessionInvite): String? {
     return parts.joinToString(" ").ifEmpty { null }
 }
 
-private class LiveConversation(override val id: Int, private val baseTitle: String) : ChatConversation {
-    override val title: String
-        get() = SocialChatLink.renamed[id] ?: baseTitle
-
+private class LiveConversation(override val id: Int, override val title: String) : ChatConversation {
     @Composable
     override fun lines(): List<ChatLine> {
         val messages by GroupsRepository.messagesFlow(id).collectAsState()
@@ -129,14 +126,13 @@ internal class LiveSocialSource : SocialSource {
         val scanning by SpecialChatResponses.scanning.collectAsState()
         val partyInvites by PartyRepository.incomingInvites.collectAsState()
         val party by PartyRepository.party.collectAsState()
-        val renamed = SocialChatLink.renamed
         LaunchedEffect(friends, incoming, outgoing, blocked, groups, invites) {
             PlayerNamesRepository.resolve(
                 friends.map { it.player } + incoming.map { it.player } + outgoing.map { it.player } + blocked.map { it.player } +
                     groups.flatMap { it.members } + invites.map { it.sender },
             )
         }
-        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, renamed, partyInvites, party) {
+        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, partyInvites, party) {
             val byId = friends.associateBy { it.player }
             val inviters = invites.filter { it.status == INVITE_PENDING }.map { it.sender } + partyInvites.map { it.sender }
             val person = { id: String -> personOf(id, byId[id], party, names, inviters) }
@@ -145,7 +141,7 @@ internal class LiveSocialSource : SocialSource {
                 requests = incoming.map { SocialRequest(it.id, person(it.player), incoming = true) } +
                     outgoing.map { SocialRequest(it.id, person(it.player), incoming = false) },
                 blocked = blocked.map { person(it.player) }.sortedBy { it.name.lowercase() },
-                threads = threadsOf(groups, person, names, responded, renamed),
+                threads = threadsOf(groups, person, names, responded),
                 worlds = invites.filter { it.status == INVITE_PENDING || it.status == INVITE_ACCEPTED }
                     .sortedBy { it.status == INVITE_ACCEPTED }
                     .map { SocialWorld(it.id, person(it.sender), null, it.status == INVITE_ACCEPTED, buildLabel(it)) },
@@ -179,7 +175,6 @@ internal class LiveSocialSource : SocialSource {
         person: (String) -> SocialPerson,
         names: Map<String, String>,
         responded: Set<Int>,
-        renamed: Map<Int, String>,
     ): List<SocialThread> {
         val self = ChatIdentity.selfId()
         return groups.sortedByDescending { it.lastMessage?.sentAt.orEmpty() }.map { group ->
@@ -189,7 +184,7 @@ internal class LiveSocialSource : SocialSource {
             val mine = last?.sender == self
             SocialThread(
                 id = group.id,
-                title = renamed[group.id] ?: conversationTitle(group, self) { names[it] ?: PlayerNamesRepository.nameOr(it) },
+                title = conversationTitle(group, self) { names[it] ?: PlayerNamesRepository.nameOr(it) },
                 people = group.members.filterNot { it == self }.map(person),
                 group = isGroup,
                 preview = last?.content?.let { content -> author?.let { "$it: $content" } ?: content },

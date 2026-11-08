@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import androidx.compose.foundation.layout.height
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -44,9 +45,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialButton
+import org.polyfrost.polyplus.client.gui.a11yRegion
+import org.polyfrost.polyplus.client.gui.A11yRegion
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import kotlin.math.roundToInt
@@ -119,9 +125,11 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
         key(tour.index) {
             val shown = remember { Animatable(0f) }
             LaunchedEffect(Unit) { shown.animateTo(1f, tween(APPEAR_MILLIS)) }
+            Announce("${tour.title()}. ${tour.text()}")
             Column(
                 Modifier
                     .placed { size -> cardOffset(anchor, hole, size, root, gap, margin) }
+                    .a11yRegion(A11yRegion.Tour)
                     .width(CardWidth)
                     .graphicsLayer { alpha = shown.value }
                     .popup()
@@ -134,9 +142,9 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
                 }
                 SocialText(tour.text(), 12.sp, color = MutedText)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SocialButton("Skip tour", onClick = onEnd)
+                    TextButton("Skip tour", Modifier.height(38.dp), onEnd)
                     Spacer(Modifier.weight(1f))
-                    SocialButton(if (tour.last) "Done" else "Next", filled = true) { if (!tour.next()) onEnd() }
+                    TextButton(if (tour.last) "Done" else "Next", Modifier.height(38.dp), ButtonStyle.Primary) { if (!tour.next()) onEnd() }
                 }
             }
         }

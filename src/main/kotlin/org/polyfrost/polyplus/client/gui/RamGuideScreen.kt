@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -16,10 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.features.JvmAdvisor
@@ -61,23 +67,21 @@ class RamGuideScreen(private val advice: JvmAdvisor.Advice) : ComposeScreen(Rend
 @Composable
 private fun RamGuideContent(advice: JvmAdvisor.Advice, onDismiss: () -> Unit) {
     val steps = if (advice.kind == JvmAdvisor.Kind.SWITCH_TO_G1) JVM_ARGUMENT_STEPS else MEMORY_STEPS
-    SocialScrimBox(onDismiss) {
-        ModalPanel(width = 520.dp, padding = PaddingValues(24.dp), spacing = 16.dp) {
-            SocialText("Allocating RAM in OneClient", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(SocialFieldShape)
-                    .background(SocialControlBackground)
-                    .padding(12.dp),
-            ) {
-                SocialText(advice.message, fontSize = 13.sp, color = SocialTextSecondary)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                steps.forEachIndexed { index, step -> GuideStep(index + 1, step) }
-            }
-            SocialButton("Got it", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onDismiss)
+    ModalDialog(onDismiss, 520.dp, Dp.Unspecified, PaddingValues(24.dp), 16.dp, true) {
+        DialogTitle("Allocating RAM in OneClient")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SocialFieldShape)
+                .background(SocialControlBackground)
+                .padding(12.dp),
+        ) {
+            SocialText(advice.message, fontSize = 13.sp, color = SocialTextSecondary)
         }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            steps.forEachIndexed { index, step -> GuideStep(index + 1, step) }
+        }
+        TextButton("Got it", Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, onDismiss)
     }
 }
 

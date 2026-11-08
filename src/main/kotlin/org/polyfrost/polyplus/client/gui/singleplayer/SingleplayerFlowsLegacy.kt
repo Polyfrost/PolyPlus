@@ -1,12 +1,15 @@
 package org.polyfrost.polyplus.client.gui.singleplayer
 
 //? if = 1.8.9 {
-/*import net.minecraft.client.Minecraft
+/*import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import net.minecraft.client.gui.screen.ConfirmScreen
 import net.minecraft.client.gui.screen.menu.world.CreateWorldScreen
 import net.minecraft.client.gui.screen.menu.world.EditWorldScreen
 import net.minecraft.client.resource.language.I18n
+import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWorldBackup
@@ -31,12 +34,18 @@ internal class SingleplayerFlows {
 
     fun backup(world: SingleplayerWorld) {
         if (!world.canBackup) return
-        runCatching { LobbyWorldBackup.write(world.id) }
-            .onSuccess { SocialNotices.emit("World backed up: $it") }
-            .onFailure {
-                LOGGER.error("Failed to back up world {}", world.id, it)
-                SocialErrors.emit("Couldn't back up the world")
+        val id = world.id
+        PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
+            val result = runCatching { LobbyWorldBackup.write(id) }
+            ClientPlatform.runOnMain {
+                result
+                    .onSuccess { SocialNotices.emit("World backed up: $it") }
+                    .onFailure {
+                        LOGGER.error("Failed to back up world {}", id, it)
+                        SocialErrors.emit("Couldn't back up the world")
+                    }
             }
+        }
     }
 
     fun recreate(world: SingleplayerWorld) {

@@ -26,18 +26,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.ContextItem
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDropdown
 import org.polyfrost.polyplus.client.gui.SocialEmojiText
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
@@ -50,17 +53,20 @@ private val NameColumn = 190.dp
 
 @Composable
 internal fun ReplyFilterButton(filter: SpecialChatResponses.Filter, scanning: Boolean, onClick: () -> Unit) {
-    SocialIconButton(
-        SOCIAL_ASSETS + if (scanning) "loading-02.svg" else "check-circle.svg",
-        tooltip = when {
+    IconButton(
+        themedIcon(SOCIAL_ASSETS + if (scanning) "loading-02.svg" else "check-circle.svg"),
+        when {
             scanning -> "Checking replies..."
             filter == SpecialChatResponses.Filter.Awaiting -> "Showing chats awaiting a reply"
             filter == SpecialChatResponses.Filter.Responded -> "Showing chats that replied"
             else -> "Filter by whether they replied"
         },
-        background = if (filter != SpecialChatResponses.Filter.All) OneConfigTheme.accent else null,
-        tint = if (filter != SpecialChatResponses.Filter.All) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
-        onClick = onClick,
+        null,
+        Modifier,
+        if (filter != SpecialChatResponses.Filter.All) OneConfigTheme.accent else null,
+        if (filter != SpecialChatResponses.Filter.All) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
+        TooltipPlacement.BelowStart,
+        onClick,
     )
 }
 
@@ -99,7 +105,7 @@ internal fun ThreadList(state: SocialPageState, list: SocialListState, snapshot:
 }
 
 @Composable
-internal fun ThreadRow(thread: SocialThread, selected: Boolean, menu: () -> List<ContextItem> = { emptyList() }, onClick: () -> Unit) {
+internal fun ThreadRow(thread: SocialThread, selected: Boolean, menu: () -> List<MenuAction> = { emptyList() }, onClick: () -> Unit) {
     val (interaction, hovered) = rememberSocialHover()
     val narrow = LocalSocialLook.current.narrowLists
     val dot: @Composable () -> Unit = {
@@ -112,7 +118,7 @@ internal fun ThreadRow(thread: SocialThread, selected: Boolean, menu: () -> List
             .socialRow(selected, hovered)
             .contextMenu(menu)
             .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .clickableWithSound(if (thread.unread) "${thread.title}, unread" else thread.title, selected = selected.takeIf { it }, onClick = onClick)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -167,7 +173,7 @@ internal fun RosterRow(state: SocialPageState, person: SocialPerson) {
             .socialRow(selected, hovered)
             .contextMenu { friendRowItems(state, person) }
             .hoverable(interaction)
-            .clickableWithSound { state.toggle(person) }
+            .clickableWithSound("${person.name}, ${person.status}", selected = selected.takeIf { it }) { state.toggle(person) }
             .padding(horizontal = if (narrow) 8.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 12.dp),
@@ -190,7 +196,7 @@ internal fun RosterRow(state: SocialPageState, person: SocialPerson) {
 
 @Composable
 private fun RowActions(state: SocialPageState, person: SocialPerson, ink: Color) {
-    SocialIconButton(SOCIAL_ASSETS + "message-chat-circle.svg", tint = ink, tooltip = "Message") { state.source.message(person) }
+    IconButton(themedIcon(SOCIAL_ASSETS + "message-chat-circle.svg"), "Message", null, Modifier, null, ink, TooltipPlacement.BelowStart) { state.source.message(person) }
 }
 
 @Composable
@@ -216,19 +222,19 @@ internal fun RequestList(state: SocialPageState, snapshot: SocialSnapshot, modif
     }
 }
 
-internal fun requestMenuItems(state: SocialPageState, request: SocialRequest): List<ContextItem> = if (request.incoming) {
-    listOf(ContextItem("Accept") { state.source.accept(request) }, ContextItem("Decline") { state.source.dismiss(request) })
+internal fun requestMenuItems(state: SocialPageState, request: SocialRequest): List<MenuAction> = if (request.incoming) {
+    listOf(MenuAction("Accept") { state.source.accept(request) }, MenuAction("Decline") { state.source.dismiss(request) })
 } else {
-    listOf(ContextItem("Cancel request") { state.source.dismiss(request) })
+    listOf(MenuAction("Cancel request") { state.source.dismiss(request) })
 }
 
-internal fun blockedMenuItems(state: SocialPageState, person: SocialPerson): List<ContextItem> =
-    listOf(ContextItem("Unblock") { state.source.unblock(person) })
+internal fun blockedMenuItems(state: SocialPageState, person: SocialPerson): List<MenuAction> =
+    listOf(MenuAction("Unblock") { state.source.unblock(person) })
 
 @Composable
 private fun RowScope.RequestActions(state: SocialPageState, request: SocialRequest) {
     requestMenuItems(state, request).forEachIndexed { index, item ->
-        SocialButton(item.label, filled = request.incoming && index == 0, onClick = item.onClick)
+        TextButton(item.label, Modifier.height(38.dp), if (request.incoming && index == 0) ButtonStyle.Primary else ButtonStyle.Secondary, item.onClick)
     }
 }
 
@@ -248,7 +254,7 @@ internal fun BlockedList(state: SocialPageState, snapshot: SocialSnapshot, modif
             ) {
                 PersonHead(person, 32.dp)
                 Label(person.name, 14.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-                blockedMenuItems(state, person).forEach { SocialButton(it.label, onClick = it.onClick) }
+                blockedMenuItems(state, person).forEach { TextButton(it.label, Modifier.height(38.dp), it.onClick) }
             }
         }
     }
@@ -267,15 +273,17 @@ internal fun InboxLine(item: InboxItem) {
             Label(item.detail, 12.sp, color = MutedText)
         }
         item.acceptLabel?.let { label ->
-            SocialIconButton(
-                LobbyIcons.TICK,
+            IconButton(
+                themedIcon(LobbyIcons.TICK),
+                label,
+                null,
                 Modifier,
-                background = OneConfigTheme.accent,
-                tint = OneConfigTheme.current.accentTextColor,
-                tooltip = label,
-                onClick = item.accept,
+                OneConfigTheme.accent,
+                OneConfigTheme.current.accentTextColor,
+                TooltipPlacement.BelowStart,
+                item.accept,
             )
         }
-        SocialIconButton(LobbyIcons.CLOSE, tooltip = item.dismissLabel, onClick = item.dismiss)
+        IconButton(themedIcon(LobbyIcons.CLOSE), item.dismissLabel, Modifier, item.dismiss)
     }
 }

@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel

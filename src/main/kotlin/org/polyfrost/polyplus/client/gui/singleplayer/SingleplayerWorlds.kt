@@ -6,7 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.oneconfig.api.platform.v1.Platform
+import org.polyfrost.polyplus.client.gui.lobbyshell.relativeDayText
 import org.polyfrost.polyplus.client.lobby.LobbyCompat
+//? if = 1.8.9 {
+/*import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+*///?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 //? if > 1.8.9
@@ -30,18 +37,13 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.WeakHashMap
 import java.util.concurrent.CompletableFuture
 
 private val LOGGER = LogManager.getLogger("PolyPlus/SingleplayerWorlds")
 
-private const val DAYS_IN_WEEK = 7L
-private const val DAYS_IN_MONTH = 30L
-private const val DAYS_IN_YEAR = 365L
 private const val META_SEPARATOR = " · "
 
 internal enum class WorldTone { Neutral, Warning, Danger }
@@ -59,23 +61,7 @@ internal enum class WorldListPhase { Loading, Ready, Failed }
 
 private fun tr(key: String): String = Platform.i18n().getUnformattedText(Component.translatable(key))
 
-internal fun playedText(lastPlayed: Long): String {
-    if (lastPlayed <= 0L) return "not played yet"
-    val zone = ZoneId.systemDefault()
-    val played = Instant.ofEpochMilli(lastPlayed).atZone(zone).toLocalDate()
-    val days = ChronoUnit.DAYS.between(played, LocalDate.now(zone))
-    return when {
-        days <= 0L -> "played today"
-        days == 1L -> "played yesterday"
-        days < DAYS_IN_WEEK -> "played $days days ago"
-        days < DAYS_IN_MONTH -> plural("played", days / DAYS_IN_WEEK, "week")
-        days < DAYS_IN_YEAR -> plural("played", days / DAYS_IN_MONTH, "month")
-        else -> plural("played", days / DAYS_IN_YEAR, "year")
-    }
-}
-
-private fun plural(prefix: String, count: Long, unit: String): String =
-    "$prefix $count $unit${if (count == 1L) "" else "s"} ago"
+internal fun playedText(lastPlayed: Long): String = relativeDayText(lastPlayed)?.let { "played $it" } ?: "not played yet"
 
 internal class SingleplayerWorld(val summary: LevelSummary) {
     val id: String = summary.levelId
@@ -175,8 +161,7 @@ internal class SingleplayerWorld(val summary: LevelSummary) {
         WorldFilter.Hardcore -> !broken && summary.isHardcore
     }
 
-    fun matches(query: String): Boolean {
-        val needle = query.lowercase(Locale.ROOT)
+    fun matches(needle: String): Boolean {
         return name.lowercase(Locale.ROOT).contains(needle) || id.lowercase(Locale.ROOT).contains(needle)
     }
 }
@@ -187,6 +172,7 @@ internal class SingleplayerState {
 
     val flows = SingleplayerFlows()
     val icons = mutableStateMapOf<String, ImageBitmap>()
+    val iconBytes = mutableStateMapOf<String, ByteArray>()
 
     var phase by mutableStateOf(WorldListPhase.Loading)
         private set
@@ -212,17 +198,25 @@ internal class SingleplayerState {
         get() = query.isNotBlank() || filter != WorldFilter.All
 
     fun visible(): List<SingleplayerWorld> {
-        val matching = worlds.filter { it.matches(filter) && it.matches(query) }
+        val needle = query.trim().lowercase(Locale.ROOT)
+        val matching = worlds.filter { it.matches(filter) && it.matches(needle) }
         return if (narrowed) matching else lastPlayedWorld.let { last -> matching.filter { it !== last } }
     }
 
     fun reload() {
         val current = ++token
         //? if = 1.8.9 {
-        /*runCatching { LevelSummary.all(mc) }.fold({ if (current == token) publish(it) }, {
-            LOGGER.error("Couldn't load level list", it)
-            fail(tr("selectWorld.unable_to_load"))
-        })
+        /*PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
+            val result = runCatching { LevelSummary.all(mc) }
+            ClientPlatform.runOnMain {
+                if (current == token) {
+                    result.fold({ publish(it) }, {
+                        LOGGER.error("Couldn't load level list", it)
+                        fail(tr("selectWorld.unable_to_load"))
+                    })
+                }
+            }
+        }
         *///?} else {
         val levelSource = mc.levelSource
         val candidates = try {
@@ -250,9 +244,10 @@ internal class SingleplayerState {
     }
 
     private fun publish(summaries: List<LevelSummary>) {
-        val list = summaries.map(::SingleplayerWorld)
+        val list = summaries.sorted().map(::SingleplayerWorld)
         val keep = list.mapTo(HashSet()) { it.id }
         icons.keys.retainAll(keep)
+        iconBytes.keys.retainAll(keep)
         if (list.none { it.id == selectedId }) selectedId = null
         worlds = list
         failure = null
@@ -267,16 +262,22 @@ internal class SingleplayerState {
             //?} else {
             /*.supplyAsync({ readIcon(world) }, Util.ioPool())
             *///?}
-            .thenAcceptAsync({ bitmap ->
-                val image = bitmap?.asComposeImageBitmap()
-                if (image != null) icons[world.id] = image else icons.remove(world.id)
+            .thenAcceptAsync({ icon ->
+                val image = icon?.second?.asComposeImageBitmap()
+                if (icon != null && image != null) {
+                    icons[world.id] = image
+                    iconBytes[world.id] = icon.first
+                } else {
+                    icons.remove(world.id)
+                    iconBytes.remove(world.id)
+                }
             }, LobbyCompat.mainExecutor(mc))
     }
 
-    private fun readIcon(world: SingleplayerWorld): PolyBitmap? {
+    private fun readIcon(world: SingleplayerWorld): Pair<ByteArray, PolyBitmap?>? {
         val path = world.iconPath ?: return null
         return try {
-            if (iconAllowed(path)) PolyBitmap.decode(Files.readAllBytes(path)) else null
+            if (iconAllowed(path)) Files.readAllBytes(path).let { it to PolyBitmap.decode(it) } else null
         } catch (error: IOException) {
             LOGGER.warn("Couldn't read icon for world {}", world.id, error)
             null

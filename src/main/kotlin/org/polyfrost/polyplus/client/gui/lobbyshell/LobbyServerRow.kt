@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,26 +22,29 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import net.minecraft.client.multiplayer.ServerData
-import org.polyfrost.polyplus.client.gui.ContextMenuList
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberReorderState
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderItem
+import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.contextMenu
-import org.polyfrost.polyplus.client.gui.lobbysocial.MENU_OFFSET
+import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.polyplus.client.gui.themedIcon
 
 private val RowHeight = 56.dp
 private val RowGap = 6.dp
@@ -48,40 +55,62 @@ private val PingWidth = 56.dp
 @Composable
 internal fun ServerList(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
-    val viewport = remember(listState) { ListReorderViewport(listState) }
-    val reorder = rememberServerReorder(lobby, shown, canReorder, viewport)
-    Box(modifier.fillMaxSize().serverReorderContainer(reorder)) {
+    val saved = shown.filter { it.kind == ServerKind.SAVED }
+    var dragged by remember { mutableStateOf<List<ServerEntry>?>(null) }
+    val draggedKey = remember { arrayOfNulls<String>(1) }
+    val order = dragged?.takeIf { canReorder && it.size == saved.size } ?: saved
+    val entries = if (order === saved) shown else order.iterator().let { moved -> shown.map { if (it.kind == ServerKind.SAVED) moved.next() else it } }
+    val currentOrder by rememberUpdatedState(order)
+    val reorder = rememberReorderState(
+        Orientation.Vertical,
+        { from, to ->
+            if (draggedKey[0] == null) draggedKey[0] = currentOrder.getOrNull(from)?.key
+            currentOrder.withItemMoved(from, to)?.let { dragged = it }
+        },
+        {
+            val moved = dragged
+            val key = draggedKey[0]
+            dragged = null
+            draggedKey[0] = null
+            val target = moved?.indexOfFirst { it.key == key } ?: -1
+            if (moved != null && target >= 0) lobby.servers.moveTo(moved[target], target)
+        },
+    )
+    Box(modifier.fillMaxSize().reorderAutoScroll(reorder, listState)) {
         LazyColumn(Modifier.fillMaxSize(), listState, verticalArrangement = Arrangement.spacedBy(RowGap)) {
-            items(reorder.entries, key = { it.key }) { entry ->
-                ServerRow(lobby, entry, canReorder, onDelete, Modifier.animateItem().serverReorderItem(reorder, entry.key))
+            items(entries, key = { it.key }) { entry ->
+                val index = order.indexOf(entry)
+                val drag = if (index >= 0) Modifier.reorderItem(reorder, entry.key, index, canReorder) else Modifier
+                ServerRow(lobby, entry, canReorder, onDelete, Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()), drag)
             }
         }
-        reorder.overlayEntry?.let { entry -> ServerRow(lobby, entry, canReorder, onDelete, Modifier.serverReorderOverlay(reorder)) }
     }
 }
 
 @Composable
-internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier = Modifier) {
+internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier = Modifier, drag: Modifier = Modifier) {
     val servers = lobby.servers
     val data = entry.data
     val revision = servers.revision
+    ServerRevisions.of(data)
     val (interaction, hovered) = rememberSocialHover()
     val selected = lobby.isSelected(data)
     val doubleClick = rememberDoubleClick { lobby.join(data) }
     LaunchedEffect(data) { servers.ping(data) }
     val failed = LobbyServers.failed(data)
-    Row(
+    LobbyHighlight(ppShape(16.dp)) { Row(
         modifier
             .fillMaxWidth()
             .height(RowHeight)
-            .cardFrame(selected, hovered)
-            .serverWash(data, 0.22f)
             .contextMenu { serverMenuItems(lobby, entry, canReorder, vertical = true, onDelete = onDelete) }
             .hoverable(interaction)
-            .clickableWithSound {
+            .clickableWithSound("${data.name}, ${serverPlayers(data)}", selected = selected.takeIf { it }, shape = ppShape(16.dp)) {
                 doubleClick()
                 lobby.select(data)
             }
+            .then(drag)
+            .cardFrame(selected, hovered)
+            .serverWash(data, 0.22f)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -96,28 +125,15 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
         }
         Label(serverPlayers(data), 12.sp, Modifier.width(PlayersWidth), color = if (failed) SocialDangerText else MutedText)
         Label(serverPing(data), 12.sp, Modifier.width(PingWidth), color = MutedText)
-        SocialButton("Join", filled = true) { lobby.join(data) }
+        TextButton("Join", Modifier.height(38.dp), ButtonStyle.Primary) { lobby.join(data) }
         ServerMoreMenu(lobby, entry, canReorder, onDelete)
-    }
+    } }
 }
 
 @Composable
 internal fun ServerMoreMenu(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, vertical: Boolean = true) {
-    var open by remember { mutableStateOf(false) }
-    val drop = with(LocalDensity.current) { MENU_OFFSET.roundToPx() }
-    Box {
-        SocialIconButton(LobbyIcons.MORE, tooltip = "More") { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, drop),
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                ContextMenuList(serverMenuItems(lobby, entry, canReorder, vertical = vertical, onDelete = onDelete)) { open = false }
-            }
-        }
+    AnchoredPopupButton(themedIcon(LobbyIcons.MORE), "More") { close ->
+        LobbyUserTheme { MenuList(serverMenuItems(lobby, entry, canReorder, vertical = vertical, onDelete = onDelete), close) }
     }
 }
 

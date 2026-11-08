@@ -4,6 +4,12 @@ package org.polyfrost.polyplus.client.gui.singleplayer
 
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +29,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -35,22 +40,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.network.chat.Component
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.HoverTooltip
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.contextMenu
-import org.polyfrost.polyplus.client.gui.lobbyshell.DangerButton
+import org.polyfrost.polyplus.client.gui.lobbyshell.DetailRow
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
+import org.polyfrost.polyplus.client.gui.lobbyshell.LastPlayedStrip
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
@@ -58,16 +59,16 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
 import org.polyfrost.polyplus.client.gui.lobbyshell.cardFrame
 import org.polyfrost.polyplus.client.gui.lobbyshell.hostWorldAllowed
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
-import org.polyfrost.polyplus.client.gui.lobbyshell.rememberDoubleClick
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberCardClick
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 
 private const val BANNER_FALLBACK_ALPHA = 0.22f
 private const val TOOLTIP_WIDTH = 240
+internal val BUTTON_HEIGHT = 38.dp
 
 private const val CARD_TAGS = 2
-private const val STRIP_HEIGHT = 60
-private const val STRIP_WASH_ALPHA = 0.35f
 
 private val WorldTone.color: Color
     @Composable get() = when (this) {
@@ -77,14 +78,11 @@ private val WorldTone.color: Color
     }
 
 @Composable
-private fun rememberCardClick(state: SingleplayerState, world: SingleplayerWorld): () -> Unit {
-    val doubleClick = rememberDoubleClick { state.flows.play(world) }
-    return {
-        doubleClick()
+private fun rememberWorldClick(state: SingleplayerState, world: SingleplayerWorld): () -> Unit =
+    rememberCardClick({ state.flows.play(world) }) {
         state.selectedId = world.id
         state.onSelect(world.id)
     }
-}
 
 @Composable
 private fun WorldBanner(icon: ImageBitmap?, height: Dp) {
@@ -112,10 +110,14 @@ private fun WorldTile(icon: ImageBitmap?, size: Dp) {
 }
 
 @Composable
-private fun WorldTags(world: SingleplayerWorld, modifier: Modifier = Modifier, lead: (@Composable () -> Unit)? = null) {
+private fun WorldTagItems(world: SingleplayerWorld) {
+    world.tags.take(CARD_TAGS).forEach { Tag(it.label, if (it.tone == WorldTone.Danger) TagTone.Danger else TagTone.Dark) }
+}
+
+@Composable
+private fun WorldTags(world: SingleplayerWorld, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        lead?.invoke()
-        world.tags.take(CARD_TAGS).forEach { Tag(it.label, if (it.tone == WorldTone.Danger) TagTone.Danger else TagTone.Dark) }
+        WorldTagItems(world)
     }
 }
 
@@ -133,13 +135,13 @@ private fun WorldCardText(world: SingleplayerWorld, titleSize: Int = 16) {
     }
 }
 
-private fun worldMenuItems(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit): List<ContextItem> = listOfNotNull(
-    ContextItem(world.primaryLabel, SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { state.flows.play(world) },
-    ContextItem("Host", SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { onHost(world.id) }.takeIf { hostWorldAllowed() },
-    ContextItem("Edit", SOCIAL_ASSETS + "edit-02.svg", enabled = world.canEdit) { state.flows.edit(world) },
-    ContextItem("Backup", LobbyIcons.COPY, enabled = world.canBackup) { state.flows.backup(world) },
-    ContextItem("Recreate", LobbyIcons.REFRESH, enabled = world.canRecreate) { state.flows.recreate(world) },
-    ContextItem("Delete", LobbyIcons.TRASH, danger = true, enabled = world.canDelete) { state.flows.delete(world) },
+private fun worldMenuItems(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit): List<MenuAction> = listOfNotNull(
+    MenuAction(world.primaryLabel, SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { state.flows.play(world) },
+    MenuAction("Host", SOCIAL_ASSETS + "log-in-04.svg", enabled = world.canPlay) { onHost(world.id) }.takeIf { hostWorldAllowed() },
+    MenuAction("Edit", SOCIAL_ASSETS + "edit-02.svg", enabled = world.canEdit) { state.flows.edit(world) },
+    MenuAction("Backup", LobbyIcons.COPY, enabled = world.canBackup) { state.flows.backup(world) },
+    MenuAction("Recreate", LobbyIcons.REFRESH, enabled = world.canRecreate) { state.flows.recreate(world) },
+    MenuAction("Delete", LobbyIcons.TRASH, danger = true, enabled = world.canDelete) { state.flows.delete(world) },
 )
 
 @Composable
@@ -154,7 +156,7 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
             .cardFrame(state.selected === world, hovered)
             .contextMenu { worldMenuItems(state, world, onHost) }
             .hoverable(interaction)
-            .clickableWithSound(rememberCardClick(state, world)),
+            .clickableWithSound(world.name, selected = (state.selected === world).takeIf { it }, shape = ppShape(16.dp), onClick = rememberWorldClick(state, world)),
     ) {
         Column(Modifier.fillMaxSize()) {
             WorldBanner(icon, banner)
@@ -163,7 +165,7 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 WorldCardText(world)
-                SocialButton(world.primaryLabel, filled = true, enabled = world.canPlay) { state.flows.play(world) }
+                TextButton(world.primaryLabel, null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, world.canPlay) { state.flows.play(world) }
             }
         }
         WorldTags(world, Modifier.padding(10.dp))
@@ -174,52 +176,31 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
 @Composable
 internal fun LastPlayedWorldStrip(state: SingleplayerState, onHost: (String) -> Unit) {
     val world = state.lastPlayedWorld ?: return
-    val icon = state.icons[world.id]
-    val (interaction, hovered) = rememberSocialHover()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(STRIP_HEIGHT.dp)
-            .cardFrame(state.selected === world, hovered)
-            .background(Brush.horizontalGradient(listOf(OneConfigTheme.accent.copy(alpha = STRIP_WASH_ALPHA), Color.Transparent)))
-            .contextMenu { worldMenuItems(state, world, onHost) }
-            .hoverable(interaction)
-            .clickableWithSound(rememberCardClick(state, world))
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    LastPlayedStrip(
+        tag = "Last played",
+        name = world.name,
+        selected = state.selected === world,
+        onClick = rememberWorldClick(state, world),
+        menu = { worldMenuItems(state, world, onHost) },
+        actionLabel = world.primaryLabel,
+        onAction = { state.flows.play(world) },
+        actionEnabled = world.canPlay,
+        thumb = { WorldTile(state.icons[world.id], 40.dp) },
+        tags = { WorldTagItems(world) },
     ) {
-        WorldTile(icon, 40.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WorldTags(world) { Tag("Last played", TagTone.Accent) }
-                Label(world.name, 15.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
-            }
-            val status = world.status
-            if (status != null) {
-                Label(status, 12.sp, color = world.statusTone.color)
-            } else {
-                Label(world.meta, 12.sp, color = MutedText)
-            }
+        val status = world.status
+        if (status != null) {
+            Label(status, 12.sp, color = world.statusTone.color)
+        } else {
+            Label(world.meta, 12.sp, color = MutedText)
         }
-        SocialButton(world.primaryLabel, filled = true, enabled = world.canPlay) { state.flows.play(world) }
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Label(label, 12.sp, Modifier.weight(1f), color = MutedText)
-        Label(value, 12.sp)
     }
 }
 
 @Composable
 private fun ActionButton(label: String, icon: String, enabled: Boolean, tooltip: String?, modifier: Modifier, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Box(modifier.hoverable(interaction)) {
-        SocialButton(label, icon = icon, modifier = Modifier.fillMaxWidth(), enabled = enabled, onClick = onClick)
-        if (hovered && tooltip != null) HoverTooltip(tooltip, TooltipPlacement.ABOVE_CENTER, TOOLTIP_WIDTH.dp)
+    TooltipBox(tooltip, modifier, TooltipPlacement.AboveCenter, TOOLTIP_WIDTH.dp) {
+        TextButton(label, themedIcon(icon), Modifier.fillMaxWidth().height(BUTTON_HEIGHT), ButtonStyle.Secondary, enabled, onClick)
     }
 }
 
@@ -254,7 +235,7 @@ internal fun WorldDetailsPanel(state: SingleplayerState, onHost: (String) -> Uni
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionButton("Recreate", LobbyIcons.REFRESH, world.canRecreate, fixingTooltip(world, "recreate"), Modifier.weight(1f)) { state.flows.recreate(world) }
-                DangerButton("Delete", Modifier.weight(1f), world.canDelete) { state.flows.delete(world) }
+                TextButton("Delete", themedIcon(LobbyIcons.TRASH), Modifier.weight(1f).height(BUTTON_HEIGHT), ButtonStyle.Danger, world.canDelete) { state.flows.delete(world) }
             }
         }
     }

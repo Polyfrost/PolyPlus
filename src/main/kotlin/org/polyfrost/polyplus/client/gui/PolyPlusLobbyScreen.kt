@@ -57,7 +57,8 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
             /*return true
             *///?}
         }
-        if ((key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER) && lobby.openSocial()) return true
+        val enter = key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER
+        if (enter && (lobby.tour != null || !LobbyA11y.keyboardFocused()) && lobby.openSocial()) return true
         return super.handleKeyPressed(key, modifiers)
     }
 
@@ -67,6 +68,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
         if (!LobbyScene.showing()) ctx.fill(0, 0, width, height, 0xFF11171C.toInt())
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
         StartupAccessibility.frame()
+        LobbyA11y.frame()
         StartupOverlay.screenFrame(client, ctx)
     }
 
@@ -78,6 +80,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
         if (!LobbyScene.showing()) fill(0, 0, width, height, 0xFF11171C.toInt())
         super.render(mouseX, mouseY, tickDelta)
         StartupAccessibility.frame()
+        LobbyA11y.frame()
         StartupOverlay.legacyFrame()
     }
     *///?} else {
@@ -86,6 +89,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
         if (!LobbyScene.showing()) ctx.fill(0, 0, width, height, 0xFF11171C.toInt())
         super.render(ctx, mouseX, mouseY, tickDelta)
         StartupAccessibility.frame()
+        LobbyA11y.frame()
         StartupOverlay.screenFrame(client, ctx)
     }
 

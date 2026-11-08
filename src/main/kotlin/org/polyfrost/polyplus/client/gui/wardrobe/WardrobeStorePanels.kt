@@ -31,13 +31,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
@@ -100,12 +102,13 @@ private fun CartPanel(
         if (status != null) {
             SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        SocialButton(
+        TextButton(
             "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
-            icon = "assets/polyplus/ico/shopping-cart/0.svg",
-            modifier = Modifier.fillMaxWidth(),
-            filled = true,
-            onClick = onCheckout,
+            themedIcon("assets/polyplus/ico/shopping-cart/0.svg"),
+            Modifier.fillMaxWidth().height(38.dp),
+            ButtonStyle.Primary,
+            true,
+            onCheckout,
         )
     }
 }
@@ -135,7 +138,7 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
                 }
             }
         }
-        SocialIconButton("trash", Modifier.align(Alignment.BottomEnd).padding(2.dp), tooltip = "Remove", onClick = onRemove)
+        IconButton(themedIcon("trash"), "Remove", Modifier.align(Alignment.BottomEnd).padding(2.dp), onClick = onRemove)
     }
 }
 
@@ -288,7 +291,7 @@ internal fun WardrobeCartPane(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SocialText("Cart", color = OneConfigTheme.current.textColor, fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            SocialIconButton("close", tooltip = "Close", onClick = onClose)
+            IconButton(themedIcon("close"), "Close", Modifier, onClose)
         }
         CartPanel(items = cart, status = status, modifier = Modifier.weight(1f).fillMaxWidth(), onRemove = onRemove, onCheckout = onCheckout)
     }

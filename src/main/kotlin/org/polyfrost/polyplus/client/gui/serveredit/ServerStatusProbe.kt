@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.lobby.LobbyCompat
 import net.minecraft.client.Minecraft
@@ -20,7 +21,9 @@ import java.net.UnknownHostException
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 internal class ServerStatusProbe(private val minecraft: Minecraft, original: ServerData?) {
-    private val pinger = ServerStatusPinger()
+    @Volatile
+    private var pinger = ServerStatusPinger()
+    private var job: Job? = null
     private val originalAddress = original?.ip
     private val originalIcon = original?.iconBytes
 
@@ -33,19 +36,23 @@ internal class ServerStatusProbe(private val minecraft: Minecraft, original: Ser
         private set
 
     fun reset(address: String) {
-        pinger.removeAll()
+        supersede()
         data = draft(address)
     }
 
     fun ping() {
+        if (closed) return
+        supersede()
         val target = data
+        val owner = pinger
         target.setState(ServerData.State.PINGING)
         target.motd = CommonComponents.EMPTY
         target.status = CommonComponents.EMPTY
         revision++
-        PolyPlusClient.SCOPE.launch(PING_DISPATCHER) {
-            pinger.pingInto(target, {}) { revision++ }
-            if (closed) pinger.removeAll()
+        job = PolyPlusClient.SCOPE.launch(PING_DISPATCHER) {
+            if (closed || owner !== pinger) return@launch
+            owner.pingInto(target, {}) { if (owner === pinger && target === data) revision++ }
+            if (closed || owner !== pinger) owner.removeAll()
         }
     }
 
@@ -59,7 +66,16 @@ internal class ServerStatusProbe(private val minecraft: Minecraft, original: Ser
 
     fun close() {
         closed = true
+        job?.cancel()
+        job = null
         pinger.removeAll()
+    }
+
+    private fun supersede() {
+        job?.cancel()
+        job = null
+        pinger.removeAll()
+        pinger = ServerStatusPinger()
     }
 
     private fun draft(address: String): ServerData {

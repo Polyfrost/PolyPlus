@@ -3,6 +3,9 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,8 +45,6 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.FeaturedBundle
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialButton
-import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
@@ -52,6 +53,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.rememberRemoteImage
@@ -131,7 +133,7 @@ internal fun EquippedRail(
         Row(Modifier.fillMaxWidth().height(RailHeaderHeight).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlineIconButton("left-arrow.svg", onClick = onBack)
             Label(title, 20.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            SocialIconButton(LobbyIcons.REFRESH, tooltip = "Refresh", onClick = onRefresh)
+            IconButton(themedIcon(LobbyIcons.REFRESH), "Refresh", Modifier, onRefresh)
         }
         for (slot in slots) {
             SlotRow(slot, active = slot.type == activeType, onClick = { onSelect(slot.type) })
@@ -291,7 +293,7 @@ internal fun SeasonalBundlePanel(items: List<CosmeticUiItem>, onMarketplace: () 
                 BundleRow(row, Modifier.fillMaxWidth().weight(1f))
             }
         }
-        SocialButton("Open Marketplace", filled = true, modifier = Modifier.fillMaxWidth(), onClick = onMarketplace)
+        TextButton("Open Marketplace", Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, onMarketplace)
     }
 }
 
@@ -327,7 +329,7 @@ internal fun CapesOnlyPanel(onTurnOn: () -> Unit, modifier: Modifier) {
     Column(modifier.panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PanelTitle("Minecraft capes only")
         SocialText("Cosmetics and outfits need online services. Your Minecraft capes still work.", 14.sp, color = MutedText)
-        SocialButton("Turn on online services", modifier = Modifier.fillMaxWidth(), filled = true, onClick = onTurnOn)
+        TextButton("Turn on online services", Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, onTurnOn)
     }
 }
 
@@ -339,6 +341,6 @@ internal fun OutfitPanel(onStatus: (String) -> Unit, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) { OutfitSwitcher(onStatus) }
-        SocialButton("Save this look", onClick = { createOutfitFromCurrent(onStatus) })
+        TextButton("Save this look", Modifier.height(38.dp)) { createOutfitFromCurrent(onStatus) }
     }
 }
