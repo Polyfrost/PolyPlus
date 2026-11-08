@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,11 +78,12 @@ internal fun MenuBackdrop(modifier: Modifier) {
     var time by remember { mutableFloatStateOf(0f) }
     val eased = remember { floatArrayOf(0.5f, 0.5f) }
     LaunchedEffect(Unit) {
+        if (Motion.reduced) return@LaunchedEffect
         val start = withFrameNanos { it }
         while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
     }
     Canvas(modifier) {
-        val target = menuMouse()
+        val target = if (Motion.reduced) Offset(0.5f, 0.5f) else menuMouse()
         eased[0] += (target.x - eased[0]) * PARALLAX_EASE
         eased[1] += (target.y - eased[1]) * PARALLAX_EASE
         drawMenuBackground(time, Offset(eased[0], eased[1]))

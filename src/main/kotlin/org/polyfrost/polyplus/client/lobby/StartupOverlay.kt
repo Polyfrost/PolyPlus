@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.lobby
 
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import net.minecraft.client.Minecraft
@@ -8,6 +12,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.Easing
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -197,7 +202,7 @@ object StartupOverlay {
         if (holding && (!lobby || failed || timedOut) && startNanos == 0L) return fadeOnly(canvas, now)
         val started = holding && LobbyScene.revealStarted()
         if (started && startNanos == 0L) startNanos = now
-        if (startNanos != 0L && PolyPlusConfig.reducedMotion) return fadeOnly(canvas, now)
+        if (startNanos != 0L && Motion.reduced) return fadeOnly(canvas, now)
         val t = if (startNanos == 0L) 0f else seconds(startNanos, now).toFloat()
         val line = progress(reload, holding, started, now)
         return if (card) drawCard(canvas, t, line) else drawRise(canvas, t, line)
@@ -319,10 +324,7 @@ object StartupOverlay {
 
     private fun clamp(value: Float) = value.coerceIn(0f, 1f)
 
-    private fun smooth(from: Float, to: Float, value: Float): Float {
-        val t = clamp((value - from) / (to - from))
-        return t * t * (3f - 2f * t)
-    }
+    private fun smooth(from: Float, to: Float, value: Float): Float = Easing.smoothstep((value - from) / (to - from))
 
     private fun cubic(value: Float): Float {
         val t = clamp(value)

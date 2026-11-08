@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import androidx.compose.runtime.getValue
@@ -7,8 +9,12 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.language.I18n
 import org.polyfrost.oneconfig.api.platform.v1.Platform
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
+import org.polyfrost.polyplus.client.gui.OnboardingKeys
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -51,7 +57,7 @@ internal object StartupAccessibility {
         private set
     var narratorLabel by mutableStateOf("")
         private set
-    var reducedMotion by mutableStateOf(PolyPlusConfig.reducedMotion)
+    var reducedMotion by mutableStateOf(OneConfigConfig.reducedMotion)
         private set
     private var languageStamp by mutableStateOf("")
 
@@ -75,7 +81,7 @@ internal object StartupAccessibility {
     fun attach(onLeave: () -> Unit) {
         leave = onLeave
         refreshLanguage()
-        reducedMotion = PolyPlusConfig.reducedMotion
+        reducedMotion = OneConfigConfig.reducedMotion
         if (attachedOnce) return
         attachedOnce = true
         focus = if (narratorAvailable()) Control.Narrator else Control.Continue
@@ -153,7 +159,7 @@ internal object StartupAccessibility {
     }
 
     fun handleKey(key: Int, modifiers: Int): Boolean {
-        val exit = leave ?: return false
+        val exit = leave ?: return OnboardingKeys.handle(key)
         when (key) {
             InputConstants.KEY_ESCAPE -> exit()
             InputConstants.KEY_TAB -> move(if (modifiers and SHIFT_MODIFIER != 0) -1 else 1)
@@ -181,7 +187,7 @@ internal object StartupAccessibility {
         //? if > 1.8.9 {
         speakPrompt()
         val on = narratorOn()
-        if (on && !narrating && focus != Control.Narrator) sayQueued(buttonNarration(label(focus)))
+        if (on && !narrating && focus != Control.Narrator) A11y.say(buttonNarration(label(focus)))
         narrating = on
         //?}
     }
@@ -216,8 +222,8 @@ internal object StartupAccessibility {
 
     private fun toggleReducedMotion() {
         reducedMotion = !reducedMotion
-        PolyPlusConfig.reducedMotion = reducedMotion
-        PolyPlusConfig.save()
+        OneConfigConfig.reducedMotion = reducedMotion
+        OneConfigConfig.INSTANCE?.save()
         announce(buttonNarration(label(Control.ReducedMotion)))
     }
 
@@ -262,13 +268,7 @@ internal object StartupAccessibility {
 
     private fun buttonNarration(label: String): String = I18n.get("narration.button", label)
 
-    private fun announce(text: String) {
-        //? if > 1.8.9 {
-        if (!Minecraft.getInstance().options.narrator().get().shouldNarrateSystem() || !narratorAvailable()) return
-        Narrator.getNarrator().clear()
-        say(text, true)
-        //?}
-    }
+    private fun announce(text: String) = A11y.say(text, true)
 
     //? if > 1.8.9 {
     private fun speakPrompt() {
@@ -279,10 +279,6 @@ internal object StartupAccessibility {
             say(I18n.get("accessibility.onboarding.screen.narrator"), true)
             promptSpoken = true
         }
-    }
-
-    private fun sayQueued(text: String) {
-        if (Minecraft.getInstance().options.narrator().get().shouldNarrateSystem() && narratorAvailable()) say(text, false)
     }
 
     private fun say(text: String, interrupt: Boolean) {

@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.rotateBy
 import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandle
@@ -335,10 +336,7 @@ object PlayerPreviewRenderer {
         return (if (s > 255) 255 else s).toByte()
     }
 
-    internal fun smooth(t: Float): Float {
-        val c = t.coerceIn(0f, 1f)
-        return c * c * c * (c * (c * 6f - 15f) + 10f)
-    }
+    internal fun smooth(t: Float): Float = Easing.smootherstep(t)
 
     private fun toImageBitmap(data: ByteBuffer, w: Int, h: Int, pixelSize: Int): ImageBitmap {
         val out = ByteArray(w * h * 4)
@@ -1418,6 +1416,7 @@ import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.rotateBy
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
@@ -1497,10 +1496,7 @@ object PlayerPreviewRenderer {
         if (t != null) ClientPlatform.runOnMain { runCatching { t.destroyBuffers() } }
     }
 
-    internal fun smooth(t: Float): Float {
-        val c = t.coerceIn(0f, 1f)
-        return c * c * c * (c * (c * 6f - 15f) + 10f)
-    }
+    internal fun smooth(t: Float): Float = Easing.smootherstep(t)
 
     private fun fadeAlpha(tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float): Float {
         var a = 1f

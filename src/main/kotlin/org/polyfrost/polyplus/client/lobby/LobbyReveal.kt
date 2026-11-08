@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.lobby
 
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 
 enum class LobbyReveal(val id: String, private val label: String, private val shader: Float) {
@@ -9,12 +12,11 @@ enum class LobbyReveal(val id: String, private val label: String, private val sh
     FOCUS("focus", "Focus pull", 1f),
     LIGHT("light", "First light", 2f);
 
-    val waves: Boolean get() = shader == 0f
+    val waves: Boolean get() = shader == 0f && !still()
 
     override fun toString(): String = label
 
     companion object {
-        private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
         private var picked = roll(null)
 
         val active: LobbyReveal
@@ -24,10 +26,12 @@ enum class LobbyReveal(val id: String, private val label: String, private val sh
 
         fun next() {
             picked = if (StartupOverlay.active) WAVE else roll(picked)
-            if (PolyPlusLobbyConfig.lobbyReveal == RANDOM) LOGGER.info("Lobby reveal: {}", picked)
+            if (PolyPlusLobbyConfig.lobbyReveal == RANDOM) LOBBY_LOGGER.info("Lobby reveal: {}", picked)
         }
 
-        fun shaderMode(progress: Float): Float = if (progress < 1f) active.shader else 0f
+        fun shaderMode(progress: Float): Float = if (progress < 1f && !still()) active.shader else 0f
+
+        private fun still(): Boolean = Motion.reduced && LobbyScene.drivenReveal() == null
 
         private fun roll(last: LobbyReveal?): LobbyReveal = entries.filter { it != RANDOM && it != last }.random()
     }
