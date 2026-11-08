@@ -90,16 +90,28 @@ class LobbyAccountSkin {
 
 object LobbyAccountSkins {
     private val loaded = ConcurrentHashMap<UUID, LobbyAccountSkin>()
+    private val retries = ConcurrentHashMap<UUID, Retry>()
+    private val RETRY_MILLIS = longArrayOf(30_000L, 120_000L, 600_000L)
 
-    fun of(uuid: UUID, name: String, local: Boolean): LobbyAccountSkin =
-        loaded.computeIfAbsent(uuid) { LobbyAccountSkin().also { load(it, uuid, name, local) } }
+    private class Retry(val attempt: Int, val at: Long)
 
-    private fun load(skin: LobbyAccountSkin, uuid: UUID, name: String, local: Boolean) {
+    fun of(uuid: UUID, name: String, local: Boolean): LobbyAccountSkin {
+        val skin = loaded.computeIfAbsent(uuid) { LobbyAccountSkin().also { load(it, uuid, name, local, 0) } }
+        val retry = retries[uuid]
+        if (retry != null && System.currentTimeMillis() >= retry.at && retries.remove(uuid, retry)) load(skin, uuid, name, local, retry.attempt)
+        return skin
+    }
+
+    private fun load(skin: LobbyAccountSkin, uuid: UUID, name: String, local: Boolean, attempt: Int) {
         val mc = Minecraft.getInstance()
         LobbyUtil.ioPool().execute {
             val profile = runCatching {
                 if (local) mc.session.profile else mc.sessionService.fillProfileProperties(GameProfile(uuid, name), false)
-            }.getOrNull() ?: return@execute
+            }.getOrNull()?.takeIf { local || it.properties.containsKey("textures") }
+            if (profile == null) {
+                if (attempt < RETRY_MILLIS.size) retries[uuid] = Retry(attempt + 1, System.currentTimeMillis() + RETRY_MILLIS[attempt])
+                return@execute
+            }
             runCatching {
                 mc.skinManager.register(profile, { type, location, texture ->
                     when (type) {
@@ -124,6 +136,8 @@ object LobbyMth {
     fun clamp(value: Int, low: Int, high: Int): Int = value.coerceIn(low, high)
 
     fun lerp(amount: Float, from: Float, to: Float): Float = from + (to - from) * amount
+
+    fun lerp(amount: Double, from: Double, to: Double): Double = from + (to - from) * amount
 
     fun wrapDegrees(value: Float): Float = MathHelper.wrapDegrees(value)
 

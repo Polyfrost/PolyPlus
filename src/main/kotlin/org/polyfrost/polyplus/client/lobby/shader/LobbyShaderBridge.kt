@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.client.lobby.shader
 
 //? if iris {
-import net.fabricmc.loader.api.FabricLoader
+import org.polyfrost.polyplus.compat.Mods
 import org.polyfrost.polyplus.compat.iris.IrisProbe
 //?}
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 
 enum class Capability { LOBBY_PIPELINE, SSBO_GUARD, TERRAIN_REVEAL, WAVE_UNIFORM, DEPTH_MODEL }
 
@@ -35,19 +35,17 @@ object NoBridge : LobbyShaderBridge {
 }
 
 object LobbyShaderBridges {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
-
     @JvmStatic
     val current: LobbyShaderBridge by lazy {
         val probed = runCatching { probe() }
-            .onFailure { LOGGER.warn("Shader bridge probe failed, lobby uses no shader bridge", it) }
+            .onFailure { LOBBY_LOGGER.warn("Shader bridge probe failed, lobby uses no shader bridge", it) }
             .getOrNull()
         probed ?: NoBridge
     }
 
     private fun probe(): LobbyShaderBridge? {
         //? if iris {
-        if (FabricLoader.getInstance().isModLoaded("iris")) return IrisProbe.bridge()
+        if (Mods.iris) return IrisProbe.bridge()
         //?}
         return null
     }

@@ -38,4 +38,9 @@ object LobbyWaveState {
         }
         frame = Vector4f((look.x / level).toFloat(), (look.z / level).toFloat(), start.toFloat(), seconds() * SPEED)
     }
+
+    fun distance(x: Double, z: Double, camera: Vec3): Double {
+        val wave = frame
+        return ((x - camera.x) * wave.x + (z - camera.z) * wave.y - wave.z).coerceAtLeast(0.0)
+    }
 }

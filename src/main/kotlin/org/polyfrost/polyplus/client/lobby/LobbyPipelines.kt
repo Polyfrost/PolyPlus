@@ -33,22 +33,32 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer
 *///?}
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.mixin.client.access.RenderPipelinesAccessor
+import java.util.concurrent.ConcurrentHashMap
 
 object LobbyPipelines {
     @Volatile
     var previewing = false
 
-    private val solidCompiled by lazy {
-        runCatching {
+    private val failed = ConcurrentHashMap.newKeySet<RenderPipeline>()
+
+    private fun usable(pipeline: RenderPipeline): Boolean {
+        if (pipeline in failed) return false
+        if (!RenderSystem.isOnRenderThread()) return true
+        val result = runCatching {
             //? if >= 26.3 {
-            RenderSystem.getCompiledPipelineNullable(solid) != null
+            RenderSystem.getCompiledPipelineNullable(pipeline) != null
             //?} else {
-            /*RenderSystem.getDevice().precompilePipeline(solid).isValid
+            /*RenderSystem.getDevice().precompilePipeline(pipeline).isValid
             *///?}
-        }.getOrDefault(false)
+        }
+        if (result.getOrDefault(false)) return true
+        if (failed.add(pipeline)) LOBBY_LOGGER.warn("Lobby pipeline {} failed to compile, falling back to vanilla rendering for it", pipeline.location, result.exceptionOrNull())
+        return false
     }
 
-    fun compiled(): Boolean = solidCompiled
+    private fun pick(lobby: RenderPipeline, original: RenderPipeline): RenderPipeline = if (usable(lobby)) lobby else original
+
+    fun compiled(): Boolean = terrain.all(::usable)
 
     private val SHADER = Identifier.fromNamespaceAndPath("polyplus", "core/lobby_terrain")
     private val HOLOGRAM = Identifier.fromNamespaceAndPath("polyplus", "core/lobby_hologram")
@@ -89,6 +99,18 @@ object LobbyPipelines {
     //? if < 26.1
     /*private val tripwire by lazy { pipeline("tripwire", false, 0.1f, true) }*/
 
+    private val terrain by lazy {
+        listOf(
+            solid,
+            //? if < 1.21.11
+            /*cutoutMipped,*/
+            cutout,
+            translucent,
+            //? if < 26.1
+            /*tripwire,*/
+        )
+    }
+
     private val hologram by lazy {
         val builder = RenderPipeline.builder(RenderPipelinesAccessor.`polyplus$entitySnippet`())
             .withLocation(Identifier.fromNamespaceAndPath("polyplus", "pipeline/lobby_hologram"))
@@ -122,7 +144,7 @@ object LobbyPipelines {
     *///?}
 
     @JvmStatic
-    fun hologram(original: RenderPipeline): RenderPipeline = if (LobbyHologram.drawing && entityFormat(original)) hologram else original
+    fun hologram(original: RenderPipeline): RenderPipeline = if (LobbyHologram.drawing && entityFormat(original) && usable(hologram)) hologram else original
 
     //? if < 1.21.10 {
     /*private val perFaceEntity by lazy {
@@ -159,17 +181,17 @@ object LobbyPipelines {
 
     @JvmStatic
     fun entity(original: RenderPipeline): RenderPipeline =
-        if (original === RenderPipelines.ENTITY_CUTOUT_NO_CULL && (previewing || LobbyScene.terrainActive())) perFaceEntity else original
+        if (original === RenderPipelines.ENTITY_CUTOUT_NO_CULL && (previewing || LobbyScene.terrainActive())) pick(perFaceEntity, original) else original
 
     @JvmStatic
-    fun lightmap(original: RenderPipeline): RenderPipeline = if (LobbyScene.terrainActive()) lightmap else original
+    fun lightmap(original: RenderPipeline): RenderPipeline = if (LobbyScene.terrainActive()) pick(lightmap, original) else original
     *///?}
 
     //? if >= 1.21.8 {
     @JvmStatic
     fun select(layer: ChunkSectionLayer, multiDraw: Boolean, original: RenderPipeline): RenderPipeline {
         if (!LobbyScene.terrainActive()) return original
-        return when (layer) {
+        val lobby = when (layer) {
             ChunkSectionLayer.SOLID -> if (multiDraw) solidMultiDraw else solid
             //? if < 1.21.11
             /*ChunkSectionLayer.CUTOUT_MIPPED -> cutoutMipped*/
@@ -178,19 +200,21 @@ object LobbyPipelines {
             //? if < 26.1
             /*ChunkSectionLayer.TRIPWIRE -> tripwire*/
         }
+        return pick(lobby, original)
     }
     //?} else {
     /*@JvmStatic
     fun select(layer: RenderType, original: RenderPipeline): RenderPipeline {
         if (!LobbyScene.terrainActive()) return original
-        return when (layer) {
+        val lobby = when (layer) {
             RenderType.solid() -> solid
             RenderType.cutoutMipped() -> cutoutMipped
             RenderType.cutout() -> cutout
             RenderType.translucent() -> translucent
             RenderType.tripwire() -> tripwire
-            else -> original
+            else -> return original
         }
+        return pick(lobby, original)
     }
     *///?}
 }
@@ -203,10 +227,27 @@ import net.minecraft.client.renderer.CoreShaders
 import net.minecraft.client.renderer.ShaderDefines
 import net.minecraft.client.renderer.ShaderProgram
 import net.minecraft.resources.Identifier
+import java.util.concurrent.ConcurrentHashMap
 
 object LobbyPipelines {
     @Volatile
     var previewing = false
+
+    private val failed = ConcurrentHashMap.newKeySet<ShaderProgram>()
+
+    @JvmStatic
+    fun ownsProgram(program: ShaderProgram): Boolean = program.configId().namespace == "polyplus"
+
+    private fun usable(program: ShaderProgram): Boolean {
+        if (program in failed) return false
+        if (!RenderSystem.isOnRenderThread()) return true
+        val result = runCatching { Minecraft.getInstance().shaderManager.getProgram(program) != null }
+        if (result.getOrDefault(false)) return true
+        if (failed.add(program)) LOBBY_LOGGER.warn("Lobby shader {} failed to compile, falling back to vanilla rendering for it", program.configId(), result.exceptionOrNull())
+        return false
+    }
+
+    private fun pick(lobby: ShaderProgram, original: ShaderProgram?): ShaderProgram? = if (usable(lobby)) lobby else original
 
     private fun program(name: String, format: VertexFormat) =
         ShaderProgram(Identifier.fromNamespaceAndPath("polyplus", "core/$name"), format, ShaderDefines.EMPTY)
@@ -220,7 +261,7 @@ object LobbyPipelines {
     private val entity = program("lobby_entity", DefaultVertexFormat.NEW_ENTITY)
     private val hologram = program("lobby_hologram", DefaultVertexFormat.NEW_ENTITY)
 
-    fun compiled(): Boolean = Minecraft.getInstance().shaderManager.getProgram(solid) != null
+    fun compiled(): Boolean = listOf(solid, cutoutMipped, cutout, translucent, tripwire).all(::usable)
 
     @JvmStatic
     fun hologramState() {
@@ -233,27 +274,31 @@ object LobbyPipelines {
 
     @JvmStatic
     fun shader(original: ShaderProgram?): ShaderProgram? {
-        if (LobbyHologram.drawing && original?.vertexFormat() === DefaultVertexFormat.NEW_ENTITY) return hologram
+        if (LobbyHologram.drawing && original?.vertexFormat() === DefaultVertexFormat.NEW_ENTITY) return pick(hologram, original)
         val lobby = LobbyScene.terrainActive()
-        if (original === CoreShaders.RENDERTYPE_ENTITY_CUTOUT_NO_CULL && (lobby || previewing)) return entity
+        if (original === CoreShaders.RENDERTYPE_ENTITY_CUTOUT_NO_CULL && (lobby || previewing)) return pick(entity, original)
         if (!lobby) return original
-        return when {
+        val swapped = when {
             original === CoreShaders.RENDERTYPE_SOLID -> solid
             original === CoreShaders.RENDERTYPE_CUTOUT_MIPPED -> cutoutMipped
             original === CoreShaders.RENDERTYPE_CUTOUT -> cutout
             original === CoreShaders.RENDERTYPE_TRANSLUCENT -> translucent
             original === CoreShaders.RENDERTYPE_TRIPWIRE -> tripwire
             original === CoreShaders.LIGHTMAP -> lightmap
-            else -> original
+            else -> return original
         }
+        return pick(swapped, original)
     }
 }
 *///?} else {
 /*import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
+import com.mojang.blaze3d.platform.GlStateManager
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback
 import net.minecraft.client.renderer.ShaderInstance
 import net.minecraft.resources.Identifier
+import org.lwjgl.opengl.GL20
 
 object LobbyPipelines {
     @Volatile
@@ -267,19 +312,44 @@ object LobbyPipelines {
     private var entity: ShaderInstance? = null
     private var hologram: ShaderInstance? = null
 
-    fun compiled(): Boolean = solid != null
+    private val failed = mutableSetOf<String>()
+
+    fun compiled(): Boolean = solid != null && cutoutMipped != null && cutout != null && translucent != null && tripwire != null
 
     fun register() {
         CoreShaderRegistrationCallback.EVENT.register { context ->
-            val id = { name: String -> Identifier.fromNamespaceAndPath("polyplus", name) }
-            context.register(id("lobby_solid"), DefaultVertexFormat.BLOCK) { solid = it }
-            context.register(id("lobby_cutout_mipped"), DefaultVertexFormat.BLOCK) { cutoutMipped = it }
-            context.register(id("lobby_cutout"), DefaultVertexFormat.BLOCK) { cutout = it }
-            context.register(id("lobby_translucent"), DefaultVertexFormat.BLOCK) { translucent = it }
-            context.register(id("lobby_tripwire"), DefaultVertexFormat.BLOCK) { tripwire = it }
-            context.register(id("lobby_entity"), DefaultVertexFormat.NEW_ENTITY) { entity = it }
-            context.register(id("lobby_hologram"), DefaultVertexFormat.NEW_ENTITY) { hologram = it }
+            solid = null
+            cutoutMipped = null
+            cutout = null
+            translucent = null
+            tripwire = null
+            entity = null
+            hologram = null
+            val load = { name: String, format: VertexFormat, assign: (ShaderInstance) -> Unit ->
+                if (name !in failed) {
+                    runCatching {
+                        context.register(Identifier.fromNamespaceAndPath("polyplus", name), format) { if (linked(name, it)) assign(it) }
+                    }.onFailure { fail(name, it) }
+                }
+            }
+            load("lobby_solid", DefaultVertexFormat.BLOCK) { solid = it }
+            load("lobby_cutout_mipped", DefaultVertexFormat.BLOCK) { cutoutMipped = it }
+            load("lobby_cutout", DefaultVertexFormat.BLOCK) { cutout = it }
+            load("lobby_translucent", DefaultVertexFormat.BLOCK) { translucent = it }
+            load("lobby_tripwire", DefaultVertexFormat.BLOCK) { tripwire = it }
+            load("lobby_entity", DefaultVertexFormat.NEW_ENTITY) { entity = it }
+            load("lobby_hologram", DefaultVertexFormat.NEW_ENTITY) { hologram = it }
         }
+    }
+
+    private fun linked(name: String, shader: ShaderInstance): Boolean {
+        if (GlStateManager.glGetProgrami(shader.id, GL20.GL_LINK_STATUS) != 0) return true
+        fail(name, null)
+        return false
+    }
+
+    private fun fail(name: String, error: Throwable?) {
+        if (failed.add(name)) LOBBY_LOGGER.warn("Lobby shader {} failed to load, falling back to vanilla rendering for it", name, error)
     }
 
     private fun scene(shader: ShaderInstance?, original: ShaderInstance?) = if (LobbyScene.terrainActive()) shader ?: original else original

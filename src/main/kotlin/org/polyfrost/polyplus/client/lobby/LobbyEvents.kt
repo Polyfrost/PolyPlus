@@ -1,13 +1,11 @@
 package org.polyfrost.polyplus.client.lobby
 
 import net.minecraft.client.multiplayer.ClientLevel
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.api.lobby.LobbyListener
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 object LobbyEvents {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val listeners = CopyOnWriteArrayList<LobbyListener>()
     private val reported: MutableSet<Any> = ConcurrentHashMap.newKeySet()
 
@@ -36,6 +34,6 @@ object LobbyEvents {
     }
 
     private inline fun guard(owner: Any, action: () -> Unit) {
-        runCatching(action).onFailure { if (reported.add(owner)) LOGGER.warn("Lobby listener {} failed", owner, it) }
+        runCatching(action).onFailure { if (reported.add(owner)) LOBBY_LOGGER.warn("Lobby listener {} failed", owner, it) }
     }
 }

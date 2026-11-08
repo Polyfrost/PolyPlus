@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.lobby
 
 import net.minecraft.util.Mth
+import org.polyfrost.polyplus.client.utils.Easing
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
@@ -141,8 +142,8 @@ class LobbyGaze(private val seed: Int) {
         if (waveAt < 0.0) return 0f
         val since = time - waveAt
         if (since < 0.0 || since > waveLength + GREET_OUT) return 0f
-        val rise = smooth((since / GREET_IN).toFloat())
-        val fall = 1f - smooth(((since - waveLength + GREET_HOLD_END) / (GREET_OUT + GREET_HOLD_END)).toFloat())
+        val rise = Easing.smoothstep((since / GREET_IN).toFloat())
+        val fall = 1f - Easing.smoothstep(((since - waveLength + GREET_HOLD_END) / (GREET_OUT + GREET_HOLD_END)).toFloat())
         return min(rise, fall)
     }
 
@@ -217,10 +218,5 @@ class LobbyGaze(private val seed: Int) {
         private const val GREET_HOLD_END = 0.35
         private const val GREET_OUT = 0.15
         private const val GREET_TWIST = 5f
-
-        fun smooth(x: Float): Float {
-            val t = x.coerceIn(0f, 1f)
-            return t * t * (3f - 2f * t)
-        }
     }
 }

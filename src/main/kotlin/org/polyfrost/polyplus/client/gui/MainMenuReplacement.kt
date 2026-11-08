@@ -2,7 +2,6 @@ package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.MainMenuChoice
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -12,12 +11,11 @@ import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object MainMenuReplacement {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
-
     private var playing = false
     private var lobbyFailed = false
 
@@ -57,11 +55,6 @@ object MainMenuReplacement {
         switchTo(MainMenuChoice.VANILLA)
     }
 
-    fun offerPolyPlusMenu() {
-        dismissVanillaOffer()
-        switchTo(MainMenuChoice.POLYPLUS)
-    }
-
     @JvmStatic
     fun switchToLobby() = switchTo(MainMenuChoice.LOBBY)
 
@@ -79,7 +72,7 @@ object MainMenuReplacement {
     }
 
     fun fallBackToVanilla() {
-        LOGGER.warn("The lobby can't run, using the vanilla title screen until the next launch")
+        LOBBY_LOGGER.warn("The lobby can't run, using the vanilla title screen until the next launch")
         lobbyFailed = true
         LobbyScene.stop()
         ClientPlatform.setScreen(

@@ -22,6 +22,11 @@ float hash(vec2 point) {
     return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+vec3 safeNormalize(vec3 value) {
+    float size = length(value);
+    return size > 1e-6 ? value / size : vec3(0.0, 0.0, 1.0);
+}
+
 void main() {
     vec4 skin = texture2D(Sampler0, texCoord0);
     if (skin.a < 0.1) {
@@ -39,8 +44,8 @@ void main() {
 
     float line = smoothstep(0.2, 0.8, 0.5 + 0.5 * sin(height * LINES_PER_BLOCK * TAU - time * 1.7));
     float scan = mix(0.6, 1.0, line);
-    float sweep = pow(0.5 + 0.5 * sin(height * 1.9 - time * 0.85 + Seed * TAU), 18.0);
-    float rim = pow(1.0 - abs(dot(normalize(viewNormal), normalize(-viewPosition))), 2.2);
+    float sweep = pow(max(0.5 + 0.5 * sin(height * 1.9 - time * 0.85 + Seed * TAU), 0.0), 18.0);
+    float rim = pow(max(1.0 - abs(dot(safeNormalize(viewNormal), safeNormalize(-viewPosition))), 0.0), 2.2);
     float flutter = 0.95 + 0.05 * sin(time * 9.0 + Seed * TAU) * sin(time * 3.7 + Seed * 11.0);
     float dip = smoothstep(0.985, 1.0, sin(time * 1.3 + Seed * TAU)) * 0.22;
 

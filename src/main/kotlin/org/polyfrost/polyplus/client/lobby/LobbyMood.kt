@@ -40,13 +40,15 @@ data class LobbyMood(
 
         val NEUTRAL = LobbyMood(6000L, 0f, 0f, 0f, DAY_EXPOSURE, false, 0)
 
-        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long, interior: Boolean = false): LobbyMood {
+        fun darkAt(capturedClock: Long): Boolean = nightAmount(Math.floorMod(capturedClock, DAY_TICKS).toFloat()) > LANTERN_NIGHT
+
+        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long, interior: Boolean = false, knownLanterns: Int? = null): LobbyMood {
             val clock = Math.floorMod(capturedClock, DAY_TICKS)
             if (interior) return LobbyMood(clock, 0f, 0f, 0f, DAY_EXPOSURE * fill(level, aim), false, 0, true)
             val night = nightAmount(clock.toFloat())
             val biome = level.getBiome(aim).value()
             val cold = 1f - Mth.clamp(biome.baseTemperature / COLD_MAX, 0f, 1f)
-            val lanterns = if (night > LANTERN_NIGHT) (MAX_LANTERNS - litCells(level, aim) / LIT_SEEN).coerceIn(0, MAX_LANTERNS) else 0
+            val lanterns = if (night > LANTERN_NIGHT) knownLanterns ?: (MAX_LANTERNS - litCells(level, aim) / LIT_SEEN).coerceIn(0, MAX_LANTERNS) else 0
             return LobbyMood(
                 clock,
                 night,

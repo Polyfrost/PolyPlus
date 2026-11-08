@@ -2,14 +2,12 @@ package org.polyfrost.polyplus.client.lobby
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.Minecraft
-import org.apache.logging.log4j.LogManager
 import net.minecraft.client.render.GameRenderer
 import net.minecraft.client.render.platform.GlStateManager
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
 
 object LobbyLegacyRender {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private var program = 0
     var failed = false
         private set
@@ -30,7 +28,7 @@ object LobbyLegacyRender {
         if (failed) return
         if (program == 0) program = runCatching { build("lobby_terrain") }.onFailure {
             failed = true
-            LOGGER.warn("Terrain shader unavailable: {}", it.message)
+            LOBBY_LOGGER.warn("Terrain shader unavailable: {}", it.message)
         }.getOrDefault(0)
         if (program == 0) return
         GL20.glUseProgram(program)
@@ -52,7 +50,7 @@ object LobbyLegacyRender {
         if (hologramFailed) return false
         if (hologram == 0) hologram = runCatching { build("lobby_hologram") }.onFailure {
             hologramFailed = true
-            LOGGER.warn("Hologram shader unavailable: {}", it.message)
+            LOBBY_LOGGER.warn("Hologram shader unavailable: {}", it.message)
         }.getOrDefault(0)
         if (hologram == 0) return false
         GL20.glUseProgram(hologram)

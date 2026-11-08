@@ -55,8 +55,6 @@ import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridges
 import org.polyfrost.polyplus.mixin.client.access.PostChainAccessor
 //? if >= 1.21.8 || = 1.21.4
 import org.polyfrost.polyplus.mixin.client.access.PostPassAccessor
-//? if < 1.21.4
-/*import org.apache.logging.log4j.LogManager*/
 import kotlin.math.tan
 
 object LobbySky {
@@ -254,8 +252,7 @@ object LobbySky {
     //?}
 
     //? if < 1.21.4 {
-    /*private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
-    private var chain: PostChain? = null
+    /*private var chain: PostChain? = null
     private var chainFailed = false
 
     @JvmStatic
@@ -270,7 +267,7 @@ object LobbySky {
         return runCatching { PostChain(mc.textureManager, mc.resourceManager, LobbyCompat.mainTarget(renderer), Identifier.fromNamespaceAndPath("polyplus", "shaders/post/lobby_chain.json")) }
             .onFailure {
                 chainFailed = true
-                LOGGER.warn("Lobby post effects disabled, the shader chain failed to load", it)
+                LOBBY_LOGGER.warn("Lobby post effects disabled, the shader chain failed to load", it)
             }
             .getOrNull()
     }

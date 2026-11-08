@@ -28,9 +28,9 @@ import net.minecraft.world.entity.player.PlayerSkin
 /*import org.polyfrost.oneconfig.internal.legacy.PlayerSkin
 *///?}
 import net.minecraft.world.phys.Vec3
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.utils.Easing
 //? if > 1.8.9 {
 import com.mojang.blaze3d.vertex.PoseStack
 import org.joml.Quaternionf
@@ -129,8 +129,6 @@ object LobbyHerobrine {
     private const val FORCED_MAX_SCREEN_Y = 0.9
     private const val FORCED_CLEAR = 2.5
     private const val FORCED_STEP = 1.0
-
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
 
     private val LEAN_RADIANS = Math.toRadians(LEAN_DEGREES)
     private val HEAD_TILT_RADIANS = Math.toRadians(HEAD_TILT_DEGREES)
@@ -285,10 +283,7 @@ object LobbyHerobrine {
 
     private fun since(start: Long): Double = (System.nanoTime() - start) / NANOS
 
-    private fun ease(progress: Double): Float {
-        val t = progress.coerceIn(0.0, 1.0)
-        return (t * t * (3.0 - 2.0 * t)).toFloat()
-    }
+    private fun ease(progress: Double): Float = Easing.smoothstep(progress).toFloat()
 
     fun onSceneShown(level: ClientLevel, stage: LobbyStage) {
         try {
@@ -351,14 +346,14 @@ object LobbyHerobrine {
     private fun held(): Boolean = heldOff && !forced
 
     private fun note(message: String) {
-        if (forced) LOGGER.info("Herobrine: {}", message)
+        if (forced) LOBBY_LOGGER.info("Herobrine: {}", message)
     }
 
     private fun failed(step: String, error: Throwable) {
         state = State.GONE
         if (warned) return
         warned = true
-        LOGGER.warn("Herobrine could not {}", step, error)
+        LOBBY_LOGGER.warn("Herobrine could not {}", step, error)
     }
 
     private fun describe(spot: Spot): String =

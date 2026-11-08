@@ -65,6 +65,12 @@ object LobbyHologram {
 
     private fun seed(avatar: LobbyAvatar) = avatar.uuid.hashCode() and SEED_MASK
 
+    fun reset() {
+        drawing = false
+        //? if >= 1.21.10
+        figures = emptyList()
+    }
+
     //? if >= 1.21.10 {
     private class Figure(val avatar: LobbyAvatar, val state: EntityRenderState)
 

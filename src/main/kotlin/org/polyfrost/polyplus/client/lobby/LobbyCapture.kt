@@ -39,7 +39,6 @@ import net.minecraft.world.level.chunk.status.ChunkStatus
 import net.minecraft.world.level.levelgen.Heightmap
 //? if > 1.8.9
 import net.minecraft.world.level.storage.LevelResource
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
@@ -87,7 +86,11 @@ object LobbyCapture {
     ) {
         @Volatile
         var handOver = false
+
+        var left: ClientLevel? = null
     }
+
+    private class Leaving(val level: ClientLevel, val survey: Surveying?, val copy: Copying?)
 
     private class Return(val world: String, val fallback: LobbySceneEntry?) {
         var entry: LobbySceneEntry? = null
@@ -153,7 +156,6 @@ object LobbyCapture {
         val profile: LobbySceneScore.Profile,
     )
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val worker = Executors.newSingleThreadExecutor { task ->
         Thread(task, "PolyPlus Lobby Capture").apply {
             isDaemon = true
@@ -184,6 +186,7 @@ object LobbyCapture {
 
     private var surveying: Surveying? = null
     private var copying: Copying? = null
+    private var leaving: Leaving? = null
     private var trackedLevel: ClientLevel? = null
     private var wait = FIRST_DELAY_TICKS
     private var lastSpot: BlockPos? = null
@@ -337,7 +340,7 @@ object LobbyCapture {
         val (entry, root) = handover ?: return null
         if (entry.id != id) return null
         handover = null
-        LOGGER.debug("Scene {} read from memory", id)
+        LOBBY_LOGGER.debug("Scene {} read from memory", id)
         return root
     }
 
@@ -365,7 +368,7 @@ object LobbyCapture {
 
     private fun settle() {
         val back = returning ?: return
-        if (!back.pending || busy || copying != null || surveying != null) return
+        if (!back.pending || busy || copying != null || surveying != null || leaving != null) return
         back.pending = false
         if (back.entry == null) back.entry = back.fallback
     }
@@ -383,30 +386,24 @@ object LobbyCapture {
             return
         }
         returning = Return(source.world, recent?.takeIf { it.world == source.world })
-        inFlight?.handOver = true
+        inFlight?.let {
+            it.handOver = true
+            it.left = level
+        }
         if (copying == null && surveying == null && !busy) {
             begin(mc, level, player.blockPosition(), player.onGround(), player.isVehicle || player.isPassenger)
         }
-        surveying?.let { job ->
-            job.source.handOver = true
-            val start = Util.getNanos()
-            val cursor = BlockPos.MutableBlockPos()
-            guarded {
-                while (job.cursor < job.cells) sample(level, job, job.cursor++, cursor)
-                var verdict = job.judge()
-                val room = indoorRetry(level, job, verdict)
-                if (room != null) {
-                    while (room.cursor < room.cells) sample(level, room, room.cursor++, cursor)
-                    verdict = room.judge()
-                }
-                job.timing.add(Util.getNanos() - start)
-                surveying = null
-                finishSurvey(room ?: job, verdict)
-            }
-        }
-        copying?.let { job ->
-            job.source.handOver = true
-            guarded { while (copying === job) stepCopy(level, job) }
+        val survey = surveying
+        val copy = copying
+        val owner = copy?.source ?: survey?.source
+        if (owner != null) {
+            surveying = null
+            copying = null
+            owner.handOver = true
+            owner.left = level
+            busy = true
+            inFlight = owner
+            leaving = Leaving(level, survey, copy)
         }
         settle()
     }
@@ -417,14 +414,70 @@ object LobbyCapture {
             val task = landed.poll() ?: break
             guarded { task.run() }
         }
+        leaving?.let {
+            if (Minecraft.getInstance().level !== it.level) {
+                leaving = null
+                finishDetached(it)
+            }
+        }
+        if (!busy) inFlight = null
         settle()
+    }
+
+    private fun finishDetached(left: Leaving) {
+        val source = left.copy?.source ?: left.survey?.source ?: return
+        worker.execute {
+            try {
+                left.copy?.let {
+                    copyAll(left.level, it)
+                    encoder(left.level, it).run()
+                }
+                left.survey?.let { landed.add(surveyAll(left.level, it)) }
+            } catch (error: Throwable) {
+                LOBBY_LOGGER.warn("Capture after leaving failed", error)
+                landed.add(
+                    Runnable {
+                        busy = false
+                        fail(source)
+                    },
+                )
+            }
+        }
+    }
+
+    private fun surveyAll(level: ClientLevel, job: Surveying): Runnable {
+        val start = Util.getNanos()
+        val cursor = BlockPos.MutableBlockPos()
+        while (job.cursor < job.cells) sample(level, job, job.cursor++, cursor)
+        var verdict = job.judge()
+        val room = indoorRetry(level, job, verdict)
+        if (room != null) {
+            while (room.cursor < room.cells) sample(level, room, room.cursor++, cursor)
+            verdict = room.judge()
+        }
+        job.timing.add(Util.getNanos() - start)
+        val done = room ?: job
+        return Runnable { finishSurvey(done, verdict) }
+    }
+
+    private fun copyAll(level: ClientLevel, job: Copying) {
+        val start = Util.getNanos()
+        while (true) {
+            val chunk = job.chunk
+            if (chunk == null) {
+                if (!nextChunk(level, job) && !nextProp(level, job)) break
+                continue
+            }
+            copyStep(level, chunk, job)
+        }
+        job.timing.add(Util.getNanos() - start)
     }
 
     private inline fun guarded(block: () -> Unit) {
         try {
             block()
         } catch (error: Throwable) {
-            LOGGER.warn("Capture step failed", error)
+            LOBBY_LOGGER.warn("Capture step failed", error)
             progressAction()?.let { spot = LobbySpotState.Blocked(it, FAILED) }
             surveying = null
             copying = null
@@ -601,7 +654,7 @@ object LobbyCapture {
             val verdict = try {
                 job.judge()
             } catch (error: Throwable) {
-                LOGGER.warn("Capture survey failed", error)
+                LOBBY_LOGGER.warn("Capture survey failed", error)
                 landed.add(
                     Runnable {
                         busy = false
@@ -787,17 +840,24 @@ object LobbyCapture {
     private fun finishSurvey(job: Surveying, verdict: LobbySceneScore.Verdict) {
         busy = false
         val mc = Minecraft.getInstance()
-        val level = mc.level
+        val left = job.source.left
+        val level = left ?: mc.level
         val anchor = verdict.anchor
         val rejection = verdict.rejection
         val action = job.source.action
-        if (level == null || level !== trackedLevel) {
+        if (level == null || (left == null && level !== trackedLevel)) {
             if (action != null) spot = LobbySpotState.Idle
             return
         }
         indoorRetry(level, job, verdict)?.let {
             report(job.source, job.origin, "outdoor ${rejection?.name}, trying indoors")
-            surveying = it
+            if (left != null) {
+                busy = true
+                inFlight = job.source
+                leaving = Leaving(left, it, null)
+            } else {
+                surveying = it
+            }
             if (action != null) spot = LobbySpotState.Surveying(action, 0f)
             return
         }
@@ -837,7 +897,13 @@ object LobbyCapture {
         for (x in center.x - radius..center.x + radius) {
             for (z in center.z - radius..center.z + radius) copy.pending += ChunkPos(x, z)
         }
-        copying = copy
+        if (left != null) {
+            busy = true
+            inFlight = copy.source
+            leaving = Leaving(left, null, copy)
+        } else {
+            copying = copy
+        }
     }
 
     private fun stepCopy(level: ClientLevel, job: Copying) {
@@ -946,6 +1012,13 @@ object LobbyCapture {
     }
 
     private fun finishCopy(level: ClientLevel, job: Copying) {
+        val encode = encoder(level, job)
+        busy = true
+        inFlight = job.source
+        worker.execute(encode)
+    }
+
+    private fun encoder(level: ClientLevel, job: Copying): Runnable {
         val anchor = job.anchor
         val clock = LobbyCompat.clockTime(level)
         //? if >= 1.21.11 {
@@ -959,9 +1032,7 @@ object LobbyCapture {
         val factory = LobbyCompat.containers(level)
         val minY = level.minY
         val height = level.height
-        busy = true
-        inFlight = job.source
-        worker.execute {
+        return Runnable {
             try {
                 val solveStart = Util.getNanos()
                 val stage = LobbyStage.build(LobbyCopyView(job.chunks, minY, height), anchor, job.verdict.profile.interior)
@@ -977,7 +1048,7 @@ object LobbyCapture {
                             }
                         },
                     )
-                    return@execute
+                    return@Runnable
                 }
                 val encodeStart = Util.getNanos()
                 val packs = LobbyPacks.record(job.source.stack)
@@ -1006,7 +1077,7 @@ object LobbyCapture {
                 val encodeMillis = (encoded - encodeStart) / 1_000_000L
                 landed.add(Runnable { store(job, outcome, data, encodeMillis, compressMillis) })
             } catch (error: Throwable) {
-                LOGGER.warn("Capture copy failed", error)
+                LOBBY_LOGGER.warn("Capture copy failed", error)
                 landed.add(
                     Runnable {
                         busy = false
@@ -1090,6 +1161,6 @@ object LobbyCapture {
     private fun allowed(source: Source): Boolean = source.connection == null || source.connection !== packed.get()
 
     private fun report(source: Source, pos: BlockPos, result: String) {
-        LOGGER.debug("Capture {} at {}: {}", source.label, pos.toShortString(), result)
+        LOBBY_LOGGER.debug("Capture {} at {}: {}", source.label, pos.toShortString(), result)
     }
 }

@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.client.lobby
 
 import net.minecraft.client.Minecraft
-import org.apache.logging.log4j.LogManager
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
@@ -19,8 +18,6 @@ import net.minecraft.util.Util
 *///?}
 
 object StartupSounds {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
-
     @Volatile
     private var waiting = false
 
@@ -30,7 +27,7 @@ object StartupSounds {
     fun prepare() {
         if (!StartupOverlay.enabled()) return
         runCatching { Files.createDirectories(Paths.get("oneconfig", "sounds", "assets", "oneconfig", "sounds")) }
-            .onFailure { LOGGER.warn("Could not prepare the OneConfig sound pack folder", it) }
+            .onFailure { LOBBY_LOGGER.warn("Could not prepare the OneConfig sound pack folder", it) }
     }
 
     fun gameLoaded() {
@@ -56,7 +53,7 @@ object StartupSounds {
             .supplyAsync({ listener.`polyplus$prepare`(manager, InactiveProfiler.INSTANCE) }, Util.ioPool())
             .thenAcceptAsync({ listener.`polyplus$apply`(it, manager, InactiveProfiler.INSTANCE) }, LobbyCompat.mainExecutor(mc))
             .exceptionally {
-                LOGGER.warn("Could not reload sounds after downloading them", it)
+                LOBBY_LOGGER.warn("Could not reload sounds after downloading them", it)
                 null
             }
     }
@@ -68,7 +65,7 @@ object StartupSounds {
 
     private fun reloadSounds(mc: Minecraft) {
         runCatching { mc.soundManager.reload(mc.resourceManager) }
-            .onFailure { LOGGER.warn("Could not reload sounds after downloading them", it) }
+            .onFailure { LOBBY_LOGGER.warn("Could not reload sounds after downloading them", it) }
     }
     *///?}
 }

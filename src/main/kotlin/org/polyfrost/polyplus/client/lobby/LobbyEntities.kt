@@ -18,7 +18,6 @@ import net.minecraft.world.entity.decoration.HangingEntity
 import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.entity.vehicle.VehicleEntity
 import net.minecraft.world.phys.Vec3
-import org.apache.logging.log4j.LogManager
 //? if >= 1.21.4
 import net.minecraft.world.entity.EntitySpawnReason
 //? if >= 1.21.8 {
@@ -53,7 +52,6 @@ object LobbyEntities {
     )
 
     private val STAND_IN_OWNER = intArrayOf(0, 0, 0, 1)
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val reported = HashSet<String>()
     private const val FIRST_PROP_ID = 0x50524F50
     private var nextPropId = FIRST_PROP_ID
@@ -154,7 +152,7 @@ object LobbyEntities {
 
     private fun report(entity: Entity, phase: String, error: Throwable) {
         val key = "$phase ${EntityType.getKey(entity.type)}"
-        if (reported.add(key)) LOGGER.warn("Lobby entity {} failed during {}", EntityType.getKey(entity.type), phase, error)
+        if (reported.add(key)) LOBBY_LOGGER.warn("Lobby entity {} failed during {}", EntityType.getKey(entity.type), phase, error)
     }
 
     private fun kept(entity: Entity, privacy: LobbyPrivacy): Boolean {

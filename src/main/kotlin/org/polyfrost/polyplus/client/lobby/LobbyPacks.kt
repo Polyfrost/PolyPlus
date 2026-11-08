@@ -18,7 +18,6 @@ import net.minecraft.server.packs.repository.PackSource
 //?} else {
 /*import net.minecraft.client.resource.pack.ResourcePacks
 *///?}
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.party.PartyScene
 import java.io.File
@@ -42,7 +41,6 @@ object LobbyPacks {
 
     private class Print(val size: Long, val hash: String, val format: Int)
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private const val FILE_PREFIX = "file/"
     private const val ZIP_SUFFIX = ".zip"
     private const val META_FILE = "pack.mcmeta"
@@ -130,7 +128,7 @@ object LobbyPacks {
         val key = "${file.path}|${file.length()}|${file.lastModified()}"
         prints[key]?.let { return it }
         return runCatching { read(file) }
-            .onFailure { LOGGER.warn("Could not read resource pack {}", file.name, it) }
+            .onFailure { LOBBY_LOGGER.warn("Could not read resource pack {}", file.name, it) }
             .getOrNull()
             ?.also { prints[key] = it }
     }

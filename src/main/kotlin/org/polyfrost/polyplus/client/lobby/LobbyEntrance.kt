@@ -18,7 +18,6 @@ import net.minecraft.world.phys.AABB
 /*import net.minecraft.util.math.Box as AABB
 *///?}
 import net.minecraft.world.phys.Vec3
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimationParser
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
@@ -224,7 +223,6 @@ object LobbyEntrance {
 
     const val RUN_SPEED = 0.27
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val ANIMATIONS by lazy {
         LobbyEntrance::class.java.getResourceAsStream("/assets/polyplus/lobby/entrance.animation.json")?.use(BedrockAnimationParser::parseStream)?.animations.orEmpty()
     }
@@ -283,7 +281,7 @@ object LobbyEntrance {
                 avatar.begin(RunIn(fromTick + (FIRST_STOP_TICK + index * STAGGER_TICKS - ticks).coerceAtLeast(FIRST_TICK), level, route))
             }
         }
-        LOGGER.debug("Entrance: {} run in, {} drop in", avatars.size - dropped, dropped)
+        LOBBY_LOGGER.debug("Entrance: {} run in, {} drop in", avatars.size - dropped, dropped)
     }
 
     fun walk(level: ClientLevel, avatar: LobbyAvatar, slot: LobbySlot, standing: List<LobbyAvatar>, fromTick: Long, viewAt: (Double) -> View) {

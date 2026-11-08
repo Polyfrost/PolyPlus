@@ -153,6 +153,7 @@ class LobbyServerData(name: String, ip: String, type: Type) {
 class LobbyServerList(private val minecraft: Minecraft) {
     private val list = ServerList(minecraft)
     private val rows = ArrayList<LobbyServerData>()
+    private val hiddenRows = ArrayList<LobbyServerData>()
 
     fun load() {
         list.load()
@@ -166,14 +167,19 @@ class LobbyServerList(private val minecraft: Minecraft) {
 
     fun get(index: Int): LobbyServerData = rows[index]
 
-    fun get(address: String): LobbyServerData? = rows.firstOrNull { it.ip == address }
+    fun get(address: String): LobbyServerData? = rows.firstOrNull { it.ip == address } ?: hiddenRows.firstOrNull { it.ip == address }
 
     fun add(data: LobbyServerData, hidden: Boolean) {
+        if (hidden) {
+            hiddenRows += data
+            return
+        }
         rows += data
         list.add(data.entry)
     }
 
     fun remove(data: LobbyServerData) {
+        if (hiddenRows.remove(data)) return
         val index = rows.indexOf(data)
         if (index < 0) return
         rows.removeAt(index)
@@ -185,7 +191,13 @@ class LobbyServerList(private val minecraft: Minecraft) {
         rows[first] = rows[second].also { rows[second] = rows[first] }
     }
 
-    fun unhide(address: String): LobbyServerData? = null
+    fun unhide(address: String): LobbyServerData? {
+        val data = hiddenRows.firstOrNull { it.ip == address } ?: return null
+        hiddenRows.remove(data)
+        rows += data
+        list.add(data.entry)
+        return data
+    }
 }
 
 class LobbyServerPinger {
