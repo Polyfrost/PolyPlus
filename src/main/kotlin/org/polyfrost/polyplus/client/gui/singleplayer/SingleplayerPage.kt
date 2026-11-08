@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.polyplus.client.gui.ContextMenuHost
 import org.polyfrost.polyplus.client.gui.SocialButton
 import org.polyfrost.polyplus.client.gui.SocialTextField
@@ -35,6 +34,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.util.Locale
 
 private val CardGap = 12.dp
 private const val COLUMNS = 3
@@ -60,7 +60,8 @@ internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSe
                 verticalArrangement = Arrangement.spacedBy(CardGap),
             ) {
                 WorldsHeader(state, onBack)
-                LastPlayedWorldStrip(state, onHost)
+                if (state.phase == WorldListPhase.Loading || state.worlds.isNotEmpty()) WorldFilterTabs(state)
+                if (state.filter == WorldFilter.All) LastPlayedWorldStrip(state, onHost)
                 WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
             }
             WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
@@ -84,12 +85,26 @@ private fun WorldsHeader(state: SingleplayerState, onBack: () -> Unit) {
             placeholder = "Search worlds",
             leadingIcon = LobbyIcons.SEARCH,
         )
-        WorldFilter.entries.forEach { entry ->
-            Chip(entry.label, selected = entry == state.filter) { state.filter = entry }
-        }
         SocialButton("Create world", icon = LobbyIcons.PLUS, onClick = state.flows::create)
     }
 }
+
+@Composable
+private fun WorldFilterTabs(state: SingleplayerState) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WorldFilter.entries.forEach { entry ->
+            SocialButton(entry.label, modifier = Modifier.weight(1f), filled = entry == state.filter) { state.filter = entry }
+        }
+    }
+}
+
+private fun noMatchTitle(state: SingleplayerState): String {
+    val mode = if (state.filter == WorldFilter.All) "" else "${state.filter.label.lowercase(Locale.ROOT)} "
+    return if (state.query.isBlank()) "No ${mode}worlds" else "No ${mode}worlds match that search"
+}
+
+private fun noMatchText(state: SingleplayerState): String =
+    if (state.query.isBlank()) "Pick another tab to see more worlds." else "Try a different name."
 
 @Composable
 private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modifier: Modifier) {
@@ -105,7 +120,7 @@ private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modif
             val visible = state.visible()
             when {
                 visible.isNotEmpty() -> WorldGrid(state, visible, onHost, modifier)
-                state.narrowed -> EmptyState("No worlds match that filter", modifier.panel())
+                state.narrowed -> EmptyState(noMatchTitle(state), modifier.panel(), noMatchText(state))
                 else -> EmptyState("No other worlds", modifier.panel(), "Your last played world is above.")
             }
         }
