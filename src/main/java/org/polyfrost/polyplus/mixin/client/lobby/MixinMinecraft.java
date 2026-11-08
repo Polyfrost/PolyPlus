@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.mixin.client.lobby;
 
 //? if > 1.8.9 {
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.main.GameConfig;
@@ -8,6 +9,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import org.polyfrost.polyplus.client.lobby.LobbyCapture;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.client.lobby.StartupOverlay;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,6 +25,15 @@ public class MixinMinecraft {
     @Inject(method = "runTick", at = @At("HEAD"))
     private void polyplus$stepLobbyClock(boolean advanceGameTime, CallbackInfo ci) {
         LobbyScene.onFrameStart();
+    }
+
+    //? if >= 26.2 {
+    @ModifyExpressionValue(method = "runTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;isPausing()Z"))
+    //?} else {
+    /*@ModifyExpressionValue(method = "runTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;isPauseScreen()Z"))
+    *///?}
+    private boolean polyplus$holdPause(boolean original) {
+        return original || PauseRouter.holdsPause();
     }
 
     @Inject(method = "tick", at = @At("RETURN"))
@@ -83,8 +94,10 @@ public class MixinMinecraft {
     }
 }
 //?} else {
-/*import net.minecraft.client.Minecraft;
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.world.ClientWorld;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.lobby.LobbyCapture;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.spongepowered.asm.mixin.Mixin;
@@ -101,6 +114,11 @@ public class MixinMinecraft {
     @Inject(method = "runGame", at = @At("HEAD"))
     private void polyplus$stepLobbyClock(CallbackInfo ci) {
         LobbyScene.onFrameStart();
+    }
+
+    @ModifyExpressionValue(method = "runGame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;shouldPauseGame()Z"))
+    private boolean polyplus$holdPause(boolean original) {
+        return original || PauseRouter.holdsPause();
     }
 
     @Inject(method = "tick", at = @At("RETURN"))

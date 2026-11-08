@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,7 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
@@ -18,7 +20,6 @@ import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
-import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -40,12 +41,11 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //? if >= 1.21.10 {
 import net.minecraft.client.input.MouseButtonEvent
 //?}
-import org.polyfrost.polyplus.client.PolyPlusConfig
 
 class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: PauseScreenStyle) : ComposeScreen(RenderMode.CONTINUOUS) {
     internal val capture = PauseCapture(vanilla)
     internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
-    internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !PolyPlusConfig.reducedMotion
+    internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !Motion.reduced
     internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)
@@ -53,6 +53,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     private var openedAt = 0L
     internal var resumeBounds = Rect.Zero
     private var resumeArmed = false
+    private var resumed = false
 
     private fun overResume(): Boolean = resumeBounds.contains(pointerPosition())
 
@@ -64,6 +65,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
 
     override fun init() {
         super.init()
+        resumed = false
         capture.sync(width, height)
         if (!decided) {
             decided = true
@@ -107,9 +109,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     //? if > 1.8.9 {
     override fun isPauseScreen(): Boolean = vanilla.isPauseScreen
 
-    override fun onClose() {
-        if (ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(null)
-    }
+    override fun onClose() = closeIfCurrent()
     //?} else {
     /*override fun shouldPauseGame(): Boolean = true
     *///?}
@@ -149,7 +149,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     *///?}
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
-        if (key == InputConstants.KEY_ESCAPE && SocialEscape.closePopup()) return true
+        if (key == InputConstants.KEY_ESCAPE && EscapeStack.closeTop()) return true
         if (key == InputConstants.KEY_ESCAPE && moreOpen) {
             moreOpen = false
             return true
@@ -158,8 +158,14 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     }
 
     internal fun resume() {
+        if (resumed) return
+        resumed = true
         val entry = capture.entry(PauseSlot.RESUME)
-        if (entry != null) entry.press() else ClientPlatform.setScreen(null)
+        if (entry != null) entry.press() else closeIfCurrent()
+    }
+
+    internal fun closeIfCurrent() {
+        if (ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(null)
     }
 
     internal fun openClassic() {
@@ -171,9 +177,15 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
 
     internal fun openHost() = SocialOverlay.openHostCurrentWorld(this)
 
-    internal fun openWardrobe() = PauseRouter.openWardrobe(vanilla)
+    internal fun openWardrobe() {
+        PauseRouter.holdPause()
+        PauseRouter.openWardrobe(vanilla)
+    }
 
-    internal fun openSettings() = PolyPlusOneConfigIntegration.openSettings()
+    internal fun openSettings() {
+        PauseRouter.holdPause()
+        PolyPlusOneConfigIntegration.openSettings()
+    }
 
     internal val online: Boolean get() = PrivacyConsent.allowsOnlineServices()
 
@@ -199,6 +211,14 @@ object PauseRouter {
     private var wardrobeReturn: PauseScreen? = null
     private var wardrobePlayer: Any? = null
     private var wardrobeAsShown = false
+    private var holding = false
+
+    internal fun holdPause() {
+        holding = PausePlatform.pausesWorld()
+    }
+
+    @JvmStatic
+    fun holdsPause(): Boolean = holding && OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
 
     internal fun openClassic(screen: Screen) {
         classic = screen
@@ -232,8 +252,12 @@ object PauseRouter {
 
     @JvmStatic
     fun replace(screen: Screen?): Screen? {
-        if (screen == null) return takeWardrobeReturn()
+        if (screen == null) {
+            holding = false
+            return takeWardrobeReturn()
+        }
         if (screen !is PauseScreen) return screen
+        holding = false
         wardrobeReturn = null
         wardrobePlayer = null
         if (screen === classic) {

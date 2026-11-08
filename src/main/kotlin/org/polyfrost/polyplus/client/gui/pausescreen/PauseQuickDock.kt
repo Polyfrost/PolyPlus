@@ -2,6 +2,9 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
@@ -43,15 +46,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableTextWithSound
 import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Head
 import org.polyfrost.polyplus.client.gui.lobbyshell.InviteButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
@@ -88,14 +91,14 @@ private fun guiScale(): Int {
 @Composable
 internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Boolean) {
     val reveal = rememberReveal()
-    val rise = if (PolyPlusConfig.reducedMotion) 0f else (1f - reveal) * RISE_PIXELS
+    val rise = if (Motion.reduced) 0f else (1f - reveal) * RISE_PIXELS
     val place = rememberPlace()
     val state = rememberPauseState()
     val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
     val party by PartyRepository.party.collectAsState()
     val groups by GroupsRepository.groups.collectAsState()
     val invites by PartyRepository.incomingInvites.collectAsState()
-    Box(Modifier.fillMaxSize().clickableTextWithSound(screen::resume))
+    Box(Modifier.fillMaxSize().clickableTextWithSound { if (screen.moreOpen) screen.moreOpen = false else screen.resume() })
     Column(
         Modifier
             .align(Alignment.BottomCenter)
@@ -107,7 +110,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (screen.moreOpen) MorePanel(screen, Modifier.blockPointer())
+        if (screen.moreOpen) MorePanel(screen, Modifier.blockPointer(), routes = true)
         Row(
             Modifier
                 .align(Alignment.CenterHorizontally)
@@ -132,7 +135,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             if (current != null || screen.online) {
                 Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (current != null) {
-                        Head(ClientPlatform.localPlayerUuid(), 30.dp, realSkin = true)
+                        PlayerHead(ClientPlatform.localPlayerUuid(), 30.dp, Modifier, headShape(30.dp))
                         VoiceButtons(current)
                     }
                     if (screen.online) {
@@ -250,7 +253,7 @@ private fun DockTile(
     ) {
         content(hovered)
         if (active) Box(Modifier.align(Alignment.BottomCenter).width(18.dp).height(2.dp).background(OneConfigTheme.accent))
-        if (tooltip != null && hovered) PauseTooltip(tooltip)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }
 

@@ -2,6 +2,8 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,20 +37,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialIconButton
+import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.lobbyshell.Head
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyDarkChrome
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
+import org.polyfrost.polyplus.client.gui.lobbyshell.NavTab
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyActions
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyRoster
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayButton
+import org.polyfrost.polyplus.client.gui.lobbyshell.Wordmark
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModMenu
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -169,7 +172,7 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     if (screen.canHost) MenuRow(asset("log-in-04"), PauseWorldAccess.hostLabel, height = rowHeight, onClick = screen::openHost)
     capture.entry(PauseSlot.ADVANCEMENTS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
     capture.entry(PauseSlot.STATS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
-    rememberPauseModMenu()?.let { (modMenu, logo) ->
+    rememberModMenu()?.let { (modMenu, logo) ->
         MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
     MenuRow(asset("dots-vertical"), "More", height = rowHeight) { screen.moreOpen = !screen.moreOpen }
@@ -194,10 +197,10 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
             if (screen.online) NavTab("Social", active = false, unread = groups.any { it.unread } || invites.isNotEmpty(), onClick = screen::openSocial)
         }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
-            SocialIconButton("settings", tooltip = "Settings", onClick = screen::openSettings)
+            IconButton(themedIcon("settings"), "Settings", Modifier, screen::openSettings)
             Spacer(Modifier.width(2.dp))
             Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)
-            Head(ClientPlatform.localPlayerUuid(), 38.dp, realSkin = true)
+            PlayerHead(ClientPlatform.localPlayerUuid(), 38.dp, Modifier, headShape(38.dp))
         }
     }
 }
@@ -216,7 +219,7 @@ private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
                 PartyRoster(PauseHost, current, maxWidth)
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Head(ClientPlatform.localPlayerUuid(), 30.dp, realSkin = true)
+                    PlayerHead(ClientPlatform.localPlayerUuid(), 30.dp, Modifier, headShape(30.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)
                         Label("You", 11.sp, color = MutedText)

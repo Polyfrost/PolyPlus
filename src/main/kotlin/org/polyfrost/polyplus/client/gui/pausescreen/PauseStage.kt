@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.gui.pausescreen
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.polyplus.client.lobby.LobbyEase
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.Easing
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.atan
@@ -99,6 +100,7 @@ object PauseStage {
     private var returnFov = 0f
     private var savedMode = 0
     private var savedHud = false
+    private var hudForced = false
     private var bodyShown = false
     private var actor: LivingEntity? = null
     private val room = LobbyEase()
@@ -137,7 +139,7 @@ object PauseStage {
     fun staged(): Boolean = phase == Phase.STAGED && bodyShown
 
     val curtain: Float
-        get() = if (!cut || phase != Phase.STAGED) 0f else 1f - smooth(abs(seconds / CURTAIN_SECONDS - 1f))
+        get() = if (!cut || phase != Phase.STAGED) 0f else 1f - Easing.smootherstep(abs(seconds / CURTAIN_SECONDS - 1f))
 
     @JvmStatic
     fun hidesHud(): Boolean = phase == Phase.STAGED && seconds >= HAND_SECONDS
@@ -148,7 +150,7 @@ object PauseStage {
     @JvmStatic
     fun handSink(): Float = when (phase) {
         Phase.IDLE -> 0f
-        Phase.STAGED -> smooth(seconds / HAND_SECONDS)
+        Phase.STAGED -> Easing.smootherstep(seconds / HAND_SECONDS)
         Phase.RETURNING -> 1f - easeOut(returnSeconds / RETURN_SECONDS)
     }
 
@@ -160,7 +162,7 @@ object PauseStage {
     internal val avatarWeight: Float
         get() = when (phase) {
             Phase.IDLE -> 0f
-            Phase.STAGED -> smooth((progress - AVATAR_START) / AVATAR_SHARE)
+            Phase.STAGED -> Easing.smootherstep((progress - AVATAR_START) / AVATAR_SHARE)
             Phase.RETURNING -> 1f - easeOut(returnSeconds / RETURN_SECONDS)
         }
 
@@ -177,11 +179,6 @@ object PauseStage {
     private fun curve(t: Float): Float {
         val left = 1f - t.coerceIn(0f, 1f)
         return 1f - left * left * left * left
-    }
-
-    private fun smooth(t: Float): Float {
-        val x = t.coerceIn(0f, 1f)
-        return x * x * x * (x * (x * 6f - 15f) + 10f)
     }
 
     private fun easeOut(t: Float): Float {
@@ -265,6 +262,11 @@ object PauseStage {
         } else {
             anchor = last
             startFov = fovNow
+            if (!hudForced) savedHud = PausePlatform.hudHidden
+            if (!(bodyShown && PausePlatform.firstPerson(savedMode) && PausePlatform.thirdPerson(PausePlatform.cameraMode))) {
+                savedMode = PausePlatform.cameraMode
+                bodyShown = !PausePlatform.firstPerson(savedMode)
+            }
         }
         motion = PausePlatform.motionScale().coerceIn(0f, 1f)
         cut = motion < REDUCED_MOTION
@@ -283,7 +285,7 @@ object PauseStage {
     private fun release() {
         if (phase != Phase.STAGED) return
         val from = last
-        PausePlatform.hudHidden = savedHud
+        restoreHud()
         if (from == null) {
             finish()
             return
@@ -294,10 +296,20 @@ object PauseStage {
         phase = Phase.RETURNING
     }
 
+    private fun restoreHud() {
+        if (!hudForced) return
+        hudForced = false
+        if (PausePlatform.hudHidden) PausePlatform.hudHidden = savedHud
+    }
+
+    private fun restoreCamera() {
+        if (bodyShown && PausePlatform.firstPerson(savedMode) && PausePlatform.thirdPerson(PausePlatform.cameraMode)) PausePlatform.cameraMode = savedMode
+    }
+
     private fun finish() {
         if (phase == Phase.IDLE) return
-        if (bodyShown && PausePlatform.firstPerson(savedMode)) PausePlatform.cameraMode = savedMode
-        PausePlatform.hudHidden = savedHud
+        restoreCamera()
+        restoreHud()
         phase = Phase.IDLE
         cullMoved = true
         regraph = true
@@ -311,8 +323,11 @@ object PauseStage {
     @JvmStatic
     fun onScreen(screen: Screen?) {
         if (PausePlatform.player() == null) finish()
-        else if (screen == null || screen is DeathScreen) release()
+        else if (screen == null || screen is DeathScreen || unpausedBy(screen)) release()
     }
+
+    private fun unpausedBy(screen: Screen): Boolean =
+        screen !is OneClientPauseScreen && PausePlatform.pausesWorld() && !PausePlatform.gamePaused()
 
     @JvmStatic
     fun frame() {
@@ -331,7 +346,10 @@ object PauseStage {
             Phase.STAGED -> {
                 if (seconds < PULL_SECONDS && seconds + dt >= PULL_SECONDS) regraph = true
                 seconds += dt
-                if (seconds >= HAND_SECONDS) PausePlatform.hudHidden = true
+                if (seconds >= HAND_SECONDS) {
+                    PausePlatform.hudHidden = true
+                    hudForced = true
+                }
                 parallaxX.step(pointerNowX * motion, PARALLAX_RATE, dt.toDouble())
                 parallaxY.step(pointerNowY * motion, PARALLAX_RATE, dt.toDouble())
             }
@@ -373,11 +391,11 @@ object PauseStage {
         lens.step(lensFor(room.value.coerceIn(MIN_ROOM, fullReach), height).toDouble(), LENS_RATE, frameSeconds.toDouble())
 
         val startVec = PauseVec(start.x, start.y, start.z)
-        val fromWeight = 1.0 - smooth((p / FROM_SHARE).toFloat())
+        val fromWeight = 1.0 - Easing.smootherstep((p / FROM_SHARE).toFloat())
         val camera = path.add(startVec.sub(eyes).scale(fromWeight.toDouble()))
 
         fovNow = startFov + (lens.value.toFloat() - startFov) * p.toFloat()
-        val aim = eyes.lerp(chest, smooth((p / AIM_SHARE).toFloat()).toDouble()).sub(camera)
+        val aim = eyes.lerp(chest, Easing.smootherstep((p / AIM_SHARE).toFloat()).toDouble()).sub(camera)
         val aimYaw = Math.toDegrees(atan2(-aim.x, aim.z)).toFloat()
         val aimPitch = (-Math.toDegrees(atan2(aim.y, hypot(aim.x, aim.z)))).toFloat()
         val offset = Math.toDegrees(atan(-SCREEN_X * PausePlatform.aspect() * tan(Math.toRadians(fovNow / 2.0)))).toFloat()
@@ -422,8 +440,8 @@ object PauseStage {
         val camera = PauseVec(from.x, from.y, from.z).lerp(target, weight.toDouble())
         fovNow = returnFov + (liveFov - returnFov) * weight
         if (bodyShown && PausePlatform.firstPerson(savedMode) && camera.sub(target).length() < BODY_RETURN) {
+            restoreCamera()
             bodyShown = false
-            PausePlatform.cameraMode = savedMode
         }
         return Pose(camera.x, camera.y, camera.z, from.yaw + wrap(live.yaw - from.yaw) * weight, from.pitch + (live.pitch - from.pitch) * weight)
     }

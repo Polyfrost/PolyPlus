@@ -1,6 +1,8 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import net.minecraft.client.Minecraft
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 
 //? if > 1.8.9 {
 import net.minecraft.client.CameraType
@@ -149,6 +151,8 @@ internal object PausePlatform {
 
     fun firstPerson(mode: Int): Boolean = mode == FIRST_PERSON
 
+    fun thirdPerson(mode: Int): Boolean = mode == THIRD_PERSON
+
     fun showBody() {
         cameraMode = THIRD_PERSON
     }
@@ -199,6 +203,8 @@ internal object PausePlatform {
     }
 
     fun gamePaused(): Boolean = Minecraft.getInstance().isPaused
+
+    fun pausesWorld(): Boolean = SocialHosting.singleplayer && !SocialHosting.lanOpen && P2PSessionManager.currentSessionId == null
 
     fun skyDarkness(entity: LivingEntity): Int {
         //? if > 1.8.9 {
