@@ -18,7 +18,6 @@ import net.minecraft.util.Util
 //?} else {
 /*import net.minecraft.Util
 *///?}
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.ServerApiProtocol
@@ -79,7 +78,6 @@ object LobbySceneStore {
         val serverPolicies: Map<String, String> = emptyMap(),
     )
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     //? if > 1.8.9 {
     private const val BUNDLED_ROOT = "/assets/polyplus/lobby/scenes/"
     //?} else {
@@ -98,16 +96,18 @@ object LobbySceneStore {
         bundled("snowy_village", "Snowy village", "minecraft:snowy_taiga", 18000L),
         bundled("desert_village", "Desert village", "minecraft:desert", 12254L),
         bundled("cherry_grove", "Cherry grove", "minecraft:cherry_grove", 3358L),
+        bundled("lush_cave", "Lush cave", "minecraft:lush_caves", 6000L, "cave"),
     )
     //?} else {
     /*private val BUNDLED = listOf(
         bundled("snowy_hills", "Snowy hills", "Extreme Hills", 18000L),
         bundled("desert_dunes", "Desert dunes", "Desert", 12254L),
         bundled("village_green", "Village green", "Plains", 3358L),
+        bundled("lava_mineshaft_cave", "Lava mineshaft cave", "Taiga", 6000L, "cave"),
     )
     *///?}
 
-    private fun bundled(name: String, label: String, biome: String, clock: Long) = LobbySceneEntry(
+    private fun bundled(name: String, label: String, biome: String, clock: Long, profile: String = "outdoor") = LobbySceneEntry(
         "bundled:$name",
         "$name.nbt.gz",
         "polyfrost",
@@ -121,6 +121,7 @@ object LobbySceneStore {
         0,
         0,
         LobbySceneEntry.ORIGIN_BUNDLED,
+        profile = profile,
     )
 
     private val root: Path by lazy { Minecraft.getInstance().gameDirectory.toPath().resolve("polyplus").resolve("lobby") }
@@ -245,7 +246,7 @@ object LobbySceneStore {
                 atomicWrite(folder.resolve(name), data)
                 stale.forEach(Path::deleteIfExists)
                 atomicWrite(indexFile, index.toByteArray(Charsets.UTF_8))
-            }.onFailure { LOGGER.warn("Could not save a scene", it) }
+            }.onFailure { LOBBY_LOGGER.warn("Could not save a scene", it) }
         }
         return true
     }
@@ -256,7 +257,7 @@ object LobbySceneStore {
         if (entry.bundled) return
         val path = folder.resolve(entry.file)
         update { copy(scenes = scenes - entry, pinned = pinned?.takeUnless { it == entry.id }) }
-        Util.ioPool().execute { runCatching { path.deleteIfExists() }.onFailure { LOGGER.warn("Could not delete a scene", it) } }
+        Util.ioPool().execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
     }
 
     fun worldKey(address: String): String = "server:${key(address)}"
@@ -290,11 +291,11 @@ object LobbySceneStore {
         runCatching {
             state = PolyPlusClient.JSON.decodeFromString(State.serializer(), text ?: error("unreadable"))
         }.onFailure { error ->
-            LOGGER.warn("Could not read the scene index", error)
+            LOBBY_LOGGER.warn("Could not read the scene index", error)
             state = salvage(text)
             runCatching {
                 Files.move(indexFile, indexFile.resolveSibling("scenes.json.bad-${System.currentTimeMillis()}"))
-            }.onFailure { LOGGER.warn("Could not set the scene index aside", it) }
+            }.onFailure { LOBBY_LOGGER.warn("Could not set the scene index aside", it) }
         }
     }
 
@@ -316,7 +317,7 @@ object LobbySceneStore {
             runCatching {
                 Files.createDirectories(root)
                 atomicWrite(indexFile, index.toByteArray(Charsets.UTF_8))
-            }.onFailure { LOGGER.warn("Could not save the scene index", it) }
+            }.onFailure { LOBBY_LOGGER.warn("Could not save the scene index", it) }
         }
     }
 
