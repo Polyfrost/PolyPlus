@@ -10,10 +10,16 @@ class ReplayEntry(
     val durationMillis: Long?,
     val modified: Long,
     val size: Long,
-    val icon: ByteArray?,
+    private val iconSource: () -> ByteArray?,
     val playable: Boolean,
     val warning: String?,
-)
+) {
+    val icon: ByteArray? by lazy { readIcon() }
+
+    fun readIcon(): ByteArray? = runCatching(iconSource).getOrNull()?.takeIf { it.isNotEmpty() }
+
+    fun sameFile(modified: Long, size: Long): Boolean = this.modified == modified && this.size == size
+}
 
 class RecordingState(
     val paused: Boolean,

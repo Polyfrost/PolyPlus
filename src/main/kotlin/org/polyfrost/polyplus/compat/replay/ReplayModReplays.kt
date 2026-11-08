@@ -4,11 +4,13 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.Mods
 import java.io.File
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 import java.util.zip.ZipFile
 
@@ -18,13 +20,12 @@ object ReplayModReplays : ReplayProvider {
     private const val DEFAULT_FOLDER = "replay_recordings"
     private val THUMB_MAGIC = byteArrayOf(0, 1, 1, 2, 3, 5, 8)
     private val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
+    private val cache = ConcurrentHashMap<Path, ReplayEntry>()
 
     override val id = MOD_ID
     override val name = "Replay Mod"
 
-    private val loaded: Boolean by lazy {
-        runCatching { FabricLoader.getInstance().isModLoaded(MOD_ID) }.getOrDefault(false)
-    }
+    private val loaded: Boolean get() = Mods.replayMod
 
     private class Core {
         val modClass: Class<*> = Class.forName("com.replaymod.core.ReplayMod")
@@ -108,27 +109,32 @@ object ReplayModReplays : ReplayProvider {
     override fun list(): List<ReplayEntry> {
         if (!available) return emptyList()
         val dir = folder() ?: return emptyList()
-        val files = runCatching {
-            Files.list(dir).use { stream ->
-                stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(EXTENSION, ignoreCase = true) }.collect(Collectors.toList())
-            }
-        }.getOrNull() ?: return emptyList()
-        return files.mapNotNull { runCatching { read(it) }.getOrNull() }.sortedByDescending { it.modified }
+        if (!Files.isDirectory(dir)) {
+            cache.clear()
+            return emptyList()
+        }
+        val files = Files.list(dir).use { stream ->
+            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(EXTENSION, ignoreCase = true) }.collect(Collectors.toList())
+        }
+        cache.keys.retainAll(files.toSet())
+        return files.mapNotNull { path ->
+            runCatching {
+                val modified = runCatching { Files.getLastModifiedTime(path).toMillis() }.getOrDefault(0L)
+                val size = runCatching { Files.size(path) }.getOrDefault(0L)
+                cache[path]?.takeIf { it.sameFile(modified, size) } ?: read(path, modified, size).also { cache[path] = it }
+            }.getOrNull()
+        }.sortedByDescending { it.modified }
     }
 
-    private fun read(path: Path): ReplayEntry {
+    private fun read(path: Path, modified: Long, size: Long): ReplayEntry {
         val fileName = path.fileName.toString()
         val name = fileName.substring(0, fileName.length - EXTENSION.length)
-        val modified = runCatching { Files.getLastModifiedTime(path).toMillis() }.getOrDefault(0L)
-        val size = runCatching { Files.size(path) }.getOrDefault(0L)
         var meta: JsonObject? = null
-        var icon: ByteArray? = null
         runCatching {
             ZipFile(path.toFile()).use { zip ->
                 meta = zip.getEntry("metaData.json")?.let { entry ->
                     zip.getInputStream(entry).use { JsonParser.parseReader(it.reader()).asJsonObject }
                 }
-                icon = runCatching { thumbnail(zip) }.getOrNull()
             }
         }
         val data = meta
@@ -152,7 +158,7 @@ object ReplayModReplays : ReplayProvider {
             durationMillis = duration,
             modified = modified,
             size = size,
-            icon = icon,
+            iconSource = { ZipFile(path.toFile()).use(::thumbnail) },
             playable = data != null && compatible,
             warning = warning,
         )
@@ -209,7 +215,7 @@ object ReplayModReplays : ReplayProvider {
                 *///?} elif > 1.8.9 {
                 /*net.minecraft.Util.getPlatform().openPath(dir)
                 *///?} else {
-                /*Unit
+                /*java.awt.Desktop.getDesktop().open(dir.toFile())
                 *///?}
             }
         }

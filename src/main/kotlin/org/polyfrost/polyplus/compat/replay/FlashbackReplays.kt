@@ -7,29 +7,40 @@ import net.minecraft.client.gui.screens.Screen
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.lobby.LobbyCompat
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.Mods
+import org.polyfrost.polyplus.compat.Reflect
+import org.polyfrost.polyplus.compat.ReflectiveHook
+import java.io.IOException
 import java.io.InputStreamReader
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipFile
-import kotlin.streams.asSequence
 
 object FlashbackReplays : ReplayProvider {
-    private const val MOD_ID = "flashback"
     private const val MAIN = "com.moulberry.flashback.Flashback"
     private const val SELECT_SCREEN = "com.moulberry.flashback.screen.select_replay.SelectReplayScreen"
     private const val METADATA = "metadata.json"
     private const val ICON = "icon.png"
     private const val MILLIS_PER_TICK = 50L
     private const val NEWER_VERSION_WARNING = "Recorded on a newer game version"
+    private const val MAX_DEPTH = 8
+    private const val MAX_FILES = 5000
 
     private val logger = LogManager.getLogger("PolyPlus/FlashbackReplays")
     private val gson = Gson()
     private val loggedUnreadable = AtomicBoolean()
-    private val loggedFailure = AtomicBoolean()
+    private val failures = ReflectiveHook(logger)
+    private val cache = ConcurrentHashMap<Path, ReplayEntry>()
+
+    private class ReplayFile(val path: Path, val modified: Long, val size: Long)
 
     private class Hooks(
         val recorder: Field,
@@ -71,15 +82,12 @@ object FlashbackReplays : ReplayProvider {
         }.getOrNull()
     }
 
-    private fun privateField(owner: Class<*>, name: String): Field? =
-        runCatching { owner.getDeclaredField(name).apply { isAccessible = true } }.getOrNull()
-
-    private val modLoaded: Boolean by lazy { runCatching { FabricLoader.getInstance().isModLoaded(MOD_ID) }.getOrDefault(false) }
+    private fun privateField(owner: Class<*>, name: String): Field? = runCatching { Reflect.declared(owner, name) }.getOrNull()
 
     override val id = "flashback"
     override val name = "Flashback"
 
-    override val available: Boolean get() = modLoaded && hooks != null
+    override val available: Boolean get() = Mods.flashback && hooks != null
 
     override val inReplay: Boolean get() = call { it.inReplay.invoke(null) as Boolean } ?: false
 
@@ -91,27 +99,54 @@ object FlashbackReplays : ReplayProvider {
     override fun list(): List<ReplayEntry> {
         if (!available) return emptyList()
         val folder = runCatching { replayFolder() }.getOrNull() ?: return emptyList()
-        if (!Files.isDirectory(folder)) return emptyList()
-        val files = runCatching {
-            Files.walk(folder).use { stream ->
-                stream.asSequence()
-                    .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".zip", ignoreCase = true) }
-                    .toList()
-            }
-        }.getOrElse {
-            logUnreadable(folder, it)
+        if (!Files.isDirectory(folder)) {
+            cache.clear()
             return emptyList()
         }
+        val files = replayFiles(folder)
+        cache.keys.retainAll(files.mapTo(HashSet()) { it.path })
         val currentDataVersion = runCatching { LobbyCompat.dataVersion() }.getOrNull()
-        return files.mapNotNull { read(it, currentDataVersion) }.sortedByDescending { it.modified }
+        return files.mapNotNull { file ->
+            cache[file.path]?.takeIf { it.sameFile(file.modified, file.size) }
+                ?: read(file, currentDataVersion)?.also { cache[file.path] = it }
+        }.sortedByDescending { it.modified }
     }
 
-    private fun read(file: Path, currentDataVersion: Int?): ReplayEntry? = runCatching {
+    private fun replayFiles(folder: Path): List<ReplayFile> {
+        val found = ArrayList<ReplayFile>()
+        Files.walkFileTree(folder, emptySet(), MAX_DEPTH, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (attrs.isRegularFile && file.fileName.toString().endsWith(".zip", ignoreCase = true)) {
+                    found += ReplayFile(file, attrs.lastModifiedTime().toMillis(), attrs.size())
+                }
+                return if (found.size >= MAX_FILES) FileVisitResult.TERMINATE else FileVisitResult.CONTINUE
+            }
+
+            override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                if (file == folder) throw exc
+                logUnreadable(file, exc)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                if (exc != null) logUnreadable(dir, exc)
+                return FileVisitResult.CONTINUE
+            }
+        })
+        return found
+    }
+
+    private fun readIcon(file: Path): ByteArray? = ZipFile(file.toFile()).use { zip ->
+        zip.getEntry(ICON)?.let { entry -> zip.getInputStream(entry).use { it.readBytes() } }
+    }
+
+    private fun read(replay: ReplayFile, currentDataVersion: Int?): ReplayEntry? = runCatching {
+        val file = replay.path
         ZipFile(file.toFile()).use { zip ->
             val metaEntry = zip.getEntry(METADATA) ?: return@runCatching null
             val meta = InputStreamReader(zip.getInputStream(metaEntry), Charsets.UTF_8).use { gson.fromJson(it, JsonObject::class.java) }
                 ?: return@runCatching null
-            val icon = zip.getEntry(ICON)?.let { entry -> runCatching { zip.getInputStream(entry).use { it.readBytes() } }.getOrNull() }
+            val hasIcon = zip.getEntry(ICON) != null
             val dataVersion = meta.intOrNull("dataVersion")
             val tooNew = dataVersion != null && currentDataVersion != null && dataVersion > currentDataVersion
             ReplayEntry(
@@ -120,14 +155,14 @@ object FlashbackReplays : ReplayProvider {
                 name = meta.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: file.fileName.toString().removeSuffix(".zip"),
                 world = meta.stringOrNull("worldName")?.takeIf { it.isNotBlank() },
                 durationMillis = meta.intOrNull("totalTicks")?.let { it.toLong() * MILLIS_PER_TICK },
-                modified = Files.getLastModifiedTime(file).toMillis(),
-                size = Files.size(file),
-                icon = icon,
+                modified = replay.modified,
+                size = replay.size,
+                iconSource = { if (hasIcon) readIcon(file) else null },
                 playable = !tooNew,
                 warning = if (tooNew) NEWER_VERSION_WARNING else null,
             )
         }
-    }.onFailure { logUnreadable(file, it) }.getOrNull()
+    }.onFailure { logUnreadable(replay.path, it) }.getOrNull()
 
     private fun JsonObject.stringOrNull(key: String): String? =
         runCatching { get(key)?.takeIf { it.isJsonPrimitive }?.asString }.getOrNull()
@@ -238,7 +273,5 @@ object FlashbackReplays : ReplayProvider {
         return runCatching { action(hooks) }.onFailure { logFailure(it) }.getOrNull()
     }
 
-    private fun logFailure(error: Throwable) {
-        if (loggedFailure.compareAndSet(false, true)) logger.warn("Flashback call failed", error)
-    }
+    private fun logFailure(error: Throwable) = failures.fail("Flashback call failed", error)
 }
