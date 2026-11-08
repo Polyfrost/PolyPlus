@@ -32,6 +32,11 @@ object PartyPresence {
         lastSent = null
     }
 
+    fun reset() {
+        lastSent = null
+        lastSentAt = 0L
+    }
+
     fun tick() {
         val next = MemberState(location(), PartyVoice.memberVoice(), scene = PartyScene.localScene())
         local = next

@@ -173,13 +173,21 @@ object PlayTogether {
     private fun onStarted(packet: ClientboundPacket.PlayTogetherStarted) {
         val party = PartyRepository.party.value ?: return
         if (party.id != packet.partyId || PartyRepository.isSelf(packet.leader)) return
+        if (!PartyRepository.samePlayer(packet.leader, party.leader)) {
+            LOGGER.warn("Ignoring Play together {} from {}, who isn't the party leader", packet.id, packet.leader)
+            return
+        }
+        val destination = safeDestination(packet.destination) ?: run {
+            LOGGER.warn("Ignoring Play together {} with an invalid destination", packet.id)
+            return
+        }
         val startsAt = runCatching { Instant.parse(packet.startsAt).toEpochMilli() }.getOrDefault(System.currentTimeMillis() + COUNTDOWN_MS)
-        val current = Active(packet.id, packet.leader, packet.destination, startsAt, leading = false)
+        val current = Active(packet.id, packet.leader, destination, startsAt, leading = false)
         current.sessionId = packet.sessionId
         current.partyId = party.id
         active?.check?.close()
         active = current
-        val where = packet.destination.name
+        val where = destination.name
         if (alreadyThere(current)) {
             respond(current, PlayResponse.Joined)
             current.stage = Stage.DONE
@@ -204,12 +212,33 @@ object PlayTogether {
             return
         }
         respond(current, PlayResponse.Joining)
-        when (packet.destination.kind) {
-            PlayDestinationKind.Server -> packet.destination.address?.let {
+        when (destination.kind) {
+            PlayDestinationKind.Server -> destination.address?.let {
                 current.check = ServerCheck(it)
                 current.session = SessionRefresh.prepareForJoin()
             }
             else -> checkWorld(current)
+        }
+    }
+
+    private val HOST_PORT = Regex("^(\\[[0-9A-Fa-f:.]{2,45}]|[A-Za-z0-9_](?:[A-Za-z0-9_.-]{0,252}[A-Za-z0-9_])?)(?::(\\d{1,5}))?$")
+
+    fun isSafeServerAddress(address: String?): Boolean {
+        if (address.isNullOrEmpty() || address.length > 260) return false
+        val match = HOST_PORT.matchEntire(address) ?: return false
+        val port = match.groupValues[2]
+        return port.isEmpty() || port.toInt() in 1..65535
+    }
+
+    private fun safeDestination(destination: PlayDestination): PlayDestination? {
+        val name = destination.name.filterNot { it.isISOControl() }.trim().take(MAX_NAME)
+        return when (destination.kind) {
+            PlayDestinationKind.Server -> {
+                val address = destination.address?.trim()
+                if (!isSafeServerAddress(address)) return null
+                destination.copy(address = address, name = name.ifEmpty { address!! })
+            }
+            else -> destination.copy(name = name)
         }
     }
 

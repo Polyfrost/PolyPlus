@@ -17,6 +17,8 @@ import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.IOException
 import java.nio.channels.UnresolvedAddressException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +26,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.serializer
 
 object PolyConnection {
@@ -34,6 +40,12 @@ object PolyConnection {
     private const val NOTIFY_AFTER_OUTAGE_MS = 15_000L
 
     private val HANDSHAKE_STATUS = Regex("expected status code 101 but was (\\d{3})")
+
+    private const val MAX_UNKNOWN_TYPES = 64
+
+    private val closeListeners = CopyOnWriteArrayList<() -> Unit>()
+
+    private val unknownPacketTypes = ConcurrentHashMap.newKeySet<String>()
 
     private var connectionCallback: (() -> Unit)? = null
     private var job: Job? = null
@@ -74,13 +86,28 @@ object PolyConnection {
         start()
     }
 
+    fun onClosed(listener: () -> Unit) {
+        closeListeners.add(listener)
+    }
+
     fun close() {
         closing = true
         disconnectNotified = false
         disconnectedSinceMs = 0L
+        val wasRunning = job != null
         job?.cancel()
         job = null
         session = null
+        drainOutgoing()
+        if (wasRunning) {
+            closeListeners.forEach { listener ->
+                runCatching(listener).onFailure { LOGGER.error("WebSocket close listener failed", it) }
+            }
+        }
+    }
+
+    private fun drainOutgoing() {
+        while (_outgoing.tryReceive().isSuccess) Unit
     }
 
     fun sendMessage(message: String): Result<Unit> {
@@ -156,6 +183,7 @@ object PolyConnection {
                     }
                 } finally {
                     session = null
+                    drainOutgoing()
                 }
 
                 if (handshakeSucceeded) {
@@ -180,6 +208,7 @@ object PolyConnection {
         PolyPlusClient.HTTP.webSocket("${apiUrl}/websocket", request = {
             bearerAuth(token)
         }) {
+            drainOutgoing()
             session = this
             handshakeSucceeded = true
             notifyReconnected()
@@ -266,10 +295,25 @@ object PolyConnection {
             EventManager.INSTANCE.post(WebSocketMessage(packet))
         } catch (e: CancellationException) {
             throw e
+        } catch (e: SerializationException) {
+            val type = packetType(message)
+            if (type != null && e.message?.contains("subclass", ignoreCase = true) == true) {
+                if (unknownPacketTypes.size < MAX_UNKNOWN_TYPES && unknownPacketTypes.add(type)) {
+                    LOGGER.warn("Ignoring unknown WebSocket packet type '{}'", type)
+                } else {
+                    LOGGER.debug("Ignoring unknown WebSocket packet type '{}'", type)
+                }
+                return
+            }
+            LOGGER.error("Failed to process WebSocket message: $message", e)
         } catch (e: Exception) {
             LOGGER.error("Failed to process WebSocket message: $message", e)
         }
     }
+
+    private fun packetType(message: String): String? = runCatching {
+        PolyPlusClient.JSON.parseToJsonElement(message).jsonObject["type"]?.jsonPrimitive?.contentOrNull
+    }.getOrNull()?.filterNot { it.isISOControl() }?.take(64)
 
     private inline fun <reified T : ServerboundPacket> T.string(): String {
         return PolyPlusClient.JSON.encodeToString(ServerboundPacket.serializer(), this)

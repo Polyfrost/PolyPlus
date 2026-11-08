@@ -300,7 +300,7 @@ object LeaderFollow {
             lastKey = key
             dismiss()
             val address = location?.display
-            if (key != null && address != null && key != PartyPresence.local.location.key && leader != null) {
+            if (key != null && PlayTogether.isSafeServerAddress(address) && address != null && key != PartyPresence.local.location.key && leader != null) {
                 val name = PlayerNamesRepository.nameOr(leader.player)
                 card = Card(leader.player, name, address, key, System.currentTimeMillis())
                 if (PartyPresence.local.location.kind != LocationKind.Menu) {

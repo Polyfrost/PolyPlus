@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.party
 
 import androidx.compose.runtime.Composable
@@ -28,7 +30,8 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.oneconfig.api.hud.v1.Font
 import org.polyfrost.oneconfig.api.hud.v1.Hud
 import org.polyfrost.oneconfig.api.hud.v1.HudManager
-import org.polyfrost.polyplus.client.gui.MenuHeadCache
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHeads
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
 import org.polyfrost.polyplus.client.network.http.responses.LocationKind
@@ -341,7 +344,7 @@ private fun liveRows(): List<VoiceRow> {
     return listOf(own) + members
 }
 
-private fun faceOf(player: String): PolyBitmap? = (MenuHeadCache.get(seedOf(player)) as? PolyImageBitmap)?.bitmap
+private fun faceOf(player: String): PolyBitmap? = (PlayerHeads.face(seedOf(player)) as? PolyImageBitmap)?.bitmap
 
 private fun iconStrokes(resource: String): List<FloatArray> = runCatching {
     val svg = VoiceRow::class.java.classLoader.getResourceAsStream(resource)!!.use { it.readBytes().decodeToString() }

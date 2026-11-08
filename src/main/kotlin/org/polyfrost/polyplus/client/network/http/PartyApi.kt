@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.network.http
 
 import org.polyfrost.polyplus.libs.ktor.client.call.body
+import org.polyfrost.polyplus.libs.ktor.client.plugins.ResponseException
 import org.polyfrost.polyplus.libs.ktor.client.request.HttpRequestBuilder
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.client.statement.HttpResponse
@@ -27,17 +28,27 @@ import org.polyfrost.polyplus.client.network.http.responses.VoicePass
 import org.polyfrost.polyplus.client.network.http.responses.VoiceToken
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
-class PartyApiException(val status: Int, val code: String?, message: String?) : RuntimeException(message ?: code ?: "HTTP $status")
+class PartyApiException(val status: Int, val code: String?, message: String?, cause: Throwable? = null) : RuntimeException(message ?: code ?: "HTTP $status", cause)
 
 object PartyApi {
     private val base: String get() = "${PolyPlusConfig.apiUrl}/v1/party"
 
     private suspend fun send(path: String, method: HttpMethod, block: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-        val response = PolyPlusClient.HTTP.requestAuthorized("$base$path", method, block)
+        val response = try {
+            PolyPlusClient.HTTP.requestAuthorized("$base$path", method, block)
+        } catch (exception: ResponseException) {
+            val text = runSuspendCatching { exception.response.bodyAsText() }.getOrNull()
+            val error = parseError(text) ?: parseError(exception.message?.substringAfter("Text: \"", "")?.removeSuffix("\""))
+            throw PartyApiException(exception.response.status.value, error?.error, error?.message, exception)
+        }
         if (response.status.isSuccess()) return response
-        val text = runSuspendCatching { response.bodyAsText() }.getOrNull().orEmpty()
-        val error = runCatching { PolyPlusClient.JSON.decodeFromString(ApiErrorBody.serializer(), text) }.getOrNull()
+        val error = parseError(runSuspendCatching { response.bodyAsText() }.getOrNull())
         throw PartyApiException(response.status.value, error?.error, error?.message)
+    }
+
+    private fun parseError(text: String?): ApiErrorBody? {
+        if (text.isNullOrBlank()) return null
+        return runCatching { PolyPlusClient.JSON.decodeFromString(ApiErrorBody.serializer(), text) }.getOrNull()
     }
 
     private suspend inline fun <reified T> call(path: String, method: HttpMethod, noinline block: HttpRequestBuilder.() -> Unit = {}): Result<T> =

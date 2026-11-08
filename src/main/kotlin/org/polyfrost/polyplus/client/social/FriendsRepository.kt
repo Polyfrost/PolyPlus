@@ -113,15 +113,6 @@ object FriendsRepository {
             .onFailure { LOGGER.error("Failed to refresh blocked players", it) }
     }
 
-    fun sendRequest(player: String) = PolyPlusClient.SCOPE.launch {
-        SocialApi.sendRequest(player)
-            .onSuccess { refreshRequests(); if (it == null) refreshFriends() }
-            .onFailure {
-                LOGGER.error("Failed to send friend request to $player", it)
-                SocialErrors.emit("Couldn't send friend request", it)
-            }
-    }
-
     fun acceptRequest(id: Int) = PolyPlusClient.SCOPE.launch {
         SocialApi.acceptRequest(id)
             .onSuccess { refreshRequests(); refreshFriends() }
