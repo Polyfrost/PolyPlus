@@ -205,6 +205,7 @@
     //? if > 1.8.9
     "client.pause.MixinPauseCamera",
     "client.pause.MixinPauseHand",
+    "client.pause.MixinPauseCulling",
     "client.pause.MixinPauseRenderer",
     //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",

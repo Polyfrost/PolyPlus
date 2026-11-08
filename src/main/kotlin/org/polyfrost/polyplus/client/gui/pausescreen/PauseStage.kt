@@ -116,6 +116,23 @@ object PauseStage {
     var tagY = 0.3f
         private set
 
+    private var cullMoved = false
+    private var regraph = false
+
+    @JvmStatic
+    fun consumeCullMove(): Boolean {
+        val moved = cullMoved
+        cullMoved = false
+        return moved
+    }
+
+    @JvmStatic
+    fun consumeRegraph(): Boolean {
+        val due = regraph
+        regraph = false
+        return due
+    }
+
     @JvmStatic
     fun staged(): Boolean = phase == Phase.STAGED && bodyShown
 
@@ -258,6 +275,7 @@ object PauseStage {
         parallaxY.snap(0.0)
         lens.snap(lensFor(reach, PausePlatform.height(entity)).toDouble())
         lastNanos = System.nanoTime()
+        regraph = true
         PauseAvatar.begin(entity)
         return true
     }
@@ -281,6 +299,8 @@ object PauseStage {
         if (bodyShown && PausePlatform.firstPerson(savedMode)) PausePlatform.cameraMode = savedMode
         PausePlatform.hudHidden = savedHud
         phase = Phase.IDLE
+        cullMoved = true
+        regraph = true
         actor = null
         anchor = null
         last = null
@@ -309,6 +329,7 @@ object PauseStage {
         onScreen(ClientPlatform.currentScreen())
         when (phase) {
             Phase.STAGED -> {
+                if (seconds < PULL_SECONDS && seconds + dt >= PULL_SECONDS) regraph = true
                 seconds += dt
                 if (seconds >= HAND_SECONDS) PausePlatform.hudHidden = true
                 parallaxX.step(pointerNowX * motion, PARALLAX_RATE, dt.toDouble())
@@ -418,6 +439,7 @@ object PauseStage {
             returnPose(entity, partial, live)
         } ?: return null
         last = result
+        cullMoved = true
         cameraNow = PauseVec(result.x, result.y, result.z)
         return result
     }
