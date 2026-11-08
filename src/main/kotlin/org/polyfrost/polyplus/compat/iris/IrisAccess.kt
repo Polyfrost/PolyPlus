@@ -8,17 +8,18 @@ import net.irisshaders.iris.pipeline.PipelineManager
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline
 import net.irisshaders.iris.pipeline.programs.ShaderKey
 import net.irisshaders.iris.shaderpack.materialmap.NamespacedId
+import org.polyfrost.polyplus.compat.Reflect
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 import java.util.Collections
 import java.util.IdentityHashMap
 
 object IrisAccess {
-    private val pipelinesField: Field by lazy { field(PipelineManager::class.java, "pipelinesPerDimension") }
-    private val pipelineField: Field by lazy { field(PipelineManager::class.java, "pipeline") }
-    private val buffersField: Field by lazy { field(IrisRenderingPipeline::class.java, "shaderStorageBufferHolder") }
+    private val pipelinesField: Field by lazy { Reflect.declared(PipelineManager::class.java, "pipelinesPerDimension") }
+    private val pipelineField: Field by lazy { Reflect.declared(PipelineManager::class.java, "pipeline") }
+    private val buffersField: Field by lazy { Reflect.declared(IrisRenderingPipeline::class.java, "shaderStorageBufferHolder") }
     private val activeField: Field by lazy {
-        field(ShaderStorageBufferHolder::class.java, "ACTIVE_BUFFERS").also { check(Modifier.isStatic(it.modifiers)) { "ACTIVE_BUFFERS is not static" } }
+        Reflect.declared(ShaderStorageBufferHolder::class.java, "ACTIVE_BUFFERS").also { check(Modifier.isStatic(it.modifiers)) { "ACTIVE_BUFFERS is not static" } }
     }
     private val overridesField: Field? by lazy {
         RenderSystem::class.java.declaredFields
@@ -76,6 +77,4 @@ object IrisAccess {
         val backend = compiled?.javaClass?.getMethod("backendRenderPipeline")?.invoke(compiled) ?: return
         (backend.javaClass.getMethod("vertexArray").invoke(backend) as? AutoCloseable)?.close()
     }
-
-    private fun field(owner: Class<*>, name: String): Field = owner.getDeclaredField(name).also { it.isAccessible = true }
 }

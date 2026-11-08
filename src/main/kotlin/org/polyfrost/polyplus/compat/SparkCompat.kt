@@ -11,7 +11,6 @@ import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Stream
@@ -62,7 +61,7 @@ internal object SparkCompat {
     private val windows = ConcurrentHashMap<String, Any>()
 
     val installed: Boolean by lazy {
-        runCatching { Class.forName(PROVIDER, false, SparkCompat::class.java.classLoader) != null }.getOrDefault(false)
+        Reflect.find(PROVIDER) != null
     }
 
     @Volatile
@@ -282,7 +281,7 @@ internal object SparkCompat {
 
     private fun fabricPlatform(): Any? {
         for (name in CLIENT_COMMANDS) {
-            val type = runCatching { Class.forName(name) }.getOrNull() ?: continue
+            val type = Reflect.find(name) ?: continue
             val dispatcher = runCatching { type.getMethod("getActiveDispatcher").invoke(null) }.getOrNull() ?: continue
             val root = call(dispatcher, "getRoot") ?: continue
             val node = call(root, "getChild", CLIENT_COMMAND) ?: continue
@@ -334,25 +333,15 @@ internal object SparkCompat {
     private fun call(target: Any, name: String, vararg args: Any?): Any? {
         val key = "${target.javaClass.name}#$name/${args.size}"
         val method = methods.getOrPut(key) {
-            target.javaClass.methods.first { it.name == name && it.parameterCount == args.size }.also { it.isAccessible = true }
+            Reflect.methodByArity(target.javaClass, name, args.size).also { it.isAccessible = true }
         }
         return method.invoke(target, *args)
     }
 
-    private fun field(target: Any, name: String): Any? = declared(target.javaClass, name)?.get(target)
+    private fun field(target: Any, name: String): Any? = Reflect.field(target.javaClass, name)?.get(target)
 
     private fun staticField(owner: String, name: String): Any? {
-        val type = runCatching { Class.forName(owner) }.getOrNull() ?: return null
-        return declared(type, name)?.get(null)
-    }
-
-    private fun declared(type: Class<*>, name: String): Field? {
-        var current: Class<*>? = type
-        while (current != null) {
-            val found = runCatching { current.getDeclaredField(name) }.getOrNull()
-            if (found != null) return found.also { it.isAccessible = true }
-            current = current.superclass
-        }
-        return null
+        val type = Reflect.find(owner) ?: return null
+        return Reflect.field(type, name)?.get(null)
     }
 }

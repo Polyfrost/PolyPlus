@@ -1,13 +1,12 @@
 package org.polyfrost.polyplus.compat.iris
 
-import net.fabricmc.loader.api.FabricLoader
 import net.irisshaders.iris.Iris
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.api.lobby.LobbyApi
+import org.polyfrost.polyplus.compat.Mods
 import java.lang.reflect.Field
 
 object IrisLobbyDh {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private const val DH_COMPAT = "net.irisshaders.iris.compat.dh.DHCompat"
     private const val PIPELINE = "net.irisshaders.iris.pipeline.IrisRenderingPipeline"
     private const val DH_INTERNAL = "net.irisshaders.iris.compat.dh.DHCompatInternal"
@@ -49,7 +48,7 @@ object IrisLobbyDh {
 
     @Synchronized
     private fun check() {
-        if (checked || !FabricLoader.getInstance().isModLoaded("distanthorizons")) return
+        if (checked || !Mods.distantHorizons) return
         checked = true
         val missing = runCatching {
             val compat = Class.forName(DH_COMPAT)
@@ -61,7 +60,7 @@ object IrisLobbyDh {
             }
         }.getOrElse { listOf("DHCompat") }
         if (missing.isNotEmpty()) {
-            LOGGER.warn("Iris Distant Horizons lobby hooks missing ({}), the lobby pipeline may build DH programs", missing.joinToString())
+            LOBBY_LOGGER.warn("Iris Distant Horizons lobby hooks missing ({}), the lobby pipeline may build DH programs", missing.joinToString())
         }
     }
 }

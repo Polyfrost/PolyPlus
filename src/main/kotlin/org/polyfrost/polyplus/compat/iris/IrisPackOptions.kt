@@ -2,10 +2,9 @@ package org.polyfrost.polyplus.compat.iris
 
 import net.irisshaders.iris.Iris
 import net.irisshaders.iris.shaderpack.option.values.OptionValues
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 
 object IrisPackOptions {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val SWITCHES = listOf("DOF", "DEPTH_OF_FIELD")
     private val CHOICES = mapOf("WORLD_BLUR" to "0")
 
@@ -26,7 +25,7 @@ object IrisPackOptions {
             cached
         }.getOrElse { error ->
             broken = true
-            LOGGER.warn("Shader pack depth of field check disabled", error)
+            LOBBY_LOGGER.warn("Shader pack depth of field check disabled", error)
             false
         }
     }

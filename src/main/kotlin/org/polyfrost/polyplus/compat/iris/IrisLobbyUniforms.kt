@@ -3,7 +3,7 @@ package org.polyfrost.polyplus.compat.iris
 import java.util.function.Supplier
 import net.irisshaders.iris.gl.uniform.UniformHolder
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.joml.Vector4f
 import org.polyfrost.polyplus.client.lobby.LobbyWaveState
 
@@ -15,7 +15,6 @@ object IrisLobbyUniforms {
     const val WAVE = "polyplus_LobbyWave"
 
     private val ZERO = Vector4f(0f, 0f, 0f, 0f)
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val wave = Supplier<Vector4f> { if (IrisLobbyReveal.ready()) LobbyWaveState.vector() else ZERO }
 
     @JvmStatic
@@ -38,7 +37,7 @@ object IrisLobbyUniforms {
             .onSuccess { registered++ }
             .onFailure {
                 failed = true
-                LOGGER.warn("Lobby wave uniform registration failed, WAVE_UNIFORM missing", it)
+                LOBBY_LOGGER.warn("Lobby wave uniform registration failed, WAVE_UNIFORM missing", it)
             }
     }
 }

@@ -69,16 +69,12 @@ internal object LinkedModMenus {
         return out
     }
 
-    private fun find(name: String): Class<*>? =
-        runCatching { Class.forName(ROOT + name, false, LinkedModMenus::class.java.classLoader) }.getOrNull()
-
-    private fun method(owner: Class<*>, name: String, vararg params: Class<*>): Method? =
-        runCatching { owner.getMethod(name, *params) }.getOrNull()
+    private fun find(name: String): Class<*>? = Reflect.find(ROOT + name)
 
     private fun instance(owner: Class<*>): Any? = runCatching { owner.getField("INSTANCE").get(null) }.getOrNull()
 
     private val openScreen: Method? by lazy {
-        find("util.GuiUtil")?.let { method(it, "openScreen", Class::class.java, Function0::class.java) }
+        find("util.GuiUtil")?.let { Reflect.method(it, "openScreen", Class::class.java, Function0::class.java) }
     }
 
     private fun opener(screen: Class<*>, factory: () -> Any): (() -> Unit)? {
@@ -93,24 +89,24 @@ internal object LinkedModMenus {
     }
 
     private fun staticCall(owner: String, name: String): (() -> Unit)? {
-        val call = find(owner)?.let { method(it, name) } ?: return null
+        val call = find(owner)?.let { Reflect.method(it, name) } ?: return null
         return { call.invoke(null) }
     }
 
     private fun settings(): (() -> Unit)? {
         val config = find("config.McEssentialConfig") ?: return null
         val holder = instance(config) ?: return null
-        val gui = method(config, "gui") ?: return null
+        val gui = Reflect.method(config, "gui") ?: return null
         return opener(gui.returnType) { gui.invoke(holder) }
     }
 
     private fun accounts(): (() -> Unit)? {
         val util = find("util.GuiUtil") ?: return null
         val holder = instance(util) ?: return null
-        val push = method(util, "pushModal", Function1::class.java) ?: return null
+        val push = Reflect.method(util, "pushModal", Function1::class.java) ?: return null
         val manager = find("gui.menu.AccountManager") ?: return null
         val create = runCatching { manager.getConstructor() }.getOrNull() ?: return null
-        val all = method(manager, "getAllAccounts") ?: return null
+        val all = Reflect.method(manager, "getAllAccounts") ?: return null
         val modal = find("gui.menu.AccountManagerModal")?.constructors?.firstOrNull { it.parameterCount == 3 } ?: return null
         return {
             val accounts = create.newInstance()
@@ -123,7 +119,7 @@ internal object LinkedModMenus {
         if (find("gui.multiplayer.EssentialMultiplayerGui") == null) return null
         val config = find("config.EssentialConfig")
         val holder = config?.let(::instance)
-        val tab = config?.let { method(it, "setCurrentMultiplayerTab", Integer.TYPE) }
+        val tab = config?.let { Reflect.method(it, "setCurrentMultiplayerTab", Integer.TYPE) }
         return open@{
             val parent = ClientPlatform.currentScreen() ?: return@open
             if (holder != null && tab != null) runCatching { tab.invoke(holder, FRIENDS_TAB) }

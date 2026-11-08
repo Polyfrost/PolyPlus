@@ -1,11 +1,10 @@
 package org.polyfrost.polyplus.compat.iris
 
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.client.lobby.shader.LobbyRevealGlsl
 import java.util.concurrent.ConcurrentHashMap
 
 object IrisLobbyReveal {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val programs = ConcurrentHashMap<String, Boolean>()
     private val reported = ConcurrentHashMap.newKeySet<String>()
 
@@ -50,14 +49,14 @@ object IrisLobbyReveal {
             .onFailure { error ->
                 programs[program] = false
                 refresh()
-                if (reported.add("$program/error")) LOGGER.warn("Iris lobby reveal failed for {}, TERRAIN_REVEAL unavailable", program, error)
+                if (reported.add("$program/error")) LOBBY_LOGGER.warn("Iris lobby reveal failed for {}, TERRAIN_REVEAL unavailable", program, error)
             }
             .getOrNull() ?: return null
         programs[program] = plan.hit
         refresh()
         val miss = plan.miss
         if (miss != null && reported.add("$program/$miss")) {
-            LOGGER.warn("Iris lobby reveal missed in {}: {}, TERRAIN_REVEAL unavailable", program, miss)
+            LOBBY_LOGGER.warn("Iris lobby reveal missed in {}: {}, TERRAIN_REVEAL unavailable", program, miss)
         }
         return plan
     }

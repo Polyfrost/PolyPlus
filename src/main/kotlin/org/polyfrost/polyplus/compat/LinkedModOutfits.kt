@@ -11,6 +11,7 @@ object LinkedModOutfits {
     private const val SKIN_OVERRIDE = "skinOverriddenByServer"
 
     private val logger = LogManager.getLogger("PolyPlus/LinkedModOutfits")
+    private val hook = ReflectiveHook(logger)
 
     private class Hooks(
         val playerType: Class<*>,
@@ -29,9 +30,7 @@ object LinkedModOutfits {
         fun skinOverridden(player: Any): Boolean {
             if (!skinOverrideLooked) {
                 skinOverrideLooked = true
-                skinOverride = generateSequence<Class<*>>(player.javaClass) { it.superclass }
-                    .firstNotNullOfOrNull { type -> runCatching { type.getDeclaredField(SKIN_OVERRIDE) }.getOrNull() }
-                    ?.apply { isAccessible = true }
+                skinOverride = Reflect.field(player.javaClass, SKIN_OVERRIDE)
             }
             return skinOverride?.getBoolean(player) == true
         }
@@ -43,15 +42,13 @@ object LinkedModOutfits {
         }
     }
 
-    private var broken = false
-
     private val hooks: Hooks? by lazy {
         runCatching(::resolve).onFailure { logger.debug("No linked outfit store", it) }.getOrNull()
     }
 
     @JvmStatic
     fun tick(player: Any, uuid: UUID, age: Int) {
-        if (broken || age % CHECK_INTERVAL != 1) return
+        if (hook.broken || age % CHECK_INTERVAL != 1) return
         val hooks = hooks ?: return
         if (!hooks.playerType.isInstance(player)) return
         try {
@@ -62,8 +59,7 @@ object LinkedModOutfits {
             if ((hooks.untracked.invoke(account) as? Map<*, *>).isNullOrEmpty()) return
             hooks.setSource.invoke(player, account)
         } catch (e: Throwable) {
-            broken = true
-            logger.warn("Couldn't show another mod's outfit on a player", e)
+            hook.fail("Couldn't show another mod's outfit on a player", e)
         }
     }
 

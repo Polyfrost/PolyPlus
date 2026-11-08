@@ -5,7 +5,7 @@ import org.polyfrost.polyplus.client.utils.AnimationActivity
 import java.lang.reflect.Method
 
 object DynamicFpsCompat {
-    private val logger = LogManager.getLogger("PolyPlus/DynamicFpsCompat")
+    private val hook = ReflectiveHook(LogManager.getLogger("PolyPlus/DynamicFpsCompat"))
     //? if > 1.8.9 {
     private const val MOD_CLASS = "dynamic_fps.impl.DynamicFPSMod"
     //?} else {
@@ -14,7 +14,6 @@ object DynamicFpsCompat {
 
     @Volatile
     private var holding = false
-    private var broken = false
     private var refresh: Method? = null
     private var looked = false
 
@@ -23,13 +22,9 @@ object DynamicFpsCompat {
 
     @JvmStatic
     fun frame() {
-        if (broken) return
-        val now = try {
+        if (hook.broken) return
+        val now = hook.attempt("Could not read animation state; Dynamic FPS will no longer be paused during animations", false) {
             AnimationActivity.update()
-        } catch (e: Throwable) {
-            broken = true
-            logger.warn("Could not read animation state; Dynamic FPS will no longer be paused during animations", e)
-            false
         }
         if (now == holding) return
         holding = now
@@ -41,9 +36,8 @@ object DynamicFpsCompat {
         try {
             method.invoke(null, false)
         } catch (e: Throwable) {
-            broken = true
             holding = false
-            logger.warn("Could not refresh the Dynamic FPS state", e)
+            hook.fail("Could not refresh the Dynamic FPS state", e)
         }
     }
 
@@ -53,9 +47,8 @@ object DynamicFpsCompat {
         refresh = try {
             Class.forName(MOD_CLASS).getMethod("onStatusChanged", Boolean::class.javaPrimitiveType)
         } catch (e: Throwable) {
-            broken = true
             holding = false
-            logger.warn("Dynamic FPS has no onStatusChanged hook; animations may run at a reduced frame rate", e)
+            hook.fail("Dynamic FPS has no onStatusChanged hook; animations may run at a reduced frame rate", e)
             null
         }
         return refresh

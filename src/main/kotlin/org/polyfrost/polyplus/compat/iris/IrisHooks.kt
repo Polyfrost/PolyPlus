@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.compat.iris
 
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.client.lobby.shader.Capability
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -18,7 +18,6 @@ interface IrisLobbyLifecycle {
 }
 
 object IrisHooks {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val seen: MutableSet<Capability> = ConcurrentHashMap.newKeySet()
     private val reported: MutableSet<Any> = ConcurrentHashMap.newKeySet()
     private val lifecycles = CopyOnWriteArrayList<IrisLobbyLifecycle>()
@@ -71,6 +70,6 @@ object IrisHooks {
     }
 
     private fun report(owner: Any, error: Throwable) {
-        if (reported.add(owner)) LOGGER.warn("Iris lobby hook {} failed", owner, error)
+        if (reported.add(owner)) LOBBY_LOGGER.warn("Iris lobby hook {} failed", owner, error)
     }
 }

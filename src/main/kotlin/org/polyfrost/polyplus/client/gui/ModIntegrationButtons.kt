@@ -5,6 +5,7 @@ import net.minecraft.client.gui.screens.Screen
 
 //? if fabric || ornithe {
 import net.fabricmc.loader.api.FabricLoader
+import org.polyfrost.polyplus.compat.Mods
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -56,7 +57,7 @@ internal object ModIntegrationButtons {
 
     private fun modLoaded(id: String): Boolean {
         //? if fabric || ornithe {
-        return FabricLoader.getInstance().isModLoaded(id)
+        return Mods.loaded(id)
         //?} else {
         /*return false
         *///?}

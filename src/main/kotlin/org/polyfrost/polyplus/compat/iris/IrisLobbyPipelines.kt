@@ -12,7 +12,7 @@ import net.irisshaders.iris.shaderpack.materialmap.NamespacedId
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.lwjgl.opengl.GL15C
 import org.polyfrost.polyplus.api.lobby.LobbyApi
 import org.polyfrost.polyplus.api.lobby.LobbyListener
@@ -25,7 +25,6 @@ import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 object IrisLobbyPipelines {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val LOBBY = NamespacedId("polyplus", "lobby")
     private const val ATTEMPTS = 2
     private const val MAX_FAILURES = 3
@@ -228,7 +227,7 @@ object IrisLobbyPipelines {
         val pipeline = built
         if (pipeline == null) {
             gaveUpFor = pack
-            LOGGER.warn("Iris lobby pipeline unavailable for this pack, the lobby uses the shared pipeline")
+            LOBBY_LOGGER.warn("Iris lobby pipeline unavailable for this pack, the lobby uses the shared pipeline")
             return null
         }
         IrisAccess.pipelines(access)[LOBBY] = pipeline
@@ -240,7 +239,7 @@ object IrisLobbyPipelines {
         IrisHooks.built(pipeline)
         reloadChunksIfNeeded()
         val millis = (System.nanoTime() - started) / NANOS_PER_MILLI
-        LOGGER.info("Iris lobby pipeline built in {} ms ({})", millis, if (patched) "patched" else "unpatched")
+        LOBBY_LOGGER.info("Iris lobby pipeline built in {} ms ({})", millis, if (patched) "patched" else "unpatched")
         return pipeline
     }
 
@@ -282,7 +281,7 @@ object IrisLobbyPipelines {
         }
         rebind(IrisAccess.pipeline(access))
         armed = scene || swapped
-        LOGGER.info("Iris lobby pipeline released{}", if (owned) "" else " (already destroyed by Iris)")
+        LOBBY_LOGGER.info("Iris lobby pipeline released{}", if (owned) "" else " (already destroyed by Iris)")
         return true
     }
 
@@ -307,6 +306,6 @@ object IrisLobbyPipelines {
     }
 
     private fun report(what: String, error: Throwable) {
-        if (reported.add(what)) LOGGER.warn("Iris lobby pipeline {} failed", what, error)
+        if (reported.add(what)) LOBBY_LOGGER.warn("Iris lobby pipeline {} failed", what, error)
     }
 }

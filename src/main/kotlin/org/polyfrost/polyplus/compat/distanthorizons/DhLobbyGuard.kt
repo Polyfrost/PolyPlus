@@ -4,7 +4,7 @@ package org.polyfrost.polyplus.compat.distanthorizons
 import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.world.level.Level
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.api.lobby.LobbyApi
 import org.polyfrost.polyplus.api.lobby.LobbyListener
 import java.lang.reflect.Field
@@ -12,7 +12,6 @@ import java.util.Collections
 import java.util.WeakHashMap
 
 object DhLobbyGuard : LobbyListener {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val seen: MutableSet<Any> = Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap()))
 
     @Volatile
@@ -56,7 +55,7 @@ object DhLobbyGuard : LobbyListener {
         runCatching {
             val level = (field.get(state) as? IDhApiUnsafeWrapper)?.wrappedMcObject ?: return
             if (seen.contains(level) || LobbyApi.isLobbyLevel(level as? Level)) field.set(state, null)
-        }.onFailure { LOGGER.warn("Distant Horizons render state could not be released after the lobby", it) }
+        }.onFailure { LOBBY_LOGGER.warn("Distant Horizons render state could not be released after the lobby", it) }
     }
 
     override fun onSceneBuilt(level: ClientLevel) {
@@ -73,12 +72,12 @@ object DhLobbyGuard : LobbyListener {
             val state = api.getField("RENDER_STATE").get(null)
             levelField = state.javaClass.getField("clientLevelWrapper")
             renderState = state
-        }.onFailure { LOGGER.warn("Distant Horizons render state not found, the lobby level may stay referenced until a world renders") }
+        }.onFailure { LOBBY_LOGGER.warn("Distant Horizons render state not found, the lobby level may stay referenced until a world renders") }
         val missing = hooks.filter { (owner, method, _) ->
             runCatching { Class.forName(owner).declaredMethods.none { it.name == method } }.getOrDefault(true)
         }
         if (missing.isNotEmpty()) {
-            LOGGER.warn("Distant Horizons lobby hooks missing, the lobby may show DH for: {}", missing.joinToString { it.third })
+            LOBBY_LOGGER.warn("Distant Horizons lobby hooks missing, the lobby may show DH for: {}", missing.joinToString { it.third })
         }
     }
 }

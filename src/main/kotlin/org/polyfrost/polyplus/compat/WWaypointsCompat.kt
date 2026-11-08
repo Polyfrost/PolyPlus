@@ -23,7 +23,6 @@ import com.mojang.blaze3d.platform.InputConstants
 import com.wwaypoints.WaypointsClient
 import com.wwaypoints.client.ModConfig
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
-import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.KeyMapping
 //?}
 
@@ -54,7 +53,7 @@ object WWaypointsCompat {
     //? if wwaypoints {
     // written to disk as well so the features stay off if Poly+ is removed later
     fun initialize() {
-        if (!FabricLoader.getInstance().isModLoaded("wwaypoints")) return
+        if (!Mods.wwaypoints) return
         SettingRowDecorators.register(disabledReasonTooltip)
         ClientLifecycleEvents.CLIENT_STARTED.register { client ->
             if (disableFeatures(WaypointsClient.getConfig())) WaypointsClient.saveConfig()

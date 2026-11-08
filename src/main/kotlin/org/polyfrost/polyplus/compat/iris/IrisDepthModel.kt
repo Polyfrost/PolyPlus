@@ -6,7 +6,7 @@ import com.mojang.renderpearl.backend.opengl.GlTexture
 /*import com.mojang.blaze3d.opengl.GlTexture
 *///?}
 import net.minecraft.client.Minecraft
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
 import org.lwjgl.opengl.GL21
@@ -17,7 +17,6 @@ import org.polyfrost.polyplus.client.lobby.LobbyWaveState
 import org.polyfrost.polyplus.client.lobby.shader.DepthModel
 
 object IrisDepthModel {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private const val SETTLE_FRAMES = 20
     private const val GIVE_UP_FRAMES = 240
     private const val SKY_ROW = 0.97f
@@ -61,7 +60,7 @@ object IrisDepthModel {
             .onSuccess(::judge)
             .onFailure {
                 settle(DepthModel.UNKNOWN)
-                LOGGER.warn("Iris depth probe failed, lobby post runs without depth effects", it)
+                LOBBY_LOGGER.warn("Iris depth probe failed, lobby post runs without depth effects", it)
             }
     }
 
@@ -70,11 +69,11 @@ object IrisDepthModel {
         when {
             model != null -> {
                 settle(model)
-                LOGGER.info("Iris depth probe: sky {} terrain {} -> {} (api {}, default {})", texels.sky, texels.terrain, model, api(), versionDefault())
+                LOBBY_LOGGER.info("Iris depth probe: sky {} terrain {} -> {} (api {}, default {})", texels.sky, texels.terrain, model, api(), versionDefault())
             }
             frames >= GIVE_UP_FRAMES -> {
                 settle(DepthModel.UNKNOWN)
-                LOGGER.warn("Iris depth probe undecided: sky {} terrain {}, lobby post runs without depth effects", texels.sky, texels.terrain)
+                LOBBY_LOGGER.warn("Iris depth probe undecided: sky {} terrain {}, lobby post runs without depth effects", texels.sky, texels.terrain)
             }
         }
     }
