@@ -14,7 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(targets = "com.seibel.distanthorizons.common.commonMixins.MixinVanillaFogCommon", remap = false)
 public abstract class MixinDhVanillaFog {
     //? if dh {
+    //? if >= 1.21.6 {
     @Inject(method = "cancelFog()Z", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
+    //?} else {
+    /*@Inject(method = "cancelFog", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
+    *///?}
     private static void polyplus$keepLobbyFog(CallbackInfoReturnable<Boolean> cir) {
         if (DhLobbyGuard.skipRender()) {
             cir.setReturnValue(false);

@@ -1,17 +1,16 @@
 package org.polyfrost.polyplus.client.lobby
 
-import org.apache.logging.log4j.LogManager
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 
 object LobbySodiumWave {
     enum class Flavour(val declarations: String, val fragmentAnchor: String, val color: String) {
         GL("gl", "color *= v_Color;", "color"),
+        GL_DIFFUSE("gl", "diffuseColor *= v_Color;", "diffuseColor"),
         PIPELINE("pipeline", "color *= v_Color;", "color"),
         CELERITAS("gl", "diffuseColor.rgb *= m_color.a;\n#endif", "diffuseColor"),
     }
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private const val ROOT = "/assets/polyplus/shaders/sodium/"
     private const val MAIN = "void main()"
     private const val MARKER = "polyplus_waveFront"
@@ -52,7 +51,7 @@ object LobbySodiumWave {
     @JvmStatic
     fun fail(what: String, error: Throwable?) {
         broken = true
-        if (reported.add("fail/$what")) LOGGER.warn("Sodium lobby reveal disabled: {}", what, error)
+        if (reported.add("fail/$what")) LOBBY_LOGGER.warn("Sodium lobby reveal disabled: {}", what, error)
     }
 
     @JvmStatic
@@ -104,7 +103,7 @@ object LobbySodiumWave {
 
     private fun miss(flavour: Flavour, what: String): String? {
         broken = true
-        if (reported.add("$flavour/$what")) LOGGER.warn("Sodium {} {} not found, lobby reveal uses Sodium's own program", flavour, what)
+        if (reported.add("$flavour/$what")) LOBBY_LOGGER.warn("Sodium {} {} not found, lobby reveal uses Sodium's own program", flavour, what)
         return null
     }
 }

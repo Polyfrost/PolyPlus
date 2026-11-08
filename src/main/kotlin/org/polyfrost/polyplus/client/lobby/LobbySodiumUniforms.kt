@@ -16,7 +16,6 @@ import com.mojang.blaze3d.shaders.UniformType
 import com.mojang.blaze3d.systems.RenderPass
 *///?}
 import net.minecraft.resources.Identifier
-import org.apache.logging.log4j.LogManager
 import org.lwjgl.system.MemoryUtil
 
 object LobbySodiumUniforms {
@@ -27,7 +26,6 @@ object LobbySodiumUniforms {
     private const val MAX_BUFFER_FAILURES = 3
     private const val BYTES = 4 * Float.SIZE_BYTES
 
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private val data = MemoryUtil.memAlloc(BYTES)
     private val CHUNK_FADE = Regex("""\bfadeFactor\s*=\s*([^;]*);""")
 
@@ -67,7 +65,7 @@ object LobbySodiumUniforms {
 
     @JvmStatic
     fun built(location: Any) {
-        LOGGER.info("Built Sodium lobby pipeline {}", location)
+        LOBBY_LOGGER.info("Built Sodium lobby pipeline {}", location)
     }
 
     @JvmStatic

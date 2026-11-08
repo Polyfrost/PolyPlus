@@ -70,7 +70,7 @@ public abstract class MixinShaderChunkRendererLobby {
         return polyplus$createShader != null;
     }
 
-    @Inject(method = "compileProgram", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
+    @Inject(method = "compileProgram(Lnet/caffeinemc/mods/sodium/client/render/chunk/shader/ChunkShaderOptions;)Lnet/caffeinemc/mods/sodium/client/gl/shader/GlProgram;", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
     private void polyplus$lobbyProgram(ChunkShaderOptions options, CallbackInfoReturnable<GlProgram<ChunkShaderInterface>> cir) {
         if (!LobbySodiumWave.active()) {
             return;

@@ -51,6 +51,14 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     private static final String polyplus$IDENTIFIER = "Lnet/minecraft/resources/Identifier;";
     @Unique
     private static final String polyplus$SHADER = "blocks/block_layer_opaque";
+    @Unique
+    private static final String polyplus$PASS = "Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;";
+    @Unique
+    private static final String polyplus$OIT_STAGE = "Lnet/minecraft/client/renderer/oit/OitStage;";
+    @Unique
+    private static final String polyplus$CREATE = "createShader(Ljava/lang/String;" + polyplus$PASS + ")" + polyplus$PIPELINE;
+    @Unique
+    private static final String polyplus$CREATE_OIT = "createOITShader(Ljava/lang/String;" + polyplus$PASS + polyplus$OIT_STAGE + ")Lnet/minecraft/client/renderer/oit/OitPipelineSet;";
 
     @Unique
     private static final Map<TerrainRenderPass, RenderPipeline> polyplus$programs = new HashMap<>();
@@ -60,7 +68,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     private static boolean polyplus$building;
 
     //? if >= 26.3 {
-    @Inject(method = "compileProgram", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
+    @Inject(method = "compileProgram(" + polyplus$PASS + polyplus$OIT_STAGE + ")" + polyplus$PIPELINE, at = @At("HEAD"), cancellable = true, remap = false, require = 0)
     private void polyplus$lobbyProgram(TerrainRenderPass pass, OitStage stage, CallbackInfoReturnable<RenderPipeline> cir) {
         if (!LobbySodiumWave.active()) return;
         RenderPipeline program = LobbySodiumUniforms.ready() ? this.polyplus$program(pass, stage) : null;
@@ -68,7 +76,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
         if (program != null) cir.setReturnValue(program);
     }
     //?} else {
-    /*@Inject(method = "compileProgram", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
+    /*@Inject(method = "compileProgram(" + polyplus$PASS + ")" + polyplus$PIPELINE, at = @At("HEAD"), cancellable = true, remap = false, require = 0)
     private void polyplus$lobbyProgram(TerrainRenderPass pass, CallbackInfoReturnable<RenderPipeline> cir) {
         if (!LobbySodiumWave.active()) return;
         RenderPipeline program = LobbySodiumUniforms.ready() ? this.polyplus$program(pass) : null;
@@ -137,7 +145,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     }
 
     @ModifyExpressionValue(
-            method = {"createShader", "createOITShader"},
+            method = {polyplus$CREATE, polyplus$CREATE_OIT},
             at = @At(value = "INVOKE", target = polyplus$PIPELINE + "builder(" + polyplus$SNIPPETS + ")" + polyplus$BUILDER),
             remap = false,
             require = 0
@@ -147,7 +155,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     }
 
     @ModifyArg(
-            method = {"createShader", "createOITShader"},
+            method = {polyplus$CREATE, polyplus$CREATE_OIT},
             at = @At(value = "INVOKE", target = polyplus$BUILDER + "withLocation(" + polyplus$IDENTIFIER + ")" + polyplus$BUILDER),
             remap = false,
             require = 0
@@ -157,7 +165,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     }
 
     @ModifyArg(
-            method = {"createShader", "createOITShader"},
+            method = {polyplus$CREATE, polyplus$CREATE_OIT},
             at = @At(value = "INVOKE", target = polyplus$BUILDER + "withVertexShader(" + polyplus$IDENTIFIER + ")" + polyplus$BUILDER),
             remap = false,
             require = 0
@@ -167,7 +175,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
     }
 
     @ModifyArg(
-            method = {"createShader", "createOITShader"},
+            method = {polyplus$CREATE, polyplus$CREATE_OIT},
             at = @At(value = "INVOKE", target = polyplus$BUILDER + "withFragmentShader(" + polyplus$IDENTIFIER + ")" + polyplus$BUILDER),
             remap = false,
             require = 0
@@ -178,7 +186,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
 
     //? if >= 26.3 {
     @ModifyArg(
-            method = "createOITShader",
+            method = polyplus$CREATE_OIT,
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/oit/OitPipelineSet;builder(Ljava/lang/String;" + polyplus$BUILDER + ")Lnet/minecraft/client/renderer/oit/OitPipelineSet$Builder;"

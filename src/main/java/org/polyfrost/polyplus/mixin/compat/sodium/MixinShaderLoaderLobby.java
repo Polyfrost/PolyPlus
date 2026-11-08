@@ -51,7 +51,7 @@ public abstract class MixinShaderLoaderLobby {
                 patched = polyplus$CHUNK_FADE.matcher(patched).replaceAll("fadeFactor = u_PolyLobbyWave.x >= 0.0 ? 1.0 : ($1);");
             }
         } else {
-            patched = LobbySodiumWave.patchFragment(source, LobbySodiumWave.Flavour.GL);
+            patched = LobbySodiumWave.patchFragment(source, source.contains(LobbySodiumWave.Flavour.GL_DIFFUSE.getFragmentAnchor()) ? LobbySodiumWave.Flavour.GL_DIFFUSE : LobbySodiumWave.Flavour.GL);
         }
         cir.setReturnValue(patched != null ? patched : source);
     }
