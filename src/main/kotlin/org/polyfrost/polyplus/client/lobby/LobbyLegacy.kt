@@ -56,8 +56,12 @@ import net.minecraft.util.math.Vec3d
 import net.minecraft.world.LightType
 import net.minecraft.world.WorldView
 import net.minecraft.world.biome.Biome
+import com.mojang.authlib.GameProfile
+import com.mojang.authlib.minecraft.MinecraftProfileTexture
+import net.minecraft.resource.Identifier
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -73,6 +77,43 @@ object LobbyUtil {
     fun getNanos(): Long = System.nanoTime()
 
     fun ioPool(): Executor = pool
+}
+
+class LobbyAccountSkin {
+    @Volatile
+    var texture: Identifier? = null
+    @Volatile
+    var slim: Boolean? = null
+    @Volatile
+    var cape: Identifier? = null
+}
+
+object LobbyAccountSkins {
+    private val loaded = ConcurrentHashMap<UUID, LobbyAccountSkin>()
+
+    fun of(uuid: UUID, name: String, local: Boolean): LobbyAccountSkin =
+        loaded.computeIfAbsent(uuid) { LobbyAccountSkin().also { load(it, uuid, name, local) } }
+
+    private fun load(skin: LobbyAccountSkin, uuid: UUID, name: String, local: Boolean) {
+        val mc = Minecraft.getInstance()
+        LobbyUtil.ioPool().execute {
+            val profile = runCatching {
+                if (local) mc.session.profile else mc.sessionService.fillProfileProperties(GameProfile(uuid, name), false)
+            }.getOrNull() ?: return@execute
+            runCatching {
+                mc.skinManager.register(profile, { type, location, texture ->
+                    when (type) {
+                        MinecraftProfileTexture.Type.SKIN -> {
+                            skin.slim = texture.getMetadata("model") == "slim"
+                            skin.texture = location
+                        }
+                        MinecraftProfileTexture.Type.CAPE -> skin.cape = location
+                        else -> {}
+                    }
+                }, false)
+            }
+        }
+    }
 }
 
 object LobbyMth {

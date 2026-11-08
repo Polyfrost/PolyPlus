@@ -25,6 +25,8 @@ import net.minecraft.world.phys.Vec3
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache*/
+//? if = 1.8.9
+/*import org.polyfrost.polyplus.client.cosmetics.MojangCapeService*/
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 
 class LobbyAvatar(
@@ -84,18 +86,30 @@ class LobbyAvatar(
     //?} else {
     /*override fun getLightLevel(tickDelta: Float): Int = LobbyScene.lightFor(this, super.getLightLevel(tickDelta))
 
+    private val account by lazy { LobbyAccountSkins.of(uuid, gameProfile.name, isLocal) }
+
     private fun chosenSkin() = (LobbyWardrobe.preview?.skin ?: LocalSkinOverride.forPlayer(uuid)).takeIf { isLocal }
 
-    override fun getSkinTextureLocation(): Identifier = chosenSkin()?.texture ?: skinSource().texture()
+    override fun getSkinTextureLocation(): Identifier = chosenSkin()?.texture ?: account.texture ?: skinSource().texture()
 
-    override fun getModelType(): String = chosenSkin()?.let { if (it.slim) "slim" else "default" } ?: super.getModelType()
+    override fun getModelType(): String {
+        val slim = chosenSkin()?.slim ?: account.slim ?: return super.getModelType()
+        return if (slim) "slim" else "default"
+    }
 
     override fun hasSkinTexture(): Boolean = true
 
     override fun hasInfo(): Boolean = true
 
-    override fun getCapeTextureLocation(): Identifier? =
-        LobbyWardrobe.previewCape().takeIf { isLocal } ?: CosmeticAssetCache.getCapeTexture(uuid) ?: super.getCapeTextureLocation()
+    override fun getCapeTextureLocation(): Identifier? {
+        if (isLocal) LobbyWardrobe.previewCape()?.let { return it }
+        CosmeticAssetCache.getCapeTexture(uuid)?.let { return it }
+        if (isLocal) {
+            MojangCapeService.localCapeTexture()?.let { return it }
+            if (MojangCapeService.localCapeHidden()) return null
+        }
+        return account.cape ?: super.getCapeTextureLocation()
+    }
 
     var scale = 1f
         private set
