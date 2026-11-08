@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -57,7 +60,29 @@ private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
 private const val FLAT_DIM = 0.45f
 private val TOOLS_GAP = 8.dp
-private val TOOLS_RULE = 24.dp
+private val MENU_RESERVE = 472.dp
+private val PANEL_WIDTH = 360.dp
+private val PANEL_MIN_WIDTH = 240.dp
+private val PANEL_PREFERRED_MIN = 300.dp
+private val PANEL_MAX_HEIGHT = 220.dp
+private val PANEL_MIN_HEIGHT = 120.dp
+private const val MAX_PANELS = 2
+
+private class PanelSlots(val count: Int, val width: Dp, val height: Dp)
+
+private val NO_PANELS = PanelSlots(0, 0.dp, 0.dp)
+
+private fun panelSlots(narrow: Boolean, wanted: Int, maxWidth: Dp, maxHeight: Dp, rowWidth: Dp): PanelSlots {
+    if (narrow || wanted == 0) return NO_PANELS
+    val preferred = if (rowWidth > 0.dp) maxOf(rowWidth, PANEL_PREFERRED_MIN) else PANEL_WIDTH
+    val width = minOf(preferred, maxWidth - LobbyLayout.Margin - MENU_RESERVE - LobbyLayout.Gap)
+    if (width < PANEL_MIN_WIDTH) return NO_PANELS
+    val room = maxHeight - LobbyLayout.NavbarHeight - LobbyLayout.Gap - LobbyLayout.BarHeight - LobbyLayout.Margin - LobbyLayout.Gap
+    var count = minOf(MAX_PANELS, wanted)
+    while (count > 0 && (room - LobbyLayout.Gap * (count - 1)) / count < PANEL_MIN_HEIGHT) count--
+    if (count == 0) return NO_PANELS
+    return PanelSlots(count, width, minOf(PANEL_MAX_HEIGHT, (room - LobbyLayout.Gap * (count - 1)) / count))
+}
 
 @Composable
 internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean) {
@@ -76,7 +101,14 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         Box(Modifier.graphicsLayer { alpha = reveal }.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(0f to ink.copy(alpha = 0.92f), 0.42f to ink.copy(alpha = 0.74f), 1f to ink.copy(alpha = 0f))))
         Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
     }
-    Box(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
+    val widgets = rememberPauseWidgets()
+    val density = LocalDensity.current
+    var rowWidth by remember { mutableStateOf(0.dp) }
+    BoxWithConstraints(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
+        val slots = panelSlots(narrow, widgets.view.panels.size, maxWidth, maxHeight, rowWidth)
+        val panels = widgets.view.panels.take(slots.count)
+        val panelArea = panelSlots(narrow, 1, maxWidth, maxHeight, rowWidth).count > 0
+        val panelled = remember(panels) { panels.mapTo(HashSet()) { it.id } }
         if (screen.staged) AvatarTag(place.title)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
@@ -102,39 +134,29 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         Row(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = LobbyLayout.Margin, end = (if (narrow) 368.dp else 472.dp) + LobbyLayout.Gap, bottom = LobbyLayout.Margin),
+                .padding(start = LobbyLayout.Margin, end = (if (narrow) 368.dp else 472.dp) + LobbyLayout.Gap, bottom = LobbyLayout.Margin)
+                .onGloballyPositioned { rowWidth = with(density) { it.size.width.toDp() } },
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(TOOLS_GAP),
         ) {
             PartyBar(screen, Modifier.weight(1f, fill = false))
-            StepBackTools(screen)
+            PauseWidgetBar(screen, widgets, panelled, panelArea = panelArea)
         }
+        PauseWidgetPanels(
+            screen,
+            widgets,
+            panels,
+            slots.width,
+            slots.height,
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin + LobbyLayout.BarHeight + LobbyLayout.Gap),
+        )
     }
     if (screen.moreOpen) {
         MoreDismiss(screen)
         LobbyDarkChrome {
             MorePanel(screen, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 376.dp else 488.dp, top = 68.dp))
-        }
-    }
-}
-
-@Composable
-private fun StepBackTools(screen: OneClientPauseScreen) {
-    val tools = rememberPauseTools()
-    if (tools.isEmpty()) return
-    Row(
-        Modifier.height(LobbyLayout.BarHeight).pauseGlass(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tools.forEachIndexed { index, tool ->
-            key(tool) {
-                if (index > 0) Box(Modifier.width(1.dp).height(TOOLS_RULE).background(SocialBorderColor))
-                when (tool) {
-                    PauseTool.RECORDING -> RecordingBarTool(screen, glass = false)
-                    PauseTool.PERFORMANCE -> PerformanceBarTool(screen, glass = false)
-                    PauseTool.SCENE -> SceneBarTool(glass = false)
-                }
-            }
         }
     }
 }

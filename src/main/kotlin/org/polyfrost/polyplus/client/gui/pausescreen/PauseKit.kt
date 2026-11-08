@@ -386,31 +386,10 @@ internal fun BoxScope.MoreDismiss(screen: OneClientPauseScreen) {
     Box(Modifier.matchParentSize().clickableTextWithSound { screen.moreOpen = false })
 }
 
-private const val TOOLS_TICK_MILLIS = 500L
 internal val POPUP_EDGE = 20.dp
 private val SIDE_GAP = 14.dp
 private val BAR_INSET = 6.dp
 private val BAR_INNER_RADIUS = 14.dp
-
-internal enum class PauseTool { RECORDING, PERFORMANCE, SCENE }
-
-private fun toolsShown(): List<PauseTool> = buildList {
-    if (runCatching { recordingShown() }.getOrDefault(false)) add(PauseTool.RECORDING)
-    if (runCatching { performanceShown() }.getOrDefault(false)) add(PauseTool.PERFORMANCE)
-    if (runCatching { sceneShown() }.getOrDefault(false)) add(PauseTool.SCENE)
-}
-
-@Composable
-internal fun rememberPauseTools(): List<PauseTool> {
-    var shown by remember { mutableStateOf(toolsShown()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(TOOLS_TICK_MILLIS)
-            shown = toolsShown()
-        }
-    }
-    return shown
-}
 
 @Composable
 internal fun BarTile(

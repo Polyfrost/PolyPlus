@@ -19,6 +19,12 @@ object PolyPlusPauseConfig : Config(
     @JvmStatic @Include
     var migratedFromSplitConfigs = false
 
+    @JvmStatic @Include
+    var pauseWidgets = ""
+
+    @JvmStatic @Include
+    var pauseWidgetPanels = ""
+
     @JvmStatic
     @Dropdown(
         title = "Pause Screen",

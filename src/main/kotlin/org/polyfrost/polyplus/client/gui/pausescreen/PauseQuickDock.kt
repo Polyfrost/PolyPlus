@@ -159,9 +159,8 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
 
 @Composable
 private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, reveal: Float, rise: Float) {
-    val tools = rememberPauseTools()
-    if (tools.isEmpty()) return
-    Column(
+    PauseWidgetCard(
+        screen,
         Modifier
             .align(Alignment.TopEnd)
             .padding(top = CARD_MARGIN, end = CARD_MARGIN)
@@ -169,22 +168,9 @@ private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, reveal: Float, rise
                 alpha = reveal
                 translationY = -rise * density
             }
-            .blockPointer()
-            .width(CARD_WIDTH)
-            .pauseGlass(16.dp)
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        tools.forEach { tool ->
-            key(tool) {
-                when (tool) {
-                    PauseTool.RECORDING -> RecordingCardTool(screen)
-                    PauseTool.PERFORMANCE -> PerformanceCardTool(screen)
-                    PauseTool.SCENE -> SceneCardTool()
-                }
-            }
-        }
-    }
+            .blockPointer(),
+        CARD_WIDTH,
+    )
 }
 
 private fun Modifier.blockPointer(): Modifier = pointerInput(Unit) {
