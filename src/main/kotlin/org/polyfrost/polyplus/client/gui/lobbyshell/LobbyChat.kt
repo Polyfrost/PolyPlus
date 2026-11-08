@@ -3,14 +3,18 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,8 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import org.polyfrost.polyplus.client.gui.EmojiPickerButton
 import org.polyfrost.polyplus.client.gui.MutedText
@@ -100,12 +106,20 @@ internal fun ChatPanel(open: Boolean) {
     val partyChat = party?.chatGroupId?.let { rememberPartyConversation(it) }
     val active = SocialChatLink.active ?: partyChat
     val conversation = active.takeIf { open }
-    val height by animateDpAsState(if (conversation != null) LobbyLayout.ChatHeight else LobbyLayout.BarHeight)
     LaunchedEffect(active?.id) { draft = "" }
     val lines = conversation?.lines().orEmpty()
-    Column(Modifier.width(LobbyLayout.ChatWidth).height(height).panel().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val resize = if (PolyPlusConfig.reducedMotion) snap<IntSize>() else spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow, IntSize.VisibilityThreshold)
+    val size = if (conversation != null) {
+        Modifier.width(LobbyLayout.ChatWidth).height(LobbyLayout.ChatHeight)
+    } else {
+        Modifier.widthIn(max = LobbyLayout.ChatWidth).height(LobbyLayout.BarHeight)
+    }
+    Column(
+        Modifier.panel().animateContentSize(resize, Alignment.BottomStart).then(size).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (conversation == null) {
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ThemedIcon("text", MutedText, 16.dp)
                 Label("Press Enter to open Social", 12.sp, color = MutedText)
             }

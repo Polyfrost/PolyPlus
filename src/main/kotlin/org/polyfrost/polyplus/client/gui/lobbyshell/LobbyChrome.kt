@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
@@ -252,7 +253,8 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
             LobbyPage.Social -> SocialPage { lobby.show(LobbyPage.Home) }
             LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }
         }
-        SceneControl(lobby)
+        var barStart by remember { mutableFloatStateOf(Float.NaN) }
+        SceneControl(lobby) { barStart }
         LobbyDarkChrome { Navbar(lobby, screen) }
         val chatShown = lobby.page != LobbyPage.Social && !LobbyPage.Social.hidden
         val chatWidth by animateDpAsState(
@@ -265,12 +267,12 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
                 .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, bottom = LobbyLayout.Margin),
             verticalAlignment = Alignment.Bottom,
         ) {
-            Column(Modifier.width(chatWidth), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
+            Column(Modifier.widthIn(max = chatWidth), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
                 if (lobby.page == LobbyPage.Home) LinkedModButton(Modifier)
                 if (chatShown) ChatPanel(open = lobby.page == LobbyPage.Home)
             }
             Spacer(Modifier.width(chatWidth.coerceAtMost(LobbyLayout.Gap)))
-            key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false)) }
+            key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false).onGloballyPositioned { barStart = it.positionInRoot().x }) }
             if (lobby.page == LobbyPage.Home) {
                 Spacer(Modifier.width(LobbyLayout.Gap))
                 SceneButton(lobby)

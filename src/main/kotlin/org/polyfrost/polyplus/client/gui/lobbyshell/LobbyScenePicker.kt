@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -58,6 +60,7 @@ import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private const val SUNSET_START = 11500L
 private const val NIGHT_START = 13500L
@@ -73,12 +76,16 @@ internal fun SceneButton(lobby: LobbyShell) {
 }
 
 @Composable
-internal fun BoxScope.SceneControl(lobby: LobbyShell) {
+internal fun BoxScope.SceneControl(lobby: LobbyShell, barStart: () -> Float) {
     if (lobby.page != LobbyPage.Home || !lobby.sceneOpen) return
     Box(
         Modifier
             .align(Alignment.BottomStart)
-            .padding(start = LobbyLayout.BarStart, bottom = LobbyLayout.PageBottom)
+            .offset {
+                val start = barStart()
+                IntOffset(if (start.isNaN()) LobbyLayout.BarStart.roundToPx() else start.roundToInt(), 0)
+            }
+            .padding(bottom = LobbyLayout.PageBottom)
             .width(LobbyLayout.UnitWidth),
     ) {
         EscapeCloses { lobby.sceneOpen = false }
