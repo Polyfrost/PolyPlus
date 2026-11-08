@@ -1,4 +1,4 @@
-## Unreleased changes
+## 1.4.6
 - Fixed pause menu icons not loading
 - Updated Polydium to 1.3.2
 
