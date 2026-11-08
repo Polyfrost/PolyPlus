@@ -19,6 +19,8 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.oneconfig.internal.ui.shell.ShellController
+import org.polyfrost.oneconfig.internal.ui.themes.LocalTheme
+import org.polyfrost.oneconfig.internal.ui.themes.surfaceOpacity
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -106,6 +108,9 @@ internal val SocialWindowShape: Shape
 internal val OneConfigUITheme.translucentSurfaces: Boolean
     get() = popupBackground.alpha < 1f
 
+internal val liquidGlassTheme: Boolean
+    @Composable get() = LocalTheme.current.liquidGlass
+
 private const val DEFAULT_PAGE_OPACITY = 88f
 private const val FULL_OPACITY = 100f
 
@@ -160,7 +165,9 @@ internal val PanelSurface: Color
     @Composable get() {
         val theme = OneConfigTheme.current
         val glass = theme.pageBackground
+        val ui = LocalTheme.current
         return when {
+            ui.liquidGlass -> ui.surfaceOpacity(glass, ShellController.shared.appearance.pageOpacity, DEFAULT_PAGE_OPACITY)
             glass.alpha < 1f && theme.textColor.luminance() < LIGHT_TEXT_LIMIT -> theme.popupBackground.copy(alpha = LIGHT_PANEL_ALPHA)
             glass.alpha < PANEL_ALPHA_FLOOR -> glass.copy(alpha = PANEL_ALPHA_FLOOR)
             else -> glass
