@@ -96,12 +96,16 @@ layout(location = 0) out vec4 fragColor;
 out vec4 fragColor;
 *///?}
 
-const int GATHER_TAPS = 32;
+const int GATHER_TAPS = 40;
 const float GOLDEN_ANGLE = 2.39996;
-const float DOF_RADIUS = 12.0;
-const float SKY_RADIUS = 34.0;
+const float DOF_RADIUS = 11.0;
+const float SKY_RADIUS = 18.0;
 const float REFERENCE_HEIGHT = 1080.0;
-const float COC_DEADZONE = 0.04;
+const float COC_DEADZONE = 0.14;
+const float COC_FULL = 0.85;
+const float FAR_DEPTH = 1000000.0;
+const float SOFT_FROM = 5.0;
+const float SOFT_TO = 12.0;
 const float DITHER = 1.3 / 255.0;
 
 bool finiteColor(vec3 color) {
@@ -203,36 +207,7 @@ float lensCoc(float depth) {
     if (z < focus) {
         return smoothstep(0.45, 1.5, (focus - z) / focus) * Lens.y;
     }
-    return smoothstep(COC_DEADZONE, 1.0, (z - focus) / max(z, 0.001)) * Lens.y;
-}
-
-float tapReach(vec2 uv) {
-    float depth = textureLod(DepthSampler, uv, 0.0).r;
-    if (!validDepth(depth)) {
-        return 0.0;
-    }
-    if (skyAt(uv, depth)) {
-        return skyRadius();
-    }
-    return clamp(lensCoc(depth), 0.0, 1.0) * dofRadius();
-}
-
-vec3 gather(vec3 center, float radius, float seed) {
-    vec3 total = center;
-    float weight = 1.0;
-    for (int i = 0; i < GATHER_TAPS; i++) {
-        float angle = float(i) * GOLDEN_ANGLE + seed * 6.28318;
-        float reach = sqrt((float(i) + 0.5) / float(GATHER_TAPS)) * radius;
-        vec2 uv = texCoord + vec2(cos(angle), sin(angle)) * reach / OutSize;
-        float tap = clamp(tapReach(uv) - reach + 1.0, 0.0, 1.0);
-        vec3 taken = textureLod(InSampler, uv, 0.0).rgb;
-        if (!finiteColor(taken)) {
-            continue;
-        }
-        total += taken * tap;
-        weight += tap;
-    }
-    return total / weight;
+    return smoothstep(COC_DEADZONE, COC_FULL, (z - focus) / max(z, 0.001)) * Lens.y;
 }
 
 float panelCoverage(int index, vec2 pixel) {
@@ -280,6 +255,68 @@ float focusPullBlur(float depth) {
     return smoothstep(focus * 0.45 * aperture, focus * 1.5 * aperture, abs(linearDepth(depth) - focus)) * Lens.y;
 }
 
+float blurAmount(float depth) {
+    return clamp(revealMode() == 1 ? focusPullBlur(depth) : lensCoc(depth), 0.0, 1.0);
+}
+
+vec2 tapLens(vec2 uv) {
+    float depth = textureLod(DepthSampler, uv, 0.0).r;
+    if (!validDepth(depth)) {
+        return vec2(0.0, FAR_DEPTH);
+    }
+    if (skyAt(uv, depth)) {
+        return vec2(skyRadius(), FAR_DEPTH);
+    }
+    return vec2(blurAmount(depth) * dofRadius(), linearDepth(depth));
+}
+
+vec3 tapColor(vec2 uv, float soften) {
+    if (soften <= 0.01) {
+        return textureLod(InSampler, uv, 0.0).rgb;
+    }
+    vec3 soft = textureLod(SoftSampler, uv, 0.0).rgb;
+    if (soften >= 0.99) {
+        return soft;
+    }
+    return mix(textureLod(InSampler, uv, 0.0).rgb, soft, soften);
+}
+
+vec3 gather(vec3 center, float centerReach, float centerDepth, float search, float seed) {
+    float soften = smoothstep(SOFT_FROM * pixelScale(), SOFT_TO * pixelScale(), centerReach);
+    vec3 back = mix(center, tapColor(texCoord, soften), soften);
+    float backWeight = 1.0;
+    vec3 front = vec3(0.0);
+    float frontWeight = 0.0;
+    float area = search * search / float(GATHER_TAPS);
+    float ahead = max(0.15, centerDepth * 0.03);
+    float spin = seed * 6.28318 * (1.0 - soften);
+    for (int i = 0; i < GATHER_TAPS; i++) {
+        float angle = float(i) * GOLDEN_ANGLE + spin;
+        float reach = sqrt((float(i) + 0.5) / float(GATHER_TAPS)) * search;
+        vec2 uv = texCoord + vec2(cos(angle), sin(angle)) * reach / OutSize;
+        vec2 lens = tapLens(uv);
+        vec3 taken = tapColor(uv, soften);
+        if (!finiteColor(taken)) {
+            continue;
+        }
+        float frontness = smoothstep(ahead * 0.5, ahead * 1.5, centerDepth - lens.y);
+        if (frontness > 0.0) {
+            float covers = clamp(lens.x - reach + 1.0, 0.0, 1.0) * smoothstep(0.25 * search, 0.5 * search, lens.x);
+            float share = min(area / max(lens.x * lens.x, 1.0), 0.25) * covers * frontness;
+            front += taken * share;
+            frontWeight += share;
+        }
+        float weight = clamp(min(lens.x, centerReach) - reach + 1.0, 0.0, 1.0) * (1.0 - frontness);
+        back += taken * weight;
+        backWeight += weight;
+    }
+    vec3 behind = back / backWeight;
+    if (frontWeight <= 0.0) {
+        return behind;
+    }
+    return mix(behind, front / frontWeight, clamp(frontWeight, 0.0, 1.0));
+}
+
 vec3 firstLightGain(float depth) {
     float progress = clamp((Lens.w - LIGHT_START) / (LIGHT_END - LIGHT_START), 0.0, 1.0);
     float radius = LIGHT_REACH * progress * progress;
@@ -303,15 +340,14 @@ vec3 scene() {
     bool known = depthKnown() && validDepth(depth);
     bool sky = known && skyAt(texCoord, depth);
     if (known && !sky) {
-        blur = clamp(revealMode() == 1 ? focusPullBlur(depth) : lensCoc(depth), 0.0, 1.0);
-        vec3 soft = mix(color, textureLod(SoftSampler, texCoord, 0.0).rgb, blur);
+        blur = blurAmount(depth);
         float radius = blur * dofRadius();
-        if (day > 0.01 && radius > 0.5) {
-            soft = mix(soft, gather(color, radius, seed), day);
+        float search = max(radius, dofRadius() * Lens.y);
+        if (search > 0.5) {
+            color = gather(color, radius, linearDepth(depth), search, seed);
         }
-        color = soft;
     } else if (sky && day > 0.01) {
-        color = mix(color, gather(color, skyRadius(), seed), day);
+        color = mix(color, gather(color, skyRadius(), FAR_DEPTH, skyRadius(), seed), day);
     }
     if (revealMode() == 2) {
         color *= firstLightGain(depth);
