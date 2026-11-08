@@ -2,9 +2,11 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -28,35 +29,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isPrimaryPressed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.zIndex
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.ReorderState
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberReorderState
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderItem
+import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
 import org.polyfrost.polyplus.api.pause.PauseWidget
-import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.ContextMenuHost
-import org.polyfrost.polyplus.client.gui.ContextMenuList
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.contextMenu
 import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.lobbyshell.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 
@@ -71,142 +65,43 @@ private const val PANEL_ENTER_MILLIS = 180
 
 internal interface FullBleedPanel
 
-private class CoordinatesRef {
-    var coordinates: LayoutCoordinates? = null
+private class WidgetDrag(val state: ReorderState, val shown: List<PauseWidget>)
 
-    fun window(local: Offset): Offset? = coordinates?.takeIf { it.isAttached }?.localToWindow(local)
-}
-
-private class WidgetDrag(val vertical: Boolean, private val gap: Float, private val commit: (List<String>) -> Unit) {
-    var order by mutableStateOf<List<PauseWidget>>(emptyList())
-    var dragging by mutableStateOf<String?>(null)
-    var offset by mutableFloatStateOf(0f)
-    val sizes = HashMap<String, Int>()
-
-    fun shown(added: List<PauseWidget>): List<PauseWidget> = if (dragging != null) order else added
-
-    fun start(id: String, current: List<PauseWidget>) {
-        order = current
-        offset = 0f
-        dragging = id
-    }
-
-    fun move(delta: Float) {
-        val id = dragging ?: return
-        offset += delta
-        val index = order.indexOfFirst { it.id == id }
-        if (index < 0) return
-        if (offset > 0f && index < order.lastIndex) {
-            val span = (sizes[order[index + 1].id] ?: return) + gap
-            if (offset > span / 2f) {
-                order = order.swapped(index, index + 1)
-                offset -= span
-            }
-        } else if (offset < 0f && index > 0) {
-            val span = (sizes[order[index - 1].id] ?: return) + gap
-            if (offset < -span / 2f) {
-                order = order.swapped(index, index - 1)
-                offset += span
-            }
-        }
-    }
-
-    fun end() {
-        if (dragging == null) return
-        val ids = order.map { it.id }
-        dragging = null
-        offset = 0f
-        commit(ids)
-    }
-}
-
-private fun <T> List<T>.swapped(a: Int, b: Int): List<T> = toMutableList().also {
-    val held = it[a]
-    it[a] = it[b]
-    it[b] = held
-}
-
-private fun List<PauseWidget>.moved(id: String, by: Int): List<String>? {
-    val ids = map { it.id }.toMutableList()
+private fun List<PauseWidget>.movedBy(id: String, by: Int): List<String>? {
+    val ids = map { it.id }
     val from = ids.indexOf(id)
-    val to = from + by
-    if (from < 0 || to !in ids.indices) return null
-    ids.add(to, ids.removeAt(from))
-    return ids
+    return ids.withItemMoved(from, from + by)
 }
 
 @Composable
 private fun rememberWidgetDrag(
-    vertical: Boolean,
-    gap: Dp,
+    orientation: Orientation,
+    widgets: List<PauseWidget>,
     refresh: () -> Unit,
     commit: (List<String>) -> Unit = PauseWidgetRegistry::reorder,
 ): WidgetDrag {
-    val gapPx = with(LocalDensity.current) { gap.toPx() }
+    var dragged by remember { mutableStateOf<List<PauseWidget>?>(null) }
+    val shown = dragged ?: widgets
+    val current by rememberUpdatedState(shown)
     val latest by rememberUpdatedState(refresh)
     val store by rememberUpdatedState(commit)
-    return remember(vertical, gapPx) {
-        WidgetDrag(vertical, gapPx) { ids ->
-            store(ids)
-            latest()
-        }
-    }
+    val state = rememberReorderState(
+        orientation,
+        { from, to -> current.withItemMoved(from, to)?.let { dragged = it } },
+        {
+            dragged?.let { order ->
+                dragged = null
+                store(order.map { it.id })
+                latest()
+            }
+        },
+    )
+    return WidgetDrag(state, shown)
 }
 
-@Composable
-private fun Modifier.reorderable(
-    drag: WidgetDrag,
-    id: String,
-    current: List<PauseWidget>,
-    pass: PointerEventPass = PointerEventPass.Initial,
-): Modifier {
-    val ref = remember { CoordinatesRef() }
-    val list by rememberUpdatedState(current)
-    val lifted = drag.dragging == id
-    return this
-        .onSizeChanged { drag.sizes[id] = if (drag.vertical) it.height else it.width }
-        .onGloballyPositioned { ref.coordinates = it }
-        .pointerInput(drag, id, pass) {
-            awaitPointerEventScope {
-                while (true) {
-                    val press = awaitPointerEvent(pass)
-                    if (press.type != PointerEventType.Press || !press.buttons.isPrimaryPressed) continue
-                    val pointer = press.changes.firstOrNull() ?: continue
-                    val origin = ref.window(pointer.position) ?: continue
-                    var last = origin
-                    var moving = false
-                    var claimed = false
-                    while (true) {
-                        val event = awaitPointerEvent(pass)
-                        val change = event.changes.firstOrNull { it.id == pointer.id } ?: break
-                        if (!change.pressed) {
-                            if (moving) change.consume()
-                            break
-                        }
-                        val at = ref.window(change.position) ?: break
-                        if (!moving && change.isConsumed) claimed = true
-                        if (!moving && !claimed && (at - origin).getDistance() > viewConfiguration.touchSlop) {
-                            moving = true
-                            drag.start(id, list)
-                        }
-                        if (moving) {
-                            drag.move(if (drag.vertical) at.y - last.y else at.x - last.x)
-                            change.consume()
-                        }
-                        last = at
-                    }
-                    if (moving && drag.dragging == id) drag.end()
-                }
-            }
-        }
-        .zIndex(if (lifted) 1f else 0f)
-        .graphicsLayer {
-            if (lifted) {
-                if (drag.vertical) translationY = drag.offset else translationX = drag.offset
-                alpha = LIFTED_ALPHA
-            }
-        }
-}
+private fun Modifier.reorderable(drag: WidgetDrag, id: String, index: Int): Modifier = this
+    .reorderItem(drag.state, id, index)
+    .graphicsLayer { if (drag.state.draggingKey == id) alpha = LIFTED_ALPHA }
 
 private fun widgetMenu(
     widget: PauseWidget,
@@ -215,7 +110,7 @@ private fun widgetMenu(
     refresh: () -> Unit,
     commit: (List<String>) -> Unit = PauseWidgetRegistry::reorder,
     asPanel: Boolean? = null,
-): List<ContextItem> = buildList {
+): List<MenuAction> = buildList {
     val reorder: (List<String>?) -> Unit = { ids ->
         if (ids != null) {
             commit(ids)
@@ -223,18 +118,18 @@ private fun widgetMenu(
         }
     }
     if (asPanel != null) {
-        add(ContextItem(if (asPanel) "Show as panel" else "Show in bar") {
+        add(MenuAction(if (asPanel) "Show as panel" else "Show in bar") {
             PauseWidgetRegistry.setPanel(widget.id, asPanel)
             refresh()
         })
     }
-    current.moved(widget.id, -1)?.let { ids ->
-        add(ContextItem(if (vertical) "Move up" else "Move left", asset(if (vertical) "chevron-up" else "chevron-left")) { reorder(ids) })
+    current.movedBy(widget.id, -1)?.let { ids ->
+        add(MenuAction(if (vertical) "Move up" else "Move left", asset(if (vertical) "chevron-up" else "chevron-left")) { reorder(ids) })
     }
-    current.moved(widget.id, 1)?.let { ids ->
-        add(ContextItem(if (vertical) "Move down" else "Move right", if (vertical) null else asset("chevron-right")) { reorder(ids) })
+    current.movedBy(widget.id, 1)?.let { ids ->
+        add(MenuAction(if (vertical) "Move down" else "Move right", if (vertical) null else asset("chevron-right")) { reorder(ids) })
     }
-    add(ContextItem("Remove widget", asset("trash-01"), danger = true) {
+    add(MenuAction("Remove widget", asset("trash-01"), danger = true) {
         PauseWidgetRegistry.remove(widget.id)
         refresh()
     })
@@ -258,9 +153,9 @@ private fun AddWidget(
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
-                ContextMenuList(
+                MenuList(
                     addable.map { widget ->
-                        ContextItem(runCatching { widget.title }.getOrDefault(widget.id), runCatching { widget.icon }.getOrNull()) {
+                        MenuAction(widget.title, widget.icon.ifEmpty { null }) {
                             PauseWidgetRegistry.add(widget.id)
                             refresh()
                         }
@@ -287,8 +182,8 @@ internal fun PauseWidgetBar(
     val view = widgets.view
     if (view.empty) return
     val context = remember(screen) { PauseScreenWidgetContext(screen) }
-    val drag = rememberWidgetDrag(vertical = false, gap = 0.dp, refresh = widgets.refresh)
-    val added = drag.shown(view.added.filter { it.id !in panelled })
+    val drag = rememberWidgetDrag(Orientation.Horizontal, view.added.filter { it.id !in panelled }, widgets.refresh)
+    val added = drag.shown
     val panelModes = view.panels.mapTo(HashSet()) { it.id }
     Box {
         ContextMenuHost {
@@ -306,12 +201,13 @@ internal fun PauseWidgetBar(
                     key(widget.id) {
                         Row(
                             Modifier
-                                .reorderable(drag, widget.id, added)
+                                .widgetGuard(widget.id)
+                                .reorderable(drag, widget.id, index)
                                 .contextMenu { widgetMenu(widget, added, false, widgets.refresh, asPanel = barPanelToggle(widget, panelModes, panelArea)) },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (index > 0 || view.builtIns.isNotEmpty()) BarRule()
-                            widget.Bar(context)
+                            WidgetGuard(widget.id) { widget.Bar(context) }
                         }
                     }
                 }
@@ -334,8 +230,8 @@ internal fun PauseWidgetCard(screen: OneClientPauseScreen, modifier: Modifier, w
     val view = widgets.view
     if (view.empty) return
     val context = remember(screen) { PauseScreenWidgetContext(screen) }
-    val drag = rememberWidgetDrag(vertical = true, gap = CARD_GAP, refresh = widgets.refresh)
-    val added = drag.shown(view.added)
+    val drag = rememberWidgetDrag(Orientation.Vertical, view.added, widgets.refresh)
+    val added = drag.shown
     Box(modifier) {
         ContextMenuHost {
             Column(
@@ -345,15 +241,16 @@ internal fun PauseWidgetCard(screen: OneClientPauseScreen, modifier: Modifier, w
                 view.builtIns.forEach { widget ->
                     key(widget.id) { widget.Card(context) }
                 }
-                added.forEach { widget ->
+                added.forEachIndexed { index, widget ->
                     key(widget.id) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .reorderable(drag, widget.id, added)
+                                .widgetGuard(widget.id)
+                                .reorderable(drag, widget.id, index)
                                 .contextMenu { widgetMenu(widget, added, true, widgets.refresh) },
                         ) {
-                            widget.Card(context)
+                            WidgetGuard(widget.id) { widget.Card(context) }
                         }
                     }
                 }
@@ -371,6 +268,8 @@ internal fun PauseWidgetCard(screen: OneClientPauseScreen, modifier: Modifier, w
         }
     }
 }
+
+private fun PauseWidget.fullBleed(): Boolean = this is FullBleedPanel || (this as? RegisteredPauseWidget)?.fullBleed == true
 
 private fun barPanelToggle(widget: PauseWidget, panelModes: Set<String>, panelArea: Boolean): Boolean? = with(PauseWidgetRegistry) {
     when {
@@ -392,19 +291,20 @@ internal fun PauseWidgetPanels(
 ) {
     if (panels.isEmpty()) return
     val context = remember(screen) { PauseScreenWidgetContext(screen) }
-    val drag = rememberWidgetDrag(vertical = true, gap = LobbyLayout.Gap, refresh = widgets.refresh, commit = PauseWidgetRegistry::reorderPanels)
-    val shown = drag.shown(panels)
+    val drag = rememberWidgetDrag(Orientation.Vertical, panels, widgets.refresh, PauseWidgetRegistry::reorderPanels)
+    val shown = drag.shown
     Box(modifier) {
         ContextMenuHost {
             Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
-                shown.forEach { widget ->
+                shown.forEachIndexed { index, widget ->
                     key(widget.id) {
                         val enter = rememberPanelEnter()
                         Box(
                             Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = maxHeight)
-                                .reorderable(drag, widget.id, shown, PointerEventPass.Main)
+                                .widgetGuard(widget.id)
+                                .reorderable(drag, widget.id, index)
                                 .contextMenu { widgetMenu(widget, shown, true, widgets.refresh, PauseWidgetRegistry::reorderPanels, asPanel = false) }
                                 .graphicsLayer {
                                     alpha = enter.value
@@ -412,9 +312,9 @@ internal fun PauseWidgetPanels(
                                 }
                                 .clip(ppShape(PANEL_RADIUS))
                                 .pauseGlass(PANEL_RADIUS)
-                                .then(if (widget is FullBleedPanel) Modifier else Modifier.padding(PANEL_PADDING)),
+                                .then(if (widget.fullBleed()) Modifier else Modifier.padding(PANEL_PADDING)),
                         ) {
-                            widget.Panel(context)
+                            WidgetGuard(widget.id) { widget.Panel(context) }
                         }
                     }
                 }
@@ -425,7 +325,7 @@ internal fun PauseWidgetPanels(
 
 @Composable
 private fun rememberPanelEnter(): Animatable<Float, AnimationVector1D> {
-    val reduced = PolyPlusConfig.reducedMotion
+    val reduced = Motion.reduced
     val enter = remember { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(reduced) {
         if (reduced) enter.snapTo(1f) else enter.animateTo(1f, tween(PANEL_ENTER_MILLIS))

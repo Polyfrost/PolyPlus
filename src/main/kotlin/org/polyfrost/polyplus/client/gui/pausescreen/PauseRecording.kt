@@ -30,9 +30,11 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.ContextMenuList
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -41,7 +43,6 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
-import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.replay.ReplayProvider
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import kotlin.math.cos
@@ -94,10 +95,6 @@ private fun elapsedText(seconds: Long): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
-}
-
-private fun closePause(screen: OneClientPauseScreen) {
-    if (ClientPlatform.currentScreen() === screen) ClientPlatform.setScreen(null)
 }
 
 internal fun recordingShown(): Boolean = readView() != null
@@ -169,7 +166,7 @@ private fun StartTool(
     var choosing by remember { mutableStateOf(false) }
     val start: (ReplayProvider) -> Unit = { provider ->
         runCatching { provider.start() }
-        closePause(screen)
+        screen.closeIfCurrent()
     }
     Box {
         trigger({ if (starters.size == 1) start(starters.first()) else choosing = !choosing }, choosing)
@@ -180,7 +177,7 @@ private fun StartTool(
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
-                ContextMenuList(starters.map { provider -> ContextItem("Record with ${provider.name}", asset("video-recorder")) { start(provider) } }, close)
+                MenuList(starters.map { provider -> MenuAction("Record with ${provider.name}", asset("video-recorder")) { start(provider) } }, close)
             }
         }
     }
@@ -222,7 +219,7 @@ private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: 
         }
         ChipButton(asset("check-circle"), "Finish and save", size, icon) {
             runCatching { provider.finish() }
-            closePause(screen)
+            screen.closeIfCurrent()
         }
         if (live.canDiscard) {
             ChipButton(asset("trash-01"), if (armed) "Click again to discard" else "Discard recording", size, icon, danger = armed) {
@@ -269,6 +266,6 @@ private fun ChipButton(icon: String, tooltip: String, size: Dp, iconSize: Dp, da
         contentAlignment = Alignment.Center,
     ) {
         PauseGlyph(icon, ink, iconSize)
-        if (hovered) PauseTooltip(tooltip)
+        if (hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }

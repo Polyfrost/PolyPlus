@@ -50,9 +50,9 @@ import kotlinx.coroutines.delay
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.ContextItem
-import org.polyfrost.polyplus.client.gui.ContextMenuList
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -279,7 +279,7 @@ private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigge
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
-                ContextMenuList(menuItems(screen, current, refresh), close)
+                MenuList(menuItems(screen, current, refresh), close)
             }
         }
     }
@@ -380,19 +380,19 @@ private fun PanelStat(label: String, value: String) {
 }
 
 private fun profileItem(screen: OneClientPauseScreen, seconds: Int, label: String, view: PerfView, refresh: () -> Unit) =
-    ContextItem(label, asset("play-circle"), enabled = view.available) {
+    MenuAction(label, asset("play-circle"), enabled = view.available) {
         if (SparkCompat.startProfile(seconds)) {
-            if (ClientPlatform.currentScreen() === screen) ClientPlatform.setScreen(null)
+            screen.closeIfCurrent()
         } else {
             SocialErrors.emit("spark couldn't start the profiler.")
         }
         refresh()
     }
 
-private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () -> Unit): List<ContextItem> {
-    val items = mutableListOf<ContextItem>()
+private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () -> Unit): List<MenuAction> {
+    val items = mutableListOf<MenuAction>()
     if (view.profiling) {
-        items += ContextItem("Stop and upload now", asset("check-circle"), enabled = view.profile != SparkProfile.Uploading) {
+        items += MenuAction("Stop and upload now", asset("check-circle"), enabled = view.profile != SparkProfile.Uploading) {
             if (!SparkCompat.stopProfile()) SocialErrors.emit("spark couldn't stop the profiler.")
             refresh()
         }
@@ -401,26 +401,26 @@ private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () 
         items += profileItem(screen, SparkCompat.LONG_PROFILE_SECONDS, "Profile 2 minutes", view, refresh)
     }
     val health = SparkCompat.healthRunning
-    items += ContextItem(if (health) "Making health report" else "Health report", asset("globe-01"), enabled = view.available && !health) {
+    items += MenuAction(if (health) "Making health report" else "Health report", asset("globe-01"), enabled = view.available && !health) {
         if (SparkCompat.healthReport()) {
             SocialNotices.emit("Making a health report")
         } else {
             SocialErrors.emit("spark couldn't make a health report.")
         }
     }
-    items += ContextItem("Copy stats", asset("copy-01")) {
+    items += MenuAction("Copy stats", asset("copy-01")) {
         SparkCompat.copy(snapshot(view))
         SocialNotices.emit("Stats copied")
     }
     SparkCompat.lastProfileUrl?.let { url ->
-        items += ContextItem("Copy last profile link", asset("copy-01")) {
+        items += MenuAction("Copy last profile link", asset("copy-01")) {
             SparkCompat.copy(url)
             SocialNotices.emit("Profile link copied")
         }
-        items += ContextItem("Open last profile", asset("link-external-01")) { ClientPlatform.openUri(url) }
+        items += MenuAction("Open last profile", asset("link-external-01")) { ClientPlatform.openUri(url) }
     }
     SparkCompat.lastHealthUrl?.let { url ->
-        items += ContextItem("Open last health report", asset("link-external-01")) { ClientPlatform.openUri(url) }
+        items += MenuAction("Open last health report", asset("link-external-01")) { ClientPlatform.openUri(url) }
     }
     return items
 }

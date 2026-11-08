@@ -174,12 +174,10 @@ object PauseAvatar {
         state.attackTime *= 1f - weight
     }
     *///?} elif > 1.8.9 {
-    /*private var kept = FloatArray(6)
-
-    @JvmStatic
-    fun beginLegacy(entity: LivingEntity) {
-        if (!isLocal(entity)) return
-        kept = floatArrayOf(entity.yBodyRot, entity.yBodyRotO, entity.yHeadRot, entity.yHeadRotO, entity.xRot, entity.xRotO)
+    /*@JvmStatic
+    fun beginLegacy(entity: LivingEntity): FloatArray? {
+        if (!isLocal(entity)) return null
+        val kept = floatArrayOf(entity.yBodyRot, entity.yBodyRotO, entity.yHeadRot, entity.yHeadRotO, entity.xRot, entity.xRotO)
         val bodyYaw = bodyNow(entity.yBodyRot)
         val headYaw = headNow(entity.yHeadRot, bodyYaw)
         val look = pitchNow(entity.xRot)
@@ -189,11 +187,11 @@ object PauseAvatar {
         entity.yHeadRotO = headYaw
         entity.setXRot(look)
         entity.xRotO = look
+        return kept
     }
 
     @JvmStatic
-    fun endLegacy(entity: LivingEntity) {
-        if (!isLocal(entity)) return
+    fun endLegacy(entity: LivingEntity, kept: FloatArray) {
         entity.yBodyRot = kept[0]
         entity.yBodyRotO = kept[1]
         entity.yHeadRot = kept[2]
@@ -208,12 +206,10 @@ object PauseAvatar {
     @JvmStatic
     fun legacyFade(entity: LivingEntity, real: Float): Float = if (isLocal(entity)) real * (1f - weight) else real
     *///?} else {
-    /*private var kept = FloatArray(6)
-
-    @JvmStatic
-    fun beginLegacy(entity: LivingEntity) {
-        if (!isLocal(entity)) return
-        kept = floatArrayOf(entity.bodyYaw, entity.lastBodyYaw, entity.headYaw, entity.lastHeadYaw, entity.pitch, entity.lastPitch)
+    /*@JvmStatic
+    fun beginLegacy(entity: LivingEntity): FloatArray? {
+        if (!isLocal(entity)) return null
+        val kept = floatArrayOf(entity.bodyYaw, entity.lastBodyYaw, entity.headYaw, entity.lastHeadYaw, entity.pitch, entity.lastPitch)
         val bodyYaw = bodyNow(entity.bodyYaw)
         val headYaw = headNow(entity.headYaw, bodyYaw)
         val look = pitchNow(entity.pitch)
@@ -223,11 +219,11 @@ object PauseAvatar {
         entity.lastHeadYaw = headYaw
         entity.pitch = look
         entity.lastPitch = look
+        return kept
     }
 
     @JvmStatic
-    fun endLegacy(entity: LivingEntity) {
-        if (!isLocal(entity)) return
+    fun endLegacy(entity: LivingEntity, kept: FloatArray) {
         entity.bodyYaw = kept[0]
         entity.lastBodyYaw = kept[1]
         entity.headYaw = kept[2]

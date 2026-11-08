@@ -6,7 +6,8 @@ import java.util.Optional
 
 @ApiStatus.Experimental
 object PauseWidgets {
-    const val API_VERSION = 1
+    @JvmField
+    val API_VERSION: Int = 1
 
     @JvmStatic
     fun register(widget: PauseWidget): Boolean = PauseWidgetRegistry.register(widget)

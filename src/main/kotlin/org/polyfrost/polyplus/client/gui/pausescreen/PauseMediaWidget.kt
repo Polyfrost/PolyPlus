@@ -59,10 +59,11 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.api.pause.PauseWidget
 import org.polyfrost.polyplus.api.pause.PauseWidgetContext
@@ -76,10 +77,10 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.polyplus.compat.Mods
 import kotlin.math.abs
 import kotlin.math.sin
 
-private const val EVERGREENHUD_ID = "evergreenhud"
 private const val READ_MILLIS = 250L
 private const val DISABLED_ALPHA = 0.4f
 private const val TONE_MILLIS = 450
@@ -217,16 +218,20 @@ internal fun prettyPlayer(raw: String): String {
 
 internal object PauseMediaWidgets {
     fun register() {
-        if (FabricLoader.getInstance().isModLoaded(EVERGREENHUD_ID)) PauseWidgets.register(MediaWidget)
+        if (Mods.evergreenHud) PauseWidgets.register(MediaWidget)
     }
 }
 
-internal object MediaWidget : PauseWidget, FullBleedPanel {
+internal object MediaWidget : PauseWidget, FullBleedPanel, PauseWidgetPresence {
     override val id = "polyplus:media"
     override val title = "Media"
     override val icon = asset("headphones-02")
 
     override fun isAvailable(): Boolean = PauseEvergreenMedia.supported()
+
+    override fun shown() = PauseEvergreenMedia.acquire()
+
+    override fun hidden() = PauseEvergreenMedia.release()
 
     @Composable
     override fun Bar(context: PauseWidgetContext) = MediaBar(context.reducedMotion)
@@ -631,7 +636,7 @@ private fun SkipButton(glyph: MediaGlyph, tooltip: String, size: Dp, iconSize: D
         contentAlignment = Alignment.Center,
     ) {
         Glyph(glyph, if (lit) SocialTextPrimary else SocialTextPrimary.copy(alpha = 0.72f), iconSize)
-        if (lit) PauseTooltip(tooltip)
+        if (lit) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }
 
@@ -657,7 +662,7 @@ private fun PlayButton(playing: Boolean, active: Boolean, tone: MediaTone, size:
         contentAlignment = Alignment.Center,
     ) {
         Glyph(if (playing) MediaGlyph.PAUSE else MediaGlyph.PLAY, ink, iconSize)
-        if (lit) PauseTooltip(if (playing) "Pause" else "Play")
+        if (lit) TooltipPopup(if (playing) "Pause" else "Play", TooltipPlacement.AboveCenter)
     }
 }
 
