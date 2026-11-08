@@ -14,6 +14,7 @@ import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -219,7 +220,7 @@ object PauseMenuPanel {
 
     private fun openSocial(from: Screen) = SocialOverlay.open(from)
 
-    private fun openWardrobe() = PolyPlusOneConfigIntegration.openCosmetics()
+    private fun openWardrobe(from: Screen) = PauseRouter.openWardrobe(from, asShown = true)
 
     private fun openHostWorld(from: Screen) = SocialOverlay.openHostCurrentWorld(from)
 
@@ -316,7 +317,7 @@ object PauseMenuPanel {
                 buttonIcons += buttonIcon(icon, x, y, layout.width, label, text)
             }
             layout.socialY?.let { y -> addIconButton("Social", "social", layout.x, y) { openSocial(screen) } }
-            addIconButton("Wardrobe", "wardrobe", layout.x, layout.wardrobeY) { openWardrobe() }
+            addIconButton("Wardrobe", "wardrobe", layout.x, layout.wardrobeY) { openWardrobe(screen) }
             layout.hostWorldY?.let { y ->
                 addIconButton(Component.translatable("polyplus.hostWorld").string, "host-world", layout.x, y) { openHostWorld(screen) }
             }
@@ -379,7 +380,7 @@ object PauseMenuPanel {
     fun onLegacyButton(screen: Screen, id: Int): Boolean {
         when (id) {
             LEGACY_SOCIAL_ID -> openSocial(screen)
-            LEGACY_WARDROBE_ID -> openWardrobe()
+            LEGACY_WARDROBE_ID -> openWardrobe(screen)
             LEGACY_HOST_WORLD_ID -> openHostWorld(screen)
             LEGACY_SETTINGS_ID -> openSettings()
             else -> return false

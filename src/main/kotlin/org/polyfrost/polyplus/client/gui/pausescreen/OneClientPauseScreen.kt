@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import androidx.compose.runtime.Composable
@@ -8,6 +10,8 @@ import androidx.compose.ui.geometry.Rect
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
@@ -41,6 +45,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: PauseScreenStyle) : ComposeScreen(RenderMode.CONTINUOUS) {
     internal val capture = PauseCapture(vanilla)
     internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
+    internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !PolyPlusConfig.reducedMotion
     internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)
@@ -62,7 +67,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
         capture.sync(width, height)
         if (!decided) {
             decided = true
-            staged = style == PauseScreenStyle.STEP_BACK && !PolyPlusConfig.reducedMotion && PauseStage.enter()
+            staged = stages && PauseStage.enter()
             openedAt = System.currentTimeMillis()
         }
     }
@@ -166,7 +171,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
 
     internal fun openHost() = SocialOverlay.openHostCurrentWorld(this)
 
-    internal fun openWardrobe() = PolyPlusOneConfigIntegration.openCosmetics()
+    internal fun openWardrobe() = PauseRouter.openWardrobe(vanilla)
 
     internal fun openSettings() = PolyPlusOneConfigIntegration.openSettings()
 
@@ -191,10 +196,35 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
 
 object PauseRouter {
     private var classic: Screen? = null
+    private var wardrobeReturn: PauseScreen? = null
+    private var wardrobePlayer: Any? = null
+    private var wardrobeAsShown = false
 
     internal fun openClassic(screen: Screen) {
         classic = screen
         ClientPlatform.setScreen(screen)
+    }
+
+    fun openWardrobe(from: Screen, asShown: Boolean = false) {
+        wardrobeReturn = from as? PauseScreen
+        wardrobePlayer = PausePlatform.player()
+        wardrobeAsShown = asShown
+        PolyPlusOneConfigIntegration.openCosmetics()
+    }
+
+    private fun takeWardrobeReturn(): Screen? {
+        val vanilla = wardrobeReturn ?: return null
+        val player = wardrobePlayer
+        val asShown = wardrobeAsShown
+        wardrobeReturn = null
+        wardrobePlayer = null
+        wardrobeAsShown = false
+        if (!OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return null
+        if (player == null || PausePlatform.player() !== player) return null
+        if (asShown) classic = vanilla
+        val next = replace(vanilla)
+        if (!(next is OneClientPauseScreen && next.stages)) PauseStage.onScreen(null)
+        return next
     }
 
     @JvmStatic
@@ -202,7 +232,10 @@ object PauseRouter {
 
     @JvmStatic
     fun replace(screen: Screen?): Screen? {
+        if (screen == null) return takeWardrobeReturn()
         if (screen !is PauseScreen) return screen
+        wardrobeReturn = null
+        wardrobePlayer = null
         if (screen === classic) {
             classic = null
             return screen
