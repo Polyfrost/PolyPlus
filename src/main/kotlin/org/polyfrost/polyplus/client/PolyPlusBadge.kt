@@ -224,9 +224,7 @@ object PolyPlusBadge {
 
     @JvmStatic
     fun badgesNameTag(entity: Any?, name: String): Boolean =
-        entity is ClientPlayerEntity &&
-            name == entity.displayName.formattedString &&
-            shouldBadge(entity.uuid)
+        entity is ClientPlayerEntity && shouldBadge(entity.uuid)
     *///?}
     //?}
 }
