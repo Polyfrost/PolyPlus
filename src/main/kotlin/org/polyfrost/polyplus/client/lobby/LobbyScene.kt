@@ -107,6 +107,7 @@ import org.polyfrost.polyplus.api.lobby.LobbyMode
 import org.polyfrost.polyplus.api.lobby.LobbyPhase
 import org.polyfrost.polyplus.api.lobby.LobbyState
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
@@ -1515,8 +1516,10 @@ object LobbyScene {
 
     private fun lerp(from: Double, to: Double, progress: Double) = from + (to - from) * progress
 
+    private fun still(): Boolean = driven == null && PolyPlusConfig.reducedMotion
+
     private fun restingView(mc: Minecraft, stage: LobbyStage, time: Double): LobbyEntrance.View {
-        val crane = 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
+        val crane = if (still()) 0.0 else 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
         val eased = 1.0 - crane * crane * crane
         val distance = lerp(stage.craneDistance, stage.distance, eased)
         val pitch = lerp(stage.cranePitch, stage.pitch.toDouble(), eased)
@@ -1530,8 +1533,10 @@ object LobbyScene {
         val stage = scene.stage
         val rig = scene.rig
         val mc = Minecraft.getInstance()
-        val crane = 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
+        val still = still()
+        val crane = if (still) 0.0 else 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
         val eased = 1.0 - crane * crane * crane
+        val sway = if (still) 0.0 else 1.0
         val elapsed = (time - lastPoseTime).coerceIn(0.0, 0.1)
         lastPoseTime = time
         LobbyWardrobe.advance(elapsed)
@@ -1539,8 +1544,8 @@ object LobbyScene {
         settleFocus(mc, scene, elapsed)
         val parallaxShare = 1.0 - (1.0 - PARALLAX_FOCUS_SHARE) * focusBlend.value
         var distance = lerp(stage.craneDistance, stage.distance, eased) + focusReach.value
-        var pitch = lerp(stage.cranePitch, stage.pitch.toDouble(), eased) + sin(time * 0.23 + 2.0) * SWAY_PITCH_DEGREES + parallaxY.value * PARALLAX_PITCH_DEGREES * parallaxShare
-        var yaw = stage.yaw + lerp(stage.craneOrbit, 0.0, eased) + sin(time * 0.17) * SWAY_YAW_DEGREES + parallaxX.value * PARALLAX_YAW_DEGREES * parallaxShare
+        var pitch = lerp(stage.cranePitch, stage.pitch.toDouble(), eased) + sin(time * 0.23 + 2.0) * SWAY_PITCH_DEGREES * sway + parallaxY.value * PARALLAX_PITCH_DEGREES * parallaxShare
+        var yaw = stage.yaw + lerp(stage.craneOrbit, 0.0, eased) + sin(time * 0.17) * SWAY_YAW_DEGREES * sway + parallaxX.value * PARALLAX_YAW_DEGREES * parallaxShare
         var aim = stage.aim.add(Vec3(focusAimX.value, focusAimY.value, focusAimZ.value))
         val framed = LobbyFraming.frame(time, elapsed, eased, OPENING_SECONDS)
         scene.avatars.firstOrNull { it.isLocal }?.takeIf { framed > 0.0 }?.let { star ->
@@ -1573,7 +1578,7 @@ object LobbyScene {
         if (departNanos != 0L) {
             val leaving = ((Util.getNanos() - departNanos) / 1_000_000_000.0 / DEPART_SECONDS).coerceIn(0.0, 1.0)
             departProgress = leaving.toFloat()
-            val push = leaving * leaving
+            val push = if (still) 0.0 else leaving * leaving
             distance = lerp(distance, DEPART_REACH, push)
             currentFov = (CAMERA_FOV + (DEPART_FOV - CAMERA_FOV) * push).toFloat()
             if (leaving >= 1.0) {
@@ -1618,7 +1623,10 @@ object LobbyScene {
         val inside = pointerInside(mc)
         val x = if (inside) soften(pointerX(mc) * 2.0 - 1.0) else 0.0
         val y = if (inside) soften(pointerY(mc) * 2.0 - 1.0) else 0.0
-        if (scene.started) {
+        if (still()) {
+            parallaxX.snap(0.0)
+            parallaxY.snap(0.0)
+        } else if (scene.started) {
             val rate = if (inside) PARALLAX_RATE else PARALLAX_REST_RATE
             parallaxX.step(x, rate, elapsed)
             parallaxY.step(y, rate, elapsed)
@@ -1630,6 +1638,10 @@ object LobbyScene {
     }
 
     private fun settleFocus(mc: Minecraft, scene: Live, elapsed: Double) {
+        if (still()) {
+            for (ease in listOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach)) ease.snap(0.0)
+            return
+        }
         val stage = scene.stage
         val avatar = selected
         val leaving = departNanos != 0L
@@ -2210,7 +2222,7 @@ object LobbyFraming {
 
     fun frame(time: Double, elapsed: Double, eased: Double, opening: Double): Double {
         val target = if (onboarding) 1.0 else 0.0
-        if (time < opening) ease.snap(target) else ease.step(target, RATE, elapsed)
+        if (time < opening || PolyPlusConfig.reducedMotion) ease.snap(target) else ease.step(target, RATE, elapsed)
         amount = ease.value.coerceIn(0.0, 1.0)
         return amount * eased
     }

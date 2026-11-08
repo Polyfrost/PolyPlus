@@ -2,11 +2,13 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -561,14 +563,14 @@ internal fun OnboardingFlow(
         val outer = LocalDensity.current
         val accessibility = pages[page] == OnboardingStep.Accessibility
         val compact = pages[page] == OnboardingStep.Terms || accessibility
-        val panelWidth by animateFloatAsState(if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH, animationSpec = spring())
+        val panelWidth by animateFloatAsState(if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH, animationSpec = panelSpec())
         val panelHeight by animateFloatAsState(
             when {
-                accessibility -> ACCESSIBILITY_PANEL_HEIGHT
+                accessibility -> accessibilityPanelHeight()
                 compact -> LOBBY_TERMS_HEIGHT
                 else -> PANEL_HEIGHT
             },
-            animationSpec = spring(),
+            animationSpec = panelSpec(),
         )
         CompositionLocalProvider(
             LocalDensity provides Density(usableScale(outer.density * LOBBY_PANEL_SCALE), usableScale(outer.fontScale)),
@@ -609,15 +611,15 @@ internal fun OnboardingFlow(
         val compact = pages[page] == OnboardingStep.Terms || accessibility
         val panelWidth by animateFloatAsState(
             if (compact) TERMS_PANEL_WIDTH else PANEL_WIDTH,
-            animationSpec = spring(),
+            animationSpec = panelSpec(),
         )
         val panelHeight by animateFloatAsState(
             when {
-                accessibility -> ACCESSIBILITY_PANEL_HEIGHT
+                accessibility -> accessibilityPanelHeight()
                 compact -> TERMS_PANEL_HEIGHT
                 else -> PANEL_HEIGHT
             },
-            animationSpec = spring(),
+            animationSpec = panelSpec(),
         )
         CompositionLocalProvider(
             LocalDensity provides scaledDensity(scale),
@@ -1689,11 +1691,7 @@ private fun AccessibilityPage(onLeave: () -> Unit) {
     }
     val panelWidth = LocalPanelWidth.current
     val prompt = StartupAccessibility.promptText()
-    val settings = remember {
-        StartupAccessibility.controls().filter {
-            it != StartupAccessibility.Control.Standard && it != StartupAccessibility.Control.Skip && it != StartupAccessibility.Control.Continue
-        }
-    }
+    val settings = remember { accessibilitySettings() }
     val rows = remember(settings) {
         if (settings.size % 2 == 1) listOf(settings.take(1)) + settings.drop(1).chunked(2) else settings.chunked(2)
     }
@@ -1716,7 +1714,7 @@ private fun AccessibilityPage(onLeave: () -> Unit) {
                     ChoiceButton(
                         StartupAccessibility.label(control),
                         accessibilityIcon(control),
-                        false,
+                        StartupAccessibility.selected(control),
                         (rowWidth - ACCESSIBILITY_GAP * (row.size - 1)) / row.size,
                         enabled = control != StartupAccessibility.Control.Narrator || StartupAccessibility.narratorAvailable(),
                         focused = StartupAccessibility.focused(control),
@@ -1728,10 +1726,23 @@ private fun AccessibilityPage(onLeave: () -> Unit) {
     StandardStartupLink(Modifier.offset(0.dp, (LocalPanelHeight.current - NAV_BOTTOM_INSET - ACCESSIBILITY_LINK_INSET).dp))
 }
 
+private fun accessibilitySettings(): List<StartupAccessibility.Control> =
+    StartupAccessibility.controls().filter {
+        it != StartupAccessibility.Control.Standard && it != StartupAccessibility.Control.Skip && it != StartupAccessibility.Control.Continue
+    }
+
+private fun accessibilityPanelHeight(): Float {
+    val rows = (accessibilitySettings().size + 1) / 2
+    return ACCESSIBILITY_PANEL_HEIGHT + (rows - ACCESSIBILITY_BASE_ROWS).coerceAtLeast(0) * (ACCESSIBILITY_ROW_HEIGHT + ACCESSIBILITY_GAP)
+}
+
+private fun panelSpec(): AnimationSpec<Float> = if (PolyPlusConfig.reducedMotion) snap() else spring()
+
 private fun accessibilityIcon(control: StartupAccessibility.Control): String = MAIN_MENU_ASSETS + when (control) {
     StartupAccessibility.Control.Narrator -> "message-chat-circle.svg"
     StartupAccessibility.Control.Sounds -> "headphones-02.svg"
     StartupAccessibility.Control.Accessibility -> "settings-02.svg"
+    StartupAccessibility.Control.ReducedMotion -> "pause-circle.svg"
     else -> "globe-01.svg"
 }
 
@@ -2558,6 +2569,8 @@ private const val ACCESSIBILITY_GAP = 8f
 private const val ACCESSIBILITY_TEXT_Y = 112f
 private const val ACCESSIBILITY_ROWS_Y = 156f
 private const val ACCESSIBILITY_LINK_INSET = 26f
+private const val ACCESSIBILITY_ROW_HEIGHT = 32f
+private const val ACCESSIBILITY_BASE_ROWS = 2
 private const val FOCUS_BORDER_WIDTH = 2f
 private const val CARD_PILL_WIDTH = 300f
 private const val CARD_PILL_HEIGHT = 84f

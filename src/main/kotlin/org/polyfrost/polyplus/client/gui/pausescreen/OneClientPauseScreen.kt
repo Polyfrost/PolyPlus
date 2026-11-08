@@ -36,6 +36,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //? if >= 1.21.10 {
 import net.minecraft.client.input.MouseButtonEvent
 //?}
+import org.polyfrost.polyplus.client.PolyPlusConfig
 
 class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: PauseScreenStyle) : ComposeScreen(RenderMode.CONTINUOUS) {
     internal val capture = PauseCapture(vanilla)
@@ -61,7 +62,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
         capture.sync(width, height)
         if (!decided) {
             decided = true
-            staged = style == PauseScreenStyle.STEP_BACK && PauseStage.enter()
+            staged = style == PauseScreenStyle.STEP_BACK && !PolyPlusConfig.reducedMotion && PauseStage.enter()
             openedAt = System.currentTimeMillis()
         }
     }

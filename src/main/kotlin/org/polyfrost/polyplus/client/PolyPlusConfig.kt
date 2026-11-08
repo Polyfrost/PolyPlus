@@ -97,6 +97,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var brandedStartup = true
 
+    @JvmStatic
+    @Switch(
+        title = "Reduced Motion",
+        description = "Keep the lobby camera still and swap the startup and lobby panel animations for short fades.",
+    )
+    var reducedMotion = false
+
     @JvmStatic @Include
     var vanillaOfferDismissed = false
 

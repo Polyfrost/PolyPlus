@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.PlayerSkin
 /*import net.minecraft.client.resources.PlayerSkin
 *///?}
 import net.minecraft.world.phys.Vec3
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -70,7 +71,7 @@ object LobbyWardrobe {
         get() = ((amount - CAST_FADE_START) / CAST_FADE_SPAN).coerceIn(0.0, 1.0)
 
     fun advance(elapsed: Double) {
-        val step = elapsed / OPEN_SECONDS
+        val step = if (PolyPlusConfig.reducedMotion) 1.0 else elapsed / OPEN_SECONDS
         progress = (progress + if (open) step else -step).coerceIn(0.0, 1.0)
     }
 

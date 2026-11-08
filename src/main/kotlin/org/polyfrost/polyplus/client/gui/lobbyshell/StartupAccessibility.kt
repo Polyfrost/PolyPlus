@@ -43,13 +43,15 @@ private const val PROMPT_FRAMES = 40
 private const val PARAGRAPH = "\n\n"
 
 internal object StartupAccessibility {
-    enum class Control { Narrator, Sounds, Accessibility, Language, Standard, Skip, Continue }
+    enum class Control { Narrator, Sounds, Accessibility, Language, ReducedMotion, Standard, Skip, Continue }
 
     var focus by mutableStateOf(Control.Continue)
         private set
     var keyboardUsed by mutableStateOf(false)
         private set
     var narratorLabel by mutableStateOf("")
+        private set
+    var reducedMotion by mutableStateOf(PolyPlusConfig.reducedMotion)
         private set
     private var languageStamp by mutableStateOf("")
 
@@ -73,6 +75,7 @@ internal object StartupAccessibility {
     fun attach(onLeave: () -> Unit) {
         leave = onLeave
         refreshLanguage()
+        reducedMotion = PolyPlusConfig.reducedMotion
         if (attachedOnce) return
         attachedOnce = true
         focus = if (narratorAvailable()) Control.Narrator else Control.Continue
@@ -89,12 +92,15 @@ internal object StartupAccessibility {
         if (VANILLA_SOUND_BUTTON) add(Control.Sounds)
         if (narratorSupported()) add(Control.Accessibility)
         add(Control.Language)
+        add(Control.ReducedMotion)
         add(Control.Standard)
         add(Control.Skip)
         add(Control.Continue)
     }
 
     fun focused(control: Control): Boolean = keyboardUsed && focus == control
+
+    fun selected(control: Control): Boolean = control == Control.ReducedMotion && reducedMotion
 
     fun narratorSupported(): Boolean =
         //? if > 1.8.9 {
@@ -129,6 +135,7 @@ internal object StartupAccessibility {
         Control.Sounds -> Platform.i18n().getUnformattedText(I18n.get("options.sounds"))
         Control.Accessibility -> Platform.i18n().getUnformattedText(I18n.get("options.accessibility"))
         Control.Language -> Platform.i18n().getUnformattedText(I18n.get("options.language"))
+        Control.ReducedMotion -> "Reduced motion: " + Platform.i18n().getUnformattedText(I18n.get(if (reducedMotion) "options.on" else "options.off"))
         Control.Standard -> "Use Minecraft's standard startup"
         Control.Skip -> "Skip"
         Control.Continue -> continueText()
@@ -139,6 +146,7 @@ internal object StartupAccessibility {
         when (control) {
             Control.Narrator -> cycleNarrator()
             Control.Sounds, Control.Accessibility, Control.Language -> openSettings(control)
+            Control.ReducedMotion -> toggleReducedMotion()
             Control.Standard -> useStandardStartup()
             Control.Skip, Control.Continue -> leave?.invoke()
         }
@@ -204,6 +212,13 @@ internal object StartupAccessibility {
         //?} else {
         /*ClientPlatform.setScreen(LanguageOptionsScreen(parent, mc.options, mc.languageManager))
         *///?}
+    }
+
+    private fun toggleReducedMotion() {
+        reducedMotion = !reducedMotion
+        PolyPlusConfig.reducedMotion = reducedMotion
+        PolyPlusConfig.save()
+        announce(buttonNarration(label(Control.ReducedMotion)))
     }
 
     private fun useStandardStartup() {

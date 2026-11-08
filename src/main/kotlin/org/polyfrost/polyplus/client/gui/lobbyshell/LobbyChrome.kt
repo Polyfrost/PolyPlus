@@ -5,8 +5,11 @@ package org.polyfrost.polyplus.client.gui.lobbyshell
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,6 +60,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceAtMost
@@ -72,6 +76,7 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.AccountSwitcherContent
@@ -250,7 +255,10 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
         SceneControl(lobby)
         LobbyDarkChrome { Navbar(lobby, screen) }
         val chatShown = lobby.page != LobbyPage.Social && !LobbyPage.Social.hidden
-        val chatWidth by animateDpAsState(if (chatShown) LobbyLayout.ChatWidth else 0.dp)
+        val chatWidth by animateDpAsState(
+            if (chatShown) LobbyLayout.ChatWidth else 0.dp,
+            if (PolyPlusConfig.reducedMotion) snap() else spring(visibilityThreshold = Dp.VisibilityThreshold),
+        )
         Row(
             Modifier
                 .align(Alignment.BottomStart)

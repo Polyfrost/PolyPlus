@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
@@ -87,7 +88,7 @@ private fun guiScale(): Int {
 @Composable
 internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Boolean) {
     val reveal = rememberReveal()
-    val rise = (1f - reveal) * RISE_PIXELS
+    val rise = if (PolyPlusConfig.reducedMotion) 0f else (1f - reveal) * RISE_PIXELS
     val place = rememberPlace()
     val state = rememberPauseState()
     val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
