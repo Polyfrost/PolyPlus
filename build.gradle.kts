@@ -358,6 +358,10 @@ dependencies {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
     }
 
+    optionalProperty("deps.evergreenhud")?.let {
+        modCompileOnly("maven.modrinth:evergreenhud:$it") { isTransitive = false }
+    }
+
     optionalProperty("deps.iris")?.let {
         modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
     }

@@ -28,6 +28,7 @@ feather_build = 2
 deps.osl_entrypoints = "0.6.1+mc13w16a-mc1.14.4"
 deps.osl_core = "0.11.0+mc14w27a-mc1.14.4"
 deps.osl_keybinds = "0.3.0+mc13w36a-mc17w15a"
+deps.evergreenhud = "X0kcrCYz"
 
 ["1.21.1"]
 mod.mc_compat = "1.21.1"
@@ -37,24 +38,28 @@ deps.sodium = "mc1.21.1-0.8.13-fabric"
 deps.iris = "1.8.14-beta.1+1.21.1-fabric"
 deps.distanthorizons = "3.3.3-1.21.1"
 deps.wwaypoints = "K8KJ2B1N"
+deps.evergreenhud = "S1VRE9dE"
 
 ["1.21.4"]
 mod.mc_compat = "1.21.4"
 mod.mc_releases = "1.21.4"
 deps.fabric_api = "0.119.4+1.21.4"
 deps.wwaypoints = "Az59rwVy"
+deps.evergreenhud = "eHwqj2VU"
 
 ["1.21.5"]
 mod.mc_compat = "1.21.5"
 mod.mc_releases = "1.21.5"
 deps.fabric_api = "0.128.2+1.21.5"
 deps.wwaypoints = "tLwAVa8Y"
+deps.evergreenhud = "LlzWfLXF"
 
 ["1.21.8"]
 mod.mc_compat = "1.21.8"
 mod.mc_releases = "1.21.8"
 deps.fabric_api = "0.136.1+1.21.8"
 deps.wwaypoints = "XZlafW7N"
+deps.evergreenhud = "aaOr291F"
 
 ["1.21.10"]
 mod.mc_compat = "1.21.10"
@@ -64,6 +69,7 @@ deps.sodium = "mc1.21.10-0.7.3-fabric"
 deps.iris = "1.9.7+1.21.10-fabric"
 deps.distanthorizons = "3.3.3-1.21.10"
 deps.wwaypoints = "9JBCPOwC"
+deps.evergreenhud = "Bj7SwDbp"
 
 ["1.21.11"]
 mod.mc_compat = "1.21.11"
@@ -73,6 +79,7 @@ deps.sodium = "mc1.21.11-0.8.13-fabric"
 deps.iris = "1.10.8+1.21.11-fabric"
 deps.distanthorizons = "3.3.3-1.21.11"
 deps.wwaypoints = "8hPTY1SS"
+deps.evergreenhud = "1Zb9G7pX"
 
 ["26.1"]
 mod.mc_compat = "~26.1"
@@ -82,6 +89,7 @@ deps.sodium = "mc26.1.2-0.9.1-fabric"
 deps.iris = "1.11.4+26.1-fabric"
 deps.distanthorizons = "3.3.3-26.1.2"
 deps.wwaypoints = "pX4mxVAv"
+deps.evergreenhud = "coniDQ92"
 
 ["26.2"]
 mod.mc_compat = "~26.2"
@@ -91,6 +99,7 @@ deps.sodium = "mc26.2-0.9.1-fabric"
 deps.iris = "1.11.4+26.2-fabric"
 deps.distanthorizons = "3.3.3-26.2"
 deps.wwaypoints = "vudKzlxH"
+deps.evergreenhud = "HZ3uu545"
 
 ["26.3"]
 mod.mc_compat = "~26.3"
@@ -100,3 +109,4 @@ deps.sodium = "mc26.3r1-0.9.2-beta.2-fabric"
 deps.iris = "1.11.7+26.3-fabric"
 deps.distanthorizons = "3.3.4-26.3"
 deps.wwaypoints = "mgo409Pu"
+deps.evergreenhud = "ZFWcFjsA"
