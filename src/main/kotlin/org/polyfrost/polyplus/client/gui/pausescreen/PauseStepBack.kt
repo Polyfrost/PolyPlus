@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.PauseMenuPanel
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialIconButton
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -95,7 +94,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 Spacer(Modifier.height(6.dp))
                 PauseStateLine(state)
                 Spacer(Modifier.height(if (narrow) 12.dp else 18.dp))
-                PlayButton(Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", "Esc", screen::resume)
+                PlayButton(Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", null, screen::resume)
                 Spacer(Modifier.height(if (narrow) 8.dp else 12.dp))
                 StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
             }
@@ -145,11 +144,11 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     val capture = screen.capture
     capture.entry(PauseSlot.OPTIONS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
     capture.entry(PauseSlot.WORLD)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
-    if (screen.canHost) MenuRow(asset("log-in-04"), PauseWorldAccess.hostLabel, "Invite friends", height = rowHeight, onClick = screen::openHost)
+    if (screen.canHost) MenuRow(asset("log-in-04"), PauseWorldAccess.hostLabel, height = rowHeight, onClick = screen::openHost)
     capture.entry(PauseSlot.ADVANCEMENTS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
-    capture.entry(PauseSlot.STATS)?.let {
-        val time = remember { PauseMenuPanel.playtimeShort() }
-        MenuRow(it.glyph, it.label, time, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press)
+    capture.entry(PauseSlot.STATS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
+    rememberPauseModMenu()?.let { (modMenu, logo) ->
+        MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
     MenuRow(asset("dots-vertical"), "More", height = rowHeight) { screen.moreOpen = !screen.moreOpen }
     Spacer(Modifier.height(6.dp))

@@ -53,10 +53,11 @@ internal class PauseEntry(
     val tooltip: String?,
     val sprite: ImageBitmap?,
     val glyph: String,
+    val modMenu: Boolean = false,
     val press: () -> Unit,
 ) {
     fun same(other: PauseEntry): Boolean =
-        key == other.key && slot == other.slot && label == other.label && section == other.section &&
+        key == other.key && slot == other.slot && label == other.label && section == other.section && modMenu == other.modMenu &&
             enabled == other.enabled && tooltip == other.tooltip && sprite === other.sprite
 }
 
@@ -169,7 +170,13 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
             tooltip?.takeIf { it != text },
             spriteOf(widget),
             slotted.glyph,
+            slotted.slot == PauseSlot.MORE && isModMenu(widget, handler),
         ) { press(widget) }
+    }
+
+    private fun isModMenu(widget: AbstractWidget, handler: Any?): Boolean {
+        if ((widget.message.contents as? TranslatableContents)?.key == MOD_MENU_KEY) return true
+        return listOfNotNull(widget.javaClass, handler?.javaClass).any { it.name.startsWith(MOD_MENU_PACKAGE) }
     }
 
     private fun press(widget: AbstractWidget) {
@@ -276,6 +283,8 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         const val GLYPH_WORLD = "assets/polyplus/mainmenu/globe-01.svg"
         const val GLYPH_LEAVE = "assets/polyplus/mainmenu/log-out-04.svg"
         const val UNNAMED = "Mod button"
+        const val MOD_MENU_KEY = "modmenu.title"
+        const val MOD_MENU_PACKAGE = "com.terraformersmc.modmenu."
         //? if = 1.8.9 {
         /*const val LEGACY_OPTIONS = 0
         const val LEGACY_QUIT = 1

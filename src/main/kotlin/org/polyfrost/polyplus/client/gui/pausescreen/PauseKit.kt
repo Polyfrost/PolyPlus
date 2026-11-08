@@ -76,6 +76,13 @@ import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialFieldShape
+import org.polyfrost.polyplus.client.gui.ModIntegrationButton
+import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.gui.lobbyshell.ModLogo
+import org.polyfrost.polyplus.client.gui.lobbyshell.decodeModLogo
+import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
@@ -107,6 +114,9 @@ private const val COMPACT_WIDTH = 1300f
 private const val OPAQUE_FLOOR = 0.94f
 private const val MENU_REVEAL_NANOS = 160_000_000f
 private const val DISABLED_ALPHA = 0.4f
+private const val DANGER_REST_TINT = 0.1f
+private const val DANGER_HOVER_TINT = 0.2f
+private val MOD_LOGO_SIZE = 16.dp
 
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
@@ -277,16 +287,18 @@ internal fun MenuRow(
     danger: Boolean = false,
     enabled: Boolean = true,
     tooltip: String? = null,
+    logo: ImageBitmap? = null,
     onClick: () -> Unit,
 ) {
     val (interaction, hovered) = rememberSocialHover()
-    val ink = if (danger && hovered) SocialDangerText else SocialTextPrimary
+    val ink = if (danger) SocialDangerText else SocialTextPrimary
     Box {
         if (tooltip != null && hovered) HoverTooltip(tooltip, TooltipPlacement.ABOVE_CENTER, 320.dp)
         Row(
             Modifier
                 .fillMaxWidth()
                 .height(height)
+                .then(if (danger) Modifier.background(SocialDangerText.copy(alpha = if (hovered && enabled) DANGER_HOVER_TINT else DANGER_REST_TINT), SocialFieldShape) else Modifier)
                 .rowFrame(false, hovered && enabled)
                 .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
                 .hoverable(interaction)
@@ -295,7 +307,7 @@ internal fun MenuRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            PauseGlyph(icon, ink)
+            if (logo != null) Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) { ModLogo(logo, MOD_LOGO_SIZE, ink) } else PauseGlyph(icon, ink)
             Label(label, size, Modifier.weight(1f), color = ink, weight = FontWeight.Medium)
             detail?.let { Label(it, 12.sp, color = MutedText) }
         }
@@ -336,7 +348,8 @@ private fun MoreEntry(entry: PauseEntry, onDone: () -> Unit) {
 
 @Composable
 internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
-    val entries = screen.capture.more
+    val modMenuShown = rememberPauseModMenu() != null
+    val entries = screen.capture.more.filterNot { modMenuShown && it.modMenu }
     val close = { screen.moreOpen = false }
     Column(
         modifier
@@ -354,6 +367,12 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
         if (entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
         MenuRow("dots-grid", "Classic pause menu", height = 38.dp, size = 14.sp, tooltip = uncapturedHint(screen.capture.uncaptured), onClick = screen::openClassic)
     }
+}
+
+@Composable
+internal fun rememberPauseModMenu(): Pair<ModIntegrationButton, ImageBitmap?>? = remember {
+    val button = if (PolyPlusMainMenuConfig.hideMainMenuModButtons) null else ModIntegrationButtons.availableModMenu()
+    button?.let { it to decodeModLogo(it.logo) }
 }
 
 private fun uncapturedHint(count: Int): String? = when (count) {
