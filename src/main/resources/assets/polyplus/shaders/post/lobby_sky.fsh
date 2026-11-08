@@ -1,4 +1,10 @@
+//? if = 1.8.9 {
+/*#version 120
+#define texture texture2D
+#define fragColor gl_FragColor
+*///?} else {
 #version 330
+//?}
 //? if >= 26.3
 #extension GL_ARB_separate_shader_objects : require
 //? if < 1.21.4 {
@@ -42,9 +48,11 @@ uniform vec4 Flags;
 //? if >= 26.3 {
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
-//?} else {
+//?} elif > 1.8.9 {
 /*in vec2 texCoord;
 out vec4 fragColor;
+*///?} else {
+/*varying vec2 texCoord;
 *///?}
 
 const float AURORA_STRENGTH = 0.6;
@@ -58,7 +66,7 @@ int flagMode() {
 }
 
 int depthMode() {
-    return flagMode() % 4;
+    return flagMode() - flagMode() / 4 * 4;
 }
 
 int ringMode() {

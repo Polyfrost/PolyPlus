@@ -188,6 +188,8 @@
     "client.lobby.MixinScreen",
     //? if >= 26.2
     "client.lobby.MixinShaderConfigsLobby",
+    //? if >= 1.21.4
+    "client.lobby.MixinShaderManagerLobby",
     //? if = 1.8.9
     //"client.lobby.MixinWorld",
     //? if = 1.8.9

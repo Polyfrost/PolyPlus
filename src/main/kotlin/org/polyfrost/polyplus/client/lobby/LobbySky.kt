@@ -55,6 +55,8 @@ import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridges
 import org.polyfrost.polyplus.mixin.client.access.PostChainAccessor
 //? if >= 1.21.8 || = 1.21.4
 import org.polyfrost.polyplus.mixin.client.access.PostPassAccessor
+//? if < 1.21.4
+/*import org.apache.logging.log4j.LogManager*/
 import kotlin.math.tan
 
 object LobbySky {
@@ -65,6 +67,12 @@ object LobbySky {
     *///?} elif >= 1.21.4 {
     /*val POST_EFFECT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "lobby_program")
     *///?}
+
+    //? if >= 1.21.4 {
+    @JvmStatic
+    fun ownsPostEffect(id: Identifier): Boolean = id == POST_EFFECT
+    //?}
+
     //? if < 1.21.8 {
     /*private val SKY_NAMES = listOf("Forward", "Right", "Up", "Params", "Mood", "Lens", "Wave", "Flags")
     private val GLASS_NAMES = listOf("Glass") + (0 until 12).map { "Panel$it" } + (0 until 3).map { "Radius$it" }
@@ -246,7 +254,9 @@ object LobbySky {
     //?}
 
     //? if < 1.21.4 {
-    /*private var chain: PostChain? = null
+    /*private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
+    private var chain: PostChain? = null
+    private var chainFailed = false
 
     @JvmStatic
     fun release() {
@@ -254,10 +264,20 @@ object LobbySky {
         chain = null
     }
 
-    fun process(renderer: GameRenderer) {
+    private fun loadChain(renderer: GameRenderer): PostChain? {
+        if (chainFailed) return null
         val mc = Minecraft.getInstance()
+        return runCatching { PostChain(mc.textureManager, mc.resourceManager, LobbyCompat.mainTarget(renderer), Identifier.fromNamespaceAndPath("polyplus", "shaders/post/lobby_chain.json")) }
+            .onFailure {
+                chainFailed = true
+                LOGGER.warn("Lobby post effects disabled, the shader chain failed to load", it)
+            }
+            .getOrNull()
+    }
+
+    fun process(renderer: GameRenderer) {
         val target = LobbyCompat.mainTarget(renderer)
-        val loaded = chain ?: PostChain(mc.textureManager, mc.resourceManager, target, Identifier.fromNamespaceAndPath("polyplus", "shaders/post/lobby_chain.json")).also {
+        val loaded = chain ?: (loadChain(renderer) ?: return target.bindWrite(true)).also {
             it.resize(target.width, target.height)
             chain = it
             sized = target.width to target.height

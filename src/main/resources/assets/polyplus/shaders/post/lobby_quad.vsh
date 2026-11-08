@@ -1,5 +1,5 @@
 //? if = 1.8.9 {
-/*#version 330 compatibility
+/*#version 120
 *///?} else {
 #version 330
 //?}
@@ -48,7 +48,7 @@ void main() {
 *///?} else {
 /*uniform vec2 OutSize;
 
-out vec2 texCoord;
+varying vec2 texCoord;
 
 void main() {
     texCoord = gl_Vertex.xy / OutSize;

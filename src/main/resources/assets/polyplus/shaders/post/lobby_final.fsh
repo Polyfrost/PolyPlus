@@ -1,4 +1,10 @@
+//? if = 1.8.9 {
+/*#version 120
+#define textureLod(sampler, uv, lod) texture2D(sampler, uv)
+#define fragColor gl_FragColor
+*///?} else {
 #version 330
+//?}
 //? if >= 26.3
 #extension GL_ARB_separate_shader_objects : require
 //? if < 1.21.4 {
@@ -84,16 +90,18 @@ vec4 panelAt(int index) {
 
 float radiusAt(int index) {
     vec4 radii[3] = vec4[3](Radius0, Radius1, Radius2);
-    return radii[index / 4][index % 4];
+    return radii[index / 4][index - index / 4 * 4];
 }
 *///?}
 
 //? if >= 26.3 {
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
-//?} else {
+//?} elif > 1.8.9 {
 /*in vec2 texCoord;
 out vec4 fragColor;
+*///?} else {
+/*varying vec2 texCoord;
 *///?}
 
 const int GATHER_TAPS = 40;
@@ -125,7 +133,7 @@ int flagMode() {
 }
 
 int depthMode() {
-    return flagMode() % 4;
+    return flagMode() - flagMode() / 4 * 4;
 }
 
 int ringMode() {
