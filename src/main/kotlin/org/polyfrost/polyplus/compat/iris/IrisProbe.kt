@@ -1,10 +1,10 @@
 package org.polyfrost.polyplus.compat.iris
 
-import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
 import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridge
+import org.polyfrost.polyplus.mixin.PolyPlusMixinPlugin
 
 object IrisProbe {
-    private val LOGGER = LogManager.getLogger("PolyPlus/Lobby")
     private const val ROOT = "net.irisshaders.iris"
     private const val NAMESPACED_ID = "$ROOT.shaderpack.materialmap.NamespacedId"
 
@@ -15,6 +15,7 @@ object IrisProbe {
     val lobbyPipeline: Boolean get() = pipelineSlot && bufferGuard
 
     fun bridge(): LobbyShaderBridge? {
+        if (!PolyPlusMixinPlugin.compatEnabled("iris")) return null
         if (!available("pack query", ::probePack)) return null
         IrisLobbyPipelines.install()
         return IrisLobbyBridge
@@ -43,7 +44,7 @@ object IrisProbe {
     private fun available(what: String, probe: () -> Unit): Boolean = runCatching(probe).fold(
         onSuccess = { true },
         onFailure = {
-            LOGGER.warn("Iris {} unavailable, lobby shader bridge degrades: {}", what, it.toString())
+            LOBBY_LOGGER.warn("Iris {} unavailable, lobby shader bridge degrades: {}", what, it.toString())
             false
         },
     )
