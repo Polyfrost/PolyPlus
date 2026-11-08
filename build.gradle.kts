@@ -559,14 +559,43 @@ val curseforgeId = optionalProperty("oneconfig.publish.curseforge", "publish.cur
 val curseforgeToken = optionalProperty("oneconfig.publish.curseforge.token", "publish.curseforge.token", "curseforge.token")
 
 val minecraftVersion = (property("mod.mc_releases") as String).split(",").map { it.trim() }
-val changelogs = rootProject.file("CHANGELOG.md").takeIf { it.exists() }?.readText() ?: "No changelog provided."
+val changelogFile = rootProject.file("CHANGELOG.md")
+
+fun currentChangelogSection(): String? {
+    if (!changelogFile.exists()) return null
+    val headingPattern = Regex("^##\\s+v?" + Regex.escape(modVersion) + "(\\s.*)?$")
+    val lines = changelogFile.readLines()
+    val start = lines.indexOfFirst { headingPattern.matches(it.trimEnd()) }
+    if (start < 0) return null
+    val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
+    return lines.subList(start + 1, end).joinToString("\n").trim().takeIf { it.isNotEmpty() }
+}
+
+val validateChangelog = tasks.register("validateChangelog") {
+    description = "Validates that the changelog is written for the current version."
+    doLast {
+        if (currentChangelogSection() == null) {
+            throw GradleException("Changelog for version $modVersion not found.")
+        }
+    }
+}
+
+tasks.matching { it.name == "publishMods" || it.name == "publishModrinth" || it.name == "publishCurseforge" }.configureEach {
+    dependsOn(validateChangelog)
+}
+
+tasks.matching { it.name.startsWith("publish") }.configureEach {
+    doFirst {
+        if (testerBuild) throw GradleException("Tester builds must never be published.")
+    }
+}
 
 publishMods {
     file = loomx.modJar.flatMap { it.archiveFile }
 
     displayName = modVersion
     version = "v$modVersion"
-    changelog = changelogs
+    changelog = providers.provider { currentChangelogSection() ?: throw GradleException("Changelog for version $modVersion not found.") }
     type = STABLE
 
     modLoaders.add(loader)
