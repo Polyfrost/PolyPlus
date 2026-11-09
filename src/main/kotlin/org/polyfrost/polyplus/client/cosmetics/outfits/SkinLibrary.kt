@@ -267,7 +267,10 @@ object SkinLibrary {
 
     fun texture(hash: String, url: String): Identifier? {
         val key = hash.lowercase().takeIf { HASH_PATTERN.matches(it) } ?: return null
-        textures[key]?.let { return it }
+        textures[key]?.let { location ->
+            if (RemoteTextures.isRegistered(texturePath(key))) return location
+            textures.remove(key, location)
+        }
         if (System.currentTimeMillis() >= (textureFailed[key] ?: 0L) && textureLoading.add(key)) loadTexture(key, url)
         return null
     }
@@ -541,7 +544,7 @@ object SkinLibrary {
                         ImageIO.write(modernLayout(previewImage(image)), "png", file)
                     }
                 }
-                RemoteTextures.register(texturePath(hash), file.toPath())
+                RemoteTextures.register(texturePath(hash), file.toPath(), keepOnReset = true)
                 textures[hash] = textureLocation(hash)
                 textureFailed.remove(hash)
                 textureVersion++
