@@ -53,6 +53,7 @@ object PartyVoice {
     @Volatile private var capture: VoiceStream? = null
     @Volatile private var lastLoud = 0L
     @Volatile private var silentSince = 0L
+    @Volatile private var micHeard = false
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -238,6 +239,7 @@ object PartyVoice {
     private fun startCapture() {
         if (capture != null) return
         silentSince = 0L
+        micHeard = false
         val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain, ::onFrame)
         if (mic != null) {
             capture = mic
@@ -253,7 +255,7 @@ object PartyVoice {
 
     private fun onFrame(frame: ShortArray, level: Float) {
         val now = System.currentTimeMillis()
-        if (EosRtcSupport.isMac && !muted && PartyVoiceSettings.inputGain() > 0f) {
+        if (EosRtcSupport.isMac && !micHeard && !muted && PartyVoiceSettings.inputGain() > 0f) {
             if (level == 0f) {
                 if (silentSince == 0L) silentSince = now else if (now - silentSince >= SILENCE_BLOCK_MS) {
                     onCaptureFailed()
@@ -261,6 +263,7 @@ object PartyVoice {
                 }
             } else {
                 silentSince = 0L
+                micHeard = true
             }
         }
         if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
