@@ -54,7 +54,6 @@ public abstract class MixinDisconnectedScreen extends Screen {
             return;
         }
         this.layout.addChild(Button.builder(Component.literal("Rejoin world"), pressed -> {
-            pressed.active = false;
             P2PSessionManager.rejoin();
         }).width(200).build());
     }
@@ -119,7 +118,6 @@ public abstract class MixinDisconnectedScreen extends Screen {
     @Inject(method = "buttonClicked", at = @At("HEAD"), cancellable = true)
     private void polyplus$pressRejoinButton(ButtonWidget button, CallbackInfo ci) {
         if (button.id == POLYPLUS_REJOIN_BUTTON_ID) {
-            button.active = false;
             P2PSessionManager.rejoin();
             ci.cancel();
         }
