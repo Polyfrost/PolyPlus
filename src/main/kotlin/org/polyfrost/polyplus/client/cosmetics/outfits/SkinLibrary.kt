@@ -267,7 +267,7 @@ object SkinLibrary {
 
     fun texture(hash: String, url: String): Identifier? {
         val key = hash.lowercase().takeIf { HASH_PATTERN.matches(it) } ?: return null
-        textures[key]?.let { return it }
+        textures[key]?.let { if (RemoteTextures.isRegistered(texturePath(key))) return it else textures.remove(key) }
         if (System.currentTimeMillis() >= (textureFailed[key] ?: 0L) && textureLoading.add(key)) loadTexture(key, url)
         return null
     }
@@ -278,6 +278,10 @@ object SkinLibrary {
         conflict = "Your skin library is full ($limit skins). Delete one to make room.",
         badRequest = NOT_A_SKIN,
     )
+
+    internal fun onTexturesReleased() {
+        textureVersion++
+    }
 
     internal fun remember(skin: PlayerSkinInfo) {
         if (state !is LibraryState.Loaded) return
@@ -544,12 +548,13 @@ object SkinLibrary {
                 RemoteTextures.register(texturePath(hash), file.toPath())
                 textures[hash] = textureLocation(hash)
                 textureFailed.remove(hash)
+                textureLoading.remove(hash)
                 textureVersion++
             }.onFailure {
                 textureFailed[hash] = System.currentTimeMillis() + BITMAP_RETRY_MS
                 LOGGER.debug("Could not load the texture for skin {}", hash, it)
+                textureLoading.remove(hash)
             }
-            textureLoading.remove(hash)
             if (textureFailed.containsKey(hash)) {
                 delay(BITMAP_RETRY_MS)
                 textureVersion++
