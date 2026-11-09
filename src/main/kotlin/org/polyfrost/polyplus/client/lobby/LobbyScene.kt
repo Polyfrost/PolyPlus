@@ -1110,12 +1110,14 @@ object LobbyScene {
             val light = ArrayList<Triple<Int, DataLayer?, DataLayer?>>()
             tag.getListOrEmpty("sections").compounds().forEach { section ->
                 val sectionY = section.getIntOr("y", 0)
+                val index = level.getSectionIndexFromSectionY(sectionY)
+                if (index !in sections.indices) return@forEach
                 val states = section.optCompound("blocks")?.let {
                     if (native) factory.blockCodec.parse(NbtOps.INSTANCE, it).getOrThrow() else LobbySnapshot.foreignBlocks(it, factory.emptyBlocks(), blockLookup)
                 } ?: factory.emptyBlocks()
                 val biomeTag = LobbySnapshot.knownBiomes(section.getCompoundOrEmpty("biomes"), biomeLookup)
                 val biomes = factory.biomeCodec.parse(NbtOps.INSTANCE, biomeTag).getOrThrow()
-                sections[level.getSectionIndexFromSectionY(sectionY)] = LevelChunkSection(states, biomes)
+                sections[index] = LevelChunkSection(states, biomes)
                 light += Triple(sectionY, LobbySnapshot.readLight(section, "block_light"), LobbySnapshot.readLight(section, "sky_light"))
             }
             val chunk = load(level, pos, sections) ?: return@forEach
