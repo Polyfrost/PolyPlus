@@ -173,9 +173,12 @@ private fun ScenePicker(onClose: () -> Unit) {
 @Composable
 private fun CaptureRow(entry: LobbySceneEntry, following: Boolean, locked: String? = null) {
     var deleting by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
     SceneRow(entry.label, locked ?: describe(entry), !following && LobbySceneStore.pinned == entry.id, { pick(entry.id) }, enabled = locked == null && !following) {
+        if (LobbySceneStore.canRename(entry)) IconButton(themedIcon(SOCIAL_ASSETS + "edit-02.svg"), "Rename capture", Modifier) { renaming = true }
         IconButton(themedIcon(SOCIAL_ASSETS + "trash-01.svg"), "Delete capture", Modifier) { deleting = true }
     }
+    if (renaming) RenameSceneDialog(entry) { renaming = false }
     if (deleting) {
         ConfirmDialog(
             title = "Delete ${entry.label}?",

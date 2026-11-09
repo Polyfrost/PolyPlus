@@ -52,6 +52,7 @@ data class LobbySceneEntry(
     val points: Int? = null,
     val manual: Boolean = false,
     val profile: String = "outdoor",
+    val renamed: Boolean = false,
 ) {
     val bundled: Boolean
         get() = origin == ORIGIN_BUNDLED
@@ -69,6 +70,8 @@ data class LobbySceneEntry(
 }
 
 object LobbySceneStore {
+    const val MAX_LABEL_LENGTH = 32
+
     @Serializable
     private data class State(
         val scenes: List<LobbySceneEntry> = emptyList(),
@@ -220,9 +223,12 @@ object LobbySceneStore {
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
         val rivals = current.filter { !it.manual && stackOf(it) == stack }
         val replaced = (inWorld - current.toSet()).toMutableList()
-        replaced += state.scenes.filter { it.file == fileName(candidate) }
+        val sameFile = state.scenes.filter { it.file == fileName(candidate) }
+        val sameSpot = if (candidate.manual) sameFile else sameFile + inWorld.filter { !it.manual && stackOf(it) == stack && near(it, candidate) }
+        val custom = sameSpot.filter { it.renamed }.maxByOrNull { it.capturedAt }
+        replaced += sameFile
         if (!candidate.manual) {
-            replaced += rivals.filter { hypot((it.x - candidate.x).toDouble(), (it.z - candidate.z).toDouble()) < SAME_SPOT_BLOCKS }
+            replaced += rivals.filter { near(it, candidate) }
             val left = rivals - replaced.toSet()
             if (left.size >= MAX_PER_WORLD) replaced += left.sortedBy { it.score }.take(left.size - MAX_PER_WORLD + 1)
         }
@@ -235,7 +241,11 @@ object LobbySceneStore {
             kept = kept - dropped
             total -= dropped.bytes
         }
-        val entry = named(candidate).copy(bytes = data.size.toLong())
+        val entry = named(candidate).copy(
+            bytes = data.size.toLong(),
+            label = custom?.label ?: candidate.label,
+            renamed = custom != null,
+        )
         val name = entry.file
         val stale = replaced.filter { it.file != name }.map { folder.resolve(it.file) }
         state = state.copy(scenes = kept + entry, pinned = state.pinned?.takeUnless { id -> replaced.any { it.id == id && it.file != name } })
@@ -260,6 +270,18 @@ object LobbySceneStore {
         Util.ioPool().execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
     }
 
+    fun canRename(entry: LobbySceneEntry): Boolean = !entry.bundled && entry.origin != LobbySceneEntry.ORIGIN_PARTY
+
+    fun rename(entry: LobbySceneEntry, label: String) {
+        if (!canRename(entry)) return
+        val name = label.trim().take(MAX_LABEL_LENGTH).trim()
+        if (name.isEmpty()) return
+        ensureLoaded()
+        val stored = state.scenes.firstOrNull { it.id == entry.id } ?: return
+        if (stored.label == name) return
+        update { copy(scenes = scenes.map { if (it.id == entry.id) it.copy(label = name, renamed = true) else it }) }
+    }
+
     fun worldKey(address: String): String = "server:${key(address)}"
 
     fun named(entry: LobbySceneEntry): LobbySceneEntry {
@@ -268,6 +290,9 @@ object LobbySceneStore {
     }
 
     private fun key(address: String): String = address.trim().lowercase(Locale.ROOT)
+
+    private fun near(entry: LobbySceneEntry, other: LobbySceneEntry): Boolean =
+        hypot((entry.x - other.x).toDouble(), (entry.z - other.z).toDouble()) < SAME_SPOT_BLOCKS
 
     private fun stackOf(entry: LobbySceneEntry): Set<String> = entry.packs.mapTo(LinkedHashSet()) { it.id }
 
