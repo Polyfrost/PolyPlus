@@ -48,6 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -127,6 +130,7 @@ import org.polyfrost.polyplus.client.gui.stats.formatDuration
 import org.polyfrost.polyplus.client.gui.themeToggle
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.toggleFullscreen
+import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import org.polyfrost.polyplus.client.lobby.LobbyHologram
 import org.polyfrost.polyplus.client.lobby.LobbyScene
@@ -247,6 +251,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
         }
         Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page)) { when (lobby.page) {
             LobbyPage.Home -> {
+                Box(Modifier.fillMaxSize().avatarTaps(lobby))
                 SceneTags(labels, root)
                 LobbyCornerCard(lobby, Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top))
             }
@@ -564,6 +569,17 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
                     button.onClick(screen)
                 }
             }
+        }
+    }
+}
+
+private fun Modifier.avatarTaps(lobby: LobbyShell): Modifier = pointerInput(lobby) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue
+            val at = event.changes.firstOrNull()?.position ?: continue
+            if (lobby.calm() && LobbyAntics.click(at.x / size.width.toDouble(), at.y / size.height.toDouble())) event.changes.forEach { it.consume() }
         }
     }
 }

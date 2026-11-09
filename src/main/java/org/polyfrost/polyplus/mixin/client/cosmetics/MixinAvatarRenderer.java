@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 //? if > 1.8.9 {
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import org.polyfrost.polyplus.client.lobby.LobbyAntics;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
@@ -133,6 +134,7 @@ public class MixinAvatarRenderer {
     )
     private void polyplus$leanHerobrine(AvatarRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
         LobbyHerobrine.lean(state.id, poseStack);
+        LobbyAntics.spin(state.id, poseStack);
     }
     //?} elif >= 1.21.4 {
     /*@Inject(
@@ -141,6 +143,7 @@ public class MixinAvatarRenderer {
     )
     private void polyplus$leanHerobrine(PlayerRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
         LobbyHerobrine.lean(state.id, poseStack);
+        LobbyAntics.spin(state.id, poseStack);
     }
     *///?} elif > 1.8.9 {
     /*@Inject(
@@ -149,6 +152,7 @@ public class MixinAvatarRenderer {
     )
     private void polyplus$leanHerobrine(AbstractClientPlayer player, PoseStack poseStack, float bob, float bodyRot, float partialTick, float scale, CallbackInfo ci) {
         LobbyHerobrine.lean(player.getId(), poseStack);
+        LobbyAntics.spin(player.getId(), poseStack);
     }
     *///?}
 //? if > 1.8.9
@@ -158,6 +162,7 @@ public class MixinAvatarRenderer {
 /*import net.minecraft.client.entity.living.player.ClientPlayerEntity;
 import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.render.entity.PlayerRenderer;
+import org.polyfrost.polyplus.client.lobby.LobbyAntics;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
 import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
@@ -191,6 +196,7 @@ public class MixinAvatarRenderer {
     @Inject(method = "applyRotation(Lnet/minecraft/client/entity/living/player/ClientPlayerEntity;FFF)V", at = @At("HEAD"))
     private void polyplus$leanHerobrine(ClientPlayerEntity player, float bob, float bodyYaw, float tickDelta, CallbackInfo ci) {
         LobbyHerobrine.lean(player.getNetworkId());
+        LobbyAntics.spin(player.getNetworkId());
     }
 }
 *///?}

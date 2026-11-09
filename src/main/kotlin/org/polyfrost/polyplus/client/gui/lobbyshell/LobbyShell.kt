@@ -31,6 +31,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPageState
 import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
 import org.polyfrost.polyplus.client.gui.replays.watchSafely
 import org.polyfrost.polyplus.client.host.HostWorldManager
@@ -341,14 +342,17 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         return true
     }
 
+    private fun covered(): Boolean = accountsOpen || EscapeStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
+
+    fun calm(): Boolean = !setup && tour == null && !sceneOpen && !covered() && !SocialPageState.dialogOpen && !TextInputFocus.isTyping
+
     fun openSocial(): Boolean {
         tour?.let { current ->
             if (TextInputFocus.isTyping) return false
             if (!current.next()) endTour()
             return true
         }
-        val covered = accountsOpen || EscapeStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
-        if (setup || page == LobbyPage.Social || covered || TextInputFocus.isTyping) return false
+        if (setup || page == LobbyPage.Social || covered() || TextInputFocus.isTyping) return false
         show(LobbyPage.Social)
         return true
     }

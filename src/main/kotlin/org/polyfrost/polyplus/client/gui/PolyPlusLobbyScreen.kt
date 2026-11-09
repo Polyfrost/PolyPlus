@@ -18,6 +18,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyShell
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyRoot
 import org.polyfrost.polyplus.client.gui.lobbyshell.StartupAccessibility
+import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 
@@ -48,6 +49,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
     override fun handleMouseClicked(button: Int): Boolean = StartupOverlay.active || lobby.skipIntro()
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
+        LobbyAntics.key(key, lobby.calm())
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
         if (lobby.setup && OnboardingKeyCapture.capture(key)) return true
         if (lobby.skipIntro()) return true
