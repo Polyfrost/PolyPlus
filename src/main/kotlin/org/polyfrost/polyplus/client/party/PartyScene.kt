@@ -141,7 +141,7 @@ object PartyScene {
     fun answerConsent(share: Boolean) {
         val entry = consentPrompt ?: return
         consentPrompt = null
-        val hash = hashes[entry.id] ?: return
+        val hash = hashes[hashKey(entry)] ?: return
         consents = consents + (hash to share)
         PolyPlusPartyConfig.partySceneConsents = consents.entries.joinToString(",") { "${it.key}=${if (it.value) 1 else 0}" }
         PolyPlusPartyConfig.save()
@@ -153,14 +153,19 @@ object PartyScene {
         if (key.isEmpty() || value.isEmpty()) null else key to (value == "1")
     }.toMap()
 
+    private fun hashKey(entry: LobbySceneEntry): String = "${entry.id}:${entry.capturedAt}:${entry.bytes}"
+
     private fun hashOf(entry: LobbySceneEntry): String? {
-        hashes[entry.id]?.let { return it }
+        val key = hashKey(entry)
+        hashes[key]?.let { return it }
         val path = LobbySceneStore.fileOf(entry) ?: return null
-        if (hashing.add(entry.id)) {
+        if (hashing.add(key)) {
             PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
-                runCatching { hashes[entry.id] = sha256(Files.readAllBytes(path)) }
-                    .onFailure { LOGGER.warn("Could not hash lobby scene {}", entry.id, it) }
-                hashing.remove(entry.id)
+                runCatching {
+                    val data = Files.readAllBytes(path)
+                    if (data.size.toLong() == entry.bytes) hashes[key] = sha256(data)
+                }.onFailure { LOGGER.warn("Could not hash lobby scene {}", entry.id, it) }
+                hashing.remove(key)
             }
         }
         return null
@@ -172,7 +177,7 @@ object PartyScene {
         val scene = published ?: return null
         if (scene.kind != SceneKind.Capture || !PartyRepository.isLeader()) return null
         val entry = currentEntry() ?: return null
-        if (hashes[entry.id] != scene.id) return null
+        if (hashes[hashKey(entry)] != scene.id) return null
         return scene.id to (LobbySceneStore.fileOf(entry) ?: return null)
     }
 
