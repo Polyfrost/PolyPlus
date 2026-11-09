@@ -58,7 +58,7 @@ internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSe
                 verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
             ) {
                 WorldsHeader(state, onBack)
-                if (state.filter == WorldFilter.All) LastPlayedWorldStrip(state, onHost)
+                if (!state.narrowed) LastPlayedWorldStrip(state, onHost)
                 WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
             }
             WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
