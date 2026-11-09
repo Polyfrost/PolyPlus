@@ -57,6 +57,7 @@ internal object SceneTransfer {
     @Volatile private var download: Download? = null
     @Volatile private var verifiedParty: String? = null
     @Volatile private var pass: String? = null
+    @Volatile private var passParty: String? = null
     @Volatile private var passExpires = 0L
     private val serving = AtomicInteger()
     @Volatile private var relayHeldUntil = 0L
@@ -113,7 +114,7 @@ internal object SceneTransfer {
         val job = Download(leader, hash)
         download = job
         PolyPlusClient.SCOPE.launch {
-            val token = ownPass() ?: return@launch fail(job, "no party pass")
+            val token = ownPass(party.id) ?: return@launch fail(job, "no party pass")
             if (PartyRepository.party.value?.id != party.id) return@launch fail(job, "left the party")
             P2PSessionManager.setSceneRelay(PolyPlusConfig.voiceHideIp)
             bridge.acceptConnection(SOCKET, leader)
@@ -124,11 +125,13 @@ internal object SceneTransfer {
         }
     }
 
-    private suspend fun ownPass(): String? {
+    private suspend fun ownPass(partyId: String): String? {
         val current = pass
-        if (current != null && passExpires - System.currentTimeMillis() > PASS_MARGIN_MS) return current
+        if (current != null && passParty == partyId && passExpires - System.currentTimeMillis() > PASS_MARGIN_MS) return current
         val fresh = PartyApi.voicePass().getOrNull() ?: return null
+        if (PartyRepository.party.value?.id != partyId) return null
         pass = fresh.pass
+        passParty = partyId
         passExpires = VoicePassVerifier.expiresAt(fresh.pass) ?: (System.currentTimeMillis() + PASS_MARGIN_MS * 2)
         return fresh.pass
     }
