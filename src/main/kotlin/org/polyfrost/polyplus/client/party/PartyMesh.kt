@@ -239,12 +239,12 @@ internal object PartyMesh {
         seq = (seq + 1) and 0xFFFF
         val packetPrefix = (sequence shl 8) or (if (last) 1 else 0)
         for (peer in peers.values) {
-            if (!peer.accepted || mix[peer.puid.raw]?.silenced == true) continue
+            if (!peer.accepted) continue
             bridge.sendPacket(SOCKET, peer.puid, frame(AUDIO, body, packetPrefix, 3), EosSdkBridge.PacketReliability.UnreliableUnordered)
         }
     }
 
-    fun hasListeners(): Boolean = peers.values.any { it.accepted && mix[it.puid.raw]?.silenced != true }
+    fun hasListeners(): Boolean = peers.values.any { it.accepted }
 
     fun speaking(): Set<String> {
         val now = System.currentTimeMillis()
