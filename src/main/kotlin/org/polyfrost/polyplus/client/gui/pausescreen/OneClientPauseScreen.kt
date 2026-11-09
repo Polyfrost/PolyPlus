@@ -116,35 +116,35 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
 
     //? if >= 1.21.10 {
     override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        resumeArmed = overResume()
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) resumeArmed = overResume()
         return super.mouseClicked(event, doubleClick)
     }
 
     override fun mouseReleased(event: MouseButtonEvent): Boolean {
         val handled = super.mouseReleased(event)
-        resumeOnRelease()
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) resumeOnRelease()
         return handled
     }
     //?} elif > 1.8.9 {
     /*override fun mouseClicked(x: Double, y: Double, button: Int): Boolean {
-        resumeArmed = overResume()
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) resumeArmed = overResume()
         return super.mouseClicked(x, y, button)
     }
 
     override fun mouseReleased(x: Double, y: Double, button: Int): Boolean {
         val handled = super.mouseReleased(x, y, button)
-        resumeOnRelease()
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) resumeOnRelease()
         return handled
     }
     *///?} else {
     /*override fun mouseClicked(x: Int, y: Int, button: Int) {
-        resumeArmed = overResume()
+        if (button == 0) resumeArmed = overResume()
         super.mouseClicked(x, y, button)
     }
 
     override fun mouseReleased(x: Int, y: Int, button: Int) {
         super.mouseReleased(x, y, button)
-        resumeOnRelease()
+        if (button == 0) resumeOnRelease()
     }
     *///?}
 
