@@ -97,6 +97,7 @@ object LobbyAmbience {
     private const val FAILED_TICKS = 200
     private const val HANDOFF_SECONDS = 3.2
     private const val INITIAL_FADE_NANOS = 400_000_000L
+    private const val AMBIENCE_GAIN = 0.5f
     private val EASE = 1f - exp(-TICK_SECONDS / EASE_SECONDS)
     private val OUTDOOR = listOf(Layer.DAY, Layer.NIGHT, Layer.GOLDEN, Layer.AURORA)
     private val NETHER_BIOMES = setOf("nether_wastes", "crimson_forest", "warped_forest", "soul_sand_valley", "basalt_deltas", "hell")
@@ -274,25 +275,22 @@ object LobbyAmbience {
         layer in present && failedAt[layer].let { it == null || clock - it > FAILED_TICKS }
 
     private fun desired(): List<Layer> {
-        val place = place(LobbySky.mood)?.takeIf(::usable)
-        return if (place != null) listOf(place) else OUTDOOR.filter(::usable)
+        val mood = LobbySky.mood
+        val place = place(mood)?.takeIf(::usable)
+        if (place != null) return listOf(place)
+        val clear = 1f - mood.golden
+        val strength = mapOf(
+            Layer.DAY to clear * (1f - mood.night),
+            Layer.NIGHT to if (mood.aurora > 0f) 0f else clear * mood.night,
+            Layer.AURORA to if (mood.aurora > 0f) clear * mood.night else 0f,
+            Layer.GOLDEN to mood.golden,
+        )
+        return listOfNotNull(OUTDOOR.filter(::usable).maxByOrNull { strength.getValue(it) })
     }
 
     private fun targets(layers: List<Layer>): FloatArray {
-        val mood = LobbySky.mood
         val weights = FloatArray(Layer.entries.size)
-        if (layers.size == 1 && layers[0] !in OUTDOOR) {
-            weights[layers[0].ordinal] = 1f
-            return weights
-        }
-        val clear = 1f - mood.golden
-        weights[Layer.DAY.ordinal] = clear * (1f - mood.night)
-        weights[Layer.NIGHT.ordinal] = clear * mood.night * (1f - mood.aurora)
-        weights[Layer.AURORA.ordinal] = clear * mood.aurora
-        weights[Layer.GOLDEN.ordinal] = mood.golden
-        for (layer in Layer.entries) if (layer !in layers) weights[layer.ordinal] = 0f
-        val total = layers.sumOf { weights[it.ordinal].toDouble() }.toFloat()
-        if (total > SILENT_FLOOR) for (layer in layers) weights[layer.ordinal] /= total
+        for (layer in layers) weights[layer.ordinal] = 1f
         return weights
     }
 
@@ -319,7 +317,7 @@ object LobbyAmbience {
         return ClientPlatform.currentScreen() is PolyPlusLobbyScreen || LobbyScene.showing()
     }
 
-    private fun volume(): Float = OneConfigConfig.uiAmbienceVolume.coerceIn(0f, 1f)
+    private fun volume(): Float = AMBIENCE_GAIN * OneConfigConfig.uiAmbienceVolume.coerceIn(0f, 1f)
 
     private fun audible(mc: Minecraft): Boolean =
         OneConfigConfig.enableUIAmbience && volume() > 0f &&
