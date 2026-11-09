@@ -19,6 +19,8 @@ import org.polyfrost.polyplus.client.lobby.level
 import org.polyfrost.polyplus.client.lobby.singleplayerServer
 *///?}
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.social.PlayerNamesRepository
+import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.File
 import java.nio.file.Files
@@ -70,6 +72,7 @@ internal object PlaySessions {
     private val lock = Any()
     private var state: State? = null
     private var session: Session? = null
+    private var hosted: Pair<String?, Place>? = null
 
     private val file: File by lazy { File(FabricLoader.getInstance().gameDir.toFile(), "polyplus/play_sessions.json") }
 
@@ -183,7 +186,18 @@ internal object PlaySessions {
         }
         *///?}
         val data = mc.currentServer ?: return null
-        val name = if (data.ip == P2PSessionManager.P2P_PLACEHOLDER_IP) FRIEND_WORLD else data.name
-        return Place(SERVER_PREFIX + data.ip.trim().lowercase(Locale.ROOT), name, true)
+        if (data.ip == P2PSessionManager.P2P_PLACEHOLDER_IP) return hostedPlace()
+        return Place(SERVER_PREFIX + data.ip.trim().lowercase(Locale.ROOT), data.name, true)
+    }
+
+    private fun hostedPlace(): Place {
+        val joined = P2PSessionManager.joinedSessionId
+        hosted?.let { (id, place) -> if (id == joined) return place }
+        val host = joined?.let { id -> SessionsRepository.incomingInvites.value.firstOrNull { it.sessionId == id }?.sender }
+        host?.let { PlayerNamesRepository.resolve(listOf(it)) }
+        val name = host?.let { PlayerNamesRepository.names.value[it] }?.let { "$it's world" } ?: FRIEND_WORLD
+        val owner = host ?: joined
+        val key = SERVER_PREFIX + P2PSessionManager.P2P_PLACEHOLDER_IP + if (owner != null) "/$owner" else ""
+        return Place(key, name, true).also { hosted = joined to it }
     }
 }
