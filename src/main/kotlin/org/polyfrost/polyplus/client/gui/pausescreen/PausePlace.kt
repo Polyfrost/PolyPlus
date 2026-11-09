@@ -66,10 +66,14 @@ internal object PauseWorld {
         val mc = Minecraft.getInstance()
         //? if > 1.8.9 {
         val server = mc.currentServer
-        return server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" } ?: server?.ip?.takeUnless { mc.options.hideServerAddress } ?: "Server"
+        val hide = mc.options.hideServerAddress
+        val name = server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" && !(hide && it.trim().equals(server.ip.trim(), true)) }
+        return name ?: server?.ip?.takeUnless { hide } ?: "Server"
         //?} else {
         /*val server = mc.getCurrentServerEntry()
-        return server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" } ?: server?.ip ?: "Server"
+        val hide = mc.options.hideServerAddress
+        val name = server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" && !(hide && it.trim().equals(server.ip.trim(), true)) }
+        return name ?: server?.ip?.takeUnless { hide } ?: "Server"
         *///?}
     }
 
