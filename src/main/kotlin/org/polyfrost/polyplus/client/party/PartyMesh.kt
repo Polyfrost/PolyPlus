@@ -232,7 +232,8 @@ internal object PartyMesh {
         if (!transmit && !sending) return
         val last = !transmit
         sending = transmit
-        val length = runCatching { encoder.encode(frame, 0, PartyAudio.FRAME_SAMPLES, encoded, 0, encoded.size) }.getOrDefault(0)
+        val pcm = if (last) ShortArray(PartyAudio.FRAME_SAMPLES) else frame
+        val length = runCatching { encoder.encode(pcm, 0, PartyAudio.FRAME_SAMPLES, encoded, 0, encoded.size) }.getOrDefault(0)
         if (length <= 0) return
         val body = encoded.copyOf(length)
         val sequence = seq
