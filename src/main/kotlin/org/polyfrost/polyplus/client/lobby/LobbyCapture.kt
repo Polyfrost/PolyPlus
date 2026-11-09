@@ -83,6 +83,7 @@ object LobbyCapture {
         val connection: Connection?,
         val stack: Set<String>,
         val action: LobbySpotAction? = null,
+        val address: String? = null,
     ) {
         @Volatile
         var handOver = false
@@ -284,11 +285,6 @@ object LobbyCapture {
     @JvmStatic
     fun onWorldSaved() {
         saved = true
-    }
-
-    @JvmStatic
-    fun onServerPack(connection: Connection) {
-        packed = WeakReference(connection)
     }
 
     private fun sessionPacked(mc: Minecraft): Boolean {
@@ -523,7 +519,7 @@ object LobbyCapture {
         val data = mc.currentServer ?: return null
         val live = if (OneClientServerApi.isConnected) OneClientServerApi.scenePolicy else policy
         if (!LobbySceneStore.serverAllows(data.ip, live)) return null
-        return Source(LobbySceneStore.worldKey(data.ip), data.name, LobbySceneEntry.ORIGIN_SERVER, LobbyPrivacy.SERVER, connection, stack, action)
+        return Source(LobbySceneStore.worldKey(data.ip), data.name, LobbySceneEntry.ORIGIN_SERVER, LobbyPrivacy.SERVER, connection, stack, action, data.ip)
     }
 
     fun spotAccess(): LobbySpotAccess {
@@ -1120,7 +1116,7 @@ object LobbyCapture {
     )
 
     private fun offer(source: Source, candidate: LobbySceneEntry, root: CompoundTag, copyMillis: Long) {
-        if (!allowed(source)) return
+        if (blocked(source) != null) return
         if (!candidate.manual && !LobbySceneStore.wouldKeep(source.world, candidate.x, candidate.z, candidate.score, source.stack)) return
         val entry = LobbySceneStore.named(candidate)
         keepHandover(entry, root)
@@ -1131,9 +1127,9 @@ object LobbyCapture {
     private fun store(job: Copying, outcome: Outcome, data: ByteArray, encodeMillis: Long, compressMillis: Long) {
         busy = false
         val source = job.source
-        if (!allowed(source)) {
-            report(source, outcome.anchor, "rejected SERVER_PACK")
-            fail(source, SERVER_PACK)
+        blocked(source)?.let {
+            report(source, outcome.anchor, "rejected ($it)")
+            fail(source, it)
             return
         }
         val entry = entry(source, outcome, data.size.toLong())
@@ -1168,7 +1164,20 @@ object LobbyCapture {
         )
     }
 
-    private fun allowed(source: Source): Boolean = source.connection == null || source.connection !== packed.get()
+    private fun blocked(source: Source): String? {
+        val mc = Minecraft.getInstance()
+        val connection = source.connection
+        val live = connection != null && connection === LobbyPacks.connectionOf(mc)
+        if (connection != null && (connection === packed.get() || (live && LobbyPacks.serverPackApplied(mc)))) return SERVER_PACK
+        val address = source.address ?: return null
+        if (LobbySceneStore.serverChoice(address) == false) return SERVER_TURNED_OFF
+        val rule = when {
+            live && OneClientServerApi.isConnected -> OneClientServerApi.scenePolicy
+            live -> policy
+            else -> LobbySceneStore.serverPolicy(address)
+        }
+        return if (LobbySceneStore.serverAllows(address, rule)) null else SERVER_BLOCKS
+    }
 
     private fun report(source: Source, pos: BlockPos, result: String) {
         LOBBY_LOGGER.debug("Capture {} at {}: {}", source.label, pos.toShortString(), result)
