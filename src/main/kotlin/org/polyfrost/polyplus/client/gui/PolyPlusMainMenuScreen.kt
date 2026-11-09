@@ -342,7 +342,11 @@ private fun MainMenu(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
             val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
-            val unscaled = { dp: Float -> (dp / scale).dp }
+            val safeScale = usableScale(scale)
+            val innerWidth = maxWidth.value / safeScale
+            val innerHeight = maxHeight.value / safeScale
+            val edgeX = { dp: Float -> minOf(dp / safeScale, dp + (innerWidth - BASE_WIDTH) / 2f).coerceAtLeast(0f).dp }
+            val edgeY = { dp: Float -> minOf(dp / safeScale, dp + (innerHeight - BASE_HEIGHT) / 2f).coerceAtLeast(0f).dp }
             CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
                 var rightColumnHeightPx by remember { mutableStateOf(0) }
                 val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
@@ -361,7 +365,7 @@ private fun MainMenu(
                     LeftColumn(
                         Modifier
                             .align(Alignment.CenterStart)
-                            .padding(start = unscaled(50f)),
+                            .padding(start = edgeX(50f)),
                         quickplay,
                         pingTick,
                         actions,
@@ -370,31 +374,31 @@ private fun MainMenu(
                 RightColumn(
                     Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = unscaled(50f))
+                        .padding(end = edgeX(50f))
                         .onSizeChanged { rightColumnHeightPx = it.height },
                     screen,
                     onAccounts = { accountsOpen = true },
                 )
                 WindowControls(
-                    Modifier.align(Alignment.TopEnd).padding(unscaled(16f)),
+                    Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f)),
                     actions,
                 )
                 if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
                     ModIntegrationBar(
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = unscaled(18f)),
+                            .padding(bottom = edgeY(18f)),
                         screen,
                     )
                 }
                 FeaturedServerCard(
                     Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = unscaled(50f), top = unscaled(50f)),
+                        .padding(start = edgeX(50f), top = edgeY(50f)),
                     pingTick,
                     actions,
                 )
-                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), unscaled)
+                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
             }
         }
         if (accountsOpen) AccountsDialog { accountsOpen = false }
@@ -685,12 +689,12 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
+private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
     Box(modifier) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = unscaled(24f), bottom = unscaled(18f)),
+                .padding(start = edgeX(24f), bottom = edgeY(18f)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -703,7 +707,7 @@ private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
             color = SocialTextSecondary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = unscaled(24f), bottom = unscaled(18f)),
+                .padding(end = edgeX(24f), bottom = edgeY(18f)),
             textAlign = TextAlign.Center,
         )
     }
