@@ -53,6 +53,8 @@ data class LobbySceneEntry(
     val manual: Boolean = false,
     val profile: String = "outdoor",
     val renamed: Boolean = false,
+    val y: Int? = null,
+    val dimension: String = "",
 ) {
     val bundled: Boolean
         get() = origin == ORIGIN_BUNDLED
@@ -222,8 +224,9 @@ object LobbySceneStore {
         val inWorld = state.scenes.filter { it.world == candidate.world }
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
         val rivals = current.filter { !it.manual && stackOf(it) == stack }
-        val replaced = (inWorld - current.toSet()).toMutableList()
-        val sameFile = state.scenes.filter { it.file == fileName(candidate) }
+        val replaced = ArrayList<LobbySceneEntry>()
+        val legacy = fileName(candidate, legacy = true)
+        val sameFile = state.scenes.filter { it.file == fileName(candidate) || (it.y == null && it.dataVersion == candidate.dataVersion && it.file == legacy) }
         val sameSpot = if (candidate.manual) sameFile else sameFile + inWorld.filter { !it.manual && stackOf(it) == stack && near(it, candidate) }
         val custom = sameSpot.filter { it.renamed }.maxByOrNull { it.capturedAt }
         replaced += sameFile
@@ -301,10 +304,15 @@ object LobbySceneStore {
         return entry.score * 0.5.pow(days / RECENCY_HALF_LIFE_DAYS).coerceAtLeast(RECENCY_FLOOR)
     }
 
-    private fun fileName(entry: LobbySceneEntry): String {
+    private fun fileName(entry: LobbySceneEntry, legacy: Boolean = false): String {
         val stack = entry.packs.joinToString("") { "|${it.id}" }
         val kind = if (entry.manual) "|manual" else ""
-        val digest = MessageDigest.getInstance("SHA-1").digest("${entry.world}|${entry.x}|${entry.z}$stack$kind".toByteArray(Charsets.UTF_8))
+        val place = when {
+            legacy -> ""
+            entry.manual -> "|${entry.dataVersion}|${entry.dimension}|${entry.y}"
+            else -> "|${entry.dataVersion}"
+        }
+        val digest = MessageDigest.getInstance("SHA-1").digest("${entry.world}|${entry.x}|${entry.z}$stack$kind$place".toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest, 0, NAME_BYTES) + ".nbt.gz"
     }
 

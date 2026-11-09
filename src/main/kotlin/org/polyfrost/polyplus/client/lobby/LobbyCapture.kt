@@ -154,6 +154,7 @@ object LobbyCapture {
         val packs: List<LobbyScenePack>,
         val points: Int?,
         val profile: LobbySceneScore.Profile,
+        val dimension: String,
     )
 
     private val worker = Executors.newSingleThreadExecutor { task ->
@@ -1028,6 +1029,13 @@ object LobbyCapture {
         *///?} else {
         /*val biome = level.getBiome(anchor).name
         *///?}
+        //? if >= 1.21.11 {
+        val dimension = level.dimension().identifier().toString()
+        //?} elif > 1.8.9 {
+        /*val dimension = level.dimension().location().toString()
+        *///?} else {
+        /*val dimension = level.dimension.id.toString()
+        *///?}
         //? if > 1.8.9
         val factory = LobbyCompat.containers(level)
         val minY = level.minY
@@ -1059,7 +1067,7 @@ object LobbyCapture {
                 /*val root = LobbySnapshot.encode(job.chunks, meta)
                 *///?}
                 val score = job.verdict.score + stage.quality * STAGE_SCORE_WEIGHT
-                val outcome = Outcome(root, score, biome, clock, anchor, solveMillis, packs, job.verdict.breakdown?.total, job.verdict.profile)
+                val outcome = Outcome(root, score, biome, clock, anchor, solveMillis, packs, job.verdict.breakdown?.total, job.verdict.profile, dimension)
                 val encoded = Util.getNanos()
                 if (job.source.handOver) {
                     //? if > 1.8.9 {
@@ -1107,6 +1115,8 @@ object LobbyCapture {
         outcome.points,
         source.action == LobbySpotAction.CAPTURE,
         outcome.profile.key,
+        y = outcome.anchor.y,
+        dimension = outcome.dimension,
     )
 
     private fun offer(source: Source, candidate: LobbySceneEntry, root: CompoundTag, copyMillis: Long) {
