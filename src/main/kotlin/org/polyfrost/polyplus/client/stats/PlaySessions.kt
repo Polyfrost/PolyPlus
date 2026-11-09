@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.level.storage.LevelResource
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.ShutdownEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.lobby.LobbyScene
@@ -74,6 +75,7 @@ internal object PlaySessions {
 
     fun initialize() {
         eventHandler<TickEvent.End> { tick() }
+        eventHandler<ShutdownEvent> { stop() }
     }
 
     fun log(player: UUID): PlayLog = synchronized(lock) { loaded().players[player.toString()] ?: PlayLog() }
@@ -94,6 +96,13 @@ internal object PlaySessions {
         }
     }
 
+    private fun stop() {
+        val open = session ?: return
+        session = null
+        advance(open, Minecraft.getInstance())
+        flush(open, async = false)
+    }
+
     private fun advance(open: Session, mc: Minecraft) {
         val now = System.nanoTime()
         val delta = ((now - open.lastNanos) / NANOS_PER_MILLI).coerceAtMost(LONGEST_TICK_MILLIS)
@@ -103,26 +112,28 @@ internal object PlaySessions {
         open.pending += delta
     }
 
-    private fun flush(open: Session) {
+    private fun flush(open: Session, async: Boolean = true) {
         if (open.elapsed < MIN_SESSION_MILLIS) return
         val millis = open.pending
         val started = !open.counted
         open.pending = 0L
         open.savedAt = open.elapsed
         open.counted = true
-        record(open.player, open.place, millis, started)
+        if (async) {
+            PolyPlusClient.SCOPE.launch(Dispatchers.IO) { record(open.player, open.place, millis, started) }
+        } else {
+            record(open.player, open.place, millis, started)
+        }
     }
 
     private fun record(player: UUID, place: Place, millis: Long, started: Boolean) {
-        PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
-            synchronized(lock) {
-                val current = loaded()
-                val id = player.toString()
-                val log = current.players[id] ?: PlayLog()
-                val next = current.copy(players = current.players + (id to logged(log, place, millis, started)))
-                state = next
-                runCatching { write(next) }.onFailure { LOGGER.warn("Could not save play sessions", it) }
-            }
+        synchronized(lock) {
+            val current = loaded()
+            val id = player.toString()
+            val log = current.players[id] ?: PlayLog()
+            val next = current.copy(players = current.players + (id to logged(log, place, millis, started)))
+            state = next
+            runCatching { write(next) }.onFailure { LOGGER.warn("Could not save play sessions", it) }
         }
     }
 
