@@ -293,6 +293,8 @@ object LobbyScene {
     private const val CLEAR_DEPTH = 5.0
     private const val DAY_FOG_START = 34f
     private const val DAY_FOG_END = 82f
+    private const val NETHER_FOG_START = 6f
+    private const val NETHER_FOG_END = 52f
     private const val DEPART_REACH = 0.9
     private const val DEPART_FOV = 96f
     private const val PARALLAX_YAW_DEGREES = 1.6
@@ -841,7 +843,12 @@ object LobbyScene {
     /*private fun build(mc: Minecraft, loaded: Loaded): Live {
         val listener = ClientPacketListener(mc, null, LobbyCompat.offlineConnection(), mc.gameProfile)
         val settings = WorldSettings(0L, WorldSettings.GameMode.SPECTATOR, false, false, WorldGeneratorType.DEFAULT)
-        val level = ClientLevel(listener, settings, 0, Difficulty.PEACEFUL, mc.profiler)
+        val dimensionId = when (loaded.entry.realm) {
+            LobbyRealm.NETHER -> -1
+            LobbyRealm.END -> 1
+            LobbyRealm.OVERWORLD -> 0
+        }
+        val level = ClientLevel(listener, settings, dimensionId, Difficulty.PEACEFUL, mc.profiler)
         sceneLevel = level
         level.gameRules.set("doDaylightCycle", "false")
         if (!embedded) {
@@ -874,15 +881,16 @@ object LobbyScene {
 
     private fun populate(level: ClientLevel, root: CompoundTag, center: ChunkPos, radius: Int) {
         val cache = level.chunkSource as ClientChunkCache
+        val hasSky = !level.dimension.hasNoSky()
         root.getListOrEmpty("chunks").compounds().forEach { tag ->
             val chunk = cache.loadChunk(tag.getIntOr("x", 0), tag.getIntOr("z", 0))
             tag.optByteArray("biomes")?.takeIf { it.size == chunk.biomes.size }?.let(chunk::setBiomes)
             tag.getListOrEmpty("sections").compounds().forEach { section ->
                 val sectionY = section.getIntOr("y", 0)
-                val data = LevelChunkSection(sectionY shl SectionPos.SECTION_BITS, true)
+                val data = LevelChunkSection(sectionY shl SectionPos.SECTION_BITS, hasSky)
                 section.optByteArray("blocks")?.let { data.blockStates = LobbySnapshot.unpackBlocks(it) }
                 LobbySnapshot.readLight(section, "block_light")?.let { data.blockLightStorage = it }
-                LobbySnapshot.readLight(section, "sky_light")?.let { data.skyLightStorage = it }
+                if (hasSky) LobbySnapshot.readLight(section, "sky_light")?.let { data.skyLightStorage = it }
                 data.validateBlockCounters()
                 chunk.sections[sectionY] = data
             }
@@ -948,13 +956,24 @@ object LobbyScene {
         )
         //?}
         val listener = ClientPacketListener(mc, Connection(PacketFlow.CLIENTBOUND), cookie)
-        val dimension = registries.lookupOrThrow(Registries.DIMENSION_TYPE).getOrThrow(BuiltinDimensionTypes.OVERWORLD)
+        val realm = loaded.entry.realm
+        val dimensionKey = when (realm) {
+            LobbyRealm.NETHER -> BuiltinDimensionTypes.NETHER
+            LobbyRealm.END -> BuiltinDimensionTypes.END
+            LobbyRealm.OVERWORLD -> BuiltinDimensionTypes.OVERWORLD
+        }
+        val levelKey = when (realm) {
+            LobbyRealm.NETHER -> Level.NETHER
+            LobbyRealm.END -> Level.END
+            LobbyRealm.OVERWORLD -> Level.OVERWORLD
+        }
+        val dimension = registries.lookupOrThrow(Registries.DIMENSION_TYPE).getOrThrow(dimensionKey)
         val root = loaded.root
         val radius = root.getIntOr("radius", LobbySnapshot.DEFAULT_RADIUS)
         val level = ClientLevel(
             listener,
             ClientLevel.ClientLevelData(Difficulty.PEACEFUL, false, false),
-            Level.OVERWORLD,
+            levelKey,
             dimension,
             radius + 2,
             2,
@@ -998,7 +1017,7 @@ object LobbyScene {
             ?: LobbyStage.build(level, anchor)
             ?: error("Scene ${loaded.entry.id} has no place for the party")
         val captured = root.getLongOr("time", 0L)
-        val mood = LobbyMood.of(level, LobbyCompat.blockAt(stage.aim), sceneClock(captured), stage.interior)
+        val mood = LobbyMood.of(level, LobbyCompat.blockAt(stage.aim), sceneClock(captured), stage.interior, realm = loaded.entry.realm)
         applyTime(level, mood)
         LobbySky.mood = mood
         val posts = dress(level, stage, mood)
@@ -1014,6 +1033,7 @@ object LobbyScene {
     private fun sceneClock(captured: Long): Long = driven?.clock ?: LobbyAntics.clock(LobbyTime.clock(captured))
 
     private fun syncTime(scene: Live) {
+        if (scene.mood.realm != LobbyRealm.OVERWORLD) return
         val clock = sceneClock(scene.captured)
         if (clock == scene.mood.clock) return
         val level = scene.level
@@ -1033,6 +1053,7 @@ object LobbyScene {
     }
 
     private fun applyTime(level: ClientLevel, mood: LobbyMood) {
+        if (mood.realm != LobbyRealm.OVERWORLD) return
         //? if >= 26.1 {
         val clock = level.dimensionType().defaultClock().orElse(null) ?: return
         level.setTimeFromServer(0L)
@@ -1143,7 +1164,7 @@ object LobbyScene {
             for (z in center.z - radius - 1..center.z + radius + 1) {
                 val pos = ChunkPos(x, z)
                 val chunk = cache.getChunk(x, z, ChunkStatus.FULL, false) ?: continue
-                val top = filled[pos] ?: (level.minSectionY - 1)
+                val top = if (level.dimensionType().hasSkyLight()) filled[pos] ?: (level.minSectionY - 1) else lightEngine.maxLightSection
                 for (sectionY in top + 1 until lightEngine.maxLightSection) {
                     lightEngine.queueSectionData(LightLayer.SKY, SectionPos.of(pos, sectionY), DataLayer(15))
                 }
@@ -1849,25 +1870,33 @@ object LobbyScene {
     /*@JvmStatic
     fun terrainFogStart(): Float {
         val scene = live ?: return 0f
-        return currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
+        return currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_START else Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
     }
 
     @JvmStatic
     fun terrainFogEnd(): Float {
         val scene = live ?: return 0f
-        return currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
+        return currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_END else Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
     }
 
     @JvmStatic
     fun aimDistance(): Float = currentDistance
     *///?}
 
+    //? if > 1.8.9 {
+    private fun fogStart(scene: Live): Float =
+        currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_START else Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
+
+    private fun fogEnd(scene: Live): Float =
+        currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_END else Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
+    //?}
+
     //? if >= 1.21.8 {
     private fun shapeFog(scene: Live, fog: FogData) {
         fog.environmentalStart = Float.MAX_VALUE
         fog.environmentalEnd = currentDistance
-        fog.renderDistanceStart = currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
-        fog.renderDistanceEnd = currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
+        fog.renderDistanceStart = fogStart(scene)
+        fog.renderDistanceEnd = fogEnd(scene)
     }
     //?} elif > 1.8.9 {
     /*@JvmStatic
@@ -1876,7 +1905,7 @@ object LobbyScene {
     private fun terrainFogRange(mode: FogRenderer.FogMode): Pair<Float, Float>? {
         val scene = live ?: return null
         if (!swappedIn || mode != FogRenderer.FogMode.FOG_TERRAIN) return null
-        return (currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)) to (currentDistance + Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN))
+        return fogStart(scene) to fogEnd(scene)
     }
     *///?}
 

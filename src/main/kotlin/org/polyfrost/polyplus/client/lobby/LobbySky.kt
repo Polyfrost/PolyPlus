@@ -114,12 +114,14 @@ object LobbySky {
     private val glass = MemoryUtil.memAlloc(LobbyGlass.BLOCK_BYTES)
     private val fogSeen = Vector3f(1f, 1f, 1f)
 
-    private fun skyLight(color: Vector3f): Vector3f = if (mood.interior) color else color.lerp(NIGHT_LIGHT, 0.34f * mood.night)
+    private val untinted: Boolean get() = mood.interior || mood.realm != LobbyRealm.OVERWORLD
 
-    private fun sky(color: Vector3f): Vector3f = if (mood.interior) color else color.add(Vector3f(NIGHT_SKY).mul(mood.night))
+    private fun skyLight(color: Vector3f): Vector3f = if (untinted) color else color.lerp(NIGHT_LIGHT, 0.34f * mood.night)
+
+    private fun sky(color: Vector3f): Vector3f = if (untinted) color else color.add(Vector3f(NIGHT_SKY).mul(mood.night))
 
     private fun fog(color: Vector3f): Vector3f =
-        if (mood.interior) color.also { fogSeen.set(it) } else color.lerp(DAY_HAZE, 0.45f * (1f - mood.night) * (1f - mood.golden)).lerp(NIGHT_FOG, 0.7f * mood.night).also { fogSeen.set(it) }
+        if (untinted) color.also { fogSeen.set(it) } else color.lerp(DAY_HAZE, 0.45f * (1f - mood.night) * (1f - mood.golden)).lerp(NIGHT_FOG, 0.7f * mood.night).also { fogSeen.set(it) }
 
     @JvmStatic
     fun skyLightFactor(value: Float): Float = value.coerceAtLeast(MOONLIGHT * mood.night)
@@ -153,6 +155,10 @@ object LobbySky {
 
     @JvmStatic
     fun notGamma(channel: Float, color: Vector3f): Float {
+        if (mood.realm != LobbyRealm.OVERWORLD) {
+            val dim = 1f - channel
+            return 1f - dim * dim * dim * dim
+        }
         val top = maxOf(color.x, color.y, color.z)
         val inverted = 1f - top
         return channel * ((1f - inverted * inverted * inverted * inverted) / top)
@@ -376,6 +382,8 @@ object LobbySky {
     private const val SKY_DARK_FLOOR = 0.95f
     private const val SKY_DARK_BASE = 0.05f
     private const val MIN_GAMMA = 0.5f
+    private const val END_BLOCK_SHARE = 0.75f
+    private val END_AMBIENT = Vector3f(0.22f, 0.28f, 0.25f)
 
     private fun cellBrightness(level: Int): Float {
         val value = level / (LIGHT_CELLS - 1f)
@@ -388,12 +396,17 @@ object LobbySky {
         val blockFactor = flicker * 0.1f + BLOCK_FLICKER_BASE
         val skyTint = skyLight(Vector3f(darken, darken, 1f).lerp(Vector3f(1f, 1f, 1f), 0.35f))
         val gamma = maxOf(Minecraft.getInstance().options.gamma, MIN_GAMMA)
+        val table = if (mood.realm == LobbyRealm.OVERWORLD) null else level.dimension.getBrightnessTable()
         for (sky in 0 until LIGHT_CELLS) {
             for (block in 0 until LIGHT_CELLS) {
-                val skyLevel = cellBrightness(sky) * skyFactor
-                val blockLevel = cellBrightness(block) * blockFactor
+                val skyLevel = (table?.get(sky) ?: cellBrightness(sky)) * skyFactor
+                val blockLevel = (table?.get(block) ?: cellBrightness(block)) * blockFactor
                 val color = Vector3f(blockLevel, blockLevel * ((blockLevel * 0.6f + 0.4f) * 0.6f + 0.4f), blockLevel * (blockLevel * blockLevel * 0.6f + 0.4f))
-                color.add(Vector3f(skyTint).mul(skyLevel))
+                if (mood.realm == LobbyRealm.END) {
+                    color.mul(END_BLOCK_SHARE).add(END_AMBIENT)
+                } else {
+                    color.add(Vector3f(skyTint).mul(skyLevel))
+                }
                 color.lerp(Vector3f(GRAY_POINT, GRAY_POINT, GRAY_POINT), GRAY_SHARE)
                 color.min(Vector3f(1f, 1f, 1f))
                 val lifted = Vector3f(notGamma(color.x, color), notGamma(color.y, color), notGamma(color.z, color))

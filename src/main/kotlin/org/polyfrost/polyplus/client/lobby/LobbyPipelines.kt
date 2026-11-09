@@ -184,7 +184,7 @@ object LobbyPipelines {
         if (original === RenderPipelines.ENTITY_CUTOUT_NO_CULL && (previewing || LobbyScene.terrainActive())) pick(perFaceEntity, original) else original
 
     @JvmStatic
-    fun lightmap(original: RenderPipeline): RenderPipeline = if (LobbyScene.terrainActive()) pick(lightmap, original) else original
+    fun lightmap(original: RenderPipeline): RenderPipeline = if (LobbyScene.terrainActive() && LobbySky.mood.realm == LobbyRealm.OVERWORLD) pick(lightmap, original) else original
     *///?}
 
     //? if >= 1.21.8 {
@@ -284,7 +284,7 @@ object LobbyPipelines {
             original === CoreShaders.RENDERTYPE_CUTOUT -> cutout
             original === CoreShaders.RENDERTYPE_TRANSLUCENT -> translucent
             original === CoreShaders.RENDERTYPE_TRIPWIRE -> tripwire
-            original === CoreShaders.LIGHTMAP -> lightmap
+            original === CoreShaders.LIGHTMAP -> if (LobbySky.mood.realm == LobbyRealm.OVERWORLD) lightmap else return original
             else -> return original
         }
         return pick(swapped, original)

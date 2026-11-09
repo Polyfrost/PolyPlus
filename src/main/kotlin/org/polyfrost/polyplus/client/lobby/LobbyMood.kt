@@ -15,6 +15,7 @@ data class LobbyMood(
     val snow: Boolean,
     val lanterns: Int,
     val interior: Boolean = false,
+    val realm: LobbyRealm = LobbyRealm.OVERWORLD,
 ) {
     val dark: Boolean get() = night > LANTERN_NIGHT
 
@@ -42,7 +43,8 @@ data class LobbyMood(
 
         fun darkAt(capturedClock: Long): Boolean = nightAmount(Math.floorMod(capturedClock, DAY_TICKS).toFloat()) > LANTERN_NIGHT
 
-        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long, interior: Boolean = false, knownLanterns: Int? = null): LobbyMood {
+        fun of(level: ClientLevel, aim: BlockPos, capturedClock: Long, interior: Boolean = false, knownLanterns: Int? = null, realm: LobbyRealm = LobbyRealm.OVERWORLD): LobbyMood {
+            if (realm != LobbyRealm.OVERWORLD) return LobbyMood(NEUTRAL.clock, 0f, 0f, 0f, DAY_EXPOSURE * fill(level, aim), false, 0, interior, realm)
             val clock = Math.floorMod(capturedClock, DAY_TICKS)
             if (interior) return LobbyMood(clock, 0f, 0f, 0f, DAY_EXPOSURE * fill(level, aim), false, 0, true)
             val night = nightAmount(clock.toFloat())
