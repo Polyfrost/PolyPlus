@@ -174,6 +174,7 @@ object LobbyCapture {
     private const val CAPTURED_TICKS = 6000
     private const val MOVED_BLOCKS = 24.0
     private const val MIN_SKY_LIGHT = 10
+    private const val VANILLA_NAMESPACE = "minecraft:"
     private const val STAGE_SCORE_WEIGHT = 0.2
     private const val BIOME_NAME_FALLBACK = "minecraft:plains"
     private const val COPY_SHARE = 0.9f
@@ -493,7 +494,7 @@ object LobbyCapture {
         val moved = lastSpot?.let { hypot((it.x - feet.x).toDouble(), (it.z - feet.z).toDouble()) } ?: Double.MAX_VALUE
         if (moved < MOVED_BLOCKS || !grounded || riding) return
         lastSpot = feet
-        early(level)?.let {
+        early(level, feet)?.let {
             report(source, feet, "rejected ${it.name}")
             return
         }
@@ -590,9 +591,14 @@ object LobbyCapture {
         }
         val feet = player.blockPosition()
         lastSpot = feet
-        early(level)?.let {
+        early(level, feet)?.let {
             report(source, feet, "rejected ${it.name}")
-            spot = LobbySpotState.Done(action, LobbySceneScore.report(null, it, false, null, false), false, it.reason)
+            val result = if (it == LobbySceneScore.Rejection.ROOF) {
+                LobbySceneScore.report(null, it, false, null, false, profile = LobbySceneScore.Profile.CAVE, realm = LobbyRealm.NETHER)
+            } else {
+                LobbySceneScore.report(null, it, false, null, false)
+            }
+            spot = LobbySpotState.Done(action, result, false, it.reason)
             return
         }
         surveying = surveyAt(level, source, feet)
@@ -604,21 +610,46 @@ object LobbyCapture {
         source.action?.let { spot = LobbySpotState.Blocked(it, message) }
     }
 
-    private fun early(level: ClientLevel): LobbySceneScore.Rejection? {
-        //? if > 1.8.9 {
-        val dimension = level.dimensionType()
-        if (dimension.hasCeiling() || !dimension.hasSkyLight() || dimension.hasFixedTime()) return LobbySceneScore.Rejection.DIMENSION
-        //?} else {
-        /*if (level.dimension.id != 0) return LobbySceneScore.Rejection.DIMENSION
+    private fun dimensionId(level: ClientLevel): String {
+        //? if >= 1.21.11 {
+        return level.dimension().identifier().toString()
+        //?} elif > 1.8.9 {
+        /*return level.dimension().location().toString()
+        *///?} else {
+        /*return level.dimension.id.toString()
         *///?}
+    }
+
+    private fun realmOf(level: ClientLevel): LobbyRealm = LobbyRealm.of(dimensionId(level))
+
+    private fun early(level: ClientLevel, feet: BlockPos): LobbySceneScore.Rejection? {
+        val id = dimensionId(level)
+        val realm = LobbyRealm.of(id)
+        //? if > 1.8.9 {
+        if (realm == LobbyRealm.OVERWORLD) {
+            val dimension = level.dimensionType()
+            if (dimension.hasCeiling() || !dimension.hasSkyLight() || dimension.hasFixedTime()) return LobbySceneScore.Rejection.DIMENSION
+        } else if (!id.startsWith(VANILLA_NAMESPACE)) {
+            return LobbySceneScore.Rejection.DIMENSION
+        }
+        //?} else {
+        /*if (realm == LobbyRealm.OVERWORLD && level.dimension.id != 0) return LobbySceneScore.Rejection.DIMENSION
+        *///?}
+        if (realm == LobbyRealm.NETHER && feet.y > LobbySceneScore.NETHER_ROOF) return LobbySceneScore.Rejection.ROOF
         return null
     }
 
-    private fun surveyAt(level: ClientLevel, source: Source, feet: BlockPos): Surveying =
-        if (level.getBrightness(LightLayer.SKY, feet) >= MIN_SKY_LIGHT) Surveying(source, feet, LobbySurvey(feet, level.minY)) else roomSurvey(level, source, feet)
+    private fun surveyAt(level: ClientLevel, source: Source, feet: BlockPos): Surveying {
+        val realm = realmOf(level)
+        return when {
+            realm == LobbyRealm.NETHER -> roomSurvey(level, source, feet)
+            realm == LobbyRealm.END || level.getBrightness(LightLayer.SKY, feet) >= MIN_SKY_LIGHT -> Surveying(source, feet, LobbySurvey(feet, level.minY, realm))
+            else -> roomSurvey(level, source, feet)
+        }
+    }
 
     private fun roomSurvey(level: ClientLevel, source: Source, feet: BlockPos, timing: Timing = Timing()): Surveying =
-        Surveying(source, feet, null, LobbyRoom(feet, biomeAt(level, feet)), timing)
+        Surveying(source, feet, null, LobbyRoom(feet, biomeAt(level, feet), realmOf(level)), timing)
 
     private fun indoorRetry(level: ClientLevel, job: Surveying, verdict: LobbySceneScore.Verdict): Surveying? {
         if (job.room != null || verdict.rejection != LobbySceneScore.Rejection.CEILING) return null
@@ -703,23 +734,23 @@ object LobbyCapture {
                 room.block[index] = System.identityHashCode(wall.block)
                 room.crafted[index] = crafted(wall)
                 room.lit[index] = wall.lightEmission > 0
-                room.beauty[index] = caveLook(wall)
+                room.beauty[index] = caveLook(wall, room.realm)
                 return
             }
         }
         val floor = level.getBlockState(cursor.set(x, y - 1, z))
-        var beauty = caveLook(floor)
+        var beauty = caveLook(floor, room.realm)
         var lit = floor.lightEmission > 0
         var head = 0
         while (head < LobbyRoom.MAX_HEADROOM && passable(level, cursor.set(x, y + head, z))) {
             val inside = level.getBlockState(cursor)
-            beauty += caveLook(inside)
+            beauty += caveLook(inside, room.realm)
             if (inside.lightEmission > 0) lit = true
             head++
         }
         val ceiling = if (head < LobbyRoom.MAX_HEADROOM) level.getBlockState(cursor.set(x, y + head, z)) else null
         if (ceiling != null) {
-            beauty += caveLook(ceiling)
+            beauty += caveLook(ceiling, room.realm)
             if (ceiling.lightEmission > 0) lit = true
         }
         room.floor[index] = y
@@ -770,9 +801,27 @@ object LobbyCapture {
         )
     }
 
-    private fun caveLook(state: BlockState): Int = caveBlocks[state.block] ?: 0
+    private val netherBlocks: Map<Block, Int> by lazy {
+        mapOf(
+            Blocks.GLOWSTONE to 3,
+            Blocks.SHROOMLIGHT to 3,
+            Blocks.CRIMSON_FUNGUS to 3,
+            Blocks.WARPED_FUNGUS to 3,
+            Blocks.CRIMSON_ROOTS to 2,
+            Blocks.WARPED_ROOTS to 2,
+            Blocks.NETHER_SPROUTS to 1,
+            Blocks.WEEPING_VINES to 3,
+            Blocks.WEEPING_VINES_PLANT to 2,
+            Blocks.TWISTING_VINES to 3,
+            Blocks.TWISTING_VINES_PLANT to 2,
+            Blocks.SOUL_FIRE to 3,
+            Blocks.CRYING_OBSIDIAN to 2,
+        )
+    }
+
+    private fun caveLook(state: BlockState, realm: LobbyRealm): Int = (if (realm == LobbyRealm.NETHER) netherBlocks else caveBlocks)[state.block] ?: 0
     //?} else {
-    /*private fun caveLook(state: BlockState): Int = 0
+    /*private fun caveLook(state: BlockState, realm: LobbyRealm): Int = 0
     *///?}
 
     private fun sampleGround(level: ClientLevel, survey: LobbySurvey, index: Int, cursor: BlockPos.MutableBlockPos) {
@@ -862,12 +911,12 @@ object LobbyCapture {
             report(job.source, job.origin, "rejected ${rejection?.name} (survey ${job.timing.describe()})")
             val reason = rejection ?: if (verdict.profile.interior) LobbySceneScore.Rejection.ROOM else LobbySceneScore.Rejection.SMALL
             if (action != null) {
-                val result = LobbySceneScore.report(verdict.breakdown, reason, false, null, false, profile = verdict.profile)
+                val result = LobbySceneScore.report(verdict.breakdown, reason, false, null, false, profile = verdict.profile, realm = verdict.realm)
                 spot = LobbySpotState.Done(action, result, false, reason.reason)
             }
             return
         }
-        val weaker = !LobbySceneStore.wouldKeep(job.source.world, anchor.x, anchor.z, verdict.score, job.source.stack)
+        val weaker = !LobbySceneStore.wouldKeep(job.source.world, anchor.x, anchor.z, verdict.score, job.source.stack, verdict.realm)
         if (action == null && weaker) {
             report(job.source, anchor, "rejected ${LobbySceneScore.Rejection.WEAKER.name} (score ${verdict.score})")
             return
@@ -877,13 +926,13 @@ object LobbyCapture {
             report(job.source, anchor, "rejected ${LobbySceneScore.Rejection.UNLOADED.name} (render distance)")
             if (action != null) {
                 val reason = "Raise your render distance to at least ${LobbySnapshot.MIN_RADIUS} chunks"
-                spot = LobbySpotState.Done(action, LobbySceneScore.report(verdict.breakdown, LobbySceneScore.Rejection.UNLOADED, true, weaker, false, reason), false, reason)
+                spot = LobbySpotState.Done(action, LobbySceneScore.report(verdict.breakdown, LobbySceneScore.Rejection.UNLOADED, true, weaker, false, reason, realm = verdict.realm), false, reason)
             }
             return
         }
         if (action == LobbySpotAction.CHECK) {
             val message = if (weaker) "Good spot. Capturing it adds an extra scene." else "Good spot. You can capture it."
-            spot = LobbySpotState.Done(action, LobbySceneScore.report(verdict.breakdown, null, true, weaker, false), false, message)
+            spot = LobbySpotState.Done(action, LobbySceneScore.report(verdict.breakdown, null, true, weaker, false, realm = verdict.realm), false, message)
             return
         }
         val minSection = maxOf(level.minSectionY, SectionPos.blockToSectionCoord(anchor.y - LobbySnapshot.BELOW_ANCHOR))
@@ -1025,13 +1074,7 @@ object LobbyCapture {
         *///?} else {
         /*val biome = level.getBiome(anchor).name
         *///?}
-        //? if >= 1.21.11 {
-        val dimension = level.dimension().identifier().toString()
-        //?} elif > 1.8.9 {
-        /*val dimension = level.dimension().location().toString()
-        *///?} else {
-        /*val dimension = level.dimension.id.toString()
-        *///?}
+        val dimension = dimensionId(level)
         //? if > 1.8.9
         val factory = LobbyCompat.containers(level)
         val minY = level.minY
@@ -1048,7 +1091,7 @@ object LobbyCapture {
                             report(job.source, anchor, "rejected ${LobbySceneScore.Rejection.NO_STAGE.name} (solve ${solveMillis}ms)")
                             job.source.action?.let {
                                 val none = LobbySceneScore.Rejection.NO_STAGE
-                                spot = LobbySpotState.Done(it, LobbySceneScore.report(job.verdict.breakdown, none, true, job.weaker, false), false, none.reason)
+                                spot = LobbySpotState.Done(it, LobbySceneScore.report(job.verdict.breakdown, none, true, job.weaker, false, realm = job.verdict.realm), false, none.reason)
                             }
                         },
                     )
@@ -1117,7 +1160,7 @@ object LobbyCapture {
 
     private fun offer(source: Source, candidate: LobbySceneEntry, root: CompoundTag, copyMillis: Long) {
         if (blocked(source) != null) return
-        if (!candidate.manual && !LobbySceneStore.wouldKeep(source.world, candidate.x, candidate.z, candidate.score, source.stack)) return
+        if (!candidate.manual && !LobbySceneStore.wouldKeep(source.world, candidate.x, candidate.z, candidate.score, source.stack, candidate.realm)) return
         val entry = LobbySceneStore.named(candidate)
         keepHandover(entry, root)
         returning?.takeIf { it.world == source.world }?.entry = entry
@@ -1142,7 +1185,7 @@ object LobbyCapture {
             returning?.takeIf { it.world == source.world }?.entry = stored
         }
         source.action?.let {
-            val report = LobbySceneScore.report(job.verdict.breakdown, null, true, job.weaker, false)
+            val report = LobbySceneScore.report(job.verdict.breakdown, null, true, job.weaker, false, realm = job.verdict.realm)
             spot = LobbySpotState.Done(it, report, kept, if (kept) "Saved to your lobby scenes" else "Could not save this scene")
         }
         report(

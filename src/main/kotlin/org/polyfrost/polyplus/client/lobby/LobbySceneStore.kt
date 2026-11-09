@@ -51,6 +51,9 @@ data class LobbySceneEntry(
     val y: Int? = null,
     val dimension: String = "",
 ) {
+    val realm: LobbyRealm
+        get() = LobbyRealm.of(dimension)
+
     val bundled: Boolean
         get() = origin == ORIGIN_BUNDLED
 
@@ -206,8 +209,8 @@ object LobbySceneStore {
         return stream.use(LobbySnapshot::read)
     }
 
-    fun wouldKeep(world: String, x: Int, z: Int, score: Double, stack: Set<String>): Boolean {
-        val rivals = scenes.filter { !it.manual && it.world == world && it.dataVersion == LobbySnapshot.dataVersion && stackOf(it) == stack }
+    fun wouldKeep(world: String, x: Int, z: Int, score: Double, stack: Set<String>, realm: LobbyRealm): Boolean {
+        val rivals = scenes.filter { !it.manual && it.world == world && it.realm == realm && it.dataVersion == LobbySnapshot.dataVersion && stackOf(it) == stack }
         val near = rivals.filter { hypot((it.x - x).toDouble(), (it.z - z).toDouble()) < SAME_SPOT_BLOCKS }
         if (near.any { it.score >= score }) return false
         return near.isNotEmpty() || rivals.size < MAX_PER_WORLD || rivals.any { it.score < score }
@@ -215,8 +218,8 @@ object LobbySceneStore {
 
     fun admit(candidate: LobbySceneEntry, data: ByteArray): Boolean {
         val stack = stackOf(candidate)
-        if (!candidate.manual && !wouldKeep(candidate.world, candidate.x, candidate.z, candidate.score, stack)) return false
-        val inWorld = state.scenes.filter { it.world == candidate.world }
+        if (!candidate.manual && !wouldKeep(candidate.world, candidate.x, candidate.z, candidate.score, stack, candidate.realm)) return false
+        val inWorld = state.scenes.filter { it.world == candidate.world && it.realm == candidate.realm }
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
         val rivals = current.filter { !it.manual && stackOf(it) == stack }
         val replaced = ArrayList<LobbySceneEntry>()

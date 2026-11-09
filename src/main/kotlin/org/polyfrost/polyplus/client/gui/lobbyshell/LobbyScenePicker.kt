@@ -61,6 +61,7 @@ import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbyPacks
+import org.polyfrost.polyplus.client.lobby.LobbyRealm
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbySceneEntry
 import org.polyfrost.polyplus.client.lobby.LobbySceneScore
@@ -313,9 +314,9 @@ private fun describe(entry: LobbySceneEntry): String {
     val points = entry.points?.let { "$it pts" }
     val size = if (entry.bytes > 0L) "${entry.bytes / KILOBYTE} KB" else null
     return when (entry.setting) {
-        LobbySceneScore.Profile.CAVE -> listOfNotNull(caveName(entry.biome), points, size)
+        LobbySceneScore.Profile.CAVE -> listOfNotNull(if (entry.realm == LobbyRealm.NETHER) biome else caveName(entry.biome), points, size)
         LobbySceneScore.Profile.INDOOR -> listOfNotNull(biome, "Indoors", points, size)
-        LobbySceneScore.Profile.OUTDOOR -> listOfNotNull(biome, time, points, size)
+        LobbySceneScore.Profile.OUTDOOR -> listOfNotNull(biome, time.takeIf { entry.realm == LobbyRealm.OVERWORLD }, points, size)
     }.joinToString(", ")
 }
 

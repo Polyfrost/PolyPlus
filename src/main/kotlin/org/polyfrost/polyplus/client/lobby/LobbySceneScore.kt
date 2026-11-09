@@ -6,7 +6,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-class LobbySurvey(val origin: BlockPos, val minY: Int) {
+class LobbySurvey(val origin: BlockPos, val minY: Int, val realm: LobbyRealm = LobbyRealm.OVERWORLD) {
     val ground = IntArray(CELLS)
     val top = IntArray(CELLS)
     val block = IntArray(CELLS)
@@ -31,7 +31,7 @@ class LobbySurvey(val origin: BlockPos, val minY: Int) {
     }
 }
 
-class LobbyRoom(val origin: BlockPos, val biome: String) {
+class LobbyRoom(val origin: BlockPos, val biome: String, val realm: LobbyRealm = LobbyRealm.OVERWORLD) {
     val floor = IntArray(CELLS)
     val headroom = IntArray(CELLS)
     val kind = ByteArray(CELLS)
@@ -56,7 +56,7 @@ class LobbyRoom(val origin: BlockPos, val biome: String) {
 
 object LobbySceneScore {
     enum class Rejection(val reason: String) {
-        DIMENSION("Only works where the sky is normal"),
+        DIMENSION("Only works in the Overworld, Nether and End"),
         UNDERGROUND("You are underground"),
         ENCLOSED("Needs open sky"),
         CEILING("Something is blocking the sky overhead"),
@@ -73,6 +73,7 @@ object LobbySceneScore {
         CAMERA("Not enough room for the camera to stand back"),
         DARK("Too dark here. Add some lights."),
         LAVA("Too close to lava"),
+        ROOF("You are above the Nether roof"),
     }
 
     enum class Profile(val label: String, val key: String) {
@@ -114,11 +115,13 @@ object LobbySceneScore {
         val rejection: Rejection?,
         val breakdown: Breakdown? = null,
         val profile: Profile = breakdown?.profile ?: Profile.OUTDOOR,
+        val realm: LobbyRealm = LobbyRealm.OVERWORLD,
     )
 
     private class Requirement(val label: String, val rejections: Set<Rejection>)
 
     const val MIN_SCORE = 34.0
+    const val NETHER_ROOF = 127
 
     private const val CANDIDATE_STEP = 3
     private const val CANDIDATE_REACH = 20
@@ -132,6 +135,7 @@ object LobbySceneScore {
     private const val MIN_PAD = 0.4
     private const val MIN_SKY = 0.4
     private const val MAX_VOID = 0.08
+    private const val END_EDGE_RADIUS = 10
     private const val MAX_WATER = 0.65
     private const val MAX_LAVA = 0.05
     private const val MIN_LOADED = 0.6
@@ -175,6 +179,21 @@ object LobbySceneScore {
         Requirement("Scene score of at least $passPoints", setOf(Rejection.DULL)),
     )
 
+    private val END_REQUIREMENTS = listOf(
+        Requirement("Above ground", setOf(Rejection.UNDERGROUND)),
+        Requirement("Nothing overhead", setOf(Rejection.ENCLOSED, Rejection.CEILING)),
+        Requirement("Room to stand", setOf(Rejection.SMALL, Rejection.NO_STAGE)),
+        Requirement("Solid ground all around", setOf(Rejection.VOID)),
+        Requirement("Not flooded", setOf(Rejection.FLOODED)),
+        Requirement("Area loaded", setOf(Rejection.UNLOADED)),
+        Requirement("Ground not too steep", setOf(Rejection.UNEVEN)),
+        Requirement("Scene score of at least $passPoints", setOf(Rejection.DULL)),
+    )
+
+    private val END_INTERIOR_REQUIREMENTS = INTERIOR_REQUIREMENTS.filter { Rejection.DIMENSION !in it.rejections }
+
+    private val NETHER_REQUIREMENTS = listOf(Requirement("Below the Nether roof", setOf(Rejection.ROOF))) + END_INTERIOR_REQUIREMENTS
+
     private val NEWER = Requirement("Better than your saved scenes here", setOf(Rejection.WEAKER))
 
     private fun display(raw: Double, max: Double): Int = (raw / max * FULL_SCORE).roundToInt().coerceIn(0, FULL_SCORE.toInt())
@@ -187,8 +206,14 @@ object LobbySceneScore {
         weakerBlocks: Boolean,
         reason: String? = rejection?.reason,
         profile: Profile = breakdown?.profile ?: Profile.OUTDOOR,
+        realm: LobbyRealm = LobbyRealm.OVERWORLD,
     ): Report {
-        val requirements = if (profile.interior) INTERIOR_REQUIREMENTS else REQUIREMENTS
+        val requirements = when {
+            realm == LobbyRealm.NETHER -> NETHER_REQUIREMENTS
+            realm == LobbyRealm.END -> if (profile.interior) END_INTERIOR_REQUIREMENTS else END_REQUIREMENTS
+            profile.interior -> INTERIOR_REQUIREMENTS
+            else -> REQUIREMENTS
+        }
         val failed = requirements.indexOfFirst { rejection != null && rejection in it.rejections }
         val checks = requirements.mapIndexed { index, requirement ->
             when {
@@ -239,7 +264,7 @@ object LobbySceneScore {
                 }
             }
         }
-        return best ?: Verdict(null, 0.0, worst ?: Rejection.SMALL, scored?.breakdown)
+        return (best ?: Verdict(null, 0.0, worst ?: Rejection.SMALL, scored?.breakdown)).copy(realm = survey.realm)
     }
 
     private fun candidate(survey: LobbySurvey, cellX: Int, cellZ: Int): Verdict? {
@@ -260,9 +285,16 @@ object LobbySceneScore {
         val area = view(survey, cellX, cellZ)
         val rejection = rejection(area)
         if (rejection != null) return Verdict(null, 0.0, rejection)
+        val end = survey.realm == LobbyRealm.END
+        if (end && nearEdge(survey, cellX, cellZ)) return Verdict(null, 0.0, Rejection.VOID)
 
         val anchor = BlockPos(survey.origin.x + cellX * LobbySurvey.STEP, height, survey.origin.z + cellZ * LobbySurvey.STEP)
         val waterShare = area.water.toDouble() / area.loaded
+        if (end) {
+            val breakdown = breakdown(stage, area, waterShare, cellX, cellZ, sky = false)
+            val score = (breakdown.categories.sumOf { it.points } - breakdown.distanceCost) * OUTDOOR_MAX / breakdown.max - WATER_COST
+            return Verdict(anchor, score, if (score < MIN_SCORE) Rejection.DULL else null, breakdown)
+        }
         val score = FLAT_WEIGHT * stage.first +
             SKY_WEIGHT * stage.second +
             VARIETY_WEIGHT * min(1.0, area.blocks.size / VARIETY_FULL) +
@@ -274,11 +306,11 @@ object LobbySceneScore {
         return Verdict(anchor, score, if (score < MIN_SCORE) Rejection.DULL else null, breakdown(stage, area, waterShare, cellX, cellZ))
     }
 
-    private fun breakdown(stage: Pair<Double, Double>, area: Area, waterShare: Double, cellX: Int, cellZ: Int) = Breakdown(
+    private fun breakdown(stage: Pair<Double, Double>, area: Area, waterShare: Double, cellX: Int, cellZ: Int, sky: Boolean = true) = Breakdown(
         Profile.OUTDOOR,
-        listOf(
+        listOfNotNull(
             Category("flat", "Flat ground", FLAT_WEIGHT * stage.first, FLAT_WEIGHT),
-            Category("sky", "Open sky", SKY_WEIGHT * stage.second, SKY_WEIGHT),
+            Category("sky", "Open sky", SKY_WEIGHT * stage.second, SKY_WEIGHT).takeIf { sky },
             Category("variety", "Block variety", VARIETY_WEIGHT * min(1.0, area.blocks.size / VARIETY_FULL), VARIETY_WEIGHT),
             Category("relief", "Hills and slopes", RELIEF_WEIGHT * min(1.0, area.relief / RELIEF_FULL), RELIEF_WEIGHT),
             Category("built", "Builds", BUILT_WEIGHT * min(1.0, area.built.toDouble() / area.loaded / BUILT_FULL), BUILT_WEIGHT),
@@ -303,6 +335,15 @@ object LobbySceneScore {
             area.relief > MAX_RELIEF -> Rejection.UNEVEN
             else -> null
         }
+    }
+
+    private fun nearEdge(survey: LobbySurvey, cellX: Int, cellZ: Int): Boolean {
+        var edge = false
+        forCells(cellX, cellZ, END_EDGE_RADIUS) { x, z ->
+            val kind = survey.kind[survey.index(x, z)]
+            if (kind == LobbySurvey.VOID || kind == LobbySurvey.UNLOADED) edge = true
+        }
+        return edge
     }
 
     private fun stageShape(survey: LobbySurvey, cellX: Int, cellZ: Int, height: Int): Pair<Double, Double> {
@@ -390,6 +431,8 @@ object LobbySceneScore {
     private const val MIN_LIGHT = 6.0
     private const val MAX_ROOM_WATER = 0.5
     private const val MAX_ROOM_LAVA = 0.06
+    private const val NETHER_MAX_LAVA = 0.35
+    private const val NETHER_MIN_LIGHT = 3.0
     private const val CAVE_BUILT = 0.12
     private const val ROOM_FULL = 170.0
     private const val ROOM_BUILT_FULL = 0.25
@@ -413,6 +456,14 @@ object LobbySceneScore {
         "minecraft:lush_caves" to 1.0,
         "minecraft:dripstone_caves" to 0.6,
         "minecraft:deep_dark" to 0.0,
+    )
+
+    private val NETHER_BIOMES = mapOf(
+        "minecraft:crimson_forest" to 1.0,
+        "minecraft:warped_forest" to 1.0,
+        "minecraft:basalt_deltas" to 0.7,
+        "minecraft:soul_sand_valley" to 0.6,
+        "minecraft:nether_wastes" to 0.3,
     )
 
     private class Room {
@@ -446,10 +497,12 @@ object LobbySceneScore {
                 }
             }
         }
-        best?.let { return it }
-        val profile = scored?.profile ?: worst?.profile ?: Profile.INDOOR
-        return Verdict(null, 0.0, worst?.rejection ?: Rejection.ROOM, scored?.breakdown, profile)
+        best?.let { return it.copy(realm = room.realm) }
+        val profile = scored?.profile ?: worst?.profile ?: fallback(room)
+        return Verdict(null, 0.0, worst?.rejection ?: Rejection.ROOM, scored?.breakdown, profile, room.realm)
     }
+
+    private fun fallback(room: LobbyRoom): Profile = if (room.realm == LobbyRealm.NETHER) Profile.CAVE else Profile.INDOOR
 
     private fun roomCandidate(room: LobbyRoom, cellX: Int, cellZ: Int): Verdict? {
         val center = room.index(cellX, cellZ)
@@ -457,18 +510,21 @@ object LobbySceneScore {
         if (kind == LobbySurvey.UNLOADED) return null
         val origin = cellX == 0 && cellZ == 0
         when (kind) {
-            LobbySurvey.WATER -> return Verdict(null, 0.0, if (origin) Rejection.FLOODED else Rejection.ROOM, profile = Profile.INDOOR)
-            LobbySurvey.LAVA -> return Verdict(null, 0.0, Rejection.LAVA, profile = Profile.INDOOR)
+            LobbySurvey.WATER -> return Verdict(null, 0.0, if (origin) Rejection.FLOODED else Rejection.ROOM, profile = fallback(room))
+            LobbySurvey.LAVA -> return Verdict(null, 0.0, Rejection.LAVA, profile = fallback(room))
             LobbySurvey.NATURAL, LobbySurvey.BUILT -> Unit
-            else -> return Verdict(null, 0.0, Rejection.ROOM, profile = Profile.INDOOR)
+            else -> return Verdict(null, 0.0, Rejection.ROOM, profile = fallback(room))
         }
         val height = room.floor[center]
         if (abs(height - room.origin.y) > ROOM_PLAYER_RISE) return null
+        val nether = room.realm == LobbyRealm.NETHER
+        if (nether && height > NETHER_ROOF) return Verdict(null, 0.0, Rejection.ROOF, profile = Profile.CAVE)
         val area = roomView(room, cellX, cellZ, height)
         val builtShare = if (area.loaded == 0) 0.0 else area.crafted.toDouble() / area.loaded
-        val profile = if (builtShare < CAVE_BUILT || room.biome in CAVE_BIOMES) Profile.CAVE else Profile.INDOOR
+        val profile = if (nether || builtShare < CAVE_BUILT || room.biome in CAVE_BIOMES) Profile.CAVE else Profile.INDOOR
+        val maxLava = if (nether) NETHER_MAX_LAVA else MAX_ROOM_LAVA
         if (area.loaded < area.cells * MIN_LOADED) return Verdict(null, 0.0, Rejection.UNLOADED, profile = profile)
-        if (area.lavaNear > 0 || area.lava > area.loaded * MAX_ROOM_LAVA) return Verdict(null, 0.0, Rejection.LAVA, profile = profile)
+        if (area.lavaNear > 0 || area.lava > area.loaded * maxLava) return Verdict(null, 0.0, Rejection.LAVA, profile = profile)
         if (area.water > area.loaded * MAX_ROOM_WATER) return Verdict(null, 0.0, Rejection.FLOODED, profile = profile)
         if (area.floor < MIN_ROOM_CELLS) return Verdict(null, 0.0, Rejection.ROOM, profile = profile)
 
@@ -479,7 +535,7 @@ object LobbySceneScore {
         val rejection = when {
             stage.second < MIN_HEAD_SHARE -> Rejection.LOW_CEILING
             !cameraFits(room, cellX, cellZ, height) -> Rejection.CAMERA
-            area.light / area.open.coerceAtLeast(1) < MIN_LIGHT -> Rejection.DARK
+            area.light / area.open.coerceAtLeast(1) < (if (nether) NETHER_MIN_LIGHT else MIN_LIGHT) -> Rejection.DARK
             breakdown.total < passPoints -> Rejection.DULL
             else -> null
         }
@@ -497,7 +553,7 @@ object LobbySceneScore {
         )
         if (CAVE_LOOK) {
             val loaded = area.loaded.coerceAtLeast(1).toDouble()
-            val biome = CAVE_BIOMES[room.biome] ?: OTHER_CAVE
+            val biome = (if (room.realm == LobbyRealm.NETHER) NETHER_BIOMES else CAVE_BIOMES)[room.biome] ?: OTHER_CAVE
             val pools = min(POOL_CAP, area.water / loaded) * POOL_POINTS
             val glow = min(LAVA_GLOW_CAP, area.lava / loaded) * LAVA_GLOW_POINTS
             val features = min(1.0, (area.beauty / loaded + pools + glow) / FEATURE_FULL)

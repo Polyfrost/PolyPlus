@@ -344,6 +344,8 @@ object LobbyAmbience {
             scenePlace = id?.let { runCatching { LobbyScene.findScene(it) }.getOrNull() }?.let { entry ->
                 val biome = entry.biome.substringAfter(':').lowercase()
                 when {
+                    entry.realm == LobbyRealm.NETHER -> Layer.NETHER
+                    entry.realm == LobbyRealm.END -> Layer.END
                     biome in NETHER_BIOMES -> Layer.NETHER
                     biome in END_BIOMES -> Layer.END
                     entry.setting == LobbySceneScore.Profile.CAVE -> Layer.CAVE
