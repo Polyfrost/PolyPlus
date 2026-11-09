@@ -77,7 +77,9 @@ internal enum class PlaySource(val page: LobbyPage) {
         get() = this != Replays || ReplayLibrary.enabled
 }
 
-internal class ServerEdit(val server: ServerData?)
+internal class ServerEdit(val server: ServerData?) {
+    val address = server?.ip
+}
 
 private class PlayChoice(val source: PlaySource, val server: ServerData?, val worldId: String?, val replay: Path?)
 
@@ -362,8 +364,13 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     fun finishEdit() {
+        val edit = editing
         editing = null
         servers.reload()
+        val selected = selectedServer ?: return
+        val edited = edit?.server
+        val target = if (edited != null && selected.ip.equals(edit?.address, ignoreCase = true)) edited else selected
+        selectedServer = servers.resolve(target)
     }
 
     fun finishDelete() {
