@@ -43,6 +43,7 @@ object PlayTogether {
     private const val JOIN_RETRY_DELAY_MS = 2_000L
     private const val MAX_JOIN_RETRIES = 2
     private const val PLAN_TIMEOUT_MS = 10_000L
+    private const val CHECK_TIMEOUT_MS = 10_000L
     private const val MAX_MODS = 300
     private const val MAX_MOD_CHARS = 96
     private const val MAX_NAME = 64
@@ -59,6 +60,7 @@ object PlayTogether {
         var warning by mutableStateOf<String?>(null)
         val responses = mutableStateMapOf<String, Pair<PlayResponse, PlayReason?>>()
         internal var check: ServerCheck? = null
+        internal var checkAt = 0L
         internal var session: Job? = null
         internal var retry: SessionRefresh.ConnectionAttempt? = null
         internal var retryAt = 0L
@@ -215,6 +217,7 @@ object PlayTogether {
         when (destination.kind) {
             PlayDestinationKind.Server -> destination.address?.let {
                 current.check = ServerCheck(it)
+                current.checkAt = System.currentTimeMillis()
                 current.session = SessionRefresh.prepareForJoin()
             }
             else -> checkWorld(current)
@@ -379,7 +382,10 @@ object PlayTogether {
             when (check.poll()) {
                 ServerCheck.Result.INCOMPATIBLE -> incompatible(current, PlayReason.Version, "Needs Minecraft ${check.serverVersion.ifBlank { "another version" }}")
                 ServerCheck.Result.UNREACHABLE, ServerCheck.Result.OK -> current.check = null
-                ServerCheck.Result.PENDING -> Unit
+                ServerCheck.Result.PENDING -> if (now - current.checkAt > CHECK_TIMEOUT_MS) {
+                    check.close()
+                    current.check = null
+                }
             }
         }
         when (current.stage) {
