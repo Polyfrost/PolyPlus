@@ -454,7 +454,7 @@ object LobbyCapture {
         }
         job.timing.add(Util.getNanos() - start)
         val done = room ?: job
-        return Runnable { finishSurvey(done, verdict) }
+        return Runnable { finishSurvey(done, verdict, level) }
     }
 
     private fun copyAll(level: ClientLevel, job: Copying) {
@@ -660,7 +660,7 @@ object LobbyCapture {
                 )
                 return@execute
             }
-            landed.add(Runnable { finishSurvey(job, verdict) })
+            landed.add(Runnable { finishSurvey(job, verdict, level) })
         }
     }
 
@@ -834,7 +834,7 @@ object LobbyCapture {
         state.`is`(Blocks.LANTERN) ||
         state.`is`(Blocks.TORCH)
 
-    private fun finishSurvey(job: Surveying, verdict: LobbySceneScore.Verdict) {
+    private fun finishSurvey(job: Surveying, verdict: LobbySceneScore.Verdict, surveyed: ClientLevel) {
         busy = false
         val mc = Minecraft.getInstance()
         val left = job.source.left
@@ -842,7 +842,7 @@ object LobbyCapture {
         val anchor = verdict.anchor
         val rejection = verdict.rejection
         val action = job.source.action
-        if (level == null || (left == null && level !== trackedLevel)) {
+        if (level == null || level !== surveyed || (left == null && level !== trackedLevel)) {
             if (action != null) spot = LobbySpotState.Idle
             return
         }
