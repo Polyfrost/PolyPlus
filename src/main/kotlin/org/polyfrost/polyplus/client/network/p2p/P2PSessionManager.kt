@@ -610,15 +610,19 @@ object P2PSessionManager {
             return
         }
 
-        val socket = joinSocketFor(socketFor(invite.eosSessionId ?: invite.sessionId))
+        val advertised = socketFor(invite.eosSessionId ?: invite.sessionId)
+        val socket = joinSocketFor(advertised)
         val target = JoinTarget(EosProductUserId(hostPuid), socket)
         joinedSessionId = invite.sessionId
         _rejoinSessionId.value = invite.sessionId
         LOGGER.info("Resolved join target for session {}: host={} socket={}", invite.sessionId, hostPuid, socket)
-        attemptJoin(bridge, target)
+        if (attemptJoin(bridge, target)) return
+        if (_rejoinSessionId.value != invite.sessionId || ClientPlatform.currentScreen() !is ConnectScreen) return
+        LOGGER.info("Retrying session {} on the advertised socket {}", invite.sessionId, advertised)
+        attemptJoin(bridge, JoinTarget(target.host, advertised))
     }
 
-    private suspend fun attemptJoin(bridge: EosSdkBridge, target: JoinTarget) {
+    private suspend fun attemptJoin(bridge: EosSdkBridge, target: JoinTarget): Boolean {
         val established = AtomicBoolean(false)
         val handle = bridge.addConnectionStateHandler(target.socket) { event ->
             if (event.remote != target.host) return@addConnectionStateHandler
@@ -631,11 +635,12 @@ object P2PSessionManager {
         delay(JOIN_HANDSHAKE_TIMEOUT_MS.milliseconds)
         bridge.removeNotificationHandler(handle)
 
-        if (established.get()) return
+        if (established.get()) return true
 
         LOGGER.error("The host never accepted our P2P connection on socket {} within {}ms", target.socket, JOIN_HANDSHAKE_TIMEOUT_MS)
         P2PConnectionContext.clearPendingJoin(target)
         bridge.closeConnection(target.socket, target.host)
+        return false
     }
 
     private fun onJoinTargetResolved(target: JoinTarget) {
