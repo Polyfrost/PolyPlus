@@ -92,6 +92,7 @@ object LobbyAmbience {
     private const val EASE_SECONDS = 0.6f
     private const val FADE_IN_SECONDS = 0.6f
     private const val FADE_OUT_SECONDS = 0.5f
+    private const val DEPART_FADE_SECONDS = 1.0f
     private const val SETTLE_TICKS = 40
     private const val RETRY_TICKS = 100
     private const val FAILED_TICKS = 200
@@ -109,6 +110,7 @@ object LobbyAmbience {
     private var introBorn = 0
     private var presence = 0f
     private var leaving = false
+    private var departing = false
     private var clock = 0
     private var retry = 0
     private var introClaimed = false
@@ -152,6 +154,14 @@ object LobbyAmbience {
         *///?}
     }
 
+    fun depart() {
+        if (holdsMusic()) departing = true
+    }
+
+    fun arrive() {
+        departing = false
+    }
+
     fun onFrame() {
         //? if = 1.8.9 {
         /*if (dueNanos == 0L || System.nanoTime() < dueNanos) return
@@ -165,7 +175,8 @@ object LobbyAmbience {
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
-        val wanted = lobbyUp(mc) && audible(mc) && !(StartupOverlay.active && !introClaimed)
+        if (departing && !holdsMusic() && !lobbyUp(mc)) departing = false
+        val wanted = lobbyUp(mc) && audible(mc) && !departing && !(StartupOverlay.active && !introClaimed)
         if (!holdsMusic()) {
             if (!wanted || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
             if (!begin(mc, false)) retry = RETRY_TICKS
@@ -179,7 +190,7 @@ object LobbyAmbience {
         val targets = targets(layers)
         for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
         voices.filter { it.layer !in layers && it.weight < SILENT_FLOOR }.forEach { drop(mc, it, false) }
-        presence = if (leaving) presence - TICK_SECONDS / FADE_OUT_SECONDS else minOf(1f, presence + TICK_SECONDS / FADE_IN_SECONDS)
+        presence = if (leaving) presence - TICK_SECONDS / (if (departing) DEPART_FADE_SECONDS else FADE_OUT_SECONDS) else minOf(1f, presence + TICK_SECONDS / FADE_IN_SECONDS)
         if (presence <= 0f || !holdsMusic()) {
             halt(mc)
             return

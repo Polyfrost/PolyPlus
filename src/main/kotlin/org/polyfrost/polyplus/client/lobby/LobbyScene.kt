@@ -544,6 +544,7 @@ object LobbyScene {
     }
 
     fun depart(done: () -> Unit) {
+        LobbyAmbience.depart()
         if (live == null) {
             done()
             return
@@ -556,6 +557,7 @@ object LobbyScene {
     }
 
     fun arrive() {
+        LobbyAmbience.arrive()
         departNanos = 0L
         departProgress = 0f
         departDone = null
