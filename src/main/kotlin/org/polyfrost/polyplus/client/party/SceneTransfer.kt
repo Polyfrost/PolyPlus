@@ -82,6 +82,8 @@ internal object SceneTransfer {
         if (partyId != verifiedParty) {
             verifiedParty = partyId
             verified.clear()
+            pass = null
+            passExpires = 0L
         }
         if (download == null && serving.get() == 0 && System.currentTimeMillis() > relayHeldUntil) P2PSessionManager.setSceneRelay(false)
     }
