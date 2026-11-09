@@ -246,7 +246,7 @@ object LobbyCapture {
         }
         settled++
         if (OneClientServerApi.isConnected) policy = OneClientServerApi.scenePolicy
-        if (!busy) rememberPolicy(mc)
+        rememberPolicy(mc)
         val screen = ClientPlatform.currentScreen()
         val pausing = screen is PauseScreen || screen is OneClientPauseScreen
         if (pausing || screen is DeathScreen) {
