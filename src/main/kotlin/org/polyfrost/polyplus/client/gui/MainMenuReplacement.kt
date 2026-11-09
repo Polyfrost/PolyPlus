@@ -37,7 +37,11 @@ object MainMenuReplacement {
     fun alreadyOpen(): Boolean = ClientPlatform.currentScreen().let { isMenu(it) || it is PolyPlusOnboardingScreen }
 
     @JvmStatic
-    fun create(): Screen = if (choice() == MainMenuChoice.POLYPLUS) PolyPlusMainMenuScreen() else PolyPlusLobbyScreen()
+    fun create(): Screen = when {
+        choice() != MainMenuChoice.POLYPLUS -> PolyPlusLobbyScreen()
+        onboardingPending() -> PolyPlusOnboardingScreen()
+        else -> PolyPlusMainMenuScreen()
+    }
 
     @JvmStatic
     fun open() = ClientPlatform.setScreen(create())
