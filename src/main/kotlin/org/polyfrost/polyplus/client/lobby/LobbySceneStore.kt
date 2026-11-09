@@ -13,11 +13,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.client.Minecraft
 import net.minecraft.nbt.CompoundTag
-//? if >= 1.21.11 {
-import net.minecraft.util.Util
-//?} else {
-/*import net.minecraft.Util
-*///?}
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.ServerApiProtocol
@@ -270,7 +265,7 @@ object LobbySceneStore {
         if (entry.bundled) return
         val path = folder.resolve(entry.file)
         update { copy(scenes = scenes - entry, pinned = pinned?.takeUnless { it == entry.id }) }
-        Util.ioPool().execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
+        writer.execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
     }
 
     fun canRename(entry: LobbySceneEntry): Boolean = !entry.bundled && entry.origin != LobbySceneEntry.ORIGIN_PARTY
