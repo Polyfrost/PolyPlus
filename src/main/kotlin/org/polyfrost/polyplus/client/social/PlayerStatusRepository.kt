@@ -22,15 +22,20 @@ object PlayerStatusRepository {
         lock.withLock { load() }
     }
 
+    @Volatile private var requested: PlayerStatus? = null
+
     fun set(status: PlayerStatus) {
         if (status == _status.value) return
         _status.value = status
+        requested = status
         PolyPlusClient.SCOPE.launch {
             lock.withLock {
-                AccountApi.setStatus(status)
-                    .onSuccess { _status.value = status }
+                val target = requested ?: return@withLock
+                requested = null
+                AccountApi.setStatus(target)
+                    .onSuccess { if (requested == null) _status.value = target }
                     .onFailure {
-                        LOGGER.error("Failed to set status to $status", it)
+                        LOGGER.error("Failed to set status to $target", it)
                         SocialErrors.emit("Couldn't change your status", it)
                         load()
                     }
@@ -40,7 +45,7 @@ object PlayerStatusRepository {
 
     private suspend fun load() {
         AccountApi.status()
-            .onSuccess { if (it != PlayerStatus.Unknown) _status.value = it }
+            .onSuccess { if (it != PlayerStatus.Unknown && requested == null) _status.value = it }
             .onFailure { LOGGER.warn("Failed to load account status", it) }
     }
 }
