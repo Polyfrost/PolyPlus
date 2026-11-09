@@ -31,9 +31,6 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic @Include
     var migratedFromLegacyConfig = false
 
-    @JvmStatic @Include
-    var useVanillaMainMenu = false
-
     @JvmStatic
     @Dropdown(
         title = "Main Menu",
@@ -165,7 +162,6 @@ object PolyPlusMainMenuConfig : Config(
         PolyPlusLobbyConfig.preload()
         preload()
         migrateFromLegacyConfig()
-        migrateVanillaMainMenu()
 
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
@@ -189,13 +185,6 @@ object PolyPlusMainMenuConfig : Config(
         if (migratedFromLegacyConfig) return
         loadLegacyPolyPlusOptions("main menu", LOGGER, ::loadFrom)
         migratedFromLegacyConfig = true
-        save()
-    }
-
-    private fun migrateVanillaMainMenu() {
-        if (!useVanillaMainMenu) return
-        mainMenu = MainMenuChoice.VANILLA
-        useVanillaMainMenu = false
         save()
     }
 

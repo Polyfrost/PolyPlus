@@ -54,7 +54,7 @@ class ConfigSplitMigrationTest {
 
     @Test
     fun `main menu options are carried over`() {
-        assertEquals(MainMenuChoice.VANILLA, PolyPlusMainMenuConfig.mainMenu)
+        assertEquals(MainMenuChoice.LOBBY, PolyPlusMainMenuConfig.mainMenu)
         assertTrue(PolyPlusMainMenuConfig.hideMainMenuSocial)
         assertTrue(PolyPlusMainMenuConfig.hideMainMenuQuickplay)
         assertEquals(MainMenuFpsLimitMode.CUSTOM, PolyPlusMainMenuConfig.mainMenuFpsLimitMode)
