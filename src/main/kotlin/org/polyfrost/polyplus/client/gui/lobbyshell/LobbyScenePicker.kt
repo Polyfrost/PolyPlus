@@ -51,6 +51,9 @@ import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialSwitch
+import org.polyfrost.polyplus.client.gui.SocialDropdown
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
+import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
@@ -164,6 +167,8 @@ private fun ScenePicker(onClose: () -> Unit) {
             LobbySceneStore.bundledScenes.forEach { entry ->
                 SceneRow(entry.label, describe(entry), !following && LobbySceneStore.pinned == entry.id, { pick(entry.id) }, enabled = !following)
             }
+            Heading("Music")
+            MusicPicker()
             Heading("Capture")
             CaptureSwitchRow()
         }
@@ -235,6 +240,24 @@ private fun CaptureSwitchRow() {
     SwitchRow("Capture scenes", "Saves good spots while you play", LobbySceneStore.captureEnabled, true) {
         LobbySceneStore.captureEnabled = !LobbySceneStore.captureEnabled
     }
+}
+
+@Composable
+private fun MusicPicker() {
+    var music by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyMusic) }
+    SocialDropdown("Play", LobbyMusic.entries, music, LobbyMusic::toString, Modifier.fillMaxWidth()) {
+        music = it
+        PolyPlusLobbyConfig.lobbyMusic = it
+        PolyPlusLobbyConfig.save()
+    }
+    musicDetail(music)?.let { Note(it) }
+}
+
+private fun musicDetail(music: LobbyMusic): String? = when (music) {
+    LobbyMusic.MATCH_SCENE -> "Follows the scene and time of day"
+    LobbyMusic.MINECRAFT -> "The game's own menu music"
+    LobbyMusic.OFF -> "No music in the lobby"
+    else -> null
 }
 
 @Composable

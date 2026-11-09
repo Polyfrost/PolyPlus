@@ -6,6 +6,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyReveal
 import org.polyfrost.polyplus.client.lobby.LobbyTime
 
@@ -41,6 +42,14 @@ object PolyPlusLobbyConfig : Config(
         options = ["As captured", "Match theme", "Real time", "Day", "Sunset", "Night"],
     )
     var lobbyTime: LobbyTime = LobbyTime.CAPTURED
+
+    @JvmStatic
+    @Dropdown(
+        title = "Lobby Music",
+        description = "Choose the music that plays in the lobby.",
+        options = ["Match scene", "Day", "Night", "Sunset", "Aurora", "Home", "Cave", "Nether", "The End", "Minecraft music", "Off"],
+    )
+    var lobbyMusic: LobbyMusic = LobbyMusic.MATCH_SCENE
 
     @JvmStatic
     @Switch(

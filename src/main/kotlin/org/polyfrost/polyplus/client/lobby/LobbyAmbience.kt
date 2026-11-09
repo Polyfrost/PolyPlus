@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.sound.UiSounds
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.exp
@@ -118,6 +119,7 @@ object LobbyAmbience {
     private val failedAt = HashMap<Layer, Int>()
     private var sceneKey: String? = null
     private var scenePlace: Layer? = null
+    private var silenced = false
     //? if > 1.8.9 {
     private var introGate: LobbySoundGate.Group? = null
     private var introDelay = 0L
@@ -127,7 +129,28 @@ object LobbyAmbience {
     *///?}
 
     @JvmStatic
-    fun holdsMusic(): Boolean = voices.isNotEmpty() || intro != null
+    fun holdsMusic(): Boolean = playing() || silent(Minecraft.getInstance())
+
+    private fun playing(): Boolean = voices.isNotEmpty() || intro != null
+
+    private fun silent(mc: Minecraft): Boolean = PolyPlusLobbyConfig.lobbyMusic == LobbyMusic.OFF && lobbyUp(mc)
+
+    private fun loops(): Boolean = when (PolyPlusLobbyConfig.lobbyMusic) {
+        LobbyMusic.MINECRAFT, LobbyMusic.OFF -> false
+        else -> true
+    }
+
+    private fun fixed(): Layer? = when (PolyPlusLobbyConfig.lobbyMusic) {
+        LobbyMusic.DAY -> Layer.DAY
+        LobbyMusic.NIGHT -> Layer.NIGHT
+        LobbyMusic.SUNSET -> Layer.GOLDEN
+        LobbyMusic.AURORA -> Layer.AURORA
+        LobbyMusic.HOME -> Layer.BUILDING
+        LobbyMusic.CAVE -> Layer.CAVE
+        LobbyMusic.NETHER -> Layer.NETHER
+        LobbyMusic.THE_END -> Layer.END
+        else -> null
+    }
 
     fun startup() {
         if (introClaimed) return
@@ -156,7 +179,7 @@ object LobbyAmbience {
     }
 
     fun depart() {
-        if (holdsMusic()) departing = true
+        if (playing()) departing = true
     }
 
     fun arrive() {
@@ -176,14 +199,20 @@ object LobbyAmbience {
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
-        if (departing && !holdsMusic() && !lobbyUp(mc)) departing = false
+        val quiet = silent(mc)
+        if (quiet && !silenced) {
+            mc.musicManager.stopPlaying()
+            UiSounds.releaseAmbience()
+        }
+        silenced = quiet
+        if (departing && !playing() && !lobbyUp(mc)) departing = false
         val wanted = lobbyUp(mc) && audible(mc) && !departing && !(StartupOverlay.active && !introClaimed)
-        if (!holdsMusic()) {
-            if (!wanted || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
+        if (!playing()) {
+            if (!wanted || !loops() || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
             if (!begin(mc, false)) retry = RETRY_TICKS
             return
         }
-        leaving = !wanted
+        leaving = !wanted || (!loops() && intro == null)
         intro?.let { if (clock - introBorn > SETTLE_TICKS && !active(mc, it)) intro = null }
         voices.filter { clock - it.born > SETTLE_TICKS && !active(mc, it.sound) }.forEach { drop(mc, it, true) }
         val layers = desired()
@@ -192,7 +221,7 @@ object LobbyAmbience {
         for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
         voices.filter { it.layer !in layers && it.weight < SILENT_FLOOR }.forEach { drop(mc, it, false) }
         presence = if (leaving) presence - TICK_SECONDS / (if (departing) DEPART_FADE_SECONDS else FADE_OUT_SECONDS) else minOf(1f, presence + TICK_SECONDS / FADE_IN_SECONDS)
-        if (presence <= 0f || !holdsMusic()) {
+        if (presence <= 0f || !playing()) {
             halt(mc)
             return
         }
@@ -287,6 +316,8 @@ object LobbyAmbience {
         layer in present && failedAt[layer].let { it == null || clock - it > FAILED_TICKS }
 
     private fun desired(): List<Layer> {
+        if (!loops()) return emptyList()
+        fixed()?.takeIf(::usable)?.let { return listOf(it) }
         val mood = LobbySky.mood
         val place = place(mood)?.takeIf(::usable)
         if (place != null) return listOf(place)
