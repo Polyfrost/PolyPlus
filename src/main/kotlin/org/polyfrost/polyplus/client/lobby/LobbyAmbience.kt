@@ -141,6 +141,7 @@ object LobbyAmbience {
         sound.gain = volume()
         presence = 1f
         mc.soundManager.play(sound)
+        //? if > 1.8.9
         if (!active(mc, sound)) return
         intro = sound
         introBorn = clock

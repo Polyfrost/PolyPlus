@@ -3,7 +3,7 @@
     "sounds": [
       {
         "name": "polyplus:lobby/startup",
-        "stream": true
+        "stream": false
       }
     ]
   },
