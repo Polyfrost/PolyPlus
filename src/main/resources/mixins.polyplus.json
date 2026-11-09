@@ -288,6 +288,7 @@
     //"compat.oneconfig.MixinComposeScreen",
     "compat.oneconfig.MixinEventManager",
     "compat.oneconfig.MixinExternalSounds",
+    "compat.oneconfig.MixinUiSounds",
     "compat.oneconfig.MixinGlHost",
     //? if > 1.8.9
     "compat.oneconfig.MixinWWaypointsCompat",

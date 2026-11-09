@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.lobby
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
 import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ui.sound.UiSounds
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.exp
@@ -193,6 +194,7 @@ object LobbyAmbience {
         val layers = desired()
         join(mc, layers, targets(layers))
         if (voices.isEmpty()) return false
+        UiSounds.releaseAmbience()
         if (afterIntro) {
             //? if > 1.8.9 {
             val gate = layerGates.lastOrNull()
