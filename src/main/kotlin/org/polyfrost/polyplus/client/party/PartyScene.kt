@@ -120,7 +120,7 @@ object PartyScene {
         val clock = LobbyTime.clock(entry.clock).toInt()
         val fallback = if (entry.bundled) entry.id else fallbackFor(entry).id
         if (entry.bundled) return MemberScene(SceneKind.Bundled, entry.id, entry.id, clock, mcVersion)
-        val hash = if (entry.origin == LobbySceneEntry.ORIGIN_WORLD) hashOf(entry) else null
+        val hash = if (entry.origin == LobbySceneEntry.ORIGIN_WORLD && entry.bytes <= SceneTransfer.MAX_BYTES) hashOf(entry) else null
         if (hash != null && shares(entry, hash)) return MemberScene(SceneKind.Capture, hash, fallback, clock, mcVersion)
         return MemberScene(SceneKind.Bundled, fallback, fallback, clock, mcVersion)
     }

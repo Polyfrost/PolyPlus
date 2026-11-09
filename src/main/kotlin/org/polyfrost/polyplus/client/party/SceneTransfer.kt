@@ -34,7 +34,7 @@ internal object SceneTransfer {
     private const val CHUNK: Byte = 0x04
     private const val MISSING: Byte = 0x05
     private const val CHUNK_BYTES = 1000
-    private const val MAX_BYTES = 1024 * 1024
+    const val MAX_BYTES = 1024 * 1024
     private const val HASH_BYTES = 32
     private const val CACHE_BYTES = 32L * 1024 * 1024
     private const val FETCH_TIMEOUT_MS = 30_000L
