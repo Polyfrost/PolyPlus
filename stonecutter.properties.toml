@@ -1,6 +1,6 @@
 mod.name = "PolyPlus"
 mod.id = "polyplus"
-mod.version = "1.5.0"
+mod.version = "2.0.0"
 mod.group = "org.polyfrost"
 
 deps.fabric_loader = "0.19.5"
