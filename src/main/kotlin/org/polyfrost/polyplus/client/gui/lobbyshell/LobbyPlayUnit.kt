@@ -456,13 +456,14 @@ private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
     }
     val flows = remember { SingleplayerFlows() }
     val action: (@Composable () -> Unit)? = when {
-        source == PlaySource.Multiplayer -> { { TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, lobby::addServer) } }
-        singleplayer && lobby.worlds.loaded -> { { TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, flows::create) } }
+        source == PlaySource.Multiplayer -> { { TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(32.dp), ButtonStyle.Secondary, true, lobby::addServer) } }
+        singleplayer && lobby.worlds.loaded -> { { TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(32.dp), ButtonStyle.Secondary, true, flows::create) } }
         else -> null
     }
-    HeroLayout({ EmptyIcon(icon) }, action) {
+    HeroLayout({ EmptyIcon(icon) }) {
         HeroName(title)
         HeroDetail(detail)
+        action?.let { Box(Modifier.padding(top = 4.dp)) { it() } }
     }
 }
 
