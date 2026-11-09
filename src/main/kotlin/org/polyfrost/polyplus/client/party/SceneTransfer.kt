@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.party
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
@@ -16,6 +17,7 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.util.HexFormat
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -56,6 +58,8 @@ internal object SceneTransfer {
     @Volatile private var verifiedParty: String? = null
     @Volatile private var pass: String? = null
     @Volatile private var passExpires = 0L
+    private val serving = AtomicInteger()
+    @Volatile private var relayHeldUntil = 0L
 
     private val cacheDir: Path by lazy { FabricLoader.getInstance().gameDir.resolve("polyplus").resolve("lobby").resolve("party-scenes") }
 
@@ -79,6 +83,7 @@ internal object SceneTransfer {
             verifiedParty = partyId
             verified.clear()
         }
+        if (download == null && serving.get() == 0 && System.currentTimeMillis() > relayHeldUntil) P2PSessionManager.setSceneRelay(false)
     }
 
     private fun memberPuids(): Set<String> =
@@ -90,6 +95,8 @@ internal object SceneTransfer {
             LOGGER.info("Ignoring a party scene connection from {}", remote)
             return
         }
+        relayHeldUntil = System.currentTimeMillis() + FETCH_TIMEOUT_MS
+        P2PSessionManager.setSceneRelay(PolyPlusConfig.voiceHideIp)
         bridge.acceptConnection(SOCKET, remote)
     }
 
@@ -106,6 +113,7 @@ internal object SceneTransfer {
         PolyPlusClient.SCOPE.launch {
             val token = ownPass() ?: return@launch fail(job, "no party pass")
             if (PartyRepository.party.value?.id != party.id) return@launch fail(job, "left the party")
+            P2PSessionManager.setSceneRelay(PolyPlusConfig.voiceHideIp)
             bridge.acceptConnection(SOCKET, leader)
             bridge.sendPacket(SOCKET, leader, frame(HELLO, token.toByteArray(Charsets.UTF_8)), EosSdkBridge.PacketReliability.ReliableOrdered)
             bridge.sendPacket(SOCKET, leader, frame(GET, hex(hash)), EosSdkBridge.PacketReliability.ReliableOrdered)
@@ -159,6 +167,7 @@ internal object SceneTransfer {
     private fun onGet(remote: EosProductUserId, hash: ByteArray) {
         val bridge = bridge ?: return
         val wanted = HexFormat.of().formatHex(hash)
+        serving.incrementAndGet()
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
             var waits = 0
             while (remote.raw !in verified && waits++ < VERIFY_WAITS) delay(VERIFY_WAIT_MS)
@@ -184,7 +193,7 @@ internal object SceneTransfer {
                 bridge.sendPacket(SOCKET, remote, frame(CHUNK, body), EosSdkBridge.PacketReliability.ReliableOrdered)
             }
             LOGGER.info("Sent the party scene to {} ({} bytes)", remote, bytes.size)
-        }
+        }.invokeOnCompletion { serving.decrementAndGet() }
     }
 
     private fun onInfo(remote: EosProductUserId, size: Int, count: Int) {

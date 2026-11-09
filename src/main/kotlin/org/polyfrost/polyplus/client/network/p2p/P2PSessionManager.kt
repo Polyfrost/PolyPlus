@@ -82,6 +82,7 @@ object P2PSessionManager {
 
     @Volatile private var hostingRelay = false
     @Volatile private var voiceRelay = false
+    @Volatile private var sceneRelay = false
 
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionIdFlow = _currentSessionId.asStateFlow()
@@ -252,7 +253,7 @@ object P2PSessionManager {
         this.bridge = bridge
         EosP2PChannel.Holder.bridge = bridge
 
-        bridge.setRelayControl(forceRelays = hostingRelay || voiceRelay)
+        bridge.setRelayControl(forceRelays = hostingRelay || voiceRelay || sceneRelay)
         bridge.setInboundPacketHandler { received ->
             if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
             if (PartyMesh.handlePacket(received)) return@setInboundPacketHandler
@@ -495,13 +496,19 @@ object P2PSessionManager {
 
     fun setPrivateRelay(enabled: Boolean) {
         hostingRelay = enabled
-        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay)
+        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay || sceneRelay)
     }
 
     fun setVoiceRelay(enabled: Boolean) {
         if (voiceRelay == enabled) return
         voiceRelay = enabled
-        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay)
+        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay || sceneRelay)
+    }
+
+    fun setSceneRelay(enabled: Boolean) {
+        if (sceneRelay == enabled) return
+        sceneRelay = enabled
+        bridge?.setRelayControl(forceRelays = hostingRelay || voiceRelay || sceneRelay)
     }
 
     suspend fun beginHostingSession(privateRelay: Boolean = false, autoShareResourcePack: Boolean = false): Result<SessionResponse> {
