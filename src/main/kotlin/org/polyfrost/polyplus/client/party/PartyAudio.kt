@@ -42,14 +42,24 @@ internal object PartyAudio {
     fun openCapture(device: String, gain: () -> Float, onFrame: (ShortArray, Float) -> Unit): VoiceStream? {
         val openAl = OpenAlCapture(device, gain, onFrame)
         val javaSound = MicCapture(device, gain, onFrame)
-        val order = if (PolyPlusConfig.voiceJavaSound) listOf(javaSound, openAl) else listOf(openAl, javaSound)
+        val order = when {
+            device.isNotBlank() && device in OpenAlDevices.inputs() -> listOf(openAl, javaSound)
+            mixerFor(device, TargetDataLine::class.java, MONO) != null -> listOf(javaSound, openAl)
+            PolyPlusConfig.voiceJavaSound -> listOf(javaSound, openAl)
+            else -> listOf(openAl, javaSound)
+        }
         return order.firstOrNull { it.start() }
     }
 
     fun openSpeaker(device: String, next: (ShortArray) -> Unit): VoiceStream? {
         val openAl = OpenAlSpeaker(device, next)
         val javaSound = SpeakerOutput(device, next)
-        val order = if (PolyPlusConfig.voiceJavaSound) listOf(javaSound, openAl) else listOf(openAl, javaSound)
+        val order = when {
+            device.isNotBlank() && device in OpenAlDevices.outputs() -> listOf(openAl, javaSound)
+            mixerFor(device, SourceDataLine::class.java, STEREO) != null -> listOf(javaSound, openAl)
+            PolyPlusConfig.voiceJavaSound -> listOf(javaSound, openAl)
+            else -> listOf(openAl, javaSound)
+        }
         return order.firstOrNull { it.start() }
     }
 
