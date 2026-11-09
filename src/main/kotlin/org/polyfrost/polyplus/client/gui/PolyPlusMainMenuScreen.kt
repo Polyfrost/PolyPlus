@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.client.gui
 
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -82,7 +84,9 @@ import net.minecraft.realms.RealmsBridge
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -94,6 +98,8 @@ import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.RecentServer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
+import org.polyfrost.polyplus.client.gui.lobbyshell.LocalGlassRegistry
+import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -322,10 +328,6 @@ private class MenuActions(
     val connect: (ServerData) -> Unit,
 )
 
-private val FeaturedCardBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.8f)
-private val CloseBackground = Color(0x80FF4444)
-
 internal fun mcGuiScale(): Int = Minecraft.getInstance().window.guiScale.toInt()
 
 @Composable
@@ -337,71 +339,75 @@ private fun MainMenu(
     pingTick: Int,
 ) {
     var accountsOpen by remember { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxSize()) {
-        MenuBackdrop(Modifier.fillMaxSize())
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-            val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
-            val safeScale = usableScale(scale)
-            val innerWidth = maxWidth.value / safeScale
-            val innerHeight = maxHeight.value / safeScale
-            val edgeX = { dp: Float -> minOf(dp / safeScale, dp + (innerWidth - BASE_WIDTH) / 2f).coerceAtLeast(0f).dp }
-            val edgeY = { dp: Float -> minOf(dp / safeScale, dp + (innerHeight - BASE_HEIGHT) / 2f).coerceAtLeast(0f).dp }
-            CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
-                var rightColumnHeightPx by remember { mutableStateOf(0) }
-                val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
-                val columnBottomPadding = ((BASE_HEIGHT.dp - rightColumnHeight) / 2).coerceAtLeast(0.dp)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
-                ) {
-                    CenterColumn(
-                        Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding),
+    val glass = remember { MenuGlass() }
+    var rootSize by remember { mutableStateOf(Size.Zero) }
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }) {
+        MenuBackdrop(Modifier.fillMaxSize(), glass)
+        CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
+                val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+                val safeScale = usableScale(scale)
+                val innerWidth = maxWidth.value / safeScale
+                val innerHeight = maxHeight.value / safeScale
+                val edgeX = { dp: Float -> minOf(dp / safeScale, dp + (innerWidth - BASE_WIDTH) / 2f).coerceAtLeast(0f).dp }
+                val edgeY = { dp: Float -> minOf(dp / safeScale, dp + (innerHeight - BASE_HEIGHT) / 2f).coerceAtLeast(0f).dp }
+                CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
+                    var rightColumnHeightPx by remember { mutableStateOf(0) }
+                    val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
+                    val columnBottomPadding = ((BASE_HEIGHT.dp - rightColumnHeight) / 2).coerceAtLeast(0.dp)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
+                    ) {
+                        CenterColumn(
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding),
+                            actions,
+                        )
+                    }
+                    if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
+                        LeftColumn(
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = edgeX(50f)),
+                            quickplay,
+                            pingTick,
+                            actions,
+                        )
+                    }
+                    RightColumn(
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = edgeX(50f))
+                            .onSizeChanged { rightColumnHeightPx = it.height },
+                        screen,
+                        onAccounts = { accountsOpen = true },
+                    )
+                    WindowControls(
+                        Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f)),
                         actions,
                     )
-                }
-                if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
-                    LeftColumn(
+                    if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
+                        ModIntegrationBar(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = edgeY(18f)),
+                            screen,
+                        )
+                    }
+                    FeaturedServerCard(
                         Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = edgeX(50f)),
-                        quickplay,
+                            .align(Alignment.TopStart)
+                            .padding(start = edgeX(50f), top = edgeY(50f)),
                         pingTick,
                         actions,
                     )
+                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
                 }
-                RightColumn(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = edgeX(50f))
-                        .onSizeChanged { rightColumnHeightPx = it.height },
-                    screen,
-                    onAccounts = { accountsOpen = true },
-                )
-                WindowControls(
-                    Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f)),
-                    actions,
-                )
-                if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
-                    ModIntegrationBar(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = edgeY(18f)),
-                        screen,
-                    )
-                }
-                FeaturedServerCard(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = edgeX(50f), top = edgeY(50f)),
-                    pingTick,
-                    actions,
-                )
-                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
             }
+            if (accountsOpen) AccountsDialog { accountsOpen = false }
         }
-        if (accountsOpen) AccountsDialog { accountsOpen = false }
     }
 }
 
@@ -584,7 +590,7 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions) {
         if (!ClientPlatform.isMac) {
             IconButton("maximise", tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
         }
-        IconButton(ASSETS + "x-close.svg", background = CloseBackground, tooltip = "Quit game", onClick = actions.quit)
+        IconButton(ASSETS + "x-close.svg", danger = true, tooltip = "Quit game", onClick = actions.quit)
     }
 }
 
@@ -614,9 +620,7 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
     Column(
         modifier = modifier
             .width(300.dp)
-            .clip(PanelShape)
-            .background(FeaturedCardBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
+            .menuFrost(OneConfigTheme.current.modCardShape, MenuCardRadius, OneConfigTheme.current.modCardBackground, false)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -658,7 +662,7 @@ private fun CardThumbnail(image: ImageBitmap?) {
 private fun DismissButton(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val color = if (hovered) SocialTextPrimary else SocialTextSecondary
+    val color by animateColorAsState(if (hovered) SocialTextPrimary else SocialTextSecondary, menuFade())
     Row(
         modifier = Modifier
             .clip(ppShape(4.dp))
@@ -674,18 +678,7 @@ private fun DismissButton(onClick: () -> Unit) {
 
 @Composable
 private fun CallToActionButton(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .clip(ppShape(6.dp))
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ppShape(6.dp))
-            .clickableWithSound(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(label, fontSize = 15.sp, color = SocialTextPrimary, maxLines = 1, textAlign = TextAlign.Center)
-    }
+    TextButton(label, null, Modifier.fillMaxWidth().height(34.dp), ButtonStyle.Primary, true, onClick)
 }
 
 @Composable
@@ -714,24 +707,15 @@ private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> D
 }
 @Composable
 private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(45.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
-        Icon(leadingIcon, SocialTextPrimary, Modifier.align(Alignment.CenterStart).size(20.dp))
-        SocialText(label, fontSize = 16.sp, textAlign = TextAlign.Center)
+    val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    MenuButtonSurface(label, Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
+        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
+        Icon(leadingIcon, ink, Modifier.align(Alignment.CenterStart).padding(start = 12.dp).size(18.dp))
+        MenuButtonLabel(label, ink, Modifier.padding(horizontal = 40.dp))
         Icon(
             ASSETS + "chevron-up.svg",
-            SocialTextPrimary,
-            Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronAngle),
+            chevronTint,
+            Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(16.dp).rotate(chevronAngle),
         )
     }
 }
@@ -744,14 +728,13 @@ private fun ServerRow(
     fallbackPng: String,
     onClick: () -> Unit = {},
 ) {
+    val (interaction, hovered) = rememberSocialHover()
+    val chevronTint by animateColorAsState(if (hovered) SocialTextPrimary else MenuMutedIcon, menuFade())
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
+            .menuListRow(OneConfigTheme.current.buttonShape, OneConfigTheme.current.modCardBackground, "$title, $subtitle", interaction, hovered, onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -766,34 +749,26 @@ private fun ServerRow(
             SocialText(title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(ASSETS + "chevron-right.svg", SocialTextSecondary, Modifier.size(20.dp))
+        Icon(ASSETS + "chevron-right.svg", chevronTint, Modifier.size(20.dp))
     }
 }
 
 @Composable
 private fun AccountPill(name: String, onClick: () -> Unit) {
     val localId = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(45.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+    val headShape = OneConfigTheme.current.checkBoxShape
+    MenuButtonSurface("Accounts, $name", Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
+        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
         if (localId != null) {
-            PlayerHead(localId, 28.dp, Modifier.align(Alignment.CenterStart), ppShape(3.dp))
+            PlayerHead(localId, 28.dp, Modifier.align(Alignment.CenterStart).padding(start = 10.dp), headShape)
         } else {
-            RasterImage(ASSETS + "avatar.png", Modifier.align(Alignment.CenterStart).size(28.dp).clip(ppShape(3.dp)), contentScale = ContentScale.Crop)
+            RasterImage(ASSETS + "avatar.png", Modifier.align(Alignment.CenterStart).padding(start = 10.dp).size(28.dp).clip(headShape), contentScale = ContentScale.Crop)
         }
-        SocialText(name, fontSize = 16.sp, textAlign = TextAlign.Center)
+        MenuButtonLabel(name, ink, Modifier.padding(horizontal = 44.dp))
         Icon(
             ASSETS + "chevron-up.svg",
-            SocialTextPrimary,
-            Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(180f),
+            chevronTint,
+            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp).size(16.dp).rotate(180f),
         )
     }
 }
@@ -807,28 +782,19 @@ private fun AccountsDialog(onClose: () -> Unit) {
 @Composable
 private fun IconButton(
     icon: String,
-    background: Color = PanelBackground,
     modifier: Modifier = Modifier,
+    danger: Boolean = false,
     tooltip: String? = null,
     tooltipPlacement: TooltipPlacement = TooltipPlacement.BelowEnd,
     onClick: () -> Unit = {},
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Box(
-        modifier = modifier
-            .size(45.dp)
-            .clip(PanelShape)
-            .background(background)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .hoverable(interaction)
-            .clickableWithSound(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
+    MenuButtonSurface(tooltip, modifier.size(45.dp), onClick) { ink, hovered ->
+        val tint by animateColorAsState(if (danger && hovered) SocialDangerText else ink, menuFade())
+        Icon(icon, tint, Modifier.size(18.dp))
         if (tooltip != null && hovered) TooltipPopup(tooltip, tooltipPlacement, Dp.Unspecified)
     }
 }
+
 @Composable
 private fun NotificationBell() {
     var expanded by remember { mutableStateOf(false) }

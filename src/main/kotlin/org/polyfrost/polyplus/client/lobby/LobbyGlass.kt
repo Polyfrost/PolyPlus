@@ -2,12 +2,20 @@ package org.polyfrost.polyplus.client.lobby
 
 import java.nio.ByteBuffer
 
-object LobbyGlass {
+interface GlassRegistry {
+    fun put(key: Any, panel: LobbyGlass.Panel)
+
+    fun putFloating(key: Any, panel: LobbyGlass.Panel)
+
+    fun remove(key: Any)
+}
+
+object LobbyGlass : GlassRegistry {
     private const val MAX_PANELS = 12
     private const val RADIUS_ROWS = 3
     const val BLOCK_BYTES = (1 + MAX_PANELS + RADIUS_ROWS) * 4 * Float.SIZE_BYTES
 
-    class Panel(val centerX: Float, val centerY: Float, val halfWidth: Float, val halfHeight: Float, val radius: Float)
+    data class Panel(val centerX: Float, val centerY: Float, val halfWidth: Float, val halfHeight: Float, val radius: Float)
 
     private val panels = LinkedHashMap<Any, Panel>()
     private val floating = LinkedHashMap<Any, Panel>()
@@ -15,15 +23,15 @@ object LobbyGlass {
     var pageFrost = 0f
     var chrome = 0f
 
-    fun put(key: Any, panel: Panel) {
+    override fun put(key: Any, panel: Panel) {
         panels[key] = panel
     }
 
-    fun putFloating(key: Any, panel: Panel) {
+    override fun putFloating(key: Any, panel: Panel) {
         floating[key] = panel
     }
 
-    fun remove(key: Any) {
+    override fun remove(key: Any) {
         panels.remove(key)
         floating.remove(key)
     }

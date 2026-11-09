@@ -67,6 +67,7 @@ import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.lobby.GlassRegistry
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -93,6 +94,8 @@ internal object LobbyLayout {
 
 internal val LocalRootSize = staticCompositionLocalOf { Size.Zero }
 
+internal val LocalGlassRegistry = staticCompositionLocalOf<GlassRegistry> { LobbyGlass }
+
 private const val HOVER_LINGER_MILLIS = 1400L
 
 private fun Modifier.glassBounds(root: Size, radiusPx: Float, register: (LobbyGlass.Panel) -> Unit): Modifier = onGloballyPositioned {
@@ -117,9 +120,10 @@ internal fun Modifier.panel(radius: Dp = 20.dp): Modifier {
     val radiusPx = with(LocalDensity.current) { radius.toPx() }
     val key = remember { Any() }
     val glass = liquidGlassTheme
-    DisposableEffect(key, glass) { onDispose { LobbyGlass.remove(key) } }
+    val registry = LocalGlassRegistry.current
+    DisposableEffect(key, glass, registry) { onDispose { registry.remove(key) } }
     return this
-        .then(if (glass) Modifier.liquidGlass(shape, frosted = true) else Modifier.glassBounds(root, radiusPx) { LobbyGlass.put(key, it) })
+        .then(if (glass) Modifier.liquidGlass(shape, frosted = true) else Modifier.glassBounds(root, radiusPx) { registry.put(key, it) })
         .clip(shape)
         .background(PanelSurface)
         .border(1.dp, SocialBorderColor, shape)
@@ -132,10 +136,11 @@ internal fun Modifier.sceneFrost(radius: Dp, floating: Boolean = true): Modifier
     val glass = liquidGlassTheme
     val active = !glass && OneConfigTheme.current.translucentSurfaces && root != Size.Zero
     val key = remember { Any() }
-    DisposableEffect(key, active) { onDispose { LobbyGlass.remove(key) } }
+    val registry = LocalGlassRegistry.current
+    DisposableEffect(key, active, registry) { onDispose { registry.remove(key) } }
     if (glass) return liquidGlass(ppShape(radius), frosted = true)
     if (!active) return this
-    return glassBounds(root, radiusPx) { if (floating) LobbyGlass.putFloating(key, it) else LobbyGlass.put(key, it) }
+    return glassBounds(root, radiusPx) { if (floating) registry.putFloating(key, it) else registry.put(key, it) }
 }
 
 @Composable
