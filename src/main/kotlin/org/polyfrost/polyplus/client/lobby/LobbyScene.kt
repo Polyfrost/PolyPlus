@@ -2252,7 +2252,7 @@ object LobbyScene {
                 session?.finish(final)
                 session = null
             } else {
-                session?.takeIf { it.embedded }?.let(::stopSession)
+                session?.let(::stopSession)
             }
             return
         }
