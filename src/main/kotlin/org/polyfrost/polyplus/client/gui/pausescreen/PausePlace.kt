@@ -66,7 +66,7 @@ internal object PauseWorld {
         val mc = Minecraft.getInstance()
         //? if > 1.8.9 {
         val server = mc.currentServer
-        return server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" } ?: server?.ip ?: "Server"
+        return server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" } ?: server?.ip?.takeUnless { mc.options.hideServerAddress } ?: "Server"
         //?} else {
         /*val server = mc.getCurrentServerEntry()
         return server?.name?.takeIf { it.isNotBlank() && it != "Minecraft Server" } ?: server?.ip ?: "Server"
