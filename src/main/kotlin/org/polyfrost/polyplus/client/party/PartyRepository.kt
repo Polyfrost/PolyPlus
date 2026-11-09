@@ -55,6 +55,9 @@ object PartyRepository {
 
     private val inviteNotices = ConcurrentHashMap<String, Notification>()
 
+    private val partyLock = Any()
+    @Volatile private var partyVersion = 0L
+
     fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -93,9 +96,10 @@ object PartyRepository {
     fun others(party: Party? = _party.value): List<PartyMember> = party?.members?.filterNot { isSelf(it.player) }.orEmpty()
 
     fun refresh() = PolyPlusClient.SCOPE.launch {
+        val since = partyVersion
         PartyApi.current()
-            .onSuccess { applyParty(it) }
-            .onFailure { if (missing(it)) applyParty(null) else LOGGER.error("Failed to refresh party", it) }
+            .onSuccess { applyParty(it, since) }
+            .onFailure { if (missing(it)) applyParty(null, since) else LOGGER.error("Failed to refresh party", it) }
         refreshInvites()
         _refreshed.emit(Unit)
     }
@@ -113,32 +117,40 @@ object PartyRepository {
     private fun missing(error: Throwable): Boolean = error is PartyApiException && error.status == 404
 
     fun reset() {
-        _party.value = null
+        updateParty { null }
         _incomingInvites.value = emptyList()
         _outgoingInvites.value = emptyList()
         _confirmLeave.value = null
         inviteNotices.keys.toList().forEach(::retireNotice)
     }
 
-    private fun applyParty(party: Party?) {
-        if (party != null && party.members.none { isSelf(it.player) }) {
-            _party.value = null
-            return
+    private fun updateParty(since: Long? = null, transform: (Party?) -> Party?): Boolean = synchronized(partyLock) {
+        if (since != null && since != partyVersion) return false
+        val previous = _party.value
+        val next = transform(previous)
+        if (next != previous) {
+            partyVersion++
+            _party.value = next
         }
-        _party.value = party
-        party?.let { PlayerNamesRepository.resolve(it.members.map(PartyMember::player)) }
+        true
+    }
+
+    private fun applyParty(party: Party?, since: Long? = null) {
+        val accepted = party?.takeIf { it.members.any { member -> isSelf(member.player) } }
+        if (!updateParty(since) { accepted }) return
+        accepted?.let { PlayerNamesRepository.resolve(it.members.map(PartyMember::player)) }
     }
 
     private fun applyMemberState(partyId: String, player: String, state: MemberState) {
-        _party.update { current ->
-            if (current == null || current.id != partyId) return@update current
+        updateParty { current ->
+            if (current == null || current.id != partyId) return@updateParty current
             current.copy(members = current.members.map { if (samePlayer(it.player, player)) it.copy(state = state) else it })
         }
     }
 
     private fun onLeft(partyId: String, reason: PartyLeftReason) {
         if (_party.value?.id != partyId) return
-        _party.value = null
+        updateParty { null }
         _left.tryEmit(reason)
         when (reason) {
             PartyLeftReason.Kicked -> SocialErrors.emit("You were removed from the party")
@@ -275,18 +287,18 @@ object PartyRepository {
     fun leave() = PolyPlusClient.SCOPE.launch {
         PartyApi.leave()
             .onSuccess {
-                _party.value = null
+                updateParty { null }
                 _left.emit(PartyLeftReason.Left)
             }
             .onFailure { error ->
-                if (error is PartyApiException && error.status == 404) _party.value = null else report("leave", "Couldn't leave the party", error)
+                if (error is PartyApiException && error.status == 404) updateParty { null } else report("leave", "Couldn't leave the party", error)
             }
     }
 
     fun disband() = PolyPlusClient.SCOPE.launch {
         PartyApi.disband()
             .onSuccess {
-                _party.value = null
+                updateParty { null }
                 _left.emit(PartyLeftReason.Disbanded)
             }
             .onFailure { report("disband", "Couldn't disband the party", it) }
@@ -294,7 +306,7 @@ object PartyRepository {
 
     fun kick(player: String) = PolyPlusClient.SCOPE.launch {
         PartyApi.kick(player)
-            .onSuccess { _party.update { it?.copy(members = it.members.filterNot { member -> samePlayer(member.player, player) }) } }
+            .onSuccess { updateParty { it?.copy(members = it.members.filterNot { member -> samePlayer(member.player, player) }) } }
             .onFailure { report("kick", "Couldn't remove that player", it) }
     }
 
@@ -307,7 +319,7 @@ object PartyRepository {
     fun setHardMuted(player: String, muted: Boolean) = PolyPlusClient.SCOPE.launch {
         PartyApi.setHardMuted(player, muted)
             .onSuccess {
-                _party.update { it?.copy(members = it.members.map { member -> if (samePlayer(member.player, player)) member.copy(voiceHardMuted = muted) else member }) }
+                updateParty { it?.copy(members = it.members.map { member -> if (samePlayer(member.player, player)) member.copy(voiceHardMuted = muted) else member }) }
             }
             .onFailure { report("hard mute", "Couldn't change their voice", it) }
     }
