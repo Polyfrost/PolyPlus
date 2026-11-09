@@ -289,7 +289,11 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     fun watch(entry: ReplayEntry) {
-        if (entry.playable) depart(entry::watchSafely)
+        if (!entry.playable) return
+        depart {
+            entry.watchSafely()
+            if (ClientPlatform.currentScreen() === screen) LobbyScene.arrive()
+        }
     }
 
     private fun depart(action: () -> Unit) {
