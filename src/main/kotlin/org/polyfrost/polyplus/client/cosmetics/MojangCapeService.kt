@@ -77,6 +77,10 @@ object MojangCapeService {
     var textureVersion by mutableIntStateOf(0)
         private set
 
+    internal fun onTexturesReleased() {
+        textureVersion++
+    }
+
     @Volatile
     private var changedThisSession = false
 
@@ -217,17 +221,18 @@ object MojangCapeService {
                 RemoteTextures.register(texturePath(hash), file, keepOnReset = true)
                 textures[hash] = location(hash)
                 retryAt.remove(hash)
+                downloading.remove(hash)
                 textureVersion++
             }.onFailure {
                 LOGGER.warn("Failed to load the texture for Minecraft cape {}", cape.name, it)
                 retryAt[hash] = System.currentTimeMillis() + TEXTURE_RETRY_MS
+                downloading.remove(hash)
                 withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(file) } }
                 PolyPlusClient.SCOPE.launch {
                     delay(TEXTURE_RETRY_MS)
                     textureVersion++
                 }
             }
-            downloading.remove(hash)
         }
     }
 

@@ -1,3 +1,5 @@
+@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+
 package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.Minecraft
@@ -13,6 +15,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //? if >= 1.21.11 {
 import org.polyfrost.oneconfig.internal.ui.compose.BlazeRenderer
+import org.polyfrost.oneconfig.internal.ui.compose.GlyphAtlas
 //?} else {
 /*import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
 import org.polyfrost.oneconfig.internal.ui.compose.GlHost
@@ -38,6 +41,7 @@ class InlineCanvas(textureName: String) {
         val renderer = BlazeRenderer(Minecraft.getInstance().window.guiScale.toFloat())
         block(PolyCanvas(renderer))
         for (op in renderer.finish()) op(ctx)
+        GlyphAtlas.uploadDirty()
         return true
     }
     //?} elif >= 1.21.11 {
@@ -45,6 +49,7 @@ class InlineCanvas(textureName: String) {
         val renderer = BlazeRenderer(Minecraft.getInstance().window.guiScale.toFloat())
         block(PolyCanvas(renderer))
         for (op in renderer.finish()) op(ctx)
+        GlyphAtlas.uploadDirty()
         return true
     }
     *///?} elif >= 1.21.8 {

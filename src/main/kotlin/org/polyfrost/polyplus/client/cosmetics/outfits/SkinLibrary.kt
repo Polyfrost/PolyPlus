@@ -282,6 +282,10 @@ object SkinLibrary {
         badRequest = NOT_A_SKIN,
     )
 
+    internal fun onTexturesReleased() {
+        textureVersion++
+    }
+
     internal fun remember(skin: PlayerSkinInfo) {
         if (state !is LibraryState.Loaded) return
         replace(skin)
@@ -547,12 +551,13 @@ object SkinLibrary {
                 RemoteTextures.register(texturePath(hash), file.toPath(), keepOnReset = true)
                 textures[hash] = textureLocation(hash)
                 textureFailed.remove(hash)
+                textureLoading.remove(hash)
                 textureVersion++
             }.onFailure {
                 textureFailed[hash] = System.currentTimeMillis() + BITMAP_RETRY_MS
                 LOGGER.debug("Could not load the texture for skin {}", hash, it)
+                textureLoading.remove(hash)
             }
-            textureLoading.remove(hash)
             if (textureFailed.containsKey(hash)) {
                 delay(BITMAP_RETRY_MS)
                 textureVersion++

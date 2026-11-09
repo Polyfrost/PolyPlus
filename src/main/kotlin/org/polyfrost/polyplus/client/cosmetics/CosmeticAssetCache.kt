@@ -28,6 +28,7 @@ import org.polyfrost.polyplus.client.cosmetics.assets.OutOfDiskSpaceException
 import org.polyfrost.polyplus.client.cosmetics.assets.RejectedArchiveException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.network.http.readLimited
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if >= 1.21.1 || = 1.8.9 {
@@ -121,6 +122,8 @@ object CosmeticAssetCache {
         attachedById.clear()
         petsById.clear()
         RemoteTextures.releaseAll()
+        SkinLibrary.onTexturesReleased()
+        MojangCapeService.onTexturesReleased()
         BedrockPlayerGeometryCache.reset()
         //?}
         installs++
