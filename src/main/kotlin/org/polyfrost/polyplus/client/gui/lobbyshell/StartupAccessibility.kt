@@ -11,7 +11,7 @@ import net.minecraft.client.resources.language.I18n
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
-import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.OnboardingKeys
@@ -57,7 +57,7 @@ internal object StartupAccessibility {
         private set
     var narratorLabel by mutableStateOf("")
         private set
-    var reducedMotion by mutableStateOf(OneConfigConfig.reducedMotion)
+    var reducedMotion by mutableStateOf(ThemeConfig.reducedMotion)
         private set
     private var languageStamp by mutableStateOf("")
 
@@ -81,7 +81,7 @@ internal object StartupAccessibility {
     fun attach(onLeave: () -> Unit) {
         leave = onLeave
         refreshLanguage()
-        reducedMotion = OneConfigConfig.reducedMotion
+        reducedMotion = ThemeConfig.reducedMotion
         if (attachedOnce) return
         attachedOnce = true
         focus = if (narratorAvailable()) Control.Narrator else Control.Continue
@@ -222,8 +222,8 @@ internal object StartupAccessibility {
 
     private fun toggleReducedMotion() {
         reducedMotion = !reducedMotion
-        OneConfigConfig.reducedMotion = reducedMotion
-        OneConfigConfig.INSTANCE?.save()
+        ThemeConfig.reducedMotion = reducedMotion
+        ThemeConfig.INSTANCE?.save()
         announce(buttonNarration(label(Control.ReducedMotion)))
     }
 

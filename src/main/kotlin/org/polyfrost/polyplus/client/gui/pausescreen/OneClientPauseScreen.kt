@@ -14,7 +14,7 @@ import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
-import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import org.polyfrost.oneconfig.internal.ui.themes.Theme
@@ -75,7 +75,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     }
 
     override fun blurAlpha(): Float {
-        if (!stepBack || staged || !OneConfigConfig.enableBackgroundBlur) return 0f
+        if (!stepBack || staged || !ThemeConfig.enableBackgroundBlur) return 0f
         return ((System.currentTimeMillis() - openedAt).toFloat() / FLAT_BLUR_MS).coerceIn(0f, 1f)
     }
 

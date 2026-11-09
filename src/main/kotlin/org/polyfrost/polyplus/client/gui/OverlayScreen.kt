@@ -9,7 +9,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -64,7 +64,7 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
 
     /** Mirrors OneConfig's own fullscreen blur fade-in (see OneConfigUIScreen). */
     override fun blurAlpha(): Float {
-        if (!inGame() || !OneConfigConfig.enableBackgroundBlur) return 0f
+        if (!inGame() || !ThemeConfig.enableBackgroundBlur) return 0f
         val progress = (System.currentTimeMillis() - openedAt).toFloat() / OPEN_ANIMATION_MS
         return progress.coerceIn(0f, 1f)
     }
