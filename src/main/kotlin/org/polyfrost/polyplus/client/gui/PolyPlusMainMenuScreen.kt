@@ -71,6 +71,7 @@ import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.ServerList
 import net.minecraft.client.multiplayer.ServerStatusPinger
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 //?} else {
@@ -79,6 +80,7 @@ import net.minecraft.client.gui.screen.menu.options.OptionsScreen
 import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
 import net.minecraft.client.network.MultiplayerServerListPinger as ServerStatusPinger
 import net.minecraft.client.options.ServerListEntry as ServerData
+import net.minecraft.client.options.ServerList
 import net.minecraft.realms.RealmsBridge
 *///?}
 import org.polyfrost.compose.backend.asComposeImageBitmap
@@ -168,7 +170,8 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             withFrameNanos { }
             launch(Dispatchers.IO) { FeaturedServers.warmUp() }
             val serverLoad = async(Dispatchers.IO) {
-                PolyPlusRecentServers.recent().take(QUICKPLAY_MAX).map { QuickplayEntry.Server(recentServerData(it), it.lastPlayed) }
+                val saved = runCatching { ServerList(mc).apply { load() } }.getOrNull()
+                PolyPlusRecentServers.recent().take(QUICKPLAY_MAX).map { QuickplayEntry.Server(recentServerData(it, saved), it.lastPlayed) }
             }
             val worldLoad = async {
                 HostWorldManager.loadWorlds()
@@ -265,7 +268,8 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         }
     }
 
-    private fun recentServerData(server: RecentServer): ServerData =
+    private fun recentServerData(server: RecentServer, saved: ServerList?): ServerData =
+        saved?.let { list -> (0 until list.size()).map { list.get(it) }.firstOrNull { it.ip.equals(server.ip, ignoreCase = true) } } ?:
         //? if > 1.8.9 {
         ServerData(server.name, server.ip, ServerData.Type.OTHER)
         //?} else {
