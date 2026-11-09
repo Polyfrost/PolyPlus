@@ -283,7 +283,9 @@ object CosmeticSync {
         val dropped = watchedFriends.filter { it !in friends }
         watchedFriends.retainAll(friends)
         watchedFriends.addAll(friends)
-        unsubscribePlayers(dropped)
+        if (dropped.isNotEmpty()) {
+            if (LobbyScene.hasRealPlayer() && !LobbyScene.terrainActive()) refreshVisibleSubscriptions() else unsubscribePlayers(dropped)
+        }
         return subscribePlayers(friends)
     }
 
