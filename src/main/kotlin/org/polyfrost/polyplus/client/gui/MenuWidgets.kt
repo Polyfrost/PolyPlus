@@ -67,8 +67,11 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.social.ChatIdentity
+import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.ConcurrentHashMap
 
 internal object MainMenuRasterAssets {
@@ -180,12 +183,28 @@ internal fun WardrobePill(modifier: Modifier) {
 
 @Composable
 internal fun HostWorldButton(screen: Screen, modifier: Modifier = Modifier.fillMaxWidth()) {
-    PillButton(
-        label = "Host World",
-        icon = ASSETS + "log-in-04.svg",
-        modifier = modifier,
-        onClick = { SocialOverlay.openHostCurrentWorld(screen) },
-    )
+    var selectingWorld by remember { mutableStateOf(false) }
+    Box(modifier) {
+        PillButton(
+            label = "Host World",
+            icon = ASSETS + "log-in-04.svg",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                if (ClientPlatform.inWorld()) {
+                    SocialOverlay.openHostCurrentWorld(screen)
+                } else {
+                    FriendsRepository.refreshAll()
+                    GroupsRepository.refreshGroups()
+                    selectingWorld = true
+                }
+            },
+        )
+        if (selectingWorld) {
+            val friends by FriendsRepository.friends.collectAsState()
+            val groups by GroupsRepository.groups.collectAsState()
+            HostWorldFlow(screen, friends, groups, ChatIdentity.selfId(), onDismiss = { selectingWorld = false })
+        }
+    }
 }
 
 internal fun switchToVanillaMenu() = MainMenuReplacement.switchToVanilla()
