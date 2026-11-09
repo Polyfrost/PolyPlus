@@ -201,7 +201,10 @@ object StartupOverlay {
         val timedOut = holding && seconds(holdNanos, now) > HOLD_LIMIT_SECONDS
         if (holding && (!lobby || failed || timedOut) && startNanos == 0L) return fadeOnly(canvas, now)
         val started = holding && LobbyScene.revealStarted()
-        if (started && startNanos == 0L) startNanos = now
+        if (started && startNanos == 0L) {
+            startNanos = now
+            LobbyAmbience.startup()
+        }
         if (startNanos != 0L && Motion.reduced) return fadeOnly(canvas, now)
         val t = if (startNanos == 0L) 0f else seconds(startNanos, now).toFloat()
         val line = progress(reload, holding, started, now)

@@ -566,6 +566,7 @@ object LobbyScene {
     @JvmStatic
     fun onFrameStart() {
         StartupOverlay.onFrame()
+        LobbyAmbience.onFrame()
         if (saved != null) {
             LOBBY_LOGGER.warn("Lobby swap was left open, restoring the client")
             end()
@@ -2002,6 +2003,7 @@ object LobbyScene {
 
     @JvmStatic
     fun onClientTick() {
+        LobbyAmbience.tick()
         val scene = shown() ?: return
         guarded("tick") { tickScene(scene) }
     }

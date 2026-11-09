@@ -1,0 +1,74 @@
+{
+  "lobby/startup": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/startup",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/day": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/day",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/night": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/night",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/golden": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/golden",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/aurora": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/aurora",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/interior_building": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/interior_building",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/interior_cave": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/interior_cave",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/nether": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/nether",
+        "stream": true
+      }
+    ]
+  },
+  "lobby/the_end": {
+    "sounds": [
+      {
+        "name": "polyplus:lobby/the_end",
+        "stream": true
+      }
+    ]
+  }
+}

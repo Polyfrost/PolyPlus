@@ -81,6 +81,10 @@
     "client.access.ButtonAccessor",
     //? if > 1.8.9
     "client.access.CameraAccessor",
+    //? if > 1.8.9
+    "client.access.ChannelAccessor",
+    //? if > 1.8.9
+    "client.access.ChannelHandleAccessor",
     "client.access.ClientCommonPacketListenerAccessor",
     "client.access.ClientHandshakePacketListenerAccessor",
     "client.access.ClientPacketListenerAccessor",
@@ -115,6 +119,10 @@
     "client.access.RenderPipelinesAccessor",
     "client.access.ScreenAccessor",
     //? if > 1.8.9
+    "client.access.SoundEngineAccessor",
+    //? if > 1.8.9
+    "client.access.SoundManagerAccessor",
+    //? if > 1.8.9
     "client.access.SpriteIconButtonAccessor",
     //? if = 1.8.9
     //"client.access.TitleScreenInvoker",
@@ -138,6 +146,8 @@
     "client.cosmetics.MixinPlayerModel",
     //? if > 1.8.9
     "client.lobby.MixinCamera",
+    //? if > 1.8.9
+    "client.lobby.MixinChannel",
     //? if >= 1.21.8
     "client.lobby.MixinChunkSectionLayer",
     //? if < 1.21.11 && > 1.8.9
@@ -180,6 +190,7 @@
     //? if = 1.8.9
     //"client.lobby.MixinMinecraftStartup",
     "client.lobby.MixinMinecraftServer",
+    "client.lobby.MixinMusicManager",
     //? if = 1.8.9
     //"client.lobby.MixinPlayerRenderer",
     //? if < 1.21.5 && > 1.8.9
