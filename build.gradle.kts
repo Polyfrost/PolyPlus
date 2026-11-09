@@ -77,7 +77,6 @@ val ktorVersion = property("deps.ktor") as String
 val sentryVersion = property("deps.sentry") as String
 val mixinExtrasVersion = property("deps.mixin_extras") as String
 val mixinSquaredVersion = property("deps.mixin_squared") as String
-val devauthVersion = property("deps.devauth") as String
 val junitVersion = property("deps.junit") as String
 
 val ktorModules = listOf(
@@ -341,7 +340,6 @@ dependencies {
     }
 
     if (!isOrnithe) {
-        modLocalRuntime("me.djtheredstoner:DevAuth-fabric:$devauthVersion")
         modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
         include("org.polyfrost:polydium:${property("deps.polydium")}+$mcVersion")
     }
