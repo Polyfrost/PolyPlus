@@ -27,6 +27,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.tan
@@ -39,7 +40,7 @@ abstract class LobbyMotion(val startTick: Long) {
     open fun settle(avatar: LobbyAvatar) = Unit
 }
 
-class LobbyRoute(private val points: List<Vec3>) {
+class LobbyRoute(private val points: List<Vec3>, val climbs: Int = 0) {
     private val lengths = points.zipWithNext { a, b -> hypot(b.x - a.x, b.z - a.z) }
     val length = lengths.sum()
     val start: Vec3 = points.first()
@@ -51,6 +52,24 @@ class LobbyRoute(private val points: List<Vec3>) {
             left -= segment
         }
         return points.last()
+    }
+
+    fun nearest(pos: Vec3): Double {
+        var best = 0.0
+        var bestGap = Double.MAX_VALUE
+        var start = 0.0
+        for ((index, segment) in lengths.withIndex()) {
+            val a = points[index]
+            val b = points[index + 1]
+            val t = if (segment > 0.0) (((pos.x - a.x) * (b.x - a.x) + (pos.z - a.z) * (b.z - a.z)) / (segment * segment)).coerceIn(0.0, 1.0) else 0.0
+            val gap = hypot(a.x + (b.x - a.x) * t - pos.x, a.z + (b.z - a.z) * t - pos.z)
+            if (gap < bestGap) {
+                bestGap = gap
+                best = start + segment * t
+            }
+            start += segment
+        }
+        return best
     }
 
     fun heading(distance: Double): Float {
@@ -74,6 +93,9 @@ private class RunIn(start: Long, private val level: ClientLevel, private val rou
     private var lift = 0.0
     private var stuck = 0
     private var arrived = false
+    private var windup = 0
+    private var aim: Vec3? = null
+    private var jumps = 0
 
     override fun begin(avatar: LobbyAvatar) {
         yaw = if (turning) avatar.yRot else route.heading(0.0)
@@ -82,51 +104,111 @@ private class RunIn(start: Long, private val level: ClientLevel, private val rou
 
     override fun advance(avatar: LobbyAvatar, elapsed: Long): Boolean {
         if (arrived) return true
-        val remaining = route.length - travelled
-        speed = min(speed + ACCELERATION, min(LobbyEntrance.RUN_SPEED, remaining * BRAKE + CREEP))
-        val target = min(route.length, travelled + speed)
-        val spot = route.at(target)
         val from = avatar.position()
-        if (avatar.onGround() && jumpDue(avatar, from)) lift = avatar.leap()
-        avatar.walk(Vec3(spot.x - from.x, lift, spot.z - from.z))
-        if (avatar.bumpedVertically) lift = 0.0
-        lift = (lift - avatar.fallRate) * DRAG
-        val to = avatar.position()
+        val rest = avatar.rest.pos
+        val routeDone = route.length - travelled <= 0.01
+        if (windup == 0 && aim == null && jumps < MAX_JUMPS && avatar.onGround()) {
+            val step = if (routeDone) rest.takeIf { it.y - from.y > avatar.climb && !near(from, rest) } else stepAhead(avatar, from)
+            if (step != null) {
+                windup = WINDUP_TICKS
+                aim = step
+                jumps++
+            }
+        }
+        val target = aim
+        val to = when {
+            windup > 0 -> {
+                speed = 0.0
+                if (--windup > 0) from else {
+                    lift = avatar.leap()
+                    toward(avatar, from, target ?: rest, JUMP_SPEED)
+                }
+            }
+            target != null -> toward(avatar, from, target, JUMP_SPEED).also {
+                if (avatar.onGround() && lift <= 0.0) {
+                    aim = null
+                    travelled = route.nearest(it)
+                    speed = LANDING_SPEED
+                }
+            }
+            routeDone && !near(from, rest) -> toward(avatar, from, rest, min(LobbyEntrance.RUN_SPEED, max(hypot(rest.x - from.x, rest.z - from.z) * SETTLE_RATE, SETTLE_CREEP)))
+            else -> running(avatar, from)
+        }
         val progress = hypot(to.x - from.x, to.z - from.z)
-        travelled = if (avatar.bumped) min(target, travelled + progress) else target
-        val moving = remaining > 0.01
-        stuck = if (moving && progress < STALL) stuck + 1 else 0
+        val busy = windup > 0 || aim != null
+        val moving = !routeDone || !near(to, rest)
+        stuck = if (moving && progress < STALL && !busy) stuck + 1 else 0
         val going = moving && stuck <= STUCK_TICKS
-        val wanted = if (going) route.heading(travelled) else avatar.rest.yaw
+        val wanted = when {
+            target != null -> yawTo(from, target)
+            routeDone && going -> yawTo(from, rest)
+            going -> route.heading(travelled)
+            else -> avatar.rest.yaw
+        }
         yaw += Mth.wrapDegrees(wanted - yaw).coerceIn(-TURN_RATE, TURN_RATE)
         avatar.place(to, yaw)
-        avatar.stride(if (moving) Vec3(to.x - from.x, 0.0, to.z - from.z) else null)
-        if (going || !avatar.onGround() || abs(Mth.wrapDegrees(avatar.rest.yaw - yaw)) > TURN_DONE) return false
+        avatar.stride(if (moving && windup == 0) Vec3(to.x - from.x, 0.0, to.z - from.z) else null)
+        if (busy || going || !avatar.onGround() || abs(Mth.wrapDegrees(avatar.rest.yaw - yaw)) > TURN_DONE) return false
         avatar.place(avatar.rest.pos, avatar.rest.yaw)
         arrived = true
         return false
     }
 
-    private fun jumpDue(avatar: LobbyAvatar, from: Vec3): Boolean {
+    private fun near(at: Vec3, rest: Vec3): Boolean = hypot(rest.x - at.x, rest.z - at.z) <= ARRIVE_REACH && abs(rest.y - at.y) <= ARRIVE_RISE
+
+    private fun yawTo(from: Vec3, to: Vec3): Float =
+        if (hypot(to.x - from.x, to.z - from.z) < 0.01) yaw else Math.toDegrees(atan2(-(to.x - from.x), to.z - from.z)).toFloat()
+
+    private fun toward(avatar: LobbyAvatar, from: Vec3, target: Vec3, pace: Double): Vec3 {
+        val dx = target.x - from.x
+        val dz = target.z - from.z
+        val distance = hypot(dx, dz)
+        val step = if (distance > 0.0) min(pace, distance) / distance else 0.0
+        avatar.walk(Vec3(dx * step, lift, dz * step))
+        if (avatar.bumpedVertically) lift = 0.0
+        lift = (lift - avatar.fallRate) * DRAG
+        return avatar.position()
+    }
+
+    private fun running(avatar: LobbyAvatar, from: Vec3): Vec3 {
+        val remaining = route.length - travelled
+        speed = min(speed + ACCELERATION, min(LobbyEntrance.RUN_SPEED, remaining * BRAKE + CREEP))
+        val target = min(route.length, travelled + speed)
+        val pursuit = route.at(min(route.length, travelled + max(speed, PURSUIT)))
+        val to = toward(avatar, from, pursuit, max(speed, CREEP))
+        travelled = route.nearest(to).coerceIn(travelled, target)
+        return to
+    }
+
+    private fun stepAhead(avatar: LobbyAvatar, from: Vec3): Vec3? {
         var feet = from.y
         var ahead = PROBE
-        var due = false
-        while (ahead <= REACH_TICKS * speed && travelled + ahead <= route.length) {
+        while (ahead <= RUN_JUMP_LEAD && travelled + ahead <= route.length) {
             val at = route.at(travelled + ahead)
             val top = level.obstacle(at.x, at.z, feet)
             if (top == null) {
-                feet = level.ground(at.x, at.z, feet, LOOK_DROP) ?: break
+                feet = level.ground(at.x, at.z, feet, LOOK_DROP) ?: return null
             } else if (top - feet <= avatar.climb && level.obstacle(at.x, at.z, top) == null) {
                 feet = top
             } else {
                 val rise = top - from.y
                 val room = level.obstacle(at.x, at.z, top) == null && level.obstacle(from.x, from.z, from.y, BODY_HEIGHT + rise + HEADROOM) == null
-                due = rise <= MAX_RISE && room && ahead <= (riseTicks(rise) + 1) * speed
-                break
+                if (rise > MAX_RISE || !room) return null
+                if (rise < BRACE_RISE) {
+                    if (ahead <= HOP_LEAD) lift = avatar.leap()
+                    return null
+                }
+                if (speed >= RUNNING_SPEED) {
+                    if (ahead <= RUN_JUMP_LEAD) lift = avatar.leap()
+                    return null
+                }
+                if (ahead > JUMP_LEAD) return null
+                val past = route.at(min(route.length, travelled + ahead + LANDING_REACH))
+                return Vec3(Mth.floor(past.x) + 0.5, top, Mth.floor(past.z) + 0.5)
             }
             ahead += PROBE
         }
-        return due
+        return null
     }
 
     companion object {
@@ -137,25 +219,25 @@ private class RunIn(start: Long, private val level: ClientLevel, private val rou
         private const val TURN_DONE = 6f
         private const val DRAG = 0.98
         private const val PROBE = 0.05
-        private const val REACH_TICKS = 7.0
         private const val LOOK_DROP = 0.5
         private const val STALL = 0.005
         private const val STUCK_TICKS = 40
-        private const val JUMP_LIFT = 0.42
-        private const val JUMP_FALL = 0.08
-        private const val MAX_ARC_TICKS = 12
-
-        private fun riseTicks(rise: Double): Int {
-            var height = 0.0
-            var lift = JUMP_LIFT
-            var ticks = 0
-            while (height < rise && ticks < MAX_ARC_TICKS) {
-                height += lift
-                lift = (lift - JUMP_FALL) * DRAG
-                ticks++
-            }
-            return ticks
-        }
+        private const val JUMP_LEAD = 0.7
+        private const val JUMP_SPEED = 0.16
+        private const val LANDING_REACH = 0.8
+        private const val ARRIVE_REACH = 0.05
+        private const val SETTLE_CREEP = 0.06
+        private const val SETTLE_RATE = 0.5
+        private const val PURSUIT = 1.2
+        private const val ARRIVE_RISE = 0.6
+        private const val MAX_JUMPS = 6
+        private const val BRACE_RISE = 0.9
+        private const val HOP_LEAD = 0.35
+        private const val RUNNING_SPEED = 0.2
+        private const val LANDING_SPEED = 0.22
+        private const val RUN_JUMP_LEAD = 1.0
+        const val WINDUP_TICKS = 10
+        const val AIR_TICKS = 10
     }
 }
 
@@ -277,7 +359,7 @@ object LobbyEntrance {
                 dropped++
                 avatar.begin(DropIn(fromTick + FIRST_TICK + index * STAGGER_TICKS, level, headroom(level, avatar.rest.pos)))
             } else {
-                val ticks = (route.length / RUN_SPEED).toLong() + STOP_MARGIN_TICKS
+                val ticks = (route.length / RUN_SPEED).toLong() + STOP_MARGIN_TICKS + route.climbs * (RunIn.WINDUP_TICKS + RunIn.AIR_TICKS)
                 avatar.begin(RunIn(fromTick + (FIRST_STOP_TICK + index * STAGGER_TICKS - ticks).coerceAtLeast(FIRST_TICK), level, route))
             }
         }
@@ -448,7 +530,8 @@ object LobbyEntrance {
                 index = next
             }
             pulled[pulled.size - 1] = avatar.rest.pos
-            return LobbyRoute(pulled.distinct())
+            val climbs = feet.zipWithNext().count { (a, c) -> c.y - a.y > PLAYER_STEP }
+            return LobbyRoute(pulled.distinct(), climbs)
         }
 
         private fun clear(from: Vec3, to: Vec3, avatar: LobbyAvatar): Boolean {

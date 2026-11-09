@@ -28,6 +28,7 @@ import org.polyfrost.polyplus.client.cosmetics.CapeResolver
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.cosmetics.MojangCapeService*/
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
+import kotlin.math.hypot
 
 class LobbyAvatar(
     level: ClientLevel,
@@ -185,7 +186,7 @@ class LobbyAvatar(
     fun consumeLanded(): Boolean = landedThisTick.also { landedThisTick = false }
 
     fun stride(step: Vec3?) {
-        isSprinting = step != null
+        isSprinting = step != null && hypot(step.x, step.z) > SPRINT_STEP
         //? if > 1.8.9 {
         deltaMovement = step ?: Vec3.ZERO
         //?} else {
@@ -317,9 +318,10 @@ class LobbyAvatar(
         private const val MIN_SCALE = 0.07
         private const val SOLID_SWAP = 0.5
         private const val PROJECTION_SECONDS = 1.5
+        private const val SPRINT_STEP = 0.12
         //? if = 1.8.9
         /*private const val LEGACY_GRAVITY = 0.08*/
         //? if = 1.8.9
-        /*private const val LEGACY_STEP = 0.6f*/
+        /*private const val LEGACY_STEP = 0.13f*/
     }
 }
