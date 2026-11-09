@@ -268,7 +268,7 @@ object GroupsRepository {
         val selfId = ChatIdentity.selfId()
         val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
         _groups.value = _groups.value.map {
-            if (it.id == groupId) it.copy(lastMessage = last, unread = message.sender != selfId && (it.unread || groupId !in readingConversations)) else it
+            if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || (message.sender != selfId && groupId !in readingConversations)) else it
         }
     }
 
