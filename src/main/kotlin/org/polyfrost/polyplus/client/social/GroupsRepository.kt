@@ -206,7 +206,7 @@ object GroupsRepository {
         _groups.update { list -> list.map { if (it.id == groupId && it.unread) it.copy(unread = false) else it } }
         PolyPlusClient.SCOPE.launch {
             val result = GroupsApi.markRead(groupId, target)
-            readFence[groupId] = if (result.isSuccess) refreshTicket.get() else 0L
+            readFence.replace(groupId, Long.MAX_VALUE, if (result.isSuccess) refreshTicket.get() else 0L)
             result.onFailure {
                 LOGGER.error("Failed to mark group $groupId read up to $target", it)
                 readThrough.remove(groupId)
@@ -267,8 +267,10 @@ object GroupsRepository {
         }
         val selfId = ChatIdentity.selfId()
         val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
+        val unread = message.sender != selfId && groupId !in readingConversations
+        if (unread) readFence.remove(groupId)
         _groups.value = _groups.value.map {
-            if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || (message.sender != selfId && groupId !in readingConversations)) else it
+            if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || unread) else it
         }
     }
 
