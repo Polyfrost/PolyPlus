@@ -378,8 +378,7 @@ object PlayTogether {
         current.check?.let { check ->
             when (check.poll()) {
                 ServerCheck.Result.INCOMPATIBLE -> incompatible(current, PlayReason.Version, "Needs Minecraft ${check.serverVersion.ifBlank { "another version" }}")
-                ServerCheck.Result.UNREACHABLE -> incompatible(current, PlayReason.Unreachable, "Can't reach ${current.destination.name}")
-                ServerCheck.Result.OK -> current.check = null
+                ServerCheck.Result.UNREACHABLE, ServerCheck.Result.OK -> current.check = null
                 ServerCheck.Result.PENDING -> Unit
             }
         }

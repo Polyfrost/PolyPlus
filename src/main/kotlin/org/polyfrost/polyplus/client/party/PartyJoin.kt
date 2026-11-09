@@ -145,7 +145,7 @@ object PartyJoin {
             }
             result == ServerCheck.Result.UNREACHABLE || expired -> {
                 if (result == ServerCheck.Result.PENDING) check.close()
-                current.problem = "Can't reach ${current.target}"
+                current.ready = true
             }
             else -> return
         }
