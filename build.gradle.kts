@@ -8,6 +8,7 @@ import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 import net.ltgt.gradle.errorprone.errorprone
 import net.ornithemc.ploceus.api.PloceusGradleExtensionApi
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.kotlin.dsl.getByName
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -23,7 +24,7 @@ plugins {
     id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
     id("ploceus") version "1.17.4" apply false
     id("me.modmuss50.mod-publish-plugin")
-    id("dev.detekt") version "2.0.0-alpha.6"
+    id("dev.detekt")
     id("net.ltgt.errorprone") version "5.1.1"
 }
 
@@ -296,6 +297,13 @@ tasks.jar {
             exclude("META-INF/MANIFEST.MF")
         }
     }
+    val bundledProjects = setOf(":molang")
+    val bundledJars = configurations.runtimeClasspath.get().incoming.artifactView {
+        componentFilter { it is ProjectComponentIdentifier && it.projectPath in bundledProjects }
+    }.files
+    from(bundledJars.elements.map { jars -> jars.map { zipTree(it.asFile) } }) {
+        exclude("META-INF/MANIFEST.MF")
+    }
 }
 
 dependencies {
@@ -318,6 +326,7 @@ dependencies {
     }
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    implementation(project(":molang"))
     annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
     "com.github.bawnorton.mixinsquared:mixinsquared-fabric:$mixinSquaredVersion".let {
         annotationProcessor(it)

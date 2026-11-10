@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.bedrock.animation
 
 import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
-import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
+import org.polyfrost.polyplus.client.bedrock.molang.MolangScript
 import org.polyfrost.polyplus.client.bedrock.molang.MolangVector3
 
 data class BedrockAnimationFile(
@@ -13,8 +13,8 @@ data class BedrockAnimation(
     val name: String,
     val lengthTicks: Float,
     val loop: LoopMode,
-    val initialize: List<MolangStatement> = emptyList(),
-    val preAnimation: List<MolangStatement> = emptyList(),
+    val initialize: List<MolangScript> = emptyList(),
+    val preAnimation: List<MolangScript> = emptyList(),
     val boneAnimations: Map<String, BoneAnimation>,
 )
 
