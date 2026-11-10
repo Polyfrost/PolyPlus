@@ -12,6 +12,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.reconnectDelay
+import org.polyfrost.polyplus.client.ping.PartyPings
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -288,8 +289,11 @@ object PolyConnection {
     private fun process(message: String) {
         try {
             val packet = PolyPlusClient.JSON.decodeFromString<ClientboundPacket>(message)
-            if (packet is ClientboundPacket.Error) {
+            if (packet is ClientboundPacket.Error && !PartyPings.handleError(packet)) {
                 LOGGER.error("Error packet received: ${packet.message}")
+            }
+            if (packet is ClientboundPacket.PartyPing || packet is ClientboundPacket.PartyPingCleared || packet is ClientboundPacket.PartyPingReply) {
+                PartyPings.handle(packet)
             }
 
             EventManager.INSTANCE.post(WebSocketMessage(packet))

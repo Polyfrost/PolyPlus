@@ -12,6 +12,9 @@ import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
 import org.polyfrost.polyplus.client.network.http.responses.PartyInviteStatus
 import org.polyfrost.polyplus.client.network.http.responses.PartyLeftReason
 import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
+import org.polyfrost.polyplus.client.ping.PingKind
+import org.polyfrost.polyplus.client.ping.PingReply
+import org.polyfrost.polyplus.client.ping.PingTarget
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -247,5 +250,38 @@ sealed interface ClientboundPacket {
         @SerialName("session_id") val sessionId: String,
         val result: HostedJoinResult,
         @SerialName("invite_id") val inviteId: Int? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPing")
+    data class PartyPing(
+        val from: String,
+        @SerialName("sent_at") val sentAt: Long,
+        val id: String,
+        val server: String,
+        val dimension: String,
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val kind: PingKind,
+        val target: PingTarget? = null,
+        val label: String? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPingCleared")
+    data class PartyPingCleared(
+        val id: String,
+        val from: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPingReply")
+    data class PartyPingReply(
+        val id: String,
+        val owner: String,
+        val from: String,
+        val reply: PingReply,
+        @SerialName("sent_at") val sentAt: Long,
     ) : ClientboundPacket
 }

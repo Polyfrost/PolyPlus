@@ -22,6 +22,7 @@ import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.VoiceInputMode
+import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import java.nio.file.Files
@@ -420,6 +421,16 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         if (state) {
             PartyVoice.onJoinLeaveKey()
         }
+        true
+    }
+
+    @Keybind(
+        title = "Ping",
+        subcategory = "Keybinds",
+        description = "Tap to ping what you're looking at. Hold to choose a ping.",
+    )
+    var pingKeybind = OneConfigKeybind(null, intArrayOf(InputConstants.MOUSE_BUTTON_MIDDLE), KeyModifiers.NONE, 0L) { state ->
+        PingInput.onKeybindState(state)
         true
     }
 

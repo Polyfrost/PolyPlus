@@ -60,6 +60,13 @@
     //? if = 1.8.9
     //"client.MixinOptionsScreen",
     "client.MixinOnlineServerEntry",
+    "client.ping.MixinPingHud",
+    "client.ping.MixinPingPick",
+    "client.ping.MixinPingWheelKeys",
+    "client.ping.MixinPingWheelMouse",
+    "client.ping.PingPickInvoker",
+    //? if = 1.8.9
+    //"client.ping.PingFovInvoker",
     //? if > 1.8.9
     "client.MixinPanorama",
     //? if <26.3
