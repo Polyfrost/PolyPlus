@@ -8,6 +8,7 @@ import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 /*import com.mojang.authlib.properties.PropertyMap;
 import net.minecraft.client.Session;
 import net.minecraft.network.Connection;
+import net.minecraft.client.TickTimer;
 import net.minecraft.client.render.pipeline.RenderTarget;
 *///?}
 import net.minecraft.client.Minecraft;
@@ -75,6 +76,8 @@ public interface MinecraftAccessor {
 
     @Accessor("connection")
     Connection polyplus$getConnection();
+    @Accessor("timer")
+    TickTimer polyplus$nameplateTimer();
     *///?}
 
     //? if >= 1.21.10 {
