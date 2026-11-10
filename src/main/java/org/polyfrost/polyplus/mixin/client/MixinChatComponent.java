@@ -3,15 +3,13 @@ package org.polyfrost.polyplus.mixin.client;
 //? if > 1.8.9 {
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
+import org.polyfrost.polyplus.client.utils.ServerUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import java.util.Locale;
 
 //? if < 1.21.11 {
 /*import net.minecraft.network.chat.FormattedText;
@@ -41,7 +39,7 @@ public class MixinChatComponent {
         *///?}
     )
     private void hideBobbyUpgradeMessage(Component message, Operation<Void> original) {
-        if (polyplus$isBobbyUpgradeMessage(message) && polyplus$onHypixel()) {
+        if (polyplus$isBobbyUpgradeMessage(message) && ServerUtils.isOnHypixel()) {
             return;
         }
         original.call(message);
@@ -54,20 +52,6 @@ public class MixinChatComponent {
         }
         String key = contents.getKey();
         return "bobby.upgrade.required".equals(key) || "bobby.upgrade.fallback_world".equals(key);
-    }
-
-    @Unique
-    private static boolean polyplus$onHypixel() {
-        ServerData server = Minecraft.getInstance().getCurrentServer();
-        if (server == null || server.ip == null) {
-            return false;
-        }
-        String host = server.ip.toLowerCase(Locale.ROOT);
-        int portSeparator = host.indexOf(':');
-        if (portSeparator >= 0) {
-            host = host.substring(0, portSeparator);
-        }
-        return host.equals("hypixel.net") || host.endsWith(".hypixel.net");
     }
 }
 //?} else {

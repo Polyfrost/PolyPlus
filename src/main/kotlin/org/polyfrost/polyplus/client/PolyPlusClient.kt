@@ -77,9 +77,8 @@ import org.polyfrost.polyplus.client.gui.pausescreen.PauseMediaWidgets
 //? if >= 26.2 {
 import org.polyfrost.polyplus.compat.RrlsCrashGuard
 //?}
-//? if wwaypoints {
+//? if wwaypoints
 import org.polyfrost.polyplus.compat.WWaypointsCompat
-//?}
 
 //? if >= 1.21.11 {
 import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama

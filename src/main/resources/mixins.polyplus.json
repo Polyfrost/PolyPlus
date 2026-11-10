@@ -304,8 +304,6 @@
     "compat.oneconfig.MixinUiSounds",
     "compat.oneconfig.MixinGlHost",
     //? if > 1.8.9
-    "compat.oneconfig.MixinWWaypointsCompat",
-    //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2 {
     "compat.rrls.MixinOverlayHelper",
@@ -332,19 +330,15 @@
     //? if > 1.8.9
     "compat.waveycapes.MixinPlayerWrapper",
     //? if > 1.8.9
-    "compat.wwaypoints.MixinConfigStorage",
-    //? if > 1.8.9
     "compat.wwaypoints.MixinEssentialSharingContextResolver",
     //? if > 1.8.9
     "compat.wwaypoints.MixinLocalPlayer",
     //? if > 1.8.9
     "compat.wwaypoints.MixinServerFeaturePolicy",
     //? if > 1.8.9
-    "compat.wwaypoints.MixinServerPolicyFeedback",
+    "compat.wwaypoints.ServerFeaturePolicyInvoker",
     //? if > 1.8.9
     "compat.wwaypoints.MixinSharingLiveConnection",
-    //? if > 1.8.9
-    "compat.wwaypoints.MixinToggleSneakConfigScreen",
     //? if > 1.8.9
     "compat.wwaypoints.MixinToggleSneakService",
     //? if > 1.8.9

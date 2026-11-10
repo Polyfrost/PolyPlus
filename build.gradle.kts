@@ -21,7 +21,7 @@ plugins {
     kotlin("plugin.serialization")
     id("com.gradleup.shadow")
     id("dev.kikugie.loom-back-compat")
-    id("net.fabricmc.fabric-loom-remap") version "1.17-SNAPSHOT" apply false
+    id("net.fabricmc.fabric-loom-remap") version "1.19-SNAPSHOT" apply false
     id("ploceus") version "1.17.4" apply false
     id("me.modmuss50.mod-publish-plugin")
     id("dev.detekt") version "2.0.0-alpha.6"
