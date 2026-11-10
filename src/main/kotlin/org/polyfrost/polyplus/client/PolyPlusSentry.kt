@@ -9,14 +9,18 @@ import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.nameplate.render.material.NameplateShaderFailure
+import org.polyfrost.polyplus.client.nameplate.render.material.NameplateShaderFailures
 import org.polyfrost.polyplus.libs.sentry.Attachment
 import org.polyfrost.polyplus.libs.sentry.Hub
 import org.polyfrost.polyplus.libs.sentry.IHub
 import org.polyfrost.polyplus.libs.sentry.SentryEvent
+import org.polyfrost.polyplus.libs.sentry.SentryLevel
 import org.polyfrost.polyplus.libs.sentry.SentryOptions
 import org.polyfrost.polyplus.libs.sentry.SystemOutLogger
 import org.polyfrost.polyplus.libs.sentry.exception.ExceptionMechanismException
 import org.polyfrost.polyplus.libs.sentry.protocol.Mechanism
+import org.polyfrost.polyplus.libs.sentry.protocol.Message
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.io.EOFException
 import java.io.File
@@ -501,6 +505,62 @@ object PolyPlusSentry {
             )
         }
         event.fingerprints = listOf("thread_stall", thread.name)
+        hub.captureEvent(event)
+    }
+
+    fun captureNameplateIssues(cosmeticId: Int, assetHash: String, issues: List<String>) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
+        initialize()
+        val hub = activeHub() ?: return
+
+        val event = SentryEvent()
+        event.level = SentryLevel.WARNING
+        event.message = Message().apply { formatted = "Invalid nameplate bundle for cosmetic $cosmeticId" }
+        event.setTag("mechanism", "nameplate_invalid")
+        event.setTag("cosmetic_id", cosmeticId.toString())
+        event.setExtra("asset_hash", assetHash)
+        event.setExtra("issues", issues.joinToString("\n"))
+        event.fingerprints = listOf("nameplate_invalid", assetHash)
+        hub.captureEvent(event)
+    }
+
+    init {
+        NameplateShaderFailures.reporter = NameplateShaderFailures.Reporter(::captureNameplateShaderFailure)
+    }
+
+    fun captureNameplateShaderFailure(failure: NameplateShaderFailure) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
+        initialize()
+        val hub = activeHub() ?: return
+
+        val event = SentryEvent()
+        event.level = SentryLevel.WARNING
+        event.message = Message().apply { formatted = "Nameplate material shader failed to compile" }
+        event.setTag("mechanism", "nameplate_shader")
+        event.setTag("gpu_backend", failure.device["backend"].orEmpty())
+        event.setTag("gpu_vendor", failure.device["vendor"].orEmpty())
+        event.setExtra("material_hash", failure.hash)
+        event.setExtra("pipelines", failure.pipelines.joinToString("\n"))
+        event.setExtra("device", failure.device.entries.joinToString("\n") { "${it.key}=${it.value}" })
+        event.setExtra("debug_messages", failure.debugMessages.joinToString("\n"))
+        failure.error?.let { event.setExtra("error", it.toString()) }
+        event.fingerprints = listOf("nameplate_shader", failure.hash, failure.device["backend"].orEmpty())
+        hub.captureEvent(event)
+    }
+
+    fun captureNameplateDropped(bundleId: String, variant: String, call: String) {
+        if (!PrivacyConsent.allowsOnlineServices()) return
+        initialize()
+        val hub = activeHub() ?: return
+
+        val event = SentryEvent()
+        event.level = SentryLevel.WARNING
+        event.message = Message().apply { formatted = "Nameplate $bundleId dropped its Molang in $call" }
+        event.setTag("mechanism", "nameplate_dropped")
+        event.setTag("nameplate_bundle", bundleId)
+        event.setTag("nameplate_variant", variant)
+        event.setTag("nameplate_call", call)
+        event.fingerprints = listOf("nameplate_dropped", bundleId, variant, call)
         hub.captureEvent(event)
     }
 
