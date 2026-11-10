@@ -31,19 +31,9 @@ import java.util.concurrent.ConcurrentHashMap
 import com.mojang.renderpearl.api.GpuFormat
 import com.mojang.renderpearl.api.buffers.GpuBuffer
 import com.mojang.renderpearl.api.textures.GpuTexture
-import com.mojang.renderpearl.api.textures.GpuTextureView
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher
-import java.util.OptionalDouble
-//?}
-
-//? if >= 26.2 {
-import net.minecraft.client.renderer.Projection
-import net.minecraft.client.renderer.SubmitNodeStorage
-import org.joml.Vector4f
 //?}
 
 //? if >= 26.1 {
-import net.minecraft.client.renderer.ProjectionMatrixBuffer
 import net.minecraft.client.renderer.state.level.CameraRenderState
 //?}
 
@@ -74,13 +64,8 @@ import java.util.UUID
 //?}
 
 //? if >= 1.21.4 {
-import com.mojang.blaze3d.ProjectionType
 import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController
-//?}
-
-//? if < 1.21.8 || >= 26.1 {
-import org.joml.Matrix4f
 //?}
 
 //? if = 1.21.1 || >= 1.21.8 {
@@ -100,9 +85,9 @@ import kotlinx.coroutines.launch
 import net.minecraft.world.phys.Vec3
 //?}
 
-//? if = 1.21.1 || >= 26.3 {
-import java.util.Optional
-//?}
+//? if = 1.21.1 {
+/*import java.util.Optional
+*///?}
 
 //? if = 26.2 {
 /*import com.mojang.blaze3d.GpuFormat
@@ -115,10 +100,6 @@ import com.mojang.blaze3d.textures.GpuTexture
 
 //? if >= 1.21.10 && < 26.1 {
 /*import net.minecraft.client.renderer.state.CameraRenderState
-*///?}
-
-//? if >= 1.21.8 && < 26.1 {
-/*import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer
 *///?}
 
 //? if >= 1.21.8 && < 1.21.11 {
@@ -141,10 +122,6 @@ import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor
 *///?}
 
-//? if < 1.21.8 {
-/*import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
-*///?}
-
 //? if = 1.21.5 {
 /*import com.mojang.blaze3d.buffers.BufferType
 import com.mojang.blaze3d.buffers.BufferUsage
@@ -152,7 +129,6 @@ import com.mojang.blaze3d.buffers.BufferUsage
 
 //? if < 1.21.5 {
 /*import com.mojang.blaze3d.platform.NativeImage
-import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
 *///?}
 
 //? if = 1.21.4 {
@@ -160,8 +136,7 @@ import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
 *///?}
 
 //? if = 1.21.1 {
-/*import com.mojang.blaze3d.vertex.VertexSorting
-import com.mojang.serialization.Lifecycle
+/*import com.mojang.serialization.Lifecycle
 import net.minecraft.client.Camera
 import net.minecraft.client.multiplayer.ClientPacketListener
 import net.minecraft.client.multiplayer.PlayerInfo
@@ -362,6 +337,7 @@ object PlayerPreviewRenderer {
     //? if >= 1.21.8 {
     private val LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val MAX_DIM = 512
+    private const val ORTHO_DEPTH = 1000f
 
     private val loggedSkips = HashSet<String>()
 
@@ -373,41 +349,9 @@ object PlayerPreviewRenderer {
     }
 
     private var target: TextureTarget? = null
-    //? if >= 26.3 {
-    private var passColorView: GpuTextureView? = null
-    private var passDepthView: GpuTextureView? = null
-
-    private fun renderFeatures(mc: Minecraft, storage: SubmitNodeStorage) {
-        val colorView = passColorView ?: return
-        mc.gameRenderer.featureRenderDispatcher().prepareFrame(storage).use { frame ->
-            RenderSystem.getDevice().createCommandEncoder().createRenderPass(
-                { "polyplus_preview" },
-                colorView,
-                Optional.empty(),
-                passDepthView,
-                OptionalDouble.empty(),
-            ).use { pass ->
-                RenderSystem.bindDefaultUniforms(pass)
-                FeatureRenderDispatcher.renderAllFeatures(pass, frame)
-            }
-        }
-    }
-    //?}
     private var dummy: AbstractClientPlayer? = null
     private var dummyProfileId: UUID? = null
-    //? if < 26.1 {
-    /*private val projection by lazy { CachedOrthoProjectionMatrixBuffer("polyplus_preview", -1000f, 1000f, true) }
-    *///?}
-    //? if >= 26.1 {
-    private val projection by lazy { ProjectionMatrixBuffer("polyplus_preview") }
-
-    private fun orthoMatrix(w: Int, h: Int): Matrix4f =
-        Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f)
-    //?}
-    //? if >= 26.2 {
-    private fun orthoProjection(w: Int, h: Int): Projection =
-        Projection().apply { setupOrtho(-1000f, 1000f, w.toFloat(), h.toFloat(), true) }
-    //?}
+    private val ortho = PreviewFramebuffer.Ortho("polyplus_preview", ORTHO_DEPTH)
 
     private fun ensureTarget(w: Int, h: Int): TextureTarget {
         val existing = target
@@ -435,53 +379,7 @@ object PlayerPreviewRenderer {
 
     fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
         val mc = Minecraft.getInstance()
-        val colorTex = fbo.colorTexture ?: return false
-        val depthTex = fbo.depthTexture ?: return false
-        val colorView = fbo.colorTextureView ?: return false
-        val depthView = fbo.depthTextureView ?: return false
-
-        val savedLights = RenderSystem.getShaderLights()
-        val savedFog = RenderSystem.getShaderFog()
-
-        //? if >= 26.2 {
-        RenderSystem.getDevice().createCommandEncoder()
-            .clearColorAndDepthTextures(colorTex, Vector4f(0f, 0f, 0f, 0f), depthTex, 0.0)
-        //?} else {
-        /*RenderSystem.getDevice().createCommandEncoder()
-            .clearColorAndDepthTextures(colorTex, 0x00000000, depthTex, 1.0)
-        *///?}
-        RenderSystem.backupProjectionMatrix()
-        //? if < 26.1 {
-        /*RenderSystem.setProjectionMatrix(projection.getBuffer(w.toFloat(), h.toFloat()), ProjectionType.ORTHOGRAPHIC)
-        *///?}
-        //? if >= 26.2 {
-        RenderSystem.setProjectionMatrix(projection.getBuffer(orthoProjection(w, h)), ProjectionType.ORTHOGRAPHIC)
-        //?} else {
-        /*//? if >= 26.1 {
-        RenderSystem.setProjectionMatrix(projection.getBuffer(orthoMatrix(w, h)), ProjectionType.ORTHOGRAPHIC)
-        //?}
-        *///?}
-        //? if >= 26.3 {
-        passColorView = colorView
-        passDepthView = depthView
-        //?} else {
-        /*RenderSystem.outputColorTextureOverride = colorView
-        RenderSystem.outputDepthTextureOverride = depthView
-        *///?}
-        //? if >= 26.1 {
-        val scissor = RenderSystem.getScissorStateForRenderTypeDraws()
-        val hadScissor = scissor.enabled()
-        val scX = scissor.x(); val scY = scissor.y(); val scW = scissor.width(); val scH = scissor.height()
-        RenderSystem.disableScissorForRenderTypeDraws()
-        //?} else {
-        /*RenderSystem.disableScissorForRenderTypeDraws()
-        *///?}
-        //? if >= 26.2 {
-        val modelViewStack = RenderSystem.getModelViewStack()
-        modelViewStack.pushMatrix()
-        modelViewStack.identity()
-        //?}
-        return try {
+        return PreviewFramebuffer.render(fbo, w, h, ortho) {
             //? if >= 1.21.10 {
             previewCape = capeOverride(source)?.let { ClientAsset.ResourceTexture(it).texturePath() }
             renderingPreview = true
@@ -506,23 +404,6 @@ object PlayerPreviewRenderer {
                 previewCape = null
                 //?}
             }
-        } finally {
-            //? if >= 26.2 {
-            RenderSystem.getModelViewStack().popMatrix()
-            //?}
-            //? if >= 26.3 {
-            passColorView = null
-            passDepthView = null
-            //?} else {
-            /*RenderSystem.outputColorTextureOverride = null
-            RenderSystem.outputDepthTextureOverride = null
-            *///?}
-            RenderSystem.restoreProjectionMatrix()
-            savedLights?.let { RenderSystem.setShaderLights(it) }
-            savedFog?.let { RenderSystem.setShaderFog(it) }
-            //? if >= 26.1 {
-            if (hadScissor) RenderSystem.enableScissorForRenderTypeDraws(scX, scY, scW, scH)
-            //?}
         }
     }
 
@@ -553,24 +434,10 @@ object PlayerPreviewRenderer {
             /*entityPos = Vec3.ZERO
             *///?}
         }
-        //? if >= 26.3 {
-        val submitStorage = SubmitNodeStorage()
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
-        renderFeatures(mc, submitStorage)
-        //?} elif >= 26.2 {
-        /*val features = mc.gameRenderer.featureRenderDispatcher()
-        val submitStorage = SubmitNodeStorage()
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
-        features.renderAllFeatures(submitStorage)
-        *///?} else {
-        /*val features = mc.gameRenderer.featureRenderDispatcher
-        mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
-        features.renderAllFeatures()
-        mc.renderBuffers().bufferSource().endBatch()
-        *///?}
+        PreviewFramebuffer.collect { collector ->
+            mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, collector)
+            previewPet(source)?.let { submitPreviewPet(it, pose, collector, state.lightCoords, yawDeg) }
+        }
     }
     //?}
 
@@ -960,6 +827,7 @@ object PlayerPreviewRenderer {
     //? if < 1.21.8 {
     /*private val LEGACY_LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val LEGACY_MAX_DIM = 512
+    private val legacyOrtho = PreviewFramebuffer.Ortho("polyplus_preview", 1000f)
     private const val LEGACY_PREVIEW_ENTITY_ID = Int.MIN_VALUE + 1
     private var legacyTarget: TextureTarget? = null
     //? if < 1.21.4 {
@@ -1218,33 +1086,6 @@ object PlayerPreviewRenderer {
         player.xCloakO = 0.0; player.yCloakO = 0.0; player.zCloakO = 0.0
         *///?}
 
-        //? if < 1.21.5 {
-        /*// live previews render right before the buffer swap, which presents nothing on macOS unless framebuffer 0 is still bound
-        val boundTarget = RenderTargetFbo.saveBoundTarget()
-        *///?}
-        //? if >= 1.21.5 {
-        val colorTex = fbo.colorTexture ?: return false
-        val depthTex = fbo.depthTexture ?: return false
-        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(colorTex, 0, depthTex, 1.0)
-        //?} elif = 1.21.4 {
-        /*fbo.setClearColor(0f, 0f, 0f, 0f)
-        fbo.clear()
-        fbo.bindWrite(true)
-        *///?} else {
-        /*fbo.setClearColor(0f, 0f, 0f, 0f)
-        fbo.clear(Minecraft.ON_OSX)
-        fbo.bindWrite(true)
-        *///?}
-
-        RenderSystem.backupProjectionMatrix()
-        val ortho = Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f)
-        //? if >= 1.21.4 {
-        RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC)
-        //?}
-        //? if < 1.21.4 {
-        /*RenderSystem.setProjectionMatrix(ortho, VertexSorting.ORTHOGRAPHIC_Z)
-        *///?}
-
         val bbH = 1.8f
         val scale = h * modelScale
         val pose = PoseStack()
@@ -1253,43 +1094,33 @@ object PlayerPreviewRenderer {
         pose.translate(0f, bbH / 2f, 0f)
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
-        Lighting.setupForEntityInInventory()
-        val dispatcher = mc.entityRenderDispatcher
-        dispatcher.setRenderShadow(false)
-        val bufferSource = mc.renderBuffers().bufferSource()
-        //? if < 1.21.4 {
-        /*val prevCamera = dispatcher.camera
-        *///?}
-        val realMainTarget = mc.mainRenderTarget
-        (mc as MinecraftAccessor)
-            .`polyplus$setMainRenderTarget`(fbo)
-        try {
-            //? if >= 1.21.4 {
-            renderer.render(state, pose, bufferSource, 0xF000F0)
-            //?}
+        return PreviewFramebuffer.render(fbo, w, h, legacyOrtho) {
+            Lighting.setupForEntityInInventory()
+            val dispatcher = mc.entityRenderDispatcher
+            dispatcher.setRenderShadow(false)
             //? if < 1.21.4 {
-            /*// Always swap in the far-away stand-in camera (not only off-world): in a live
-            dispatcher.camera = PreviewWorld.camera()
-            dispatcher.overrideCameraOrientation(Quaternionf().rotateY(Math.PI.toFloat()))
-            dispatcher.getRenderer(player)?.render(player, 0f, 1f, pose, bufferSource, 0xF000F0)
+            /*val prevCamera = dispatcher.camera
             *///?}
-            //? if < 1.21.5
-            //fbo.bindWrite(true)
-            bufferSource.endBatch()
-        } finally {
-            (mc as MinecraftAccessor)
-                .`polyplus$setMainRenderTarget`(realMainTarget)
-            dispatcher.setRenderShadow(true)
-            //? if < 1.21.4 {
-            /*dispatcher.camera = prevCamera
-            *///?}
-            RenderSystem.restoreProjectionMatrix()
-            //? if < 1.21.5 {
-            /*RenderTargetFbo.restoreBoundTarget(boundTarget)
-            *///?}
+            try {
+                PreviewFramebuffer.collect { bufferSource ->
+                    //? if >= 1.21.4 {
+                    renderer.render(state, pose, bufferSource, 0xF000F0)
+                    //?}
+                    //? if < 1.21.4 {
+                    /*// Always swap in the far-away stand-in camera (not only off-world): in a live
+                    dispatcher.camera = PreviewWorld.camera()
+                    dispatcher.overrideCameraOrientation(Quaternionf().rotateY(Math.PI.toFloat()))
+                    dispatcher.getRenderer(player)?.render(player, 0f, 1f, pose, bufferSource, 0xF000F0)
+                    *///?}
+                }
+            } finally {
+                dispatcher.setRenderShadow(true)
+                //? if < 1.21.4 {
+                /*dispatcher.camera = prevCamera
+                *///?}
+            }
+            true
         }
-
-        return true
     }
 
     private fun renderLegacy(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, key: Any) {
@@ -1361,7 +1192,6 @@ import com.mojang.authlib.minecraft.MinecraftProfileTexture
 import org.polyfrost.compose.render.PolyBitmap
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL30
 import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
 import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
@@ -1405,6 +1235,7 @@ object PlayerPreviewRenderer {
     private val retainCounts = ConcurrentHashMap<Any, Int>()
     private val models = HashMap<Boolean, PlayerModel>()
     private var target: RenderTarget? = null
+    private val ortho = PreviewFramebuffer.Ortho("polyplus_preview", 1000f)
 
     fun cached(key: Any): ImageBitmap? = latestByKey[key]
 
@@ -1473,52 +1304,24 @@ object PlayerPreviewRenderer {
     }
 
     fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
-        if (!GLX.useFbo()) return false
         val mc = Minecraft.getInstance()
-        var drawn = false
-        withSavedFramebuffer {
-            resyncGlState()
-            fbo.setClearColor(0f, 0f, 0f, 0f)
-            fbo.clear()
-            fbo.bindWrite(true)
-            withOrtho(w, h) {
-                runCatching { drawPlayer(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
-                    .onSuccess { drawn = true }
-                    .onFailure { LOG.error("[preview] player draw failed", it) }
-            }
-        }
-        return drawn
+        return PreviewFramebuffer.render(fbo, w, h, ortho) { drawPlayerSafely(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
     }
 
     private fun renderOffscreen(source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): RenderTarget? {
         if (!GLX.useFbo()) return null
         val mc = Minecraft.getInstance()
         var fbo: RenderTarget? = null
-        withSavedFramebuffer {
-            val target = ensureTarget(w, h)
-            resyncGlState()
-            target.clear()
-            target.bindWrite(true)
-            withOrtho(w, h) {
-                runCatching { drawPlayer(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
-                    .onFailure { LOG.error("[preview] player draw failed", it) }
-            }
-            fbo = target
-        }
-        return fbo
+        PreviewFramebuffer.withSavedFramebuffer { fbo = ensureTarget(w, h) }
+        val target = fbo ?: return null
+        PreviewFramebuffer.render(target, w, h, ortho) { drawPlayerSafely(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
+        return target
     }
 
-    private fun resyncGlState() {
-        GlStateManager.disableDepthTest(); GlStateManager.enableDepthTest()
-        GlStateManager.depthFunc(GL11.GL_ALWAYS); GlStateManager.depthFunc(GL11.GL_LEQUAL)
-        GlStateManager.depthMask(false); GlStateManager.depthMask(true)
-        GlStateManager.colorMask(false, false, false, false); GlStateManager.colorMask(true, true, true, true)
-        GlStateManager.enableCull(); GlStateManager.disableCull()
-        GlStateManager.enableBlend(); GlStateManager.disableBlend()
-        GlStateManager.enableLighting(); GlStateManager.disableLighting()
-        GL11.glDisable(GL11.GL_SCISSOR_TEST)
-        GL11.glDisable(GL11.GL_STENCIL_TEST)
-    }
+    private fun drawPlayerSafely(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean =
+        runCatching { drawPlayer(mc, source, yawDeg, w, h, modelScale, verticalAnchor) }
+            .onFailure { LOG.error("[preview] player draw failed", it) }
+            .isSuccess
 
     private fun drawPlayer(mc: Minecraft, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float) {
         val (skin, slim) = previewSkin(source)?.let { it.texture to it.slim } ?: localSkin(mc)
@@ -1782,7 +1585,7 @@ object PlayerPreviewRenderer {
 
     private fun readback(fbo: RenderTarget, w: Int, h: Int): ImageBitmap {
         val data = BufferUtils.createByteBuffer(w * h * 4)
-        withSavedFramebuffer {
+        PreviewFramebuffer.withSavedFramebuffer {
             fbo.bindWrite(false)
             GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1)
             GL11.glReadPixels(0, 0, w, h, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, data)
@@ -1805,36 +1608,5 @@ object PlayerPreviewRenderer {
     }
 
     private fun scaleByte(v: Int, f: Float): Byte = (v * f).toInt().coerceAtMost(255).toByte()
-
-    private inline fun withSavedFramebuffer(block: () -> Unit) {
-        val fb = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
-        val viewport = IntArray(4)
-        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport)
-        try {
-            block()
-        } finally {
-            GLX.bindFramebuffer(GLX.GL_FRAMEBUFFER, fb)
-            GlStateManager.viewport(viewport[0], viewport[1], viewport[2], viewport[3])
-        }
-    }
-
-    private inline fun withOrtho(w: Int, h: Int, block: () -> Unit) {
-        GlStateManager.matrixMode(GL11.GL_PROJECTION)
-        GlStateManager.pushMatrix()
-        GlStateManager.loadIdentity()
-        GlStateManager.ortho(0.0, w.toDouble(), h.toDouble(), 0.0, 1000.0, 3000.0)
-        GlStateManager.matrixMode(GL11.GL_MODELVIEW)
-        GlStateManager.pushMatrix()
-        GlStateManager.loadIdentity()
-        GlStateManager.translatef(0f, 0f, -2000f)
-        try {
-            block()
-        } finally {
-            GlStateManager.matrixMode(GL11.GL_PROJECTION)
-            GlStateManager.popMatrix()
-            GlStateManager.matrixMode(GL11.GL_MODELVIEW)
-            GlStateManager.popMatrix()
-        }
-    }
 }
 *///?}
