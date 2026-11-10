@@ -327,7 +327,6 @@ dependencies {
     if (!isOrnithe) {
         modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
         modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
-        include("org.polyfrost:polydium:${property("deps.polydium")}+$mcVersion")
     }
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
     // This is a library, not a traditional mod. It must not use modRuntimeOnly,
