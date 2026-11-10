@@ -77,9 +77,13 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinServerSelectionList",
+    //? if = 1.8.9
+    //"client.MixinSession",
     //? if > 1.8.9
     "client.MixinTabButton",
     "client.MixinTitleScreen",
+    //? if = 1.8.9
+    //"client.MixinUnopenedPack",
     //? if > 1.8.9
     "client.access.AbstractSelectionListAccessor",
     //? if > 1.8.9
