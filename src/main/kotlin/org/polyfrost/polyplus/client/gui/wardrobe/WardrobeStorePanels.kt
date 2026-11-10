@@ -175,6 +175,9 @@ internal fun StoreDetailPanel(
         ) {
             if (info == null || variant == null) {
                 EmptyState("Select a cosmetic to preview it.", Modifier.fillMaxSize())
+            } else if (info.type == CosmeticType.Nameplate) {
+                NameplateStage(variant.id, info.cartName(variant), Modifier.fillMaxSize())
+                OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
             } else {
                 val (source, _) = rememberCosmeticPreviewSource(variant.id, info.type)
                 val fades = info.type != CosmeticType.Boots

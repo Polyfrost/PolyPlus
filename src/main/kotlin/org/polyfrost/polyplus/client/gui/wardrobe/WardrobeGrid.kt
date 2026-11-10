@@ -198,6 +198,7 @@ internal fun WardrobeGrid(
                                 modifier,
                                 checker = false,
                                 coverAssetId = coverFor(item),
+                                cosmeticId = variantId,
                             )
                         }
                     }
@@ -251,6 +252,7 @@ internal fun WardrobeGrid(
                                 modifier,
                                 checker = false,
                                 coverAssetId = info.coverAssetId,
+                                cosmeticId = variant.id,
                             )
                         }
                     }
