@@ -48,7 +48,7 @@ object NameplateRegistry {
 
     fun isLoaded(id: Int): Boolean = installed.containsKey(id)
 
-    fun installedBundle(id: Int): NameplateBundle? = installed[id]?.bundle
+    fun installedBundle(id: Int, hash: String): NameplateBundle? = installed[id]?.takeIf { it.hash == hash }?.bundle
 
     fun clear() {
         installed.values.forEach { releaseAssets(it.bundle) }
