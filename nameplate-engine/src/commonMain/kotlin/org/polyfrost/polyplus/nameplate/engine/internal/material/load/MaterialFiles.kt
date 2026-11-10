@@ -86,13 +86,12 @@ internal object MaterialFiles {
             frames.any { rows -> rows.size != height || rows.any { it.length != width } } ->
                 issues += BundleIssue(path, "every frame and row must be $width x $height")
         }
+        if (issues.size != start) return null
         val cells = IntArray(width * height * frames.size)
-        if (issues.size == start) {
-            var i = 0
-            for (row in frames.flatten()) {
-                for (c in row) {
-                    cells[i++] = if (c == '.') -1 else colors[c.toString()] ?: unknownCell(path, c, issues)
-                }
+        var i = 0
+        for (row in frames.flatten()) {
+            for (c in row) {
+                cells[i++] = if (c == '.') -1 else colors[c.toString()] ?: unknownCell(path, c, issues)
             }
         }
         return if (issues.size == start) MaterialSprite(width, height, frames.size, cells) else null
