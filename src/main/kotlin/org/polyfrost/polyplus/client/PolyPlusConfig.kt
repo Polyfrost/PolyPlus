@@ -183,6 +183,14 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic
     @Switch(
+        title = "Notify on Server Setting Changes",
+        description = "Show a notification whenever a server changes or resets one of your mod settings. Useful for debugging server integrations.",
+        category = "Multiplayer",
+    )
+    var notifyServerSettingChanges = false
+
+    @JvmStatic
+    @Switch(
         title = "PolyPlus User Indicators",
         description = "Show a badge on the nametag and tab list of players who are using PolyPlus.",
     )

@@ -1,0 +1,11 @@
+{
+  "mod": "polysprint",
+  "config": "polysprint.json",
+  "options": {
+    "toggle-sneak.enabled": { "path": "isEnabled" },
+    "toggle-sneak.toggle-sprint": { "path": "toggleSprint" },
+    "toggle-sneak.toggle-sneak": { "path": "toggleSneak" },
+    "toggle-sneak.fly-boost": { "path": "toggleFlyBoost" },
+    "toggle-sneak.fly-boost-amount": { "path": "flyBoostAmount" }
+  }
+}

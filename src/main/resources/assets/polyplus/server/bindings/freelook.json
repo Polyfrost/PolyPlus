@@ -1,0 +1,10 @@
+{
+  "mod": "freelook",
+  "config": "freelook.json",
+  "options": {
+    "freelook.enabled": { "path": "enabled" },
+    "freelook.invert-pitch": { "path": "Pitch.invert" },
+    "freelook.invert-yaw": { "path": "Yaw.invert" },
+    "freelook.toggle-key-freelook": { "path": "pressMode", "enum": { "false": 0, "true": 1 } }
+  }
+}

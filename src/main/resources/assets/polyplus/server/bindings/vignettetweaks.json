@@ -1,0 +1,9 @@
+{
+  "mod": "vignettetweaks",
+  "config": "vignettetweaks.json",
+  "options": {
+    "damage-tint.enabled": { "path": "Health.enabled" },
+    "damage-tint.vignette-color": { "path": "Health.color" },
+    "damage-tint.show-vignette-below": { "path": "Health.threshold" }
+  }
+}

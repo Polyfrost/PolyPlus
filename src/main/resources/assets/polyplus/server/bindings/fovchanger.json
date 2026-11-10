@@ -1,0 +1,9 @@
+{
+  "mod": "fovchanger",
+  "config": "fovchanger.json",
+  "options": {
+    "fov.enabled":         { "path": "enabled" },
+    "fov.speed-f-o-v":     { "path": "speedFov" },
+    "fov.aiming-modifier": { "path": "aiming", "scale": 100 }
+  }
+}

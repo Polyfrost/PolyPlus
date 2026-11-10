@@ -43,6 +43,7 @@
     "client.MixinGuiMessage",
     "client.MixinIntegratedServer",
     "client.MixinMinecraft",
+    "client.MixinMinecraftCombat",
     "client.MixinMinecraftSystemReport",
     //? if > 1.8.9
     "client.MixinMouseHandler",

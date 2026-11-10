@@ -54,11 +54,11 @@ import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
-import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import org.polyfrost.polyplus.server.ServerIntegration
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -157,6 +157,7 @@ object PolyPlusClient {
         step("crash outcome tracker") { CrashOutcomeTracker.installHeartbeat() }
         step("crash log upload") { SCOPE.launch(Dispatchers.IO) { PolyPlusCrashLogUploader.uploadPending() } }
         step("config preload") { PolyPlusConfig.preload() }
+        step("server integration") { ServerIntegration.initialize() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("pylon raw input") { PylonRawInput.initialize() }
@@ -181,7 +182,6 @@ object PolyPlusClient {
         step("login gate") { MinecraftLoginGate.register() }
         step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
-        step("oneclient server api") { OneClientServerApi.initialize() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
 

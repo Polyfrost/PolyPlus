@@ -1,0 +1,9 @@
+{
+  "mod": "polynametag",
+  "config": "nametag.json",
+  "options": {
+    "nametag.enabled": { "path": "isEnabled" },
+    "nametag.nametag-shadow": { "path": "textType", "enum": { "false": 0, "true": 1 } },
+    "nametag.nametag": { "path": "isShowOwnNametag" }
+  }
+}
