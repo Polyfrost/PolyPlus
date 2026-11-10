@@ -45,7 +45,6 @@ A new title screen with Quickplay for your last servers, a 3D preview of your pl
 - A first launch setup screen for toggle sprint, motion blur, GUI scale and other OneClient mods
 - A warning when your memory allocation is hurting performance
 - A Windows sensitivity converter in the controls screen (1.8.9)
-- Polydium, our performance mod, is included
 
 ## Terms of Service
 

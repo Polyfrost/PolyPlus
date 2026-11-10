@@ -46,7 +46,10 @@ object EmojiFont {
     }
 
     @JvmStatic
-    fun legacyIndex(chr: Char): Int = (chr.code - LEGACY_BASE).takeIf { it in 0 until LEGACY_COUNT } ?: -1
+    fun legacyIndex(chr: Char): Int {
+        val index = chr.code - LEGACY_BASE
+        return if (index in 0 until LEGACY_COUNT) index else -1
+    }
 
     @JvmStatic
     fun drawLegacy(index: Int, x: Float, y: Float, alpha: Float) {

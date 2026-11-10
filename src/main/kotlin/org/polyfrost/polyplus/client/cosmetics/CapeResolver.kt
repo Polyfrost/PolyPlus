@@ -35,6 +35,9 @@ object CapeResolver {
     var localOverrideModId by mutableStateOf<String?>(null)
         private set
 
+    // decide() runs for every getSkin call on the render thread; a plain mirror skips the snapshot read there.
+    private var lastOverrideModId: String? = null
+
     val localOverrideModName: String?
         get() = localOverrideModId?.let { id ->
             FabricLoader.getInstance().getModContainer(id).map { it.metadata.name }.orElse(id)
@@ -48,7 +51,10 @@ object CapeResolver {
         val local = isLocal(playerId)
         if (local) {
             val modId = if (foreign) currentNamespace else null
-            if (localOverrideModId != modId) localOverrideModId = modId
+            if (lastOverrideModId != modId) {
+                lastOverrideModId = modId
+                localOverrideModId = modId
+            }
         }
 
         if (foreign && !PolyPlusCosmeticsConfig.forcePolyPlusCapes) return CapeDecision.KEEP

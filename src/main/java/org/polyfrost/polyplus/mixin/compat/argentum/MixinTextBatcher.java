@@ -1,7 +1,8 @@
 package org.polyfrost.polyplus.mixin.compat.argentum;
 
 //? if = 1.8.9 {
-/*import com.llamalad7.mixinextras.sugar.Local;
+/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.sugar.Local;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.polyfrost.polyplus.client.emoji.EmojiFont;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,9 +16,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Pseudo
 @Mixin(targets = "dev.rdh.argentum.impl.render.gui.TextBatcher", remap = false)
 public class MixinTextBatcher {
-    @Inject(method = "cacheable(Ljava/lang/String;)Z", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
-    private static void polyplus$skipEmoji(String text, CallbackInfoReturnable<Boolean> cir) {
-        if (polyplus$hasEmoji(text)) cir.setReturnValue(false);
+    @ModifyReturnValue(method = "cacheable(Ljava/lang/String;)Z", at = @At("RETURN"), remap = false, require = 0)
+    private static boolean polyplus$skipEmoji(boolean cacheable, String text) {
+        return cacheable && !polyplus$hasEmoji(text);
     }
 
     // Argentum 1.0.3+ draws non-cacheable text with its own glyphs too, so the badge/emoji never reach

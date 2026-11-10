@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.drawscope.translate
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import kotlin.math.PI
 import kotlin.math.cos
@@ -15,15 +15,6 @@ private val GlowA = Color(0xFF1878F1)
 private val GlowB = Color(0xFF24D3EE)
 private val GlowC = Color(0xFF6D5EF6)
 private val FxPageBackground = Color(0xFF11171C)
-
-fun coolGlowColor(phase: Float): Color {
-    val p = phase - floor(phase)
-    return when {
-        p < 1f / 3f -> lerp(GlowA, GlowB, p * 3f)
-        p < 2f / 3f -> lerp(GlowB, GlowC, (p - 1f / 3f) * 3f)
-        else -> lerp(GlowC, GlowA, (p - 2f / 3f) * 3f)
-    }
-}
 
 private class Blob(
     val ax: Float, val ay: Float,
@@ -46,13 +37,29 @@ private val Blobs = listOf(
 
 private const val GLOW_STEPS = 12
 
-private fun softRadial(color: Color, alpha: Float, center: Offset, radius: Float): Brush {
+private val GlowPalette = arrayOf(GlowA, GlowB, GlowC)
+
+private inline fun coolGlowLayers(phase: Float, alpha: Float, draw: (Color, Float) -> Unit) {
+    val p = (phase - floor(phase)) * GlowPalette.size
+    val i = p.toInt().coerceAtMost(GlowPalette.size - 1)
+    val f = p - i
+    if (f < 1f) draw(GlowPalette[i], alpha * (1f - f))
+    if (f > 0f) draw(GlowPalette[(i + 1) % GlowPalette.size], alpha * f)
+}
+
+private fun DrawScope.drawRadial(stops: Array<Pair<Float, Color>>, center: Offset, radius: Float, alpha: Float) {
+    translate(center.x, center.y) {
+        drawCircle(Brush.radialGradient(colorStops = stops, center = Offset.Zero, radius = radius), radius, Offset.Zero, alpha)
+    }
+}
+
+private fun DrawScope.drawSoftGlow(color: Color, center: Offset, radius: Float, alpha: Float) {
     val stops = Array(GLOW_STEPS + 1) { i ->
         val t = i.toFloat() / GLOW_STEPS
         val s = 1f - t
-        t to color.copy(alpha = alpha * s * s * (3f - 2f * s))
+        t to color.copy(alpha = s * s * (3f - 2f * s))
     }
-    return Brush.radialGradient(colorStops = stops, center = center, radius = radius)
+    drawRadial(stops, center, radius, alpha)
 }
 
 fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
@@ -64,30 +71,30 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
         val cy = size.height * (b.ay + cos(time * b.sy + b.psi) * b.driftY) + mdy * b.par
         val radius = size.width * b.rF * (1f + 0.12f * sin(time * 0.6f + b.phi))
         val alpha = (b.baseAlpha * (0.75f + 0.25f * sin(time * 0.9f + b.psi))).coerceIn(0f, 1f)
-        val color = coolGlowColor(time * 0.05f + b.hueOffset)
-        val center = Offset(cx, cy)
-        drawCircle(brush = softRadial(color, alpha, center, radius), radius = radius, center = center)
+        coolGlowLayers(time * 0.05f + b.hueOffset, alpha) { color, a -> drawSoftGlow(color, Offset(cx, cy), radius, a) }
     }
     drawAurora(time)
     drawParticles(time, mouse)
-    drawVignette(time)
+    drawVignette()
 }
 
 private fun DrawScope.drawAurora(time: Float) {
     val sweep = sin(time * 0.08f) * 0.5f + 0.5f
     val cx = size.width * (sweep * 1.4f - 0.2f)
-    val col = coolGlowColor(time * 0.05f + 0.2f)
-    drawRect(
-        brush = Brush.linearGradient(
-            colorStops = arrayOf(
-                0f to Color.Transparent,
-                0.5f to col.copy(alpha = 0.06f),
-                1f to Color.Transparent,
+    coolGlowLayers(time * 0.05f + 0.2f, 0.06f) { col, a ->
+        drawRect(
+            brush = Brush.linearGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.5f to col,
+                    1f to Color.Transparent,
+                ),
+                start = Offset(cx - size.width * 0.3f, 0f),
+                end = Offset(cx + size.width * 0.3f, size.height),
             ),
-            start = Offset(cx - size.width * 0.3f, 0f),
-            end = Offset(cx + size.width * 0.3f, size.height),
-        ),
-    )
+            alpha = a,
+        )
+    }
 }
 
 private const val PARTICLE_COUNT = 44
@@ -123,7 +130,7 @@ private fun DrawScope.drawParticles(time: Float, mouse: Offset) {
         val par = p.size * 0.0006f
         val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
         val r = p.size * 3f
-        drawCircle(brush = softRadial(Color.White, alpha, center, r), radius = r, center = center)
+        drawSoftGlow(Color.White, center, r, alpha)
     }
 }
 
@@ -167,22 +174,14 @@ private fun DrawScope.drawPanoramaGlowMask() {
     for (g in GlowMask) {
         val center = Offset(size.width * g.ax, size.height * g.ay)
         val radius = size.width * g.radiusF
-        drawCircle(brush = softRadial(PanoramaGlowBlue, g.alpha, center, radius), radius = radius, center = center)
+        drawSoftGlow(PanoramaGlowBlue, center, radius, g.alpha)
     }
 }
 
-private fun DrawScope.drawVignette(time: Float) {
-    val radius = size.maxDimension * (0.78f + 0.02f * sin(time * 0.5f))
-    val stops = Array(GLOW_STEPS + 1) { i ->
-        val t = i.toFloat() / GLOW_STEPS
-        val s = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
-        t to FxPageBackground.copy(alpha = 0.55f * s * s * (3f - 2f * s))
-    }
-    drawRect(
-        brush = Brush.radialGradient(
-            colorStops = stops,
-            center = Offset(size.width / 2f, size.height / 2f),
-            radius = radius,
-        ),
-    )
+private val VignetteStops = Array(GLOW_STEPS + 1) { i ->
+    val t = i.toFloat() / GLOW_STEPS
+    val s = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
+    t to FxPageBackground.copy(alpha = 0.55f * s * s * (3f - 2f * s))
 }
+
+private fun DrawScope.drawVignette() = drawRadial(VignetteStops, center, size.maxDimension * 0.78f, 1f)
