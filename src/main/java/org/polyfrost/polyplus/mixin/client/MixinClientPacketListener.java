@@ -3,10 +3,14 @@ package org.polyfrost.polyplus.mixin.client;
 //? if > 1.8.9 {
 
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
+import org.polyfrost.polyplus.server.ServerIntegration;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPacketListener.class)
 public class MixinClientPacketListener {
@@ -19,6 +23,11 @@ public class MixinClientPacketListener {
     private String polyplus$emojiCommand(String command) {
         return EmojiRegistry.toShortcodes(command);
     }
+
+    @Inject(method = "handleLogin", at = @At("TAIL"))
+    private void polyplus$serverSession(ClientboundLoginPacket packet, CallbackInfo ci) {
+        ServerIntegration.onJoinGame();
+    }
 }
 //?} else {
 /*import net.minecraft.client.network.handler.ClientPlayNetworkHandler;
@@ -27,7 +36,9 @@ import net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket;
 import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry;
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
-import org.polyfrost.polyplus.client.serverapi.OneClientServerApi;
+import net.minecraft.network.packet.s2c.play.LoginS2CPacket;
+import org.polyfrost.polyplus.server.ServerChannels;
+import org.polyfrost.polyplus.server.ServerIntegration;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -51,7 +62,7 @@ public class MixinClientPacketListener {
     @Inject(method = "closeWorld", at = @At("HEAD"))
     private void polyplus$onDisconnect(CallbackInfo ci) {
         P2PSessionManager.onClientDisconnected();
-        OneClientServerApi.reset();
+        ServerIntegration.onDisconnect();
     }
 
     @Inject(
@@ -62,8 +73,13 @@ public class MixinClientPacketListener {
             shift = At.Shift.AFTER
         )
     )
-    private void polyplus$oneClientServerApi(CustomPayloadS2CPacket packet, CallbackInfo ci) {
-        OneClientServerApi.onLegacyPayload(packet.getChannel(), packet.getData());
+    private void polyplus$serverChannels(CustomPayloadS2CPacket packet, CallbackInfo ci) {
+        ServerChannels.onLegacyPayload(packet.getChannel(), packet.getData());
+    }
+
+    @Inject(method = "handleLogin", at = @At("TAIL"))
+    private void polyplus$serverSession(LoginS2CPacket packet, CallbackInfo ci) {
+        ServerIntegration.onJoinGame();
     }
 }
 *///?}

@@ -1,0 +1,10 @@
+{
+  "mod": "polyzoom",
+  "config": "zoomify.json",
+  "options": {
+    "zoom.enabled": { "path": "modEnabled" },
+    "zoom.toggle-key-zoom": { "path": "zoomKeyBehaviour", "enum": { "false": "hold", "true": "toggle" } },
+    "zoom.variable-zoom": { "path": "scrollZoom" },
+    "zoom.zoom-divisor": { "path": "initialZoom" }
+  }
+}

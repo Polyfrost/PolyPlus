@@ -1,0 +1,8 @@
+{
+  "mod": "countdown",
+  "config": "countdown.json",
+  "options": {
+    "tnt-countdown.enabled": { "path": "enabled" },
+    "tnt-countdown.adjust-fuse-time": { "path": "fuseOffset" }
+  }
+}

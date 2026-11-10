@@ -1,0 +1,8 @@
+{
+  "mod": "behindyouv3",
+  "config": "behindyouv3.json",
+  "options": {
+    "snaplook.enabled": { "path": "isEnabled" },
+    "snaplook.snaplook-toggle-mode": { "path": "Keybinds.frontKeybindHandleMode", "enum": { "false": "Hold", "true": "Toggle" } }
+  }
+}

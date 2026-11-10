@@ -64,6 +64,8 @@ val minecraftPredicate = property("mod.mc_compat") as String
 stonecutter constants {
     put("sodium", optionalProperty("deps.sodium") != null)
     put("wwaypoints", optionalProperty("deps.wwaypoints") != null)
+    put("zoomify", optionalProperty("deps.zoomify") != null)
+    put("jade", optionalProperty("deps.jade") != null)
 }
 
 val fabricLoaderVersion = property("deps.fabric_loader") as String
@@ -125,6 +127,7 @@ repositories {
     strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
     strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
     strictMaven("https://maven.taumc.org/releases", "TauMC", "org.embeddedt.celeritas")
+    strictMaven("https://us-central1-maven.pkg.dev/mw-lunarclient-maven-repo/public", "LunarClient", "com.lunarclient")
 }
 
 val flkProvidedVersions: Map<String, String> = run {
@@ -342,6 +345,20 @@ dependencies {
         modCompileOnly("maven.modrinth:wwaypoints:$it") { isTransitive = false }
     }
 
+    optionalProperty("deps.zoomify")?.let {
+        modCompileOnly("maven.modrinth:zoomify:$it") { isTransitive = false }
+        modCompileOnly("maven.modrinth:yacl:${property("deps.yacl")}") { isTransitive = false }
+    }
+
+    optionalProperty("deps.jade")?.let {
+        modCompileOnly("maven.modrinth:jade:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.o_itemphysiclite")?.let {
+        modCompileOnly("maven.modrinth:ornitheitemphysiclite:$it") { isTransitive = false }
+        compileOnly("net.ornithemc.osl-gen2:config:${property("deps.osl_config")}") { isTransitive = false }
+    }
+
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
 
     compileOnly("com.nikoverflow:exploit-preventer-api:1.0.0")
@@ -381,6 +398,8 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
     testImplementation("net.fabricmc:fabric-loader-junit:$fabricLoaderVersion")
+    testImplementation("com.lunarclient:apollo-protos:0.2.7")
+    testImplementation("com.google.protobuf:protobuf-java-util:3.25.0")
 
     errorprone("com.google.errorprone:error_prone_core:${property("deps.errorprone")}")
 }

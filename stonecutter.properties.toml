@@ -27,12 +27,17 @@ feather_build = 2
 deps.osl_entrypoints = "0.6.1+mc13w16a-mc1.14.4"
 deps.osl_core = "0.11.0+mc14w27a-mc1.14.4"
 deps.osl_keybinds = "0.3.0+mc13w36a-mc17w15a"
+deps.o_itemphysiclite = "jIZ9eX42"
+deps.osl_config = "0.6.3+mc14w27a-mc15w39c"
 
 ["1.21.1"]
 mod.mc_compat = "1.21.1"
 mod.mc_releases = "1.21.1"
 deps.fabric_api = "0.116.15+1.21.1"
 deps.wwaypoints = "K8KJ2B1N"
+deps.zoomify = "6jrMC48Z"
+deps.yacl = "o3cDn8Vp"
+deps.jade = "adpNvTZS"
 
 ["1.21.4"]
 mod.mc_compat = "1.21.4"
@@ -57,6 +62,9 @@ mod.mc_compat = "1.21.10"
 mod.mc_releases = "1.21.10"
 deps.fabric_api = "0.138.4+1.21.10"
 deps.wwaypoints = "9JBCPOwC"
+deps.zoomify = "Vdx09fu6"
+deps.yacl = "skcT0J9K"
+deps.jade = "qC0qUqL5"
 
 ["1.21.11"]
 mod.mc_compat = "1.21.11"
@@ -64,6 +72,9 @@ mod.mc_releases = "1.21.11"
 deps.fabric_api = "0.141.6+1.21.11"
 deps.sodium = "mc1.21.11-0.8.13-fabric"
 deps.wwaypoints = "8hPTY1SS"
+deps.zoomify = "gI5KZI8V"
+deps.yacl = "pHWDw3Vc"
+deps.jade = "swJhAyak"
 
 ["26.1"]
 mod.mc_compat = "~26.1"
@@ -71,6 +82,9 @@ mod.mc_releases = "26.1, 26.1.1, 26.1.2"
 deps.fabric_api = "0.155.2+26.1.2"
 deps.sodium = "mc26.1.2-0.9.1-fabric"
 deps.wwaypoints = "pX4mxVAv"
+deps.zoomify = "gwKcDOSy"
+deps.yacl = "IODousKT"
+deps.jade = "fW2xykin"
 
 ["26.2"]
 mod.mc_compat = "~26.2"
@@ -78,6 +92,9 @@ mod.mc_releases = "26.2"
 deps.fabric_api = "0.157.0+26.2"
 deps.sodium = "mc26.2-0.9.1-fabric"
 deps.wwaypoints = "vudKzlxH"
+deps.zoomify = "D64cvU6G"
+deps.yacl = "DoR7RYgi"
+deps.jade = "ue8CO97w"
 
 ["26.3"]
 mod.mc_compat = "~26.3"
@@ -85,3 +102,6 @@ mod.mc_releases = "26.3"
 deps.fabric_api = "0.160.3+26.3"
 deps.sodium = "mc26.3r1-0.9.2-beta.2-fabric"
 deps.wwaypoints = "mgo409Pu"
+deps.zoomify = "RUBpNu00"
+deps.yacl = "s9SjoFu1"
+deps.jade = "71CTWqdE"
