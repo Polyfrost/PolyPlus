@@ -32,7 +32,9 @@ object EmojiFont {
     //?} else {
     /*private val ATLAS: Identifier = Identifier.fromNamespaceAndPath("polyplus", "textures/emoji/emoji_0.png")
     private const val LEGACY_BASE = 0xF100
-    private const val LEGACY_COUNT = 32 * 24
+    private const val LEGACY_COLS = 64
+    private const val LEGACY_ROWS = 30
+    private const val LEGACY_COUNT = LEGACY_COLS * LEGACY_ROWS
     const val LEGACY_ADVANCE = 10f
     private val colorBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -53,9 +55,9 @@ object EmojiFont {
 
     @JvmStatic
     fun drawLegacy(index: Int, x: Float, y: Float, alpha: Float) {
-        val u = (index % 32) / 32f
-        val v = (index / 32) / 24f
-        drawLegacyQuad(ATLAS, x, y - 1, x + 9, y + 8, u, v, u + 1 / 32f, v + 1 / 24f, alpha)
+        val u = (index % LEGACY_COLS) / LEGACY_COLS.toFloat()
+        val v = (index / LEGACY_COLS) / LEGACY_ROWS.toFloat()
+        drawLegacyQuad(ATLAS, x, y - 1, x + 9, y + 8, u, v, u + 1f / LEGACY_COLS, v + 1f / LEGACY_ROWS, alpha)
     }
 
     @JvmStatic
