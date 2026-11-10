@@ -133,6 +133,15 @@ object DefaultSettings {
                 coveredByLegacyFlag = false,
             ),
         )
+        add(
+            Task(
+                id = "wwaypoints-sneak-sign-modifications",
+                label = "wWaypoints",
+                isPresent = { modLoaded(WWAYPOINTS_ID) },
+                apply = ::disableWWaypointsSneakAndSignModifications,
+                coveredByLegacyFlag = false,
+            ),
+        )
         //?}
         add(
             Task(
@@ -390,6 +399,17 @@ object DefaultSettings {
     private fun unbindWWaypointsCreateKeys() {
         val createKeys = WaypointsClient.getPresetCreateWaypointKeys().map { it.value }
         unbindMatching { it in createKeys && it.isDefault }
+    }
+
+    private fun disableWWaypointsSneakAndSignModifications() {
+        val config = WaypointsClient.getConfig()
+        config.toggleSneakStaySneakedInContainers = false
+        config.toggleSneakBetterInteractions = false
+        config.sneakKeybindOverrides = false
+        config.signGuiPopup = true
+        WaypointsClient.saveConfig()
+        val popupKey = WaypointsClient.getSignGuiPopupToggleKey()
+        unbindMatching { it == popupKey }
     }
     //?}
 
