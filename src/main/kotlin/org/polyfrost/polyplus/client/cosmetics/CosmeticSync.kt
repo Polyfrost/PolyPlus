@@ -164,6 +164,7 @@ object CosmeticSync {
                     CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.online)
                 }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
+                is ClientboundPacket.CatalogUpdated -> handleCatalogUpdated(packet)
                 is ClientboundPacket.Error -> handleError(packet)
                 //? if >= 1.21.1 || = 1.8.9 {
                 is ClientboundPacket.PlayerEmoteStarted -> handleEmotePlay(packet.player, packet.emoteId)
@@ -382,6 +383,11 @@ object CosmeticSync {
         if (packet.cosmeticIds.isNotEmpty() || packet.emoteIds.isNotEmpty()) {
             PolyPlusClient.refreshCosmetics()
         }
+    }
+
+    private fun handleCatalogUpdated(packet: ClientboundPacket.CatalogUpdated) {
+        LOGGER.info("PolyPlus cosmetic catalog updated (version {}); refreshing", packet.version)
+        PolyPlusClient.refreshCosmetics()
     }
 
     //? if >= 1.21.1 || = 1.8.9 {
