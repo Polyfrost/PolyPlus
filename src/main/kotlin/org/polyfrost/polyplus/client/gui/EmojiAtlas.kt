@@ -30,8 +30,8 @@ import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import kotlin.math.roundToInt
 
 internal object EmojiAtlas {
-    const val CELL = 48
-    private const val COLUMNS = 32
+    const val CELL = 32
+    private const val COLUMNS = 64
     private const val PATH = "/assets/polyplus/textures/emoji/emoji_0.png"
 
     val bitmap: ImageBitmap? by lazy {

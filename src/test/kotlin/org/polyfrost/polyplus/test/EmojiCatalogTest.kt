@@ -21,7 +21,7 @@ class EmojiCatalogTest {
         val indices = EmojiRegistry.catalog.map { EmojiRegistry.atlasIndex(it.glyph) }
         assertTrue(indices.all { it >= 0 }) { "every catalog glyph must live in the atlas" }
         assertEquals(indices.sorted(), indices)
-        assertTrue(indices.last() < 32 * 24) { "atlas is 32x24 cells, saw index ${indices.last()}" }
+        assertTrue(indices.last() < 64 * 30) { "atlas is 64x30 cells, saw index ${indices.last()}" }
     }
 
     @Test
