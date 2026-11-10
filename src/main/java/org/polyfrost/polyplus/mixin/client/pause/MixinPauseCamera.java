@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.mixin.client.pause;
 
 //? if > 1.8.9 {
 import net.minecraft.client.Camera;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -34,6 +35,12 @@ public abstract class MixinPauseCamera {
     private float yRot;
 
     @Shadow
+    private float eyeHeight;
+
+    @Shadow
+    private float eyeHeightOld;
+
+    @Shadow
     protected abstract void setRotation(float yRot, float xRot);
 
     @Shadow
@@ -59,7 +66,7 @@ public abstract class MixinPauseCamera {
     @Unique
     private void polyplus$applyStage(float partialTicks) {
         if (!(this.entity instanceof LivingEntity living)) return;
-        PauseStage.Pose pose = PauseStage.pose(living, partialTicks, this.position.x, this.position.y, this.position.z, this.yRot, this.xRot);
+        PauseStage.Pose pose = PauseStage.pose(living, partialTicks, this.position.x, this.position.y, this.position.z, this.yRot, this.xRot, Mth.lerp(partialTicks, this.eyeHeightOld, this.eyeHeight));
         if (pose == null) return;
         this.setRotation(pose.yaw, pose.pitch);
         this.setPosition(new Vec3(pose.x, pose.y, pose.z));

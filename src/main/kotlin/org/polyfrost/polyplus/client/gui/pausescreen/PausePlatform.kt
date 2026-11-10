@@ -121,6 +121,22 @@ internal object PausePlatform {
         return shortest
     }
 
+    //? if = 1.8.9 {
+    /*fun legacyZoom(eye: PauseVec, ray: PauseVec, distance: Double): Double {
+        val world = Minecraft.getInstance().world ?: return distance
+        val origin = Vec3d(eye.x, eye.y, eye.z)
+        var zoom = distance
+        for (corner in 0 until CORNERS) {
+            val p = ((corner and 1) * 2 - 1) * JITTER
+            val q = ((corner shr 1 and 1) * 2 - 1) * JITTER
+            val r = ((corner shr 2 and 1) * 2 - 1) * JITTER
+            val hit = world.rayTrace(Vec3d(eye.x + p, eye.y + q, eye.z + r), Vec3d(eye.x - ray.x + p + r, eye.y - ray.y + q, eye.z - ray.z + r)) ?: continue
+            zoom = minOf(zoom, hit.facePos.distanceTo(origin))
+        }
+        return zoom
+    }
+    *///?}
+
     fun canStage(entity: LivingEntity): Boolean {
         //? if > 1.8.9 {
         val spectating = (entity as? Player)?.isSpectator == true

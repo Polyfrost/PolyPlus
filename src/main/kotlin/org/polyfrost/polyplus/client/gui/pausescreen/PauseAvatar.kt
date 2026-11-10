@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import org.polyfrost.polyplus.client.lobby.LobbyEase
-import kotlin.math.atan2
 import kotlin.math.sin
 
 //? if > 1.8.9 {
@@ -33,6 +32,8 @@ object PauseAvatar {
     private const val HEAD_PITCH_REST = -2.0
     private const val STANCE = 22f
     private const val HEAD_BODY_LIMIT = 48f
+    private const val HEAD_LEAD = 40f
+    private const val BODY_LEAD = 60f
     private const val SCREEN_X = -0.3
     private const val SCREEN_Y = 0.25
     private const val BREATH_RATE = 1.5f
@@ -81,9 +82,7 @@ object PauseAvatar {
     internal fun step(entity: LivingEntity, dt: Float) {
         clock += dt
         weight = PauseStage.avatarWeight
-        val feet = PausePlatform.feet(entity, 1f)
-        val toCamera = PauseStage.camera.sub(feet)
-        val facing = Math.toDegrees(atan2(-toCamera.x, toCamera.z)).toFloat()
+        val facing = PausePlatform.yaw(entity, 1f) + PauseStage.arc
         val stance = facing - STANCE
         val cursorX = PauseStage.pointerX - SCREEN_X
         val cursorY = PauseStage.pointerY - SCREEN_Y
@@ -91,9 +90,9 @@ object PauseAvatar {
         val look = HEAD_PITCH_REST - cursorY * HEAD_PITCH_REACH
         val headNow = head.value.toFloat()
         val bodyNow = body.value.toFloat()
-        head.step(headNow + wrap(gaze - headNow).toDouble(), HEAD_RATE, dt.toDouble())
+        head.step((headNow + wrap(gaze - headNow).coerceIn(-HEAD_LEAD, HEAD_LEAD)).toDouble(), HEAD_RATE, dt.toDouble())
         pitch.step(look.coerceIn(-HEAD_PITCH_REACH, HEAD_PITCH_REACH), HEAD_RATE, dt.toDouble())
-        body.step(bodyNow + wrap(stance - bodyNow).toDouble(), BODY_RATE, dt.toDouble())
+        body.step((bodyNow + wrap(stance - bodyNow).coerceIn(-BODY_LEAD, BODY_LEAD)).toDouble(), BODY_RATE, dt.toDouble())
     }
 
     private fun bodyNow(real: Float): Float = blend(real, body.value.toFloat(), weight)
@@ -106,7 +105,7 @@ object PauseAvatar {
     private fun pitchNow(real: Float): Float = real + (pitch.value.toFloat() - real) * weight
 
     private fun age(real: Float): Float {
-        if (ageBase < 0f) ageBase = real
+        if (ageBase < 0f) ageBase = real - clock * TICKS_PER_SECOND
         return ageBase + clock * TICKS_PER_SECOND
     }
 
