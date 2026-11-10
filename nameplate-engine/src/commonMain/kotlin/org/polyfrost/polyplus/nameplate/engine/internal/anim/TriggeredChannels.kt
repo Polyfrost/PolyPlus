@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.nameplate.engine.internal.anim
 
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
+import org.polyfrost.polyplus.nameplate.engine.api.bundle.OneShot
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.Triggers
 import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.internal.track.ChannelTracks
@@ -22,24 +23,12 @@ internal inline fun triggered(
 ): Int {
     if (state.isIdle) return UNSET
 
-    var best = UNSET
-    var bestStart = 0
-    var bestIndex = 0
-    val shots = if (state.isReduced) 0 else state.oneShotCount
-    for (i in 0 until shots) {
-        val index = state.oneShot(i)
-        val shot = triggers.oneShots.getOrNull(index) ?: continue
-        val track = shot.channels(targetId)?.let(select) ?: continue
-        val start = state.start(i)
-        val local = time - start
-        val newer = best == UNSET || start > bestStart || (start == bestStart && index < bestIndex)
-        if (local in 0 until shot.length && newer) {
-            best = track.at(local, molang)
-            bestStart = start
-            bestIndex = index
-        }
+    val won = latestShot(triggers, state, time) { _, shot -> shot.channels(targetId)?.let(select) != null }
+    if (won >= 0) {
+        val track = triggers.oneShots[state.oneShot(won)].channels(targetId)?.let(select) ?: return UNSET
+        return track.at(time - state.start(won), molang)
     }
-    if (best != UNSET || state.inputs.isEmpty) return best
+    if (state.inputs.isEmpty) return UNSET
 
     for (reaction in triggers.whilesOf(targetId)) {
         if (state.inputs.has(reaction.reaction)) {
@@ -49,4 +38,24 @@ internal inline fun triggered(
     }
 
     return UNSET
+}
+
+internal inline fun latestShot(triggers: Triggers, state: TagState, time: Int, accepts: (Int, OneShot) -> Boolean): Int {
+    var won = -1
+    var wonStart = 0
+    var wonIndex = 0
+    val shots = if (state.isReduced) 0 else state.oneShotCount
+    for (i in 0 until shots) {
+        val index = state.oneShot(i)
+        val shot = triggers.oneShots.getOrNull(index) ?: continue
+        if (!accepts(index, shot)) continue
+        val start = state.start(i)
+        val newer = won < 0 || start > wonStart || (start == wonStart && index < wonIndex)
+        if (time - start in 0 until shot.length && newer) {
+            won = i
+            wonStart = start
+            wonIndex = index
+        }
+    }
+    return won
 }

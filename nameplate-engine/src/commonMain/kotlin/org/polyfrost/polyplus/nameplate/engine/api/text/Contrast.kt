@@ -25,16 +25,14 @@ object Contrast {
         OUTLINE,
     }
 
-    data class Choice(val color: Int, val minRatio: Double, val shadow: Int, val decoration: Decoration)
+    data class Choice(val color: Int, val minRatio: Double, val decoration: Decoration)
 
-    data class Adjusted(val color: Int, val minRatio: Double, val decoration: Decoration)
+    data class Adjusted(val color: Int, val decoration: Decoration)
 
     fun luminance(rgb: Int): Double =
         0.2126 * Srgb.linear((rgb shr 16) and 0xFF) +
             0.7152 * Srgb.linear((rgb shr 8) and 0xFF) +
             0.0722 * Srgb.linear(rgb and 0xFF)
-
-    internal fun ratio(first: Int, second: Int): Double = ratioOf(luminance(first), luminance(second))
 
     internal fun compositeOver(argb: Int, backdropRgb: Int): Int {
         val alpha = argb ushr 24
@@ -49,7 +47,7 @@ object Contrast {
         checkCount(pixels, count)
         require(candidates.isNotEmpty()) { "no candidates" }
 
-        if (count == 0) return Choice(candidates[0], MAX_RATIO, opposite(candidates[0], candidates), Decoration.NONE)
+        if (count == 0) return Choice(candidates[0], MAX_RATIO, Decoration.NONE)
 
         var best = candidates[0]
         var bestRatio = minRatio(best, pixels, count)
@@ -61,7 +59,7 @@ object Contrast {
             }
         }
 
-        return Choice(best, bestRatio, opposite(best, candidates), decorationFor(bestRatio))
+        return Choice(best, bestRatio, decorationFor(bestRatio))
     }
 
     fun opposite(rgb: Int, candidates: IntArray): Int {
@@ -82,10 +80,10 @@ object Contrast {
     fun adjust(rgb: Int, pixels: IntArray, count: Int): Adjusted {
         checkCount(pixels, count)
         val original = rgb and 0xFFFFFF
-        if (count == 0) return Adjusted(original, MAX_RATIO, Decoration.NONE)
+        if (count == 0) return Adjusted(original, Decoration.NONE)
 
         val originalRatio = minRatio(original, pixels, count)
-        if (originalRatio >= READABLE) return Adjusted(original, originalRatio, Decoration.NONE)
+        if (originalRatio >= READABLE) return Adjusted(original, Decoration.NONE)
 
         val a = Oklab.a(original)
         val b = Oklab.b(original)
@@ -120,7 +118,7 @@ object Contrast {
             }
         }
 
-        if (!feasible) return Adjusted(bestColor, bestRatio, decorationFor(bestRatio))
+        if (!feasible) return Adjusted(bestColor, decorationFor(bestRatio))
 
         var high = feasibleLightness
         var highColor = feasibleColor
@@ -136,7 +134,7 @@ object Contrast {
             }
         }
 
-        return Adjusted(highColor, minRatio(highColor, pixels, count), Decoration.NONE)
+        return Adjusted(highColor, Decoration.NONE)
     }
 
     internal fun decorationFor(minRatio: Double): Decoration = when {

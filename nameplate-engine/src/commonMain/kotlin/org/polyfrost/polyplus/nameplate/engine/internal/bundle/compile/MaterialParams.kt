@@ -12,10 +12,9 @@ import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
 import org.polyfrost.polyplus.nameplate.engine.api.limit.BundleLimits
 import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
+import org.polyfrost.polyplus.nameplate.engine.internal.anim.latestShot
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.mirrorFrame
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.phaseOffset
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.states
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.triggered
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.AnimationJson
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BundleFiles
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.LayerFileJson
@@ -26,6 +25,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.issue.IssueSink
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.keyValues
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialClock
+import org.polyfrost.polyplus.nameplate.engine.internal.track.BundleMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.track.Interpolation
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MaterialParamTracks
 import org.polyfrost.polyplus.nameplate.engine.internal.track.ParamChannels
@@ -112,10 +112,7 @@ internal class MaterialParamValidator(
     private val layers: Map<String, LayerFileJson>,
     private val report: IssueSink,
 ) {
-    private val params: Set<String> = buildSet {
-        addAll(manifest.params.keys)
-        manifest.variants.values.forEach { addAll(it.params.keys) }
-    }
+    private val params: Set<String> = BundleMolang.paramNames(manifest)
 
     fun validate(path: String, target: String, channel: String, element: JsonElement, length: Int?, scheduled: Boolean) {
         val name = MaterialParamTracks.paramOf(channel)
@@ -212,24 +209,12 @@ internal object MaterialParams {
         if (state.isIdle) return null
         val tracks = bundle.materialParams
         val triggers = bundle.triggers
-        var best: Double? = null
-        var bestStart = 0
-        var bestIndex = 0
-        val shots = if (state.isReduced) 0 else state.oneShotCount
-        for (i in 0 until shots) {
-            val index = state.oneShot(i)
-            val shot = triggers.oneShots.getOrNull(index) ?: continue
-            val track = tracks.shotOf(index, layer.id)?.track(name) ?: continue
-            val start = state.start(i)
-            val local = time - start
-            val newer = best == null || start > bestStart || (start == bestStart && index < bestIndex)
-            if (local in 0 until shot.length && newer) {
-                best = track.at(local / layer.step * layer.step, base)
-                bestStart = start
-                bestIndex = index
-            }
+        val won = latestShot(triggers, state, time) { index, _ -> tracks.shotOf(index, layer.id)?.track(name) != null }
+        if (won >= 0) {
+            val track = checkNotNull(tracks.shotOf(state.oneShot(won), layer.id)?.track(name))
+            return track.at((time - state.start(won)) / layer.step * layer.step, base)
         }
-        if (best != null || state.inputs.isEmpty) return best
+        if (state.inputs.isEmpty) return null
         for ((index, reaction) in triggers.whiles.withIndex()) {
             if (!state.inputs.has(reaction.reaction)) continue
             if (state.isReduced && reaction.dropsWhenReduced) continue

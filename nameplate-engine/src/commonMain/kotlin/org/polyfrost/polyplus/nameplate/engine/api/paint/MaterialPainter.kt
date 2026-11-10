@@ -74,7 +74,7 @@ internal class MaterialPainter(
         val area = material.area(PixelRect(0, 0, body.width, body.height))
         val shot = MaterialParams.inShot(bundle, layer, target.frame, target.seed, target.state, target.mirrored)
         val op = MaterialOp(layer.id, content, area, body, frame, bundle.loop / layer.step, this, bundle, variant, shot = shot)
-        val image = if (evaluate) image(op, bundle, variant, frame, null, shot) else PixelImage.EMPTY
+        val image = if (evaluate) image(op, frame, null, shot) else PixelImage.EMPTY
         return LayerPainter.Painted(
             target.index,
             layer.depth,
@@ -88,79 +88,53 @@ internal class MaterialPainter(
         )
     }
 
-    fun image(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        textures: MaterialTextures?,
-        shot: Boolean = false,
-    ): PixelImage {
-        val image = if (op.layer.drift && frame.frame != 0) {
-            drifted(op, bundle, variant, frame, textures)
-        } else if (shot) {
-            shotImage(op, bundle, variant, frame, textures)
-        } else {
-            cache.getOrPut(probe(op, bundle, variant, frame), LayerKey::stored) { evaluate(op, frame, textures) }
-        }
-        return clipped(op, bundle, image)
-    }
+    fun image(op: MaterialOp, frame: MaterialFrame, textures: MaterialTextures?, shot: Boolean = false): PixelImage =
+        clipped(op, lookup(op, frame, shot) ?: create(op, frame, textures, shot))
 
-    private fun drifted(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        textures: MaterialTextures?,
-    ): PixelImage {
-        val key = probe(op, bundle, variant, frame.copy(frame = HELD))
-        drifts[key]?.at(frame.frame)?.let { return it }
-        val image = evaluate(op, frame, textures)
-        val held = drifts[key] ?: Drifted().also {
-            if (drifts.size >= MAX_DRIFTS) {
-                drifts.clear()
-            }
-            drifts[key.stored()] = it
-        }
-        held.put(frame.frame, image)
-        return image
-    }
+    fun cached(op: MaterialOp, frame: MaterialFrame, shot: Boolean = false): PixelImage? =
+        lookup(op, frame, shot)?.let { clipped(op, it) }
 
-    private fun shotImage(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        textures: MaterialTextures?,
-    ): PixelImage {
-        val ring = shots[probe(op, bundle, variant, frame.copy(frame = SHOT), held = true)]
-        val key = probe(op, bundle, variant, frame)
-        ring?.at(key)?.let { return it }
-        val stored = key.stored()
-        val image = evaluate(op, frame, textures)
-        val held = ring ?: Shots().also {
-            if (shots.size >= MAX_DRIFTS) {
-                shots.clear()
-            }
-            shots[probe(op, bundle, variant, frame.copy(frame = SHOT), held = true).stored()] = it
-        }
-        held.put(stored, image)
-        return image
-    }
-
-    fun held(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        shot: Boolean = false,
-    ): PixelImage? {
+    fun held(op: MaterialOp, frame: MaterialFrame, shot: Boolean = false): PixelImage? {
         val image = if (op.layer.drift || !shot) {
-            drifts[probe(op, bundle, variant, frame.copy(frame = HELD))]?.latest()
+            drifts[probe(op, frame.copy(frame = HELD))]?.latest()
         } else {
-            shots[probe(op, bundle, variant, frame.copy(frame = SHOT), held = true)]?.latest()
+            shots[probe(op, frame.copy(frame = SHOT), held = true)]?.latest()
         }
-        return image?.let { clipped(op, bundle, it) }
+        return image?.let { clipped(op, it) }
+    }
+
+    private fun lookup(op: MaterialOp, frame: MaterialFrame, shot: Boolean): PixelImage? = when {
+        op.layer.drift && frame.frame != 0 -> drifts[probe(op, frame.copy(frame = HELD))]?.at(frame.frame)
+        shot -> shots[probe(op, frame.copy(frame = SHOT), held = true)]?.at(probe(op, frame))
+        else -> cache[probe(op, frame)]
+    }
+
+    private fun create(op: MaterialOp, frame: MaterialFrame, textures: MaterialTextures?, shot: Boolean): PixelImage {
+        val image = evaluate(op, frame, textures)
+        when {
+            op.layer.drift && frame.frame != 0 -> {
+                val key = probe(op, frame.copy(frame = HELD))
+                val ring = drifts[key] ?: Drifted().also {
+                    if (drifts.size >= MAX_DRIFTS) {
+                        drifts.clear()
+                    }
+                    drifts[key.stored()] = it
+                }
+                ring.put(frame.frame, image)
+            }
+            shot -> {
+                val key = probe(op, frame.copy(frame = SHOT), held = true)
+                val ring = shots[key] ?: Shots().also {
+                    if (shots.size >= MAX_DRIFTS) {
+                        shots.clear()
+                    }
+                    shots[key.stored()] = it
+                }
+                ring.put(probe(op, frame).stored(), image)
+            }
+            else -> cache.store(probe(op, frame).stored(), image)
+        }
+        return image
     }
 
     private fun evaluate(op: MaterialOp, frame: MaterialFrame, textures: MaterialTextures?): PixelImage {
@@ -172,38 +146,15 @@ internal class MaterialPainter(
         }
     }
 
-    fun cached(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        shot: Boolean = false,
-    ): PixelImage? {
-        val image = if (op.layer.drift && frame.frame != 0) {
-            drifts[probe(op, bundle, variant, frame.copy(frame = HELD))]?.at(frame.frame)
-        } else if (shot) {
-            val ring = shots[probe(op, bundle, variant, frame.copy(frame = SHOT), held = true)]
-            ring?.at(probe(op, bundle, variant, frame))
-        } else {
-            cache[probe(op, bundle, variant, frame)]
-        }
-        return image?.let { clipped(op, bundle, it) }
-    }
+    private fun clipped(op: MaterialOp, image: PixelImage): PixelImage =
+        op.clip?.let { masks.clip(op.bundle, op.layerId, image, it) } ?: image
 
-    private fun clipped(op: MaterialOp, bundle: NameplateBundle, image: PixelImage): PixelImage =
-        op.clip?.let { masks.clip(bundle, op.layerId, image, it) } ?: image
-
-    private fun probe(
-        op: MaterialOp,
-        bundle: NameplateBundle,
-        variant: NameplateBundle.Variant,
-        frame: MaterialFrame,
-        held: Boolean = false,
-    ): LayerKey {
+    private fun probe(op: MaterialOp, frame: MaterialFrame, held: Boolean = false): LayerKey {
+        val bundle = op.bundle
         val material = op.material
         val body = op.body
         val placement = op.frame.placement.takeIf { material.readsPlacement }
-        val variantKey = variant.key.takeIf { material.inputs.isNotEmpty() || material.readsPalette }
+        val variantKey = op.variant.key.takeIf { material.inputs.isNotEmpty() || material.readsPalette }
         val params = if (held) null else MaterialParams.values(bundle, op.layerId, frame.params)
         val state = frame.frame
         return reusedKey?.set(bundle, op.layerId, body.width, body.height, null, state, placement, variantKey, params)

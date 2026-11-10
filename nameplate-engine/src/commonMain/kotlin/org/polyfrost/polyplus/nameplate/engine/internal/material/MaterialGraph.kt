@@ -1,8 +1,6 @@
 package org.polyfrost.polyplus.nameplate.engine.internal.material
 
 import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialExpression
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialInput
 
 internal class GraphNode(val id: String, val kind: NodeKind, val settings: NodeSettings) {
     var inputs: List<GraphInput> = emptyList()
@@ -10,6 +8,9 @@ internal class GraphNode(val id: String, val kind: NodeKind, val settings: NodeS
     var type: SocketType = SocketType.FLOAT
     var typed: Boolean = false
     var index: Int = 0
+
+    val readsFrame: Boolean
+        get() = kind.type == "Frame" || kind.type == "SteppedTime"
 }
 
 internal class GraphInput(val node: GraphNode?, val literal: DoubleArray?) {
@@ -52,7 +53,7 @@ internal class NodeSettings {
     var blend: GraphBlend = GraphBlend.ALPHA
     var sprite: MaterialSprite? = null
     var texture: TextureRef? = null
-    var expression: MaterialExpression? = null
+    var expression: MolangMaterialExpression? = null
     var input: Int = -1
     var sampler: Int = -1
     var edge: String = "fill"
@@ -83,7 +84,7 @@ internal class MaterialGraph(
 
     val valueInputs: List<MaterialInput> = inputs.filter { it !is MaterialInput.BodyEdgeInput }
 
-    val readsFrame: Boolean = reachable.any { it.kind.type == "Frame" || it.kind.type == "SteppedTime" }
+    val readsFrame: Boolean = reachable.any { it.readsFrame }
 
     val coverageReads: CoverageReads = CoverageReads.of(output.inputs.getOrNull(1)?.node)
 }
@@ -99,7 +100,7 @@ internal enum class CoverageReads {
             val cone = root?.let(GraphOrder::reachable).orEmpty()
             return when {
                 cone.any(::varies) -> ANY
-                cone.any { it.kind.type == "Frame" || it.kind.type == "SteppedTime" } -> FRAME
+                cone.any { it.readsFrame } -> FRAME
                 else -> FIXED
             }
         }

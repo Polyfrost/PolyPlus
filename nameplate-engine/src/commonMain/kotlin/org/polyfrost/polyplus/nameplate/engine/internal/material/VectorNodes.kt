@@ -37,10 +37,10 @@ internal object ComponentKind : NodeKind("Component", listOf(Socket("v", Accepts
     }
 
     override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing {
-        val typing = Typings.elementwise(sockets, inputs) as? Typing.Ok ?: return Typings.elementwise(sockets, inputs)
-        val name = NAMES[node.settings.component]
+        val typing = Typings.elementwise(sockets, inputs)
+        if (typing !is Typing.Ok) return typing
         return if (node.settings.component >= typing.output.width) {
-            Typing.Error("a ${typing.output.label} has no $name")
+            Typing.Error("a ${typing.output.label} has no ${NAMES[node.settings.component]}")
         } else {
             Typing.Ok(SocketType.FLOAT, typing.targets)
         }
@@ -81,15 +81,11 @@ internal object SelectKind : NodeKind(
 
     override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp? {
         for (k in 0 until node.type.width) {
-            compiler.emit(SelectLane(args[0][0], args[1][k], args[2][k], out + k))
+            compiler.emit(MathLane(LaneFn.SELECT, out + k, args[0][0], args[1][k], args[2][k]))
         }
         return null
     }
 
     override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String =
         "(${args[0]} > 0.0 ? ${args[2]} : ${args[1]})"
-}
-
-internal object VectorNodes {
-    fun kinds(): List<NodeKind> = listOf(CombineKind, ComponentKind, SelectKind)
 }

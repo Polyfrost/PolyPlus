@@ -15,36 +15,22 @@ class BadgeStyling(
         require(candidates.isNotEmpty()) { "Auto decoration needs at least one candidate" }
     }
 
-    val needsBackdrop: Boolean
-        get() = true
-
-    fun candidates(): IntArray = candidates.copyOf()
-
-    internal fun withTint(tint: Tint): BadgeStyling = BadgeStyling(tint, decoration, placement, candidates)
-
-    internal fun withDecoration(decoration: Decoration): BadgeStyling = BadgeStyling(tint, decoration, placement, candidates)
-
-    internal fun withPlacement(placement: Placement): BadgeStyling = BadgeStyling(tint, decoration, placement, candidates)
-
-    internal fun withCandidates(vararg candidates: Int): BadgeStyling = BadgeStyling(tint, decoration, placement, candidates)
-
     fun resolve(pixels: IntArray): ResolvedBadge {
         val tintRgb = if (tint.kind == Tint.Kind.NONE) ResolvedText.UNSET else tint.rgb
         val badgeRgb = if (tintRgb == ResolvedText.UNSET) ART_RGB else tintRgb
         val choice = Contrast.choose(pixels, pixels.size, intArrayOf(badgeRgb))
         if (decoration.kind != Decoration.Kind.OUTLINE && choice.minRatio < Contrast.LARGE_TEXT) {
-            return ResolvedBadge(tintRgb, Contrast.Decoration.OUTLINE, Contrast.opposite(badgeRgb, candidates), choice.minRatio)
+            return ResolvedBadge(tintRgb, Contrast.Decoration.OUTLINE, Contrast.opposite(badgeRgb, candidates))
         }
         return when (decoration.kind) {
-            Decoration.Kind.NONE -> ResolvedBadge(tintRgb, Contrast.Decoration.NONE, 0, choice.minRatio)
-            Decoration.Kind.SHADOW -> ResolvedBadge(tintRgb, Contrast.Decoration.SHADOW, decoration.rgb, choice.minRatio)
-            Decoration.Kind.OUTLINE -> ResolvedBadge(tintRgb, Contrast.Decoration.OUTLINE, decoration.rgb, choice.minRatio)
-            Decoration.Kind.AUTO ->
-                ResolvedBadge(tintRgb, choice.decoration, Contrast.opposite(badgeRgb, candidates), choice.minRatio)
+            Decoration.Kind.NONE -> ResolvedBadge(tintRgb, Contrast.Decoration.NONE, 0)
+            Decoration.Kind.SHADOW -> ResolvedBadge(tintRgb, Contrast.Decoration.SHADOW, decoration.rgb)
+            Decoration.Kind.OUTLINE -> ResolvedBadge(tintRgb, Contrast.Decoration.OUTLINE, decoration.rgb)
+            Decoration.Kind.AUTO -> ResolvedBadge(tintRgb, choice.decoration, Contrast.opposite(badgeRgb, candidates))
         }
     }
 
-    class Tint private constructor(val kind: Kind, val rgb: Int, val ref: Int) {
+    class Tint private constructor(val kind: Kind, val rgb: Int) {
         enum class Kind {
             NONE,
             FIXED,
@@ -52,11 +38,11 @@ class BadgeStyling(
         }
 
         companion object {
-            val NONE: Tint = Tint(Kind.NONE, 0, -1)
+            val NONE: Tint = Tint(Kind.NONE, 0)
 
-            fun of(rgb: Int): Tint = Tint(Kind.FIXED, rgb and 0xFFFFFF, -1)
+            fun of(rgb: Int): Tint = Tint(Kind.FIXED, rgb and 0xFFFFFF)
 
-            fun slot(palette: ResolvedPalette, ref: Int): Tint = Tint(Kind.SLOT, palette.color(ref) and 0xFFFFFF, ref)
+            fun slot(palette: ResolvedPalette, ref: Int): Tint = Tint(Kind.SLOT, palette.color(ref) and 0xFFFFFF)
         }
     }
 
@@ -106,8 +92,5 @@ class BadgeStyling(
         const val ART_RGB = 0xD6D6D6
         const val CELLS_WIDE = 9
         const val CELLS_HIGH = 8
-
-        internal val RESERVE: BadgeStyling =
-            BadgeStyling(Tint.NONE, Decoration.NONE, Placement.RESERVE, Contrast.DEFAULT_CANDIDATES)
     }
 }

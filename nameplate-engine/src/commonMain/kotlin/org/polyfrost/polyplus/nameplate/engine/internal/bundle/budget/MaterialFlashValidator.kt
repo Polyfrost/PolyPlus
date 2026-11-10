@@ -6,8 +6,6 @@ import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelGrid
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelImage
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
 import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
-import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
-import org.polyfrost.polyplus.nameplate.engine.api.layout.TagBlock
 import org.polyfrost.polyplus.nameplate.engine.api.limit.BundleLimits
 import org.polyfrost.polyplus.nameplate.engine.api.paint.MaterialPainter
 import org.polyfrost.polyplus.nameplate.engine.api.shader.MaterialFrame
@@ -15,7 +13,6 @@ import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.MaterialParams
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BundleFiles
 import org.polyfrost.polyplus.nameplate.engine.internal.color.Srgb
-import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialClock
 import org.polyfrost.polyplus.nameplate.engine.internal.material.load.MaterialEvaluator
 import org.polyfrost.polyplus.nameplate.engine.internal.paint.BodyEdges
@@ -40,14 +37,13 @@ internal object MaterialFlashValidator {
 
     private fun scan(bundle: NameplateBundle, full: Boolean): FlashResult {
         var worst = FlashResult.NONE
-        val block = TagBlock.line(ReferencePlacements.MEDIUM, 0, ReferencePlacements.MEDIUM)
+        val block = ReferencePlacements.MEDIUM_LINE
         val grid = PixelGrid()
         val variants = PlacedLayers.distinct(bundle, byPalette = true)
         for ((layer, content) in bundle.materialLayers) {
             val material = content.material
             if (!material.animated && bundle.materialParams.namesOf(layer.id) == null) continue
-            val body = content.of?.let { (bundle.layer(it).content as NameplateBundle.LayerContent.Body).rect(block) }
-                ?: block.background
+            val body = content.bodyRect(bundle, block)
             val area = material.area(PixelRect(0, 0, body.width, body.height))
             val edge = BodyEdges.of(bundle, content, body)
             val evaluator = MaterialEvaluator(material)
@@ -98,72 +94,59 @@ internal object MaterialFlashValidator {
         private val step = layer.step
         private val loop = bundle.loop
 
-        val frames: Int = if (drift) bundle.fps * DRIFT_SECONDS + bundle.fps else bundle.loop * LOOPS + bundle.fps
+        val frames: Int = if (drift) bundle.fps * DRIFT_SECONDS + bundle.fps else loop * LOOPS + bundle.fps
 
-        val states: Int = if (drift) (frames + step - 1) / step else bundle.loop / layer.step
+        val states: Int = if (drift) (frames + step - 1) / step else loop / step
 
         fun state(frame: Int): Int = if (drift) MaterialClock.drift(maxOf(frame, 0), step) else MaterialClock.state(frame, step, loop)
     }
 
-    private class Tiled(val means: Array<DoubleArray>, val areas: IntArray)
-
-    private fun supported(states: Array<DoubleArray>, support: BooleanArray): Tiled {
+    private fun supported(states: Array<DoubleArray>, support: BooleanArray): Array<DoubleArray> {
         val pixels = support.indices.filter { support[it] }.toIntArray()
-        val means = Array(states.size) { state ->
+        return Array(states.size) { state ->
             val values = states[state]
             DoubleArray(pixels.size) { values[pixels[it]] }
         }
-        return Tiled(means, IntArray(pixels.size) { 1 })
     }
 
     private fun flashing(
-        tiled: Tiled,
+        means: Array<DoubleArray>,
         bundle: NameplateBundle,
         layer: NameplateBundle.Layer,
         clock: Clock,
         copies: IntArray,
     ): FlashResult {
-        val frames = clock.frames
-        val windows = IntArray(frames)
-        val tiles = tiled.areas.size
+        val windows = IntArray(clock.frames)
+        val pixels = means.firstOrNull()?.size ?: 0
         var peak = 0
-        for (copy in 0 until copies.size * tiles) {
-            val tile = copy % tiles
-            val flashes = flashTimes(tiled.means, clock, tile, copies[copy / tiles])
-            var first = 0
-            var lastCounted = -1
-            for (last in flashes.indices) {
-                while (flashes[last] - flashes[first] >= bundle.fps) {
-                    first++
-                }
-                peak = maxOf(peak, last - first + 1)
-                if (last - first + 1 > BundleLimits.MAX_FLASHES) {
-                    for (start in maxOf(flashes[last] - bundle.fps + 1, lastCounted + 1, 0)..flashes[first]) {
-                        windows[start] += tiled.areas[tile]
+        for (delay in copies) {
+            for (pixel in 0 until pixels) {
+                val flashes = flashTimes(means, clock, pixel, delay)
+                var first = 0
+                var lastCounted = -1
+                for (last in flashes.indices) {
+                    while (flashes[last] - flashes[first] >= bundle.fps) {
+                        first++
                     }
-                    lastCounted = flashes[first]
+                    peak = maxOf(peak, last - first + 1)
+                    if (last - first + 1 > BundleLimits.MAX_FLASHES) {
+                        for (start in maxOf(flashes[last] - bundle.fps + 1, lastCounted + 1, 0)..flashes[first]) {
+                            windows[start]++
+                        }
+                        lastCounted = flashes[first]
+                    }
                 }
             }
         }
         val flashing = windows.maxOrNull() ?: 0
-        val issue = if (flashing > BundleLimits.MAX_FLASH_AREA) {
-            BundleIssue(
-                BundleFiles.layerPath(layer.id),
-                "$flashing px flash together more than ${BundleLimits.MAX_FLASHES} times in one second " +
-                    "(each pixel checked on its own for light-dark swings of 10% or more); " +
-                    "the limit is ${BundleLimits.MAX_FLASHES} flashes over ${BundleLimits.MAX_FLASH_AREA} px",
-                IssueCode.FLASH,
-                issueValues(
-                    "flashes" to peak,
-                    "px" to flashing,
-                    "limit" to BundleLimits.MAX_FLASHES,
-                    "area" to BundleLimits.MAX_FLASH_AREA,
-                ),
-            )
-        } else {
-            null
-        }
-        return FlashResult(peak, flashing, issue)
+        if (flashing <= BundleLimits.MAX_FLASH_AREA) return FlashResult(peak, flashing, null)
+
+        return FlashResult.flagged(
+            BundleFiles.layerPath(layer.id),
+            "$flashing px flash together more than ${BundleLimits.MAX_FLASHES} times in one second",
+            peak,
+            flashing,
+        )
     }
 
     private fun flashTimes(states: Array<DoubleArray>, clock: Clock, pixel: Int, delay: Int): IntArray {

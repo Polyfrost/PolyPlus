@@ -12,13 +12,11 @@ import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.Trigger
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.WhileReaction
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.IssueSink
 import org.polyfrost.polyplus.nameplate.engine.internal.track.BundleMolang
-import org.polyfrost.polyplus.nameplate.engine.internal.track.ChannelTracks
 import org.polyfrost.polyplus.nameplate.engine.internal.track.Track
 
 internal object TriggerCompiler {
-    const val DEFAULT_APPEAR_SECONDS = 5
-    const val MAX_APPEAR_SECONDS = 30
-
+    private const val DEFAULT_APPEAR_SECONDS = 5
+    private const val MAX_APPEAR_SECONDS = 30
     private const val EQUIP = "equip"
     private const val APPEAR = "appear"
     private const val REACTION = "reaction"
@@ -44,7 +42,7 @@ internal object TriggerCompiler {
         val whiles = ArrayList<WhileReaction>()
         for ((name, trigger) in triggered(animations)) {
             val animation = animations.getValue(name)
-            val tracks = tracksOf(animation, molang)
+            val tracks = AnimationCompiler.tracksOf(animation, molang)
             val speeds = speedsOf(animation)
             val palette = animation.tracks.filterKeys(PaletteTracks::isPaletteTrack)
             val text = TextTracks.compile(animation, molang.channelEnvironment.paramNames)
@@ -98,14 +96,12 @@ internal object TriggerCompiler {
             report("$path.$REACTION", if (name == null) "must be a reaction name" else "no reaction '$name'; reactions are $known")
         }
         val mode = (on as? JsonPrimitive)?.takeIf { it.isString }?.content
-        val trigger = when (mode) {
+        return when (mode) {
             "while" -> reaction?.let { Trigger.While(it) }
             "start" -> reaction?.let { Trigger.Start(it) }
             "stop" -> reaction?.let { Trigger.Stop(it) }
             else -> failed("$path.$ON", "must be \"while\", \"start\" or \"stop\"", report)
         }
-
-        return trigger
     }
 
     private fun appear(element: JsonElement, path: String, report: IssueSink): Trigger? {
@@ -123,15 +119,6 @@ internal object TriggerCompiler {
             channels[SPEED]?.let { speeds[target] = AdaptiveCompiler.speedTrack(it) }
         }
         return speeds
-    }
-
-    private fun tracksOf(animation: AnimationJson, molang: BundleMolang): Map<String, ChannelTracks> {
-        val tracks = LinkedHashMap<String, ChannelTracks>()
-        for ((target, channels) in animation.tracks) {
-            ChannelKeys.compile(channels, molang)?.let { tracks[target] = it }
-        }
-
-        return tracks
     }
 
     private fun failed(path: String, message: String, report: IssueSink): Trigger? {

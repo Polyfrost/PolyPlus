@@ -69,7 +69,7 @@ internal object MaterialFallbacks {
         var rebuildNanos = 0.0
         var budget = if (textured && !drifting && material.coverageReads == CoverageReads.FRAME) MAX_REACH_PIXELS else 0L
         for (block in ReferencePlacements.ALL) {
-            val body = bodyOf(bundle, content, block)
+            val body = content.bodyRect(bundle, block)
             val placement = MaterialPainter.placementOf(block)
             rebuildNanos = maxOf(rebuildNanos, rebuildNanos(material, body))
             if (keys.add(if (material.readsPlacement) placement else body.width to body.height)) {
@@ -125,7 +125,7 @@ internal object MaterialFallbacks {
         }
 
         private fun sizes(block: TagBlock, samples: Int, frames: Int): LongArray {
-            val body = bodyOf(bundle, content, block)
+            val body = content.bodyRect(bundle, block)
             val placement = MaterialPainter.placementOf(block)
             val count = minOf(samples, frames)
             val edge = BodyEdges.of(bundle, content, body)
@@ -149,7 +149,4 @@ internal object MaterialFallbacks {
         val area = material.area(PixelRect(0, 0, body.width, body.height))
         return (area.width + grow).toLong() * (area.height + grow)
     }
-
-    private fun bodyOf(bundle: NameplateBundle, content: MaterialLayer, block: TagBlock): PixelRect =
-        content.of?.let { (bundle.layer(it).content as NameplateBundle.LayerContent.Body).rect(block) } ?: block.background
 }

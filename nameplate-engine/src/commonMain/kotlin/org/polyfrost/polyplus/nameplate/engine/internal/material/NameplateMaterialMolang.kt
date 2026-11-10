@@ -6,16 +6,14 @@ import org.polyfrost.polyplus.molang.MolangIssue
 import org.polyfrost.polyplus.molang.MolangProgram
 import org.polyfrost.polyplus.molang.MolangRuntime
 import org.polyfrost.polyplus.nameplate.engine.api.shader.MaterialFrame
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialExpression
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.query.MolangUse
 import org.polyfrost.polyplus.nameplate.engine.internal.query.NameplateQueries
 import org.polyfrost.polyplus.nameplate.engine.internal.query.NameplateQuery
 
-internal class NameplateMaterialMolang(params: Collection<String>, private val loop: Int, private val fps: Int) : MaterialMolang {
+internal class NameplateMaterialMolang(params: Collection<String>, private val loop: Int, private val fps: Int) {
     private val environment = NameplateQueries.environment(MolangUse.CHANNEL, params)
 
-    override fun compile(source: String, issues: MutableList<MolangIssue>): MaterialExpression? {
+    fun compile(source: String, issues: MutableList<MolangIssue>): MolangMaterialExpression? {
         val result = MolangCompiler.compile(source, environment, EXPR)
         issues += result.issues
         return result.program?.let { MolangMaterialExpression(it, environment, loop, fps) }
@@ -31,7 +29,7 @@ internal class MolangMaterialExpression(
     environment: MolangEnvironment,
     private val loop: Int,
     private val fps: Int,
-) : MaterialExpression {
+) {
     private val runtime = MolangRuntime(environment)
     private val slots = IntArray(NameplateQuery.entries.size) { environment.querySlot(NameplateQuery.entries[it].id) }
     private val params = environment.paramNames
@@ -39,10 +37,7 @@ internal class MolangMaterialExpression(
     val cost: Int
         get() = program.cost
 
-    val source: String
-        get() = program.source
-
-    override fun evaluate(frame: MaterialFrame): Double {
+    fun evaluate(frame: MaterialFrame): Double {
         val placement = frame.placement
         val background = placement?.background
         set(NameplateQuery.WIDTH, placement?.width ?: 0)

@@ -20,8 +20,9 @@ internal class ReactionPlan(private val toggled: Int, private val repeatShots: B
 
         fun hurtPeriod(fps: Int): Int = maxOf(2, (fps * HURT_TICKS + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND)
 
-        fun repeats(bundle: NameplateBundle): Boolean =
-            bundle.triggers.oneShots.any { it.trigger is Trigger.Appear || it.trigger == Trigger.Equip }
+        fun repeats(bundle: NameplateBundle): Boolean = bundle.triggers.oneShots.any { repeating(it.trigger) }
+
+        fun repeating(trigger: Trigger): Boolean = trigger is Trigger.Appear || trigger == Trigger.Equip
 
         fun span(bundle: NameplateBundle): Int {
             val longest = bundle.triggers.oneShots.maxOfOrNull { it.length } ?: 0
@@ -41,9 +42,7 @@ internal class ReactionSequence(
     private val record = TagRecord<Int>(1) { now }
     private val variant = bundle.variants.values.first()
     private val hurtPeriod = ReactionPlan.hurtPeriod(bundle.fps)
-    private val repeated = bundle.triggers.oneShots.indices
-        .filter { bundle.triggers.oneShots[it].trigger.let { trigger -> trigger is Trigger.Appear || trigger == Trigger.Equip } }
-        .toIntArray()
+    private val repeated = bundle.triggers.oneShots.indices.filter { ReactionPlan.repeating(bundle.triggers.oneShots[it].trigger) }
 
     fun at(frame: Int): TagState {
         now = frame * MILLIS_PER_SECOND / bundle.fps

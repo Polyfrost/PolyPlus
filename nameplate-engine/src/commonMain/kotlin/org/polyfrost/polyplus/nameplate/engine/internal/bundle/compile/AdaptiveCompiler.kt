@@ -10,6 +10,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.tag.LayerPose
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.Particles
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.PathMotion
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BodyLayerJson
+import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BreakpointJson
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BundleFiles
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.EmitterLayerJson
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.LayerFileJson
@@ -124,7 +125,7 @@ internal object AdaptiveCompiler {
     fun gates(manifest: ManifestJson, layers: Map<String, LayerFileJson>): Map<String, List<List<WidthRange>>> {
         val groups = manifest.groups.orEmpty()
         val parents = groups.associate { it.id to it.parent }
-        val ranges = groups.associate { group -> group.id to group.breakpoints?.map { WidthRange(it.min, it.max) } }
+        val ranges = groups.associate { group -> group.id to group.breakpoints?.let(::widthRanges) }
         val groupOf = HashMap<String, String>()
         for (group in groups) {
             group.layers.forEach { groupOf[it] = group.id }
@@ -134,9 +135,9 @@ internal object AdaptiveCompiler {
         for (layer in manifest.layers) {
             val chain = ArrayList<List<WidthRange>>()
             val emitter = layers[layer.id] as? EmitterLayerJson
-            emitter?.breakpoints?.let { own -> chain.add(own.map { WidthRange(it.min, it.max) }) }
+            emitter?.breakpoints?.let { chain.add(widthRanges(it)) }
             val attached = emitter?.of?.let(layers::get) as? SpriteLayerJson
-            attached?.breakpoints?.let { own -> chain.add(own.map { WidthRange(it.min, it.max) }) }
+            attached?.breakpoints?.let { chain.add(widthRanges(it)) }
             var group = groupOf[layer.id]
             var hops = 0
             while (group != null && hops++ <= groups.size) {
@@ -184,6 +185,9 @@ internal object AdaptiveCompiler {
         }
         return bursts
     }
+
+    private fun widthRanges(breakpoints: List<BreakpointJson>): List<WidthRange> =
+        breakpoints.map { WidthRange(it.min, it.max) }
 
     private fun keyAt(keys: JsonArray, index: Int, part: Int): Int =
         ((keys[index] as? JsonArray)?.getOrNull(part))?.let(ChannelKeys::wholeNumber) ?: 0

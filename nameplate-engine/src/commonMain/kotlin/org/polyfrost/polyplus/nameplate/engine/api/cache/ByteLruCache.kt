@@ -21,61 +21,19 @@ class ByteLruCache<K : Any, V : Any>(
     var bytes: Long = 0
         private set
 
-    val size: Int
-        get() = nodes.size
-
-    var hits: Long = 0
-        private set
-
-    var misses: Long = 0
-        private set
-
-    var evictions: Long = 0
-        private set
-
-    operator fun get(key: K): V? {
-        val node = nodes[key]
-        if (node == null) {
-            misses++
-            return null
-        }
-
-        hits++
-        touch(node)
-        return node.value
-    }
-
-    fun getOrPut(key: K, create: () -> V): V {
-        val node = nodes[key]
-        if (node != null) {
-            hits++
-            touch(node)
-            return node.value
-        }
-
-        misses++
-        val value = create()
-        put(key, value)
-        return value
-    }
+    operator fun get(key: K): V? = entry(key)?.value
 
     internal inline fun getOrPut(probe: K, keep: (K) -> K, create: () -> V): V {
         val value = get(probe)
         if (value != null) return value
 
         val created = create()
-        put(keep(probe), created)
+        store(keep(probe), created)
         return created
     }
 
     internal fun entry(key: K): Node<K, V>? {
-        val node = nodes[key]
-        if (node == null) {
-            misses++
-            return null
-        }
-
-        hits++
+        val node = nodes[key] ?: return null
         touch(node)
         return node
     }
@@ -83,18 +41,11 @@ class ByteLruCache<K : Any, V : Any>(
     internal fun recall(node: Node<K, V>): V? {
         if (!node.live) return null
 
-        hits++
         touch(node)
         return node.value
     }
 
-    internal fun store(key: K, value: V): Node<K, V>? = putNode(key, value)
-
-    fun put(key: K, value: V) {
-        putNode(key, value)
-    }
-
-    private fun putNode(key: K, value: V): Node<K, V>? {
+    internal fun store(key: K, value: V): Node<K, V>? {
         val size = sizeOf(value)
         require(size >= 0) { "Value size must not be negative: $size" }
         val existing = nodes[key]
@@ -123,27 +74,8 @@ class ByteLruCache<K : Any, V : Any>(
         while (bytes > maxBytes) {
             val victim = oldest ?: break
             drop(victim)
-            evictions++
         }
         return stored.takeIf { it.live }
-    }
-
-    fun remove(key: K): V? {
-        val node = nodes[key] ?: return null
-        drop(node)
-        return node.value
-    }
-
-    fun clear() {
-        var node = newest
-        while (node != null) {
-            node.live = false
-            node = node.older
-        }
-        nodes.clear()
-        newest = null
-        oldest = null
-        bytes = 0
     }
 
     private fun drop(node: Node<K, V>) {

@@ -169,20 +169,16 @@ class NameplateBundle internal constructor(
                 get() = timeline != null
 
             internal fun timelineFrame(cycleStep: Int): Int = timeline?.get(cycleStep) ?: 0
-
-            internal fun timelineFrames(): IntArray = timeline?.copyOf() ?: IntArray(0)
         }
     }
 
     class Variant internal constructor(
         val key: String,
-        internal val colorway: String,
         internal val palette: Palette,
         val text: TextStyling,
         val badge: BadgeStyling,
         internal val hidden: Set<String>,
         internal val swaps: Map<String, String>,
-        internal val layerOrder: List<String>,
         internal val flag: Flag?,
         val ownsBackground: Boolean,
         internal val params: Map<String, Double>,

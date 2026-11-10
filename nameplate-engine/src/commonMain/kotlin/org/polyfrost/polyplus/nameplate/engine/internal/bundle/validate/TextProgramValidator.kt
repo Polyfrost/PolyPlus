@@ -210,27 +210,17 @@ internal object TextProgramValidator {
                 for (i in 0 until glyphs) {
                     val opacity = frame.opacity[i]
                     val opacityChange = opacity - lastOpacity[i]
-                    if (f > 0 && abs(opacityChange) >= OPACITY_STEP) {
-                        val trend = if (opacityChange > 0) 1 else -1
-                        if (opacityTrend[i] == -trend) {
-                            flashes[i][f] = 1
-                            opacityTrend[i] = 0
-                        } else {
-                            opacityTrend[i] = trend
-                        }
+                    if (f > 0 && abs(opacityChange) >= OPACITY_STEP && reverses(opacityTrend, i, opacityChange > 0)) {
+                        flashes[i][f] = 1
                     }
                     lastOpacity[i] = opacity
                     val color = frame.color[i]
                     val luminance = if (color == LetterFrame.KEEP) lastLuminance[i] else Contrast.luminance(color)
                     val luminanceChange = luminance - lastLuminance[i]
-                    if (f > 0 && !luminanceChange.isNaN() && abs(luminanceChange) >= LUMINANCE_STEP) {
-                        val trend = if (luminanceChange > 0) 1 else -1
-                        if (luminanceTrend[i] == -trend) {
-                            flashes[i][f] = 1
-                            luminanceTrend[i] = 0
-                        } else {
-                            luminanceTrend[i] = trend
-                        }
+                    if (f > 0 && !luminanceChange.isNaN() && abs(luminanceChange) >= LUMINANCE_STEP &&
+                        reverses(luminanceTrend, i, luminanceChange > 0)
+                    ) {
+                        flashes[i][f] = 1
                     }
                     lastLuminance[i] = luminance
                 }
@@ -253,6 +243,16 @@ internal object TextProgramValidator {
                     issueValues("limit" to BundleLimits.MAX_FLASHES, "area" to BundleLimits.MAX_FLASH_AREA),
                 )
             }
+        }
+
+        private fun reverses(trends: IntArray, glyph: Int, rising: Boolean): Boolean {
+            val trend = if (rising) 1 else -1
+            if (trends[glyph] == -trend) {
+                trends[glyph] = 0
+                return true
+            }
+            trends[glyph] = trend
+            return false
         }
 
         private fun flashes(flashes: Array<IntArray>, frames: Int): Boolean {

@@ -137,8 +137,6 @@ enum class IssueCode(val id: String, val level: IssueLevel = IssueLevel.ERROR) {
     companion object {
         private val BY_ID: Map<String, IssueCode> = entries.associateBy { it.id }
 
-        fun byId(id: String): IssueCode? = BY_ID[id]
-
         fun of(problem: MolangProblem): IssueCode = BY_ID["${MOLANG.id}_${problem.id}"] ?: MOLANG
 
         fun of(path: String): IssueCode {

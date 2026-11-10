@@ -6,7 +6,6 @@ import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
 import org.polyfrost.polyplus.nameplate.engine.api.limit.MaterialLimits
 import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialInput
 
 internal class GraphBuilder(
     private val path: String,
@@ -50,7 +49,7 @@ internal class GraphBuilder(
     private fun declare(json: List<NodeJson>): Map<String, GraphNode> {
         val nodes = LinkedHashMap<String, GraphNode>()
         for (node in json) {
-            val kind = NodeCatalog.kind(node.type)
+            val kind = NodeCatalog.kinds[node.type]
             when {
                 !ID.matches(node.id) ->
                     report(

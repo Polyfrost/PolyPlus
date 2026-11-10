@@ -17,18 +17,13 @@ internal class Footprint(
     val y1: Int,
     val xs: IntArray,
     val ys: IntArray,
-    val tiles: IntArray,
-    val areas: IntArray,
     val rows: IntArray,
 ) {
     val size: Int
         get() = xs.size
 
-    val tileCount: Int
-        get() = areas.size
-
     companion object {
-        val EMPTY: Footprint = Footprint(0, 0, 0, 0, IntArray(0), IntArray(0), IntArray(0), IntArray(0), IntArray(1))
+        val EMPTY: Footprint = Footprint(0, 0, 0, 0, IntArray(0), IntArray(0), IntArray(1))
 
         fun of(images: List<PixelImage>): Footprint {
             var x0 = Int.MAX_VALUE
@@ -71,7 +66,6 @@ internal class Footprint(
             val width = x1 - x0
             val xs = IntArray(count)
             val ys = IntArray(count)
-            val tiles = IntArray(count) { it }
             val rows = IntArray(y1 - y0 + 1)
             var k = 0
             for (y in y0 until y1) {
@@ -85,7 +79,7 @@ internal class Footprint(
             }
             rows[y1 - y0] = k
 
-            return Footprint(x0, y0, x1, y1, xs, ys, tiles, IntArray(count) { 1 }, rows)
+            return Footprint(x0, y0, x1, y1, xs, ys, rows)
         }
     }
 }

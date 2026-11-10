@@ -74,7 +74,7 @@ fun nameplateEffectParams(
     state: NameplateState? = null,
     mirrored: Boolean = false,
 ): NameplateParamValues {
-    val values = paramsAt(preview.bundle, layer, variant, frame, seed, state?.state ?: TagState.NONE, mirrored)
+    val values = paramsAt(preview.bundle, layer, variant, frame, seed, state.tag, mirrored)
     val names = values.keys.sorted().toTypedArray()
     return NameplateParamValues(names, DoubleArray(names.size) { values.getValue(names[it]) })
 }
@@ -92,8 +92,7 @@ fun nameplateParamCurve(
     mirrored: Boolean = false,
 ): DoubleArray {
     val bundle = preview.bundle
-    val tag = state?.state ?: TagState.NONE
-    return DoubleArray(maxOf(count, 0)) { i -> paramsAt(bundle, layer, variant, from + i, seed, tag, mirrored)[param] ?: 0.0 }
+    return DoubleArray(maxOf(count, 0)) { i -> paramsAt(bundle, layer, variant, from + i, seed, state.tag, mirrored)[param] ?: 0.0 }
 }
 
 private fun paramsAt(

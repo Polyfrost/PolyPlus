@@ -75,11 +75,6 @@ internal object NameplateQueries {
         set(runtime, NameplateQuery.FPS, fps)
     }
 
-    fun bindPixel(runtime: MolangRuntime, x: Int, y: Int) {
-        set(runtime, NameplateQuery.X, x)
-        set(runtime, NameplateQuery.Y, y)
-    }
-
     fun bindGlyph(runtime: MolangRuntime, index: Int, count: Int, x: Int, width: Int) {
         set(runtime, NameplateQuery.GLYPH_INDEX, index)
         set(runtime, NameplateQuery.GLYPH_COUNT, count)

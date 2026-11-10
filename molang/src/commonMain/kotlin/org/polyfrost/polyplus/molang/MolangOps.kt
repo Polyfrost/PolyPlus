@@ -9,8 +9,7 @@ internal abstract class MolangOp {
 private fun truth(value: Boolean): Double = if (value) 1.0 else 0.0
 
 internal class ConstOp(val value: Double) : MolangOp() {
-    override val cost: Int
-        get() = 1
+    override val cost: Int = 1
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
@@ -19,8 +18,7 @@ internal class ConstOp(val value: Double) : MolangOp() {
 }
 
 internal class QueryOp(private val slot: Int) : MolangOp() {
-    override val cost: Int
-        get() = 1
+    override val cost: Int = 1
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
@@ -29,8 +27,7 @@ internal class QueryOp(private val slot: Int) : MolangOp() {
 }
 
 internal class ParamOp(private val slot: Int) : MolangOp() {
-    override val cost: Int
-        get() = 1
+    override val cost: Int = 1
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
@@ -39,8 +36,7 @@ internal class ParamOp(private val slot: Int) : MolangOp() {
 }
 
 internal class VariableOp(private val slot: Int) : MolangOp() {
-    override val cost: Int
-        get() = 1
+    override val cost: Int = 1
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
@@ -48,95 +44,59 @@ internal class VariableOp(private val slot: Int) : MolangOp() {
     }
 }
 
-internal abstract class UnaryOp(protected val operand: MolangOp) : MolangOp() {
+internal class UnaryOp(private val operand: MolangOp, private val negate: Boolean) : MolangOp() {
     override val cost: Int = 1 + operand.cost
-}
 
-internal class NegateOp(operand: MolangOp) : UnaryOp(operand) {
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
-        return -operand.eval(runtime)
+        val value = operand.eval(runtime)
+        return if (negate) -value else truth(value == 0.0)
     }
 }
 
-internal class NotOp(operand: MolangOp) : UnaryOp(operand) {
-    override fun eval(runtime: MolangRuntime): Double {
-        runtime.steps++
-        return truth(operand.eval(runtime) == 0.0)
-    }
+internal fun interface BinaryFunction {
+    fun apply(a: Double, b: Double): Double
 }
 
-internal abstract class BinaryOp(protected val left: MolangOp, protected val right: MolangOp) : MolangOp() {
+internal val BINARY_FUNCTIONS: Map<TokenKind, BinaryFunction> = mapOf(
+    TokenKind.PLUS to BinaryFunction { a, b -> a + b },
+    TokenKind.MINUS to BinaryFunction { a, b -> a - b },
+    TokenKind.STAR to BinaryFunction { a, b -> a * b },
+    TokenKind.SLASH to BinaryFunction { a, b -> if (b == 0.0) 0.0 else a / b },
+    TokenKind.PERCENT to BinaryFunction { a, b -> MolangMath.mod(a, b) },
+    TokenKind.EQUAL to BinaryFunction { a, b -> truth(a == b) },
+    TokenKind.NOT_EQUAL to BinaryFunction { a, b -> truth(a != b) },
+    TokenKind.LESS to BinaryFunction { a, b -> truth(a < b) },
+    TokenKind.LESS_EQUAL to BinaryFunction { a, b -> truth(a <= b) },
+    TokenKind.GREATER to BinaryFunction { a, b -> truth(a > b) },
+    TokenKind.GREATER_EQUAL to BinaryFunction { a, b -> truth(a >= b) },
+)
+
+internal class BinaryOp(
+    private val left: MolangOp,
+    private val right: MolangOp,
+    private val function: BinaryFunction,
+) : MolangOp() {
     override val cost: Int = 1 + left.cost + right.cost
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
         val a = left.eval(runtime)
-        return apply(a, right.eval(runtime))
+        return function.apply(a, right.eval(runtime))
     }
-
-    abstract fun apply(a: Double, b: Double): Double
 }
 
-internal class AddOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = a + b
-}
-
-internal class SubtractOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = a - b
-}
-
-internal class MultiplyOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = a * b
-}
-
-internal class DivideOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = if (b == 0.0) 0.0 else a / b
-}
-
-internal class ModuloOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = MolangMath.mod(a, b)
-}
-
-internal class EqualOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a == b)
-}
-
-internal class NotEqualOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a != b)
-}
-
-internal class LessOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a < b)
-}
-
-internal class LessEqualOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a <= b)
-}
-
-internal class GreaterOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a > b)
-}
-
-internal class GreaterEqualOp(left: MolangOp, right: MolangOp) : BinaryOp(left, right) {
-    override fun apply(a: Double, b: Double): Double = truth(a >= b)
-}
-
-internal class AndOp(private val left: MolangOp, private val right: MolangOp) : MolangOp() {
+internal class LogicOp(
+    private val left: MolangOp,
+    private val right: MolangOp,
+    private val isAnd: Boolean,
+) : MolangOp() {
     override val cost: Int = 1 + left.cost + right.cost
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
-        return truth(left.eval(runtime) != 0.0 && right.eval(runtime) != 0.0)
-    }
-}
-
-internal class OrOp(private val left: MolangOp, private val right: MolangOp) : MolangOp() {
-    override val cost: Int = 1 + left.cost + right.cost
-
-    override fun eval(runtime: MolangRuntime): Double {
-        runtime.steps++
-        return truth(left.eval(runtime) != 0.0 || right.eval(runtime) != 0.0)
+        val first = left.eval(runtime) != 0.0
+        return truth(if (isAnd) first && right.eval(runtime) != 0.0 else first || right.eval(runtime) != 0.0)
     }
 }
 
@@ -167,22 +127,17 @@ internal class CallOp(private val function: MolangFunction, private val args: Ar
     }
 }
 
-internal class AssignOp(private val slot: Int, private val value: MolangOp) : MolangOp() {
+internal class AssignOp(
+    private val slot: Int,
+    private val value: MolangOp,
+    private val floatPrecision: Boolean,
+) : MolangOp() {
     override val cost: Int = 1 + value.cost
 
     override fun eval(runtime: MolangRuntime): Double {
         runtime.steps++
-        runtime.variables[slot] = value.eval(runtime)
-        return 0.0
-    }
-}
-
-internal class FloatAssignOp(private val slot: Int, private val value: MolangOp) : MolangOp() {
-    override val cost: Int = 1 + value.cost
-
-    override fun eval(runtime: MolangRuntime): Double {
-        runtime.steps++
-        runtime.variables[slot] = MolangMath.float(value.eval(runtime))
+        val assigned = value.eval(runtime)
+        runtime.variables[slot] = if (floatPrecision) MolangMath.float(assigned) else assigned
         return 0.0
     }
 }

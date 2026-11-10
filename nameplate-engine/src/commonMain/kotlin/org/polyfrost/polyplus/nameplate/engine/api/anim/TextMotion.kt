@@ -7,6 +7,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.layout.TagBlock
 import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.api.text.LetterFrame
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.LetterCache
+import org.polyfrost.polyplus.nameplate.engine.internal.anim.latestShot
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.phaseOffset
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.tagFrame
 import org.polyfrost.polyplus.nameplate.engine.internal.query.NameplateQueries
@@ -23,9 +24,6 @@ class TextMotion private constructor(
     private val runtimes = HashMap<LetterProgram, MolangRuntime>()
     private val boundVariants = HashMap<MolangRuntime, NameplateBundle.Variant>()
     private val cache = LetterCache()
-    private var shotStart = 0
-    private var shotLength = 0
-    private var shotText: TextTrack? = null
 
     var failed: Boolean = false
         private set
@@ -56,10 +54,12 @@ class TextMotion private constructor(
         var program = motion.base
         var local = loopTime
         var length = bundle.loop
-        if (findShot(bundle, state, time)) {
-            program = shotText?.program
-            local = time - shotStart
-            length = shotLength
+        val shot = latestShot(bundle.triggers, state, time) { _, candidate -> candidate.text != null }
+        if (shot >= 0) {
+            val playing = bundle.triggers.oneShots[state.oneShot(shot)]
+            program = playing.text?.program
+            local = time - state.start(shot)
+            length = playing.length
         } else {
             val reacting = activeWhile(bundle, state)
             if (reacting != null) {
@@ -111,29 +111,6 @@ class TextMotion private constructor(
         return into.moving
     }
 
-    private fun findShot(bundle: NameplateBundle, state: TagState, time: Int): Boolean {
-        if (state.isIdle || state.isReduced || !bundle.triggers.hasText) return false
-        var found = false
-        var bestIndex = 0
-        shotText = null
-        for (i in 0 until state.oneShotCount) {
-            val index = state.oneShot(i)
-            val shot = bundle.triggers.oneShots.getOrNull(index) ?: continue
-            val text = shot.text ?: continue
-            val start = state.start(i)
-            val local = time - start
-            val newer = !found || start > shotStart || (start == shotStart && index < bestIndex)
-            if (local in 0 until shot.length && newer) {
-                found = true
-                shotStart = start
-                shotLength = shot.length
-                shotText = text
-                bestIndex = index
-            }
-        }
-        return found
-    }
-
     private fun activeWhile(bundle: NameplateBundle, state: TagState): TextTrack? {
         if (state.inputs.isEmpty || !bundle.triggers.hasText) return null
         for (reaction in bundle.triggers.whiles) {
@@ -162,7 +139,7 @@ class TextMotion private constructor(
             return TextMotion(variants, variants.values.any { it.canMove }, cost)
         }
 
-        internal fun paramNames(bundle: NameplateBundle): Set<String> {
+        private fun paramNames(bundle: NameplateBundle): Set<String> {
             val names = LinkedHashSet(bundle.params.keys)
             for (variant in bundle.variants.values) {
                 names.addAll(variant.params.keys)

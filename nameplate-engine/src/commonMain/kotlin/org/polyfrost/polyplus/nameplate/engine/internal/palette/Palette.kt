@@ -13,28 +13,18 @@ internal class Palette(slots: List<Slot>) {
     }
 
     fun ref(id: String, tone: Int = 0): Int {
-        val index = indexOf(id)
+        val index = indexOfSlot(id)
         require(tone >= 0 && tone < slots[index].size) { "Slot '$id' has no tone $tone" }
         return index * MAX_TONES + tone
     }
 
-    fun with(id: String, vararg ramp: Int): Palette {
-        val index = indexOf(id)
-        val copy = slots.toMutableList()
-        val slot = copy[index]
-        copy[index] = Slot(slot.id, slot.name, *ramp)
-        return Palette(copy)
-    }
-
     fun with(id: String, ramp: IntArray, stops: IntArray): Palette {
-        val index = indexOf(id)
+        val index = indexOfSlot(id)
         val copy = slots.toMutableList()
         val slot = copy[index]
         copy[index] = Slot(slot.id, slot.name, ramp, stops)
         return Palette(copy)
     }
-
-    fun indexOfSlot(id: String): Int = indexOf(id)
 
     fun resolve(): ResolvedPalette {
         val colors = IntArray(slots.size * MAX_TONES)
@@ -47,7 +37,7 @@ internal class Palette(slots: List<Slot>) {
         return ResolvedPalette(colors, Array(slots.size) { slots[it].stops() })
     }
 
-    private fun indexOf(id: String): Int {
+    fun indexOfSlot(id: String): Int {
         val index = slots.indexOfFirst { it.id == id }
         require(index >= 0) { "No palette slot '$id'" }
         return index
@@ -72,13 +62,9 @@ internal class Palette(slots: List<Slot>) {
             get() = ramp.size
 
         fun tone(index: Int): Int = ramp[index]
-
-        fun ramp(): IntArray = ramp.copyOf()
     }
 
     companion object {
         const val MAX_TONES = 16
-
-        fun of(vararg slots: Slot): Palette = Palette(slots.asList())
     }
 }

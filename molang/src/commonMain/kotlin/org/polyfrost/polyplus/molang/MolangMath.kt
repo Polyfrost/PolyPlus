@@ -60,14 +60,18 @@ private const val ATAN_HALF_HIGH = 0x3FE60000
 private const val ATAN_BIG_HIGH = 0x40038000
 private const val ATAN_ONE_HALF = 1.5
 private const val ATAN_LAST = 3
-private const val ATAN_HI_0 = 4.63647609000806093515e-01
-private const val ATAN_HI_1 = 7.85398163397448278999e-01
-private const val ATAN_HI_2 = 9.82793723247329054082e-01
-private const val ATAN_HI_3 = 1.57079632679489655800e+00
-private const val ATAN_LO_0 = 2.26987774529616870924e-17
-private const val ATAN_LO_1 = 3.06161699786838301793e-17
-private const val ATAN_LO_2 = 1.39033110312309984516e-17
-private const val ATAN_LO_3 = 6.12323399573676603587e-17
+private val ATAN_HIGH = doubleArrayOf(
+    4.63647609000806093515e-01,
+    7.85398163397448278999e-01,
+    9.82793723247329054082e-01,
+    1.57079632679489655800e+00,
+)
+private val ATAN_LOW = doubleArrayOf(
+    2.26987774529616870924e-17,
+    3.06161699786838301793e-17,
+    1.39033110312309984516e-17,
+    6.12323399573676603587e-17,
+)
 private const val AT0 = 3.33333333333329318027e-01
 private const val AT1 = -1.99999999998764832476e-01
 private const val AT2 = 1.42857142725034663711e-01
@@ -248,7 +252,13 @@ internal object MolangMath {
     fun atan(value: Double): Double {
         val hx = high(value)
         val ix = hx and ABS_MASK
-        if (ix >= ATAN_HUGE_HIGH) return if (value.isNaN()) value else if (hx > 0) ATAN_HI_3 + ATAN_LO_3 else -ATAN_HI_3 - ATAN_LO_3
+        if (ix >= ATAN_HUGE_HIGH) {
+            return when {
+                value.isNaN() -> value
+                hx > 0 -> ATAN_HIGH[ATAN_LAST] + ATAN_LOW[ATAN_LAST]
+                else -> -ATAN_HIGH[ATAN_LAST] - ATAN_LOW[ATAN_LAST]
+            }
+        }
         if (ix < ATAN_SMALL_HIGH) return if (ix < ATAN_TINY_HIGH) value else value - value * atanSeries(value)
         val a = abs(value)
         val id = when {
@@ -263,7 +273,7 @@ internal object MolangMath {
             2 -> (a - ATAN_ONE_HALF) / (1.0 + ATAN_ONE_HALF * a)
             else -> -1.0 / a
         }
-        val z = atanHigh(id) - ((x * atanSeries(x) - atanLow(id)) - x)
+        val z = ATAN_HIGH[id] - ((x * atanSeries(x) - ATAN_LOW[id]) - x)
         return if (hx < 0) -z else z
     }
 
@@ -273,20 +283,6 @@ internal object MolangMath {
         val s1 = z * (AT0 + w * (AT2 + w * (AT4 + w * (AT6 + w * (AT8 + w * AT10)))))
         val s2 = w * (AT1 + w * (AT3 + w * (AT5 + w * (AT7 + w * AT9))))
         return s1 + s2
-    }
-
-    private fun atanHigh(id: Int): Double = when (id) {
-        0 -> ATAN_HI_0
-        1 -> ATAN_HI_1
-        2 -> ATAN_HI_2
-        else -> ATAN_HI_3
-    }
-
-    private fun atanLow(id: Int): Double = when (id) {
-        0 -> ATAN_LO_0
-        1 -> ATAN_LO_1
-        2 -> ATAN_LO_2
-        else -> ATAN_LO_3
     }
 
     fun atan2(y: Double, x: Double): Double {
@@ -445,8 +441,7 @@ internal object MolangMath {
 
     fun smoothstep(edge0: Double, edge1: Double, x: Double): Double {
         if (edge0 == edge1) return step(edge0, x)
-        val t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0)
-        return t * t * (SMOOTH_A - 2.0 * t)
+        return smooth(clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0))
     }
 
     fun clamp(value: Double, low: Double, high: Double): Double = min(max(value, low), high)

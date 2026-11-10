@@ -10,11 +10,8 @@ class MolangEnvironment(
     private val paramSlots: Map<String, Int> = params.withIndex().associate { (i, name) -> name to i }
     private val variableSlots = LinkedHashMap<String, Int>()
 
-    internal val queryNames: List<String> = queries.toList()
+    internal val queryCount: Int = queries.size
     val paramNames: List<String> = params.toList()
-
-    internal val queryCount: Int
-        get() = queryNames.size
 
     internal val paramCount: Int
         get() = paramNames.size

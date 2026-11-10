@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.nameplate.engine.js
 
-import org.khronos.webgl.get
 import org.polyfrost.polyplus.nameplate.engine.api.anim.reactedPalette
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.MaterialLayer
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.materialLayers
@@ -20,44 +19,21 @@ import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslDialect
 import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslGlobals
 import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslSamplers
 import org.polyfrost.polyplus.nameplate.engine.api.shader.MaterialTextures
-import org.polyfrost.polyplus.nameplate.engine.api.shader.TexturePixels
 import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
-import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialClock
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialInput
 
 private const val ES_300 = "es300"
-private const val CORE_330 = "core330"
-private const val CORE_330_UBO = "core330ubo"
-private const val LEGACY_FLAT = "legacyflat"
-private const val COMPAT_130 = "compat130"
 private const val NUMBERED = "numbered"
 private const val SCREEN_FIRST = "screen"
 private const val LANES = 4
 private const val INPUT_VECTORS = 4
 private const val ATLAS_VECTORS = 4
-private const val CHANNELS = 4
-private const val ALPHA = 3
-private const val BYTE = 0xFF
-private const val ALPHA_SHIFT = 24
-private const val RED_SHIFT = 16
-private const val GREEN_SHIFT = 8
 
-private fun dialectOf(name: String): GlslDialect = when (name.lowercase()) {
-    CORE_330 -> GlslDialect.CORE_330
-    CORE_330_UBO -> GlslDialect.CORE_330_UBO
-    LEGACY_FLAT -> GlslDialect.LEGACY_FLAT
-    COMPAT_130 -> GlslDialect.COMPAT_130
-    else -> GlslDialect.ES_300
-}
+private fun dialectName(dialect: GlslDialect): String = dialect.name.replace("_", "").lowercase()
 
-private fun dialectName(dialect: GlslDialect): String = when (dialect) {
-    GlslDialect.CORE_330 -> CORE_330
-    GlslDialect.ES_300 -> ES_300
-    GlslDialect.CORE_330_UBO -> CORE_330_UBO
-    GlslDialect.LEGACY_FLAT -> LEGACY_FLAT
-    GlslDialect.COMPAT_130 -> COMPAT_130
-}
+private fun dialectOf(name: String): GlslDialect =
+    GlslDialect.entries.firstOrNull { dialectName(it) == name.lowercase() } ?: GlslDialect.ES_300
 
 private fun samplersOf(name: String, dialect: GlslDialect): GlslSamplers = when (name.lowercase()) {
     NUMBERED -> GlslSamplers.NUMBERED
@@ -72,18 +48,6 @@ private fun rectOf(rect: PixelRect): IntArray = intArrayOf(rect.x0, rect.y0, rec
 
 private fun lower(value: Enum<*>): String = value.name.lowercase()
 
-private fun textureKind(ref: TextureRef): String = when (ref) {
-    is TextureRef.Bundle -> "bundle"
-    is TextureRef.Vanilla -> "vanilla"
-    is TextureRef.Atlas -> "atlas"
-}
-
-private fun textureId(ref: TextureRef): String = when (ref) {
-    is TextureRef.Bundle -> ref.id
-    is TextureRef.Vanilla -> ref.name
-    is TextureRef.Atlas -> ref.sprite
-}
-
 private fun texturePath(ref: TextureRef): String = when (ref) {
     is TextureRef.Bundle -> "textures/${ref.id}.png"
     is TextureRef.Vanilla -> "vanilla/${ref.name}"
@@ -96,12 +60,19 @@ class NameplateShaderTexture internal constructor(
     val unit: Int,
     val sampler: String = GlslSamplers.NAMED.name(unit),
 ) {
-
     val kind: String
-        get() = textureKind(ref)
+        get() = when (ref) {
+            is TextureRef.Bundle -> "bundle"
+            is TextureRef.Vanilla -> "vanilla"
+            is TextureRef.Atlas -> "atlas"
+        }
 
     val id: String
-        get() = textureId(ref)
+        get() = when (ref) {
+            is TextureRef.Bundle -> ref.id
+            is TextureRef.Vanilla -> ref.name
+            is TextureRef.Atlas -> ref.sprite
+        }
 
     val path: String
         get() = texturePath(ref)
@@ -327,7 +298,7 @@ class NameplateShaders(
         val bundle = preview.bundle
         if (bundle.materialLayers.isEmpty()) return emptyArray()
         val resolved = bundle.variant(variant)
-        val tag = state?.state ?: TagState.NONE
+        val tag = state.tag
         val level = Detail.named(detail) ?: Detail.FULL
         val palette = reactedPalette(bundle, resolved, painter.palette(bundle, resolved, frame, seed, block.block), frame, seed, tag)
         return painter.paint(bundle, resolved, block.block, frame, seed, tag, level)
@@ -351,21 +322,7 @@ fun nameplateTextureRefs(preview: NameplatePreview): Array<NameplateShaderTextur
 
 @JsExport
 fun nameplateWithTextures(preview: NameplatePreview, pixels: Array<NameplatePixels>): NameplatePreview {
-    val textures = pixels.mapNotNull { entry -> texturePixelsOf(entry)?.let { entry.path to it } }.toMap()
+    val textures = pixels.mapNotNull { entry -> entry.toTexturePixels()?.let { entry.path to it } }.toMap()
     val detail = preview.detail
     return NameplatePreview(preview.bundle, MaterialTextures { ref -> textures[texturePath(ref)] }).also { it.detail = detail }
-}
-
-private fun texturePixelsOf(pixels: NameplatePixels): TexturePixels? {
-    val count = pixels.width * pixels.height
-    if (pixels.width <= 0 || pixels.height <= 0 || pixels.rgba.length < count * CHANNELS) return null
-    val rgba = pixels.rgba
-    val argb = IntArray(count) { i ->
-        val p = i * CHANNELS
-        (rgba[p + ALPHA].toInt() and BYTE shl ALPHA_SHIFT) or
-            (rgba[p].toInt() and BYTE shl RED_SHIFT) or
-            (rgba[p + 1].toInt() and BYTE shl GREEN_SHIFT) or
-            (rgba[p + 2].toInt() and BYTE)
-    }
-    return TexturePixels(pixels.width, pixels.height, argb)
 }

@@ -4,32 +4,12 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-internal class UnaryKind(
-    type: String,
-    private val lane: (Int, Int) -> CpuOp,
-    private val code: String,
-    private val unitCost: Int,
-) : NodeKind(type, listOf(Socket("x", Accepts.NUMBER))) {
-    override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typings.elementwise(sockets, inputs)
-
-    override fun own(node: GraphNode): Int = unitCost * node.type.width
-
-    override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp? {
-        for (k in 0 until node.type.width) {
-            compiler.emit(lane(args[0][k], out + k))
-        }
-        return null
-    }
-
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = "$code(${args[0]})"
-}
-
-internal class BinaryKind(
+internal class ElementwiseKind(
     type: String,
     names: List<String>,
-    private val lane: (Int, Int, Int) -> CpuOp,
-    private val code: (String, String) -> String,
+    private val lane: LaneFn,
     private val unitCost: Int,
+    private val code: (List<String>) -> String,
 ) : NodeKind(type, names.map { Socket(it, Accepts.NUMBER) }) {
     override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typings.elementwise(sockets, inputs)
 
@@ -37,33 +17,12 @@ internal class BinaryKind(
 
     override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp? {
         for (k in 0 until node.type.width) {
-            compiler.emit(lane(args[0][k], args[1][k], out + k))
+            compiler.emit(MathLane(lane, out + k, *IntArray(args.size) { args[it][k] }))
         }
         return null
     }
 
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = code(args[0], args[1])
-}
-
-internal class TernaryKind(
-    type: String,
-    names: List<String>,
-    private val lane: (Int, Int, Int, Int) -> CpuOp,
-    private val code: String,
-    private val unitCost: Int,
-) : NodeKind(type, names.map { Socket(it, Accepts.NUMBER) }) {
-    override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typings.elementwise(sockets, inputs)
-
-    override fun own(node: GraphNode): Int = unitCost * node.type.width
-
-    override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp? {
-        for (k in 0 until node.type.width) {
-            compiler.emit(lane(args[0][k], args[1][k], args[2][k], out + k))
-        }
-        return null
-    }
-
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = "$code(${args.joinToString(", ")})"
+    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = code(args)
 }
 
 internal class DotKind(type: String, private val length: Boolean) :
@@ -107,28 +66,33 @@ internal object MathNodes {
     private const val SMOOTH = 5
     private const val SMOOTH_BASE = 3.0
 
+    private val UNARY = listOf("x")
     private val PAIR = listOf("a", "b")
 
+    private fun call(name: String): (List<String>) -> String = { args -> "$name(${args.joinToString(", ")})" }
+
+    private fun infix(operator: String): (List<String>) -> String = { (a, b) -> "($a $operator $b)" }
+
     fun kinds(): List<NodeKind> = listOf(
-        UnaryKind("abs", ::AbsLane, "abs", 1),
-        UnaryKind("floor", ::FloorLane, "floor", 1),
-        UnaryKind("frac", ::FracLane, "fract", 1),
-        UnaryKind("sin", ::SinLane, "sin", TRIG),
-        UnaryKind("cos", ::CosLane, "cos", TRIG),
-        UnaryKind("exp", ::ExpLane, "exp", EXP),
-        BinaryKind("add", PAIR, ::AddLane, { a, b -> "($a + $b)" }, 1),
-        BinaryKind("sub", PAIR, ::SubLane, { a, b -> "($a - $b)" }, 1),
-        BinaryKind("mul", PAIR, ::MulLane, { a, b -> "($a * $b)" }, 1),
-        BinaryKind("div", PAIR, ::DivLane, { a, b -> "nDiv($a, $b)" }, DIV),
-        BinaryKind("mod", PAIR, ::ModLane, { a, b -> "nMod($a, $b)" }, MOD),
-        BinaryKind("min", PAIR, ::MinLane, { a, b -> "min($a, $b)" }, 1),
-        BinaryKind("max", PAIR, ::MaxLane, { a, b -> "max($a, $b)" }, 1),
-        BinaryKind("step", listOf("edge", "x"), ::StepLane, { e, x -> "step($e, $x)" }, 1),
-        BinaryKind("pow", listOf("x", "y"), ::PowLane, { a, b -> "nPow($a, $b)" }, POW),
-        BinaryKind("atan2", listOf("y", "x"), ::Atan2Lane, { y, x -> "nAtan2($y, $x)" }, ATAN),
-        TernaryKind("clamp", listOf("x", "min", "max"), ::ClampLane, "nClamp", 2),
-        TernaryKind("mix", listOf("a", "b", "t"), ::MixLane, "nMix", 2),
-        TernaryKind("smoothstep", listOf("edge0", "edge1", "x"), ::SmoothLane, "nSmooth", SMOOTH),
+        ElementwiseKind("abs", UNARY, LaneFn.ABS, 1, call("abs")),
+        ElementwiseKind("floor", UNARY, LaneFn.FLOOR, 1, call("floor")),
+        ElementwiseKind("frac", UNARY, LaneFn.FRAC, 1, call("fract")),
+        ElementwiseKind("sin", UNARY, LaneFn.SIN, TRIG, call("sin")),
+        ElementwiseKind("cos", UNARY, LaneFn.COS, TRIG, call("cos")),
+        ElementwiseKind("exp", UNARY, LaneFn.EXP, EXP, call("exp")),
+        ElementwiseKind("add", PAIR, LaneFn.ADD, 1, infix("+")),
+        ElementwiseKind("sub", PAIR, LaneFn.SUB, 1, infix("-")),
+        ElementwiseKind("mul", PAIR, LaneFn.MUL, 1, infix("*")),
+        ElementwiseKind("div", PAIR, LaneFn.DIV, DIV, call("nDiv")),
+        ElementwiseKind("mod", PAIR, LaneFn.MOD, MOD, call("nMod")),
+        ElementwiseKind("min", PAIR, LaneFn.MIN, 1, call("min")),
+        ElementwiseKind("max", PAIR, LaneFn.MAX, 1, call("max")),
+        ElementwiseKind("step", listOf("edge", "x"), LaneFn.STEP, 1, call("step")),
+        ElementwiseKind("pow", listOf("x", "y"), LaneFn.POW, POW, call("nPow")),
+        ElementwiseKind("atan2", listOf("y", "x"), LaneFn.ATAN2, ATAN, call("nAtan2")),
+        ElementwiseKind("clamp", listOf("x", "min", "max"), LaneFn.CLAMP, 2, call("nClamp")),
+        ElementwiseKind("mix", listOf("a", "b", "t"), LaneFn.MIX, 2, call("nMix")),
+        ElementwiseKind("smoothstep", listOf("edge0", "edge1", "x"), LaneFn.SMOOTH, SMOOTH, call("nSmooth")),
         DotKind("length", length = true),
         DotKind("dot", length = false),
         PolarKind,

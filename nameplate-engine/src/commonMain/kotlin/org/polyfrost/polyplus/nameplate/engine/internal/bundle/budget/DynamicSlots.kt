@@ -8,6 +8,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
 import org.polyfrost.polyplus.nameplate.engine.api.layout.TagBlock
 import org.polyfrost.polyplus.nameplate.engine.api.tag.LayerPose
 import org.polyfrost.polyplus.nameplate.engine.api.tag.NameplateHash
+import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.BodyOutline
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.EdgeRoute
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.EdgeRows
@@ -25,12 +26,6 @@ import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.EdgeSide
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.SpawnShape
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.SpriteAdaptive
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.SpritePath
-
-internal interface DynamicSlot {
-    fun pose(motion: SimulatedMotion, frame: Int): LayerPose
-
-    fun state(motion: SimulatedMotion, frame: Int): Int
-}
 
 internal class DynamicLayer(
     val layer: NameplateBundle.Layer,
@@ -85,7 +80,7 @@ internal object DynamicSlots {
                 is ParticleEmitter -> DynamicLayer(layer, content, rect, 0, maxLive(bundle, layer, content), outline)
                 is LayerContent.Sprite -> {
                     val alternative = content.adaptive.alternative(block.nameWidth)
-                    val capacity = if (alternative == SpriteAdaptive.HIDDEN) 0 else walkers(content)
+                    val capacity = if (alternative == SpriteAdaptive.HIDDEN) 0 else checkNotNull(content.adaptive.path).walkers
                     DynamicLayer(layer, content, rect, alternative, capacity, outline)
                 }
                 is LayerContent.Body, is MaterialLayer -> null
@@ -102,8 +97,6 @@ internal object DynamicSlots {
             bundle.triggers.burstCopies(bundle, shot)
         }
 
-    private fun walkers(sprite: LayerContent.Sprite): Int = checkNotNull(sprite.adaptive.path).walkers
-
     fun of(bundle: NameplateBundle, variant: NameplateBundle.Variant, block: TagBlock): List<Placed> {
         val placed = ArrayList<Placed>()
         for ((index, dynamic) in layers(bundle, variant, block)) {
@@ -119,8 +112,8 @@ internal object DynamicSlots {
         return placed
     }
 
-    private class Slot(private val source: Source, private val index: Int, private val flip: Boolean) : DynamicSlot {
-        override fun pose(motion: SimulatedMotion, frame: Int): LayerPose {
+    internal class Slot(private val source: Source, private val index: Int, private val flip: Boolean) {
+        fun pose(motion: SimulatedMotion, frame: Int): LayerPose {
             source.at(motion, frame)
             if (!source.present[index] || source.flips[index] != flip) return HIDDEN_POSE
             val pose = motion.pose(source.layer, frame, false)
@@ -128,13 +121,13 @@ internal object DynamicSlots {
             return LayerPose(source.xs[index] + pose.dx, source.ys[index] + pose.dy, opacity, pose.visible)
         }
 
-        override fun state(motion: SimulatedMotion, frame: Int): Int {
+        fun state(motion: SimulatedMotion, frame: Int): Int {
             source.at(motion, frame)
             return if (source.present[index]) source.states[index] else 0
         }
     }
 
-    private class Source(private val bundle: NameplateBundle, private val dynamic: DynamicLayer) {
+    internal class Source(private val bundle: NameplateBundle, private val dynamic: DynamicLayer) {
         val layer: NameplateBundle.Layer = dynamic.layer
         val xs = IntArray(dynamic.capacity)
         val ys = IntArray(dynamic.capacity)
@@ -156,9 +149,11 @@ internal object DynamicSlots {
                 0,
                 NameplateHash.text(layer.id),
                 bundle.loop / layer.step,
-                layerStep = layer.step,
-                route = dynamic.spawnRoute(emitter),
-                rows = dynamic.spawnRows(emitter),
+                TagState.NONE,
+                layer.step,
+                0,
+                dynamic.spawnRoute(emitter),
+                dynamic.spawnRows(emitter),
             )
         }
 

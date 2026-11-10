@@ -99,7 +99,7 @@ internal class PathGeometry private constructor(private val path: SpritePath, wa
     private val total: Long = starts[segments]
     private val sequence = if (path.end == PathEnd.BOUNCE) 2 * segments else segments
     private val lapSpan = if (path.end == PathEnd.BOUNCE) 2 * total else total
-    private val horizontals: IntArray? = stepFacings?.let { horizontalTable() }
+    private val horizontals: IntArray? = if (path.hasFacings) horizontalTable() else null
     private val paused = pauses.any { it > 0 }
     private val moving: Long = if (paused && path.laps > 0) lapPeriod() - waiting() else 0L
     private val travels: LongArray = if (paused) travelTable() else NO_STEPS
@@ -303,18 +303,7 @@ internal class PathGeometry private constructor(private val path: SpritePath, wa
         return if (facing == PathMotion.RIGHT || facing == PathMotion.LEFT) facing else fallback
     }
 
-    private fun lastHorizontal(entry: Int): Int {
-        horizontals?.let { return it[entry] }
-
-        val cyclic = path.end != PathEnd.STOP
-        for (back in 0 until sequence) {
-            val at = entry - back
-            if (at < 0 && !cyclic) break
-            val facing = facingOf(at.mod(sequence))
-            if (facing == PathMotion.RIGHT || facing == PathMotion.LEFT) return facing
-        }
-        return PathMotion.RIGHT
-    }
+    private fun lastHorizontal(entry: Int): Int = checkNotNull(horizontals)[entry]
 }
 
 internal object PathMotion {

@@ -11,12 +11,13 @@ internal object ReferencePlacements {
     const val MEDIUM = 96
     val WIDEST: Int = PixelGrid.WINDOW.x1 - BundleLimits.MAX_DECORATION_MARGIN
 
+    val NARROW_LINE: TagBlock = TagBlock.line(NARROW, 0, NARROW)
+    val MEDIUM_LINE: TagBlock = TagBlock.line(MEDIUM, 0, MEDIUM)
     val WIDEST_LINE: TagBlock = TagBlock.line(WIDEST, 0, WIDEST)
 
-    val ALL: List<TagBlock> = listOf(
-        TagBlock.line(NARROW, 0, NARROW),
-        TagBlock.line(MEDIUM, 0, MEDIUM),
-        WIDEST_LINE,
+    val LINES: List<TagBlock> = listOf(NARROW_LINE, MEDIUM_LINE, WIDEST_LINE)
+
+    val ALL: List<TagBlock> = LINES + listOf(
         lines(MEDIUM, 2),
         lines(WIDEST, 2),
         lines(MEDIUM, 3),

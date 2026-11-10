@@ -24,10 +24,10 @@ internal object HsvKind : FixedKind(
 
 internal class RampKind(type: String, sockets: List<Socket>, private val mode: Mode) :
     FixedKind(type, sockets, SocketType.SLOT, unitCost = mode.cost) {
-    enum class Mode(val cost: Int) {
-        QUANTIZE(3),
-        DITHER(8),
-        CYCLE(4),
+    enum class Mode(val cost: Int, val glsl: String) {
+        QUANTIZE(3, "nQuantize"),
+        DITHER(8, "nDither"),
+        CYCLE(4, "nCycle"),
     }
 
     override fun read(reader: SettingsReader) = reader.slot("slot")
@@ -43,56 +43,45 @@ internal class RampKind(type: String, sockets: List<Socket>, private val mode: M
 
     override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String {
         val ramp = "${context.toneBase(node.settings.slot)}, ${node.settings.tones}"
-        return when (mode) {
-            Mode.QUANTIZE -> "nQuantize(${args[0]}, $ramp)"
-            Mode.DITHER -> "nDither(${args[0]}, ${args[1]}, $ramp)"
-            Mode.CYCLE -> "nCycle(${args[0]}, ${args[1]}, $ramp)"
-        }
+        return "${mode.glsl}(${args.joinToString(", ")}, $ramp)"
     }
 }
 
 internal class ShadeKind(type: String, second: String, private val mode: Mode) :
     FixedKind(type, listOf(Socket("color", Accepts.COLOR), Socket(second, Accepts.FLOAT)), SocketType.VEC4, unitCost = 6) {
-    enum class Mode {
-        LIGHTEN,
-        DARKEN,
-        ALPHA,
+    enum class Mode(val glsl: String, val channelFn: LaneFn?) {
+        LIGHTEN("nLighten", LaneFn.LIGHTEN),
+        DARKEN("nDarken", LaneFn.DARKEN),
+        ALPHA("nAlpha", null),
     }
 
     override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp? {
         val amount = args[1][0]
+        val channelFn = mode.channelFn
         for (channel in 0 until ColorNodes.RGB) {
             val value = args[0][channel]
-            when (mode) {
-                Mode.LIGHTEN -> compiler.emit(LightenLane(value, amount, out + channel))
-                Mode.DARKEN -> compiler.emit(DarkenLane(value, amount, out + channel))
-                Mode.ALPHA -> compiler.alias(out + channel, value)
+            if (channelFn != null) {
+                compiler.emit(MathLane(channelFn, out + channel, value, amount))
+            } else {
+                compiler.alias(out + channel, value)
             }
         }
         val alpha = args[0][ColorNodes.RGB]
-        if (mode == Mode.ALPHA) {
-            compiler.emit(MulLane(alpha, amount, out + ColorNodes.RGB))
+        if (channelFn == null) {
+            compiler.emit(MathLane(LaneFn.MUL, out + ColorNodes.RGB, alpha, amount))
         } else {
             compiler.alias(out + ColorNodes.RGB, alpha)
         }
         return null
     }
 
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = when (mode) {
-        Mode.LIGHTEN -> "nLighten(${args[0]}, ${args[1]})"
-        Mode.DARKEN -> "nDarken(${args[0]}, ${args[1]})"
-        Mode.ALPHA -> "nAlpha(${args[0]}, ${args[1]})"
-    }
+    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String =
+        "${mode.glsl}(${args[0]}, ${args[1]})"
 }
 
 internal object ColorNodes {
     const val RGB = 3
     const val ROUND = 0.5
-    private const val SIXTHS = 6.0
-    private const val SECTORS = 6
-    private const val THIRD = 3
-    private const val FOURTH = 4
-    private const val LAST = 5
 
     fun kinds(): List<NodeKind> = listOf(
         HsvKind,
@@ -114,37 +103,6 @@ internal object ColorNodes {
 
     fun level(level: Double, tones: Int, threshold: Double): Int =
         (floor(level * (tones - 1) + threshold)).toInt().coerceIn(0, tones - 1)
-
-    fun hsv(registers: DoubleArray, at: IntArray, lane: Int) {
-        val h = registers[at[0] + lane]
-        val s = registers[at[1] + lane]
-        val v = registers[at[2] + lane]
-        val h6 = (h - floor(h)) * SIXTHS
-        val sector = floor(h6)
-        val f = h6 - sector
-        val p = v * (1.0 - s)
-        val q = v * (1.0 - s * f)
-        val t = v * (1.0 - s * (1.0 - f))
-        val index = sector.toInt().mod(SECTORS)
-        registers[at[RGB] + lane] = when (index) {
-            0, LAST -> v
-            1 -> q
-            2, THIRD -> p
-            else -> t
-        }
-        registers[at[RGB + 1] + lane] = when (index) {
-            0 -> t
-            1, 2 -> v
-            THIRD -> q
-            else -> p
-        }
-        registers[at[RGB + 2] + lane] = when (index) {
-            0, 1 -> p
-            2 -> t
-            THIRD, FOURTH -> v
-            else -> q
-        }
-    }
 }
 
 internal class HsvLane(h: Int, s: Int, v: Int, out: Int) : CpuOp(intArrayOf(h, s, v), IntArray(ColorNodes.RGB) { out + it }) {
@@ -153,9 +111,41 @@ internal class HsvLane(h: Int, s: Int, v: Int, out: Int) : CpuOp(intArrayOf(h, s
 
     override fun run(registers: DoubleArray, count: Int, shared: CpuShared) {
         val at = at
-        for (i in 0 until count) {
-            ColorNodes.hsv(registers, at, i)
+        for (lane in 0 until count) {
+            val h = registers[at[0] + lane]
+            val s = registers[at[1] + lane]
+            val v = registers[at[2] + lane]
+            val h6 = (h - floor(h)) * SIXTHS
+            val sector = floor(h6)
+            val f = h6 - sector
+            val p = v * (1.0 - s)
+            val q = v * (1.0 - s * f)
+            val t = v * (1.0 - s * (1.0 - f))
+            val index = sector.toInt().mod(SECTORS)
+            registers[at[3] + lane] = when (index) {
+                0, 5 -> v
+                1 -> q
+                2, 3 -> p
+                else -> t
+            }
+            registers[at[4] + lane] = when (index) {
+                0 -> t
+                1, 2 -> v
+                3 -> q
+                else -> p
+            }
+            registers[at[5] + lane] = when (index) {
+                0, 1 -> p
+                2 -> t
+                3, 4 -> v
+                else -> q
+            }
         }
+    }
+
+    private companion object {
+        const val SIXTHS = 6.0
+        const val SECTORS = 6
     }
 }
 

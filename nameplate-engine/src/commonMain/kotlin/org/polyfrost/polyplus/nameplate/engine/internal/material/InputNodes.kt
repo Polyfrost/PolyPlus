@@ -61,7 +61,17 @@ internal object ConstantKind : NodeKind("Constant") {
         GlslNumber.vector(node.settings.value, node.type)
 }
 
-internal object ParamKind : NodeKind("Param") {
+internal abstract class UniformInputKind(type: String) : NodeKind(type) {
+    override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typing.Ok(SocketType.FLOAT, emptyList())
+
+    override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp =
+        SharedLane(SharedLane.INPUT, node.settings.input, out, 1)
+
+    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String =
+        InputNodes.lane(node.settings.input)
+}
+
+internal object ParamKind : UniformInputKind("Param") {
     override fun read(reader: SettingsReader) {
         val name = reader.required("name") ?: return
         if (name !in reader.context.params) {
@@ -69,45 +79,24 @@ internal object ParamKind : NodeKind("Param") {
         }
         reader.settings.name = name
     }
-
-    override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typing.Ok(SocketType.FLOAT, emptyList())
-
-    override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp = InputNodes.input(node, out)
-
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = InputNodes.uniform(node)
 }
 
-internal object ExprKind : NodeKind("Expr") {
+internal object ExprKind : UniformInputKind("Expr") {
     override fun read(reader: SettingsReader) {
         val source = reader.required("expr") ?: return
-        val molang = reader.context.molang
-        val messages = ArrayList<String>()
         val problems = ArrayList<MolangIssue>()
-        val expression = when {
-            source.length > MaterialLimits.MAX_EXPRESSION_CHARS -> {
-                messages += "longer than ${MaterialLimits.MAX_EXPRESSION_CHARS} characters"
-                null
-            }
-            molang == null -> {
-                messages += "Molang is not available in this engine build"
-                null
-            }
-            else -> molang.compile(source, problems)
+        val tooLong = source.length > MaterialLimits.MAX_EXPRESSION_CHARS
+        val expression = if (tooLong) null else reader.context.molang.compile(source, problems)
+        if (tooLong) {
+            reader.report("expr", "longer than ${MaterialLimits.MAX_EXPRESSION_CHARS} characters")
         }
-        messages.forEach { reader.report("expr", it) }
         problems.forEach { reader.report("expr", it.message, IssueCode.of(it.problem), it.values(), it.names) }
-        if (expression == null && messages.isEmpty() && problems.isEmpty()) {
+        if (expression == null && !tooLong && problems.isEmpty()) {
             reader.report("expr", "is not a valid expression")
         }
         reader.settings.name = source
         reader.settings.expression = expression
     }
-
-    override fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typing.Ok(SocketType.FLOAT, emptyList())
-
-    override fun cpu(compiler: CpuCompiler, node: GraphNode, args: Array<CpuArg>, out: Int): CpuOp = InputNodes.input(node, out)
-
-    override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String = InputNodes.uniform(node)
 }
 
 internal object BodyEdgeKind : NodeKind("BodyEdge", listOf(Socket("p", Accepts.VEC2, SocketDefault.Input("PixelPos")))) {
@@ -145,10 +134,6 @@ internal object InputNodes {
     private const val LANES = 4
     private const val POSITION_COST = 3
 
-    fun input(node: GraphNode, out: Int): CpuOp = SharedLane(SharedLane.INPUT, node.settings.input, out, 1)
-
-    fun uniform(node: GraphNode): String = lane(node.settings.input)
-
     fun lane(index: Int): String = "Inputs[${index / LANES}][${index % LANES}]"
 
     fun kinds(): List<NodeKind> = listOf(
@@ -157,8 +142,8 @@ internal object InputNodes {
             c.alias(o + 1, env.y)
         }, "pos"),
         EnvInputKind("PixelCell", SocketType.VEC2, { c, env, o ->
-            c.emit(FloorLane(env.x, o))
-            c.emit(FloorLane(env.y, o + 1))
+            c.emit(MathLane(LaneFn.FLOOR, o, env.x))
+            c.emit(MathLane(LaneFn.FLOOR, o + 1, env.y))
         }, "floor(pos)"),
         EnvInputKind("TagUV", SocketType.VEC2, ::tagUv, "nTagUv(pos)", POSITION_COST),
         EnvInputKind("AreaSize", SocketType.VEC2, { c, _, o ->
@@ -171,8 +156,8 @@ internal object InputNodes {
         EnvInputKind("SteppedTime", SocketType.FLOAT, { c, env, o -> c.emit(SecondsLane(env.frame, o)) }, "nSeconds(frame)"),
         EnvInputKind("ScreenPos", SocketType.VEC2, ::tagUv, "nScreen(pos)", POSITION_COST),
         EnvInputKind("PixelScreenPos", SocketType.VEC2, { c, env, o ->
-            c.emit(PixelScreenLane(env.x, o, vertical = false))
-            c.emit(PixelScreenLane(env.y, o + 1, vertical = true))
+            c.emit(AreaLane(env.x, o, vertical = false, pixelCenter = true))
+            c.emit(AreaLane(env.y, o + 1, vertical = true, pixelCenter = true))
         }, "nScreen(floor(pos) + 0.5)", POSITION_COST),
         SlotKind,
         ConstantKind,
@@ -182,7 +167,7 @@ internal object InputNodes {
     )
 
     private fun tagUv(compiler: CpuCompiler, env: CpuEnv, out: Int) {
-        compiler.emit(TagLane(env.x, out, vertical = false))
-        compiler.emit(TagLane(env.y, out + 1, vertical = true))
+        compiler.emit(AreaLane(env.x, out, vertical = false, pixelCenter = false))
+        compiler.emit(AreaLane(env.y, out + 1, vertical = true, pixelCenter = false))
     }
 }

@@ -11,7 +11,6 @@ class TagBlock private constructor(
     val nameWidth: Int,
     val badgeX: Int,
     val badgeY: Int,
-    internal val coversAllLines: Boolean,
     prefixWidth: Int? = null,
     background: PixelRect? = null,
 ) {
@@ -20,7 +19,7 @@ class TagBlock private constructor(
     val background: PixelRect = background ?: PixelRect.vanillaBackground(width, height)
 
     fun placed(prefixWidth: Int, background: PixelRect): TagBlock =
-        TagBlock(width, height, lines, nameLine, nameX, nameWidth, badgeX, badgeY, coversAllLines, prefixWidth, background)
+        TagBlock(width, height, lines, nameLine, nameX, nameWidth, badgeX, badgeY, prefixWidth, background)
 
     val lineCount: Int
         get() = lines.size / 4
@@ -41,13 +40,6 @@ class TagBlock private constructor(
 
     fun nameRect(): PixelRect = PixelRect(nameX, nameLineY, nameX + nameWidth, nameLineY + GLYPH_HEIGHT)
 
-    fun line(index: Int): PixelRect? {
-        val i = index * 4
-        if (lines[i] == lines[i + 2]) return null
-
-        return PixelRect(lines[i], lines[i + 1], lines[i + 2], lines[i + 3])
-    }
-
     enum class Align {
         LEFT,
         RIGHT,
@@ -55,7 +47,7 @@ class TagBlock private constructor(
     }
 
     companion object {
-        internal const val LINE_PITCH = 10
+        private const val LINE_PITCH = 10
         const val GLYPH_HEIGHT = PixelRect.GLYPH_HEIGHT
         const val MAX_LINES = 3
         const val BADGE_ADVANCE = 11
@@ -71,7 +63,6 @@ class TagBlock private constructor(
             nameWidth = nameWidth,
             badgeX = NO_BADGE,
             badgeY = 0,
-            coversAllLines = true,
         )
 
         fun display(
@@ -127,7 +118,7 @@ class TagBlock private constructor(
                 badgeY -= y0
             }
 
-            return TagBlock(x1 - x0, y1 - y0, lines, nameLine, nameX - x0, nameWidth, badgeX, badgeY, all)
+            return TagBlock(x1 - x0, y1 - y0, lines, nameLine, nameX - x0, nameWidth, badgeX, badgeY)
         }
 
         private fun doubledOffset(align: Align, maxWidth: Int, lineWidth: Int): Int = when (align) {

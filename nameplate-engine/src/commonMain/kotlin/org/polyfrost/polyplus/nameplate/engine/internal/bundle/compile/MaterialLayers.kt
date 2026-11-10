@@ -23,6 +23,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.material.load.MaterialLo
 import org.polyfrost.polyplus.nameplate.engine.internal.material.load.MaterialLoader
 import org.polyfrost.polyplus.nameplate.engine.internal.material.load.MaterialScope
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
+import org.polyfrost.polyplus.nameplate.engine.internal.track.BundleMolang
 
 internal object MaterialLayers {
     private val ID = Regex("[a-z0-9_]{1,64}")
@@ -64,8 +65,7 @@ internal object MaterialLayers {
     ): Result {
         val users = manifest.layers.mapNotNull { layer -> (files[layer.id] as? MaterialLayerJson)?.let { layer to it } }
         if (users.isEmpty()) return Result.Loaded(emptyMap())
-        val names = LinkedHashSet(manifest.params.keys)
-        manifest.variants.values.forEach { names.addAll(it.params.keys) }
+        val names = BundleMolang.paramNames(manifest)
         val scope = MaterialScope(palette, names, manifest.params, manifest.fps, manifest.loop)
         val loader = MaterialLoader(NameplateMaterialMolang(names, manifest.loop, manifest.fps))
         val issues = ArrayList<BundleIssue>()

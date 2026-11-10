@@ -5,7 +5,6 @@ package org.polyfrost.polyplus.nameplate.engine.js
 import org.polyfrost.polyplus.nameplate.engine.api.anim.TextMotion
 import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
-import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
 import org.polyfrost.polyplus.nameplate.engine.api.text.LetterFrame
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.ManifestJson
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.TextJson
@@ -70,7 +69,7 @@ class NameplateLetterMotion(private val preview: NameplatePreview) {
             block.block,
             frame,
             seed,
-            state?.state ?: TagState.NONE,
+            state.tag,
             shown,
             glyphX,
             glyphWidth,
@@ -110,5 +109,5 @@ fun nameplateCheckLetterProgram(
     )
     val issues = ArrayList<BundleIssue>()
     TextProgramValidator.validate(manifest, issueSink(issues).coded(IssueCode.LETTER_PROGRAM))
-    return issues.map { it.toJs() }.toTypedArray()
+    return issues.toJs()
 }

@@ -13,7 +13,6 @@ import org.polyfrost.polyplus.nameplate.engine.internal.material.ColorBytes
 import org.polyfrost.polyplus.nameplate.engine.internal.material.CpuCompiler
 import org.polyfrost.polyplus.nameplate.engine.internal.material.CpuProgram
 import org.polyfrost.polyplus.nameplate.engine.internal.material.CpuShared
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialInput
 
 internal class MaterialEvaluator(material: Material, private val textures: MaterialTextures = MaterialTextures.NONE) {
     private val spec = material.spec
@@ -149,11 +148,7 @@ internal class MaterialEvaluator(material: Material, private val textures: Mater
         shared.step = frame.step.toDouble()
         shared.palette = frame.palette
         for ((k, input) in graph.inputs.withIndex()) {
-            shared.inputs[k] = when (input) {
-                is MaterialInput.Param -> frame.params[input.name] ?: 0.0
-                is MaterialInput.Expression -> input.expression.evaluate(frame)
-                is MaterialInput.BodyEdgeInput -> input.value(frame.edge)
-            }
+            shared.inputs[k] = input.value(frame)
         }
         val tick = frame.frame.toLong() * frame.step * TexturePixels.TICKS_PER_SECOND / maxOf(1, frame.fps)
         for ((k, texture) in graph.textures.withIndex()) {

@@ -20,9 +20,9 @@ class MaterialOp internal constructor(
     val body: PixelRect,
     val frame: MaterialFrame,
     val cycle: Int,
-    private val painter: MaterialPainter? = null,
-    private val bundle: NameplateBundle? = null,
-    private val variant: NameplateBundle.Variant? = null,
+    private val painter: MaterialPainter,
+    internal val bundle: NameplateBundle,
+    internal val variant: NameplateBundle.Variant,
     val clip: PixelImage? = null,
     internal val shot: Boolean = false,
 ) {
@@ -60,9 +60,6 @@ class MaterialOp internal constructor(
     val drift: Boolean
         get() = layer.drift
 
-    internal val fallbackState: Int
-        get() = if (layer.fallback.still) 0 else frame.frame
-
     fun shader(dialect: GlslDialect): MaterialShader = layer.shader(dialect)
 
     fun uniforms(
@@ -77,26 +74,21 @@ class MaterialOp internal constructor(
     val params: Map<String, Double>
         get() = frame.params
 
-    fun frameImage(textures: MaterialTextures? = null): PixelImage = image(frame, textures)
-
-    fun fallbackImage(textures: MaterialTextures? = null): PixelImage = image(fallbackFrame(layer.fallback.still), textures)
+    fun fallbackImage(textures: MaterialTextures? = null): PixelImage {
+        val shown = fallbackFrame(layer.fallback.still)
+        return painter.image(this, shown, textures, shot && shown === frame)
+    }
 
     fun cachedFallback(still: Boolean = false): PixelImage? {
-        val painter = painter ?: return null
         if (still && (layer.drift || shot)) {
-            painter.held(this, checkNotNull(bundle), checkNotNull(variant), frame, shot)?.let { return it }
+            painter.held(this, frame, shot)?.let { return it }
         }
         val shown = fallbackFrame(still || layer.fallback.still)
-        return painter.cached(this, checkNotNull(bundle), checkNotNull(variant), shown, shot && shown === frame)
+        return painter.cached(this, shown, shot && shown === frame)
     }
 
     private fun fallbackFrame(still: Boolean): MaterialFrame =
-        if (still) frame.copy(frame = 0, params = variant?.params ?: frame.params) else frame
-
-    private fun image(shown: MaterialFrame, textures: MaterialTextures?): PixelImage {
-        val painter = painter ?: return PixelImage.EMPTY
-        return painter.image(this, checkNotNull(bundle), checkNotNull(variant), shown, textures, shot && shown === frame)
-    }
+        if (still) frame.copy(frame = 0, params = variant.params) else frame
 
     companion object {
         const val CLIP_STRIDE = 4

@@ -20,8 +20,5 @@ data class PixelRect(val x0: Int, val y0: Int, val x1: Int, val y1: Int) {
         const val GLYPH_HEIGHT = 8
 
         fun vanillaBackground(width: Int, height: Int): PixelRect = PixelRect(-1, -1, width, height + 1)
-
-        fun padded(width: Int, height: Int, left: Int, top: Int, right: Int, bottom: Int): PixelRect =
-            PixelRect(-left, -top, width + right, height + bottom)
     }
 }

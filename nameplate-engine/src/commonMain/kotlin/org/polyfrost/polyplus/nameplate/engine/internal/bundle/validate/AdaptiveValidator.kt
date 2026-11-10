@@ -9,7 +9,6 @@ import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
 import org.polyfrost.polyplus.nameplate.engine.api.limit.BundleLimits
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.Particles
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.PathMotion
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.framesOf
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.AdaptiveCompiler
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.ChannelKeys
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BodyLayerJson
@@ -86,12 +85,16 @@ internal class AdaptiveValidator(
             if (walk == null) {
                 report("$path#walkers", "walkers need a path")
             }
-            if (walkers.count !in 1..AdaptiveLimits.MAX_WALKERS) {
-                report("$path#walkers.count", "must be 1 to ${AdaptiveLimits.MAX_WALKERS}")
-            }
-            if (walkers.spacing !in 0..AdaptiveLimits.MAX_SPACING) {
-                report("$path#walkers.spacing", "must be 0 to ${AdaptiveLimits.MAX_SPACING} px")
-            }
+            report.ensure(
+                walkers.count in 1..AdaptiveLimits.MAX_WALKERS,
+                "$path#walkers.count",
+                "must be 1 to ${AdaptiveLimits.MAX_WALKERS}",
+            )
+            report.ensure(
+                walkers.spacing in 0..AdaptiveLimits.MAX_SPACING,
+                "$path#walkers.spacing",
+                "must be 0 to ${AdaptiveLimits.MAX_SPACING} px",
+            )
             if (walkers.even) {
                 checkEven("$path#walkers.even", walkers, walk)
             }
@@ -122,10 +125,12 @@ internal class AdaptiveValidator(
             if (Anchor.named(point.anchor) == null) {
                 report("$path.points[$i].anchor", "must be one of ${BundleValidator.ANCHORS.joinToString()}")
             }
-            checkOffset("$path.points[$i].offset", point.offset)
-            if (point.pause !in 0..AdaptiveLimits.MAX_PAUSE) {
-                report("$path.points[$i].pause", "must be 0 to ${AdaptiveLimits.MAX_PAUSE} steps")
-            }
+            BundleValidator.checkOffset("$path.points[$i].offset", point.offset, report)
+            report.ensure(
+                point.pause in 0..AdaptiveLimits.MAX_PAUSE,
+                "$path.points[$i].pause",
+                "must be 0 to ${AdaptiveLimits.MAX_PAUSE} steps",
+            )
         }
         val keyed = checkSpeed("$path.speed", walk.speed, cycle)
         if (keyed && points.orEmpty().any { it.pause > 0 }) {
@@ -177,9 +182,7 @@ internal class AdaptiveValidator(
                 stop.at !in 0.0..1.0 -> report("$path[$i].at", "must be 0 to 1")
                 stop.at <= last -> report("$path[$i].at", "must be above the stop before it")
             }
-            if (stop.pause !in 1..AdaptiveLimits.MAX_PAUSE) {
-                report("$path[$i].pause", "must be 1 to ${AdaptiveLimits.MAX_PAUSE} steps")
-            }
+            report.ensure(stop.pause in 1..AdaptiveLimits.MAX_PAUSE, "$path[$i].pause", "must be 1 to ${AdaptiveLimits.MAX_PAUSE} steps")
             last = stop.at
         }
     }
@@ -236,37 +239,7 @@ internal class AdaptiveValidator(
         if (speed.isEmpty()) {
             report(path, "needs at least one key")
         }
-        var last = -1
-        for ((i, entry) in speed.withIndex()) {
-            val key = entry as? JsonArray
-            val step = key?.getOrNull(0)?.let(ChannelKeys::wholeNumber)
-            val value = (key?.getOrNull(1) as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
-            val mode =
-                key?.getOrNull(2)?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull?.let(Interpolation::parse) }
-            when {
-                key == null || key.size !in 2..3 || step == null || value == null ->
-                    report("$path[$i]", "must be [step, speed] or [step, speed, interpolation]")
-                key.size == 3 && mode == null -> report("$path[$i]", "interpolation must be step, linear or ease")
-                i == 0 && step != 0 ->
-                    report.issue("$path[$i]", "the first key must be at step 0", IssueCode.KEY_START, keyValues(step, cycle))
-                step <= last ->
-                    report.issue("$path[$i]", "keys must be in increasing step order", IssueCode.KEY_ORDER, keyValues(step, cycle))
-                step >= cycle ->
-                    report.issue(
-                        "$path[$i]",
-                        "step must be inside the layer's $cycle-step cycle",
-                        IssueCode.KEY_RANGE,
-                        keyValues(step, cycle),
-                    )
-                value < 0.0 || value > AdaptiveLimits.MAX_SPEED -> report.issue(
-                    "$path[$i]",
-                    "speed must be 0 to ${AdaptiveLimits.MAX_SPEED} px per step",
-                    IssueCode.SPEED_RANGE,
-                    issueValues("min" to 0, "limit" to AdaptiveLimits.MAX_SPEED),
-                )
-            }
-            last = step ?: last
-        }
+        checkSpeedKeys(path, speed, cycle, false, report)
         return true
     }
 
@@ -292,15 +265,9 @@ internal class AdaptiveValidator(
         if (Edge.named(repeat.edge) == null) {
             report("$path.edge", "must be top, bottom, left or right")
         }
-        if (repeat.spacing !in 1..AdaptiveLimits.MAX_SPACING) {
-            report("$path.spacing", "must be 1 to ${AdaptiveLimits.MAX_SPACING} px")
-        }
-        if (repeat.min !in 1..AdaptiveLimits.MAX_REPEATS) {
-            report("$path.min", "must be 1 to ${AdaptiveLimits.MAX_REPEATS}")
-        }
-        if (repeat.max !in repeat.min..AdaptiveLimits.MAX_REPEATS) {
-            report("$path.max", "must be min to ${AdaptiveLimits.MAX_REPEATS}")
-        }
+        report.ensure(repeat.spacing in 1..AdaptiveLimits.MAX_SPACING, "$path.spacing", "must be 1 to ${AdaptiveLimits.MAX_SPACING} px")
+        report.ensure(repeat.min in 1..AdaptiveLimits.MAX_REPEATS, "$path.min", "must be 1 to ${AdaptiveLimits.MAX_REPEATS}")
+        report.ensure(repeat.max in repeat.min..AdaptiveLimits.MAX_REPEATS, "$path.max", "must be min to ${AdaptiveLimits.MAX_REPEATS}")
     }
 
     private fun checkBreakpoints(path: String, breakpoints: List<BreakpointJson>, layer: SpriteLayerJson?) {
@@ -309,10 +276,7 @@ internal class AdaptiveValidator(
         }
         val frames = layer?.let { frameCount(it.sprite) }
         for ((i, entry) in breakpoints.withIndex()) {
-            val max = entry.max
-            if (entry.min !in 0..AdaptiveLimits.MAX_WIDTH || (max != null && max !in entry.min + 1..AdaptiveLimits.MAX_WIDTH)) {
-                report("$path[$i]", "needs 0 <= min < max <= ${AdaptiveLimits.MAX_WIDTH}")
-            }
+            checkWidths("$path[$i]", entry, report)
             val sprite = entry.sprite ?: continue
             when {
                 layer == null -> report("$path[$i].sprite", "only sprite layers swap sprites")
@@ -327,21 +291,26 @@ internal class AdaptiveValidator(
         EmitterValidator(path, emitter, layers, sprites, report.coded(IssueCode.EMITTER)).validate()
     }
 
-    private fun checkOffset(path: String, offset: List<Int>) {
-        if (offset.size != 2 || offset.any { it !in -BundleLimits.MAX_OFFSET..BundleLimits.MAX_OFFSET }) {
-            report(path, "must be [x, y], each within ${BundleLimits.MAX_OFFSET} px")
-        }
-    }
-
-    private fun frameCount(sprite: String): Int? = sprites[sprite]?.let(BundleFiles::framesOf)?.size
+    private fun frameCount(sprite: String): Int? = BundleFiles.frameCount(sprites[sprite])
 
     companion object {
+        fun checkWidths(path: String, entry: BreakpointJson, report: IssueSink) {
+            val max = entry.max
+            if (entry.min !in 0..AdaptiveLimits.MAX_WIDTH || (max != null && max !in entry.min + 1..AdaptiveLimits.MAX_WIDTH)) {
+                report(path, "needs 0 <= min < max <= ${AdaptiveLimits.MAX_WIDTH}")
+            }
+        }
+
         fun checkTriggeredSpeed(path: String, element: JsonElement, length: Int?, report: IssueSink) {
             val keys = element as? JsonArray
             if (keys == null || keys.isEmpty()) {
                 report(path, "must be a list of [step, speed] keys")
                 return
             }
+            checkSpeedKeys(path, keys, length, true, report)
+        }
+
+        private fun checkSpeedKeys(path: String, keys: JsonArray, length: Int?, triggered: Boolean, report: IssueSink) {
             val limit = AdaptiveLimits.MAX_SPEED
             val shown = limit.toInt()
             var last = -1
@@ -362,15 +331,21 @@ internal class AdaptiveValidator(
                     length != null && step >= length ->
                         report.issue(
                             "$path[$i]",
-                            "step must be inside the animation's length",
+                            "step must be inside ${if (triggered) "the animation's length" else "the layer's $length-step cycle"}",
                             IssueCode.KEY_RANGE,
                             keyValues(step, length),
                         )
-                    !value.isFinite() || value < -limit || value > limit -> report.issue(
+                    triggered && (!value.isFinite() || value < -limit || value > limit) -> report.issue(
                         "$path[$i]",
                         "speed must be -$shown to $shown px per step; 0 stops the path and below 0 runs it backwards",
                         IssueCode.SPEED_RANGE,
                         issueValues("min" to -shown, "limit" to shown),
+                    )
+                    !triggered && (value < 0.0 || value > limit) -> report.issue(
+                        "$path[$i]",
+                        "speed must be 0 to $limit px per step",
+                        IssueCode.SPEED_RANGE,
+                        issueValues("min" to 0, "limit" to limit),
                     )
                 }
                 last = step ?: last

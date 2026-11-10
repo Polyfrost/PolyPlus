@@ -194,15 +194,3 @@ internal object GradientKind : FixedKind(
     override fun glsl(context: GlslContext, node: GraphNode, args: List<String>): String =
         "nGradient(${args[0]}, ${args[1]}, ${args[2]})"
 }
-
-internal object PatternNodes {
-    fun kinds(): List<NodeKind> = listOf(
-        NoiseKind("Noise", fractal = false),
-        NoiseKind("Fbm", fractal = true),
-        HashKind,
-        BayerKind,
-        CheckerKind,
-        StripesKind,
-        GradientKind,
-    )
-}

@@ -13,10 +13,6 @@ class ResolvedText internal constructor(
 ) {
     private val adjusted = HashMap<Int, Contrast.Adjusted>()
 
-    internal val touchesText: Boolean
-        get() = color != UNSET || shadowUse != ShadowUse.LEAVE || outline != UNSET ||
-            formatting != TextStyling.Formatting.KEEP
-
     fun adjust(rgb: Int): Int = adjusted(rgb).color
 
     fun adjustShadow(rgb: Int): Int {

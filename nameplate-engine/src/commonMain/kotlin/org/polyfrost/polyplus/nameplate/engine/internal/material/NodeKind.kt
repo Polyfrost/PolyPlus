@@ -12,7 +12,7 @@ internal abstract class NodeKind(val type: String, val sockets: List<Socket> = e
 
     open fun read(reader: SettingsReader) = Unit
 
-    open fun typing(node: GraphNode, inputs: List<SocketType?>): Typing = Typing.Error("$type has no output")
+    abstract fun typing(node: GraphNode, inputs: List<SocketType?>): Typing
 
     fun cost(node: GraphNode): Int = own(node) + MaterialLimits.TONE_COST * node.inputs.count(::readsTone)
 
@@ -32,7 +32,7 @@ internal abstract class NodeKind(val type: String, val sockets: List<Socket> = e
 
 internal object NodeCosts {
     fun own(type: String, variant: Int): Int? {
-        val kind = NodeCatalog.kind(type) ?: return null
+        val kind = NodeCatalog.kinds[type] ?: return null
         val width = SocketType.vector(variant.coerceIn(1, VECTOR))
         val settings = NodeSettings().also { it.octaves = variant.coerceIn(1, MaterialLimits.MAX_OCTAVES) }
         val node = GraphNode(type, kind, settings)

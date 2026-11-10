@@ -13,25 +13,12 @@ internal object TriggeredSpeed {
         val triggers = bundle.triggers
         val frame = step * layerStep
         val raw = frame - phase
-        var best = UNSET
-        var bestStart = 0
-        var bestIndex = 0
-        if (!state.isReduced) {
-            for (i in 0 until state.oneShotCount) {
-                val index = state.oneShot(i)
-                val shot = triggers.oneShots.getOrNull(index) ?: continue
-                val track = shot.speeds[layerId] ?: continue
-                val start = state.start(i)
-                val local = raw - start
-                val newer = best == UNSET || start > bestStart || (start == bestStart && index < bestIndex)
-                if (local in 0 until shot.length && newer) {
-                    best = track.at(local)
-                    bestStart = start
-                    bestIndex = index
-                }
-            }
+        val won = latestShot(triggers, state, raw) { _, shot -> layerId in shot.speeds }
+        if (won >= 0) {
+            val track = triggers.oneShots[state.oneShot(won)].speeds.getValue(layerId)
+            return track.at(raw - state.start(won))
         }
-        if (best != UNSET || state.inputs.isEmpty) return best
+        if (state.inputs.isEmpty) return UNSET
 
         for (reaction in triggers.whiles) {
             if (!state.inputs.has(reaction.reaction) || (state.isReduced && reaction.dropsWhenReduced)) continue

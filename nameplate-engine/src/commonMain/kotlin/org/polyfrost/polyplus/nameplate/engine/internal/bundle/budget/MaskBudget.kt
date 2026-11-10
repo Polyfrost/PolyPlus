@@ -41,18 +41,7 @@ internal class MaskBudget(private val bundle: NameplateBundle, private val shape
                 unclipped = maxOf(unclipped, if (entry.layer.content is MaterialLayer) 1 else image.quadCount)
                 for (ops in states) {
                     val list = ArrayList<LayerPainter.Painted>(ops.size + 1)
-                    list.add(
-                        LayerPainter.Painted(
-                            entry.slot,
-                            entry.depth,
-                            entry.x,
-                            entry.y,
-                            entry.mirrored,
-                            entry.width,
-                            image,
-                            LayerPose.OPAQUE,
-                        ),
-                    )
+                    list.add(op(entry, image))
                     list.addAll(ops)
                     masks.apply(list, bundle, variant, block)
                     worst = maxOf(worst, list[0].image.quadCount)
@@ -68,16 +57,12 @@ internal class MaskBudget(private val bundle: NameplateBundle, private val shape
         val layer = entry.layer
         return when (val content = layer.content) {
             is MaterialLayer -> {
-                val body = content.of?.let { (bundle.layer(it).content as NameplateBundle.LayerContent.Body).rect(block) }
-                    ?: block.background
+                val body = content.bodyRect(bundle, block)
                 val canvas = grid.paletteCanvas()
                 canvas.fill(content.material.area(PixelRect(0, 0, body.width, body.height)), 0)
                 listOf(canvas.compile())
             }
-            is NameplateBundle.LayerContent.Sprite ->
-                states(bundle, layer)
-                    .filter { it - entry.base in 0 until SpriteAdaptive.STATE_STRIDE }
-                    .map { shapes.sprite(layer, it).image }
+            is NameplateBundle.LayerContent.Sprite -> shapes.alternative(bundle, layer, entry.base).map { it.image }
             else -> listOfNotNull(entry.body)
         }
     }

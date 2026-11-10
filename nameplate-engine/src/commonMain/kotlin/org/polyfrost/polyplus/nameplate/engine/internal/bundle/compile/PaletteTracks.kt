@@ -280,7 +280,8 @@ internal object PaletteTracks {
             }
             val ref = text?.let(ColorRef::parse)
             if (text != null && ref == null && !text.startsWith('#')) {
-                refs.add(Tone(null, molang(text, path, context) ?: return null))
+                val message = "'$text' is a constant Molang expression; write it as #hex"
+                refs.add(Tone(null, ChannelKeys.expression(text, path, context.report, context.environment, message) ?: return null))
                 continue
             }
             val problem = when {
@@ -296,15 +297,6 @@ internal object PaletteTracks {
         }
 
         return refs
-    }
-
-    private fun molang(text: String, path: String, context: Context): MolangValue? {
-        val value = MolangValue.of(text, context.environment, path, context.report.molang()) ?: return null
-        if (value is MolangValue.Constant) {
-            context.report.issue(path, "'$text' is a constant Molang expression; write it as #hex", IssueCode.MOLANG_CONSTANT)
-            return null
-        }
-        return value
     }
 
     private fun slotProblem(ref: ColorRef.Slot, tones: Map<String, Int>): String? {

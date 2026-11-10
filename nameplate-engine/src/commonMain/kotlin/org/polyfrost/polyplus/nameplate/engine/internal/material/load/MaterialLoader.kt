@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.nameplate.engine.internal.material.load
 
-import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
 import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
@@ -19,10 +18,10 @@ import org.polyfrost.polyplus.nameplate.engine.internal.material.GraphContext
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialFileJson
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialGraph
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialMargins
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialResolution
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialSpec
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialSprite
+import org.polyfrost.polyplus.nameplate.engine.internal.material.NameplateMaterialMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.ColorRef
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
 
@@ -40,18 +39,7 @@ internal class MaterialScope(
     val loop: Int,
 )
 
-internal class MaterialLoader(private val molang: MaterialMolang? = null) {
-    fun load(
-        source: BundleSource,
-        bytes: BundleBytes,
-        bundle: NameplateBundle,
-        ids: Collection<String>,
-        cycle: Int = bundle.loop,
-    ): MaterialLoad {
-        val params = bundle.params.keys + bundle.variants.values.flatMap { it.params.keys }
-        return load(source, bytes, MaterialScope(bundle.palette, params, bundle.params, bundle.fps, bundle.loop), ids, cycle)
-    }
-
+internal class MaterialLoader(private val molang: NameplateMaterialMolang) {
     fun load(
         source: BundleSource,
         bytes: BundleBytes,
@@ -106,12 +94,14 @@ internal class MaterialLoader(private val molang: MaterialMolang? = null) {
                 issueValues("limit" to MaterialLimits.MAX_MARGIN),
             )
         }
-        val outline = file.outline?.let { slotRef(it, context.palette) ?: issue(issues, "$path#outline", "must be a slot or slot[tone]") }
+        val outline = file.outline?.let { context.palette.slotRef(it) ?: issue(issues, "$path#outline", "must be a slot or slot[tone]") }
         val resolved = context.palette.resolve()
-        val toneHint = file.toneHint.mapIndexed { i, ref ->
-            argb(ref, context.palette, resolved) ?: issue(issues, "$path#toneHint[$i]", "must be a color or a slot")
+        file.toneHint.forEachIndexed { i, ref ->
+            if (argb(ref, context.palette, resolved) == null) {
+                issues += BundleIssue("$path#toneHint[$i]", "must be a color or a slot")
+            }
         }
-        val hintRefs = file.toneHint.mapNotNull { slotRef(it, context.palette) }
+        val hintRefs = file.toneHint.mapNotNull { context.palette.slotRef(it) }
         val hintColors = file.toneHint.mapNotNull { (ColorRef.parse(it) as? ColorRef.Hex)?.argb }
         val graph = GraphBuilder(path, context, issues).build(file.nodes, outline != null)
         val valid = issues.size == start && graph != null && margins.size == MARGINS
@@ -121,7 +111,6 @@ internal class MaterialLoader(private val molang: MaterialMolang? = null) {
                 margins = MaterialMargins(margins[0], margins[1], margins[2], margins[MARGINS - 1]),
                 outline = outline,
                 emissive = file.emissive,
-                toneHint = toneHint.filterNotNull().toIntArray(),
                 graph = graph,
                 backdropRefs = if (file.toneHint.isEmpty()) paletteRange(outline, graph, context.palette) else hintRefs.toIntArray(),
                 backdropColors = hintColors.toIntArray(),
@@ -207,15 +196,9 @@ internal class MaterialLoader(private val molang: MaterialMolang? = null) {
             return refs.toIntArray()
         }
 
-        fun slotRef(value: String, palette: Palette): Int? {
-            val ref = ColorRef.parse(value) as? ColorRef.Slot ?: return null
-            val slot = palette.slots.indexOfFirst { it.id == ref.id }
-            return if (slot >= 0 && ref.tone < palette.slots[slot].size) slot * Palette.MAX_TONES + ref.tone else null
-        }
-
         fun argb(value: String, palette: Palette, resolved: ResolvedPalette): Int? = when (val ref = ColorRef.parse(value)) {
             is ColorRef.Hex -> ref.argb
-            is ColorRef.Slot -> slotRef(value, palette)?.let(resolved::color)
+            is ColorRef.Slot -> palette.slotRef(value)?.let(resolved::color)
             else -> null
         }
     }

@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.nameplate.engine.internal.material.load
 
 import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
@@ -14,6 +13,12 @@ import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialSprite
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.ColorRef
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
+
+internal fun Palette.slotRef(value: String): Int? {
+    val ref = ColorRef.parse(value) as? ColorRef.Slot ?: return null
+    val slot = slots.indexOfFirst { it.id == ref.id }
+    return if (slot >= 0 && ref.tone < slots[slot].size) slot * Palette.MAX_TONES + ref.tone else null
+}
 
 internal object MaterialFiles {
     private val JSON = Json {
@@ -37,8 +42,11 @@ internal object MaterialFiles {
 
     fun <T> read(source: BundleSource, path: String, strategy: DeserializationStrategy<T>, issues: MutableList<BundleIssue>): T? {
         val text = source.text(path)
+        if (text == null) {
+            issues += BundleIssue(path, MISSING, IssueCode.MISSING_FILE)
+            return null
+        }
         val problem = when {
-            text == null -> BundleIssue(path, MISSING, IssueCode.MISSING_FILE)
             text.length > BundleLimits.MAX_JSON_CHARS -> BundleIssue(
                 path,
                 "larger than ${BundleLimits.MAX_JSON_CHARS} characters",
@@ -53,15 +61,12 @@ internal object MaterialFiles {
             )
             else -> null
         }
-        if (problem != null || text == null) {
-            issues += problem ?: BundleIssue(path, MISSING, IssueCode.MISSING_FILE)
+        if (problem != null) {
+            issues += problem
             return null
         }
         return try {
             JSON.decodeFromString(strategy, text)
-        } catch (e: SerializationException) {
-            issues += BundleIssue(path, e.message ?: "does not match the format")
-            null
         } catch (e: IllegalArgumentException) {
             issues += BundleIssue(path, e.message ?: "does not match the format")
             null
@@ -113,13 +118,11 @@ internal object MaterialFiles {
     }
 
     private fun spriteColor(path: String, value: String, palette: Palette, issues: MutableList<BundleIssue>): Int {
-        val ref = ColorRef.parse(value) as? ColorRef.Slot
-        val slot = ref?.let { palette.slots.indexOfFirst { s -> s.id == it.id } } ?: -1
-        val valid = ref != null && slot >= 0 && ref.tone < palette.slots[slot].size
-        if (!valid) {
+        val ref = palette.slotRef(value)
+        if (ref == null) {
             issues += BundleIssue(path, "must be a slot or slot[tone] of the palette")
         }
-        return if (valid) slot * Palette.MAX_TONES + ref.tone else -1
+        return ref ?: -1
     }
 
     private fun unknownCell(path: String, char: Char, issues: MutableList<BundleIssue>): Int {

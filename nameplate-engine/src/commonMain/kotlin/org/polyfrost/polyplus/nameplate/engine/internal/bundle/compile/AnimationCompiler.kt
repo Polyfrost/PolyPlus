@@ -57,7 +57,7 @@ internal object AnimationCompiler {
 
     fun perPlayer(phase: JsonElement?): Boolean = (phase as? JsonPrimitive)?.takeIf { it.isString }?.content == PER_PLAYER
 
-    private fun tracksOf(animation: AnimationJson, molang: BundleMolang): Map<String, ChannelTracks> {
+    fun tracksOf(animation: AnimationJson, molang: BundleMolang): Map<String, ChannelTracks> {
         val tracks = LinkedHashMap<String, ChannelTracks>()
         for ((target, channels) in animation.tracks) {
             ChannelKeys.compile(channels, molang)?.let { tracks[target] = it }

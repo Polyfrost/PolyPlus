@@ -83,10 +83,10 @@ fun nameplateCost(preview: NameplatePreview, flash: Boolean): NameplateCost {
         flashIssue,
         worst?.times,
         worst?.pixels,
-        issues.map { it.toJs() }.toTypedArray(),
-        ReviewWarnings.warnings(bundle).map { it.toJs() }.toTypedArray(),
+        issues.toJs(),
+        ReviewWarnings.warnings(bundle).toJs(),
         report.materialBuildOps.toDouble(),
         fallbackCosts(bundle),
-        CostBudget.infos(bundle).map { it.toJs() }.toTypedArray(),
+        CostBudget.infos(bundle).toJs(),
     )
 }

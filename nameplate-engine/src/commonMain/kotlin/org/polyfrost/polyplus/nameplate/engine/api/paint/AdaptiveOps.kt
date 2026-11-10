@@ -26,34 +26,21 @@ import org.polyfrost.polyplus.nameplate.engine.internal.canvas.PixelSprite
 import org.polyfrost.polyplus.nameplate.engine.internal.paint.LayerMemo
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MolangFrame
 
-internal fun interface SpriteImages {
-    fun image(memo: LayerMemo, bundle: NameplateBundle, layer: NameplateBundle.Layer, sprite: PixelSprite, state: Int): PixelImage
-}
-
-internal class AdaptiveOps(private val images: SpriteImages) {
+internal class AdaptiveOps(
+    private val images: (LayerMemo, NameplateBundle, NameplateBundle.Layer, PixelSprite, Int) -> PixelImage,
+) {
     class Target {
         var out: MutableList<LayerPainter.Painted> = ArrayList()
-            private set
         var index: Int = 0
-            private set
         lateinit var bundle: NameplateBundle
-            private set
         lateinit var layer: NameplateBundle.Layer
-            private set
         lateinit var rect: PixelRect
-            private set
         var frame: Int = 0
-            private set
         var seed: Int = 0
-            private set
         var state: TagState = TagState.NONE
-            private set
         var molang: MolangFrame? = null
-            private set
         lateinit var memo: LayerMemo
-            private set
         var follow: LayerPose = LayerPose.IDENTITY
-            private set
 
         fun set(
             out: MutableList<LayerPainter.Painted>,
@@ -105,7 +92,7 @@ internal class AdaptiveOps(private val images: SpriteImages) {
                     y - pixels.height / 2 + dy,
                     false,
                     pixels.width,
-                    images.image(target.memo, target.bundle, layer, pixels, state),
+                    images(target.memo, target.bundle, layer, pixels, state),
                     (this.opacity * opacity + OPACITY_HALF) / LayerPose.OPAQUE,
                 ),
             )
@@ -155,7 +142,7 @@ internal class AdaptiveOps(private val images: SpriteImages) {
                     y,
                     spot.flip,
                     pixels.width,
-                    images.image(target.memo, target.bundle, layer, pixels, state),
+                    images(target.memo, target.bundle, layer, pixels, state),
                     pose.opacity,
                 ),
             )
@@ -170,7 +157,7 @@ internal class AdaptiveOps(private val images: SpriteImages) {
 
         val shown = frameAt(target.bundle, layer, target.frame, target.seed, state = target.state, molang = target.molang)
         val pixels = sprite.framesOf(alternative)[shown]
-        val pixelsImage = images.image(target.memo, target.bundle, layer, pixels, alternative * SpriteAdaptive.STATE_STRIDE + shown)
+        val pixelsImage = images(target.memo, target.bundle, layer, pixels, alternative * SpriteAdaptive.STATE_STRIDE + shown)
         val rect = target.rect
         val length = repeat.edge.length(rect)
         val route = sprite.follow?.let { target.memo.edgeRoutes().route(it, repeat.side, rect, pixels.width, pixels.height) }

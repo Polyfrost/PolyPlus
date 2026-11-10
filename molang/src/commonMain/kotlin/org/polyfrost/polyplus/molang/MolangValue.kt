@@ -7,8 +7,6 @@ sealed class MolangValue {
 
     abstract fun evaluate(runtime: MolangRuntime): Double
 
-    internal fun snapped(runtime: MolangRuntime): Int = snap(evaluate(runtime))
-
     class Constant(val value: Double) : MolangValue() {
         override val cost: Int
             get() = 0

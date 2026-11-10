@@ -73,49 +73,77 @@ internal abstract class BinaryLane(a: Int, b: Int, out: Int, private val tag: St
         get() = tag
 }
 
-internal abstract class TernaryLane(a: Int, b: Int, c: Int, out: Int, private val tag: String) :
-    CpuOp(intArrayOf(a, b, c), intArrayOf(out)) {
+internal enum class LaneFn {
+    ABS,
+    FLOOR,
+    FRAC,
+    SIN,
+    COS,
+    EXP,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    MOD,
+    MIN,
+    MAX,
+    STEP,
+    POW,
+    ATAN2,
+    LIGHTEN,
+    DARKEN,
+    CLAMP,
+    MIX,
+    SMOOTH,
+    SELECT,
+    ;
+
+    val tag: String = name.lowercase()
+}
+
+internal class MathLane(private val fn: LaneFn, out: Int, vararg reads: Int) : CpuOp(reads, intArrayOf(out)) {
     override val params: String
-        get() = tag
-}
+        get() = fn.tag
 
-internal class AbsLane(a: Int, out: Int) : UnaryLane(a, out, "abs") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { abs(it) }
-}
-
-internal class FloorLane(a: Int, out: Int) : UnaryLane(a, out, "floor") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { floor(it) }
-}
-
-internal class FracLane(a: Int, out: Int) : UnaryLane(a, out, "frac") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { it - floor(it) }
-}
-
-internal class SinLane(a: Int, out: Int) : UnaryLane(a, out, "sin") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { Trig.sin(it) }
-}
-
-internal class CosLane(a: Int, out: Int) : UnaryLane(a, out, "cos") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { Trig.cos(it) }
-}
-
-internal class ExpLane(a: Int, out: Int) : UnaryLane(a, out, "exp") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { Exponent.exp(it) }
-}
-
-internal class TagLane(a: Int, out: Int, private val vertical: Boolean) : UnaryLane(a, out, "tag$vertical") {
     override fun run(registers: DoubleArray, count: Int, shared: CpuShared) {
-        val origin = if (vertical) shared.areaY0 else shared.areaX0
-        val size = if (vertical) shared.areaHeight else shared.areaWidth
-        lanes(registers, count, at) { (it - origin) / size }
+        val at = at
+        when (fn) {
+            LaneFn.ABS -> lanes(registers, count, at) { abs(it) }
+            LaneFn.FLOOR -> lanes(registers, count, at) { floor(it) }
+            LaneFn.FRAC -> lanes(registers, count, at) { it - floor(it) }
+            LaneFn.SIN -> lanes(registers, count, at) { Trig.sin(it) }
+            LaneFn.COS -> lanes(registers, count, at) { Trig.cos(it) }
+            LaneFn.EXP -> lanes(registers, count, at) { Exponent.exp(it) }
+            LaneFn.ADD -> lanes(registers, count, at) { x, y -> x + y }
+            LaneFn.SUB -> lanes(registers, count, at) { x, y -> x - y }
+            LaneFn.MUL -> lanes(registers, count, at) { x, y -> x * y }
+            LaneFn.DIV -> lanes(registers, count, at) { x, y -> MathNodes.div(x, y) }
+            LaneFn.MOD -> lanes(registers, count, at) { x, y -> MathNodes.mod(x, y) }
+            LaneFn.MIN -> lanes(registers, count, at) { x, y -> min(x, y) }
+            LaneFn.MAX -> lanes(registers, count, at) { x, y -> max(x, y) }
+            LaneFn.STEP -> lanes(registers, count, at) { edge, x -> if (x < edge) 0.0 else 1.0 }
+            LaneFn.POW -> lanes(registers, count, at) { x, y -> Exponent.pow(x, y) }
+            LaneFn.ATAN2 -> lanes(registers, count, at) { y, x -> Trig.atan2(y, x) }
+            LaneFn.LIGHTEN -> lanes(registers, count, at) { v, t -> v + (1.0 - v) * t }
+            LaneFn.DARKEN -> lanes(registers, count, at) { v, t -> v * (1.0 - t) }
+            LaneFn.CLAMP -> lanes(registers, count, at) { x, lo, hi -> min(max(x, lo), hi) }
+            LaneFn.MIX -> lanes(registers, count, at) { x, y, t -> MaterialNoise.mix(x, y, t) }
+            LaneFn.SMOOTH -> lanes(registers, count, at) { e0, e1, x -> MathNodes.smoothstep(e0, e1, x) }
+            LaneFn.SELECT -> lanes(registers, count, at) { c, a, b -> if (c > 0.0) b else a }
+        }
     }
 }
 
-internal class PixelScreenLane(a: Int, out: Int, private val vertical: Boolean) : UnaryLane(a, out, "screen$vertical") {
+internal class AreaLane(a: Int, out: Int, private val vertical: Boolean, private val pixelCenter: Boolean) :
+    UnaryLane(a, out, "area$vertical$pixelCenter") {
     override fun run(registers: DoubleArray, count: Int, shared: CpuShared) {
         val origin = if (vertical) shared.areaY0 else shared.areaX0
         val size = if (vertical) shared.areaHeight else shared.areaWidth
-        lanes(registers, count, at) { (floor(it) + HALF - origin) / size }
+        if (pixelCenter) {
+            lanes(registers, count, at) { (floor(it) + HALF - origin) / size }
+        } else {
+            lanes(registers, count, at) { (it - origin) / size }
+        }
     }
 
     private companion object {
@@ -129,75 +157,6 @@ internal class SecondsLane(a: Int, out: Int) : UnaryLane(a, out, "seconds") {
         val fps = shared.fps
         lanes(registers, count, at) { it * step / fps }
     }
-}
-
-internal class AddLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "add") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> x + y }
-}
-
-internal class SubLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "sub") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> x - y }
-}
-
-internal class MulLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "mul") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> x * y }
-}
-
-internal class DivLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "div") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> MathNodes.div(x, y) }
-}
-
-internal class ModLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "mod") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> MathNodes.mod(x, y) }
-}
-
-internal class MinLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "min") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> min(x, y) }
-}
-
-internal class MaxLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "max") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> max(x, y) }
-}
-
-internal class StepLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "step") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) =
-        lanes(registers, count, at) { e, x -> if (x < e) 0.0 else 1.0 }
-}
-
-internal class PowLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "pow") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { x, y -> Exponent.pow(x, y) }
-}
-
-internal class Atan2Lane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "atan2") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { y, x -> Trig.atan2(y, x) }
-}
-
-internal class LightenLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "lighten") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { v, t -> v + (1.0 - v) * t }
-}
-
-internal class DarkenLane(a: Int, b: Int, out: Int) : BinaryLane(a, b, out, "darken") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) = lanes(registers, count, at) { v, t -> v * (1.0 - t) }
-}
-
-internal class ClampLane(a: Int, b: Int, c: Int, out: Int) : TernaryLane(a, b, c, out, "clamp") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) =
-        lanes(registers, count, at) { x, lo, hi -> min(max(x, lo), hi) }
-}
-
-internal class MixLane(a: Int, b: Int, c: Int, out: Int) : TernaryLane(a, b, c, out, "mix") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) =
-        lanes(registers, count, at) { x, y, t -> MaterialNoise.mix(x, y, t) }
-}
-
-internal class SmoothLane(a: Int, b: Int, c: Int, out: Int) : TernaryLane(a, b, c, out, "smooth") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) =
-        lanes(registers, count, at) { e0, e1, x -> MathNodes.smoothstep(e0, e1, x) }
-}
-
-internal class SelectLane(condition: Int, a: Int, b: Int, out: Int) : TernaryLane(condition, a, b, out, "select") {
-    override fun run(registers: DoubleArray, count: Int, shared: CpuShared) =
-        lanes(registers, count, at) { c, a, b -> if (c > 0.0) b else a }
 }
 
 internal class DotLane(a: IntArray, b: IntArray, out: Int, private val root: Boolean) : CpuOp(a + b, intArrayOf(out)) {

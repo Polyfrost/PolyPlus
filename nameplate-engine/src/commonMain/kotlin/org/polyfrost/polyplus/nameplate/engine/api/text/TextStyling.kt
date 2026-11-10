@@ -21,26 +21,9 @@ class TextStyling(
             outline.kind == TextPaint.Kind.AUTO ||
             formatting == Formatting.ADJUST
 
-    fun candidates(): IntArray = candidates.copyOf()
-
     fun backdropHint(): IntArray = backdropHint.copyOf()
 
     fun withColor(color: TextPaint): TextStyling =
-        TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
-
-    internal fun withShadow(shadow: TextPaint): TextStyling =
-        TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
-
-    internal fun withOutline(outline: TextPaint): TextStyling =
-        TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
-
-    internal fun withFormatting(formatting: Formatting): TextStyling =
-        TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
-
-    internal fun withCandidates(vararg candidates: Int): TextStyling =
-        TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
-
-    internal fun withBackdropHint(vararg backdropHint: Int): TextStyling =
         TextStyling(color, shadow, outline, formatting, candidates, backdropHint)
 
     fun resolve(pixels: IntArray, externalRgb: Int): ResolvedText {
@@ -139,7 +122,9 @@ class TextStyling(
             IntArray(0),
         )
 
-        val DEFAULT: TextStyling = VANILLA.withFormatting(Formatting.ADJUST)
+        val DEFAULT: TextStyling = VANILLA.run {
+            TextStyling(color, shadow, outline, Formatting.ADJUST, candidates, backdropHint)
+        }
 
         private fun minRatio(rgb: Int, pixels: IntArray): Double =
             Contrast.choose(pixels, pixels.size, intArrayOf(rgb)).minRatio

@@ -67,15 +67,8 @@ internal class EdgeRoute(val xs: IntArray, val ys: IntArray, val facings: IntArr
         fun point(x: Int, y: Int): EdgeRoute = EdgeRoute(intArrayOf(x, x), intArrayOf(y, y), intArrayOf(PathMotion.NONE))
 
         private fun inside(shape: EdgeRows, side: EdgeSide, width: Int, height: Int): EdgeRoute {
-            var fitWidth = minOf(width, shape.width)
-            var fitHeight = minOf(height, shape.count)
-            var rows = shape.eroded(fitWidth, fitHeight)
-            while (rows == null) {
-                fitWidth = maxOf(1, fitWidth - 1)
-                fitHeight = maxOf(1, fitHeight - 1)
-                rows = shape.eroded(fitWidth, fitHeight)
-            }
-            return EdgeLoop(rows).route(side, (fitWidth - width) / 2, (fitHeight - height) / 2)
+            val fit = shape.fit(width, height)
+            return EdgeLoop(fit.rows).route(side, (fit.width - width) / 2, (fit.height - height) / 2)
         }
     }
 }
@@ -284,44 +277,41 @@ internal class EdgeRoutes(private val outline: BodyOutline) {
     private val ways = arrayOfNulls<Cached>(WAYS)
 
     fun geometry(path: SpritePath, rect: PixelRect, width: Int, height: Int): PathGeometry {
-        val way = way(rect, width, height)
-        ways[way]?.takeIf { it.matches(rect, width, height) }?.geometry?.let { return it }
+        cached(rect, width, height)?.geometry?.let { return it }
 
         val route = EdgeRoute.of(checkNotNull(path.follow), path.side, outline, rect, width, height)
-        val geometry = PathGeometry(path, route)
-        ways[way] = Cached(rect, width, height, route, geometry)
-        return geometry
+        return PathGeometry(path, route).also { store(Cached(rect, width, height, route, it)) }
     }
 
     fun route(follow: EdgeFollow, side: EdgeSide, rect: PixelRect, width: Int, height: Int): EdgeRoute {
-        val way = way(rect, width, height)
-        ways[way]?.takeIf { it.matches(rect, width, height) }?.route?.let { return it }
+        cached(rect, width, height)?.route?.let { return it }
 
-        val route = EdgeRoute.of(follow, side, outline, rect, width, height)
-        ways[way] = Cached(rect, width, height, route, null)
-        return route
+        return EdgeRoute.of(follow, side, outline, rect, width, height).also { store(Cached(rect, width, height, it, null)) }
     }
 
     fun rows(rect: PixelRect, width: Int, height: Int): EdgeRows? {
-        val way = way(rect, width, height)
-        ways[way]?.takeIf { it.matches(rect, width, height) }?.rows?.let { return it }
+        cached(rect, width, height)?.rows?.let { return it }
 
-        val rows = outline.rows(rect)?.fitted(width, height)
-        ways[way] = Cached(rect, width, height, null, null, rows)
-        return rows
+        return outline.rows(rect)?.fitted(width, height).also { store(Cached(rect, width, height, null, null, it)) }
     }
 
     fun spot(follow: EdgeFollow, place: OrnamentAnchor, rect: PixelRect, width: Int, height: Int): Long {
-        val way = way(rect, width, height)
-        val cached = ways[way]?.takeIf { it.matches(rect, width, height) && it.route != null }
-            ?: Cached(rect, width, height, EdgeRoute.of(follow, EdgeSide.PERIMETER, outline, rect, width, height), null)
-                .also { ways[way] = it }
+        val cached = cached(rect, width, height)?.takeIf { it.route != null }
+            ?: store(Cached(rect, width, height, EdgeRoute.of(follow, EdgeSide.PERIMETER, outline, rect, width, height), null))
         val spots = cached.spots
         spots.firstOrNull { it?.place === place }?.let { return it.spot }
 
         val spot = checkNotNull(cached.route).nearest(place.edgeX(rect), place.edgeY(rect), width, height)
         spots[if (spots[0] == null) 0 else 1] = PlacedSpot(place, spot)
         return spot
+    }
+
+    private fun cached(rect: PixelRect, width: Int, height: Int): Cached? =
+        ways[way(rect, width, height)]?.takeIf { it.matches(rect, width, height) }
+
+    private fun store(cached: Cached): Cached {
+        ways[way(cached.rect, cached.width, cached.height)] = cached
+        return cached
     }
 
     private fun way(rect: PixelRect, width: Int, height: Int): Int =

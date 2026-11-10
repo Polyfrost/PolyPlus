@@ -47,14 +47,13 @@ internal object CpuDeps {
     const val INDEX = 4
 
     private val POSITION_KINDS = setOf("PixelPos", "PixelCell", "TagUV", "ScreenPos", "PixelScreenPos")
-    private val FRAME_KINDS = setOf("Frame", "SteppedTime")
 
     fun of(node: GraphNode, memo: MutableMap<GraphNode, Int>): Int {
         memo[node]?.let { return it }
-        var mask = when (node.kind.type) {
-            in POSITION_KINDS -> POSITION
-            in FRAME_KINDS -> FRAME
-            "RepeatIndex" -> INDEX
+        var mask = when {
+            node.kind.type in POSITION_KINDS -> POSITION
+            node.readsFrame -> FRAME
+            node.kind.type == "RepeatIndex" -> INDEX
             else -> 0
         }
         for (input in node.inputs) {
@@ -218,13 +217,12 @@ internal class CpuCompiler(private val shared: CpuShared) {
 
     private fun reduce(reduce: Reduce, a: Int, b: Int): Int {
         val out = regs.allocate(1)
-        emit(
-            when (reduce) {
-                Reduce.MIN -> MinLane(a, b, out)
-                Reduce.MAX -> MaxLane(a, b, out)
-                else -> AddLane(a, b, out)
-            },
-        )
+        val fn = when (reduce) {
+            Reduce.MIN -> LaneFn.MIN
+            Reduce.MAX -> LaneFn.MAX
+            else -> LaneFn.ADD
+        }
+        emit(MathLane(fn, out, a, b))
         return regs.resolve(out)
     }
 
@@ -232,7 +230,7 @@ internal class CpuCompiler(private val shared: CpuShared) {
         val offset = regs.resolve(by)
         if (regs.kind(offset) == CpuRegs.CONSTANT && regs.value(offset) == 0.0) return base
         val out = regs.allocate(1)
-        emit(AddLane(base, offset, out))
+        emit(MathLane(LaneFn.ADD, out, base, offset))
         return regs.resolve(out)
     }
 

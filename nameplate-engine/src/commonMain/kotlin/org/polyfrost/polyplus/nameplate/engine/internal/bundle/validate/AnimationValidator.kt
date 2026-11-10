@@ -2,9 +2,9 @@ package org.polyfrost.polyplus.nameplate.engine.internal.bundle.validate
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import org.polyfrost.polyplus.molang.MolangEnvironment
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
 import org.polyfrost.polyplus.nameplate.engine.api.limit.BundleLimits
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.framesOf
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.AdaptiveCompiler
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.AnimationCompiler
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.ChannelKeys
@@ -27,6 +27,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.PLATE_TARGE
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.Trigger
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.IssueSink
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
+import org.polyfrost.polyplus.nameplate.engine.internal.issue.keyValues
 import org.polyfrost.polyplus.nameplate.engine.internal.text.TEXT_TARGET
 import org.polyfrost.polyplus.nameplate.engine.internal.track.BundleMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MaterialParamTracks
@@ -59,9 +60,7 @@ internal class AnimationValidator(
             if (layer !is SpriteLayerJson) continue
             val path = BundleFiles.layerPath(id)
             layer.timeline?.let { checkTimeline("$path#timeline", it, id, layer) }
-            if (layer.mirrorDelay < 0) {
-                report("$path#mirrorDelay", "must be 0 or more")
-            }
+            report.ensure(layer.mirrorDelay >= 0, "$path#mirrorDelay", "must be 0 or more")
         }
         for ((name, animation) in manifest.animations) {
             checkAnimation("$MANIFEST#animations.$name", name, animation)
@@ -69,7 +68,7 @@ internal class AnimationValidator(
     }
 
     private fun checkTimeline(path: String, timeline: List<TimelineStepJson>, id: String, layer: SpriteLayerJson) {
-        val frames = frameCount(layer)
+        val frames = BundleFiles.frameCount(sprites[layer.sprite])
         val cycle = manifest.loop / (steps[id] ?: 1).coerceAtLeast(1)
         var total = 0L
         for ((i, held) in timeline.withIndex()) {
@@ -225,18 +224,14 @@ internal class AnimationValidator(
     }
 
     private fun checkSchedule(path: String, schedule: ScheduleJson) {
-        if (schedule.window < 1) {
-            report("$path.window", "must be at least 1")
-        }
-        if (schedule.jitter < 0) {
-            report("$path.jitter", "must be 0 or more")
-        }
-        if (schedule.chance !in 0.0..1.0) {
-            report("$path.chance", "must be 0 to 1")
-        }
-        if (schedule.weight !in 1..BundleLimits.MAX_SCHEDULE_WEIGHT) {
-            report("$path.weight", "must be 1 to ${BundleLimits.MAX_SCHEDULE_WEIGHT}")
-        }
+        report.ensure(schedule.window >= 1, "$path.window", "must be at least 1")
+        report.ensure(schedule.jitter >= 0, "$path.jitter", "must be 0 or more")
+        report.ensure(schedule.chance in 0.0..1.0, "$path.chance", "must be 0 to 1")
+        report.ensure(
+            schedule.weight in 1..BundleLimits.MAX_SCHEDULE_WEIGHT,
+            "$path.weight",
+            "must be 1 to ${BundleLimits.MAX_SCHEDULE_WEIGHT}",
+        )
     }
 
     private fun checkLength(path: String, length: Int?, schedule: ScheduleJson) {
@@ -250,15 +245,10 @@ internal class AnimationValidator(
 
     private fun checkSharing(path: String, id: String, name: String, schedule: ScheduleJson) {
         val (firstName, first) = firstOfSchedule.getOrPut(id) { name to schedule }
-        if (first.window != schedule.window) {
-            report("$path.window", "must match '$firstName', which shares schedule '$id'")
-        }
-        if (first.jitter != schedule.jitter) {
-            report("$path.jitter", "must match '$firstName', which shares schedule '$id'")
-        }
-        if (first.chance != schedule.chance) {
-            report("$path.chance", "must match '$firstName', which shares schedule '$id'")
-        }
+        val mismatch = "must match '$firstName', which shares schedule '$id'"
+        report.ensure(first.window == schedule.window, "$path.window", mismatch)
+        report.ensure(first.jitter == schedule.jitter, "$path.jitter", mismatch)
+        report.ensure(first.chance == schedule.chance, "$path.chance", mismatch)
     }
 
     private fun checkTarget(path: String, id: String, scheduleId: String?): Boolean {
@@ -287,11 +277,92 @@ internal class AnimationValidator(
         }
     }
 
-    private fun frameCount(layer: SpriteLayerJson): Int? = sprites[layer.sprite]?.let(BundleFiles::framesOf)?.size
-
     private companion object {
         const val MANIFEST = BundleFiles.MANIFEST
 
         val BADGE_CHANNELS: Set<String> = setOf(ChannelKeys.POSITION, ChannelKeys.OPACITY, ChannelKeys.VISIBLE)
+    }
+}
+
+internal class TrackValidator(
+    private val layers: Map<String, LayerFileJson>,
+    private val sprites: Map<String, SpriteFileJson>,
+    private val report: IssueSink,
+    private val environment: MolangEnvironment,
+) {
+    fun validate(path: String, channel: String, element: JsonElement, target: String, length: Int?) {
+        val sprite = layers[target] as? SpriteLayerJson
+        if (channel == ChannelKeys.FRAME && sprite == null) {
+            report(path, "frame tracks need a sprite layer")
+            return
+        }
+
+        val keys = ChannelKeys.parse(channel, element, path, report, environment) ?: return
+        if (keys.steps.isEmpty()) {
+            report(path, "needs at least one key")
+            return
+        }
+
+        val frames = sprite?.let { BundleFiles.frameCount(sprites[it.sprite]) }
+        for (i in keys.steps.indices) {
+            checkStep("$path[$i]", keys.steps, i, length)
+            if (channel == ChannelKeys.FRAME && frames != null && keys.molang[i] == null && keys.values[i] !in 0 until frames) {
+                report("$path[$i]", "frame must be 0 to ${frames - 1}")
+            }
+        }
+    }
+
+    private fun checkStep(path: String, steps: IntArray, index: Int, length: Int?) {
+        val step = steps[index]
+        when {
+            index == 0 && step != 0 -> report.issue(path, "the first key must be at step 0", IssueCode.KEY_START, keyValues(step, length))
+            index > 0 && step <= steps[index - 1] ->
+                report.issue(path, "keys must be in increasing step order", IssueCode.KEY_ORDER, keyValues(step, length))
+            step < 0 || (length != null && step >= length) ->
+                report.issue(path, "step must be inside the animation's length", IssueCode.KEY_RANGE, keyValues(step, length))
+            step > BundleLimits.MAX_TRACK_STEP -> report(path, "step must be at most ${BundleLimits.MAX_TRACK_STEP}")
+        }
+    }
+}
+
+internal class TriggerValidator(private val loop: Int, private val report: IssueSink) {
+    fun validate(path: String, animation: AnimationJson, element: JsonElement): Int? {
+        val trigger = TriggerCompiler.parse(element, "$path.trigger", report) ?: return null
+        animation.reduced?.let { reduced ->
+            when {
+                trigger !is Trigger.While -> report.issue(
+                    "$path.reduced",
+                    "only while reactions take reduced; one-shots never play when motion is reduced",
+                    IssueCode.REDUCED_WHILE,
+                )
+                reduced != TriggerCompiler.REDUCED_AUTO && reduced != TriggerCompiler.REDUCED_DROP ->
+                    report.issue(
+                        "$path.reduced",
+                        "must be \"${TriggerCompiler.REDUCED_AUTO}\" or \"${TriggerCompiler.REDUCED_DROP}\"",
+                        IssueCode.REDUCED_CHOICE,
+                    )
+            }
+        }
+        if (trigger is Trigger.While) {
+            if (animation.length != null) {
+                report("$path.length", "a while reaction plays in the loop's frames; it takes no length")
+            }
+            if (animation.restart != null) {
+                report("$path.restart", "only one-shots take restart")
+            }
+            return loop
+        }
+
+        val length = animation.length
+        return when {
+            length == null -> failed("$path.length", "a one-shot needs a length in frames")
+            length !in 1..BundleLimits.MAX_LOOP -> failed("$path.length", "must be 1 to ${BundleLimits.MAX_LOOP} frames")
+            else -> length
+        }
+    }
+
+    private fun failed(path: String, message: String): Int? {
+        report(path, message)
+        return null
     }
 }
