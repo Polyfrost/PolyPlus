@@ -14,7 +14,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-internal class EosVoicechatServerSocket(private val bridge: EosSdkBridge) : VoicechatSocket {
+internal class EosVoicechatServerSocket : VoicechatSocket {
     private val logger = LogManager.getLogger()
     private val inbound = LinkedBlockingQueue<RawUdpPacket>()
 
@@ -61,6 +61,11 @@ internal class EosVoicechatServerSocket(private val bridge: EosSdkBridge) : Voic
 
     override fun send(data: ByteArray, address: SocketAddress) {
         if (address is EosVoicechatAddress) {
+            val bridge = EosVoicechatBridge.currentBridge()
+            if (bridge == null) {
+                logger.warn("Asked to send a P2P voice packet to {}, but the EOS bridge isn't installed, dropping it.", address.remote)
+                return
+            }
             bridge.sendPacket(EosVoicechatBridge.SOCKET_ID, address.remote, ByteBuffer.wrap(data), EosSdkBridge.PacketReliability.UnreliableUnordered)
             return
         }

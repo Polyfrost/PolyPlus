@@ -29,16 +29,6 @@ class P2PVoicechatPlugin : VoicechatPlugin {
     }
 
     private fun onServerStarting(event: VoicechatServerStartingEvent) {
-        if (P2PSessionManager.currentSessionId == null) {
-            return
-        }
-        val bridge = EosVoicechatBridge.currentBridge()
-        if (bridge == null) {
-            LOGGER.warn("Hosting a world over PolyPlus P2P, but the EOS bridge isn't installed. We can't route voice chat over it, falling back to default UDP (probably won't reach the peers).")
-            return
-        }
-
-        LOGGER.info("Routing Simple Voice Chat through P2P.")
-        event.socketImplementation = EosVoicechatServerSocket(bridge)
+        event.socketImplementation = EosVoicechatServerSocket()
     }
 }
