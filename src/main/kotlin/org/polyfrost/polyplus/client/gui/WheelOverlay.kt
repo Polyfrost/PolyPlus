@@ -9,6 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import net.minecraft.client.Minecraft
+//? if > 1.8.9 {
+import org.lwjgl.system.Platform
+import org.lwjgl.system.windows.User32
+//?}
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -163,8 +167,7 @@ object WheelOverlay {
     private fun physical(button: Int): Int {
         //? if > 1.8.9 {
         val swapped = runCatching {
-            org.lwjgl.system.Platform.get() == org.lwjgl.system.Platform.WINDOWS &&
-                org.lwjgl.system.windows.User32.GetSystemMetrics(org.lwjgl.system.windows.User32.SM_SWAPBUTTON) != 0
+            Platform.get() == Platform.WINDOWS && User32.GetSystemMetrics(User32.SM_SWAPBUTTON) != 0
         }.getOrDefault(false)
         return if (swapped) 1 - button else button
         //?} else {

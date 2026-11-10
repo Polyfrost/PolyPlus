@@ -26,6 +26,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.abs
 
 object PartyPings {
     private val LOGGER = LogManager.getLogger()
@@ -320,7 +321,7 @@ object PartyPings {
         return times.size < limit
     }
 
-    private fun validCoord(value: Double): Boolean = value.isFinite() && kotlin.math.abs(value) <= MAX_COORD
+    private fun validCoord(value: Double): Boolean = value.isFinite() && abs(value) <= MAX_COORD
 
     private fun fits(value: String): Boolean = value.length <= MAX_FIELD
 

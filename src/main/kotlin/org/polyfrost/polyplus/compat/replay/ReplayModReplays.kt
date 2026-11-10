@@ -2,10 +2,19 @@ package org.polyfrost.polyplus.compat.replay
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+//? if >= 26.3
+import com.mojang.blaze3d.Blaze3D
 import net.fabricmc.loader.api.FabricLoader
+//? if >= 1.21.11 && < 26.3
+//import net.minecraft.util.Util
+//? if > 1.8.9 && < 1.21.11
+//import net.minecraft.Util
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.Mods
+//? if = 1.8.9
+//import java.awt.Desktop
 import java.io.File
+import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.nio.file.Files
@@ -40,7 +49,7 @@ object ReplayModReplays : ReplayProvider {
         val instance: Field = replayClass.getField("instance")
         val replayHandler: Method = replayClass.getMethod("getReplayHandler")
         val startReplay: Method = replayClass.getMethod("startReplay", File::class.java)
-        val viewer: java.lang.reflect.Constructor<*> = Class.forName("com.replaymod.replay.gui.screen.GuiReplayViewer").getConstructor(replayClass)
+        val viewer: Constructor<*> = Class.forName("com.replaymod.replay.gui.screen.GuiReplayViewer").getConstructor(replayClass)
         val display: Method = Class.forName("com.replaymod.lib.de.johni0702.minecraft.gui.container.AbstractGuiScreen").getMethod("display")
     }
 
@@ -209,13 +218,11 @@ object ReplayModReplays : ReplayProvider {
         ClientPlatform.runOnMain {
             runCatching {
                 //? if >= 26.3 {
-                com.mojang.blaze3d.Blaze3D.openPath(dir)
-                //?} elif >= 1.21.11 {
-                /*net.minecraft.util.Util.getPlatform().openPath(dir)
-                *///?} elif > 1.8.9 {
-                /*net.minecraft.Util.getPlatform().openPath(dir)
+                Blaze3D.openPath(dir)
+                //?} elif > 1.8.9 {
+                /*Util.getPlatform().openPath(dir)
                 *///?} else {
-                /*java.awt.Desktop.getDesktop().open(dir.toFile())
+                /*Desktop.getDesktop().open(dir.toFile())
                 *///?}
             }
         }

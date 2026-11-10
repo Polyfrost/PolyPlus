@@ -2,14 +2,22 @@ package org.polyfrost.polyplus.compat.replay
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+//? if >= 26.3
+import com.mojang.blaze3d.Blaze3D
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.gui.screens.Screen
+//? if >= 1.21.11 && < 26.3
+//import net.minecraft.util.Util
+//? if > 1.8.9 && < 1.21.11
+//import net.minecraft.Util
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.lobby.LobbyCompat
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.Mods
 import org.polyfrost.polyplus.compat.Reflect
 import org.polyfrost.polyplus.compat.ReflectiveHook
+//? if = 1.8.9
+//import java.awt.Desktop
 import java.io.IOException
 import java.io.InputStreamReader
 import java.lang.reflect.Constructor
@@ -185,13 +193,11 @@ object FlashbackReplays : ReplayProvider {
         ClientPlatform.runOnMain {
             runCatching {
                 //? if >= 26.3 {
-                com.mojang.blaze3d.Blaze3D.openPath(folder)
-                //?} elif >= 1.21.11 {
-                /*net.minecraft.util.Util.getPlatform().openPath(folder)
-                *///?} elif > 1.8.9 {
-                /*net.minecraft.Util.getPlatform().openPath(folder)
+                Blaze3D.openPath(folder)
+                //?} elif > 1.8.9 {
+                /*Util.getPlatform().openPath(folder)
                 *///?} else {
-                /*java.awt.Desktop.getDesktop().open(folder.toFile())
+                /*Desktop.getDesktop().open(folder.toFile())
                 *///?}
             }.onFailure { logFailure(it) }
         }

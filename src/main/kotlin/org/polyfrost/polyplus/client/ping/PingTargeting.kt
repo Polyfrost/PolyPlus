@@ -15,6 +15,7 @@ import net.minecraft.world.entity.projectile.Projectile
 import net.minecraft.world.entity.vehicle.ContainerEntity
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.EntityHitResult
+import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 //?} else {
 /*import net.minecraft.block.Block
@@ -94,7 +95,7 @@ internal object PingTargeting {
         }
 
         val blocks = level.clip(ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.ANY, camera))
-        val blockMissed = blocks.type == net.minecraft.world.phys.HitResult.Type.MISS
+        val blockMissed = blocks.type == HitResult.Type.MISS
         var nearest = if (blockMissed) reach * reach else blocks.location.distanceToSqr(eye)
         var picked: Entity? = null
         var pickedAt = eye

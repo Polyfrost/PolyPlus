@@ -2,8 +2,10 @@ package org.polyfrost.polyplus.client.lobby
 
 import net.minecraft.core.BlockPos
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class LobbySurvey(val origin: BlockPos, val minY: Int, val realm: LobbyRealm = LobbyRealm.OVERWORLD) {
@@ -609,8 +611,8 @@ object LobbySceneScore {
     private fun cameraFits(room: LobbyRoom, cellX: Int, cellZ: Int, height: Int): Boolean = (0 until CAMERA_HEADINGS).any { heading ->
         val angle = heading * Math.PI * 2.0 / CAMERA_HEADINGS
         (1..CAMERA_REACH).all { step ->
-            val x = cellX + (kotlin.math.cos(angle) * step).roundToInt()
-            val z = cellZ + (kotlin.math.sin(angle) * step).roundToInt()
+            val x = cellX + (cos(angle) * step).roundToInt()
+            val z = cellZ + (sin(angle) * step).roundToInt()
             if (abs(x) > LobbyRoom.RADIUS || abs(z) > LobbyRoom.RADIUS) return@all false
             val index = room.index(x, z)
             val kind = room.kind[index]

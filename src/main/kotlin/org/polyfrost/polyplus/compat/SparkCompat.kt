@@ -4,6 +4,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
+//? if = 1.8.9
+//import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.notifications.v1.NotificationAction
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -159,7 +161,7 @@ internal object SparkCompat {
                 //? if > 1.8.9 {
                 Minecraft.getInstance().keyboardHandler.setClipboard(text)
                 //?} else {
-                /*net.minecraft.client.gui.screens.Screen.setClipboard(text)
+                /*Screen.setClipboard(text)
                 *///?}
             }
         }
