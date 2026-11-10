@@ -1,7 +1,7 @@
 package org.polyfrost.polyplus.client.bedrock.controller
 
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
-import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
+import org.polyfrost.polyplus.client.bedrock.molang.MolangScalar
+import org.polyfrost.polyplus.client.bedrock.molang.MolangScript
 
 data class BedrockAnimationControllerFile(
     val controllers: Map<String, BedrockAnimationController>,
@@ -16,17 +16,17 @@ data class BedrockAnimationController(
 data class ControllerState(
     val name: String,
     val animations: List<StateAnimation>,
-    val onEntry: List<MolangStatement> = emptyList(),
-    val onExit: List<MolangStatement> = emptyList(),
+    val onEntry: List<MolangScript> = emptyList(),
+    val onExit: List<MolangScript> = emptyList(),
     val transitions: List<ControllerTransition> = emptyList(),
 )
 
 data class StateAnimation(
     val animationName: String,
-    val weight: MolangExpr = MolangExpr.Number(1.0),
+    val weight: MolangScalar = MolangScalar.ONE,
 )
 
 data class ControllerTransition(
     val targetState: String,
-    val condition: MolangExpr,
+    val condition: MolangScalar,
 )
