@@ -324,6 +324,8 @@
     //? if sodium && >= 1.21.10 && < 26.1
     //"compat.sodium.MixinSodiumWorldRendererLobby",
     //? if > 1.8.9
+    "compat.voicechat.MixinClientManager",
+    //? if > 1.8.9
     "compat.waveycapes.MixinCustomCapeRenderer",
     //? if > 1.8.9
     "compat.waveycapes.MixinCustomCapeRenderLayer",

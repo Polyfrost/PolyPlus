@@ -219,6 +219,8 @@ object P2PSessionManager {
                 LOGGER.info("Consent withdrawn; shutting EOS down.")
                 bridge = null
                 authJob?.cancel()
+                //? if > 1.8.9
+                EosVoicechatBridge.uninstall()
                 P2PPackTransport.uninstall()
                 shutDownForConsent = true
                 stopHosting()
@@ -258,6 +260,8 @@ object P2PSessionManager {
             if (P2PPackTransport.handlePacket(received)) return@setInboundPacketHandler
             if (PartyMesh.handlePacket(received)) return@setInboundPacketHandler
             if (SceneTransfer.handlePacket(received)) return@setInboundPacketHandler
+            //? if > 1.8.9
+            if (EosVoicechatBridge.handlePacket(received)) return@setInboundPacketHandler
 
             val channel = P2PChannelRegistry.get(received.socket, received.remote)
             if (channel == null) {
@@ -268,6 +272,8 @@ object P2PSessionManager {
         }
         bridge.setLoginLostHandler { authenticate(bridge) }
         P2PPackTransport.install(bridge)
+        //? if > 1.8.9
+        EosVoicechatBridge.install(bridge)
 
         authenticate(bridge)
     }
@@ -341,6 +347,8 @@ object P2PSessionManager {
             bridge = null
             authJob?.cancel()
             stallReported = false
+            //? if > 1.8.9
+            EosVoicechatBridge.uninstall()
             P2PPackTransport.uninstall()
             _status.value = EosStatus.Connecting
         }

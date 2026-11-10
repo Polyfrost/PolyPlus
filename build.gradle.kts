@@ -134,6 +134,7 @@ repositories {
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
     strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
+    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
     strictMaven("https://maven.taumc.org/releases", "TauMC", "org.embeddedt.celeritas")
 }
 
@@ -174,9 +175,11 @@ configurations.all {
 if (isOrnithe) {
     sourceSets.main {
         val excluded = listOf(
+            "**/client/network/p2p/P2PVoicechatPlugin.kt",
             "**/mixin/client/MixinGameNarrator.java",
             "**/mixin/client/access/HolderReferenceInvoker.java",
             "**/mixin/client/MixinGuiMessage.java",
+            "**/client/network/p2p/EosVoicechat*.kt",
             "**/mixin/compat/animatium/**",
             "**/mixin/compat/essential/**",
             "**/mixin/compat/euphoria/**",
@@ -184,6 +187,7 @@ if (isOrnithe) {
             "**/mixin/compat/polytone/**",
             "**/mixin/compat/rrls/**",
             "**/mixin/compat/sodium/**",
+            "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",
             "**/mixin/compat/wwaypoints/**",
         )
@@ -341,6 +345,7 @@ dependencies {
 
     if (!isOrnithe) {
         modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+        modCompileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.20") { isTransitive = false }
     }
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
     // This is a library, not a traditional mod. It must not use modRuntimeOnly,
