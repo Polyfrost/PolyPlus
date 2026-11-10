@@ -57,6 +57,14 @@ object PolyPlusMainMenuConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Compact Pause Menu Buttons",
+        description = "Put PolyPlus's pause menu buttons in rows under the menu's own buttons, without the player preview.",
+        subcategory = "Pause Menu",
+    )
+    var compactPauseMenuPanel = false
+
+    @JvmStatic
+    @Switch(
         title = "Hide Quickplay",
         description = "Hide the Quickplay recent servers panel on the PolyPlus main menu.",
         subcategory = "Elements",
