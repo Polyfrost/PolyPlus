@@ -31,16 +31,16 @@ internal class WardrobeStoreData {
     suspend fun load() {
         loading = true
         featuredLoading = true
-        val types = CosmeticType.entries.filter { it != CosmeticType.Unknown }
+        val types = CosmeticType.entries.filter { it.listed }
         coroutineScope {
             launch {
                 val popularFetched = async {
                     CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Popularity).getOrNull()
-                        ?.also { response -> popular = response.results.filter { it.type != CosmeticType.Unknown } }
+                        ?.also { response -> popular = response.results.filter { it.type.listed } }
                 }
                 val newestFetched = async {
                     CosmeticStore.search(perPage = FEATURED_ROW_SIZE, sort = CosmeticStore.Sort.Newest).getOrNull()
-                        ?.also { response -> newest = response.results.filter { it.type != CosmeticType.Unknown } }
+                        ?.also { response -> newest = response.results.filter { it.type.listed } }
                 }
                 val bundlesFetched = async {
                     BundleCatalog.search(perPage = FEATURED_ROW_SIZE).getOrNull()

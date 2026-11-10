@@ -74,6 +74,7 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
 import org.polyfrost.polyplus.client.gui.preview.PreviewTint
+import org.polyfrost.polyplus.client.nameplate.NameplateRegistry
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -127,6 +128,7 @@ internal fun OutfitThumbnail(outfit: OutfitInfo, modifier: Modifier) {
 private fun isOutfitAssetLoaded(slot: BodySlot, id: Int): Boolean = when (slot) {
     BodySlot.Cape -> CosmeticAssetCache.isCapeLoaded(id)
     BodySlot.Pet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+    BodySlot.Nameplate -> NameplateRegistry.isLoaded(id)
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 

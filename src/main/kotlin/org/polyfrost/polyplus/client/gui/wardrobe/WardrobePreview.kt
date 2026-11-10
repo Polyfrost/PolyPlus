@@ -63,6 +63,7 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 @Composable
@@ -88,17 +89,35 @@ internal fun PreviewPanel(
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
             ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
-        PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-            source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
-            autoSpin = false,
-            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
-            initialYaw = FRONT_YAW_DEG,
-            live = true,
-            rotation = rotation,
-        )
+        val nameplate = selected?.takeIf { it.type == CosmeticType.Nameplate }
+        val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
+        var headingHeight by remember { mutableIntStateOf(0) }
+        if (nameplate != null) {
+            val headingSpace = with(LocalDensity.current) { headingHeight.toDp() }
+            NameplateStage(
+                selectedVariantId,
+                nameplate.name,
+                Modifier.fillMaxSize().padding(top = headingSpace),
+                selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
+            ) {
+                if (variants.isNotEmpty()) VariantsCard(variants, selectedVariantId, onSelectVariant)
+            }
+        } else {
+            PlayerPreview(
+                Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+                source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
+                autoSpin = false,
+                verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+                initialYaw = FRONT_YAW_DEG,
+                live = true,
+                rotation = rotation,
+            )
+        }
         ResetRotationButton(rotation, onResetRotation)
-        Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.align(Alignment.TopStart).onSizeChanged { headingHeight = it.height }.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
             if (title != null) {
                 Column {
@@ -110,25 +129,13 @@ internal fun PreviewPanel(
                 SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
             }
         }
-        val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
-        if (variants.isNotEmpty() || showAuraColor) {
+        val overlayVariants = if (nameplate == null) variants else emptyList()
+        if (overlayVariants.isNotEmpty() || showAuraColor) {
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (variants.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(ppShape(12.dp))
-                            .background(OneConfigTheme.current.chipBackground)
-                            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        SocialText("Variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
-                        VariantChips(variants, selectedVariantId, onSelectVariant)
-                    }
-                }
+                if (overlayVariants.isNotEmpty()) VariantsCard(overlayVariants, selectedVariantId, onSelectVariant)
                 if (showAuraColor) {
                     PreviewPill(
                         auraColor = auraColor,
@@ -139,6 +146,21 @@ internal fun PreviewPanel(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VariantsCard(variants: List<CosmeticVariantUi>, selectedVariantId: Int?, onSelect: (Int) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .clip(ppShape(12.dp))
+            .background(OneConfigTheme.current.chipBackground)
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SocialText("Variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        VariantChips(variants, selectedVariantId, onSelect)
     }
 }
 

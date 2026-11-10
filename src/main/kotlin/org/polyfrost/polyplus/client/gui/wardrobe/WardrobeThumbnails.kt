@@ -48,7 +48,12 @@ internal fun CosmeticThumbnail(
     modifier: Modifier,
     checker: Boolean = true,
     coverAssetId: Int? = null,
+    cosmeticId: Int? = null,
 ) {
+    if (type == CosmeticType.Nameplate) {
+        NameplateThumbnail(cosmeticId, modifier)
+        return
+    }
     val framing = cosmeticPreviewFraming(type)
     Box(modifier) {
         if (checker) CheckerThumbnail(Modifier.fillMaxSize())
