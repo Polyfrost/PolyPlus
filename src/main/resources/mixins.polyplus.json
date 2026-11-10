@@ -144,6 +144,8 @@
     "client.nameplate.SpriteContentsAccessor",
     //? if >= 1.21.1
     "client.nameplate.StringSplitterAccessor",
+    //? if = 1.8.9
+    //"client.nameplate.BufferBuilderAccessor",
     //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",
     //? if > 1.8.9
