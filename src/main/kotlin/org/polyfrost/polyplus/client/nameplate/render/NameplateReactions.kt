@@ -22,24 +22,7 @@ object NameplateReactions {
     private val held = arrayOfNulls<TagState>(1 shl Reaction.entries.size)
 
     //? if >= 1.21.1 {
-    fun state(player: Player, nameplate: BoundNameplate, frame: Int): TagState {
-        val motion = NameplateBinding.settings.motion
-        val mask = mask(player) or NameplateTryOn.reactionMask(player.uuid)
-        if (motion == NameplateMotion.OFF) {
-            NameplateTryOn.drainShots(player.uuid)
-            return held(inputsOf(mask))
-        }
-
-        val state = record.update(player.uuid, nameplate.bundle, nameplate.variant, frame, inputsOf(mask), nameplate.seed)
-        if (motion != NameplateMotion.FULL) {
-            NameplateTryOn.drainShots(player.uuid)
-            return held(state.inputs)
-        }
-        val shots = NameplateTryOn.drainShots(player.uuid)
-        if (shots.isEmpty()) return state
-        shots.forEach { record.fire(player.uuid, nameplate.bundle, it, frame) }
-        return record.state(player.uuid)
-    }
+    fun state(player: Player, nameplate: BoundNameplate, frame: Int): TagState = state(player.uuid, nameplate, frame, mask(player))
 
     private fun mask(player: Player): Int {
         var mask = 0
@@ -73,25 +56,7 @@ object NameplateReactions {
         return mask
     }
     //?} else {
-    /*fun state(player: PlayerEntity, nameplate: BoundNameplate, frame: Int): TagState {
-        val motion = NameplateBinding.settings.motion
-        val uuid = player.uuid
-        val mask = mask(player) or NameplateTryOn.reactionMask(uuid)
-        if (motion == NameplateMotion.OFF) {
-            NameplateTryOn.drainShots(uuid)
-            return held(inputsOf(mask))
-        }
-
-        val state = record.update(uuid, nameplate.bundle, nameplate.variant, frame, inputsOf(mask), nameplate.seed)
-        if (motion != NameplateMotion.FULL) {
-            NameplateTryOn.drainShots(uuid)
-            return held(state.inputs)
-        }
-        val shots = NameplateTryOn.drainShots(uuid)
-        if (shots.isEmpty()) return state
-        shots.forEach { record.fire(uuid, nameplate.bundle, it, frame) }
-        return record.state(uuid)
-    }
+    /*fun state(player: PlayerEntity, nameplate: BoundNameplate, frame: Int): TagState = state(player.uuid, nameplate, frame, mask(player))
 
     private fun mask(player: PlayerEntity): Int {
         var mask = 0
@@ -119,6 +84,25 @@ object NameplateReactions {
         return mask
     }
     *///?}
+
+    private fun state(uuid: UUID, nameplate: BoundNameplate, frame: Int, playerMask: Int): TagState {
+        val motion = NameplateBinding.settings.motion
+        val mask = playerMask or NameplateTryOn.reactionMask(uuid)
+        if (motion == NameplateMotion.OFF) {
+            NameplateTryOn.drainShots(uuid)
+            return held(inputsOf(mask))
+        }
+
+        val state = record.update(uuid, nameplate.bundle, nameplate.variant, frame, inputsOf(mask), nameplate.seed)
+        if (motion != NameplateMotion.FULL) {
+            NameplateTryOn.drainShots(uuid)
+            return held(state.inputs)
+        }
+        val shots = NameplateTryOn.drainShots(uuid)
+        if (shots.isEmpty()) return state
+        shots.forEach { record.fire(uuid, nameplate.bundle, it, frame) }
+        return record.state(uuid)
+    }
 
     private fun inputsOf(mask: Int): TagInputs = inputs[mask] ?: TagInputs.ofMask(mask).also { inputs[mask] = it }
 

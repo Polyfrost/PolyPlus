@@ -129,7 +129,6 @@ object LegacyNameplateRenderer {
         LegacyVertexSink.record()
         try {
             NameplateDecorations.submit(frame, bound.nameplate, bound.frame, bound.state, bound.detailed, bound.badge, tag.gapX)
-            LegacyVertexSink.stopRecording()
             LegacyVertexSink.drawRecorded(overText = false, depthMask)
         } finally {
             LegacyVertexSink.stopRecording()

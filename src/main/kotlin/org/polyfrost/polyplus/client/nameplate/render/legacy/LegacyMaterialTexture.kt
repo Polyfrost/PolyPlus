@@ -182,13 +182,10 @@ object LegacyMaterialTexture {
             return
         }
         lastSweep = now
-        val iterator = entries.values.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (now - entry.lastUsed >= IDLE_NANOS) {
-                entry.texture.clearGlId()
-                iterator.remove()
-            }
+        entries.values.removeAll { entry ->
+            val idle = now - entry.lastUsed >= IDLE_NANOS
+            if (idle) entry.texture.clearGlId()
+            idle
         }
     }
 }

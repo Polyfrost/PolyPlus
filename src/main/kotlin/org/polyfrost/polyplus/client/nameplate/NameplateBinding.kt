@@ -1,17 +1,12 @@
 package org.polyfrost.polyplus.client.nameplate
 
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
-import java.util.UUID
 
 class BoundNameplate(
     val bundle: NameplateBundle,
     val variant: NameplateBundle.Variant,
     val seed: Int,
 )
-
-fun interface NameplateSource {
-    fun boundFor(player: UUID): BoundNameplate?
-}
 
 enum class NameplateMotion {
     FULL,
@@ -28,9 +23,6 @@ class NameplateRenderSettings(
 )
 
 object NameplateBinding {
-    @Volatile
-    var source: NameplateSource = NameplateSource { null }
-
     @Volatile
     var settings: NameplateRenderSettings = NameplateRenderSettings()
 }

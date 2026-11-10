@@ -22,6 +22,7 @@ import net.minecraft.resources.Identifier
 import net.minecraft.util.Util
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.nameplate.PipelineCacheAccessor
 import org.polyfrost.polyplus.nameplate.engine.api.material.Material
 import java.util.Optional
@@ -46,8 +47,10 @@ object NameplateMaterialPipelines {
         if (entry.program !== program && entry.program.fragmentSource != program.fragmentSource && mismatched.add(program.hash)) {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
-        onRenderThread { compile(entry) }
-        onRenderThread { NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE) }
+        ClientPlatform.runOnMain {
+            compile(entry)
+            NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+        }
         return entry.status
     }
 
@@ -70,28 +73,10 @@ object NameplateMaterialPipelines {
         NameplateShaderSources.remove(program)
     }
 
-    internal fun compileNow(pipeline: RenderPipeline): CompiledRenderPipeline? {
-        val current = generation ?: return null
-        current.acquire()
-        try {
-            return RenderSystem.getDevice().compilePipeline(pipeline, current.source, Util.backgroundExecutor()).join().finishCompile()
-        } finally {
-            current.release()
-        }
-    }
-
-    internal fun parityPipeline(program: NameplateShaderProgram): RenderPipeline = shared(program, materialLayout(program))
-        .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-        .withLocation(Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "pipeline/nameplate_material_${program.hash}_parity"))
-        .withShaderDefine(PARITY)
-        .withColorTargetState(ColorTargetState.DEFAULT)
-        .build()
-
     @JvmStatic
     fun onShadersApplied(cache: PipelineCache) {
         NameplateMaterialAssets.onResourcesReloaded()
-        generation?.retire()
+        generation?.release()
         val includes = ShaderManager.listAllIncludes(Minecraft.getInstance().resourceManager)
         val next = Generation(++generations, cache, NameplateShaderSource(includes))
         generation = next
@@ -111,8 +96,13 @@ object NameplateMaterialPipelines {
         entry.generation = current.id
         current.acquire()
         val device = RenderSystem.getDevice()
-        val pipelines = entry.pipelines
-        val futures = pipelines.map { device.compilePipeline(it, current.source, Util.backgroundExecutor()) }
+        val futures = try {
+            entry.pipelines.map { device.compilePipeline(it, current.source, Util.backgroundExecutor()) }
+        } catch (e: RuntimeException) {
+            current.release()
+            fail(entry, List(entry.pipelines.size) { null }, e)
+            return
+        }
         CompletableFuture.allOf(*futures.toTypedArray()).whenCompleteAsync({ _, _ ->
             try {
                 finish(entry, current, futures)
@@ -163,19 +153,7 @@ object NameplateMaterialPipelines {
             "backend" to info.backendName(),
             "type" to info.type().toString(),
         )
-        LOGGER.error(
-            "Nameplate material {} failed to compile ({}) on {} / {} / {} ({}); the CPU fallback draws it",
-            hash, failed, info.name(), info.vendorName(), info.driverInfo(), info.backendName(), error,
-        )
-        NameplateShaderFailures.report(NameplateShaderFailure(hash, failed, driver, device.lastDebugMessages.toList(), error))
-    }
-
-    private fun onRenderThread(block: () -> Unit) {
-        if (RenderSystem.isOnRenderThread()) {
-            block()
-        } else {
-            Minecraft.getInstance().execute { block() }
-        }
+        NameplateShaderFailures.report(hash, failed, driver, device.lastDebugMessages.toList(), error)
     }
 
     class Entry internal constructor(val program: NameplateShaderProgram) {
@@ -195,20 +173,19 @@ object NameplateMaterialPipelines {
         init {
             val material = materialLayout(program)
             val location = "nameplate_material_${program.hash}"
-            pipeline = shared(program, material)
-                .withShaderDefine(BLOCKS, blocks)
-                .withBindGroupLayout(BindGroupLayouts.GLOBALS)
-                .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-                .withLocation(Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "pipeline/$location"))
-                .withColorTargetState(ColorTargetState(blend(program.blend)))
-                .withDepthStencilState(TRANSLUCENT_DEPTH)
-                .build()
-            depthPipeline = if (program.blend == Material.Blend.ALPHA) {
+            val scene = { suffix: String ->
                 shared(program, material)
                     .withShaderDefine(BLOCKS, blocks)
                     .withBindGroupLayout(BindGroupLayouts.GLOBALS)
                     .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-                    .withLocation(Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "pipeline/${location}_depth"))
+                    .withLocation(Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "pipeline/$location$suffix"))
+            }
+            pipeline = scene("")
+                .withColorTargetState(ColorTargetState(blend(program.blend)))
+                .withDepthStencilState(TRANSLUCENT_DEPTH)
+                .build()
+            depthPipeline = if (program.blend == Material.Blend.ALPHA) {
+                scene("_depth")
                     .withShaderDefine(DEPTH_ONLY)
                     .withColorTargetState(DEPTH_ONLY_TARGET)
                     .withDepthStencilState(DepthStencilState.DEFAULT)
@@ -226,14 +203,13 @@ object NameplateMaterialPipelines {
     }
 
     private const val OIT_ADDITIVE = "OIT_ADDITIVE"
-    private const val PARITY = "NAMEPLATE_PARITY"
     private const val RELEASED = -1
     private const val DEPTH_ONLY = "NAMEPLATE_DEPTH_ONLY"
     private const val BLOCKS = "NAMEPLATE_BLOCKS"
     private const val MAX_UNIFORM_BLOCK_BYTES = 16384
     private const val MAX_BLOCKS = 127
 
-    internal val UNEXTENDED_VERTEX_FORMAT = DefaultVertexFormat.PARTICLE
+    private val UNEXTENDED_VERTEX_FORMAT = DefaultVertexFormat.PARTICLE
 
     private val TRANSLUCENT_DEPTH = DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false)
     private val DEPTH_ONLY_TARGET = ColorTargetState(Optional.empty(), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_NONE)
@@ -273,10 +249,6 @@ object NameplateMaterialPipelines {
                 source.close()
             }
         }
-
-        fun retire() {
-            release()
-        }
     }
 }
 //?} elif = 26.2 {
@@ -293,11 +265,11 @@ import com.mojang.blaze3d.shaders.ShaderType
 import com.mojang.blaze3d.shaders.UniformType
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.BindGroupLayouts
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.nameplate.engine.api.material.Material
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
@@ -323,8 +295,10 @@ object NameplateMaterialPipelines {
         if (entry.program !== program && entry.program.fragmentSource != program.fragmentSource && mismatched.add(program.hash)) {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
-        onRenderThread { schedule(entry) }
-        onRenderThread { NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE) }
+        ClientPlatform.runOnMain {
+            schedule(entry)
+            NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+        }
         return entry.status
     }
 
@@ -432,11 +406,7 @@ object NameplateMaterialPipelines {
             "backend" to info.backendName(),
             "type" to info.type().toString(),
         )
-        LOGGER.error(
-            "Nameplate material {} failed to compile ({}) on {} / {} / {} ({}); the CPU fallback draws it",
-            hash, failed, info.name(), info.vendorName(), info.driverInfo(), info.backendName(), error,
-        )
-        NameplateShaderFailures.report(NameplateShaderFailure(hash, failed, driver, device.lastDebugMessages.toList(), error))
+        NameplateShaderFailures.report(hash, failed, driver, device.lastDebugMessages.toList(), error)
     }
 
     private fun addSources(program: NameplateShaderProgram) {
@@ -447,14 +417,6 @@ object NameplateMaterialPipelines {
     private fun removeSources(program: NameplateShaderProgram) {
         if (entries[program.hash] == null) {
             stages.remove(Stage(program.fragmentShader, ShaderType.FRAGMENT))
-        }
-    }
-
-    private fun onRenderThread(block: () -> Unit) {
-        if (RenderSystem.isOnRenderThread()) {
-            block()
-        } else {
-            Minecraft.getInstance().execute { block() }
         }
     }
 
@@ -539,11 +501,11 @@ import com.mojang.blaze3d.shaders.UniformType
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat
-import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.nameplate.render.NameplateLayer
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.nameplate.engine.api.material.Material
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -580,8 +542,10 @@ object NameplateMaterialPipelines {
         if (entry.program !== program && entry.program.fragmentSource != program.fragmentSource && mismatched.add(program.hash)) {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
-        onRenderThread { enqueue(entry) }
-        onRenderThread { NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE) }
+        ClientPlatform.runOnMain {
+            enqueue(entry)
+            NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+        }
         return entry.status
     }
 
@@ -677,19 +641,7 @@ object NameplateMaterialPipelines {
             "driver" to device.version,
             "backend" to device.backendName,
         )
-        LOGGER.error(
-            "Nameplate material {} failed to compile ({}) on {} / {} / {} ({}); the CPU fallback draws it",
-            hash, failed, device.renderer, device.vendor, device.version, device.backendName, error,
-        )
-        NameplateShaderFailures.report(NameplateShaderFailure(hash, failed, driver, device.lastDebugMessages.toList(), error))
-    }
-
-    private fun onRenderThread(block: () -> Unit) {
-        if (RenderSystem.isOnRenderThread()) {
-            block()
-        } else {
-            Minecraft.getInstance().execute { block() }
-        }
+        NameplateShaderFailures.report(hash, failed, driver, device.lastDebugMessages.toList(), error)
     }
 
     class Entry internal constructor(val program: NameplateShaderProgram) {
@@ -776,11 +728,10 @@ private fun depthOnly(builder: RenderPipeline.Builder): RenderPipeline.Builder =
 }
 ^///?}
 *///?} elif >= 1.21.1 {
-/*import com.mojang.blaze3d.systems.RenderSystem
-import net.minecraft.client.Minecraft
-import net.minecraft.resources.Identifier
+/*import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.nameplate.render.NameplateLayer
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.nameplate.engine.api.material.Material
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -800,9 +751,9 @@ object NameplateMaterialPipelines {
         if (entry.program !== program && entry.program.fragmentSource != program.fragmentSource && mismatched.add(program.hash)) {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
-        onRenderThread { enqueue(entry) }
+        ClientPlatform.runOnMain { enqueue(entry) }
         //? if = 1.21.5 {
-        /^onRenderThread { NameplateIris.assign(entry.pipelines.map { it.pipeline }, program.emissive || program.blend == Material.Blend.ADDITIVE) }
+        /^ClientPlatform.runOnMain { NameplateIris.assign(entry.pipelines.map { it.pipeline }, program.emissive || program.blend == Material.Blend.ADDITIVE) }
         ^///?}
         return entry.status
     }
@@ -818,7 +769,7 @@ object NameplateMaterialPipelines {
         entry.generation = RELEASED
         entry.status = NameplateShaderStatus.PENDING
         queue.remove(entry)
-        onRenderThread { entry.close() }
+        ClientPlatform.runOnMain { entry.close() }
     }
 
     @JvmStatic
@@ -892,20 +843,7 @@ object NameplateMaterialPipelines {
         if (!reported.add(hash)) {
             return
         }
-        val driver = NameplateFlatVariant.driver()
-        LOGGER.error(
-            "Nameplate material {} failed to compile ({}) on {} / {} / {} ({}); the CPU fallback draws it",
-            hash, listOf(variant.label), driver["name"], driver["vendor"], driver["driver"], driver["backend"], error,
-        )
-        NameplateShaderFailures.report(NameplateShaderFailure(hash, listOf(variant.label), driver, NameplateFlatVariant.debugMessages(), error))
-    }
-
-    private fun onRenderThread(block: () -> Unit) {
-        if (RenderSystem.isOnRenderThread()) {
-            block()
-        } else {
-            Minecraft.getInstance().execute { block() }
-        }
+        NameplateShaderFailures.report(hash, listOf(variant.label), NameplateFlatVariant.driver(), NameplateFlatVariant.debugMessages(), error)
     }
 
     class Entry internal constructor(val program: NameplateShaderProgram) {

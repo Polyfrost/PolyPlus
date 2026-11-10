@@ -85,8 +85,6 @@ object NameplateCanvas {
     ) : Run
     //?}
 
-    fun renderType(): NameplateLayer = NameplateLayers.text(WHITE)
-
     fun submit(
         frame: NameplateFrame,
         bundle: NameplateBundle,
@@ -243,7 +241,7 @@ object NameplateCanvas {
         val now = System.nanoTime()
         NameplateStrips.sweep(now)
         val rows = stripRows(ops, palette, now)
-        val renderType = if (rows == null) renderType() else NameplateStrips.renderType()
+        val renderType = if (rows == null) NameplateLayers.text(WHITE) else NameplateStrips.renderType()
         val renderer = NameplateGeometry { pose, buffer ->
             try {
                 for ((k, op) in ops.withIndex()) {
@@ -353,11 +351,7 @@ object NameplateCanvas {
             }
             val y0 = (op.y + top).toFloat()
             val y1 = (op.y + bottom).toFloat()
-            val color = PortraitGuard.vertex(argb)
-            vertex(buffer, pose, x0, y1, z, u, v, light, color)
-            vertex(buffer, pose, x1, y1, z, u, v, light, color)
-            vertex(buffer, pose, x1, y0, z, u, v, light, color)
-            vertex(buffer, pose, x0, y0, z, u, v, light, color)
+            quad(buffer, pose, x0, y0, x1, y1, z, u, u, v, light, PortraitGuard.vertex(argb))
         }
         if (rows != null) {
             drawStrips(buffer, pose, op, rows, z, light, alpha)
@@ -411,11 +405,7 @@ object NameplateCanvas {
             }
             val y0 = (op.y + top).toFloat()
             val y1 = (op.y + bottom).toFloat()
-            val v = NameplateStrips.v(row)
-            vertex(buffer, pose, x0, y1, z, u0, v, light, color)
-            vertex(buffer, pose, x1, y1, z, u1, v, light, color)
-            vertex(buffer, pose, x1, y0, z, u1, v, light, color)
-            vertex(buffer, pose, x0, y0, z, u0, v, light, color)
+            quad(buffer, pose, x0, y0, x1, y1, z, u0, u1, NameplateStrips.v(row), light, color)
         }
     }
 
@@ -426,8 +416,24 @@ object NameplateCanvas {
         NameplateBundle.Depth.OVER_TEXT -> OVER_TEXT
     }
 
-    private fun vertex(buffer: NameplateVertexSink, pose: NameplatePose, x: Float, y: Float, z: Float, u: Float, v: Float, light: Int, color: Int) {
-        Vertices.add(buffer, pose, x, y, z).setUv(u, v).setLight(light).setColor(color)
+    private fun quad(
+        buffer: NameplateVertexSink,
+        pose: NameplatePose,
+        x0: Float,
+        y0: Float,
+        x1: Float,
+        y1: Float,
+        z: Float,
+        u0: Float,
+        u1: Float,
+        v: Float,
+        light: Int,
+        color: Int,
+    ) {
+        Vertices.add(buffer, pose, x0, y1, z).setUv(u0, v).setLight(light).setColor(color)
+        Vertices.add(buffer, pose, x1, y1, z).setUv(u1, v).setLight(light).setColor(color)
+        Vertices.add(buffer, pose, x1, y0, z).setUv(u1, v).setLight(light).setColor(color)
+        Vertices.add(buffer, pose, x0, y0, z).setUv(u0, v).setLight(light).setColor(color)
     }
 
     private class ColorSink : (Int) -> Unit {

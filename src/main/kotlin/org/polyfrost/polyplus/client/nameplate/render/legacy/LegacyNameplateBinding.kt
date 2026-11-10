@@ -50,7 +50,7 @@ object LegacyNameplateBinding {
     private const val BADGE_PAD = 1f
     private const val WHITE_RGB = 0xFFFFFF
 
-    private class DisplayName(var time: Long, var text: String)
+    private class DisplayName(val time: Long, val text: String)
 
     private val names = WeakHashMap<Entity, DisplayName>()
 
@@ -88,12 +88,7 @@ object LegacyNameplateBinding {
             return cached.text
         }
         val text = entity.displayName.formattedString
-        if (cached == null) {
-            names[entity] = DisplayName(time, text)
-        } else {
-            cached.time = time
-            cached.text = text
-        }
+        names[entity] = DisplayName(time, text)
         return text
     }
 

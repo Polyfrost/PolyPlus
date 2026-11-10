@@ -19,15 +19,13 @@ object PolyNametagPadding {
             }
             val padX = (found.paddingX.invoke(found.instance) as Float).roundToInt()
             val padY = (found.paddingY.invoke(found.instance) as Float).roundToInt()
-            vanilla.expandBy(padX, padY)
+            PixelRect(vanilla.x0 - padX, vanilla.y0 - padY, vanilla.x1 + padX, vanilla.y1 + padY)
         } catch (e: ReflectiveOperationException) {
             config = null
             LOGGER.warn("PolyNametag padding could not be read; nameplates use vanilla's background rect", e)
             vanilla
         }
     }
-
-    private fun PixelRect.expandBy(dx: Int, dy: Int): PixelRect = PixelRect(x0 - dx, y0 - dy, x1 + dx, y1 + dy)
 
     private class Config(
         val instance: Any,

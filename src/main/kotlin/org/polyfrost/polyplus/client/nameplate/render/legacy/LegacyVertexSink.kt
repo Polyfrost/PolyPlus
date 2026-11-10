@@ -109,12 +109,7 @@ object LegacyVertexSink : NameplateVertexSink {
             append(manager.get(texture)?.glId ?: return, NO_MATERIAL, x, y, renderer)
             return
         }
-        collect(x, y, renderer)
-        if (size > 0) {
-            val direct = LegacyTagBatch.flush()
-            Minecraft.getInstance().textureManager.bind(texture)
-            flush(data, size, direct)
-        }
+        drawNow(x, y, renderer) { Minecraft.getInstance().textureManager.bind(texture) }
     }
 
     fun draw(glId: Int, x: Float, y: Float, renderer: NameplateGeometry) {
@@ -122,12 +117,7 @@ object LegacyVertexSink : NameplateVertexSink {
             append(glId, NO_MATERIAL, x, y, renderer)
             return
         }
-        collect(x, y, renderer)
-        if (size > 0) {
-            val direct = LegacyTagBatch.flush()
-            GlStateManager.bindTexture(glId)
-            flush(data, size, direct)
-        }
+        drawNow(x, y, renderer) { GlStateManager.bindTexture(glId) }
     }
 
     fun drawMaterial(draw: LegacyMaterialGpu.Draw, x: Float, y: Float, renderer: NameplateGeometry) {
@@ -136,14 +126,18 @@ object LegacyVertexSink : NameplateVertexSink {
             append(0, materials.size - 1, x, y, renderer)
             return
         }
+        drawNow(x, y, renderer, { LegacyMaterialGpu.end(draw) }) { LegacyMaterialGpu.begin(draw) }
+    }
+
+    private inline fun drawNow(x: Float, y: Float, renderer: NameplateGeometry, after: () -> Unit = {}, bind: () -> Unit) {
         collect(x, y, renderer)
         if (size > 0) {
             val direct = LegacyTagBatch.flush()
-            LegacyMaterialGpu.begin(draw)
+            bind()
             try {
                 flush(data, size, direct)
             } finally {
-                LegacyMaterialGpu.end(draw)
+                after()
             }
         }
     }

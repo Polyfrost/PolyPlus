@@ -25,7 +25,7 @@ import kotlin.io.path.name
 object NameplateLoader {
     private val LOGGER = LogManager.getLogger("PolyPlus/Nameplates")
 
-    val CAPABILITIES: Set<String> = setOf("canvas", "sprites", "flags", MaterialLayer.CAPABILITY, Layout.CAPABILITY)
+    private val CAPABILITIES: Set<String> = setOf("canvas", "sprites", "flags", MaterialLayer.CAPABILITY, Layout.CAPABILITY)
 
     private const val MIB = 1024L * 1024
 
@@ -35,8 +35,7 @@ object NameplateLoader {
     private const val JSON_EXTENSION = ".json"
     private const val PNG_EXTENSION = ".png"
     private const val APPLE_DOUBLE_PREFIX = "._"
-    private const val MAX_JSON_BYTES = MIB
-    private const val MAX_PNG_BYTES = MIB
+    private const val MAX_FILE_BYTES = MIB
     private const val MAX_REPORTED_ISSUES = 50
 
     private class Parsed(val hash: String, val bundle: NameplateBundle?)
@@ -77,7 +76,7 @@ object NameplateLoader {
         return bundle
     }
 
-    fun parse(dir: Path): BundleLoad = try {
+    private fun parse(dir: Path): BundleLoad = try {
         val files = readFiles(dir)
         val result = BundleLoader(CAPABILITIES).load(BundleSource.of(files.texts), BundleBytes.of(files.bytes))
         //? if >= 1.21.1 || = 1.8.9 {
@@ -108,9 +107,8 @@ object NameplateLoader {
                 val normalized = path.toAbsolutePath().normalize()
                 if (!normalized.startsWith(root)) continue
                 val size = Files.size(normalized)
-                val limit = if (json) MAX_JSON_BYTES else MAX_PNG_BYTES
-                if (size > limit) {
-                    LOGGER.warn("Ignoring nameplate file {}: larger than {} bytes", normalized, limit)
+                if (size > MAX_FILE_BYTES) {
+                    LOGGER.warn("Ignoring nameplate file {}: larger than {} bytes", normalized, MAX_FILE_BYTES)
                     continue
                 }
                 if (total + size > ARCHIVE_LIMITS.maxExtractedBytes) {

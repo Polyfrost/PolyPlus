@@ -36,9 +36,7 @@ object LegacyPolyNametag {
             textRgb = if (rgb == RGB) ResolvedText.UNSET else rgb
             textShadow = found.textShadow.invoke(null, false) as Boolean
         } catch (e: ReflectiveOperationException) {
-            hooks = null
-            clear()
-            LOGGER.warn("PolyNametag settings could not be read; nameplates ignore its height, color and shadow", e)
+            disable("PolyNametag settings could not be read; nameplates ignore its height, color and shadow", e)
         }
     }
 
@@ -47,11 +45,15 @@ object LegacyPolyNametag {
         return try {
             found.textColor.invoke(null, color) as Int
         } catch (e: ReflectiveOperationException) {
-            hooks = null
-            clear()
-            LOGGER.warn("PolyNametag text color could not be read; nameplates use vanilla's", e)
+            disable("PolyNametag text color could not be read; nameplates use vanilla's", e)
             color
         }
+    }
+
+    private fun disable(message: String, error: ReflectiveOperationException) {
+        hooks = null
+        clear()
+        LOGGER.warn(message, error)
     }
 
     private fun clear() {

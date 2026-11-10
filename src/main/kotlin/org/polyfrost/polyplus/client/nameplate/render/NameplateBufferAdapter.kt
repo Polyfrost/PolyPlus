@@ -33,9 +33,6 @@ object NameplateBufferAdapter {
         var light = 0
         var outline = 0
 
-        val pending: Boolean
-            get() = operation != null
-
         fun store(
             operation: Operation<*>,
             font: Font,

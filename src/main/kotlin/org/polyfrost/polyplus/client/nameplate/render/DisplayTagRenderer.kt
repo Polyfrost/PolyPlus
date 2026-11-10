@@ -75,14 +75,12 @@ object DisplayTagRenderer {
 
         val nameplate = binding.nameplate
         val layout = NameplateText.layout(Minecraft.getInstance().font, text, binding.profileName)
-        val nameStart = layout.nameStart
-        val nameEnd = layout.nameEnd
         val beside = binding.badge && nameplate.variant.badge.placement.kind != BadgeStyling.Placement.Kind.PLACED
         val shape = block(info, flags, binding, layout.nameX, layout.nameWidth, beside)
         val block = shape.placed(layout.prefixWidth, PixelRect.vanillaBackground(shape.width, shape.height))
 
         val resolved = NameplatePaint.text(nameplate, block, ResolvedText.UNSET)
-        val restyled = NameplateText.restyleLine(text, nameStart, nameEnd, resolved, dropShadow)
+        val restyled = NameplateText.restyleLine(text, layout.nameStart, layout.nameEnd, resolved, dropShadow)
         var outline = outlineColor
         if (outline == 0 && !seeThrough && resolved.outline != ResolvedText.UNSET) {
             outline = ARGB.color(visible, PortraitGuard.vertex(resolved.outline))

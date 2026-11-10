@@ -26,8 +26,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.paint.MaterialOp
 import kotlin.math.roundToInt
 
 object NameplateMaterialDraw {
-    const val MAX_DRAWS_PER_FRAME: Int = 1024
-
+    private const val MAX_DRAWS_PER_FRAME = 1024
     private const val OPAQUE = 255
     private const val CHANNEL = 255f
     //? if >= 26.3 {

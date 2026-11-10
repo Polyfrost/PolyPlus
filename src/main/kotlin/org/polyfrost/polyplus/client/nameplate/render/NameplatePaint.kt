@@ -170,25 +170,19 @@ object NameplatePaint {
     }
 
     fun badge(nameplate: BoundNameplate, block: TagBlock, x: Int, y: Int): ResolvedBadge {
-        val styling = nameplate.variant.badge
-        val sampled = styling.needsBackdrop
-        val key = if (sampled) placementKey(block.width, block.height, y, x, 0) else 0L
+        val key = placementKey(block.width, block.height, y, x, 0)
         return badges.getOrPut(nameplate.variant) { LruMap() }.getOrPut(key) {
-            val pixels = if (sampled) {
-                BackdropPixels.collect(
-                    backdrop(nameplate, block),
-                    block.width,
-                    block.height,
-                    x,
-                    y,
-                    x + BadgeStyling.CELLS_WIDE,
-                    y + BadgeStyling.CELLS_HIGH,
-                    NO_PIXELS,
-                )
-            } else {
-                NO_PIXELS
-            }
-            styling.resolve(pixels)
+            val pixels = BackdropPixels.collect(
+                backdrop(nameplate, block),
+                block.width,
+                block.height,
+                x,
+                y,
+                x + BadgeStyling.CELLS_WIDE,
+                y + BadgeStyling.CELLS_HIGH,
+                NO_PIXELS,
+            )
+            nameplate.variant.badge.resolve(pixels)
         }
     }
 

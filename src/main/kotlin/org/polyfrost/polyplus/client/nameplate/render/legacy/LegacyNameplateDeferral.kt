@@ -50,7 +50,7 @@ object LegacyNameplateDeferral {
         var distance = 0.0
     }
 
-    private class Sight(var eyeCell: Long, var tagCell: Long, var time: Long, var blocked: Boolean)
+    private class Sight(val eyeCell: Long, val tagCell: Long, val time: Long, val blocked: Boolean)
 
     private val entries = ArrayList<Entry>()
     private val byDistance = Comparator<Entry> { a, b -> b.distance.compareTo(a.distance) }
@@ -191,14 +191,7 @@ object LegacyNameplateDeferral {
             return cached.blocked
         }
         val blocked = march(world, ex, ey, ez, px, py, pz)
-        if (cached == null) {
-            sights[entity] = Sight(eyeCell, tagCell, time, blocked)
-        } else {
-            cached.eyeCell = eyeCell
-            cached.tagCell = tagCell
-            cached.time = time
-            cached.blocked = blocked
-        }
+        sights[entity] = Sight(eyeCell, tagCell, time, blocked)
         return blocked
     }
 

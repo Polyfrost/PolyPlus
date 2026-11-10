@@ -280,7 +280,7 @@ object PreviewFramebuffer {
         }
     }
 
-    internal fun resyncGlState() {
+    private fun resyncGlState() {
         GlStateManager.disableDepthTest(); GlStateManager.enableDepthTest()
         GlStateManager.depthFunc(GL11.GL_ALWAYS); GlStateManager.depthFunc(GL11.GL_LEQUAL)
         GlStateManager.depthMask(false); GlStateManager.depthMask(true)

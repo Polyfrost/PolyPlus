@@ -23,13 +23,16 @@ object NameplateIrisTarget {
 
     private const val PATH = "pipeline/nameplate_material_"
     private const val PREFIX = "${PolyPlusConstants.ID}:$PATH"
-    private const val PARITY = "_parity"
     private const val MAX_TARGETS = 4
+    private const val BLEND_STORAGE = "net.irisshaders.iris.gl.blending.BlendModeStorage"
+    private const val RESTORE_BLEND = "restoreBlend"
 
     @JvmField
     val enabled: Boolean = FabricLoader.getInstance().isModLoaded("iris")
 
-    private val access: Access? by lazy { Access.create() }
+    private val access: IrisFramebufferAccess? by lazy {
+        if (enabled) IrisFramebufferAccess.create(listOf(BLEND_STORAGE to RESTORE_BLEND)) else null
+    }
     private val targets = ArrayList<Target>(MAX_TARGETS)
 
     @Volatile
@@ -52,7 +55,7 @@ object NameplateIrisTarget {
         }
     }
 
-    private fun owns(label: String): Boolean = !broken && label.startsWith(PREFIX) && !label.endsWith(PARITY)
+    private fun owns(label: String): Boolean = !broken && label.startsWith(PREFIX)
     //?} else {
     /*@JvmStatic
     fun beforeApply(pipeline: RenderPipeline) {
@@ -74,7 +77,7 @@ object NameplateIrisTarget {
         }
         val location = pipeline.location
         val path = location.path
-        return location.namespace == PolyPlusConstants.ID && path.startsWith(PATH) && !path.endsWith(PARITY)
+        return location.namespace == PolyPlusConstants.ID && path.startsWith(PATH)
     }
     *///?}
 
@@ -87,7 +90,7 @@ object NameplateIrisTarget {
     private fun unlockBlend() {
         val api = access ?: return
         try {
-            api.unlockBlend()
+            api.unlock()
         } catch (e: ReflectiveOperationException) {
             fail(e)
         } catch (e: RuntimeException) {
@@ -119,6 +122,7 @@ object NameplateIrisTarget {
         if (targets.size >= MAX_TARGETS) {
             GlStateManager._glDeleteFramebuffers(targets.removeAt(0).fbo)
         }
+        val previous = GL33C.glGetInteger(GL33C.GL_FRAMEBUFFER_BINDING)
         val fbo = GlStateManager.glGenFramebuffers()
         GlStateManager._glBindFramebuffer(GL33C.GL_FRAMEBUFFER, fbo)
         GlStateManager._glFramebufferTexture2D(GL33C.GL_FRAMEBUFFER, GL33C.GL_COLOR_ATTACHMENT0, GL33C.GL_TEXTURE_2D, color, 0)
@@ -126,6 +130,7 @@ object NameplateIrisTarget {
         GL33C.glDrawBuffers(GL33C.GL_COLOR_ATTACHMENT0)
         val status = GL33C.glCheckFramebufferStatus(GL33C.GL_FRAMEBUFFER)
         if (status != GL33C.GL_FRAMEBUFFER_COMPLETE) {
+            GlStateManager._glBindFramebuffer(GL33C.GL_FRAMEBUFFER, previous)
             GlStateManager._glDeleteFramebuffers(fbo)
             fail(IllegalStateException("framebuffer status 0x${Integer.toHexString(status)}"))
             return null
@@ -141,97 +146,6 @@ object NameplateIrisTarget {
     private class Target(val framebuffer: Any, val color: Int, val depth: GlTexture, val fbo: Int) {
         fun matches(framebuffer: Any, color: Int, depth: GlTexture): Boolean =
             this.framebuffer === framebuffer && this.color == color && this.depth === depth
-    }
-
-    private class Access(
-        private val manager: Method,
-        private val current: Method,
-        private val rendering: Class<*>,
-        private val overrides: Method,
-        private val before: Field,
-        private val shaderMap: Method,
-        private val shader: Method,
-        private val text: Any,
-        private val attachment: Method,
-        private val restoreBlend: Method,
-    ) {
-        private val writers = HashMap<Class<*>, Pair<Field, Field>?>()
-
-        fun framebuffer(): Any? {
-            val pipeline = current.invoke(manager.invoke(null) ?: return null) ?: return null
-            if (!rendering.isInstance(pipeline) || overrides.invoke(pipeline) != true) {
-                return null
-            }
-            val program = shader.invoke(shaderMap.invoke(pipeline), text) ?: return null
-            val (beforeTranslucent, afterTranslucent) = writers.getOrPut(program.javaClass) { writers(program.javaClass) } ?: return null
-            return (if (before.getBoolean(pipeline)) beforeTranslucent else afterTranslucent).get(program)
-        }
-
-        fun color(framebuffer: Any): Int = attachment.invoke(framebuffer, 0) as Int
-
-        fun unlockBlend() {
-            restoreBlend.invoke(null)
-        }
-
-        private fun writers(type: Class<*>): Pair<Field, Field>? {
-            val before = field(type, BEFORE) ?: return null
-            val after = field(type, AFTER) ?: return null
-            return before to after
-        }
-
-        private fun field(type: Class<*>, name: String): Field? {
-            var current: Class<*>? = type
-            while (current != null) {
-                current.declaredFields.firstOrNull { it.name == name }?.let {
-                    it.isAccessible = true
-                    return it
-                }
-                current = current.superclass
-            }
-            return null
-        }
-
-        companion object {
-            private const val BEFORE = "writingToBeforeTranslucent"
-            private const val AFTER = "writingToAfterTranslucent"
-
-            fun create(): Access? {
-                if (!enabled) {
-                    return null
-                }
-                return try {
-                    val iris = load("net.irisshaders.iris.Iris")
-                    val manager = iris.getMethod("getPipelineManager")
-                    val current = load("net.irisshaders.iris.pipeline.PipelineManager").getMethod("getPipelineNullable")
-                    val rendering = load("net.irisshaders.iris.pipeline.IrisRenderingPipeline")
-                    val keys = load("net.irisshaders.iris.pipeline.programs.ShaderKey")
-                    val text = keys.enumConstants.first { (it as Enum<*>).name == "TEXT" }
-                    Access(
-                        manager,
-                        current,
-                        rendering,
-                        rendering.getMethod("shouldOverrideShaders"),
-                        rendering.getField("isBeforeTranslucent"),
-                        rendering.getMethod("getShaderMap"),
-                        load("net.irisshaders.iris.pipeline.programs.ShaderMap").getMethod("getShader", keys),
-                        text,
-                        load("net.irisshaders.iris.gl.framebuffer.GlFramebuffer").getMethod("getColorAttachment", Int::class.javaPrimitiveType),
-                        load("net.irisshaders.iris.gl.blending.BlendModeStorage").getMethod("restoreBlend"),
-                    )
-                } catch (e: ReflectiveOperationException) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                } catch (e: NoSuchElementException) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                } catch (e: LinkageError) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                }
-            }
-
-            private fun load(name: String): Class<*> = Class.forName(name, false, NameplateIrisTarget::class.java.classLoader)
-        }
     }
 }
 //?}
@@ -258,7 +172,18 @@ object NameplateIrisTarget {
     @JvmField
     val enabled: Boolean = FabricLoader.getInstance().isModLoaded("iris")
 
-    private val access: Access? by lazy { Access.create() }
+    private val access: IrisFramebufferAccess? by lazy {
+        if (enabled) {
+            IrisFramebufferAccess.create(
+                listOf(
+                    "net.irisshaders.iris.gl.blending.DepthColorStorage" to "unlockDepthColor",
+                    "net.irisshaders.iris.gl.blending.BlendModeStorage" to "restoreBlend",
+                ),
+            )
+        } else {
+            null
+        }
+    }
     private val targets = ArrayList<Target>(MAX_TARGETS)
     private val programs: MutableSet<Any> = Collections.newSetFromMap(WeakHashMap())
     private var redirected = false
@@ -359,98 +284,94 @@ object NameplateIrisTarget {
             this.framebuffer === framebuffer && this.color == color && this.depth == depth
     }
 
-    private class Access(
-        private val manager: Method,
-        private val current: Method,
-        private val rendering: Class<*>,
-        private val overrides: Method,
-        private val before: Field,
-        private val shaderMap: Method,
-        private val shader: Method,
-        private val text: Any,
-        private val attachment: Method,
-        private val unlockDepthColor: Method,
-        private val restoreBlend: Method,
-    ) {
-        private val writers = HashMap<Class<*>, Pair<Field, Field>?>()
+}
+*///?}
+//? if >= 1.21.1 {
+private class IrisFramebufferAccess(
+    private val manager: Method,
+    private val current: Method,
+    private val rendering: Class<*>,
+    private val overrides: Method,
+    private val before: Field,
+    private val shaderMap: Method,
+    private val shader: Method,
+    private val text: Any,
+    private val attachment: Method,
+    private val unlocks: List<Method>,
+) {
+    private val writers = HashMap<Class<*>, Pair<Field, Field>?>()
 
-        fun framebuffer(): Any? {
-            val pipeline = current.invoke(manager.invoke(null) ?: return null) ?: return null
-            if (!rendering.isInstance(pipeline) || overrides.invoke(pipeline) != true) {
-                return null
+    fun framebuffer(): Any? {
+        val pipeline = current.invoke(manager.invoke(null) ?: return null) ?: return null
+        if (!rendering.isInstance(pipeline) || overrides.invoke(pipeline) != true) {
+            return null
+        }
+        val program = shader.invoke(shaderMap.invoke(pipeline), text) ?: return null
+        val (beforeTranslucent, afterTranslucent) = writers.getOrPut(program.javaClass) { writers(program.javaClass) } ?: return null
+        return (if (before.getBoolean(pipeline)) beforeTranslucent else afterTranslucent).get(program)
+    }
+
+    fun color(framebuffer: Any): Int = attachment.invoke(framebuffer, 0) as Int
+
+    fun unlock() {
+        unlocks.forEach { it.invoke(null) }
+    }
+
+    private fun writers(type: Class<*>): Pair<Field, Field>? {
+        val before = field(type, BEFORE) ?: return null
+        val after = field(type, AFTER) ?: return null
+        return before to after
+    }
+
+    private fun field(type: Class<*>, name: String): Field? {
+        var current: Class<*>? = type
+        while (current != null) {
+            current.declaredFields.firstOrNull { it.name == name }?.let {
+                it.isAccessible = true
+                return it
             }
-            val program = shader.invoke(shaderMap.invoke(pipeline), text) ?: return null
-            val (beforeTranslucent, afterTranslucent) = writers.getOrPut(program.javaClass) { writers(program.javaClass) } ?: return null
-            return (if (before.getBoolean(pipeline)) beforeTranslucent else afterTranslucent).get(program)
+            current = current.superclass
+        }
+        return null
+    }
+
+    companion object {
+        private const val BEFORE = "writingToBeforeTranslucent"
+        private const val AFTER = "writingToAfterTranslucent"
+
+        fun create(unlocks: List<Pair<String, String>>): IrisFramebufferAccess? = try {
+            val iris = load("net.irisshaders.iris.Iris")
+            val manager = iris.getMethod("getPipelineManager")
+            val current = load("net.irisshaders.iris.pipeline.PipelineManager").getMethod("getPipelineNullable")
+            val rendering = load("net.irisshaders.iris.pipeline.IrisRenderingPipeline")
+            val keys = load("net.irisshaders.iris.pipeline.programs.ShaderKey")
+            val text = keys.enumConstants.first { (it as Enum<*>).name == "TEXT" }
+            IrisFramebufferAccess(
+                manager,
+                current,
+                rendering,
+                rendering.getMethod("shouldOverrideShaders"),
+                rendering.getField("isBeforeTranslucent"),
+                rendering.getMethod("getShaderMap"),
+                load("net.irisshaders.iris.pipeline.programs.ShaderMap").getMethod("getShader", keys),
+                text,
+                load("net.irisshaders.iris.gl.framebuffer.GlFramebuffer").getMethod("getColorAttachment", Int::class.javaPrimitiveType),
+                unlocks.map { (type, method) -> load(type).getMethod(method) },
+            )
+        } catch (e: ReflectiveOperationException) {
+            missing(e)
+        } catch (e: NoSuchElementException) {
+            missing(e)
+        } catch (e: LinkageError) {
+            missing(e)
         }
 
-        fun color(framebuffer: Any): Int = attachment.invoke(framebuffer, 0) as Int
-
-        fun unlock() {
-            unlockDepthColor.invoke(null)
-            restoreBlend.invoke(null)
-        }
-
-        private fun writers(type: Class<*>): Pair<Field, Field>? {
-            val before = field(type, BEFORE) ?: return null
-            val after = field(type, AFTER) ?: return null
-            return before to after
-        }
-
-        private fun field(type: Class<*>, name: String): Field? {
-            var current: Class<*>? = type
-            while (current != null) {
-                current.declaredFields.firstOrNull { it.name == name }?.let {
-                    it.isAccessible = true
-                    return it
-                }
-                current = current.superclass
-            }
+        private fun missing(error: Throwable): IrisFramebufferAccess? {
+            LogManager.getLogger("PolyPlus/Nameplates").warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", error)
             return null
         }
 
-        companion object {
-            private const val BEFORE = "writingToBeforeTranslucent"
-            private const val AFTER = "writingToAfterTranslucent"
-
-            fun create(): Access? {
-                if (!enabled) {
-                    return null
-                }
-                return try {
-                    val iris = load("net.irisshaders.iris.Iris")
-                    val manager = iris.getMethod("getPipelineManager")
-                    val current = load("net.irisshaders.iris.pipeline.PipelineManager").getMethod("getPipelineNullable")
-                    val rendering = load("net.irisshaders.iris.pipeline.IrisRenderingPipeline")
-                    val keys = load("net.irisshaders.iris.pipeline.programs.ShaderKey")
-                    val text = keys.enumConstants.first { (it as Enum<*>).name == "TEXT" }
-                    Access(
-                        manager,
-                        current,
-                        rendering,
-                        rendering.getMethod("shouldOverrideShaders"),
-                        rendering.getField("isBeforeTranslucent"),
-                        rendering.getMethod("getShaderMap"),
-                        load("net.irisshaders.iris.pipeline.programs.ShaderMap").getMethod("getShader", keys),
-                        text,
-                        load("net.irisshaders.iris.gl.framebuffer.GlFramebuffer").getMethod("getColorAttachment", Int::class.javaPrimitiveType),
-                        load("net.irisshaders.iris.gl.blending.DepthColorStorage").getMethod("unlockDepthColor"),
-                        load("net.irisshaders.iris.gl.blending.BlendModeStorage").getMethod("restoreBlend"),
-                    )
-                } catch (e: ReflectiveOperationException) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                } catch (e: NoSuchElementException) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                } catch (e: LinkageError) {
-                    LOGGER.warn("Iris internals not found; nameplate effects use the CPU fallback under shader packs", e)
-                    null
-                }
-            }
-
-            private fun load(name: String): Class<*> = Class.forName(name, false, NameplateIrisTarget::class.java.classLoader)
-        }
+        private fun load(name: String): Class<*> = Class.forName(name, false, IrisFramebufferAccess::class.java.classLoader)
     }
 }
-*///?}
+//?}

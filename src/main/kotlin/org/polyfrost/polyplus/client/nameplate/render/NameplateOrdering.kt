@@ -7,9 +7,7 @@ import org.polyfrost.polyplus.client.nameplate.render.material.NameplateMaterial
 //?}
 
 object NameplateOrdering {
-    const val MAX_RANKED: Int = 32
-
-    private const val INSERTION_LIMIT = 48
+    private const val MAX_RANKED = 32
 
     fun interface Runs {
         fun submit(frame: NameplateFrame, last: Int)
@@ -103,7 +101,7 @@ object NameplateOrdering {
         if (size == 0) {
             return
         }
-        sortByDistance()
+        entries.subList(0, size).sortWith(byDistance)
 
         val overflow = maxOf(0, size - MAX_RANKED)
         var next = NameplateCanvas.ORDER - 1
@@ -116,22 +114,6 @@ object NameplateOrdering {
             val entry = entries[i]
             val frame = entry.frame ?: continue
             entry.task?.submit(frame, if (i < overflow) next else entry.last)
-        }
-    }
-
-    private fun sortByDistance() {
-        if (size > INSERTION_LIMIT) {
-            entries.subList(0, size).sortWith(byDistance)
-            return
-        }
-        for (i in 1 until size) {
-            val entry = entries[i]
-            var j = i - 1
-            while (j >= 0 && entries[j].distance.compareTo(entry.distance) < 0) {
-                entries[j + 1] = entries[j]
-                j--
-            }
-            entries[j + 1] = entry
         }
     }
 

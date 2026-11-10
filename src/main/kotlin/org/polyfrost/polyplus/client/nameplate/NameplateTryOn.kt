@@ -8,8 +8,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 
 object NameplateTryOn {
-    const val DEFAULT_DURATION_MS: Long = 120_000L
-
     class Trial internal constructor(
         val title: String,
         val choices: List<NameplateChoice>,
@@ -22,6 +20,7 @@ object NameplateTryOn {
         fun remainingMillis(now: Long = System.currentTimeMillis()): Long = (expiresAt - now).coerceAtLeast(0L)
     }
 
+    private const val DURATION_MS = 120_000L
     private const val MAX_PENDING_SHOTS = 8
 
     @Volatile
@@ -38,10 +37,9 @@ object NameplateTryOn {
     @Volatile
     private var pulsing = 0L
 
-    fun start(title: String, choices: List<NameplateChoice>, index: Int, durationMs: Long = DEFAULT_DURATION_MS): Trial? {
+    fun start(title: String, choices: List<NameplateChoice>, index: Int): Trial? {
         if (choices.isEmpty()) return null
-        install()
-        val started = Trial(title, choices, index.coerceIn(choices.indices), System.currentTimeMillis() + durationMs)
+        val started = Trial(title, choices, index.coerceIn(choices.indices), System.currentTimeMillis() + DURATION_MS)
         resetMotion()
         trial = started
         return started
@@ -125,22 +123,9 @@ object NameplateTryOn {
         NameplateBinding.settings.enabled &&
             PolyPlusCosmeticsConfig.isVisible(BodySlot.Nameplate, ClientPlatform.localPlayerUuid())
 
-    private fun install() {
-        val current = NameplateBinding.source
-        if (current !is TryOnSource) {
-            NameplateBinding.source = TryOnSource(current)
-        }
-    }
-
-    private class TryOnSource(private val fallback: NameplateSource) : NameplateSource {
-        override fun boundFor(player: UUID): BoundNameplate? {
-            val current = active()
-            if (current != null && player == ClientPlatform.localPlayerUuid() &&
-                PolyPlusCosmeticsConfig.isVisible(BodySlot.Nameplate, player)
-            ) {
-                return NameplateRegistry.bind(player, current.choice.bundle, current.choice.variant)
-            }
-            return fallback.boundFor(player)
-        }
+    fun boundFor(player: UUID): BoundNameplate? {
+        val current = active() ?: return null
+        if (player != ClientPlatform.localPlayerUuid() || !PolyPlusCosmeticsConfig.isVisible(BodySlot.Nameplate, player)) return null
+        return NameplateRegistry.bind(player, current.choice.bundle, current.choice.variant)
     }
 }

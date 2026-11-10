@@ -20,6 +20,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.Collections
+import java.util.HexFormat
 import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
@@ -32,8 +33,6 @@ object NameplateMaterialAssets {
 
     private const val TEXTURE_PATH = "nameplate/texture/"
     private const val DIGEST_BYTES = 16
-    private const val HEX_DIGITS = 2
-    private const val BYTE = 0xFF
     private const val RECT = 4
     private const val GRACE_NANOS = 60_000_000_000L
     private const val SWEEP_NANOS = 1_000_000_000L
@@ -64,10 +63,6 @@ object NameplateMaterialAssets {
         val missing: MutableSet<MaterialLayer> = Collections.newSetFromMap(HashMap())
     }
 
-    private class Registered {
-        var users = 0
-    }
-
     private class Use {
         var users = 0
         var lastUsed = System.nanoTime()
@@ -75,7 +70,7 @@ object NameplateMaterialAssets {
 
     private val prepared: MutableMap<NameplateBundle, Prepared> = Collections.synchronizedMap(WeakHashMap())
     private val installed = HashMap<NameplateBundle, Prepared>()
-    private val registered = HashMap<Identifier, Registered>()
+    private val registered = HashMap<Identifier, Int>()
     private val programs = ConcurrentHashMap<String, NameplateShaderProgram>()
     private val uses = HashMap<String, Use>()
     private val vanillaPixels = HashMap<String, TexturePixels?>()
@@ -239,15 +234,7 @@ object NameplateMaterialAssets {
         val id = VANILLA[name] ?: return null
         val pixels = try {
             Minecraft.getInstance().resourceManager.open(id).use { stream ->
-                NativeImage.read(stream).use { image ->
-                    val argb = IntArray(image.width * image.height)
-                    for (y in 0 until image.height) {
-                        for (x in 0 until image.width) {
-                            argb[y * image.width + x] = argbAt(image, x, y)
-                        }
-                    }
-                    TexturePixels(image.width, image.height, argb)
-                }
+                NativeImage.read(stream).use { image -> TexturePixels(image.width, image.height, argbOf(image)) }
             }
         } catch (e: IOException) {
             logOnce("vanilla:$name", "Vanilla texture {} could not be read for the nameplate CPU fallback; it draws transparent there ({})", id, e.message)
@@ -265,12 +252,20 @@ object NameplateMaterialAssets {
 
     private fun texturePath(id: String): String = "textures/$id.png"
 
-    private fun argbAt(image: NativeImage, x: Int, y: Int): Int =
-        //? if >= 1.21.4 {
-        image.getPixel(x, y)
-        //?} else {
-        /*FastColor.ABGR32.fromArgb32(image.getPixelRGBA(x, y))
-        *///?}
+    private fun argbOf(image: NativeImage): IntArray {
+        val argb = IntArray(image.width * image.height)
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                argb[y * image.width + x] =
+                    //? if >= 1.21.4 {
+                    image.getPixel(x, y)
+                    //?} else {
+                    /*FastColor.ABGR32.fromArgb32(image.getPixelRGBA(x, y))
+                    *///?}
+            }
+        }
+        return argb
+    }
 
     private fun decode(path: String, data: ByteArray?, issues: MutableList<BundleIssue>): Texture? {
         if (data == null) {
@@ -285,13 +280,7 @@ object NameplateMaterialAssets {
                     issues += BundleIssue(path, "decodes to $width x $height; at most ${MaterialLimits.MAX_TEXTURE_SIZE} each way")
                     return null
                 }
-                val argb = IntArray(width * height)
-                for (y in 0 until height) {
-                    for (x in 0 until width) {
-                        argb[y * width + x] = argbAt(image, x, y)
-                    }
-                }
-                Texture(textureId(data), width, height, argb)
+                Texture(textureId(data), width, height, argbOf(image))
             }
         } catch (e: IOException) {
             issues += BundleIssue(path, "could not be decoded: ${e.message}")
@@ -304,16 +293,12 @@ object NameplateMaterialAssets {
 
     private fun textureId(data: ByteArray): Identifier {
         val digest = MessageDigest.getInstance("SHA-256").digest(data)
-        val hex = StringBuilder(DIGEST_BYTES * HEX_DIGITS)
-        for (i in 0 until DIGEST_BYTES) {
-            hex.append(Integer.toHexString((digest[i].toInt() and BYTE) or (BYTE + 1)).substring(1))
-        }
-        return Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, TEXTURE_PATH + hex)
+        return Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, TEXTURE_PATH + HexFormat.of().formatHex(digest, 0, DIGEST_BYTES))
     }
 
     private fun acquire(texture: Texture) {
-        val entry = registered.getOrPut(texture.id) { Registered() }
-        if (entry.users++ > 0) {
+        val users = registered.merge(texture.id, 1, Int::plus)
+        if (users != 1) {
             return
         }
         val image = NativeImage(texture.width, texture.height, false)
@@ -341,8 +326,9 @@ object NameplateMaterialAssets {
     }
 
     private fun drop(texture: Texture) {
-        val entry = registered[texture.id] ?: return
-        if (--entry.users > 0) {
+        val users = registered[texture.id] ?: return
+        if (users > 1) {
+            registered[texture.id] = users - 1
             return
         }
         registered.remove(texture.id)

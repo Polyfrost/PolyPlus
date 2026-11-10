@@ -65,10 +65,6 @@ object LegacyMaterialGpu {
     private const val FOG_LINEAR = 1
     private const val FOG_EXP = 2
     private const val FOG_EXP2 = 3
-    private const val GL_SRC_ALPHA = 770
-    private const val GL_ONE_MINUS_SRC_ALPHA = 771
-    private const val GL_ONE = 1
-    private const val GL_ZERO = 0
     private const val GL_EXP2 = 0x0801
 
     private val forceCpu: Boolean = java.lang.Boolean.getBoolean(NameplateCanvas.CPU_PROPERTY)
@@ -77,7 +73,6 @@ object LegacyMaterialGpu {
         val key: String,
         internal val id: Int,
         val additive: Boolean,
-        internal val samplers: Int,
         private val locations: IntArray,
     ) {
         internal var lastUsed = 0L
@@ -104,8 +99,7 @@ object LegacyMaterialGpu {
     private const val SCREEN = 6
     private const val FOG = 7
     private const val LIT = 8
-    private const val INPUT_VECTORS = 4
-    private const val ATLAS_VECTORS = 4
+    private const val VECTORS = 4
 
     private val programs = HashMap<String, Program>()
     private val requested = HashMap<String, Long>()
@@ -203,8 +197,8 @@ object LegacyMaterialGpu {
             ints.put(words, MaterialUniforms.CLOCK, LANES).flip()
             GLX.uniform4(clock, ints)
         }
-        vec4s(program.location(INPUTS), words, MaterialUniforms.INPUTS, INPUT_VECTORS)
-        vec4s(program.location(ATLAS), words, MaterialUniforms.ATLAS, ATLAS_VECTORS)
+        vec4s(program.location(INPUTS), words, MaterialUniforms.INPUTS, VECTORS)
+        vec4s(program.location(ATLAS), words, MaterialUniforms.ATLAS, VECTORS)
         vec4s(program.location(TONES), words, MaterialUniforms.TONES, (words.size - MaterialUniforms.TONES) / LANES)
         val screen = program.location(SCREEN)
         if (screen >= 0) {
@@ -227,7 +221,7 @@ object LegacyMaterialGpu {
         }
         GlStateManager.activeTexture(GLX.GL_TEXTURE0)
         if (program.additive) {
-            GlStateManager.blendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ONE, GL_ZERO)
+            GlStateManager.blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE, GL11.GL_ZERO)
         }
     }
 
@@ -239,7 +233,7 @@ object LegacyMaterialGpu {
         }
         GlStateManager.activeTexture(GLX.GL_TEXTURE0)
         if (draw.program.additive) {
-            GlStateManager.blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO)
+            GlStateManager.blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
         }
     }
 
@@ -317,7 +311,7 @@ object LegacyMaterialGpu {
         GLX.useProgram(0)
         val locations = IntArray(UNIFORMS.size) { GLX.getUniformLocation(id, UNIFORMS[it]) }
         LOGGER.info("Nameplate material program {} compiled for the GPU", shader.key)
-        return Program(shader.key, id, material.blend == Material.Blend.ADDITIVE, shader.samplers.size, locations)
+        return Program(shader.key, id, material.blend == Material.Blend.ADDITIVE, locations)
     }
 
     private fun stage(type: Int, source: String, key: String): Int? {
@@ -393,22 +387,18 @@ object LegacyMaterialGpu {
             return
         }
         lastSweep = now
-        val programIterator = programs.values.iterator()
-        while (programIterator.hasNext()) {
-            val program = programIterator.next()
-            if (now - program.lastUsed >= GRACE_NANOS) {
+        programs.values.removeAll { program ->
+            val idle = now - program.lastUsed >= GRACE_NANOS
+            if (idle) {
                 GLX.deleteProgram(program.id)
-                programIterator.remove()
                 LOGGER.info("Nameplate material program {} released: no nameplate drew it for a while", program.key)
             }
+            idle
         }
-        val uploadIterator = uploads.values.iterator()
-        while (uploadIterator.hasNext()) {
-            val upload = uploadIterator.next()
-            if (now - upload.lastUsed >= GRACE_NANOS) {
-                upload.texture.clearGlId()
-                uploadIterator.remove()
-            }
+        uploads.values.removeAll { upload ->
+            val idle = now - upload.lastUsed >= GRACE_NANOS
+            if (idle) upload.texture.clearGlId()
+            idle
         }
     }
 
