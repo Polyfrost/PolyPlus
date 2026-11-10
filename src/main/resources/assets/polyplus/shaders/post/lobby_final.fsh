@@ -289,7 +289,7 @@ vec3 tapColor(vec2 uv, float soften) {
     return mix(textureLod(InSampler, uv, 0.0).rgb, soft, soften);
 }
 
-vec3 gather(vec3 center, float centerReach, float centerDepth, float search, float seed) {
+vec3 gather(vec3 center, float centerReach, float centerDepth, float search, float seed, float behindMix) {
     float soften = smoothstep(SOFT_FROM * pixelScale(), SOFT_TO * pixelScale(), centerReach);
     vec3 back = mix(center, tapColor(texCoord, soften), soften);
     float backWeight = 1.0;
@@ -318,7 +318,7 @@ vec3 gather(vec3 center, float centerReach, float centerDepth, float search, flo
         back += taken * weight;
         backWeight += weight;
     }
-    vec3 behind = back / backWeight;
+    vec3 behind = mix(center, back / backWeight, behindMix);
     if (frontWeight <= 0.0) {
         return behind;
     }
@@ -352,10 +352,13 @@ vec3 scene() {
         float radius = blur * dofRadius();
         float search = max(radius, dofRadius() * Lens.y);
         if (search > 0.5) {
-            color = gather(color, radius, linearDepth(depth), search, seed);
+            color = gather(color, radius, linearDepth(depth), search, seed, 1.0);
         }
-    } else if (sky && day > 0.01) {
-        color = mix(color, gather(color, skyRadius(), FAR_DEPTH, skyRadius(), seed), day);
+    } else if (sky) {
+        float search = mix(dofRadius() * Lens.y, skyRadius(), day);
+        if (search > 0.5) {
+            color = gather(color, search, FAR_DEPTH, search, seed, day);
+        }
     }
     if (revealMode() == 2) {
         color *= firstLightGain(depth);
