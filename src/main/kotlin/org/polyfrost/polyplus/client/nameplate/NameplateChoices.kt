@@ -2,7 +2,6 @@ package org.polyfrost.polyplus.client.nameplate
 
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
-import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
 import java.util.concurrent.ConcurrentHashMap
@@ -15,22 +14,27 @@ class NameplateChoice(
 )
 
 object NameplateChoices {
-    private class CatalogEntry(val hash: String, val choice: NameplateChoice)
+    private val catalog = ConcurrentHashMap<Int, NameplateChoice>()
 
-    private val catalog = ConcurrentHashMap<Int, CatalogEntry>()
-
-    fun choice(id: Int): NameplateChoice? = catalogChoice(id)
-
-    fun isCatalogNameplate(id: Int): Boolean = CosmeticCatalog.getCosmeticDefinition(id)?.type == CosmeticType.Nameplate
+    fun choice(id: Int): NameplateChoice? {
+        val definition = CosmeticCatalog.getCosmeticDefinition(id)?.takeIf { it.type == CosmeticType.Nameplate }
+        val bundle = definition?.let { NameplateRegistry.installedBundle(id, it.hash) }
+        if (definition == null || bundle == null) {
+            catalog.remove(id)
+            return null
+        }
+        catalog[id]?.takeIf { it.bundle === bundle }?.let { return it }
+        return NameplateChoice(id, bundle, bundle.variant(definition.variantKey), definition.variantName).also { catalog[id] = it }
+    }
 
     suspend fun ensureLoaded(id: Int) {
-        if (!isCatalogNameplate(id) || catalogChoice(id) != null) return
+        if (CosmeticCatalog.getCosmeticDefinition(id)?.type != CosmeticType.Nameplate || choice(id) != null) return
         CosmeticAssetCache.ensureCosmeticLoaded(id)
     }
 
     fun groupChoices(id: Int): List<NameplateChoice> {
-        catalogChoice(id) ?: return emptyList()
-        return groupIds(id).mapNotNull(::catalogChoice).distinctBy { it.variant }
+        choice(id) ?: return emptyList()
+        return groupIds(id).mapNotNull(::choice).distinctBy { it.variant }
     }
 
     fun groupIds(id: Int): List<Int> {
@@ -40,20 +44,4 @@ object NameplateChoices {
             .map { it.id }
             .sorted()
     }
-
-    private fun catalogChoice(id: Int): NameplateChoice? {
-        val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return null
-        if (definition.type != CosmeticType.Nameplate) return null
-        catalog[id]?.let { entry ->
-            if (entry.hash == definition.hash && NameplateRegistry.isLoaded(id)) return entry.choice
-            catalog.remove(id)
-        }
-        val bundle = bundleFor(id, definition) ?: return null
-        val choice = NameplateChoice(id, bundle, bundle.variant(definition.variantKey), definition.variantName)
-        catalog[id] = CatalogEntry(definition.hash, choice)
-        return choice
-    }
-
-    private fun bundleFor(id: Int, definition: CosmeticDefinition): NameplateBundle? =
-        if (NameplateRegistry.isLoaded(id, definition.hash)) NameplateRegistry.installedBundle(id) else null
 }
