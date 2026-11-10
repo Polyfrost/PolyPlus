@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
 import net.minecraft.client.gui.screens.TitleScreen
+import org.polyfrost.oneconfig.api.ui.v1.ChangelogSources
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.ModCardIcons
 import org.polyfrost.oneconfig.api.ui.v1.ModsPageDecorator
@@ -50,6 +51,7 @@ object PolyPlusOneConfigIntegration {
         if (OneConfigPages.byId(wardrobePage.id) == null) OneConfigPages.register(wardrobePage)
         ModsPageDecorators.register(modOrderToggle)
         ModCardIcons.register { modId, defaultIcon -> modCardIcon(modId, defaultIcon) }
+        ChangelogSources.register(ModpackChangelog)
         OneConfigTheme.overrideLogo(BRAND_LOGO)
     }
 
