@@ -17,7 +17,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.Trigger
 import kotlin.time.TimeSource
 
 class TagRecord<K : Any>(
-    val capacity: Int = DEFAULT_CAPACITY,
+    private val capacity: Int = DEFAULT_CAPACITY,
     private val clock: () -> Long = monotonicMillis(),
 ) {
     init {
@@ -108,10 +108,6 @@ class TagRecord<K : Any>(
 
     fun clear() {
         entries.clear()
-    }
-
-    fun sweep() {
-        sweep(clock())
     }
 
     internal fun fireIgnoringRestart(key: K, bundle: NameplateBundle, index: Int, frame: Int): Boolean {
@@ -336,7 +332,7 @@ class TagRecord<K : Any>(
         private const val SWEEP_MILLIS = 1_000L
         private const val MILLIS_PER_SECOND = 1_000L
 
-        fun identity(bundle: NameplateBundle, variant: NameplateBundle.Variant): Int =
+        private fun identity(bundle: NameplateBundle, variant: NameplateBundle.Variant): Int =
             NameplateHash.hash(NameplateHash.text(bundle.id), NameplateHash.text(variant.key), bundle.triggers.oneShots.size)
 
         internal fun burstTrail(bundle: NameplateBundle, reaction: Reaction): Int {

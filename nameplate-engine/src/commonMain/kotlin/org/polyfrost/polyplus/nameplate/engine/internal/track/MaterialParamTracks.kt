@@ -7,26 +7,19 @@ internal class ParamTrack(
     private val modes: IntArray,
 ) {
     fun at(step: Int, base: Double): Double {
-        var i = 0
-        while (i + 1 < steps.size && steps[i + 1] <= step) {
-            i++
-        }
+        val i = Interpolation.keyAt(steps, step)
         val mode = if (i + 1 < steps.size) modes[i + 1] else Interpolation.STEP
         val from = value(i, base)
         if (mode == Interpolation.STEP) return from
         val to = value(i + 1, base)
         val t = maxOf(step - steps[i], 0).toDouble() / (steps[i + 1] - steps[i])
-        val eased = if (mode == Interpolation.LINEAR) t else t * t * (THREE - 2 * t)
+        val eased = if (mode == Interpolation.LINEAR) t else t * t * (3 - 2 * t)
         return from + (to - from) * eased
     }
 
     fun first(base: Double): Double = value(0, base)
 
     private fun value(index: Int, base: Double): Double = if (bases[index]) base else values[index]
-
-    private companion object {
-        const val THREE = 3.0
-    }
 }
 
 internal class ParamChannels(val names: Array<String>, val tracks: Array<ParamTrack>) {
@@ -52,12 +45,6 @@ internal class MaterialParamTracks(
             put(layerId, set.sorted().toTypedArray())
         }
     }
-
-    val isEmpty: Boolean
-        get() = names.isEmpty()
-
-    val targets: Set<String>
-        get() = names.keys
 
     fun animated(layerId: String): List<String> = names[layerId]?.toList().orEmpty()
 

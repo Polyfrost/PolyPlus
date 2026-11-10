@@ -70,10 +70,8 @@ import org.polyfrost.polyplus.nameplate.engine.internal.track.BundleMolang
 
 class BundleLoader(private val capabilities: Set<String>) {
     fun load(source: BundleSource, bytes: BundleBytes = BundleBytes.NONE, budgets: Boolean = true): BundleLoad {
-        val manifestElement = when (val read = readJson(source, BundleFiles.MANIFEST)) {
-            is Read.Failed -> return BundleLoad.Invalid(listOf(read.issue))
-            is Read.Parsed -> read.element
-        }
+        val failures = ArrayList<BundleIssue>()
+        val manifestElement = readJson(source, BundleFiles.MANIFEST, failures) ?: return BundleLoad.Invalid(failures)
 
         val format = (manifestElement as? JsonObject)?.get("format")?.let { runCatching { it.jsonPrimitive.intOrNull }.getOrNull() }
         when {
@@ -82,22 +80,14 @@ class BundleLoader(private val capabilities: Set<String>) {
             format < 1 -> return invalid(BundleFiles.MANIFEST + "#format", "must be 1 or more")
         }
 
-        val manifest = when (val decoded = decode(manifestElement, ManifestJson.serializer(), BundleFiles.MANIFEST)) {
-            is Decoded.Failed -> return BundleLoad.Invalid(listOf(decoded.issue))
-            is Decoded.Ok -> decoded.value
-        }
+        val manifest = decode(manifestElement, ManifestJson.serializer(), BundleFiles.MANIFEST, JSON, failures)
+            ?: return BundleLoad.Invalid(failures)
 
         val missing = manifest.requires.filter { it !in capabilities }
         if (missing.isNotEmpty()) return BundleLoad.Skipped("needs ${missing.joinToString()}")
 
-        val palettesElement = when (val read = readJson(source, BundleFiles.PALETTES)) {
-            is Read.Failed -> return BundleLoad.Invalid(listOf(read.issue))
-            is Read.Parsed -> read.element
-        }
-        val palettes = when (val decoded = decode(palettesElement, PalettesJson.serializer(), BundleFiles.PALETTES)) {
-            is Decoded.Failed -> return BundleLoad.Invalid(listOf(decoded.issue))
-            is Decoded.Ok -> decoded.value
-        }
+        val palettes = readAndDecode(source, BundleFiles.PALETTES, PalettesJson.serializer(), failures, JSON)
+            ?: return BundleLoad.Invalid(failures)
 
         val issues = BundleValidator.validate(manifest, palettes)
         if (issues.isNotEmpty()) return BundleLoad.Invalid(issues)
@@ -152,22 +142,8 @@ class BundleLoader(private val capabilities: Set<String>) {
         path: String,
         strategy: DeserializationStrategy<T>,
         issues: MutableList<BundleIssue>,
-    ): T? {
-        val element = when (val read = readJson(source, path)) {
-            is Read.Failed -> {
-                issues.add(read.issue)
-                return null
-            }
-            is Read.Parsed -> read.element
-        }
-        return when (val decoded = decode(element, strategy, path, CONTENT_JSON)) {
-            is Decoded.Failed -> {
-                issues.add(decoded.issue)
-                null
-            }
-            is Decoded.Ok -> decoded.value
-        }
-    }
+        json: Json = CONTENT_JSON,
+    ): T? = readJson(source, path, issues)?.let { decode(it, strategy, path, json, issues) }
 
     private fun basePalette(palettes: PalettesJson): Palette = Palette(
         palettes.slots.map { Palette.Slot(it.id, it.name, ramp(it.ramp, it.interpolate ?: 0), stops(it.ramp)) },
@@ -211,13 +187,11 @@ class BundleLoader(private val capabilities: Set<String>) {
             val declared = NameplateBundle.TextMode.valueOf(merged.mode.uppercase())
             variants[key] = NameplateBundle.Variant(
                 key = key,
-                colorway = spec.palette,
                 palette = palette,
                 text = text(merged, refs),
                 badge = badge(VariantOverrides.badge(manifest.badge, spec.badge), refs, bodies),
                 hidden = hidden,
                 swaps = spec.swap,
-                layerOrder = manifest.layers.filter { it.id !in hidden }.map { spec.swap[it.id] ?: it.id },
                 flag = spec.flag?.let(flagsById::getValue) ?: flags.firstOrNull(),
                 ownsBackground = VariantOverrides.ownsBackground(manifest, spec),
                 params = VariantOverrides.params(manifest, spec),
@@ -402,18 +376,6 @@ class BundleLoader(private val capabilities: Set<String>) {
             if (values == null) Contrast.DEFAULT_CANDIDATES else IntArray(values.size) { rgb(values[it]) }
     }
 
-    private sealed interface Read {
-        data class Parsed(val element: JsonElement) : Read
-
-        data class Failed(val issue: BundleIssue) : Read
-    }
-
-    private sealed interface Decoded<out T> {
-        data class Ok<T>(val value: T) : Decoded<T>
-
-        data class Failed(val issue: BundleIssue) : Decoded<Nothing>
-    }
-
     private companion object {
         val JSON = Json { ignoreUnknownKeys = true }
         internal val CONTENT_JSON = Json {
@@ -427,10 +389,14 @@ class BundleLoader(private val capabilities: Set<String>) {
 
         internal fun ramp(stops: List<String>, interpolate: Int): IntArray = RampInterpolation.expand(stops(stops), interpolate)
 
-        internal fun readJson(source: BundleSource, path: String): Read {
-            val text = source.text(path) ?: return Read.Failed(BundleIssue(path, "missing", IssueCode.MISSING_FILE))
+        fun readJson(source: BundleSource, path: String, issues: MutableList<BundleIssue>): JsonElement? {
+            val text = source.text(path)
+            if (text == null) {
+                issues.add(BundleIssue(path, "missing", IssueCode.MISSING_FILE))
+                return null
+            }
             if (text.length > BundleLimits.MAX_JSON_CHARS) {
-                return Read.Failed(
+                issues.add(
                     BundleIssue(
                         path,
                         "larger than ${BundleLimits.MAX_JSON_CHARS} characters",
@@ -438,10 +404,11 @@ class BundleLoader(private val capabilities: Set<String>) {
                         issueValues("chars" to text.length, "limit" to BundleLimits.MAX_JSON_CHARS),
                     ),
                 )
+                return null
             }
             val depth = depth(text)
             if (depth > BundleLimits.MAX_JSON_DEPTH) {
-                return Read.Failed(
+                issues.add(
                     BundleIssue(
                         path,
                         "nested deeper than ${BundleLimits.MAX_JSON_DEPTH}",
@@ -449,12 +416,14 @@ class BundleLoader(private val capabilities: Set<String>) {
                         issueValues("depth" to depth, "limit" to BundleLimits.MAX_JSON_DEPTH),
                     ),
                 )
+                return null
             }
 
             return try {
-                Read.Parsed(JSON.parseToJsonElement(text))
+                JSON.parseToJsonElement(text)
             } catch (e: SerializationException) {
-                Read.Failed(BundleIssue(path, "not valid JSON: ${e.message}", IssueCode.JSON_SYNTAX))
+                issues.add(BundleIssue(path, "not valid JSON: ${e.message}", IssueCode.JSON_SYNTAX))
+                null
             }
         }
 
@@ -462,13 +431,13 @@ class BundleLoader(private val capabilities: Set<String>) {
             element: JsonElement,
             strategy: DeserializationStrategy<T>,
             path: String,
-            json: Json = JSON,
-        ): Decoded<T> = try {
-            Decoded.Ok(json.decodeFromJsonElement(strategy, element))
-        } catch (e: SerializationException) {
-            Decoded.Failed(BundleIssue(path, e.message ?: "does not match the format", IssueCode.FORMAT))
+            json: Json,
+            issues: MutableList<BundleIssue>,
+        ): T? = try {
+            json.decodeFromJsonElement(strategy, element)
         } catch (e: IllegalArgumentException) {
-            Decoded.Failed(BundleIssue(path, e.message ?: "does not match the format", IssueCode.FORMAT))
+            issues.add(BundleIssue(path, e.message ?: "does not match the format", IssueCode.FORMAT))
+            null
         }
 
         fun depth(text: String): Int {

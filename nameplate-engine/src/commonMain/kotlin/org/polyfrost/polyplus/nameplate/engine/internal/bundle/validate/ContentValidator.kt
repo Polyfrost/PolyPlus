@@ -41,7 +41,9 @@ internal object ContentValidator {
 
     fun usesFlags(manifest: ManifestJson, layers: Map<String, LayerFileJson>): Boolean =
         manifest.variants.values.any { it.flag != null } ||
-            layers.values.filterIsInstance<BodyLayerJson>().any { body -> (listOfNotNull(body.fill) + body.rings).any { it.flag } }
+            layers.values.filterIsInstance<BodyLayerJson>().any(::usesFlag)
+
+    private fun usesFlag(body: BodyLayerJson): Boolean = (listOfNotNull(body.fill) + body.rings).any { it.flag }
 
     fun validate(
         manifest: ManifestJson,
@@ -100,9 +102,7 @@ internal object ContentValidator {
     }
 
     private fun checkFlags(flags: FlagsJson, tones: Map<String, Int>, report: IssueSink) {
-        if (flags.flags.isEmpty() || flags.flags.size > BundleLimits.MAX_FLAGS) {
-            report("$FLAGS#flags", "must hold 1 to ${BundleLimits.MAX_FLAGS} flags")
-        }
+        report.ensure(flags.flags.size in 1..BundleLimits.MAX_FLAGS, "$FLAGS#flags", "must hold 1 to ${BundleLimits.MAX_FLAGS} flags")
         val seen = HashSet<String>()
         for (flag in flags.flags) {
             val path = "$FLAGS#flags.${flag.id}"
@@ -112,14 +112,14 @@ internal object ContentValidator {
             if (!seen.add(flag.id)) {
                 report(path, "duplicate flag")
             }
-            if (flag.bands.isEmpty() || flag.bands.size > BundleLimits.MAX_BANDS) {
-                report("$path.bands", "must hold 1 to ${BundleLimits.MAX_BANDS} bands")
-            }
+            report.ensure(flag.bands.size in 1..BundleLimits.MAX_BANDS, "$path.bands", "must hold 1 to ${BundleLimits.MAX_BANDS} bands")
             for ((i, band) in flag.bands.withIndex()) {
                 checkSlotRef(band.color, "$path.bands[$i]", tones, report)
-                if (band.weight !in 1..BundleLimits.MAX_BAND_WEIGHT) {
-                    report("$path.bands[$i]", "weight must be 1 to ${BundleLimits.MAX_BAND_WEIGHT}")
-                }
+                report.ensure(
+                    band.weight in 1..BundleLimits.MAX_BAND_WEIGHT,
+                    "$path.bands[$i]",
+                    "weight must be 1 to ${BundleLimits.MAX_BAND_WEIGHT}",
+                )
             }
             flag.overlay?.let { checkOverlay("$path.overlay", it, tones, report) }
             if (flag.axis != ROWS && flag.axis != COLUMNS) {
@@ -143,9 +143,7 @@ internal object ContentValidator {
     }
 
     private fun checkOverlay(path: String, overlay: OverlayJson, tones: Map<String, Int>, report: IssueSink) {
-        if (overlay.kind !in OVERLAYS) {
-            report("$path.kind", "must be one of ${OVERLAYS.joinToString()}")
-        }
+        BundleValidator.checkOneOf("$path.kind", overlay.kind, OVERLAYS, report)
         val allowed = when (overlay.kind) {
             "triangle" -> 1..1
             "circle" -> 1..2
@@ -157,9 +155,7 @@ internal object ContentValidator {
         for ((i, color) in overlay.colors.withIndex()) {
             checkSlotRef(color, "$path.colors[$i]", tones, report)
         }
-        if (overlay.width !in 1..BundleLimits.MAX_OVERLAY_WIDTH) {
-            report("$path.width", "must be 1 to ${BundleLimits.MAX_OVERLAY_WIDTH}")
-        }
+        report.ensure(overlay.width in 1..BundleLimits.MAX_OVERLAY_WIDTH, "$path.width", "must be 1 to ${BundleLimits.MAX_OVERLAY_WIDTH}")
     }
 
     private fun checkBody(
@@ -169,8 +165,7 @@ internal object ContentValidator {
         flags: FlagsJson?,
         report: IssueSink,
     ) {
-        val usesFlag = (listOfNotNull(body.fill) + body.rings).any { it.flag }
-        if (usesFlag && body.padding.size == 4) {
+        if (usesFlag(body) && body.padding.size == 4) {
             val rows = PixelRect.GLYPH_HEIGHT + body.padding[1] + body.padding[3]
             val all = flags?.flags.orEmpty()
             val maxBands = all.filter { it.axis != COLUMNS }.maxOfOrNull { it.bands.size } ?: 0
@@ -183,9 +178,7 @@ internal object ContentValidator {
         if (body.padding.size != 4 || body.padding.any { it !in 0..BundleLimits.MAX_PADDING }) {
             report("$path#padding", "must be [left, top, right, bottom], each 0 to ${BundleLimits.MAX_PADDING}")
         }
-        if (body.minWidth !in 0..BundleLimits.MAX_MIN_WIDTH) {
-            report("$path#minWidth", "must be 0 to ${BundleLimits.MAX_MIN_WIDTH}")
-        }
+        report.ensure(body.minWidth in 0..BundleLimits.MAX_MIN_WIDTH, "$path#minWidth", "must be 0 to ${BundleLimits.MAX_MIN_WIDTH}")
         if (body.radius !in 0..BundleLimits.MAX_RADIUS) {
             report.issue(
                 "$path#radius",
@@ -195,9 +188,7 @@ internal object ContentValidator {
             )
         }
         BodyCorners.validate(path, body, report.coded(IssueCode.CORNERS))
-        if (body.rings.size > BundleLimits.MAX_RINGS) {
-            report("$path#rings", "at most ${BundleLimits.MAX_RINGS} rings")
-        }
+        report.ensure(body.rings.size <= BundleLimits.MAX_RINGS, "$path#rings", "at most ${BundleLimits.MAX_RINGS} rings")
         body.fill?.let { checkFill("$path#fill", it, tones, report) }
         for ((i, ring) in body.rings.withIndex()) {
             checkFill("$path#rings[$i]", ring, tones, report)
@@ -240,9 +231,7 @@ internal object ContentValidator {
         if (pivot != null && Anchor.named(pivot) == null) {
             report("$path#pivot", "must be one of ${BundleValidator.ANCHORS.joinToString()}")
         }
-        if (layer.offset.size != 2 || layer.offset.any { it !in -BundleLimits.MAX_OFFSET..BundleLimits.MAX_OFFSET }) {
-            report("$path#offset", "must be [x, y], each within ${BundleLimits.MAX_OFFSET} px")
-        }
+        BundleValidator.checkOffset("$path#offset", layer.offset, report)
     }
 
     private fun checkAnchor(path: String, layer: SpriteLayerJson, sink: IssueSink) {
@@ -318,15 +307,15 @@ internal object ContentValidator {
         }
     }
 
-    fun cachedStateIssues(bundle: NameplateBundle, limit: Int = BundleLimits.MAX_CACHED_STATES): List<BundleIssue> =
+    fun cachedStateIssues(bundle: NameplateBundle): List<BundleIssue> =
         bundle.layers.mapNotNull { layer ->
             val count = LayerMasks.cachedStates(bundle, layer)
-            if (count > limit) {
+            if (count > BundleLimits.MAX_CACHED_STATES) {
                 BundleIssue(
                     BundleFiles.layerPath(layer.id),
-                    "shows $count different frames; at most $limit",
+                    "shows $count different frames; at most ${BundleLimits.MAX_CACHED_STATES}",
                     IssueCode.OVER_STATES,
-                    issueValues("frames" to count, "limit" to limit),
+                    issueValues("frames" to count, "limit" to BundleLimits.MAX_CACHED_STATES),
                 )
             } else {
                 null
@@ -335,13 +324,7 @@ internal object ContentValidator {
 
     private fun checkSlotRef(value: String, path: String, tones: Map<String, Int>, report: IssueSink) {
         when (val ref = ColorRef.parse(value)) {
-            is ColorRef.Slot -> {
-                val count = tones[ref.id]
-                when {
-                    count == null -> report(path, "no slot '${ref.id}'")
-                    ref.tone >= count -> report(path, "slot '${ref.id}' has no tone ${ref.tone}")
-                }
-            }
+            is ColorRef.Slot -> BundleValidator.checkSlot(ref, path, tones, report)
             else -> report(path, "must be a slot or slot[tone]")
         }
     }

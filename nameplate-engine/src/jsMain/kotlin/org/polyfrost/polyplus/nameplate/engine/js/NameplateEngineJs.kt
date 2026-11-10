@@ -26,7 +26,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.shader.TexturePixels
 import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
 import org.polyfrost.polyplus.nameplate.engine.api.source.BundleBytes
 import org.polyfrost.polyplus.nameplate.engine.api.source.BundleSource
-import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
+import org.polyfrost.polyplus.nameplate.engine.api.tag.LayerPose
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.NAME_TARGET
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.PLATE_TARGET
 import org.polyfrost.polyplus.nameplate.engine.internal.layout.OrnamentAnchor
@@ -50,17 +50,20 @@ class NameplateIssue internal constructor(
     val names: dynamic,
 )
 
-internal fun BundleIssue.toJs(): NameplateIssue {
-    val values: dynamic = js("({})")
-    for ((name, value) in this.values) {
-        values[name] = value
+private fun Map<String, Any>.toJsObject(): dynamic {
+    val result: dynamic = js("({})")
+    for ((name, value) in this) {
+        result[name] = value
     }
-    val names: dynamic = js("({})")
-    for ((name, value) in this.names) {
-        names[name] = value
-    }
-    return NameplateIssue(path, message, code.id, level.name.lowercase(), values, names)
+    return result
 }
+
+internal fun BundleIssue.toJs(): NameplateIssue =
+    NameplateIssue(path, message, code.id, level.name.lowercase(), values.toJsObject(), names.toJsObject())
+
+internal fun List<BundleIssue>.toJs(): Array<NameplateIssue> = map { it.toJs() }.toTypedArray()
+
+private fun LayerPose.toJs(): NameplateBadgePose = NameplateBadgePose(dx, dy, opacity, visible)
 
 @JsExport
 class NameplateLoad internal constructor(
@@ -161,17 +164,18 @@ class NameplatePreview internal constructor(
         state: NameplateState? = null,
     ): Array<NameplateLayer> {
         val resolved = bundle.variant(variant)
+        val tag = state.tag
         val palette = reactedPalette(
             bundle,
             resolved,
             painter.palette(bundle, resolved, frame, seed, block.block),
             frame,
             seed,
-            state?.state ?: TagState.NONE,
+            tag,
         )
-        val plate = painter.plate(bundle, resolved, block.block, frame, seed, state?.state ?: TagState.NONE)
+        val plate = painter.plate(bundle, resolved, block.block, frame, seed, tag)
         val rasters = HashMap<Pair<PixelImage, PixelRect?>, Raster>()
-        return painter.paint(bundle, resolved, block.block, frame, seed, state?.state ?: TagState.NONE, level)
+        return painter.paint(bundle, resolved, block.block, frame, seed, tag, level)
             .map { op ->
                 val slot = bundle.layers[op.index]
                 val layer = bundle.layer(resolved.swaps[slot.id] ?: slot.id)
@@ -208,20 +212,14 @@ class NameplatePreview internal constructor(
         return intArrayOf(rect.x0, rect.y0, rect.x1, rect.y1)
     }
 
-    fun badgePose(frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose {
-        val pose = badgePose(bundle, frame, seed, state?.state ?: TagState.NONE)
-        return NameplateBadgePose(pose.dx, pose.dy, pose.opacity, pose.visible)
-    }
+    fun badgePose(frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose =
+        badgePose(bundle, frame, seed, state.tag).toJs()
 
-    fun platePose(variant: String, block: NameplateBlock, frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose {
-        val pose = painter.plate(bundle, bundle.variant(variant), block.block, frame, seed, state?.state ?: TagState.NONE)
-        return NameplateBadgePose(pose.dx, pose.dy, pose.opacity, pose.visible)
-    }
+    fun platePose(variant: String, block: NameplateBlock, frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose =
+        painter.plate(bundle, bundle.variant(variant), block.block, frame, seed, state.tag).toJs()
 
-    fun badgeFollow(variant: String, block: NameplateBlock, frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose {
-        val pose = painter.badgeFollow(bundle, bundle.variant(variant), block.block, frame, seed, state?.state ?: TagState.NONE)
-        return NameplateBadgePose(pose.dx, pose.dy, pose.opacity, pose.visible)
-    }
+    fun badgeFollow(variant: String, block: NameplateBlock, frame: Int, seed: Int, state: NameplateState? = null): NameplateBadgePose =
+        painter.badgeFollow(bundle, bundle.variant(variant), block.block, frame, seed, state.tag).toJs()
 
     fun badgeSpot(variant: String, block: NameplateBlock): IntArray? {
         val anchor = bundle.variant(variant).badge.placement.anchor ?: return null
@@ -300,7 +298,7 @@ fun nameplateLoadPreview(
 
 private class Assets(binaries: Array<NameplateBinary>, pixels: Array<NameplatePixels>) {
     private val bytes = binaries.associate { it.path to byteArrayOf(it.bytes) }
-    private val textures = pixels.associate { it.path to texturePixels(it) }
+    private val textures = pixels.associate { it.path to it.toTexturePixels() }
 
     val source: BundleBytes = BundleBytes { bytes[it] }
 
@@ -310,29 +308,26 @@ private class Assets(binaries: Array<NameplateBinary>, pixels: Array<NameplatePi
 
     private fun byteArrayOf(bytes: Uint8Array): ByteArray =
         Int8Array(bytes.buffer, bytes.byteOffset, bytes.length).unsafeCast<ByteArray>().copyOf()
+}
 
-    private fun texturePixels(pixels: NameplatePixels): TexturePixels? {
-        val count = pixels.width * pixels.height
-        if (pixels.width <= 0 || pixels.height <= 0 || pixels.rgba.length < count * CHANNELS) return null
-        val rgba = pixels.rgba
-        val argb = IntArray(count) { i ->
-            val p = i * CHANNELS
-            (rgba[p + ALPHA].toInt() and BYTE shl ALPHA_SHIFT) or
-                (rgba[p].toInt() and BYTE shl RED_SHIFT) or
-                (rgba[p + 1].toInt() and BYTE shl GREEN_SHIFT) or
-                (rgba[p + 2].toInt() and BYTE)
-        }
-        return TexturePixels(pixels.width, pixels.height, argb)
-    }
+private const val CHANNELS = 4
+private const val ALPHA = 3
+private const val BYTE = 0xFF
+private const val ALPHA_SHIFT = 24
+private const val RED_SHIFT = 16
+private const val GREEN_SHIFT = 8
 
-    private companion object {
-        const val CHANNELS = 4
-        const val ALPHA = 3
-        const val BYTE = 0xFF
-        const val ALPHA_SHIFT = 24
-        const val RED_SHIFT = 16
-        const val GREEN_SHIFT = 8
+internal fun NameplatePixels.toTexturePixels(): TexturePixels? {
+    val count = width * height
+    if (width <= 0 || height <= 0 || rgba.length < count * CHANNELS) return null
+    val argb = IntArray(count) { i ->
+        val p = i * CHANNELS
+        (rgba[p + ALPHA].toInt() and BYTE shl ALPHA_SHIFT) or
+            (rgba[p].toInt() and BYTE shl RED_SHIFT) or
+            (rgba[p + 1].toInt() and BYTE shl GREEN_SHIFT) or
+            (rgba[p + 2].toInt() and BYTE)
     }
+    return TexturePixels(width, height, argb)
 }
 
 private fun load(files: Array<NameplateFile>, capabilities: Array<String>, assets: Assets, budgets: Boolean): NameplateLoad {
@@ -340,7 +335,7 @@ private fun load(files: Array<NameplateFile>, capabilities: Array<String>, asset
     return when (val load = BundleLoader(capabilities.toSet()).load(source, assets.source, budgets = budgets)) {
         is BundleLoad.Loaded -> NameplateLoad(NameplatePreview(load.bundle, assets.pixels), null, emptyArray())
         is BundleLoad.Skipped -> NameplateLoad(null, load.reason, emptyArray())
-        is BundleLoad.Invalid -> NameplateLoad(null, null, load.issues.map { it.toJs() }.toTypedArray())
+        is BundleLoad.Invalid -> NameplateLoad(null, null, load.issues.toJs())
     }
 }
 

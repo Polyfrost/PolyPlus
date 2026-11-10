@@ -283,8 +283,8 @@ internal object Particles {
         emitter: ParticleEmitter,
         bursts: List<Burst>,
         cycle: Int,
-        layerStep: Int = 1,
-        copies: (Int) -> Int = { 1 },
+        layerStep: Int,
+        copies: (Int) -> Int,
     ): Int {
         val longest = emitter.life.max
         var live = if (emitter.every > 0) emitter.count * ceilDiv(longest + emitter.jitter, emitter.every) else 0

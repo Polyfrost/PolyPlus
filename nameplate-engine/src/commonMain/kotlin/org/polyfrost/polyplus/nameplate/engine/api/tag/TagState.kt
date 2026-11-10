@@ -28,9 +28,6 @@ class TagState private constructor(
 
     internal fun prior(index: Int): Int = priors?.get(index) ?: NO_PRIOR
 
-    internal fun withInputs(inputs: TagInputs): TagState =
-        if (inputs == this.inputs) this else TagState(inputs, shots, starts, since, shifts, isReduced, stops, priors)
-
     fun reduced(): TagState =
         if (isReduced && shots.isEmpty()) this else TagState(inputs, NO_INTS, NO_INTS, since, shifts, true, stops)
 

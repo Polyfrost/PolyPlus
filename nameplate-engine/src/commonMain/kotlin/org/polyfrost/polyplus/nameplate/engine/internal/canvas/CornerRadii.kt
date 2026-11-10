@@ -1,7 +1,6 @@
 package org.polyfrost.polyplus.nameplate.engine.internal.canvas
 
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
-import org.polyfrost.polyplus.nameplate.engine.internal.canvas.PixelCanvas
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -66,7 +65,7 @@ internal class CornerRadii(val topLeft: Int, val topRight: Int, val bottomRight:
     companion object {
         fun uniform(radius: Int): CornerRadii = CornerRadii(radius, radius, radius, radius)
 
-        private fun inset(radius: Int, rowFromEdge: Int): Int {
+        fun inset(radius: Int, rowFromEdge: Int): Int {
             if (rowFromEdge >= radius) return 0
 
             val dy = radius - rowFromEdge - 0.5

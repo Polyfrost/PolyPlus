@@ -11,9 +11,6 @@ internal class Burst(
     val shot: Int = NO_SHOT,
     val reaction: Reaction? = null,
 ) {
-    val isTriggered: Boolean
-        get() = shot != NO_SHOT || reaction != null
-
     val firstStep: Int
         get() = steps.first()
 

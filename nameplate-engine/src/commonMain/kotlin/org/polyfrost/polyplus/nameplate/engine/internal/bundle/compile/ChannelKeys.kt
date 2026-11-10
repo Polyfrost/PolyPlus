@@ -198,10 +198,13 @@ internal object ChannelKeys {
         }
     }
 
-    private fun molang(element: JsonElement, path: String, report: IssueSink, environment: MolangEnvironment): MolangValue? {
-        val value = MolangValue.of((element as JsonPrimitive).content, environment, path, report.molang()) ?: return null
+    private fun molang(element: JsonElement, path: String, report: IssueSink, environment: MolangEnvironment): MolangValue? =
+        expression((element as JsonPrimitive).content, path, report, environment, "is a constant Molang expression; write it as a number")
+
+    fun expression(source: String, path: String, report: IssueSink, environment: MolangEnvironment, constantMessage: String): MolangValue? {
+        val value = MolangValue.of(source, environment, path, report.molang()) ?: return null
         if (value is MolangValue.Constant) {
-            report.issue(path, "is a constant Molang expression; write it as a number", IssueCode.MOLANG_CONSTANT)
+            report.issue(path, constantMessage, IssueCode.MOLANG_CONSTANT)
             return null
         }
         return value

@@ -1,11 +1,9 @@
 package org.polyfrost.polyplus.nameplate.engine.api.material
 
-import org.polyfrost.polyplus.nameplate.engine.api.material.ShaderLayout
 import org.polyfrost.polyplus.nameplate.engine.api.shader.FlatUniform
 import org.polyfrost.polyplus.nameplate.engine.api.shader.MaterialFrame
 import org.polyfrost.polyplus.nameplate.engine.api.shader.TextureRef
 import org.polyfrost.polyplus.nameplate.engine.internal.material.GlslTemplate
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialInput
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
 
 object MaterialUniforms {
@@ -33,12 +31,7 @@ object MaterialUniforms {
         words[CLOCK + 2] = frame.fps
         words[CLOCK + LANES - 1] = frame.step
         for ((k, input) in layout.inputs.withIndex()) {
-            val value = when (input) {
-                is MaterialInput.Param -> frame.params[input.name] ?: 0.0
-                is MaterialInput.Expression -> input.expression.evaluate(frame)
-                is MaterialInput.BodyEdgeInput -> input.value(frame.edge)
-            }
-            words[INPUTS + k] = value.toFloat().toRawBits()
+            words[INPUTS + k] = input.value(frame).toFloat().toRawBits()
         }
         atlas?.forEachIndexed { i, value -> words[ATLAS + i] = value.toRawBits() }
         for ((s, slot) in layout.toneSlots().withIndex()) {

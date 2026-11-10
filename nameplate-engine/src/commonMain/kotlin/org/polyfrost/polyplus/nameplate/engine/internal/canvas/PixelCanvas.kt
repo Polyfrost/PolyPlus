@@ -6,8 +6,6 @@ import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
 import org.polyfrost.polyplus.nameplate.engine.api.palette.ResolvedPalette
 import org.polyfrost.polyplus.nameplate.engine.internal.strip.IntList
 import org.polyfrost.polyplus.nameplate.engine.internal.strip.PixelStrips
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 internal class PixelCanvas(
     private val grid: PixelGrid,
@@ -45,18 +43,14 @@ internal class PixelCanvas(
     }
 
     fun fill(rect: PixelRect, color: Int) {
-        roundedRect(rect, 0, color)
-    }
-
-    fun roundedRect(rect: PixelRect, radius: Int, color: Int) {
-        roundedRect(rect, radius) { _, _ -> color }
+        roundedRect(rect, 0) { _, _ -> color }
     }
 
     fun roundedRect(rect: PixelRect, radius: Int, color: PixelColor) {
         val r = minOf(radius, minOf(rect.width, rect.height) / 2)
         for (y in rect.y0 until rect.y1) {
             val fromEdge = minOf(y - rect.y0, rect.y1 - 1 - y)
-            val inset = if (fromEdge < r) cornerInset(r, fromEdge) else 0
+            val inset = if (fromEdge < r) CornerRadii.inset(r, fromEdge) else 0
             for (x in rect.x0 + inset until rect.x1 - inset) {
                 set(x, y, color.colorAt(x, y))
             }
@@ -69,16 +63,6 @@ internal class PixelCanvas(
                 val c = sprite.cell(if (mirrorX) sprite.width - 1 - column else column, row)
                 if (c != PixelSprite.TRANSPARENT) {
                     set(x + column, y + row, sprite.color(c))
-                }
-            }
-        }
-    }
-
-    fun silhouette(sprite: PixelSprite, x: Int, y: Int, color: Int) {
-        for (row in 0 until sprite.height) {
-            for (column in 0 until sprite.width) {
-                if (sprite.cell(column, row) != PixelSprite.TRANSPARENT) {
-                    set(x + column, y + row, color)
                 }
             }
         }
@@ -173,11 +157,6 @@ internal class PixelCanvas(
             out.add(open[at + 1])
             out.add(bottom)
             out.add(open[at + 2])
-        }
-
-        fun cornerInset(radius: Int, rowFromEdge: Int): Int {
-            val dy = radius - rowFromEdge - 0.5
-            return radius - sqrt(radius * radius - dy * dy).roundToInt()
         }
     }
 }

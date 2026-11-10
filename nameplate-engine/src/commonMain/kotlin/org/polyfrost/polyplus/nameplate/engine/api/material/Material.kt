@@ -58,8 +58,6 @@ class Material internal constructor(
     internal val coverageReads: CoverageReads
         get() = spec.graph.coverageReads
 
-    internal fun toneHint(): IntArray = spec.toneHint.copyOf()
-
     internal val backdropRefs: IntArray
         get() = spec.backdropRefs
 

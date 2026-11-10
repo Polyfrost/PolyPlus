@@ -19,6 +19,9 @@ class NameplateState internal constructor(internal val state: TagState, private 
         get() = IntArray(state.oneShotCount) { state.start(it) }
 }
 
+internal val NameplateState?.tag: TagState
+    get() = this?.state ?: TagState.NONE
+
 @JsExport
 fun nameplateState(reactions: Array<String>, reduced: Boolean = false): NameplateState =
     NameplateState(TagState.of(inputsOf(reactions), reduced = reduced), emptyArray())

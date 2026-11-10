@@ -26,9 +26,6 @@ class TagInputs private constructor(val mask: Int) {
 
     fun has(reaction: Reaction): Boolean = mask and reaction.bit != 0
 
-    fun with(reaction: Reaction, on: Boolean = true): TagInputs =
-        ofMask(if (on) mask or reaction.bit else mask and reaction.bit.inv())
-
     fun reactions(): List<Reaction> = Reaction.entries.filter(::has)
 
     override fun equals(other: Any?): Boolean = other is TagInputs && other.mask == mask

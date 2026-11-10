@@ -37,7 +37,9 @@ internal class EdgeRows private constructor(val top: Int, val lefts: IntArray, v
     val width: Int
         get() = rights.max() - lefts.min() + 1
 
-    fun fitted(boxWidth: Int, boxHeight: Int): EdgeRows {
+    class Fit(val rows: EdgeRows, val width: Int, val height: Int)
+
+    fun fit(boxWidth: Int, boxHeight: Int): Fit {
         var fitWidth = minOf(boxWidth, width)
         var fitHeight = minOf(boxHeight, count)
         var rows = eroded(fitWidth, fitHeight)
@@ -46,15 +48,21 @@ internal class EdgeRows private constructor(val top: Int, val lefts: IntArray, v
             fitHeight = maxOf(1, fitHeight - 1)
             rows = eroded(fitWidth, fitHeight)
         }
-        val shift = (fitWidth - boxWidth) / 2
+        return Fit(rows, fitWidth, fitHeight)
+    }
+
+    fun fitted(boxWidth: Int, boxHeight: Int): EdgeRows {
+        val fit = fit(boxWidth, boxHeight)
+        val rows = fit.rows
+        val shift = (fit.width - boxWidth) / 2
         return EdgeRows(
-            rows.top + (fitHeight - boxHeight) / 2,
+            rows.top + (fit.height - boxHeight) / 2,
             IntArray(rows.count) { rows.lefts[it] + shift },
             IntArray(rows.count) { rows.rights[it] + shift },
         )
     }
 
-    fun eroded(width: Int, height: Int): EdgeRows? {
+    private fun eroded(width: Int, height: Int): EdgeRows? {
         val rows = count - height + 1
         if (rows <= 0) return null
 

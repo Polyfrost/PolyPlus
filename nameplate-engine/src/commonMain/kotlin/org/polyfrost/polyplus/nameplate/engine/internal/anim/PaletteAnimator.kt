@@ -6,9 +6,8 @@ import org.polyfrost.polyplus.nameplate.engine.api.palette.ResolvedPalette
 import org.polyfrost.polyplus.nameplate.engine.internal.color.ColorLerp
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.PaletteTrack
+import org.polyfrost.polyplus.nameplate.engine.internal.track.Interpolation
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MolangFrame
-
-private const val SMOOTH_UNITS = 1024
 
 internal fun paletteAt(
     bundle: NameplateBundle,
@@ -65,11 +64,7 @@ private fun recolor(
     stops: Array<IntArray>,
     molang: MolangFrame?,
 ) {
-    var key = 0
-    while (key + 1 < track.keyCount && track.steps[key + 1] <= frame) {
-        key++
-    }
-
+    val key = Interpolation.keyAt(track.steps, frame)
     val next = key + 1
     val moving = next < track.keyCount && track.easings[next] != PaletteTrack.Easing.STEP
     if (track.isBase(key) && (!moving || track.isBase(next))) return
@@ -106,11 +101,6 @@ private fun keyColor(track: PaletteTrack.Keys, key: Int, tone: Int, resolved: Re
 private fun blend(from: Int, to: Int, easing: PaletteTrack.Easing, elapsed: Int, span: Int): Int = when (easing) {
     PaletteTrack.Easing.STEP -> from
     PaletteTrack.Easing.LINEAR -> ColorLerp.srgb(from, to, elapsed, span)
-    PaletteTrack.Easing.EASE -> ColorLerp.srgb(from, to, smoothstep(elapsed, span), SMOOTH_UNITS)
-}
-
-private fun smoothstep(numerator: Int, denominator: Int): Int {
-    val n = numerator.toLong()
-    val d = denominator.toLong()
-    return (n * n * (3 * d - 2 * n) * SMOOTH_UNITS / (d * d * d)).toInt()
+    PaletteTrack.Easing.EASE ->
+        ColorLerp.srgb(from, to, Interpolation.smoothstep(elapsed.toLong(), span.toLong()).toInt(), Interpolation.EASE_UNITS)
 }

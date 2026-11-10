@@ -7,14 +7,19 @@ import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle.LayerC
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.ParticleEmitter
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelGrid
 import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelImage
+import org.polyfrost.polyplus.nameplate.engine.api.canvas.PixelRect
 import org.polyfrost.polyplus.nameplate.engine.api.layout.TagBlock
 import org.polyfrost.polyplus.nameplate.engine.api.paint.Detail
 import org.polyfrost.polyplus.nameplate.engine.api.paint.LayerPainter
 import org.polyfrost.polyplus.nameplate.engine.api.palette.ResolvedPalette
 import org.polyfrost.polyplus.nameplate.engine.api.tag.LayerPose
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.spriteOf
+import org.polyfrost.polyplus.nameplate.engine.internal.anim.states
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.SpriteAdaptive
 import org.polyfrost.polyplus.nameplate.engine.internal.canvas.paletteCanvas
+
+internal fun MaterialLayer.bodyRect(bundle: NameplateBundle, block: TagBlock): PixelRect =
+    of?.let { (bundle.layer(it).content as LayerContent.Body).rect(block) } ?: block.background
 
 internal class Shape(val image: PixelImage, val x0: Int, val y0: Int, val x1: Int, val y1: Int) {
     val isEmpty: Boolean
@@ -34,7 +39,7 @@ internal class Placed(
     val body: PixelImage?,
     val slot: Int = 0,
     val base: Int = 0,
-    val dynamic: DynamicSlot? = null,
+    val dynamic: DynamicSlots.Slot? = null,
 ) {
     fun pose(motion: SimulatedMotion, frame: Int): LayerPose =
         dynamic?.pose(motion, frame) ?: motion.pose(layer, frame, mirrored)
@@ -65,6 +70,9 @@ internal class ShapeSet(private val grid: PixelGrid, private val palette: Resolv
             shapeOf(canvas.compile()).also { shapes[state] = it }
         }
     }
+
+    fun alternative(bundle: NameplateBundle, layer: NameplateBundle.Layer, base: Int): List<Shape> =
+        states(bundle, layer).filter { it - base in 0 until SpriteAdaptive.STATE_STRIDE }.map { sprite(layer, it) }
 
     fun shapeOf(image: PixelImage): Shape {
         var x0 = Int.MAX_VALUE

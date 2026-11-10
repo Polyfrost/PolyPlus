@@ -83,8 +83,7 @@ class LayerPainter(
         block: TagBlock? = null,
     ): ResolvedPalette {
         val phased = tagFrame(bundle, frame, seed)
-        val molang = if ((bundle.molang?.slotCount ?: 0) > 0) molangOf(bundle) else null
-        molang?.bind(variant.params, block, phased)
+        val molang = boundMolang(bundle, variant, block, phased, slots = true)
         val palette = paletteAt(bundle, variant, phased, molang)
         dropped = molang?.failed == true
         return if (dropped) variant.resolved else palette
@@ -100,9 +99,7 @@ class LayerPainter(
     ): LayerPose {
         if (bundle.plateChain.isEmpty() || state.isReduced) return LayerPose.IDENTITY
         val phased = tagFrame(bundle, frame, seed)
-        val molang = if ((bundle.molang?.channelCount ?: 0) > 0) molangOf(bundle) else null
-        molang?.bind(variant.params, block, phased)
-        return plateAt(bundle, phased, seed, state, molang)
+        return plateAt(bundle, phased, seed, state, boundMolang(bundle, variant, block, phased))
     }
 
     fun badgeFollow(
@@ -114,9 +111,7 @@ class LayerPainter(
         state: TagState = TagState.NONE,
     ): LayerPose {
         val phased = tagFrame(bundle, frame, seed)
-        val molang = if ((bundle.molang?.channelCount ?: 0) > 0) molangOf(bundle) else null
-        molang?.bind(variant.params, block, phased)
-        return badgeFollowAt(bundle, variant, phased, seed, state, molang)
+        return badgeFollowAt(bundle, variant, phased, seed, state, boundMolang(bundle, variant, block, phased))
     }
 
     fun paint(
@@ -143,8 +138,7 @@ class LayerPainter(
         }
 
         val phased = tagFrame(bundle, frame, seed)
-        val molang = if ((bundle.molang?.channelCount ?: 0) > 0) molangOf(bundle) else null
-        molang?.bind(variant.params, block, phased)
+        val molang = boundMolang(bundle, variant, block, phased)
         val painted = if (plan.opsHint > 0) ArrayList<Painted>(plan.opsHint) else ArrayList()
         val whole = block.rect()
         val slots = plan.slots(variant)
@@ -170,21 +164,13 @@ class LayerPainter(
                     val rect = if (content.of == null) whole else plan.body(resolved)
                     val alternative = content.adaptive.alternative(block.nameWidth)
                     val follow = followAt(bundle, layer, phased, seed, state, molang)
+                    val adaptiveTarget = target.set(painted, index, bundle, layer, rect, phased, seed, state, molang, memo, follow)
                     when {
                         alternative == SpriteAdaptive.HIDDEN -> Unit
                         content.adaptive.path != null -> if (detail == Detail.FULL) {
-                            adaptive.walkers(
-                                target.set(painted, index, bundle, layer, rect, phased, seed, state, molang, memo, follow),
-                                content,
-                                alternative,
-                            )
+                            adaptive.walkers(adaptiveTarget, content, alternative)
                         }
-                        content.adaptive.repeat != null ->
-                            adaptive.repeats(
-                                target.set(painted, index, bundle, layer, rect, phased, seed, state, molang, memo, follow),
-                                content,
-                                alternative,
-                            )
+                        content.adaptive.repeat != null -> adaptive.repeats(adaptiveTarget, content, alternative)
                         else ->
                             paintSprite(
                                 painted,
@@ -309,13 +295,24 @@ class LayerPainter(
         return LayerPlan(bundle).also { plans[bundle] = it }
     }
 
-    private fun molangOf(bundle: NameplateBundle): MolangFrame {
-        molangFrames[bundle]?.let { return it }
-        val molang = checkNotNull(bundle.molang)
-        if (molangFrames.size >= MAX_MOLANG_BUNDLES) {
-            molangFrames.clear()
+    private fun boundMolang(
+        bundle: NameplateBundle,
+        variant: NameplateBundle.Variant,
+        block: TagBlock?,
+        frame: Int,
+        slots: Boolean = false,
+    ): MolangFrame? {
+        val molang = bundle.molang ?: return null
+        if ((if (slots) molang.slotCount else molang.channelCount) <= 0) return null
+
+        val bound = molangFrames[bundle] ?: run {
+            if (molangFrames.size >= MAX_MOLANG_BUNDLES) {
+                molangFrames.clear()
+            }
+            MolangFrame(molang, bundle.loop, bundle.fps).also { molangFrames[bundle] = it }
         }
-        return MolangFrame(molang, bundle.loop, bundle.fps).also { molangFrames[bundle] = it }
+        bound.bind(variant.params, block, frame)
+        return bound
     }
 
     private fun paintMaterial(

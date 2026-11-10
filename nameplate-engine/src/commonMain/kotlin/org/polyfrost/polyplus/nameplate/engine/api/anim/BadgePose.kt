@@ -3,10 +3,9 @@ package org.polyfrost.polyplus.nameplate.engine.api.anim
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
 import org.polyfrost.polyplus.nameplate.engine.api.tag.LayerPose
 import org.polyfrost.polyplus.nameplate.engine.api.tag.TagState
+import org.polyfrost.polyplus.nameplate.engine.internal.anim.channelAt
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.phaseOffset
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.sample
 import org.polyfrost.polyplus.nameplate.engine.internal.anim.tagFrame
-import org.polyfrost.polyplus.nameplate.engine.internal.anim.triggered
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.model.BADGE_TARGET
 
 fun badgePose(bundle: NameplateBundle, frame: Int, seed: Int, state: TagState = TagState.NONE): LayerPose {
@@ -17,14 +16,10 @@ fun badgePose(bundle: NameplateBundle, frame: Int, seed: Int, state: TagState = 
     val loopTime = phased.mod(bundle.loop)
     val time = phased - phaseOffset(bundle, seed)
     val triggers = bundle.triggers
-    val movedX = triggered(triggers, BADGE_TARGET, state, time, loopTime, null) { it.positionX }
-    val movedY = triggered(triggers, BADGE_TARGET, state, time, loopTime, null) { it.positionY }
-    val reacted = triggered(triggers, BADGE_TARGET, state, time, loopTime, null) { it.opacity }
-    val shown = triggered(triggers, BADGE_TARGET, state, time, loopTime, null) { it.visible }
     return LayerPose(
-        sample(null, loop, 0, loopTime, null, 0, movedX) { it.positionX },
-        sample(null, loop, 0, loopTime, null, 0, movedY) { it.positionY },
-        sample(null, loop, 0, loopTime, null, LayerPose.OPAQUE, reacted) { it.opacity },
-        sample(null, loop, 0, loopTime, null, 1, shown) { it.visible } != 0,
+        channelAt(triggers, BADGE_TARGET, null, loop, state, time, loopTime, 0, null, 0) { it.positionX },
+        channelAt(triggers, BADGE_TARGET, null, loop, state, time, loopTime, 0, null, 0) { it.positionY },
+        channelAt(triggers, BADGE_TARGET, null, loop, state, time, loopTime, 0, null, LayerPose.OPAQUE) { it.opacity },
+        channelAt(triggers, BADGE_TARGET, null, loop, state, time, loopTime, 0, null, 1) { it.visible } != 0,
     )
 }

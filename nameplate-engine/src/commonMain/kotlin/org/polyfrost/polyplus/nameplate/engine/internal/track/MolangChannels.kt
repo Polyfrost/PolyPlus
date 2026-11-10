@@ -81,7 +81,7 @@ internal class BundleMolang(params: Collection<String>) {
         fun slotEnvironment(manifest: ManifestJson): MolangEnvironment =
             NameplateQueries.environment(MolangUse.SLOT_COLOR, paramNames(manifest))
 
-        private fun paramNames(manifest: ManifestJson): Set<String> {
+        fun paramNames(manifest: ManifestJson): Set<String> {
             val names = LinkedHashSet(manifest.params.keys)
             for (variant in manifest.variants.values) {
                 names.addAll(variant.params.keys)
@@ -94,6 +94,7 @@ internal class BundleMolang(params: Collection<String>) {
 internal class MolangFrame(private val molang: BundleMolang, private val loop: Int, private val fps: Int) {
     private val channelRuntime = MolangRuntime(molang.channelEnvironment)
     private val slotRuntime = MolangRuntime(molang.slotEnvironment)
+    private val runtimes = arrayOf(channelRuntime, slotRuntime)
     private val channelValues = DoubleArray(molang.channelCount)
     private val channelStamps = IntArray(molang.channelCount)
     private val slotValues = DoubleArray(molang.slotCount)
@@ -111,19 +112,17 @@ internal class MolangFrame(private val molang: BundleMolang, private val loop: I
             generation = 0
         }
         generation++
-        channelRuntime.startFrame()
-        slotRuntime.startFrame()
-        if (params !== this.params) {
-            NameplateQueries.bindParams(channelRuntime, params)
-            NameplateQueries.bindParams(slotRuntime, params)
-            this.params = params
-        }
         val shown = block ?: NO_BLOCK
-        NameplateQueries.bindBlock(channelRuntime, shown)
-        NameplateQueries.bindBlock(slotRuntime, shown)
         val local = frame.mod(loop)
-        NameplateQueries.bindFrame(channelRuntime, local, loop, fps)
-        NameplateQueries.bindFrame(slotRuntime, local, loop, fps)
+        for (runtime in runtimes) {
+            runtime.startFrame()
+            if (params !== this.params) {
+                NameplateQueries.bindParams(runtime, params)
+            }
+            NameplateQueries.bindBlock(runtime, shown)
+            NameplateQueries.bindFrame(runtime, local, loop, fps)
+        }
+        this.params = params
     }
 
     fun channel(index: Int): Double {

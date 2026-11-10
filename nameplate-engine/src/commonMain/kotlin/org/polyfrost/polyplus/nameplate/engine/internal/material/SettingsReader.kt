@@ -7,7 +7,6 @@ import kotlinx.serialization.json.doubleOrNull
 import org.polyfrost.polyplus.nameplate.engine.api.issue.BundleIssue
 import org.polyfrost.polyplus.nameplate.engine.api.issue.IssueCode
 import org.polyfrost.polyplus.nameplate.engine.api.limit.MaterialLimits
-import org.polyfrost.polyplus.nameplate.engine.internal.material.MaterialMolang
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.ColorRef
 import org.polyfrost.polyplus.nameplate.engine.internal.palette.Palette
 
@@ -16,7 +15,7 @@ internal class GraphContext(
     val params: Set<String>,
     val sprites: (String) -> MaterialSprite?,
     val textures: (String) -> Boolean,
-    val molang: MaterialMolang?,
+    val molang: NameplateMaterialMolang,
 )
 
 internal class SettingsReader(
@@ -40,7 +39,13 @@ internal class SettingsReader(
     }
 
     fun int(name: String, range: IntRange, default: Int): Int {
-        val number = number(name) ?: return default
+        seen += name
+        val element = values[name] ?: return default
+        val number = (element as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
+        if (number == null) {
+            report(name, "must be a number")
+            return default
+        }
         val whole = number.toInt()
         val valid = whole.toDouble() == number && whole in range
         if (!valid) {
@@ -122,15 +127,5 @@ internal class SettingsReader(
                 report(key, "is not a setting of this node", IssueCode.NODE_SETTING)
             }
         }
-    }
-
-    private fun number(name: String): Double? {
-        seen += name
-        val element = values[name] ?: return null
-        val number = (element as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
-        if (number == null) {
-            report(name, "must be a number")
-        }
-        return number
     }
 }

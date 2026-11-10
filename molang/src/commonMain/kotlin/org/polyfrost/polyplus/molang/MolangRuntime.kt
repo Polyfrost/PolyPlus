@@ -30,13 +30,6 @@ class MolangRuntime(val environment: MolangEnvironment) {
         variables[slot] = value
     }
 
-    internal fun setQuery(name: String, value: Double) {
-        val slot = environment.querySlot(name)
-        if (slot != MolangEnvironment.NONE) {
-            queries[slot] = value
-        }
-    }
-
     fun setParam(name: String, value: Double) {
         val slot = environment.paramSlot(name)
         if (slot != MolangEnvironment.NONE) {

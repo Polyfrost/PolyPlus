@@ -1,7 +1,5 @@
 package org.polyfrost.polyplus.nameplate.engine.api.material
 
-import org.polyfrost.polyplus.nameplate.engine.api.material.MaterialShader
-import org.polyfrost.polyplus.nameplate.engine.api.material.ShaderLayout
 import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslDialect
 import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslGlobals
 import org.polyfrost.polyplus.nameplate.engine.api.shader.GlslSamplers
@@ -72,10 +70,6 @@ object MaterialGlsl {
             uniforms = uniforms,
         )
     }
-
-    fun vertex(dialect: GlslDialect): String = GlslTemplate.vertex(dialect)
-
-    fun include(): String = GlslTemplate.include()
 
     internal fun toneSlots(outline: Int?, graph: MaterialGraph): IntArray {
         val slots = HashSet<Int>()

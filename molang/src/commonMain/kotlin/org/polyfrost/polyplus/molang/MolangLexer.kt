@@ -106,7 +106,7 @@ internal class MolangLexer(private val source: String) {
             index += 2
             return Token(pair, column)
         }
-        val single = singleOf(char)
+        val single = SINGLES[char]
             ?: throw MolangSyntaxException(
                 "unexpected character '$char'",
                 column,
@@ -126,8 +126,6 @@ internal class MolangLexer(private val source: String) {
         char == '|' && next == '|' -> TokenKind.OR
         else -> null
     }
-
-    private fun singleOf(char: Char): TokenKind? = SINGLES[char]
 
     private fun peek(offset: Int): Char = if (index + offset < source.length) source[index + offset] else '\u0000'
 

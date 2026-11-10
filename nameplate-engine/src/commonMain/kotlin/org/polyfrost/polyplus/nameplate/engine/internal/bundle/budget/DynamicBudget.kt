@@ -94,7 +94,7 @@ internal object DynamicBudget {
     ): List<Shape> {
         val path = checkNotNull(sprite.adaptive.path)
         val base = dynamic.alternative * SpriteAdaptive.STATE_STRIDE
-        val candidates = states(bundle, layer).filter { it - base in 0 until SpriteAdaptive.STATE_STRIDE }.map { shapes.sprite(layer, it) }
+        val candidates = shapes.alternative(bundle, layer, base)
         val geometry = dynamic.geometry(sprite, path)
         val pixels = sprite.framesOf(dynamic.alternative).first()
         val left = sprite.alongPathX(geometry.xs.min(), pixels)
@@ -118,11 +118,7 @@ internal object DynamicBudget {
         extent: Extent,
     ): List<Shape> {
         val spawn = spawnExtent(emitter, dynamic)
-        val moved = IntArray(4)
-        moved[0] = Int.MAX_VALUE
-        moved[1] = Int.MIN_VALUE
-        moved[2] = Int.MAX_VALUE
-        moved[3] = Int.MIN_VALUE
+        val moved = intArrayOf(Int.MAX_VALUE, Int.MIN_VALUE, Int.MAX_VALUE, Int.MIN_VALUE)
         for (age in 0 until emitter.life.max) {
             for (vx in intArrayOf(emitter.velocityX.min, emitter.velocityX.max)) {
                 val dx = Particles.offset(vx + emitter.driftX, emitter.gravityX, age)
@@ -137,8 +133,9 @@ internal object DynamicBudget {
         }
         val wobbleX = abs(emitter.wobble?.x ?: 0)
         val wobbleY = abs(emitter.wobble?.y ?: 0)
-        val candidates = emitter.states().map { shapes.sprite(layer, it) }
-        for ((i, state) in emitter.states().withIndex()) {
+        val states = emitter.states()
+        val candidates = states.map { shapes.sprite(layer, it) }
+        for ((i, state) in states.withIndex()) {
             val shape = candidates[i]
             if (shape.isEmpty) continue
             val pixels = emitter.spriteOf(state)

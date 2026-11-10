@@ -19,19 +19,13 @@ class LetterFrame {
         private set
 
     internal val inPlace: Boolean
-        get() {
-            for (i in 0 until count) {
-                if (!isInPlace(i)) return false
-            }
-            return true
+        get() = (0 until count).all { glyph ->
+            abs(dx[glyph]) <= READABLE_SHIFT &&
+                abs(dy[glyph]) <= READABLE_SHIFT &&
+                opacity[glyph] >= HALF &&
+                abs(scale[glyph] - SCALE_UNITS) <= 1 &&
+                (rotation[glyph] <= READABLE_TURN || rotation[glyph] >= FULL_TURN - READABLE_TURN)
         }
-
-    internal fun isInPlace(glyph: Int): Boolean =
-        abs(dx[glyph]) <= READABLE_SHIFT &&
-            abs(dy[glyph]) <= READABLE_SHIFT &&
-            opacity[glyph] >= HALF &&
-            abs(scale[glyph] - SCALE_UNITS) <= 1 &&
-            (rotation[glyph] <= READABLE_TURN || rotation[glyph] >= FULL_TURN - READABLE_TURN)
 
     fun isStill(glyph: Int): Boolean =
         dx[glyph] == 0 &&
@@ -69,12 +63,6 @@ class LetterFrame {
                 return
             }
         }
-    }
-
-    fun copyOf(): LetterFrame {
-        val copy = LetterFrame()
-        copy.copyFrom(this)
-        return copy
     }
 
     internal fun copyFrom(source: LetterFrame) {

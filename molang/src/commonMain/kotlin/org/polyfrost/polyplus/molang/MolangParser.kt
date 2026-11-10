@@ -6,15 +6,7 @@ internal class MolangParser(private val tokens: List<Token>) {
     private var depth = 0
 
     fun script(): MolangNode.Script {
-        val statements = ArrayList<MolangNode>()
-        skipSemicolons()
-        while (peek().kind != TokenKind.END) {
-            statements += statement()
-            if (peek().kind != TokenKind.END) {
-                expect(TokenKind.SEMICOLON)
-            }
-            skipSemicolons()
-        }
+        val statements = statements(TokenKind.END)
         if (statements.isEmpty()) {
             throw MolangSyntaxException("empty expression", 1, MolangProblem.EMPTY)
         }
@@ -57,20 +49,25 @@ internal class MolangParser(private val tokens: List<Token>) {
 
     private fun block(): MolangNode.Block = nested {
         val open = expect(TokenKind.OPEN_BRACE)
+        val statements = statements(TokenKind.CLOSE_BRACE)
+        advance()
+        counted(MolangNode.Block(open.column, statements))
+    }
+
+    private fun statements(end: TokenKind): List<MolangNode> {
         val statements = ArrayList<MolangNode>()
         skipSemicolons()
-        while (peek().kind != TokenKind.CLOSE_BRACE) {
+        while (peek().kind != end) {
             if (peek().kind == TokenKind.END) {
-                throw unexpected(TokenKind.CLOSE_BRACE)
+                throw unexpected(end)
             }
             statements += statement()
-            if (peek().kind != TokenKind.CLOSE_BRACE) {
+            if (peek().kind != end) {
                 expect(TokenKind.SEMICOLON)
             }
             skipSemicolons()
         }
-        advance()
-        counted(MolangNode.Block(open.column, statements))
+        return statements
     }
 
     private fun expressionStatement(): MolangNode {
@@ -98,23 +95,14 @@ internal class MolangParser(private val tokens: List<Token>) {
         return counted(MolangNode.Ternary(question.column, condition, whenTrue, whenFalse))
     }
 
-    private fun or(): MolangNode = leftAssociative(OR) { and() }
+    private fun or(): MolangNode = binary(0)
 
-    private fun and(): MolangNode = leftAssociative(AND) { equality() }
-
-    private fun equality(): MolangNode = leftAssociative(EQUALITY) { comparison() }
-
-    private fun comparison(): MolangNode = leftAssociative(COMPARISON) { additive() }
-
-    private fun additive(): MolangNode = leftAssociative(ADDITIVE) { multiplicative() }
-
-    private fun multiplicative(): MolangNode = leftAssociative(MULTIPLICATIVE) { unary() }
-
-    private inline fun leftAssociative(kinds: Set<TokenKind>, operand: () -> MolangNode): MolangNode {
-        var left = operand()
-        while (peek().kind in kinds) {
+    private fun binary(level: Int): MolangNode {
+        if (level == BINARY_LEVELS.size) return unary()
+        var left = binary(level + 1)
+        while (peek().kind in BINARY_LEVELS[level]) {
             val op = advance()
-            left = counted(MolangNode.Binary(op.column, op.kind, left, operand()))
+            left = counted(MolangNode.Binary(op.column, op.kind, left, binary(level + 1)))
         }
         return left
     }
@@ -234,12 +222,13 @@ internal class MolangParser(private val tokens: List<Token>) {
         const val RETURN = "return"
         const val VALUE = "a value"
 
-        val OR: Set<TokenKind> = setOf(TokenKind.OR)
-        val AND: Set<TokenKind> = setOf(TokenKind.AND)
-        val EQUALITY: Set<TokenKind> = setOf(TokenKind.EQUAL, TokenKind.NOT_EQUAL)
-        val COMPARISON: Set<TokenKind> =
-            setOf(TokenKind.LESS, TokenKind.LESS_EQUAL, TokenKind.GREATER, TokenKind.GREATER_EQUAL)
-        val ADDITIVE: Set<TokenKind> = setOf(TokenKind.PLUS, TokenKind.MINUS)
-        val MULTIPLICATIVE: Set<TokenKind> = setOf(TokenKind.STAR, TokenKind.SLASH, TokenKind.PERCENT)
+        val BINARY_LEVELS: List<Set<TokenKind>> = listOf(
+            setOf(TokenKind.OR),
+            setOf(TokenKind.AND),
+            setOf(TokenKind.EQUAL, TokenKind.NOT_EQUAL),
+            setOf(TokenKind.LESS, TokenKind.LESS_EQUAL, TokenKind.GREATER, TokenKind.GREATER_EQUAL),
+            setOf(TokenKind.PLUS, TokenKind.MINUS),
+            setOf(TokenKind.STAR, TokenKind.SLASH, TokenKind.PERCENT),
+        )
     }
 }

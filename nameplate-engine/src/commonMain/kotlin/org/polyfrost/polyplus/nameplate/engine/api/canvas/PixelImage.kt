@@ -109,7 +109,6 @@ class PixelImage internal constructor(
         internal const val REF = PixelStrips.RECT_REF
 
         const val STRIP_STRIDE = 5
-        internal const val STRIP_PERIOD = PixelStrips.PERIOD
         const val MAX_STRIP_PERIOD = PixelStrips.MAX_PERIOD
         const val MAX_STRIP_LENGTH = PixelStrips.MAX_LENGTH
     }

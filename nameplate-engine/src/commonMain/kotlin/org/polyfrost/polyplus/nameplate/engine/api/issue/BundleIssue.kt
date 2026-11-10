@@ -12,11 +12,7 @@ class BundleIssue(
 
     override fun equals(other: Any?): Boolean = other is BundleIssue && other.path == path && other.message == message
 
-    override fun hashCode(): Int = path.hashCode() * HASH + message.hashCode()
+    override fun hashCode(): Int = path.hashCode() * 31 + message.hashCode()
 
     override fun toString(): String = "$path: $message"
-
-    private companion object {
-        internal const val HASH = 31
-    }
 }

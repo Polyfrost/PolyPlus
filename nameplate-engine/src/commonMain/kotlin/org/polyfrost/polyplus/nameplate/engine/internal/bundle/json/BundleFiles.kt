@@ -17,5 +17,7 @@ internal object BundleFiles {
         else -> null
     }
 
+    fun frameCount(sprite: SpriteFileJson?): Int? = sprite?.let(::framesOf)?.size
+
     fun isSpriteId(id: String): Boolean = SPRITE_ID.matches(id)
 }

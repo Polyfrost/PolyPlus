@@ -129,27 +129,18 @@ internal class SimulatedMotion(private val bundle: NameplateBundle, private val 
         val shifted = mirrorFrame(layer, frame, mirrored)
         val reseeded = reseeded(layer, mirrored)
         val loopTime = shifted.mod(bundle.loop)
-        val triggers = bundle.triggers
-        val state = tagState
-        val molang = molang
         var dx = 0
         var dy = 0
         var opacity = LayerPose.OPAQUE
         var visible = true
         for (target in chain) {
-            val schedule = target.schedule
-            val slot = if (schedule == null) NO_EVENT else plan.slot(schedule, shifted, target.step, reseeded)
-            val event = if (schedule == null || slot == NO_EVENT) null else schedule.events[eventOf(slot)].channels(target.id)
+            val slot = slotOf(target, shifted, reseeded)
+            val event = channelsAt(target, slot)
             val local = localOf(slot)
-            val id = target.id
-            val movedX = triggered(triggers, id, state, shifted, loopTime, molang) { it.positionX }
-            dx += sample(event, target.loop, local, loopTime, molang, 0, movedX) { it.positionX }
-            val movedY = triggered(triggers, id, state, shifted, loopTime, molang) { it.positionY }
-            dy += sample(event, target.loop, local, loopTime, molang, 0, movedY) { it.positionY }
-            val reacted = triggered(triggers, id, state, shifted, loopTime, molang) { it.opacity }
-            opacity = multiply(opacity, sample(event, target.loop, local, loopTime, molang, LayerPose.OPAQUE, reacted) { it.opacity })
-            val shown = triggered(triggers, id, state, shifted, loopTime, molang) { it.visible }
-            visible = visible && sample(event, target.loop, local, loopTime, molang, 1, shown) { it.visible } != 0
+            dx += sample(target, event, local, shifted, loopTime, 0) { it.positionX }
+            dy += sample(target, event, local, shifted, loopTime, 0) { it.positionY }
+            opacity = multiply(opacity, sample(target, event, local, shifted, loopTime, LayerPose.OPAQUE) { it.opacity })
+            visible = visible && sample(target, event, local, shifted, loopTime, 1) { it.visible } != 0
         }
 
         return LayerPose(dx + follow.dx, dy + follow.dy, opacity, visible)
@@ -160,22 +151,26 @@ internal class SimulatedMotion(private val bundle: NameplateBundle, private val 
         if (chain.isEmpty()) return LayerPose.IDENTITY
 
         val loopTime = frame.mod(bundle.loop)
-        val triggers = bundle.triggers
-        val state = tagState
-        val molang = molang
         var dx = 0
         var dy = 0
         for (target in chain) {
-            val schedule = target.schedule
-            val slot = if (schedule == null) NO_EVENT else plan.slot(schedule, frame, target.step, false)
-            val event = if (schedule == null || slot == NO_EVENT) null else schedule.events[eventOf(slot)].channels(target.id)
+            val slot = slotOf(target, frame, false)
+            val event = channelsAt(target, slot)
             val local = localOf(slot)
-            val movedX = triggered(triggers, target.id, state, frame, loopTime, molang) { it.positionX }
-            dx += sample(event, target.loop, local, loopTime, molang, 0, movedX) { it.positionX }
-            val movedY = triggered(triggers, target.id, state, frame, loopTime, molang) { it.positionY }
-            dy += sample(event, target.loop, local, loopTime, molang, 0, movedY) { it.positionY }
+            dx += sample(target, event, local, frame, loopTime, 0) { it.positionX }
+            dy += sample(target, event, local, frame, loopTime, 0) { it.positionY }
         }
         return LayerPose(dx, dy, LayerPose.OPAQUE, true)
+    }
+
+    private fun slotOf(target: PoseTarget, time: Int, reseeded: Boolean): Long {
+        val schedule = target.schedule ?: return NO_EVENT
+        return plan.slot(schedule, time, target.step, reseeded)
+    }
+
+    private fun channelsAt(target: PoseTarget, slot: Long): ChannelTracks? {
+        val schedule = target.schedule
+        return if (schedule == null || slot == NO_EVENT) null else schedule.events[eventOf(slot)].channels(target.id)
     }
 
     fun state(layer: NameplateBundle.Layer, frame: Int, mirrored: Boolean): Int {
@@ -204,19 +199,19 @@ internal class SimulatedMotion(private val bundle: NameplateBundle, private val 
     private fun multiply(a: Int, b: Int): Int = (a * b + OPACITY_HALF) / LayerPose.OPAQUE
 
     private inline fun sample(
+        target: PoseTarget,
         event: ChannelTracks?,
-        loop: ChannelTracks?,
         local: Int,
+        time: Int,
         loopTime: Int,
-        molang: MolangFrame?,
         default: Int,
-        reacted: Int,
         select: (ChannelTracks) -> Track?,
     ): Int {
+        val reacted = triggered(bundle.triggers, target.id, tagState, time, loopTime, molang, select)
         if (reacted != UNSET) return reacted
 
         val scheduled = event?.let { select(it) }
-        val looped = loop?.let { select(it) }
+        val looped = target.loop?.let { select(it) }
         return when {
             scheduled != null -> scheduled.at(local, molang)
             looped != null -> looped.at(loopTime, molang)

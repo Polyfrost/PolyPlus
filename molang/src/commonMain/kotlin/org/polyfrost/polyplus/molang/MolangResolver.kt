@@ -1,17 +1,7 @@
 package org.polyfrost.polyplus.molang
 
-internal class MolangResolver(private val environment: MolangEnvironment) {
-    class Problem(
-        val message: String,
-        val column: Int,
-        val problem: MolangProblem,
-        val names: Map<String, String> = emptyMap(),
-        val values: Map<String, Int> = emptyMap(),
-    ) {
-        fun issue(path: String): MolangIssue = MolangIssue(path, "$message at column $column", problem, column, names, values)
-    }
-
-    val problems: MutableList<Problem> = ArrayList()
+internal class MolangResolver(private val environment: MolangEnvironment, private val path: String) {
+    val problems: MutableList<MolangIssue> = ArrayList()
 
     private val folder by lazy { MolangRuntime(environment) }
 
@@ -43,11 +33,7 @@ internal class MolangResolver(private val environment: MolangEnvironment) {
     private fun assign(node: MolangNode.Assign): MolangOp {
         val slot = variable(node.target)
         val value = expression(node.value)
-        return when {
-            slot == MolangEnvironment.NONE -> value
-            environment.floatVariables -> FloatAssignOp(slot, value)
-            else -> AssignOp(slot, value)
-        }
+        return if (slot == MolangEnvironment.NONE) value else AssignOp(slot, value, environment.floatVariables)
     }
 
     private fun expression(node: MolangNode): MolangOp = when (node) {
@@ -63,33 +49,18 @@ internal class MolangResolver(private val environment: MolangEnvironment) {
 
     private fun unary(node: MolangNode.Unary): MolangOp {
         val operand = expression(node.operand)
-        val op = if (node.op == TokenKind.MINUS) NegateOp(operand) else NotOp(operand)
-        return folded(op, operand)
+        return folded(UnaryOp(operand, negate = node.op == TokenKind.MINUS), operand)
     }
 
     private fun binary(node: MolangNode.Binary): MolangOp {
         val left = expression(node.left)
         val right = expression(node.right)
         val op = when (node.op) {
-            TokenKind.PLUS -> AddOp(left, right)
-            TokenKind.MINUS -> SubtractOp(left, right)
-            TokenKind.STAR -> MultiplyOp(left, right)
-            TokenKind.SLASH -> DivideOp(left, right)
-            TokenKind.PERCENT -> ModuloOp(left, right)
-            else -> comparison(node.op, left, right)
+            TokenKind.AND -> LogicOp(left, right, isAnd = true)
+            TokenKind.OR -> LogicOp(left, right, isAnd = false)
+            else -> BinaryOp(left, right, BINARY_FUNCTIONS.getValue(node.op))
         }
         return folded(op, left, right)
-    }
-
-    private fun comparison(kind: TokenKind, left: MolangOp, right: MolangOp): MolangOp = when (kind) {
-        TokenKind.EQUAL -> EqualOp(left, right)
-        TokenKind.NOT_EQUAL -> NotEqualOp(left, right)
-        TokenKind.LESS -> LessOp(left, right)
-        TokenKind.LESS_EQUAL -> LessEqualOp(left, right)
-        TokenKind.GREATER -> GreaterOp(left, right)
-        TokenKind.GREATER_EQUAL -> GreaterEqualOp(left, right)
-        TokenKind.AND -> AndOp(left, right)
-        else -> OrOp(left, right)
     }
 
     private fun ternary(node: MolangNode.Ternary): MolangOp {
@@ -207,7 +178,7 @@ internal class MolangResolver(private val environment: MolangEnvironment) {
         names: Map<String, String> = emptyMap(),
         values: Map<String, Int> = emptyMap(),
     ): MolangOp {
-        problems += Problem(message, column, problem, names, values)
+        problems += MolangIssue(path, "$message at column $column", problem, column, names, values)
         return ConstOp(0.0)
     }
 

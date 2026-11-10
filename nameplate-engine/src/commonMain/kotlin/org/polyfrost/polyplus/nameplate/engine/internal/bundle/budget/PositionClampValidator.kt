@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.Animation
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.compile.ChannelKeys
 import org.polyfrost.polyplus.nameplate.engine.internal.bundle.json.BundleFiles
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.IssueSink
+import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueSink
 import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import org.polyfrost.polyplus.nameplate.engine.internal.track.ChannelTracks
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MolangFrame
@@ -49,7 +50,7 @@ internal object PositionClampValidator {
         }
 
         val issues = ArrayList<BundleIssue>()
-        val report = IssueSink { issues.add(it) }
+        val report = issueSink(issues)
         val first = bundle.variants.values.first()
         for (i in moved.indices) {
             over[i]?.let { report.overReach(moved[i], it, first) }

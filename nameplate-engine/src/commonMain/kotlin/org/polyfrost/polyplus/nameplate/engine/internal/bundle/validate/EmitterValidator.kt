@@ -38,24 +38,23 @@ internal class EmitterValidator(
         checkPair("$path#drift", emitter.drift, AdaptiveLimits.MAX_PARTICLE_SPEED)
         emitter.wobble?.let { wobble ->
             val amplitude = -AdaptiveLimits.MAX_WOBBLE..AdaptiveLimits.MAX_WOBBLE
-            if (wobble.x !in amplitude || wobble.y !in amplitude) {
-                report("$path#wobble", "x and y must be within ${AdaptiveLimits.MAX_WOBBLE} px")
-            }
-            if (wobble.period !in 1..AdaptiveLimits.MAX_LIFETIME) {
-                report("$path#wobble.period", "must be 1 to ${AdaptiveLimits.MAX_LIFETIME} steps")
-            }
+            report.ensure(
+                wobble.x in amplitude && wobble.y in amplitude,
+                "$path#wobble",
+                "x and y must be within ${AdaptiveLimits.MAX_WOBBLE} px",
+            )
+            report.ensure(
+                wobble.period in 1..AdaptiveLimits.MAX_LIFETIME,
+                "$path#wobble.period",
+                "must be 1 to ${AdaptiveLimits.MAX_LIFETIME} steps",
+            )
         }
-        if (emitter.frames != "loop" && emitter.frames != "stretch") {
-            report("$path#frames", "must be loop or stretch")
-        }
+        report.ensure(emitter.frames == "loop" || emitter.frames == "stretch", "$path#frames", "must be loop or stretch")
         emitter.breakpoints?.forEachIndexed { i, entry ->
-            val max = entry.max
             if (entry.sprite != null) {
                 report("$path#breakpoints[$i].sprite", "an emitter takes ranges only")
             }
-            if (entry.min !in 0..AdaptiveLimits.MAX_WIDTH || (max != null && max !in entry.min + 1..AdaptiveLimits.MAX_WIDTH)) {
-                report("$path#breakpoints[$i]", "needs 0 <= min < max <= ${AdaptiveLimits.MAX_WIDTH}")
-            }
+            AdaptiveValidator.checkWidths("$path#breakpoints[$i]", entry, report)
         }
         if (emitter.breakpoints?.let { it.isEmpty() || it.size > AdaptiveLimits.MAX_BREAKPOINTS } == true) {
             report("$path#breakpoints", "must hold 1 to ${AdaptiveLimits.MAX_BREAKPOINTS} ranges")
@@ -74,15 +73,9 @@ internal class EmitterValidator(
     }
 
     private fun checkFade(fade: FadeJson) {
-        if (fade.after !in 0.0..<1.0) {
-            report("$path#fade.after", "must be 0 or more and below 1")
-        }
-        if (fade.to !in 0.0..1.0) {
-            report("$path#fade.to", "must be 0 to 1")
-        }
-        if (fade.steps !in 1..AdaptiveLimits.MAX_FADE_STEPS) {
-            report("$path#fade.steps", "must be 1 to ${AdaptiveLimits.MAX_FADE_STEPS}")
-        }
+        report.ensure(fade.after in 0.0..<1.0, "$path#fade.after", "must be 0 or more and below 1")
+        report.ensure(fade.to in 0.0..1.0, "$path#fade.to", "must be 0 to 1")
+        report.ensure(fade.steps in 1..AdaptiveLimits.MAX_FADE_STEPS, "$path#fade.steps", "must be 1 to ${AdaptiveLimits.MAX_FADE_STEPS}")
     }
 
     private fun checkPool() {
@@ -118,9 +111,7 @@ internal class EmitterValidator(
         if (Edge.named(spawn.edge) == null) {
             report("$path#spawn.edge", "must be top, bottom, left or right")
         }
-        if (spawn.offset.size != 2 || spawn.offset.any { it !in -BundleLimits.MAX_OFFSET..BundleLimits.MAX_OFFSET }) {
-            report("$path#spawn.offset", "must be [x, y], each within ${BundleLimits.MAX_OFFSET} px")
-        }
+        BundleValidator.checkOffset("$path#spawn.offset", spawn.offset, report)
         spawn.follow?.let { follow ->
             val named = EdgeFollow.named(follow)
             val area = spawn.shape.equals(SpawnShape.AREA.name, ignoreCase = true)
@@ -135,12 +126,8 @@ internal class EmitterValidator(
     }
 
     private fun checkRate(rate: RateJson) {
-        if (rate.every !in 1..BundleLimits.MAX_LOOP) {
-            report("$path#rate.every", "must be 1 to ${BundleLimits.MAX_LOOP} steps")
-        }
-        if (rate.count !in 1..AdaptiveLimits.MAX_SPAWN_COUNT) {
-            report("$path#rate.count", "must be 1 to ${AdaptiveLimits.MAX_SPAWN_COUNT}")
-        }
+        report.ensure(rate.every in 1..BundleLimits.MAX_LOOP, "$path#rate.every", "must be 1 to ${BundleLimits.MAX_LOOP} steps")
+        report.ensure(rate.count in 1..AdaptiveLimits.MAX_SPAWN_COUNT, "$path#rate.count", "must be 1 to ${AdaptiveLimits.MAX_SPAWN_COUNT}")
         if (rate.jitter < 0 || rate.jitter >= rate.every) {
             report("$path#rate.jitter", "must be 0 to every - 1")
         }

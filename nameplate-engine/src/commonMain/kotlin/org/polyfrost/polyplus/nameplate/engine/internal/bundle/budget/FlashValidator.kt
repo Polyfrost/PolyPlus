@@ -30,6 +30,23 @@ internal class FlashResult(val times: Int, val pixels: Int, val issue: BundleIss
 
     companion object {
         val NONE: FlashResult = FlashResult(0, 0, null)
+
+        fun flagged(path: String, summary: String, times: Int, pixels: Int): FlashResult = FlashResult(
+            times,
+            pixels,
+            BundleIssue(
+                path,
+                "$summary (each pixel checked on its own for light-dark swings of 10% or more); " +
+                    "the limit is ${BundleLimits.MAX_FLASHES} flashes over ${BundleLimits.MAX_FLASH_AREA} px",
+                IssueCode.FLASH,
+                issueValues(
+                    "flashes" to times,
+                    "px" to pixels,
+                    "limit" to BundleLimits.MAX_FLASHES,
+                    "area" to BundleLimits.MAX_FLASH_AREA,
+                ),
+            ),
+        )
     }
 }
 
@@ -46,13 +63,6 @@ internal object FlashValidator {
     private const val SENTINEL = -1
 
     private val LINEAR = IntArray(256) { (Srgb.linear(it) * FlashTiles.SCALE + 0.5).toInt() }
-
-    private class Outcome(val pixels: Int, val times: Int, val exposed: Boolean) {
-        fun worse(other: Outcome): Outcome = when {
-            other.pixels != pixels -> if (other.pixels > pixels) other else this
-            else -> if (other.times > times) other else this
-        }
-    }
 
     private class Scenario(val plan: EventPlan, val frames: Int, val reactions: ReactionPlan = ReactionPlan.NONE)
 
@@ -87,11 +97,11 @@ internal object FlashValidator {
                 for (scenario in scenarios(bundle)) {
                     val run = Run(bundle, scene, scenario, workspace)
                     var outcome = run.simulate(light = false)
-                    if (outcome.exposed && (full || outcome.pixels <= BundleLimits.MAX_FLASH_AREA)) {
+                    if (run.exposed && (full || outcome.pixels <= BundleLimits.MAX_FLASH_AREA)) {
                         val light = run.simulate(light = true)
                         outcome = if (full) outcome.worse(light) else light
                     }
-                    val result = result(outcome)
+                    val result = withIssue(outcome)
                     if (!full && result.issue != null) return result
                     worst = worst.worse(result)
                 }
@@ -101,26 +111,17 @@ internal object FlashValidator {
         return worst
     }
 
-    private fun result(outcome: Outcome): FlashResult {
-        val issue = if (outcome.pixels > BundleLimits.MAX_FLASH_AREA) {
-            BundleIssue(
+    private fun withIssue(outcome: FlashResult): FlashResult =
+        if (outcome.pixels > BundleLimits.MAX_FLASH_AREA) {
+            FlashResult.flagged(
                 MANIFEST,
-                "${outcome.pixels} px flash together ${outcome.times} times in one second " +
-                    "(each pixel checked on its own for light-dark swings of 10% or more); " +
-                    "the limit is ${BundleLimits.MAX_FLASHES} flashes over ${BundleLimits.MAX_FLASH_AREA} px",
-                IssueCode.FLASH,
-                issueValues(
-                    "flashes" to outcome.times,
-                    "px" to outcome.pixels,
-                    "limit" to BundleLimits.MAX_FLASHES,
-                    "area" to BundleLimits.MAX_FLASH_AREA,
-                ),
+                "${outcome.pixels} px flash together ${outcome.times} times in one second",
+                outcome.times,
+                outcome.pixels,
             )
         } else {
-            null
+            outcome
         }
-        return FlashResult(outcome.times, outcome.pixels, issue)
-    }
 
     private fun isAnimated(bundle: NameplateBundle): Boolean =
         bundle.loopChannels.isNotEmpty() ||
@@ -246,11 +247,8 @@ internal object FlashValidator {
         private val previous = Signature(ops.size)
         private val drawn = arrayOfNulls<Shape>(ops.size)
         private val tileBase = IntArray(ops.size)
-        private val areas: IntArray
         private val weights: IntArray
-        private val values = Array(ops.size) { IntArray(prints[it].size) }
         private val sums: IntArray
-        private val seen = Array(ops.size) { BooleanArray(prints[it].size) }
         private val posX = IntArray(ops.size)
         private val posY = IntArray(ops.size)
         private val known = BooleanArray(ops.size)
@@ -258,18 +256,16 @@ internal object FlashValidator {
         private val wasShown = BooleanArray(ops.size)
         private val touched = BooleanArray(ops.size)
         private var tiles = FlashTiles(IntArray(0), bundle.fps, 0)
-        private var exposed = false
         private var drawing = 0
+
+        var exposed = false
+            private set
 
         init {
             var total = 0
             for (i in ops.indices) {
                 tileBase[i] = total
-                total += prints[i].tileCount
-            }
-            areas = IntArray(total)
-            for (i in ops.indices) {
-                prints[i].areas.copyInto(areas, tileBase[i])
+                total += prints[i].size
             }
             weights = IntArray(total)
             sums = IntArray(total)
@@ -280,7 +276,7 @@ internal object FlashValidator {
             val boxes = IntArray(count * 4)
         }
 
-        fun simulate(light: Boolean): Outcome {
+        fun simulate(light: Boolean): FlashResult {
             val backdrop = if (light) 0xFFFFFF else 0
             reset(backdrop)
             val reactions = scenario.reactions.start(bundle)
@@ -316,23 +312,18 @@ internal object FlashValidator {
                 then = swap
             }
 
-            return Outcome(tiles.mostPixels(scenario.frames), tiles.mostTimes, exposed)
+            return FlashResult(tiles.mostTimes, tiles.mostPixels(scenario.frames), null)
         }
 
         private fun reset(backdrop: Int) {
-            areas.copyInto(weights)
+            weights.fill(1)
             tiles = FlashTiles(weights, bundle.fps, scenario.frames)
             exposed = false
             known.fill(false)
             tracked.fill(false)
             wasShown.fill(false)
             touched.fill(false)
-            val blank = luminance(backdrop)
-            values.forEach { it.fill(blank) }
-            for (t in areas.indices) {
-                sums[t] = areas[t] * blank
-            }
-            seen.forEach { it.fill(true) }
+            sums.fill(luminance(backdrop))
         }
 
         private fun describe(frame: Int, into: Signature) {
@@ -340,7 +331,7 @@ internal object FlashValidator {
                 val pose = op.pose(motion, frame)
                 val placed = op.dynamic == null || pose !== DynamicSlots.HIDDEN_POSE
                 val state = op.state(motion, frame)
-                val shape = shapes(op, state)
+                val shape = scene.shapes.of(op, state)
                 val shown = placed && pose.visible && pose.opacity > 0 && !shape.isEmpty
                 drawn[i] = shape
                 if (shown || (placed && !known[i])) {
@@ -364,8 +355,6 @@ internal object FlashValidator {
                 box(i, op, if (shown) shape else null, into.boxes, b)
             }
         }
-
-        private fun shapes(op: Placed, state: Int): Shape = scene.shapes.of(op, state)
 
         private fun box(index: Int, op: Placed, shape: Shape?, boxes: IntArray, offset: Int) {
             val ox = posX[index]
@@ -488,8 +477,6 @@ internal object FlashValidator {
         }
 
         private fun read(index: Int, op: Placed, frame: Int, backdrop: Int) {
-            val into = values[index]
-            val tileOf = prints[index].tiles
             val base = tileBase[index]
             inDirty(index, op) { k, pixel ->
                 var color = ws.rgb[pixel]
@@ -497,36 +484,27 @@ internal object FlashValidator {
                     exposed = exposed || frame > 0
                     color = backdrop
                 }
-                val value = luminance(color)
-                sums[base + tileOf[k]] += value - into[k]
-                into[k] = value
+                sums[base + k] = luminance(color)
             }
         }
 
         private fun uncover(index: Int, op: Placed) {
-            val flags = seen[index]
-            val tileOf = prints[index].tiles
             val base = tileBase[index]
             inDirty(index, op) { k, pixel ->
-                val visible = ws.owner[pixel] <= index
-                if (visible != flags[k]) {
-                    flags[k] = visible
-                    weights[base + tileOf[k]] += if (visible) 1 else -1
-                }
+                weights[base + k] = if (ws.owner[pixel] <= index) 1 else 0
             }
         }
 
         private fun settle(index: Int, op: Placed, frame: Int, start: Boolean) {
             val base = tileBase[index]
             if (start) {
-                for (t in 0 until prints[index].tileCount) {
+                for (t in 0 until prints[index].size) {
                     tiles.start(base + t, sums[base + t], frame)
                 }
                 return
             }
-            val tileOf = prints[index].tiles
             inDirty(index, op) { k, _ ->
-                tiles.step(base + tileOf[k], sums[base + tileOf[k]], frame)
+                tiles.step(base + k, sums[base + k], frame)
             }
         }
 

@@ -26,14 +26,13 @@ import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import org.polyfrost.polyplus.nameplate.engine.internal.track.ChannelTracks
 
 internal object ReviewWarnings {
-    const val FADED_BELOW = 128
-    const val COVERED_PERCENT = 25
-    const val COVERAGE_PERCENT = 50
-    const val SOLID_ALPHA = 128
-    const val AREA_TIMES = 4
-    const val VISIBLE_ALPHA = 32
-    const val TYPICAL_NAME = 27
-
+    private const val FADED_BELOW = 128
+    private const val COVERED_PERCENT = 25
+    private const val COVERAGE_PERCENT = 50
+    private const val SOLID_ALPHA = 128
+    private const val AREA_TIMES = 4
+    private const val VISIBLE_ALPHA = 32
+    private const val TYPICAL_NAME = 27
     private const val MAX_FRAMES = 60
     private const val TENTHS = 10
     private const val OPAQUE = 255
@@ -138,6 +137,17 @@ internal object ReviewWarnings {
                 }
             }
         }
+
+        fun cover(x0: Int, y0: Int, x1: Int, y1: Int): Int {
+            var added = 0
+            each(x0, y0, x1, y1) { pixel ->
+                if (!covered[pixel]) {
+                    covered[pixel] = true
+                    added++
+                }
+            }
+            return added
+        }
     }
 
     private class Scan(private val bundle: NameplateBundle) {
@@ -148,6 +158,14 @@ internal object ReviewWarnings {
         private val held: List<Reaction?> = listOf<Reaction?>(null) + bundle.triggers.whiles.map { it.reaction }.distinct()
 
         fun validate(): List<BundleIssue> = listOfNotNull(area() ?: coverage(), fixedHeight() ?: sameOnEveryLine()) + covered() + overlaps()
+
+        private inline fun eachFrame(visit: (NameplateBundle.Variant, Int) -> Unit) {
+            for (variant in variants) {
+                for (frame in frames) {
+                    visit(variant, frame)
+                }
+            }
+        }
 
         private fun stateOf(reaction: Reaction?): TagState =
             if (reaction == null) TagState.NONE else TagState.of(TagInputs.of(reaction))
@@ -187,24 +205,22 @@ internal object ReviewWarnings {
                 val background = block.background
                 val raster = Raster(region(block))
                 val ring = raster.covered.size - background.width * background.height
-                for (variant in variants) {
-                    for (frame in frames) {
-                        raster.clear()
-                        var count = 0
-                        placed(block, variant, frame, materials = true) { op, rects ->
-                            rects(op, rects) { x0, y0, x1, y1, _ ->
-                                raster.each(x0, y0, x1, y1) { pixel ->
-                                    if (!raster.covered[pixel] && !inside(raster, pixel, background)) {
-                                        raster.covered[pixel] = true
-                                        count++
-                                    }
+                eachFrame { variant, frame ->
+                    raster.clear()
+                    var count = 0
+                    placed(block, variant, frame, materials = true) { op, rects ->
+                        rects(op, rects) { x0, y0, x1, y1, _ ->
+                            raster.each(x0, y0, x1, y1) { pixel ->
+                                if (!raster.covered[pixel] && !inside(raster, pixel, background)) {
+                                    raster.covered[pixel] = true
+                                    count++
                                 }
                             }
                         }
-                        val percent = count * PERCENT / maxOf(1, ring)
-                        if (worst == null || percent > worst.percent) {
-                            worst = Coverage(percent, count)
-                        }
+                    }
+                    val percent = count * PERCENT / maxOf(1, ring)
+                    if (percent > (worst?.percent ?: -1)) {
+                        worst = Coverage(percent, count)
                     }
                 }
             }
@@ -224,24 +240,17 @@ internal object ReviewWarnings {
             val plain = block.background.width * block.background.height
             val raster = Raster(region(block))
             var most = 0
-            for (variant in variants) {
-                for (frame in frames) {
-                    raster.clear()
-                    var count = 0
-                    placed(block, variant, frame, materials = true) { op, rects ->
-                        rects(op, rects) { x0, y0, x1, y1, alpha ->
-                            if (alpha >= VISIBLE_ALPHA) {
-                                raster.each(x0, y0, x1, y1) { pixel ->
-                                    if (!raster.covered[pixel]) {
-                                        raster.covered[pixel] = true
-                                        count++
-                                    }
-                                }
-                            }
+            eachFrame { variant, frame ->
+                raster.clear()
+                var count = 0
+                placed(block, variant, frame, materials = true) { op, rects ->
+                    rects(op, rects) { x0, y0, x1, y1, alpha ->
+                        if (alpha >= VISIBLE_ALPHA) {
+                            count += raster.cover(x0, y0, x1, y1)
                         }
                     }
-                    most = maxOf(most, count)
                 }
+                most = maxOf(most, count)
             }
             if (most < plain * AREA_TIMES) return null
             val tenths = most * TENTHS / plain
@@ -265,14 +274,12 @@ internal object ReviewWarnings {
             var top = Int.MAX_VALUE
             var bottom = Int.MIN_VALUE
             val region = region(block)
-            for (variant in variants) {
-                for (frame in frames) {
-                    placed(block, variant, frame) { op, rects ->
-                        rects(op, rects) { x0, y0, x1, y1, _ ->
-                            if (x1 > maxOf(x0, region.x0) && minOf(x1, region.x1) > x0 && y1 > y0) {
-                                top = minOf(top, maxOf(y0, region.y0))
-                                bottom = maxOf(bottom, minOf(y1, region.y1))
-                            }
+            eachFrame { variant, frame ->
+                placed(block, variant, frame) { op, rects ->
+                    rects(op, rects) { x0, y0, x1, y1, _ ->
+                        if (x1 > maxOf(x0, region.x0) && minOf(x1, region.x1) > x0 && y1 > y0) {
+                            top = minOf(top, maxOf(y0, region.y0))
+                            bottom = maxOf(bottom, minOf(y1, region.y1))
                         }
                     }
                 }
@@ -303,30 +310,28 @@ internal object ReviewWarnings {
 
         private fun shapes(block: TagBlock): List<Long> {
             val shapes = ArrayList<Long>()
-            for (variant in variants) {
-                for (frame in frames) {
-                    val bounds = LinkedHashMap<Int, IntArray>()
-                    val palette = painter.palette(bundle, variant, frame, 0, block)
-                    for (op in painter.paint(bundle, variant, block, frame, 0)) {
-                        if (op.opacity <= 0) continue
-                        val area = op.material?.area
-                        val box = bounds.getOrPut(op.index) { intArrayOf(Int.MAX_VALUE, Int.MAX_VALUE, Int.MIN_VALUE, Int.MIN_VALUE) }
-                        if (area != null) {
-                            grow(box, area.x0, area.y0, area.x1, area.y1)
-                            continue
-                        }
-                        val image = op.image
-                        val resolved = if (image.usesPalette) image.resolve(palette) else image.resolve()
-                        rects(op, resolved) { x0, y0, x1, y1, _ -> grow(box, x0, y0, x1, y1) }
+            eachFrame { variant, frame ->
+                val bounds = LinkedHashMap<Int, IntArray>()
+                val palette = painter.palette(bundle, variant, frame, 0, block)
+                for (op in painter.paint(bundle, variant, block, frame, 0)) {
+                    if (op.opacity <= 0) continue
+                    val area = op.material?.area
+                    val box = bounds.getOrPut(op.index) { intArrayOf(Int.MAX_VALUE, Int.MAX_VALUE, Int.MIN_VALUE, Int.MIN_VALUE) }
+                    if (area != null) {
+                        grow(box, area.x0, area.y0, area.x1, area.y1)
+                        continue
                     }
-                    for ((index, box) in bounds) {
-                        if (box[0] < box[2]) {
-                            shapes += index.toLong()
-                            box.forEach { shapes += it.toLong() }
-                        }
-                    }
-                    shapes += Long.MIN_VALUE
+                    val image = op.image
+                    val resolved = if (image.usesPalette) image.resolve(palette) else image.resolve()
+                    rects(op, resolved) { x0, y0, x1, y1, _ -> grow(box, x0, y0, x1, y1) }
                 }
+                for ((index, box) in bounds) {
+                    if (box[0] < box[2]) {
+                        shapes += index.toLong()
+                        box.forEach { shapes += it.toLong() }
+                    }
+                }
+                shapes += Long.MIN_VALUE
             }
             return shapes
         }
@@ -388,17 +393,7 @@ internal object ReviewWarnings {
                                 var count = 0
                                 rects(op, rects) { x0, y0, x1, y1, alpha ->
                                     if (alpha >= SOLID_ALPHA) {
-                                        raster.each(
-                                            maxOf(x0, badge.x0),
-                                            maxOf(y0, badge.y0),
-                                            minOf(x1, badge.x1),
-                                            minOf(y1, badge.y1),
-                                        ) { pixel ->
-                                            if (!raster.covered[pixel]) {
-                                                raster.covered[pixel] = true
-                                                count++
-                                            }
-                                        }
+                                        count += raster.cover(maxOf(x0, badge.x0), maxOf(y0, badge.y0), minOf(x1, badge.x1), minOf(y1, badge.y1))
                                     }
                                 }
                                 if (count > (most[op.index] ?: 0)) {
@@ -424,33 +419,28 @@ internal object ReviewWarnings {
 
         private fun overlaps(): List<BundleIssue> {
             val most = LinkedHashMap<Int, Int>()
-            val blocks = listOf(ReferencePlacements.ALL[1], ReferencePlacements.ALL[3])
-            for (block in blocks) {
+            for (block in listOf(ReferencePlacements.MEDIUM_LINE, ReferencePlacements.ALL[3])) {
                 val raster = Raster(region(block))
-                for (variant in variants) {
-                    for (frame in frames) {
-                        val ops = ArrayList<Pair<LayerPainter.Painted, IntArray>>()
-                        placed(block, variant, frame) { op, rects -> ops += op to rects }
-                        ops.sortWith(compareBy({ it.first.depth.ordinal }, { it.first.index }))
-                        raster.clear()
-                        for ((op, rects) in ops) {
-                            var count = 0
-                            raster.marked.fill(false)
-                            rects(op, rects) { x0, y0, x1, y1, alpha ->
-                                raster.each(x0, y0, x1, y1) { pixel ->
-                                    if (alpha < OPAQUE && raster.covered[pixel] && !raster.marked[pixel]) {
-                                        raster.marked[pixel] = true
-                                        count++
-                                    }
+                eachFrame { variant, frame ->
+                    val ops = ArrayList<Pair<LayerPainter.Painted, IntArray>>()
+                    placed(block, variant, frame) { op, rects -> ops += op to rects }
+                    ops.sortWith(compareBy({ it.first.depth.ordinal }, { it.first.index }))
+                    raster.clear()
+                    for ((op, rects) in ops) {
+                        var count = 0
+                        raster.marked.fill(false)
+                        rects(op, rects) { x0, y0, x1, y1, alpha ->
+                            raster.each(x0, y0, x1, y1) { pixel ->
+                                if (alpha < OPAQUE && raster.covered[pixel] && !raster.marked[pixel]) {
+                                    raster.marked[pixel] = true
+                                    count++
                                 }
                             }
-                            if (count > 0) {
-                                most[op.index] = maxOf(most[op.index] ?: 0, count)
-                            }
-                            rects(op, rects) { x0, y0, x1, y1, _ ->
-                                raster.each(x0, y0, x1, y1) { raster.covered[it] = true }
-                            }
                         }
+                        if (count > 0) {
+                            most[op.index] = maxOf(most[op.index] ?: 0, count)
+                        }
+                        rects(op, rects) { x0, y0, x1, y1, _ -> raster.cover(x0, y0, x1, y1) }
                     }
                 }
             }

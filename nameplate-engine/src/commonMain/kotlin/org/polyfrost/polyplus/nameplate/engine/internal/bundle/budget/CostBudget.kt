@@ -38,7 +38,7 @@ import org.polyfrost.polyplus.nameplate.engine.internal.palette.PaletteTrack
 import org.polyfrost.polyplus.nameplate.engine.internal.track.MolangBounds
 import kotlin.math.roundToLong
 
-internal class CostReport(val quads: Int, val cacheBytes: Long, val margins: Map<String, Int>, val materialBuildOps: Long = 0)
+internal class CostReport(val quads: Int, val cacheBytes: Long, val margins: Map<String, Int>, val materialBuildOps: Long)
 
 internal object CostBudget {
     private const val MANIFEST = BundleFiles.MANIFEST
@@ -91,41 +91,27 @@ internal object CostBudget {
         for (layer in bundle.layers) {
             val breach = report.margins[layer.id] ?: continue
             if (breach > BundleLimits.MAX_DECORATION_MARGIN) {
-                issues.add(
-                    BundleIssue(
-                        BundleFiles.layerPath(layer.id),
-                        "reaches $breach px outside the background; the limit is ${BundleLimits.MAX_DECORATION_MARGIN}",
-                        IssueCode.OVER_MARGIN,
-                        issueValues("px" to breach, "limit" to BundleLimits.MAX_DECORATION_MARGIN),
-                    ),
-                )
+                issues.add(overMargin(BundleFiles.layerPath(layer.id), "reaches $breach px outside the background", breach))
             }
         }
         val badge = report.margins[BADGE_TARGET] ?: 0
         if (badge > BundleLimits.MAX_DECORATION_MARGIN) {
-            issues.add(
-                BundleIssue(
-                    "$MANIFEST#badge",
-                    "the badge reaches $badge px outside the background; the limit is ${BundleLimits.MAX_DECORATION_MARGIN}",
-                    IssueCode.OVER_MARGIN,
-                    issueValues("px" to badge, "limit" to BundleLimits.MAX_DECORATION_MARGIN),
-                ),
-            )
+            issues.add(overMargin("$MANIFEST#badge", "the badge reaches $badge px outside the background", badge))
         }
         val plate = report.margins[PLATE_TARGET] ?: 0
         if (plate > BundleLimits.MAX_DECORATION_MARGIN) {
-            issues.add(
-                BundleIssue(
-                    "$MANIFEST#animations.$PLATE_TARGET",
-                    "moves the whole plate $plate px; the limit is ${BundleLimits.MAX_DECORATION_MARGIN}",
-                    IssueCode.OVER_MARGIN,
-                    issueValues("px" to plate, "limit" to BundleLimits.MAX_DECORATION_MARGIN),
-                ),
-            )
+            issues.add(overMargin("$MANIFEST#animations.$PLATE_TARGET", "moves the whole plate $plate px", plate))
         }
 
         return issues
     }
+
+    private fun overMargin(path: String, what: String, px: Int): BundleIssue = BundleIssue(
+        path,
+        "$what; the limit is ${BundleLimits.MAX_DECORATION_MARGIN}",
+        IssueCode.OVER_MARGIN,
+        issueValues("px" to px, "limit" to BundleLimits.MAX_DECORATION_MARGIN),
+    )
 
     fun report(bundle: NameplateBundle): CostReport {
         val measured = measure(bundle)
@@ -211,15 +197,11 @@ internal object CostBudget {
         return bytes + DynamicBudget.cachedBytes(bundle, measured.shapes) + measured.masks.bytes
     }
 
-    fun quads(bundle: NameplateBundle): Int = measure(bundle).quads
-
     private fun measure(bundle: NameplateBundle): Measured {
         val stripped = PlacedLayers.stripped(bundle)
         val grid = PixelGrid()
         val painter = LayerPainter(grid, ByteLruCache<LayerKey, PixelImage>(Long.MAX_VALUE, ::imageBytes), materialFallbacks = false)
         val shapes = ShapeSet(grid, bundle.variants.values.first().resolved)
-        val ranges = HashMap<String, PoseRange>()
-        val mirrors = HashMap<String, PoseRange>()
         val measured = Measured(shapes, masks = MaskBudget(bundle, shapes))
         val variants = if (bundle.molang == null) PlacedLayers.distinct(bundle, byPalette = false) else bundle.variants.values
         for (variant in variants) {
@@ -238,25 +220,19 @@ internal object CostBudget {
                     val candidates = when (content) {
                         is LayerContent.Body -> {
                             val body = checkNotNull(placed.body)
-                            measured.bodies[BodyKey(layer.id, placed.width, bodyHeight(content, block), flagId(content, variant))] =
+                            measured.bodies[BodyKey(layer.id, placed.width, content.rect(block).height, flagId(content, variant))] =
                                 imageBytes(body)
                             listOf(shapes.shapeOf(body))
                         }
                         is LayerContent.Sprite -> {
                             measured.sprites[layer.id] = layer
-                            states(bundle, layer).filter { it - placed.base in 0 until SpriteAdaptive.STATE_STRIDE }
-                                .map { shapes.sprite(layer, it) }
+                            shapes.alternative(bundle, layer, placed.base)
                         }
                         is ParticleEmitter -> emptyList()
                         is MaterialLayer -> listOf(materialShape(bundle, content, block))
                     }
                     quads += if (content is MaterialLayer) MATERIAL_QUADS else candidates.maxOfOrNull { it.rectCount } ?: 0
-                    val range = when {
-                        molang != null && placed.mirrored -> PoseRange.ofMirror(bundle, layer, molang)
-                        molang != null -> PoseRange.of(bundle, layer, molang)
-                        placed.mirrored -> mirrors.getOrPut(layer.id) { PoseRange.ofMirror(bundle, layer) }
-                        else -> ranges.getOrPut(layer.id) { PoseRange.of(bundle, layer) }
-                    }
+                    val range = if (placed.mirrored) PoseRange.ofMirror(bundle, layer, molang) else PoseRange.of(bundle, layer, molang)
                     extents.add(extent(placed, candidates, range))
                 }
                 for ((k, placed) in placements.withIndex()) {
@@ -297,12 +273,10 @@ internal object CostBudget {
     }
 
     private fun materialShape(bundle: NameplateBundle, content: MaterialLayer, block: TagBlock): Shape {
-        val body = content.of?.let { (bundle.layer(it).content as LayerContent.Body).rect(block) } ?: block.background
+        val body = content.bodyRect(bundle, block)
         val area = content.material.area(PixelRect(0, 0, body.width, body.height))
         return Shape(PixelImage.EMPTY, area.x0, area.y0, area.x1, area.y1)
     }
-
-    private fun bodyHeight(content: LayerContent.Body, block: TagBlock): Int = content.rect(block).height
 
     private fun flagId(content: LayerContent.Body, variant: NameplateBundle.Variant): String? =
         variant.flag?.id?.takeIf { content.fill == Fill.ActiveFlag || content.rings.any { it == Fill.ActiveFlag } }
@@ -355,7 +329,7 @@ internal class CpuCost(
     val repeats: Int,
     val palette: Int,
     val materials: Int,
-    val text: Int = 0,
+    val text: Int,
 ) {
     val total: Int
         get() = molang + paths + particles + repeats + palette + materials + text
@@ -392,14 +366,14 @@ internal class CpuCost(
     }
 
     companion object {
-        const val WALKER = 20
-        const val REPEAT_COPY = 5
-        const val PARTICLE = 18
-        const val SPAWN_CHECK = 2
-        const val PALETTE_FRAME = 10
-        const val CYCLE_TRACK = 25
-        const val KEYS_TRACK = 3
-        const val MATERIAL_LAYER = 18
+        private const val WALKER = 20
+        private const val REPEAT_COPY = 5
+        private const val PARTICLE = 18
+        private const val SPAWN_CHECK = 2
+        private const val PALETTE_FRAME = 10
+        private const val CYCLE_TRACK = 25
+        private const val KEYS_TRACK = 3
+        private const val MATERIAL_LAYER = 18
 
         fun of(bundle: NameplateBundle): CpuCost {
             var worst = Dynamic()
@@ -426,8 +400,7 @@ internal class CpuCost(
             var worst = 0L
             for ((_, content) in bundle.materialLayers) {
                 for (block in ReferencePlacements.ALL) {
-                    val body =
-                        content.of?.let { (bundle.layer(it).content as LayerContent.Body).rect(block) } ?: block.background
+                    val body = content.bodyRect(bundle, block)
                     val area = content.material.area(PixelRect(0, 0, body.width, body.height))
                     worst = maxOf(worst, content.material.cost.toLong() * area.width * area.height)
                 }

@@ -18,14 +18,9 @@ import org.polyfrost.polyplus.nameplate.engine.internal.issue.issueValues
 import kotlin.math.roundToInt
 
 internal object ReadabilityValidator {
-    const val WARN_BELOW = Contrast.LARGE_TEXT
+    private const val WARN_BELOW = Contrast.LARGE_TEXT
 
     private const val TENTHS = 10.0
-    private val PLACEMENTS: List<TagBlock> = listOf(
-        TagBlock.line(ReferencePlacements.NARROW, 0, ReferencePlacements.NARROW),
-        TagBlock.line(ReferencePlacements.MEDIUM, 0, ReferencePlacements.MEDIUM),
-        ReferencePlacements.WIDEST_LINE,
-    )
 
     fun validate(bundle: NameplateBundle): List<BundleIssue> {
         val painter = LayerPainter(PixelGrid(), ByteLruCache<LayerKey, PixelImage>(Long.MAX_VALUE, ::imageBytes))
@@ -52,7 +47,7 @@ internal object ReadabilityValidator {
     private fun worstRatio(painter: LayerPainter, bundle: NameplateBundle, variant: NameplateBundle.Variant): Double? {
         val styling = variant.text
         var worst: Double? = null
-        for (block in PLACEMENTS) {
+        for (block in ReferencePlacements.LINES) {
             val y0 = block.nameLineY
             val pixels = BackdropPixels.collect(
                 painter.backdrop(bundle, variant, block),

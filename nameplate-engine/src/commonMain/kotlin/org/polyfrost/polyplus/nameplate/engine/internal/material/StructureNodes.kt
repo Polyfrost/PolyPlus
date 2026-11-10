@@ -119,15 +119,6 @@ internal object SpriteKind : FixedKind(
     }
 }
 
-internal object StructureNodes {
-    fun kinds(): List<NodeKind> = listOf(
-        SampleAtKind,
-        RepeatKind,
-        EnvInputKind("RepeatIndex", SocketType.FLOAT, { c, env, o -> c.alias(o, env.index) }, "index"),
-        SpriteKind,
-    )
-}
-
 internal class SpriteLane(x: Int, y: Int, frame: Int, private val sprite: MaterialSprite, out: Int) :
     CpuOp(intArrayOf(x, y, frame), intArrayOf(out)) {
     override fun run(registers: DoubleArray, count: Int, shared: CpuShared) {
