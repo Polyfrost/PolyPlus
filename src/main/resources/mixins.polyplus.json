@@ -146,6 +146,12 @@
     "client.nameplate.StringSplitterAccessor",
     //? if = 1.8.9
     //"client.nameplate.BufferBuilderAccessor",
+    //? if = 1.21.4
+    //"client.nameplate.iris.MixinCompiledShaderProgram",
+    //? if >= 1.21.5 && < 26.3
+    //"client.nameplate.iris.MixinGlCommandEncoder",
+    //? if = 1.21.1 || = 1.21.4
+    //"client.nameplate.iris.MixinVertexBuffer",
     //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",
     //? if > 1.8.9
