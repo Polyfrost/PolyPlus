@@ -49,19 +49,20 @@ data class LobbyMood(
             if (interior) return LobbyMood(clock, 0f, 0f, 0f, DAY_EXPOSURE * fill(level, aim), false, 0, true)
             val night = nightAmount(clock.toFloat())
             val biome = level.getBiome(aim).value()
-            val cold = 1f - Mth.clamp(biome.baseTemperature / COLD_MAX, 0f, 1f)
+            //? if >= 1.21.4 {
+            val snow = biome.coldEnoughToSnow(aim, level.seaLevel)
+            //?} else {
+            /*val snow = biome.coldEnoughToSnow(aim)
+            *///?}
+            val cold = if (snow) 1f else 1f - Mth.clamp(biome.baseTemperature / COLD_MAX, 0f, 1f)
             val lanterns = if (night > LANTERN_NIGHT) knownLanterns ?: (MAX_LANTERNS - litCells(level, aim) / LIT_SEEN).coerceIn(0, MAX_LANTERNS) else 0
             return LobbyMood(
                 clock,
                 night,
-                goldenAmount(clock.toFloat()),
+                goldenAmount(clock.toFloat(), night),
                 cold * night,
                 Mth.lerp(night, Mth.lerp(cold, DAY_EXPOSURE, COLD_DAY_EXPOSURE), Mth.lerp(cold, MILD_NIGHT_EXPOSURE, COLD_NIGHT_EXPOSURE)),
-                //? if >= 1.21.4 {
-                biome.coldEnoughToSnow(aim, level.seaLevel),
-                //?} else {
-                /*biome.coldEnoughToSnow(aim),
-                *///?}
+                snow,
                 lanterns,
             )
         }
@@ -72,10 +73,10 @@ data class LobbyMood(
             return intoNight * (1f - intoDay)
         }
 
-        private fun goldenAmount(clock: Float): Float {
+        private fun goldenAmount(clock: Float, night: Float): Float {
             val toSunset = abs(clock - SUNSET)
             val toSunrise = minOf(abs(clock - SUNRISE), abs(clock + DAY_TICKS - SUNRISE))
-            return (1f - minOf(toSunset, toSunrise) / GOLDEN_SPAN).coerceAtLeast(0f)
+            return (1f - minOf(toSunset, toSunrise) / GOLDEN_SPAN).coerceAtLeast(0f) * (1f - night)
         }
 
         private fun fill(level: ClientLevel, aim: BlockPos): Float {
