@@ -84,6 +84,7 @@ import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
     private val cosmeticsRefreshInProgress = AtomicBoolean(false)
+    private val cosmeticsRefreshQueued = AtomicBoolean(false)
 
     private val EXCEPTION_HANDLER = CoroutineExceptionHandler { _, throwable ->
         LOGGER.error("Uncaught exception in PolyPlus coroutine", throwable)
@@ -255,9 +256,10 @@ object PolyPlusClient {
     }
 
     // Refetches cosmetics without wiping auth or caches
-    fun refreshCosmetics() {
+    fun refreshCosmetics(queueIfBusy: Boolean = false) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
+            if (queueIfBusy) cosmeticsRefreshQueued.set(true)
             return
         }
 
@@ -266,6 +268,7 @@ object PolyPlusClient {
                 refreshCosmeticsInternal()
             } finally {
                 cosmeticsRefreshInProgress.set(false)
+                if (cosmeticsRefreshQueued.getAndSet(false)) refreshCosmetics(queueIfBusy = true)
             }
         }
     }
