@@ -12,6 +12,7 @@ data class CosmeticVariant(
     @SerialName("allowed_slots") val allowedSlots: List<BodySlot> = emptyList(),
     val url: String? = null,
     val hash: String,
+    @SerialName("variant_key") val variantKey: String? = null,
 )
 
 @Serializable
@@ -35,6 +36,7 @@ data class CosmeticGroupResponse(
                 groupName = name,
                 variantName = variant.name,
                 model = variant.model,
+                variantKey = variant.variantKey,
             )
         }
 }

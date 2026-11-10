@@ -24,6 +24,7 @@ import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.nameplate.NameplateRegistry
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
@@ -418,6 +419,7 @@ object CosmeticSync {
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
         reconcileCape(equipped[BodySlot.Cape])
+        reconcileNameplate(equipped[BodySlot.Nameplate])
         for (slot in ATTACHED_SLOTS) {
             val desiredId = equipped[slot]
             val current = CosmeticApi.equippedSlot(player, slot)
@@ -453,6 +455,16 @@ object CosmeticSync {
     //? if >= 1.21.1 || = 1.8.9 {
     private fun reconcileCape(cosmeticId: Int?) {
         if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
+        loadInBackground(cosmeticId)
+    }
+    //?}
+
+    //? if >= 1.21.1 || = 1.8.9 {
+    private fun reconcileNameplate(cosmeticId: Int?) {
+        if (cosmeticId == null) return
+        val definition = CosmeticCatalog.getCosmeticDefinition(cosmeticId) ?: return
+        if (definition.type != CosmeticType.Nameplate) return
+        if (NameplateRegistry.isLoaded(cosmeticId, definition.hash)) return
         loadInBackground(cosmeticId)
     }
     //?}

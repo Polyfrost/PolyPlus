@@ -29,6 +29,8 @@ import org.polyfrost.polyplus.client.cosmetics.assets.RejectedArchiveException
 import org.polyfrost.polyplus.client.cosmetics.assets.RemoteTextures
 import org.polyfrost.polyplus.client.cosmetics.assets.detectVerticalTextureFrameCount
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
+import org.polyfrost.polyplus.client.nameplate.NameplateLoader
+import org.polyfrost.polyplus.client.nameplate.NameplateRegistry
 import org.polyfrost.polyplus.client.network.http.readLimited
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if >= 1.21.1 || = 1.8.9 {
@@ -115,6 +117,7 @@ object CosmeticAssetCache {
         }
         parsedHashes.clear()
         failedParses.clear()
+        NameplateRegistry.clear()
         //? if >= 1.21.1 || = 1.8.9 {
         emotesById.clear()
         attachedById.clear()
@@ -151,6 +154,7 @@ object CosmeticAssetCache {
         petsById.evict { listOf(it.texture) }
         emotesById.evict { emote -> emote.effects.map { it.texture } }
         //?}
+        if (NameplateRegistry.retain(keep)) evicted = true
         // lets open previews notice what they lost
         if (evicted) installs++
     }
@@ -163,6 +167,7 @@ object CosmeticAssetCache {
     private const val APPLE_DOUBLE_PREFIX = "._"
 
     private const val MIB = 1024L * 1024
+    private const val ASSET_DIGEST_BYTES = 8
     private val CAPE_LIMITS = ArchiveLimits(maxDownloadBytes = 16 * MIB, maxExtractedBytes = 32 * MIB, maxEntries = 16)
     private val MODEL_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 64)
     private val EMOTE_LIMITS = ArchiveLimits(maxDownloadBytes = 8 * MIB, maxExtractedBytes = 16 * MIB, maxEntries = 128)
@@ -212,7 +217,7 @@ object CosmeticAssetCache {
                 //?}
 
                 for (definition in definitions) {
-                    parseLock.withLock {
+                    assetLockFor(definition).withLock {
                         runCatching { loadCosmeticAssetsLocked(definition) }
                             .onFailure { LOGGER.error("Failed to load cosmetic {}", definition.id, it) }
                     }
@@ -233,6 +238,9 @@ object CosmeticAssetCache {
     private fun downloadLockFor(definition: CosmeticDefinition): Mutex =
         downloadLocks.computeIfAbsent(definition.cacheKey()) { Mutex() }
 
+    private fun assetLockFor(definition: CosmeticDefinition): Mutex =
+        if (definition.type == CosmeticType.Nameplate) downloadLockFor(definition) else parseLock
+
     suspend fun ensureCosmeticLoaded(id: Int): Boolean {
         val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return false
         return ensureLoaded(definition)
@@ -247,6 +255,7 @@ object CosmeticAssetCache {
 
     private fun isLoaded(definition: CosmeticDefinition): Boolean {
         if (definition.type == CosmeticType.Cape) return capes.containsKey(definition.id)
+        if (definition.type == CosmeticType.Nameplate) return NameplateRegistry.isLoaded(definition.id, definition.hash)
         //? if >= 1.21.1 || = 1.8.9 {
         return when (definition.type) {
             CosmeticType.Emote -> emotesById.containsKey(definition.id)
@@ -265,7 +274,7 @@ object CosmeticAssetCache {
                 }
                 if (definition.failedToParse()) return@runSuspendCatching false
                 downloadLockFor(definition).withLock { materializeCosmeticLocked(definition) }
-                parseLock.withLock { loadCosmeticAssetsLocked(definition) }
+                assetLockFor(definition).withLock { loadCosmeticAssetsLocked(definition) }
                 hashManager.save()
                 !definition.failedToParse()
             }.getOrElse {
@@ -335,6 +344,7 @@ object CosmeticAssetCache {
         CosmeticType.Pet,
         CosmeticType.Unknown -> MODEL_LIMITS
         CosmeticType.Emote -> EMOTE_LIMITS
+        CosmeticType.Nameplate -> NameplateLoader.ARCHIVE_LIMITS
     }
 
     private fun loadCosmeticAssetsLocked(definition: CosmeticDefinition) {
@@ -359,6 +369,7 @@ object CosmeticAssetCache {
                 //?} else {
                 /*skip("Attached cosmetics require Minecraft 1.21.1+")*/
                 //?}
+            CosmeticType.Nameplate -> loadNameplate(definition, cosmeticDir)
             CosmeticType.Unknown -> skip("Ignoring cosmetic ${definition.id} with unknown type/slot")
             //? if >= 1.21.1 || = 1.8.9 {
             CosmeticType.Emote -> loadEmote(definition.id, cosmeticDir)
@@ -451,6 +462,16 @@ object CosmeticAssetCache {
         return true
     }
 
+    private fun loadNameplate(definition: CosmeticDefinition, dir: Path): Boolean {
+        val stamp = generation
+        val key = definition.cacheKey()
+        val bundle = NameplateLoader.loadDownloaded(key, definition.hash, definition.id, dir) ?: return false
+        installOnMain(stamp) {
+            NameplateRegistry.install(definition.id, definition.hash, key, bundle)
+        }
+        return true
+    }
+
     //? if >= 1.21.1 || = 1.8.9 {
     private fun playerGeometryOrNull(id: Int, dir: Path): BedrockGeometry? {
         BedrockPlayerGeometryCache.tryCaptureFrom(dir)
@@ -512,8 +533,15 @@ object CosmeticAssetCache {
     private fun CosmeticDefinition.cacheKey(): String =
         when (type) {
             CosmeticType.Emote -> "emote-$id"
+            CosmeticType.Nameplate -> "nameplate-$groupId-${assetDigest(hash, url)}"
             else -> "cosmetic-$id"
         }
+
+    private fun assetDigest(hash: String, url: String?): String {
+        val source = "$hash|${url?.substringBefore('?').orEmpty()}"
+        val digest = MessageDigest.getInstance("SHA-256").digest(source.toByteArray(Charsets.UTF_8))
+        return HexFormat.of().formatHex(digest, 0, ASSET_DIGEST_BYTES)
+    }
 
     fun primaryTextureFile(id: Int): File? {
         val definition = CosmeticCatalog.getCosmeticDefinition(id) ?: return null

@@ -54,7 +54,7 @@ object CosmeticStore {
 
     suspend fun stockedTypes(): List<CosmeticType> {
         cachedStockedTypes?.let { return it }
-        val types = CosmeticType.entries.filter { it != CosmeticType.Unknown }
+        val types = CosmeticType.entries.filter { it.listed }
         val probes = coroutineScope {
             types.map { type ->
                 async {
