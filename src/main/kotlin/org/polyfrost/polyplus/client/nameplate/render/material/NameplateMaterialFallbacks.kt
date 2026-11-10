@@ -20,7 +20,6 @@ object NameplateMaterialFallbacks {
 
     private var windowStart = 0L
     private var spent = 0L
-    private val textures = WeakHashMap<NameplateBundle, MaterialTextures>()
     private val logged: MutableSet<MaterialLayer> = Collections.newSetFromMap(WeakHashMap())
 
     fun painted(bundle: NameplateBundle, op: LayerPainter.Painted, material: MaterialOp): LayerPainter.Painted {
@@ -31,7 +30,7 @@ object NameplateMaterialFallbacks {
         return if (image === op.image) op else op.copy(image = image)
     }
 
-    fun image(bundle: NameplateBundle, op: LayerPainter.Painted, material: MaterialOp): PixelImage {
+    private fun image(bundle: NameplateBundle, op: LayerPainter.Painted, material: MaterialOp): PixelImage {
         val fallback = material.fallback
         if (material.drift && logged.add(material.layer)) {
             LOGGER.info("Nameplate {} layer {} drifts without repeating, so the CPU fallback rebuilds it at each frame step", bundle.id, material.layerId)
@@ -53,12 +52,9 @@ object NameplateMaterialFallbacks {
         if (spent >= BUDGET_NANOS) {
             return material.cachedFallback(still = true) ?: PixelImage.EMPTY
         }
-        val image = material.fallbackImage(textures(bundle))
+        val image = material.fallbackImage(MaterialTextures { ref -> NameplateMaterialAssets.pixels(bundle, ref) })
         spent += System.nanoTime() - now
         return image
     }
-
-    fun textures(bundle: NameplateBundle): MaterialTextures =
-        textures.getOrPut(bundle) { MaterialTextures { ref -> NameplateMaterialAssets.pixels(bundle, ref) } }
 }
 //?}
