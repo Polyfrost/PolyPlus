@@ -30,10 +30,12 @@ import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.polyplus.client.gui.ModIntegrationButton
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.Outfit
+import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.isMinecraftTheme
+import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 
 private const val NAV_INACTIVE_ALPHA = 0.6f
@@ -63,13 +65,13 @@ internal fun NavTab(
         modifier
             .height(38.dp)
             .hoverable(interaction)
-            .clickableWithSound(label, A11yRole.Tab, selected = active, onClick = onClick)
+            .clickableWithSound(label, A11yRole.Tab, selected = active, shape = SocialFieldShape, onClick = onClick)
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Label(label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = NAV_INACTIVE_ALPHA), weight = if (isMinecraftTheme) FontWeight.Bold else FontWeight.Medium)
         if (active) {
-            Box(Modifier.align(Alignment.BottomCenter).width(NAV_UNDERLINE_WIDTH).height(2.dp).background(OneConfigTheme.accent).then(underline))
+            Box(Modifier.align(Alignment.BottomCenter).width(NAV_UNDERLINE_WIDTH).height(2.dp).clip(ppShape(1.dp)).background(OneConfigTheme.accent).then(underline))
         }
         if (unread) {
             Box(
