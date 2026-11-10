@@ -4,12 +4,22 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
+import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.nameplate.NameplateBinding
+import org.polyfrost.polyplus.client.nameplate.NameplateFeature
+import org.polyfrost.polyplus.client.nameplate.NameplateMotion
+import org.polyfrost.polyplus.client.nameplate.NameplateRenderSettings
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
+
+private const val DEFAULT_NAMEPLATE_DETAIL_DISTANCE = 24
+private const val DEFAULT_NAMEPLATE_CROWD_LIMIT = 32
+private val NAMEPLATE_OPTIONS =
+    listOf("nameplatesVisibility", "nameplateMotion", "nameplateAnimatedNames", "nameplateDetailDistance", "nameplateCrowdLimit")
 
 object PolyPlusCosmeticsConfig : Config(
     "${PolyPlusConstants.ID}-cosmetics.json",
@@ -116,6 +126,54 @@ object PolyPlusCosmeticsConfig : Config(
     var aurasVisibility: CosmeticVisibility = CosmeticVisibility.EVERYONE
 
     @JvmStatic
+    @Dropdown(
+        title = "Nameplates",
+        description = "Choose whose nameplates you can see.",
+        options = ["Everyone", "Friends Only", "Self", "No One"],
+        subcategory = "Visibility",
+    )
+    var nameplatesVisibility: CosmeticVisibility = CosmeticVisibility.EVERYONE
+
+    @JvmStatic
+    @Dropdown(
+        title = "Nameplate Motion",
+        description = "Reduced keeps the loop and colors but drops shakes, flashes and moving text. Off shows each nameplate still.",
+        options = ["Full", "Reduced", "Off"],
+        subcategory = "Nameplates",
+    )
+    var nameplateMotion: NameplateMotion = NameplateMotion.FULL
+
+    @JvmStatic
+    @Switch(
+        title = "Animated Names",
+        description = "Off keeps every name in plain vanilla text, so names stay easy to read.",
+        subcategory = "Nameplates",
+    )
+    var nameplateAnimatedNames = true
+
+    @JvmStatic
+    @Slider(
+        title = "Nameplate Detail Distance",
+        description = "Nameplates further away than this many blocks drop their extra effects.",
+        min = 8f,
+        max = 64f,
+        step = 4f,
+        subcategory = "Nameplates",
+    )
+    var nameplateDetailDistance = DEFAULT_NAMEPLATE_DETAIL_DISTANCE
+
+    @JvmStatic
+    @Slider(
+        title = "Full-Detail Nameplates",
+        description = "Only the nearest this many nameplates show their extra effects.",
+        min = 4f,
+        max = 128f,
+        step = 4f,
+        subcategory = "Nameplates",
+    )
+    var nameplateCrowdLimit = DEFAULT_NAMEPLATE_CROWD_LIMIT
+
+    @JvmStatic
     fun isVisible(slot: BodySlot, owner: UUID): Boolean = when (visibilityFor(slot)) {
         CosmeticVisibility.EVERYONE -> true
         CosmeticVisibility.FRIENDS -> isSelf(owner) || FriendsRepository.isFriend(owner)
@@ -132,15 +190,32 @@ object PolyPlusCosmeticsConfig : Config(
         BodySlot.Backpack -> backsVisibility
         BodySlot.Shoulder -> shouldersVisibility
         BodySlot.Aura -> aurasVisibility
+        BodySlot.Nameplate -> nameplatesVisibility
         BodySlot.Glasses, BodySlot.Pet, BodySlot.Unknown -> CosmeticVisibility.EVERYONE
     }
 
     private fun isSelf(owner: UUID): Boolean =
         runCatching { ClientPlatform.localPlayerUuid() }.getOrNull() == owner
 
+    fun publishNameplateSettings() {
+        NameplateBinding.settings = NameplateRenderSettings(
+            enabled = nameplatesVisibility != CosmeticVisibility.NOBODY,
+            motion = nameplateMotion,
+            animatedNames = nameplateAnimatedNames,
+            detailDistance = nameplateDetailDistance,
+            crowdLimit = nameplateCrowdLimit,
+        )
+    }
+
     init {
         preload()
         migrateFromLegacyConfig()
+
+        for (option in NAMEPLATE_OPTIONS) {
+            if (!NameplateFeature.LISTED) hideIf(option) { true }
+            addCallback(option) { publishNameplateSettings() }
+        }
+        publishNameplateSettings()
     }
 
     private fun migrateFromLegacyConfig() {
