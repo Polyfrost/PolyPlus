@@ -216,7 +216,7 @@ object NameplateSubmitAdapter {
         }
 
         var color = NameplateContext.rewrittenColor
-        val outline = NameplateContext.rewrittenOutline
+        val outline = if (submit.displayMode() == Font.DisplayMode.SEE_THROUGH) 0 else NameplateContext.rewrittenOutline
         if (outline != 0) {
             outlined = true
             outlinePose.last().pose().set(submit.pose())
