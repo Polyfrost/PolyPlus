@@ -39,43 +39,50 @@ class NameplateFrame(
         }
 
     fun submitGeometry(order: Int, renderType: NameplateLayer, renderer: NameplateGeometry) {
-        poseStack.pushPose()
-        poseStack.translate(x, y, 0f)
-        //? if >= 1.21.10 {
-        collector.order(order).submitCustomGeometry(poseStack, renderType, renderer)
-        //?} else {
-        /*draw(renderType, renderer)
-        *///?}
-        poseStack.popPose()
+        translated {
+            //? if >= 1.21.10 {
+            collector.order(order).submitCustomGeometry(poseStack, renderType, renderer)
+            //?} else {
+            /*draw(renderType, renderer)
+            *///?}
+        }
     }
 
     fun submitAfterTerrain(order: Int, renderType: NameplateLayer, renderer: NameplateGeometry) {
-        poseStack.pushPose()
-        poseStack.translate(x, y, 0f)
-        //? if >= 26.2 {
-        val target = collector.order(order)
-        if (target is SubmitNodeCollection) {
-            target.afterTerrain.submit(CustomFeatureRenderer.Submit(poseStack.last().copy(), renderType, renderer))
-        } else {
-            target.submitCustomGeometry(poseStack, renderType, renderer)
+        translated {
+            //? if >= 26.2 {
+            val target = collector.order(order)
+            if (target is SubmitNodeCollection) {
+                target.afterTerrain.submit(CustomFeatureRenderer.Submit(poseStack.last().copy(), renderType, renderer))
+            } else {
+                target.submitCustomGeometry(poseStack, renderType, renderer)
+            }
+            //?} elif >= 1.21.10 {
+            /*collector.order(order).submitCustomGeometry(poseStack, renderType, renderer)
+            *///?} else {
+            /*draw(renderType, renderer)
+            *///?}
         }
-        //?} elif >= 1.21.10 {
-        /*collector.order(order).submitCustomGeometry(poseStack, renderType, renderer)
-        *///?} else {
-        /*draw(renderType, renderer)
-        *///?}
-        poseStack.popPose()
     }
 
     fun submitGeometry(renderType: NameplateLayer, renderer: NameplateGeometry) {
+        translated {
+            //? if >= 1.21.10 {
+            collector.submitCustomGeometry(poseStack, renderType, renderer)
+            //?} else {
+            /*draw(renderType, renderer)
+            *///?}
+        }
+    }
+
+    private inline fun translated(submit: () -> Unit) {
         poseStack.pushPose()
-        poseStack.translate(x, y, 0f)
-        //? if >= 1.21.10 {
-        collector.submitCustomGeometry(poseStack, renderType, renderer)
-        //?} else {
-        /*draw(renderType, renderer)
-        *///?}
-        poseStack.popPose()
+        try {
+            poseStack.translate(x, y, 0f)
+            submit()
+        } finally {
+            poseStack.popPose()
+        }
     }
 
     fun submitText(
