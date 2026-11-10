@@ -5,7 +5,7 @@ mod.group = "org.polyfrost"
 
 deps.fabric_loader = "0.19.5"
 deps.fabric_language_kotlin = "1.14.1+kotlin.2.4.20"
-deps.oneconfig = "1.7.0"
+deps.oneconfig = "1.7.0-rc.1"
 deps.kotlin = "2.4.20"
 deps.ktor = "3.5.2"
 deps.sentry = "7.22.6"
