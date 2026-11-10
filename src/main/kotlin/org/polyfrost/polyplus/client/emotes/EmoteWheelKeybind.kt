@@ -6,7 +6,9 @@ import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
 import org.polyfrost.polyplus.client.PolyPlusConfig
-import org.polyfrost.polyplus.client.gui.EmoteWheelScreen
+import org.polyfrost.polyplus.client.gui.EmoteWheelOverlay
+import org.polyfrost.polyplus.client.gui.WheelOverlay
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object EmoteWheelKeybind {
     @Volatile
@@ -16,24 +18,9 @@ object EmoteWheelKeybind {
 
     fun onKeybindState(pressed: Boolean) {
         held = pressed
-        if (!pressed) return
-
-        val mc = Minecraft.getInstance()
-        if (mc.player == null) return
-        //? if >= 26.2 {
-        val currentScreen = mc.gui.screen()
-        //?} else {
-        /*val currentScreen = mc.screen
-        *///?}
-        if (currentScreen == null) {
-            //? if >= 26.2 {
-            mc.gui.setScreen(EmoteWheelScreen())
-            //?} elif > 1.8.9 {
-            /*mc.setScreen(EmoteWheelScreen())
-            *///?} else {
-            /*mc.openScreen(EmoteWheelScreen())
-            *///?}
-        }
+        if (!pressed || WheelOverlay.isOpen) return
+        if (Minecraft.getInstance().player == null || ClientPlatform.currentScreen() != null) return
+        EmoteWheelOverlay.open()
     }
 
     fun isBound(): Boolean = PolyPlusConfig.emoteWheelKeybind.isBound
