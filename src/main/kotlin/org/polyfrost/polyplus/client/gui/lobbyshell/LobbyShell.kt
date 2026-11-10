@@ -53,6 +53,7 @@ internal enum class LobbyPage(val frosted: Boolean) {
     Marketplace(true),
     Social(true),
     Stats(true),
+    News(true),
     ;
 
     val spokenName: String

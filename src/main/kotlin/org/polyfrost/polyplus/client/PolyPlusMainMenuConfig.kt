@@ -31,6 +31,9 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic @Include
     var migratedFromLegacyConfig = false
 
+    @JvmStatic @Include
+    var lastSeenNewsMillis = 0L
+
     @JvmStatic
     @Dropdown(
         title = "Main Menu",

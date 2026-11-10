@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -40,6 +41,9 @@ import org.polyfrost.polyplus.client.gui.rememberSocialHover
 
 private const val NAV_INACTIVE_ALPHA = 0.6f
 private val NAV_UNDERLINE_WIDTH = 27.dp
+private val NAV_DOT_SIZE = 6.dp
+private val NAV_DOT_INSET = 5.dp
+private val NAV_DOT_RISE = 7.dp
 private val MORE_MENU_WIDTH = 300.dp
 internal val MORE_MENU_INSET = 8.dp
 
@@ -58,6 +62,7 @@ internal fun NavTab(
     modifier: Modifier = Modifier,
     unread: Boolean = false,
     underline: Modifier = Modifier,
+    padding: Dp = 18.dp,
     onClick: () -> Unit,
 ) {
     val (interaction, hovered) = rememberSocialHover()
@@ -66,7 +71,7 @@ internal fun NavTab(
             .height(38.dp)
             .hoverable(interaction)
             .clickableWithSound(label, A11yRole.Tab, selected = active, shape = SocialFieldShape, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = padding),
         contentAlignment = Alignment.Center,
     ) {
         Label(label, 14.sp, color = if (active || hovered) SocialTextPrimary else SocialTextPrimary.copy(alpha = NAV_INACTIVE_ALPHA), weight = if (isMinecraftTheme) FontWeight.Bold else FontWeight.Medium)
@@ -77,8 +82,8 @@ internal fun NavTab(
             Box(
                 Modifier
                     .align(Alignment.CenterEnd)
-                    .offset(x = 12.dp)
-                    .size(8.dp)
+                    .offset(x = padding - NAV_DOT_INSET, y = -NAV_DOT_RISE)
+                    .size(NAV_DOT_SIZE)
                     .clip(OneConfigTheme.current.circleShape)
                     .background(OneConfigTheme.accent),
             )

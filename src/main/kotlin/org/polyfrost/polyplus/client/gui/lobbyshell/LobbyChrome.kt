@@ -125,6 +125,8 @@ import org.polyfrost.polyplus.client.gui.rememberAccountActions
 import org.polyfrost.polyplus.client.gui.serveredit.ServerEditDialog
 import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerPage
 import org.polyfrost.polyplus.client.gui.replays.ReplaysPage
+import org.polyfrost.polyplus.client.gui.news.NewsFeed
+import org.polyfrost.polyplus.client.gui.news.NewsPage
 import org.polyfrost.polyplus.client.gui.stats.StatsPage
 import org.polyfrost.polyplus.client.gui.stats.formatDuration
 import org.polyfrost.polyplus.client.gui.themeToggle
@@ -159,10 +161,11 @@ private val TABS = listOf(
     LobbyTab("Marketplace", LobbyPage.Marketplace),
     LobbyTab("Social", LobbyPage.Social),
     LobbyTab("Stats", LobbyPage.Stats),
+    LobbyTab("News", LobbyPage.News),
 )
 
 private fun LobbyTab.activeOn(page: LobbyPage): Boolean = when (this.page) {
-    LobbyPage.Home -> page != LobbyPage.Wardrobe && page != LobbyPage.Social && page != LobbyPage.Marketplace && page != LobbyPage.Stats
+    LobbyPage.Home -> page != LobbyPage.Wardrobe && page != LobbyPage.Social && page != LobbyPage.Marketplace && page != LobbyPage.Stats && page != LobbyPage.News
     else -> this.page == page
 }
 
@@ -171,6 +174,7 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
     var labels by remember { mutableStateOf(emptyList<LobbyScene.Label>()) }
     var chrome by remember { mutableFloatStateOf(LobbyScene.overlayAlpha) }
     var depart by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) { NewsFeed.refresh() }
     val frost = animateFloatAsState(if (lobby.page.frosted) 1f else 0f, tween(FROST_MILLIS))
     val reveal = animateFloatAsState(if (lobby.setup) 0f else 1f, tween(REVEAL_MILLIS))
     LaunchedEffect(Unit) {
@@ -267,6 +271,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
             LobbyPage.Marketplace -> MarketplacePage(onBack = { lobby.show(LobbyPage.Home) }, onWardrobe = { lobby.show(LobbyPage.Wardrobe) })
             LobbyPage.Social -> SocialPage { lobby.show(LobbyPage.Home) }
             LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }
+            LobbyPage.News -> NewsPage { lobby.show(LobbyPage.Home) }
         } }
         var barStart by remember { mutableFloatStateOf(Float.NaN) }
         Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) { SceneControl(lobby) { barStart } }
@@ -365,7 +370,7 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
         )
         Row(
             Modifier.weight(1f).a11yRegion(A11yRegion.Nav),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(NAV_TAB_GAP, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TABS.filterNot { it.page.hidden }.forEach { tab ->
@@ -378,8 +383,9 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
                     tab.label,
                     tab.activeOn(lobby.page),
                     anchor,
-                    unread = tab.page == LobbyPage.Social && unread,
+                    unread = (tab.page == LobbyPage.Social && unread) || (tab.page == LobbyPage.News && NewsFeed.unread),
                     underline = if (tab.page == LobbyPage.Home) Modifier.onGloballyPositioned { StartupOverlay.navLine = StartupOverlay.place(it) } else Modifier,
+                    padding = NAV_TAB_PADDING,
                 ) { lobby.show(tab.page) }
             }
         }
@@ -390,6 +396,8 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
 }
 
 private const val NAV_SIDE = 490
+private val NAV_TAB_GAP = 4.dp
+private val NAV_TAB_PADDING = 12.dp
 private const val INVITE_PENDING = "pending"
 
 @Composable
