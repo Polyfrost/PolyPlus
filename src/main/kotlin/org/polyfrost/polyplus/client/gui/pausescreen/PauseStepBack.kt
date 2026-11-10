@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -39,7 +40,12 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.polyplus.client.gui.MENU_PREVIEW_YAW
 import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.menuPreviewSpec
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
@@ -70,6 +76,12 @@ private val PANEL_PREFERRED_MIN = 300.dp
 private val PANEL_MAX_HEIGHT = 220.dp
 private val PANEL_MIN_HEIGHT = 120.dp
 private const val MAX_PANELS = 2
+private const val FLAT_AVATAR_X = 0.35f
+private const val FLAT_AVATAR_SHARE = 0.85f
+private val FLAT_AVATAR_MIN = 120.dp
+private val FLAT_PREVIEW_COLUMN = 300.dp
+private val FLAT_TAG_ROOM = 56.dp
+private val FLAT_TAG_GAP = 4.dp
 
 private class PanelSlots(val count: Int, val width: Dp, val height: Dp)
 
@@ -112,7 +124,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         val panels = widgets.view.panels.take(slots.count)
         val panelArea = panelSlots(narrow, 1, maxWidth, maxHeight, rowWidth).count > 0
         val panelled = remember(panels) { panels.mapTo(HashSet()) { it.id } }
-        if (screen.staged) AvatarTag(place.title)
+        if (screen.staged) AvatarTag(place.title) else FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
             Column(
@@ -237,7 +249,8 @@ private fun BoxScope.AvatarTag(where: String) {
     val frame by rememberFrame()
     val root = LocalRootSize.current
     val spot = remember(frame) { Offset(PauseStage.tagX, PauseStage.tagY) }
-    Column(
+    AvatarTagCard(
+        where,
         Modifier
             .align(Alignment.TopStart)
             .layout { measurable, constraints ->
@@ -245,7 +258,48 @@ private fun BoxScope.AvatarTag(where: String) {
                 val x = (spot.x * root.width).roundToInt()
                 val y = (spot.y * root.height).roundToInt().coerceAtLeast(LobbyLayout.NavbarHeight.roundToPx() + placeable.height)
                 layout(0, 0) { placeable.place(x - placeable.width / 2, y - placeable.height) }
-            }
+            },
+    )
+}
+
+@Composable
+private fun BoxScope.FlatAvatar(where: String, maxWidth: Dp, maxHeight: Dp, menuReserve: Dp) {
+    val spec = menuPreviewSpec()
+    val top = LobbyLayout.NavbarHeight + LobbyLayout.Gap
+    val bottom = LobbyLayout.PageBottom
+    val right = maxWidth - menuReserve - LobbyLayout.Gap
+    val roomWidth = right - LobbyLayout.Margin
+    val roomHeight = maxHeight - top - bottom - FLAT_TAG_ROOM
+    val aspect = FLAT_PREVIEW_COLUMN / spec.height
+    val height = minOf(roomHeight * FLAT_AVATAR_SHARE, roomWidth / aspect)
+    if (height < FLAT_AVATAR_MIN) return
+    val width = height * aspect
+    val centre = (maxWidth * FLAT_AVATAR_X).coerceIn(LobbyLayout.Margin + width / 2, right - width / 2)
+    Box(Modifier.matchParentSize().padding(top = top, bottom = bottom)) {
+        Column(
+            Modifier.align(Alignment.CenterStart).offset(x = centre - width / 2).width(width),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AvatarTagCard(where, Modifier)
+            Spacer(Modifier.height(FLAT_TAG_GAP))
+            PlayerPreview(
+                Modifier.width(width).height(height),
+                source = PlayerPreviewSource.LocalLive,
+                autoSpin = !Motion.reduced,
+                modelScale = spec.modelScale,
+                verticalAnchor = 1f,
+                initialYaw = MENU_PREVIEW_YAW,
+                live = true,
+                bottomFadeFraction = 1f - spec.fadeStart,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvatarTagCard(where: String, modifier: Modifier) {
+    Column(
+        modifier
             .pauseGlass(8.dp)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
