@@ -42,8 +42,6 @@ object NameplatePreviewOffscreen {
 
         internal var lastDrawNanos = 0L
         internal var offscreen: OffscreenTarget? = null
-        internal var contentWidth = 0
-        internal var contentHeight = 0
         internal var hasContent = false
         internal var bound: BoundNameplate? = null
         internal var drawnKey: DrawnKey? = null
@@ -115,15 +113,15 @@ object NameplatePreviewOffscreen {
         }
     }
 
-    private fun renderEntry(entry: Entry, w: Int, h: Int): Boolean {
+    private fun renderEntry(entry: Entry, w: Int, h: Int) {
         val choice = entry.cosmeticId?.let(NameplateChoices::choice)
         if (choice == null) {
             entry.hasContent = false
             entry.drawnKey = null
-            return false
+            return
         }
         val bound = boundFor(entry, choice)
-        val frame = frameOf(bound)
+        val frame = NameplateClock.frame(bound)
         val state = stateFor(entry, bound, frame)
         val uuid = ClientPlatform.localPlayerUuid()
         val profileName = ClientPlatform.localPlayerName()
@@ -134,26 +132,21 @@ object NameplatePreviewOffscreen {
             NameplateBinding.settings.enabled, NameplateBinding.settings.motion,
         )
         val animatedMaterials = MaterialLayer.CAPABILITY in bound.bundle.requires
-        if (entry.hasContent && !animatedMaterials && key == entry.drawnKey) return false
+        if (entry.hasContent && !animatedMaterials && key == entry.drawnKey) return
 
         val offscreen = entry.offscreen ?: OffscreenTarget().also { entry.offscreen = it }
         if (!offscreen.resolve(w, h)) {
             entry.hasContent = false
-            return false
+            return
         }
-        val target = offscreen.target ?: return false
-        return runCatching {
-            if (renderInto(target, w, h, bound, frame, state, pixels, profileName, badge)) {
-                entry.contentWidth = w
-                entry.contentHeight = h
-                entry.hasContent = true
-                entry.drawnKey = key
-            }
-            true
+        val target = offscreen.target ?: return
+        runCatching {
+            entry.hasContent = renderInto(target, w, h, bound, frame, state, pixels, profileName, badge)
+            if (entry.hasContent) entry.drawnKey = key
         }.onFailure {
             entry.hasContent = false
             LOGGER.error("[nameplate-preview] render failed", it)
-        }.getOrDefault(false)
+        }
     }
 
     private fun boundFor(entry: Entry, choice: NameplateChoice): BoundNameplate {
@@ -166,18 +159,12 @@ object NameplatePreviewOffscreen {
     private fun stateFor(entry: Entry, bound: BoundNameplate, frame: Int): TagState {
         val controller = entry.controller
         val inputs = TagInputs.ofMask(controller?.reactions ?: 0)
+        val shots = controller?.drainShots().orEmpty()
         return when (NameplateBinding.settings.motion) {
-            NameplateMotion.OFF -> {
-                controller?.drainShots()
-                TagState.NONE
-            }
-            NameplateMotion.REDUCED -> {
-                controller?.drainShots()
-                TagState.of(inputs)
-            }
+            NameplateMotion.OFF -> TagState.NONE
+            NameplateMotion.REDUCED -> TagState.of(inputs)
             NameplateMotion.FULL -> {
                 val state = record.update(entry, bound.bundle, bound.variant, frame, inputs)
-                val shots = controller?.drainShots().orEmpty()
                 if (shots.isEmpty()) {
                     state
                 } else {
@@ -187,8 +174,6 @@ object NameplatePreviewOffscreen {
             }
         }
     }
-
-    private fun frameOf(bound: BoundNameplate): Int = NameplateClock.frame(bound)
 
     private fun pixelsPerFontPixel(entry: Entry, profileName: String, w: Int, h: Int): Float {
         val raw = if (entry.fit) {
@@ -238,7 +223,6 @@ object NameplatePreviewOffscreen {
         entry.lastDrawNanos = System.nanoTime()
         if (!entry.hasContent || width <= 0f || height <= 0f) return
         val target = entry.offscreen?.target ?: return
-        if (entry.contentWidth <= 0 || entry.contentHeight <= 0) return
         val textures = ctx.renderer as? TextureRenderer ?: return
         textures.texture(target, 0f, 0f, width, height, 0f, 1f, 1f, 0f, 1f)
     }
