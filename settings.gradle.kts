@@ -50,5 +50,6 @@ stonecutter.create(rootProject) {
 }
 
 include(":molang")
+include(":nameplate-engine")
 
 rootProject.name = "PolyPlus"
