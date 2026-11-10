@@ -39,8 +39,7 @@ import net.minecraft.util.ARGB
 *///?}
 
 object NameplateText {
-    const val BADGE_GLYPH: Int = 0xE000
-    const val BADGE_SPACE: Int = 0xE001
+    private const val BADGE_GLYPH: Int = 0xE000
 
     //? if >= 1.21.10 {
     val GAP_FONT: FontDescription = FontDescription.Resource(Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "badge_gap"))
@@ -242,7 +241,7 @@ object NameplateText {
         private var glyphX = FloatArray(65)
         private var defaultBefore = FloatArray(65)
         private var defaults = BooleanArray(64)
-        private var widths: StringSplitter.WidthProvider? = null
+        private lateinit var widths: StringSplitter.WidthProvider
         private var firstDefault = -1
         private var lastDefault = -1
 
@@ -283,7 +282,7 @@ object NameplateText {
                 defaults = defaults.copyOf(defaults.size * 2)
             }
 
-            val advance = widths?.getWidth(codepoint, style) ?: 0f
+            val advance = widths.getWidth(codepoint, style)
             val isDefault = isDefaultFont(style)
             if (badgeX < 0 && codepoint == BADGE_GLYPH && isBadgeGap(style)) {
                 badgeX = glyphX[count]
@@ -334,8 +333,6 @@ object NameplateText {
         }
 
         fun glyphX(index: Int): Float = glyphX[index]
-
-        fun isNameGlyph(index: Int): Boolean = index in nameStart until nameEnd
 
         fun isDefault(index: Int): Boolean = defaults[index]
     }
@@ -536,19 +533,7 @@ object NameplateLetters {
             while (to < layout.count && isOwnedPlain(layout, to, mergesStill)) {
                 to++
             }
-            val x = frame.x + layout.glyphX(from)
-            val run = LetterSlice(text, from, to, null)
-            frame.submitText(
-                x,
-                frame.y,
-                run,
-                context.dropShadow,
-                Font.DisplayMode.NORMAL,
-                context.lightCoords,
-                context.color,
-                context.outlineColor,
-            )
-            submitSeeThrough(frame, context, run, x, frame.y, 0f, 0f, CHANNEL_MAX, 0, 1f)
+            submitRun(frame, context, text, layout, from, to, -1)
             from = to
         }
     }

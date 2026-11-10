@@ -509,58 +509,49 @@ object PolyPlusSentry {
     }
 
     fun captureNameplateIssues(cosmeticId: Int, assetHash: String, issues: List<String>) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        initialize()
-        val hub = activeHub() ?: return
-
-        val event = SentryEvent()
-        event.level = SentryLevel.WARNING
-        event.message = Message().apply { formatted = "Invalid nameplate bundle for cosmetic $cosmeticId" }
-        event.setTag("mechanism", "nameplate_invalid")
-        event.setTag("cosmetic_id", cosmeticId.toString())
-        event.setExtra("asset_hash", assetHash)
-        event.setExtra("issues", issues.joinToString("\n"))
-        event.fingerprints = listOf("nameplate_invalid", assetHash)
-        hub.captureEvent(event)
+        captureNameplateEvent("Invalid nameplate bundle for cosmetic $cosmeticId", "nameplate_invalid", listOf(assetHash)) {
+            setTag("cosmetic_id", cosmeticId.toString())
+            setExtra("asset_hash", assetHash)
+            setExtra("issues", issues.joinToString("\n"))
+        }
     }
 
     init {
         NameplateShaderFailures.reporter = NameplateShaderFailures.Reporter(::captureNameplateShaderFailure)
     }
 
-    fun captureNameplateShaderFailure(failure: NameplateShaderFailure) {
-        if (!PrivacyConsent.allowsOnlineServices()) return
-        initialize()
-        val hub = activeHub() ?: return
-
-        val event = SentryEvent()
-        event.level = SentryLevel.WARNING
-        event.message = Message().apply { formatted = "Nameplate material shader failed to compile" }
-        event.setTag("mechanism", "nameplate_shader")
-        event.setTag("gpu_backend", failure.device["backend"].orEmpty())
-        event.setTag("gpu_vendor", failure.device["vendor"].orEmpty())
-        event.setExtra("material_hash", failure.hash)
-        event.setExtra("pipelines", failure.pipelines.joinToString("\n"))
-        event.setExtra("device", failure.device.entries.joinToString("\n") { "${it.key}=${it.value}" })
-        event.setExtra("debug_messages", failure.debugMessages.joinToString("\n"))
-        failure.error?.let { event.setExtra("error", it.toString()) }
-        event.fingerprints = listOf("nameplate_shader", failure.hash, failure.device["backend"].orEmpty())
-        hub.captureEvent(event)
+    private fun captureNameplateShaderFailure(failure: NameplateShaderFailure) {
+        val backend = failure.device["backend"].orEmpty()
+        captureNameplateEvent("Nameplate material shader failed to compile", "nameplate_shader", listOf(failure.hash, backend)) {
+            setTag("gpu_backend", backend)
+            setTag("gpu_vendor", failure.device["vendor"].orEmpty())
+            setExtra("material_hash", failure.hash)
+            setExtra("pipelines", failure.pipelines.joinToString("\n"))
+            setExtra("device", failure.device.entries.joinToString("\n") { "${it.key}=${it.value}" })
+            setExtra("debug_messages", failure.debugMessages.joinToString("\n"))
+            failure.error?.let { setExtra("error", it.toString()) }
+        }
     }
 
     fun captureNameplateDropped(bundleId: String, variant: String, call: String) {
+        captureNameplateEvent("Nameplate $bundleId dropped its Molang in $call", "nameplate_dropped", listOf(bundleId, variant, call)) {
+            setTag("nameplate_bundle", bundleId)
+            setTag("nameplate_variant", variant)
+            setTag("nameplate_call", call)
+        }
+    }
+
+    private fun captureNameplateEvent(message: String, mechanism: String, fingerprint: List<String>, fill: SentryEvent.() -> Unit) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         initialize()
         val hub = activeHub() ?: return
 
         val event = SentryEvent()
         event.level = SentryLevel.WARNING
-        event.message = Message().apply { formatted = "Nameplate $bundleId dropped its Molang in $call" }
-        event.setTag("mechanism", "nameplate_dropped")
-        event.setTag("nameplate_bundle", bundleId)
-        event.setTag("nameplate_variant", variant)
-        event.setTag("nameplate_call", call)
-        event.fingerprints = listOf("nameplate_dropped", bundleId, variant, call)
+        event.message = Message().apply { formatted = message }
+        event.setTag("mechanism", mechanism)
+        event.fill()
+        event.fingerprints = listOf(mechanism) + fingerprint
         hub.captureEvent(event)
     }
 

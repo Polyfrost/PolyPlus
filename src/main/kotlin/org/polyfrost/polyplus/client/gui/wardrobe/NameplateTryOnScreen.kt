@@ -6,10 +6,6 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -288,7 +284,9 @@ private fun TryOnNote() {
             Icon("alert-circle", color = theme.textColor, modifier = Modifier.padding(top = 1.dp).size(13.dp))
         }
         SocialText(
-            warning ?: motionNote() ?: "Only you see this. Nothing is bought or equipped.",
+            warning
+                ?: "Nameplate motion is off, so it stays still.".takeIf { NameplateBinding.settings.motion == NameplateMotion.OFF }
+                ?: "Only you see this. Nothing is bought or equipped.",
             color = if (warning != null) theme.textColor else mutedText(),
             fontSize = 12.sp,
         )
@@ -297,37 +295,12 @@ private fun TryOnNote() {
 
 private fun clock(seconds: Long): String = "%d:%02d".format(seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
 
-private fun motionNote(): String? = when (NameplateBinding.settings.motion) {
-    NameplateMotion.OFF -> "Nameplate motion is off, so it stays still."
-    else -> null
-}
-
 @Composable
 private fun TryOnVariantChip(choice: NameplateChoice, selected: Boolean, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
     val art = remember(choice.id, swatchVersion) { if (choice.id > 0) CosmeticSwatches.get(choice.id) else null }
-    Row(
-        modifier = Modifier.height(28.dp)
-            .clip(ppShape(6.dp))
-            .background(if (selected) OneConfigTheme.accent else theme.componentBackground)
-            .border(
-                1.dp,
-                when {
-                    selected -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> theme.borderColor
-                },
-                ppShape(6.dp),
-            )
-            .hoverable(interaction)
-            .clickable(onClick = onClick)
-            .padding(start = if (art != null) 4.dp else 10.dp, end = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    NameplateChip(selected, 28.dp, if (art != null) 4.dp else 10.dp, theme.textColorSecondary, onClick) {
         if (art != null) {
             Box(Modifier.size(width = 13.dp, height = 20.dp).clip(ppShape(4.dp)).background(theme.chipBackground)) {
                 when (art) {

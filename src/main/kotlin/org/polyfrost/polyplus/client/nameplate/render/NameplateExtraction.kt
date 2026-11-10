@@ -18,32 +18,28 @@ import net.minecraft.world.entity.Display
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import org.polyfrost.polyplus.client.PolyPlusBadge
-import org.polyfrost.polyplus.client.nameplate.BoundNameplate
-import java.util.UUID
 
 object NameplateExtraction {
 
     //? if >= 1.21.10 {
     @JvmStatic
     fun bindAvatar(entity: Avatar, state: AvatarRenderState) {
-        val access = state as NameplateTagAccess
-        access.`polyplus$setNameplateTag`(null)
-        if (state.nameTag == null || entity !is Player || !NameplateGate.active()) {
-            return
-        }
-        access.`polyplus$setNameplateTag`(playerTag(entity, state.distanceToCameraSq))
+        bindTag(entity as? Player, state as NameplateTagAccess, state.nameTag != null, state.distanceToCameraSq)
     }
     //?} elif >= 1.21.4 {
     /*@JvmStatic
     fun bindPlayer(entity: AbstractClientPlayer, state: PlayerRenderState) {
-        val access = state as NameplateTagAccess
-        access.`polyplus$setNameplateTag`(null)
-        if (state.nameTag == null || !NameplateGate.active()) {
-            return
-        }
-        access.`polyplus$setNameplateTag`(playerTag(entity, state.distanceToCameraSq))
+        bindTag(entity, state as NameplateTagAccess, state.nameTag != null, state.distanceToCameraSq)
     }
     *///?}
+
+    private fun bindTag(player: Player?, access: NameplateTagAccess, named: Boolean, distanceSq: Double) {
+        access.`polyplus$setNameplateTag`(null)
+        if (!named || player == null || !NameplateGate.active()) {
+            return
+        }
+        access.`polyplus$setNameplateTag`(playerTag(player, distanceSq))
+    }
 
     //? if >= 1.21.4 {
     @JvmStatic
@@ -61,7 +57,7 @@ object NameplateExtraction {
 
     fun playerTag(player: Player, distanceSq: Double): NameplateTag? {
         val uuid = player.uuid
-        val nameplate = resolve(uuid) ?: return null
+        val nameplate = NameplateGate.bound(uuid) ?: return null
         val frame = NameplateClock.frame(nameplate)
         return NameplateTag(
             nameplate,
@@ -84,7 +80,7 @@ object NameplateExtraction {
         }
 
         val uuid = player.uuid
-        val nameplate = resolve(uuid) ?: return null
+        val nameplate = NameplateGate.bound(uuid) ?: return null
         if (!DisplayPick.closest(player, display, profileName)) {
             return null
         }
@@ -104,8 +100,6 @@ object NameplateExtraction {
 
     fun textVisible(text: Display.TextDisplay.TextRenderState, progress: Float): Boolean =
         DisplayTagRenderer.textVisible(text.textOpacity().get(progress))
-
-    fun resolve(uuid: UUID): BoundNameplate? = NameplateGate.bound(uuid)
 
     private fun profileName(player: Player): String =
         //? if >= 1.21.10 {

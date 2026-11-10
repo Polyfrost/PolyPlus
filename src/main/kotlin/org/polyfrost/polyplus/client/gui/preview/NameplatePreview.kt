@@ -21,16 +21,11 @@ import org.polyfrost.polyplus.nameplate.engine.api.tag.Reaction
 class NameplatePreviewController {
     private var held by mutableIntStateOf(0)
     private val pulseEnds = LongArray(Reaction.entries.size)
-
-    @Volatile
-    private var pulsing = 0L
-
     private val shots = ArrayList<String>()
 
     val reactions: Int
         get() {
             val now = System.currentTimeMillis()
-            if (now >= pulsing) return held
             var mask = held
             for (reaction in Reaction.entries) {
                 if (pulseEnds[reaction.ordinal] > now) mask = mask or reaction.bit
@@ -45,15 +40,12 @@ class NameplatePreviewController {
     }
 
     fun pulse(reaction: Reaction, millis: Long) {
-        val end = System.currentTimeMillis() + millis
-        pulseEnds[reaction.ordinal] = end
-        pulsing = maxOf(pulsing, end)
+        pulseEnds[reaction.ordinal] = System.currentTimeMillis() + millis
     }
 
     fun clear() {
         held = 0
         pulseEnds.fill(0L)
-        pulsing = 0L
         shots.clear()
     }
 

@@ -24,7 +24,7 @@ object NameplateSelfVisibility {
     fun appliesTo(entity: LivingEntity): Boolean {
         if (polyNametagLoaded) return false
         val player = Minecraft.getInstance().player ?: return false
-        return entity === player && NameplateBinding.source.boundFor(player.uuid) != null
+        return entity === player && NameplateRegistry.boundFor(player.uuid) != null
     }
 
     //? if >= 1.21.1 {

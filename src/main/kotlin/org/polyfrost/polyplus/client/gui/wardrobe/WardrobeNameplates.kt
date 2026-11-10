@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -75,8 +77,6 @@ private const val STAGE_MODEL_ANCHOR = 0.66f
 private const val STAGE_CONTROLS_SHARE = 0.5f
 private const val WORLD_POLL_MS = 250L
 private const val HURT_MILLIS = 500L
-
-private val TIMED_REACTIONS: Map<Reaction, Long> = mapOf(Reaction.HURT to HURT_MILLIS)
 
 @Composable
 internal fun NameplateThumbnail(cosmeticId: Int?, modifier: Modifier) {
@@ -258,7 +258,7 @@ internal fun NameplateMotionControls(
     modifier: Modifier = Modifier,
 ) {
     if (motion == NameplateMotion.OFF) return
-    val (pulses, held) = choice.bundle.triggers.reactions.sortedBy { it.ordinal }.partition { it in TIMED_REACTIONS }
+    val (pulses, held) = choice.bundle.triggers.reactions.sortedBy { it.ordinal }.partition { it == Reaction.HURT }
     val shots = if (motion == NameplateMotion.FULL) choice.bundle.triggers.oneShots.map { it.name } else emptyList()
     if (held.isEmpty() && pulses.isEmpty() && shots.isEmpty()) return
     Column(modifier.nameplateCard(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -281,8 +281,7 @@ internal fun NameplateMotionControls(
                 verticalArrangement = Arrangement.spacedBy(CONTROL_GAP),
             ) {
                 for (reaction in pulses) {
-                    val millis = TIMED_REACTIONS.getValue(reaction)
-                    PlayOnceChip(reactionLabel(reaction), millis) { onPulse(reaction, millis) }
+                    PlayOnceChip(reactionLabel(reaction), HURT_MILLIS) { onPulse(reaction, HURT_MILLIS) }
                 }
                 for (shot in shots) {
                     PlayOnceChip(readableId(shot), PLAY_FLASH_MS) { onPlay(shot) }
@@ -293,31 +292,45 @@ internal fun NameplateMotionControls(
 }
 
 @Composable
-private fun StateToggle(label: String, on: Boolean, onClick: () -> Unit) {
+internal fun NameplateChip(
+    active: Boolean,
+    height: Dp,
+    startPadding: Dp,
+    hoverBorder: Color,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
     val theme = OneConfigTheme.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val muted = mutedText()
-    val onAccent = contentOnAccent()
     Row(
-        modifier = Modifier.height(CONTROL_HEIGHT)
+        modifier = Modifier.height(height)
             .clip(ppShape(CONTROL_RADIUS))
-            .background(if (on) OneConfigTheme.accent else theme.componentBackground)
+            .background(if (active) OneConfigTheme.accent else theme.componentBackground)
             .border(
                 1.dp,
                 when {
-                    on -> OneConfigTheme.accent
-                    hovered -> muted
+                    active -> OneConfigTheme.accent
+                    hovered -> hoverBorder
                     else -> theme.borderColor
                 },
                 ppShape(CONTROL_RADIUS),
             )
             .hoverable(interaction)
             .clickable(onClick = onClick)
-            .padding(start = 7.dp, end = 10.dp),
+            .padding(start = startPadding, end = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
-    ) {
+        content = content,
+    )
+}
+
+@Composable
+private fun StateToggle(label: String, on: Boolean, onClick: () -> Unit) {
+    val theme = OneConfigTheme.current
+    val muted = mutedText()
+    val onAccent = contentOnAccent()
+    NameplateChip(on, CONTROL_HEIGHT, 7.dp, muted, onClick) {
         Box(
             modifier = Modifier.size(MARK_SIZE)
                 .clip(theme.checkBoxShape)
@@ -334,8 +347,6 @@ private fun StateToggle(label: String, on: Boolean, onClick: () -> Unit) {
 @Composable
 private fun PlayOnceChip(label: String, flashMillis: Long, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     var litAt by remember { mutableStateOf(0L) }
     val lit = litAt != 0L
     LaunchedEffect(litAt) {
@@ -345,27 +356,15 @@ private fun PlayOnceChip(label: String, flashMillis: Long, onClick: () -> Unit) 
         }
     }
     val content = if (lit) contentOnAccent() else theme.textColor
-    Row(
-        modifier = Modifier.height(CONTROL_HEIGHT)
-            .clip(ppShape(CONTROL_RADIUS))
-            .background(if (lit) OneConfigTheme.accent else theme.componentBackground)
-            .border(
-                1.dp,
-                when {
-                    lit -> OneConfigTheme.accent
-                    hovered -> mutedText()
-                    else -> theme.borderColor
-                },
-                ppShape(CONTROL_RADIUS),
-            )
-            .hoverable(interaction)
-            .clickable {
-                litAt = System.nanoTime()
-                onClick()
-            }
-            .padding(start = 8.dp, end = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    NameplateChip(
+        active = lit,
+        height = CONTROL_HEIGHT,
+        startPadding = 8.dp,
+        hoverBorder = mutedText(),
+        onClick = {
+            litAt = System.nanoTime()
+            onClick()
+        },
     ) {
         Canvas(Modifier.size(MARK_SIZE)) {
             val w = size.width

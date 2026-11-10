@@ -48,7 +48,7 @@ object NameplateBadge {
     }
     //?}
 
-    fun submit(frame: NameplateFrame, x: Float, y: Float, badge: ResolvedBadge, opacity: Int = CHANNEL_MAX) {
+    fun submit(frame: NameplateFrame, x: Float, y: Float, badge: ResolvedBadge, opacity: Int) {
         val light = frame.lightCoords
         val alpha = if (opacity >= CHANNEL_MAX) frame.alpha else frame.alpha * opacity / CHANNEL_MAX
         val color = NameplateFrame.withAlpha(alpha, if (badge.tint == ResolvedText.UNSET) 0xFFFFFF else vertexRgb(badge.tint))

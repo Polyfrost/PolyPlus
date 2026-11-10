@@ -36,12 +36,8 @@ class NameplateShaderProgram private constructor(
     val vertexShader: Identifier
         get() = VERTEX
 
-    val uniformWords: Int
-        get() = uniformBytes / WORD_BYTES
-
     companion object {
         const val UNIFORM_BLOCK: String = "NameplateMaterial"
-        const val SAMPLER_PREFIX: String = "NameplateSampler"
 
         val VERTEX: Identifier = Identifier.fromNamespaceAndPath(PolyPlusConstants.ID, "nameplate/material")
 
@@ -70,9 +66,6 @@ class NameplateShaderProgram private constructor(
             *///?} else {
             /*layer.shader(GlslDialect.LEGACY_FLAT)
             *///?}
-
-        fun of(material: Material, hash: String): NameplateShaderProgram =
-            of(hash, MaterialGlsl.generate(material, DIALECT), material.blend, material.emissive)
 
         fun of(hash: String, shader: MaterialShader, blend: Material.Blend, emissive: Boolean): NameplateShaderProgram {
             require(shader.dialect == DIALECT) { "Nameplate pipelines need the $DIALECT dialect, got ${shader.dialect}" }

@@ -32,12 +32,13 @@ object NameplateRegistry {
     private val failureLogged = AtomicBoolean(false)
 
     fun initialize() {
-        NameplateBinding.source = NameplateSource(::boundFor)
         PolyPlusCosmeticsConfig.publishNameplateSettings()
     }
 
     fun install(id: Int, hash: String, key: String, bundle: NameplateBundle) {
-        installAssets(bundle)
+        //? if >= 1.21.1 {
+        NameplateMaterialAssets.install(bundle)
+        //?}
         val previous = installed.put(id, Installed(hash, key, bundle))
         if (previous != null && previous.bundle !== bundle) {
             releaseAssets(previous.bundle)
@@ -64,7 +65,7 @@ object NameplateRegistry {
     }
 
     fun boundFor(player: UUID): BoundNameplate? = try {
-        resolve(player)
+        NameplateTryOn.boundFor(player) ?: resolve(player)
     } catch (e: Exception) {
         if (failureLogged.compareAndSet(false, true)) {
             LOGGER.error("Failed to resolve the nameplate for {}; drawing vanilla tags", player, e)
@@ -102,13 +103,7 @@ object NameplateRegistry {
         return bind(player, bundle, bundle.variant(definition.variantKey))
     }
 
-    internal fun installAssets(bundle: NameplateBundle) {
-        //? if >= 1.21.1 {
-        NameplateMaterialAssets.install(bundle)
-        //?}
-    }
-
-    internal fun releaseAssets(bundle: NameplateBundle) {
+    private fun releaseAssets(bundle: NameplateBundle) {
         //? if >= 1.21.1 {
         NameplateMaterialAssets.release(bundle)
         //?}

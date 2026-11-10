@@ -241,7 +241,7 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
         private set
 
     val label: String
-        get() = "${PolyPlusConstants.ID}:pipeline/nameplate_material_${program.hash}${if (depth) DEPTH_SUFFIX else ""}"
+        get() = flatLabel(program, depth)
 
     fun compile(): Throwable? {
         close()
@@ -249,7 +249,7 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
         var fragment: CompiledShader? = null
         try {
             vertex = CompiledShader.compile(program.vertexShader, CompiledShader.Type.VERTEX, program.vertexSource)
-            fragment = CompiledShader.compile(program.fragmentShader, CompiledShader.Type.FRAGMENT, fragmentSource())
+            fragment = CompiledShader.compile(program.fragmentShader, CompiledShader.Type.FRAGMENT, flatFragmentSource(program, depth))
             val linked = CompiledShaderProgram.link(vertex, fragment, FORMAT)
             linked.setupUniforms(uniforms(), program.samplers.plus(LIGHTMAP).map { ShaderProgramConfig.Sampler(it) })
             compiled = linked
@@ -269,15 +269,6 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
 
     fun renderType(name: String, textures: List<Identifier>): NameplateLayer = NameplateFlatMaterialRenderType(name, this, program, textures)
 
-    private fun fragmentSource(): String {
-        val source = program.fragmentSource
-        if (!depth) {
-            return source
-        }
-        val line = source.indexOf('\n') + 1
-        return source.substring(0, line) + "#define $DEPTH_ONLY\n" + source.substring(line)
-    }
-
     private fun uniforms(): List<ShaderProgramConfig.Uniform> = BUILT_IN.map { (name, type, count) ->
         ShaderProgramConfig.Uniform(name, type, count, ZERO)
     } + program.uniforms.map { uniform ->
@@ -287,25 +278,7 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
     companion object {
         val FORMAT: VertexFormat = DefaultVertexFormat.POSITION_TEX_LIGHTMAP_COLOR
 
-        private const val DEPTH_ONLY = "NAMEPLATE_DEPTH_ONLY"
-        private const val DEPTH_SUFFIX = "_depth"
-        private const val LIGHTMAP = "Sampler2"
-        private const val INT = "int"
-        private const val FLOAT = "float"
-        private const val MATRIX = "matrix4x4"
-        private const val VEC4 = 4
-        private const val MATRIX_FLOATS = 16
         private val ZERO = listOf(0f)
-        private val BUILT_IN = listOf(
-            Triple("ModelViewMat", MATRIX, MATRIX_FLOATS),
-            Triple("ProjMat", MATRIX, MATRIX_FLOATS),
-            Triple("ColorModulator", FLOAT, VEC4),
-            Triple("FogStart", FLOAT, 1),
-            Triple("FogEnd", FLOAT, 1),
-            Triple("FogColor", FLOAT, VEC4),
-            Triple("FogShape", INT, 1),
-            Triple("ScreenSize", FLOAT, 2),
-        )
 
         fun driver(): Map<String, String> =
             mapOf("name" to GlUtil.getRenderer(), "vendor" to GlUtil.getVendor(), "driver" to GlUtil.getOpenGLVersion(), "backend" to "OpenGL")
@@ -335,33 +308,8 @@ private class NameplateFlatDrawState(
         for ((i, texture) in textures.withIndex()) {
             RenderSystem.setShaderTexture(program.samplers[i].removePrefix(SAMPLER).toInt(), texture)
         }
-        for (uniform in program.uniforms) {
-            val target = shader.safeGetUniform(uniform.name)
-            val at = uniform.offset
-            if (uniform.ints) {
-                target.set(words[at])
-            } else {
-                target.set(float(words, at), float(words, at + 1), float(words, at + 2), float(words, at + 3))
-            }
-        }
-        RenderSystem.enableDepthTest()
-        RenderSystem.depthFunc(GL11.GL_LEQUAL)
-        if (variant.depth) {
-            RenderSystem.colorMask(false, false, false, false)
-        } else {
-            RenderSystem.enableBlend()
-            if (program.blend == Material.Blend.ADDITIVE) {
-                RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE)
-            } else {
-                RenderSystem.blendFuncSeparate(
-                    GlStateManager.SourceFactor.SRC_ALPHA,
-                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                    GlStateManager.SourceFactor.ONE,
-                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                )
-            }
-            RenderSystem.depthMask(false)
-        }
+        setFlatUniforms(program, words, shader::safeGetUniform)
+        beginFlatState(program, variant.depth)
     }
 
     fun clear() {
@@ -369,20 +317,8 @@ private class NameplateFlatDrawState(
             return
         }
         active = false
-        if (variant.depth) {
-            RenderSystem.colorMask(true, true, true, true)
-        } else {
-            RenderSystem.depthMask(true)
-            RenderSystem.disableBlend()
-            RenderSystem.defaultBlendFunc()
-        }
-        RenderSystem.disableDepthTest()
-        RenderSystem.depthFunc(GL11.GL_LEQUAL)
+        endFlatState(variant.depth)
         Minecraft.getInstance().gameRenderer.lightTexture().turnOffLightLayer()
-    }
-
-    private companion object {
-        const val SAMPLER = "Sampler"
     }
 }
 
@@ -429,7 +365,7 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
     private val name = "$SHADER_DIRECTORY/material_${program.hash}${if (depth) DEPTH_SUFFIX else ""}"
 
     val label: String
-        get() = "${PolyPlusConstants.ID}:pipeline/nameplate_material_${program.hash}${if (depth) DEPTH_SUFFIX else ""}"
+        get() = flatLabel(program, depth)
 
     fun compile(): Throwable? {
         close()
@@ -458,7 +394,7 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
         val files = mapOf(
             core(".json") to definition(),
             core(".vsh") to program.vertexSource,
-            core(".fsh") to fragmentSource(),
+            core(".fsh") to flatFragmentSource(program, depth),
         )
         val minecraft = Minecraft.getInstance()
         return ResourceProvider { id ->
@@ -501,38 +437,11 @@ internal class NameplateFlatVariant(private val program: NameplateShaderProgram,
         add("values", JsonArray().apply { add(0) })
     }
 
-    private fun fragmentSource(): String {
-        val source = program.fragmentSource
-        if (!depth) {
-            return source
-        }
-        val line = source.indexOf('\n') + 1
-        return source.substring(0, line) + "#define $DEPTH_ONLY\n" + source.substring(line)
-    }
-
     companion object {
         val FORMAT: VertexFormat = DefaultVertexFormat.POSITION_TEX_LIGHTMAP_COLOR
 
         private const val SHADER_DIRECTORY = "polyplus_nameplate"
-        private const val DEPTH_ONLY = "NAMEPLATE_DEPTH_ONLY"
-        private const val DEPTH_SUFFIX = "_depth"
-        private const val LIGHTMAP = "Sampler2"
-        private const val INT = "int"
-        private const val FLOAT = "float"
-        private const val MATRIX = "matrix4x4"
-        private const val VEC4 = 4
-        private const val MATRIX_FLOATS = 16
         private const val INFO_LOG_LENGTH = 32768
-        private val BUILT_IN = listOf(
-            Triple("ModelViewMat", MATRIX, MATRIX_FLOATS),
-            Triple("ProjMat", MATRIX, MATRIX_FLOATS),
-            Triple("ColorModulator", FLOAT, VEC4),
-            Triple("FogStart", FLOAT, 1),
-            Triple("FogEnd", FLOAT, 1),
-            Triple("FogColor", FLOAT, VEC4),
-            Triple("FogShape", INT, 1),
-            Triple("ScreenSize", FLOAT, 2),
-        )
 
         fun driver(): Map<String, String> =
             mapOf("name" to GlUtil.getRenderer(), "vendor" to GlUtil.getVendor(), "driver" to GlUtil.getOpenGLVersion(), "backend" to "OpenGL")
@@ -560,53 +469,97 @@ internal class NameplateFlatMaterialRenderType(
         for ((i, texture) in textures.withIndex()) {
             RenderSystem.setShaderTexture(program.samplers[i].removePrefix(SAMPLER).toInt(), texture)
         }
-        for (uniform in program.uniforms) {
-            val target = shader.safeGetUniform(uniform.name)
-            val at = uniform.offset
-            if (uniform.ints) {
-                target.set(words[at])
-            } else {
-                target.set(float(words, at), float(words, at + 1), float(words, at + 2), float(words, at + 3))
-            }
-        }
-        RenderSystem.enableDepthTest()
-        RenderSystem.depthFunc(GL11.GL_LEQUAL)
-        if (variant.depth) {
-            RenderSystem.colorMask(false, false, false, false)
-        } else {
-            RenderSystem.enableBlend()
-            if (program.blend == Material.Blend.ADDITIVE) {
-                RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE)
-            } else {
-                RenderSystem.blendFuncSeparate(
-                    GlStateManager.SourceFactor.SRC_ALPHA,
-                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                    GlStateManager.SourceFactor.ONE,
-                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                )
-            }
-            RenderSystem.depthMask(false)
-        }
+        setFlatUniforms(program, words, shader::safeGetUniform)
+        beginFlatState(program, variant.depth)
         try {
             BufferUploader.drawWithShader(mesh)
         } finally {
-            if (variant.depth) {
-                RenderSystem.colorMask(true, true, true, true)
-            } else {
-                RenderSystem.depthMask(true)
-                RenderSystem.disableBlend()
-                RenderSystem.defaultBlendFunc()
-            }
-            RenderSystem.disableDepthTest()
-            RenderSystem.depthFunc(GL11.GL_LEQUAL)
+            endFlatState(variant.depth)
             lightTexture.turnOffLightLayer()
         }
     }
 
     private companion object {
         const val BUFFER_SIZE = 1536
-        const val SAMPLER = "Sampler"
     }
+}
+*///?}
+//? if = 1.21.4 || = 1.21.1 {
+/*private const val DEPTH_ONLY = "NAMEPLATE_DEPTH_ONLY"
+private const val DEPTH_SUFFIX = "_depth"
+private const val LIGHTMAP = "Sampler2"
+private const val SAMPLER = "Sampler"
+private const val INT = "int"
+private const val FLOAT = "float"
+private const val MATRIX = "matrix4x4"
+private const val VEC4 = 4
+private const val MATRIX_FLOATS = 16
+private val BUILT_IN = listOf(
+    Triple("ModelViewMat", MATRIX, MATRIX_FLOATS),
+    Triple("ProjMat", MATRIX, MATRIX_FLOATS),
+    Triple("ColorModulator", FLOAT, VEC4),
+    Triple("FogStart", FLOAT, 1),
+    Triple("FogEnd", FLOAT, 1),
+    Triple("FogColor", FLOAT, VEC4),
+    Triple("FogShape", INT, 1),
+    Triple("ScreenSize", FLOAT, 2),
+)
+
+private fun flatLabel(program: NameplateShaderProgram, depth: Boolean): String =
+    "${PolyPlusConstants.ID}:pipeline/nameplate_material_${program.hash}${if (depth) DEPTH_SUFFIX else ""}"
+
+private fun flatFragmentSource(program: NameplateShaderProgram, depth: Boolean): String {
+    val source = program.fragmentSource
+    if (!depth) {
+        return source
+    }
+    val line = source.indexOf('\n') + 1
+    return source.substring(0, line) + "#define $DEPTH_ONLY\n" + source.substring(line)
+}
+
+private fun setFlatUniforms(program: NameplateShaderProgram, words: IntArray, uniform: (String) -> com.mojang.blaze3d.shaders.AbstractUniform) {
+    for (flat in program.uniforms) {
+        val target = uniform(flat.name)
+        val at = flat.offset
+        if (flat.ints) {
+            target.set(words[at])
+        } else {
+            target.set(float(words, at), float(words, at + 1), float(words, at + 2), float(words, at + 3))
+        }
+    }
+}
+
+private fun beginFlatState(program: NameplateShaderProgram, depth: Boolean) {
+    RenderSystem.enableDepthTest()
+    RenderSystem.depthFunc(GL11.GL_LEQUAL)
+    if (depth) {
+        RenderSystem.colorMask(false, false, false, false)
+    } else {
+        RenderSystem.enableBlend()
+        if (program.blend == Material.Blend.ADDITIVE) {
+            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE)
+        } else {
+            RenderSystem.blendFuncSeparate(
+                GlStateManager.SourceFactor.SRC_ALPHA,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                GlStateManager.SourceFactor.ONE,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+            )
+        }
+        RenderSystem.depthMask(false)
+    }
+}
+
+private fun endFlatState(depth: Boolean) {
+    if (depth) {
+        RenderSystem.colorMask(true, true, true, true)
+    } else {
+        RenderSystem.depthMask(true)
+        RenderSystem.disableBlend()
+        RenderSystem.defaultBlendFunc()
+    }
+    RenderSystem.disableDepthTest()
+    RenderSystem.depthFunc(GL11.GL_LEQUAL)
 }
 *///?}
 //? if = 1.21.5 || = 1.21.4 || = 1.21.1 {
