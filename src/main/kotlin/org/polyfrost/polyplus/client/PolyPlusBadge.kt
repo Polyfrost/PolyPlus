@@ -10,6 +10,9 @@ import java.util.UUID
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?}
 
+//? if >= 1.21.1
+import org.polyfrost.polyplus.client.nameplate.render.NameplateBadge
+
 //? if >= 1.21.10 {
 import net.minecraft.network.chat.FontDescription
 //?}
@@ -32,6 +35,7 @@ import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.network.PlayerInfo
 import net.minecraft.client.render.platform.GlStateManager
 import org.polyfrost.polyplus.client.emoji.EmojiFont
+import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyNameplateRenderer
 *///?}
 
 //? if >= 1.21.4 && < 1.21.8 {
@@ -66,6 +70,8 @@ object PolyPlusBadge {
     @JvmStatic
     fun decorate(name: Component, uuid: UUID): Component {
         if (!shouldBadge(uuid)) return name
+        //? if >= 1.21.1
+        NameplateBadge.decorate(name, uuid)?.let { return it }
 
         return Component.empty()
             .append(badgeGlyph)
@@ -215,6 +221,9 @@ object PolyPlusBadge {
 
     const val LEGACY_CHAR = '\uE000'
 
+    @JvmField
+    var inlineSuppressed = false
+
     @JvmStatic
     fun drawInline(x: Float, y: Float, alpha: Float) {
         val bx = x + PAD_LEFT
@@ -226,7 +235,8 @@ object PolyPlusBadge {
     fun badgesNameTag(entity: Any?, name: String): Boolean =
         entity is ClientPlayerEntity &&
             name == entity.displayName.formattedString &&
-            shouldBadge(entity.uuid)
+            shouldBadge(entity.uuid) &&
+            !LegacyNameplateRenderer.placesBadge(entity.uuid)
     *///?}
     //?}
 }
