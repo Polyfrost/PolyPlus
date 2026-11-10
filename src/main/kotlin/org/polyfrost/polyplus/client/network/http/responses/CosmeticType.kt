@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.network.http.responses
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import org.polyfrost.polyplus.client.nameplate.NameplateFeature
 
 @Serializable(with = CosmeticType.Serializer::class)
 enum class CosmeticType(val serializedName: String, val displayName: String) {
@@ -16,6 +17,7 @@ enum class CosmeticType(val serializedName: String, val displayName: String) {
     Aura("aura", "Aura"),
     Pet("pet", "Pet"),
     Emote("emote", "Emote"),
+    Nameplate("nameplate", "Nameplate"),
     Unknown("unknown", "Unknown");
 
     val searchTerms: List<String>
@@ -38,8 +40,12 @@ enum class CosmeticType(val serializedName: String, val displayName: String) {
         Boots -> BodySlot.Boots
         Shoulder -> BodySlot.Shoulder
         Pet -> BodySlot.Pet
+        Nameplate -> BodySlot.Nameplate
         Emote, Unknown -> null
     }
+
+    val listed: Boolean
+        get() = this != Unknown && (this != Nameplate || NameplateFeature.LISTED)
 
     internal object Serializer : KSerializer<CosmeticType> by ApiEnumSerializer(
         "CosmeticType",

@@ -170,7 +170,7 @@ internal object AttachedCosmeticParser {
         BodySlot.Boots -> PlayerModelBone.BODY
         BodySlot.Shoulder -> PlayerModelBone.BODY
         BodySlot.Pet -> PlayerModelBone.BODY
-        BodySlot.Cape, BodySlot.Unknown -> null
+        BodySlot.Cape, BodySlot.Nameplate, BodySlot.Unknown -> null
     }
 
     private fun ensureAttached(geometry: BedrockGeometry, slot: BodySlot, anchor: PlayerModelBone? = null): BedrockGeometry {

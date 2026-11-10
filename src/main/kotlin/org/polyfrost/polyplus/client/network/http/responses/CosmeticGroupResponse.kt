@@ -13,6 +13,7 @@ data class CosmeticVariant(
     val url: String? = null,
     val hash: String,
     @SerialName("cover_url") val coverUrl: String? = null,
+    @SerialName("variant_key") val variantKey: String? = null,
 )
 
 @Serializable
@@ -37,6 +38,7 @@ data class CosmeticGroupResponse(
                 variantName = variant.name,
                 model = variant.model,
                 coverUrl = variant.coverUrl,
+                variantKey = variant.variantKey,
             )
         }
 }
