@@ -174,6 +174,12 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
             MorePanel(screen, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 376.dp else 488.dp, top = 68.dp))
         }
     }
+    if (screen.customizeOpen) {
+        CustomizeDismiss(screen)
+        LobbyDarkChrome {
+            PauseCustomizePanel(screen, Modifier.align(Alignment.TopEnd).padding(top = LobbyLayout.NavbarHeight, end = LobbyLayout.Margin))
+        }
+    }
 }
 
 @Composable
@@ -209,6 +215,7 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
             if (screen.online) NavTab("Social", active = false, unread = groups.any { it.unread } || invites.isNotEmpty(), onClick = screen::openSocial)
         }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+            CustomizeButton(screen)
             IconButton(themedIcon("settings"), "Settings", Modifier, screen::openSettings)
             Spacer(Modifier.width(2.dp))
             Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)

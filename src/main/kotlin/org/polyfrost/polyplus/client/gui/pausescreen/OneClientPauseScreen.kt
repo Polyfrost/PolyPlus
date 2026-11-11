@@ -42,13 +42,19 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.input.MouseButtonEvent
 //?}
 
-class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: PauseScreenStyle) : ComposeScreen(RenderMode.CONTINUOUS) {
+class OneClientPauseScreen(
+    private val vanilla: PauseScreen,
+    private val style: PauseScreenStyle,
+    customizing: Boolean = false,
+    internal val fromVanilla: Boolean = false,
+) : ComposeScreen(RenderMode.CONTINUOUS) {
     internal val capture = PauseCapture(vanilla)
     internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
     internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !Motion.reduced
     internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)
+    internal var customizeOpen by mutableStateOf(customizing)
     private var decided = false
     private var openedAt = 0L
     internal var resumeBounds = Rect.Zero
@@ -60,7 +66,7 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
     private fun resumeOnRelease() {
         val armed = resumeArmed
         resumeArmed = false
-        if (armed && !moreOpen && overResume()) resume()
+        if (armed && !moreOpen && !customizeOpen && overResume()) resume()
     }
 
     override fun init() {
@@ -78,6 +84,8 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
         if (!stepBack || staged || !ThemeConfig.enableBackgroundBlur) return 0f
         return ((System.currentTimeMillis() - openedAt).toFloat() / FLAT_BLUR_MS).coerceIn(0f, 1f)
     }
+
+    internal fun resyncMenu() = capture.sync(width, height)
 
     private fun keepUp() {
         if (capture.width != width || capture.height != height) capture.sync(width, height)
@@ -173,6 +181,24 @@ class OneClientPauseScreen(private val vanilla: PauseScreen, private val style: 
         PauseRouter.openClassic(vanilla)
     }
 
+    internal fun toggleCustomize() {
+        moreOpen = false
+        if (customizeOpen) closeCustomize() else customizeOpen = true
+    }
+
+    internal fun closeCustomize() {
+        customizeOpen = false
+        if (fromVanilla && PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA) PauseRouter.openClassic(vanilla)
+    }
+
+    internal fun restyle(next: PauseScreenStyle) {
+        PolyPlusPauseConfig.pauseScreenStyle = next
+        runCatching { PolyPlusPauseConfig.save() }
+        if (next == PauseScreenStyle.VANILLA || next == style) return
+        if (staged && next != PauseScreenStyle.STEP_BACK) PauseStage.onScreen(null)
+        ClientPlatform.setScreen(OneClientPauseScreen(vanilla, next, customizing = true))
+    }
+
     internal fun openSocial() = SocialOverlay.open(this)
 
     internal fun openHost() = SocialOverlay.openHostCurrentWorld(this)
@@ -219,6 +245,11 @@ object PauseRouter {
 
     @JvmStatic
     fun holdsPause(): Boolean = holding && OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
+
+    fun openCustomize(from: Screen) {
+        val pause = from as? PauseScreen ?: return
+        ClientPlatform.setScreen(OneClientPauseScreen(pause, PauseScreenStyle.STEP_BACK_FLAT, customizing = true, fromVanilla = true))
+    }
 
     internal fun openClassic(screen: Screen) {
         classic = screen

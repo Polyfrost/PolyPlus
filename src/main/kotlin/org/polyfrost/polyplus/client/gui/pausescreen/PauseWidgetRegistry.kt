@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
+import kotlin.reflect.KMutableProperty0
 
 private const val AVAILABILITY_MILLIS = 2000L
 private const val HIDE_AFTER_FAILURES = 3
@@ -41,6 +42,10 @@ internal data class PauseWidgetsView(
     val panels: List<PauseWidget> = emptyList(),
 ) {
     val empty: Boolean get() = builtIns.isEmpty() && added.isEmpty() && addable.isEmpty()
+}
+
+internal interface BuiltInPauseWidget : PauseWidget {
+    val toggle: KMutableProperty0<Boolean>
 }
 
 internal class PauseWidgetsHandle(val view: PauseWidgetsView, val refresh: () -> Unit)
@@ -174,7 +179,7 @@ internal object PauseWidgetRegistry {
     @Volatile
     private var snapshot: List<RegisteredPauseWidget> = emptyList()
 
-    private val builtIns: List<PauseWidget> = listOf(RecordingWidget, PerformanceWidget, SceneWidget)
+    private val builtIns: List<BuiltInPauseWidget> = listOf(RecordingWidget, PerformanceWidget, SceneWidget)
 
     val revision: Int get() = revisionState.intValue
 
@@ -237,12 +242,16 @@ internal object PauseWidgetRegistry {
         val added = saved.mapNotNull { byId[it] }.filter { it.isAvailable() }
         val addedById = added.associateBy { it.id }
         return PauseWidgetsView(
-            builtIns.filter { it.available() },
+            builtIns.filter { isBuiltInShown(it.id) && it.available() },
             added,
             registered.filter { it.id !in saved && it.isAvailable() },
             savedPanels().mapNotNull { addedById[it] }.filter { it.panelCapable() },
         )
     }
+
+    fun builtInToggledBy(option: String): BuiltInPauseWidget? = builtIns.firstOrNull { it.toggle.name == option }
+
+    fun isBuiltInShown(id: String): Boolean = builtIns.firstOrNull { it.id == id }?.toggle?.get() ?: true
 
     fun isPanel(id: String): Boolean = id in savedPanels()
 
@@ -349,9 +358,10 @@ internal class PauseScreenWidgetContext(val screen: OneClientPauseScreen) : Paus
 
 private val PauseWidgetContext.pause: OneClientPauseScreen get() = (this as PauseScreenWidgetContext).screen
 
-internal object RecordingWidget : PauseWidget {
+internal object RecordingWidget : BuiltInPauseWidget {
     override val id = "polyplus:recording"
     override val title = "Recording"
+    override val toggle = PolyPlusPauseConfig::pauseRecordingWidget
     override val icon = asset("video-recorder")
 
     override fun isAvailable(): Boolean = recordingShown()
@@ -363,9 +373,10 @@ internal object RecordingWidget : PauseWidget {
     override fun Card(context: PauseWidgetContext) = RecordingCardTool(context.pause)
 }
 
-internal object PerformanceWidget : PauseWidget {
+internal object PerformanceWidget : BuiltInPauseWidget {
     override val id = "polyplus:performance"
     override val title = "Performance"
+    override val toggle = PolyPlusPauseConfig::pausePerformanceWidget
     override val icon = asset("loading-02")
 
     override fun isAvailable(): Boolean = performanceShown()
@@ -377,9 +388,10 @@ internal object PerformanceWidget : PauseWidget {
     override fun Card(context: PauseWidgetContext) = PerformanceCardTool(context.pause)
 }
 
-internal object SceneWidget : PauseWidget {
+internal object SceneWidget : BuiltInPauseWidget {
     override val id = "polyplus:scene"
     override val title = "Scene check"
+    override val toggle = PolyPlusPauseConfig::pauseSceneWidget
     override val icon = asset("image-01")
 
     override fun isAvailable(): Boolean = sceneShown()
