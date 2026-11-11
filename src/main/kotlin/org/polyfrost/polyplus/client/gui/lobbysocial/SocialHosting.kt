@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialErrors
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if = 1.8.9
 //import org.polyfrost.polyplus.client.social.singleplayerServer
 
@@ -43,7 +44,13 @@ internal object SocialHosting {
     fun invited(session: String?): Set<String> = if (session == invitedSession) invitedPlayers else emptySet()
 
     fun invite(session: String, players: Collection<String>) {
-        players.forEach { SessionsRepository.invite(session, it) }
+        players.forEach { player ->
+            SessionsRepository.invite(session, player) {
+                ClientPlatform.runOnMain {
+                    if (invitedSession == session) invitedPlayers = invitedPlayers - player
+                }
+            }
+        }
         invitedPlayers = invited(session) + players
         invitedSession = session
     }

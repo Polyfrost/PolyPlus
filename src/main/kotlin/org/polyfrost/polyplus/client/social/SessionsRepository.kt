@@ -61,10 +61,11 @@ object SessionsRepository {
         SessionsApi.close(sessionId).onFailure { LOGGER.error("Failed to close session $sessionId", it) }
     }
 
-    fun invite(sessionId: String, player: String) = PolyPlusClient.SCOPE.launch {
+    fun invite(sessionId: String, player: String, onFailure: () -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         SessionsApi.invite(sessionId, player).onFailure {
             LOGGER.error("Failed to invite $player to session $sessionId", it)
             SocialErrors.emit("Couldn't send session invite", it)
+            onFailure()
         }
     }
 
