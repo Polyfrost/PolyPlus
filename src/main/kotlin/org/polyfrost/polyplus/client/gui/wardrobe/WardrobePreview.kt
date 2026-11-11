@@ -67,6 +67,8 @@ import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
+private val PREVIEW_HEIGHT = 330.dp
+
 @Composable
 internal fun PreviewPanel(
     selected: CosmeticUiItem?,
@@ -83,15 +85,22 @@ internal fun PreviewPanel(
     onPreviewAuraColor: (Int) -> Unit = {},
     onSelectAuraColor: (Int?) -> Unit = {},
 ) {
+    var panelHeight by remember { mutableIntStateOf(0) }
+    var headerHeight by remember { mutableIntStateOf(0) }
+    val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
+    val hasHeader = title != null || status != null
+    val previewHeightPx = with(LocalDensity.current) { PREVIEW_HEIGHT.roundToPx() }
+    val previewShift = if (hasHeader) (headerHeight - (panelHeight - previewHeightPx) / 2).coerceAtLeast(0) else 0
     Box(
         modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+            .onSizeChanged { panelHeight = it.height },
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
             ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
         PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+            Modifier.align(Alignment.Center).offset { IntOffset(0, previewShift) }.fillMaxWidth().height(PREVIEW_HEIGHT),
             source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
             autoSpin = false,
             verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
@@ -100,8 +109,10 @@ internal fun PreviewPanel(
             rotation = rotation,
         )
         ResetRotationButton(rotation, onResetRotation)
-        Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
+        Column(
+            Modifier.align(Alignment.TopStart).onSizeChanged { headerHeight = it.height }.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (title != null) {
                 Column {
                     SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
