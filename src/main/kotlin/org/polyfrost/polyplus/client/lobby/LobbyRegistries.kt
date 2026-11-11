@@ -13,6 +13,7 @@ import net.minecraft.core.Registry
 import net.minecraft.core.RegistryAccess
 import net.minecraft.resources.RegistryDataLoader
 import net.minecraft.server.RegistryLayer
+import net.minecraft.server.packs.PackResources
 import net.minecraft.server.packs.PackType
 import net.minecraft.server.packs.repository.ServerPacksSource
 import net.minecraft.server.packs.resources.MultiPackResourceManager
@@ -38,11 +39,34 @@ class LobbyRegistries private constructor(
     }
 
     companion object {
+        @Volatile
+        private var vanillaOnly = false
+
         fun load(): LobbyRegistries {
+            if (!vanillaOnly) {
+                try {
+                    return load(trustedPacks())
+                } catch (error: Throwable) {
+                    vanillaOnly = true
+                    LOBBY_LOGGER.warn("Lobby registries failed to load with mod data, retrying with vanilla data only", error)
+                }
+            }
+            //? if >= 26.3 {
+            return load(listOf(ServerPacksSource.createVanillaPackSource().fullResources()))
+            //?} else {
+            /*return load(listOf<PackResources>(ServerPacksSource.createVanillaPackSource()))
+            *///?}
+        }
+
+        private fun trustedPacks(): List<PackResources> {
             val packs = ServerPacksSource.createVanillaTrustedRepository()
             packs.reload()
             packs.setSelected(listOf("vanilla"))
-            return MultiPackResourceManager(PackType.SERVER_DATA, packs.openAllSelected()).use { resources ->
+            return packs.openAllSelected()
+        }
+
+        private fun load(sources: List<PackResources>): LobbyRegistries {
+            return MultiPackResourceManager(PackType.SERVER_DATA, sources).use { resources ->
                 val layers = RegistryLayer.createRegistryAccess()
                 //? if < 1.21.4 {
                 /*val world = RegistryDataLoader.load(resources, layers.getAccessForLoading(RegistryLayer.WORLDGEN), RegistryDataLoader.WORLDGEN_REGISTRIES)
