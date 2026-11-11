@@ -145,6 +145,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.stats.PlaySessions
+import org.polyfrost.polyplus.client.utils.MacSafeArea
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.time.LocalDate
 import java.util.UUID
@@ -192,7 +193,11 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
             LobbyGlass.pageFrost = frost.value
             LobbyGlass.chrome = if (lobby.setup) feed.chrome.floatValue else feed.chrome.floatValue * reveal.value
         }
-        onDispose { feed.glass = null }
+        onDispose {
+            feed.glass = null
+            LobbyGlass.pageFrost = 0f
+            LobbyGlass.chrome = 0f
+        }
     }
     LaunchedEffect(Unit) { launch { SocialErrors.events.collect(A11y::announce) }; SocialNotices.events.collect(A11y::announce) }
     var measured by remember { mutableStateOf(IntSize.Zero) }
@@ -202,16 +207,19 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
         if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
         StartupOverlay.rootWidth = widthPx
-        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT)
+        val fullscreen = MacSafeArea.fullscreen()
+        val notchPx = remember(widthPx, heightPx, fullscreen) { MacSafeArea.topShare() * heightPx }
+        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT)
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
+        val notch = with(density) { notchPx.toDp() }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             if (lobby.setup) {
                 if (chromeShown || StartupOverlay.active) {
-                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome }) { LobbySetup(lobby) }
+                    Box(Modifier.fillMaxSize().padding(top = notch).graphicsLayer { alpha = chrome }) { LobbySetup(lobby) }
                 }
             } else {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome * reveal.value }) {
-                    LobbyChrome(lobby, screen, feed, IntSize(widthPx.roundToInt(), heightPx.roundToInt()))
+                Box(Modifier.fillMaxSize().padding(top = notch).graphicsLayer { alpha = chrome * reveal.value }) {
+                    LobbyChrome(lobby, screen, feed, IntSize(widthPx.roundToInt(), heightPx.roundToInt()), notchPx.roundToInt())
                 }
                 lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors, lobby::endTour) }
             }
@@ -238,7 +246,7 @@ private fun AccountsDialog(lobby: LobbyShell) {
 }
 
 @Composable
-private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyFeed, root: IntSize) {
+private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyFeed, root: IntSize, notch: Int) {
     LobbyHighlight { ContextMenuHost {
         LobbyDarkChrome {
             val sceneScrim = OneConfigTheme.current.pageBackground.copy(alpha = 1f)
@@ -258,8 +266,8 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         }
         Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page)) { when (lobby.page) {
             LobbyPage.Home -> {
-                Box(Modifier.fillMaxSize().avatarTaps(lobby))
-                SceneTags(feed, root)
+                Box(Modifier.fillMaxSize().avatarTaps(lobby, notch))
+                SceneTags(feed, root, notch)
                 LobbyCornerCard(lobby, Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top))
             }
             LobbyPage.Wardrobe -> WardrobePage(onBack = { lobby.show(LobbyPage.Home) }, onMarketplace = { lobby.show(LobbyPage.Marketplace) })
@@ -585,19 +593,19 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     }
 }
 
-private fun Modifier.avatarTaps(lobby: LobbyShell): Modifier = pointerInput(lobby) {
+private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = pointerInput(lobby, notch) {
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent()
             if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue
             val at = event.changes.firstOrNull()?.position ?: continue
-            if (lobby.calm() && LobbyAntics.click(at.x / size.width.toDouble(), at.y / size.height.toDouble())) event.changes.forEach { it.consume() }
+            if (lobby.calm() && LobbyAntics.click(at.x / size.width.toDouble(), (at.y + notch) / (size.height + notch).toDouble())) event.changes.forEach { it.consume() }
         }
     }
 }
 
 @Composable
-private fun BoxScope.SceneTags(feed: LobbyFeed, root: IntSize) {
+private fun BoxScope.SceneTags(feed: LobbyFeed, root: IntSize, notch: Int) {
     val accent = OneConfigTheme.accent
     SideEffect {
         LobbyHologram.accent = accent.toArgb() and 0xFFFFFF
@@ -614,7 +622,7 @@ private fun BoxScope.SceneTags(feed: LobbyFeed, root: IntSize) {
                     layout(0, 0) {
                         spot.at.longValue
                         val live = spot.label ?: label
-                        placeable.placeWithLayer(live.pixelX(root.width) - placeable.width / 2, live.pixelY(root.height) - placeable.height)
+                        placeable.placeWithLayer(live.pixelX(root.width) - placeable.width / 2, live.pixelY(root.height) - placeable.height - notch)
                     }
                 },
             )

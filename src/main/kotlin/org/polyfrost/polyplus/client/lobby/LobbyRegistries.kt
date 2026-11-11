@@ -15,6 +15,7 @@ import net.minecraft.core.RegistryAccess
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.RegistryDataLoader
 import net.minecraft.server.RegistryLayer
+import net.minecraft.server.packs.PackResources
 import net.minecraft.server.packs.PackType
 import net.minecraft.server.packs.repository.ServerPacksSource
 import net.minecraft.server.packs.resources.MultiPackResourceManager
@@ -42,19 +43,43 @@ class LobbyRegistries private constructor(
     }
 
     companion object {
+        @Volatile
+        private var vanillaOnly = false
+
         fun load(): LobbyRegistries {
+            if (!vanillaOnly) {
+                try {
+                    return load(trustedPacks(), true)
+                } catch (error: Throwable) {
+                    vanillaOnly = true
+                    LOBBY_LOGGER.warn("Lobby registries failed to load with mod data, retrying with vanilla data only", error)
+                }
+            }
+            //? if >= 26.3 {
+            return load(listOf(ServerPacksSource.createVanillaPackSource().fullResources()), false)
+            //?} else {
+            /*return load(listOf<PackResources>(ServerPacksSource.createVanillaPackSource()), false)
+            *///?}
+        }
+
+        private fun trustedPacks(): List<PackResources> {
             val mc = Minecraft.getInstance()
             val packs = ServerPacksSource.createPackRepository(mc.gameDirectory.toPath().resolve("polyplus/lobby/datapacks"), mc.directoryValidator())
             packs.reload()
             packs.setSelected(listOf("vanilla"))
-            return MultiPackResourceManager(PackType.SERVER_DATA, packs.openAllSelected()).use { resources ->
+            return packs.openAllSelected()
+        }
+
+        private fun load(sources: List<PackResources>, shareTags: Boolean): LobbyRegistries {
+            return MultiPackResourceManager(PackType.SERVER_DATA, sources).use { resources ->
                 val layers = RegistryLayer.createRegistryAccess()
                 //? if < 1.21.4 {
                 /*val world = RegistryDataLoader.load(resources, layers.getAccessForLoading(RegistryLayer.WORLDGEN), RegistryDataLoader.WORLDGEN_REGISTRIES)
                 val dimensions = RegistryDataLoader.load(resources, layers.getAccessForLoading(RegistryLayer.DIMENSIONS), RegistryDataLoader.DIMENSION_REGISTRIES)
                 val merged = layers.replaceFrom(RegistryLayer.WORLDGEN, world).replaceFrom(RegistryLayer.DIMENSIONS, dimensions)
                 val access = merged.compositeAccess()
-                LobbyRegistries(access, access.registries().map { binder(resources, it) }.toList())
+                val shared = if (shareTags) emptySet() else layers.getLayer(RegistryLayer.STATIC).registries().map { it.key() }.toList().toSet()
+                LobbyRegistries(access, access.registries().filter { it.key() !in shared }.map { binder(resources, it) }.toList())
                 *///?} else {
                 val staticTags = TagLoader.loadTagsForExistingRegistries(resources, layers.getLayer(RegistryLayer.STATIC))
                 //? if >= 26.3 {
@@ -78,7 +103,7 @@ class LobbyRegistries private constructor(
                 val dimensions = RegistryDataLoader.load(resources, dimensionContext, RegistryDataLoader.DIMENSION_REGISTRIES)
                 *///?}
                 val merged = layers.replaceFrom(worldLayer, world, dimensions)
-                LobbyRegistries(merged.compositeAccess(), staticTags)
+                LobbyRegistries(merged.compositeAccess(), if (shareTags) staticTags else emptyList())
                 //?}
             }
         }

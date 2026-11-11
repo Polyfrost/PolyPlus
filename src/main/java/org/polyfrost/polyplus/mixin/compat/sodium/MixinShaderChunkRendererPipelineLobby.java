@@ -161,7 +161,7 @@ public abstract class MixinShaderChunkRendererPipelineLobby {
             require = 0
     )
     private Identifier polyplus$location(Identifier id) {
-        return polyplus$building ? LobbySodiumUniforms.lobbyId(id) : id;
+        return polyplus$building ? LobbySodiumUniforms.lobbyPipelineId(id) : id;
     }
 
     @ModifyArg(

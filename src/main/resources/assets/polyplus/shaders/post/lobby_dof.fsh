@@ -97,8 +97,10 @@ int ringMode() {
     return flagMode() / 4;
 }
 
+bool depthLost();
+
 bool depthKnown() {
-    return depthMode() != 3;
+    return depthMode() != 3 && !depthLost();
 }
 
 bool isSkyDepth(float depth) {
@@ -116,6 +118,18 @@ bool isSkyDepth(float depth) {
     //?} else {
     /*return depth >= 0.999999;
     *///?}
+}
+
+bool depthLost() {
+    for (int y = 1; y <= 3; y++) {
+        for (int x = 1; x <= 3; x++) {
+            float depth = textureLod(DepthSampler, vec2(float(x), float(y)) * 0.25, 0.0).r;
+            if (!validDepth(depth) || !isSkyDepth(depth)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 float linearDepth(float depth) {

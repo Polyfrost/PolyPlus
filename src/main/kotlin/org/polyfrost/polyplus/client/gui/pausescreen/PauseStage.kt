@@ -441,7 +441,7 @@ object PauseStage {
         val allowed = (length - slack.value).coerceIn(min(length, MIN_LENGTH), length)
         val camera = if (length > MIN_LENGTH) eyes.add(toWanted.scale(allowed / length)) else wanted
 
-        val shot = if (slack.value > 0.0) allowed.coerceIn(MIN_ROOM, fullReach) else fullReach
+        val shot = if (slack.value > 0.0) allowed.coerceIn(MIN_ROOM * fullReach / REACH, fullReach) else fullReach
         if (!eased) lens.step(lensFor(shot, height).toDouble(), LENS_RATE, frameSeconds.toDouble())
         eased = true
         fovNow = rawFov + (lens.value.toFloat() - rawFov) * amount
