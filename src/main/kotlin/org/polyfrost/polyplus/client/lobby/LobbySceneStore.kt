@@ -287,8 +287,9 @@ object LobbySceneStore {
 
     fun delete(entry: LobbySceneEntry) {
         if (entry.bundled) return
-        val path = folder.resolve(entry.file)
-        update { copy(scenes = scenes - entry, pinned = pinned?.takeUnless { it == entry.id }) }
+        ensureLoaded()
+        val path = folder.resolve(state.scenes.firstOrNull { it.id == entry.id }?.file ?: entry.file)
+        update { copy(scenes = scenes.filterNot { it.id == entry.id }, pinned = pinned?.takeUnless { it == entry.id }) }
         writer.execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
     }
 
