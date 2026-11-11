@@ -49,7 +49,11 @@ class EosSdkBridge {
     @Volatile private var tickThread: Thread? = null
     @Volatile private var running = false
     @Volatile private var abandoned = false
+    @Volatile private var keepSdk = false
     private val starting = AtomicBoolean(false)
+
+    @Volatile var mode: EosMode? = null
+        private set
 
     private class PendingCall(val run: () -> Unit, val abandon: () -> Unit)
 
@@ -162,8 +166,9 @@ class EosSdkBridge {
         startupSettled.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
-    fun shutdown() {
+    fun shutdown(retireSdk: Boolean = true) {
         val worker = synchronized(pendingCalls) {
+            keepSdk = !retireSdk
             stopped = true
             running = false
             tickThread
@@ -178,7 +183,7 @@ class EosSdkBridge {
         if (worker != null && worker.isAlive) {
             logger.warn("The EOS tick thread did not stop within {}ms; leaving it to finish on its own", SHUTDOWN_TIMEOUT_MS)
         } else {
-            teardown(retireSdk = !abandoned)
+            teardown(retireSdk = !abandoned && !keepSdk)
             rejectPendingCalls()
         }
         startupSettled.countDown()
@@ -219,6 +224,7 @@ class EosSdkBridge {
         EosLogging.setLogLevel(EosLogCategory.AllCategories, EosLogLevel.Info)
 
         val mode = EosMode.current
+        this.mode = mode
         logger.info("Using the {} EOS app", mode)
         val options = EosPlatformOptions.create(
             productId = mode.productId,
@@ -350,7 +356,7 @@ class EosSdkBridge {
         }
         runCatching { pump() }.onFailure { logger.warn("The final EOS tick before shutdown failed", it) }
         rejectPendingCalls()
-        teardown(retireSdk = !abandoned)
+        teardown(retireSdk = !abandoned && !keepSdk)
     }
 
     private fun pump() {

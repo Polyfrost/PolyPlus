@@ -23,6 +23,7 @@ import org.polyfrost.polyplus.client.PolyPlusSentry
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.network.eos.EosConnectAuth
 import org.polyfrost.polyplus.client.network.eos.EosFailureDiagnosis
+import org.polyfrost.polyplus.client.network.eos.EosMode
 import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
 import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
@@ -412,7 +413,27 @@ object P2PSessionManager {
     fun reconnect() {
         val bridge = this.bridge ?: return
         stopHosting()
-        authenticate(bridge)
+        val mode = bridge.mode
+        if (mode != null && mode != EosMode.current) restartForMode(bridge) else authenticate(bridge)
+    }
+
+    private fun restartForMode(old: EosSdkBridge) {
+        synchronized(consentLock) {
+            if (bridge !== old || starting) return
+            bridge = null
+            authJob?.cancel()
+            //? if > 1.8.9
+            EosVoicechatBridge.uninstall()
+            P2PPackTransport.uninstall()
+            _status.value = EosStatus.Connecting
+        }
+        LOGGER.info("The API URL now uses the {} EOS app; restarting EOS", EosMode.current)
+        PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
+            closeLiveConnections()
+            EosP2PChannel.Holder.bridge = null
+            old.shutdown(retireSdk = false)
+            applyConsent()
+        }
     }
 
     // skips the remaining backoff of a failed login, since a stalled bridge would only time out

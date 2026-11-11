@@ -33,12 +33,11 @@ enum class EosMode(
     companion object {
         private const val STAGING_URL = "https://plus-staging.polyfrost.org"
 
-        val current: EosMode by lazy {
-            when (System.getProperty("polyplus.eosMode")?.trim()?.lowercase()) {
+        val current: EosMode
+            get() = when (System.getProperty("polyplus.eosMode")?.trim()?.lowercase()) {
                 "production" -> PRODUCTION
                 "testing" -> TESTING
                 else -> if (PolyPlusConstants.IS_TESTER || PolyPlusConfig.apiUrl.url == STAGING_URL) TESTING else PRODUCTION
             }
-        }
     }
 }
