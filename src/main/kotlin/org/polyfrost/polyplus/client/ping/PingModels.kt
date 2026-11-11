@@ -39,6 +39,7 @@ data class PingTarget(
     val type: PingTargetType,
     val id: String? = null,
     val entity: String? = null,
+    @SerialName("entity_id") val entityId: Int? = null,
 )
 
 data class Ping(

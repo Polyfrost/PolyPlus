@@ -79,6 +79,7 @@ private val CARD_MARGIN = 20.dp
 private val CARD_WIDTH = 236.dp
 private val DOCK_ITEM_WIDTH = 64.dp
 private val DOCK_ITEM_HEIGHT = 56.dp
+private val CUSTOMIZE_DROP = 48.dp
 
 private fun guiScale(): Int {
     //? if > 1.8.9 {
@@ -158,6 +159,24 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
         }
     }
     ToolsCard(screen, reveal, rise)
+    Box(
+        Modifier
+            .align(Alignment.TopStart)
+            .padding(top = CARD_MARGIN, start = CARD_MARGIN)
+            .graphicsLayer {
+                alpha = reveal
+                translationY = -rise * density
+            }
+            .blockPointer()
+            .pauseGlass(12.dp)
+            .padding(3.dp),
+    ) {
+        CustomizeButton(screen)
+    }
+    if (screen.customizeOpen) {
+        CustomizeDismiss(screen)
+        PauseCustomizePanel(screen, Modifier.align(Alignment.TopStart).padding(top = CARD_MARGIN + CUSTOMIZE_DROP, start = CARD_MARGIN))
+    }
 }
 
 @Composable
@@ -176,7 +195,7 @@ private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, reveal: Float, rise
     )
 }
 
-private fun Modifier.blockPointer(): Modifier = pointerInput(Unit) {
+internal fun Modifier.blockPointer(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent()
     }

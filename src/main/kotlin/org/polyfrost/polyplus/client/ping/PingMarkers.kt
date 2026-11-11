@@ -80,6 +80,7 @@ object PingMarkers {
     private const val ROW_PAD_Y = 1
     private const val REPLY_ROW_HEIGHT = HEAD_CELL + ROW_PAD_Y * 2
     private const val MAX_REPLY_LINES = 4
+    private const val NETWORK_MATCH = 24.0
 
     private val lastPositions = HashMap<String, DoubleArray>()
     private val requestedNames = HashSet<String>()
@@ -123,7 +124,7 @@ object PingMarkers {
             val dy = pos[1] - viewer[1]
             val dz = pos[2] - viewer[2]
             val distance = sqrt(dx * dx + dy * dy + dz * dz)
-            val entity = ping.target?.entity?.let { entities[it] }
+            val entity = entities[ping.id]
             frames += Frame(ping, point, distance, pos[3] - viewer[1], entity, alpha(ping, now))
         }
         val hovered = pickHovered(frames)
@@ -203,26 +204,50 @@ object PingMarkers {
 
     private fun trackedEntities(pings: List<Ping>): Map<String, Entity> {
         val wanted = pings.mapNotNullTo(HashSet()) { it.target?.entity }
-        if (wanted.isEmpty()) return emptyMap()
+        if (wanted.isEmpty() && pings.none { it.target?.entityId != null }) return emptyMap()
+        val byUuid = HashMap<String, Entity>()
         val found = HashMap<String, Entity>()
         val mc = Minecraft.getInstance()
         //? if > 1.8.9 {
         val level = mc.level ?: return found
-        for (entity in level.entitiesForRendering()) {
+        if (wanted.isNotEmpty()) for (entity in level.entitiesForRendering()) {
             if (entity.isRemoved) continue
         //?} else {
         /*val world = mc.world ?: return found
-        for (entity in world.entities) {
+        if (wanted.isNotEmpty()) for (entity in world.entities) {
             if (entity.removed) continue
         *///?}
             val id = entity.uuid.toString()
-            if (id in wanted) found[id] = entity
+            if (id in wanted) byUuid[id] = entity
+        }
+        for (ping in pings) {
+            val target = ping.target ?: continue
+            val entity = target.entity?.let { byUuid[it] } ?: target.entityId?.let { networkEntity(ping, it) } ?: continue
+            found[ping.id] = entity
         }
         return found
     }
 
+    private fun networkEntity(ping: Ping, id: Int): Entity? {
+        val mc = Minecraft.getInstance()
+        //? if > 1.8.9 {
+        val raw = mc.level?.getEntity(id)?.takeUnless { it.isRemoved } ?: return null
+        val entity = PingTargeting.owner(raw)
+        val top = entity.y + entity.bbHeight + 0.25
+        //?} else {
+        /*val raw = mc.world?.getEntity(id)?.takeUnless { it.removed } ?: return null
+        val entity = PingTargeting.owner(raw)
+        val top = entity.y + entity.height + 0.25
+        *///?}
+        val last = lastPositions[ping.id]
+        val dx = entity.x - (last?.get(0) ?: ping.x)
+        val dy = top - (last?.get(1) ?: ping.y)
+        val dz = entity.z - (last?.get(2) ?: ping.z)
+        return entity.takeIf { dx * dx + dy * dy + dz * dz <= NETWORK_MATCH * NETWORK_MATCH }
+    }
+
     private fun position(ping: Ping, entities: Map<String, Entity>, partialTicks: Float): DoubleArray {
-        val entity = ping.target?.entity?.let { entities[it] }
+        val entity = entities[ping.id]
         if (entity != null) {
             //? if > 1.8.9 {
             val at = entity.getPosition(partialTicks)
@@ -464,7 +489,7 @@ object PingMarkers {
             val count = stackCount(live)
             if (count > 1) "$name ×$count" else name
         } else {
-            ping.label
+            PingTargeting.localLabel(ping.label)
         }
         val title = if (target.isNullOrBlank()) ping.kind.title else "${ping.kind.title} · $target"
         val sender = if (ping.own) "You" else senderName(ping)

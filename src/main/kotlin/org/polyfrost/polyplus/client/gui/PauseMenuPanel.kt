@@ -18,7 +18,9 @@ import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
+import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.WeakHashMap
@@ -276,7 +278,16 @@ object PauseMenuPanel {
     }
 
     // the Compose pause menu mirrors a hidden vanilla one, which must not get these buttons too
-    private fun vanillaMenuShown(): Boolean = PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA
+    private fun vanillaMenuShown(): Boolean =
+        PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA && ClientPlatform.currentScreen() !is OneClientPauseScreen
+
+    private const val CUSTOMIZE_LABEL = "Customize"
+    private const val CUSTOMIZE_MARGIN = 4
+    private const val CUSTOMIZE_PADDING = 16
+
+    private fun customizeWidth(): Int = textWidth(CUSTOMIZE_LABEL) + CUSTOMIZE_PADDING
+
+    private fun openCustomize(from: Screen) = PauseRouter.openCustomize(from)
 
     // Essential's pause menu adds proxy Buttons for the player and buttons it draws on either side of the menu
     fun drawnElsewhere(widget: Any): Boolean = widget.javaClass.name.startsWith("gg.essential.")
@@ -328,6 +339,10 @@ object PauseMenuPanel {
                 .partition(::drawnElsewhere)
             val menuLeft = menuButtons.minOfOrNull { it.x } ?: return@register
             val menuRight = menuButtons.maxOf { it.x + it.width }
+            (screen as ScreenAccessor).polyplusAddRenderableWidget(
+                Button.builder(Component.literal(CUSTOMIZE_LABEL)) { openCustomize(screen) }
+                    .bounds(CUSTOMIZE_MARGIN, CUSTOMIZE_MARGIN, customizeWidth(), BUTTON_HEIGHT).build(),
+            )
             // Essential's own bar is on the right, so the player goes in place of Essential's on the left
             val withEssential = essentialProxies.isNotEmpty()
             val layout = layout(screen.width, screen.height, menuLeft, menuRight, menuButtons.map { it.y }, onLeft = withEssential)
@@ -371,6 +386,7 @@ object PauseMenuPanel {
     private const val LEGACY_WARDROBE_ID = 0x50505302
     private const val LEGACY_HOST_WORLD_ID = 0x50505303
     private const val LEGACY_SETTINGS_ID = 0x50505304
+    private const val LEGACY_CUSTOMIZE_ID = 0x50505305
 
     fun register() {}
 
@@ -381,6 +397,7 @@ object PauseMenuPanel {
         val menuButtons = buttons.filter { it.visible }
         val menuLeft = menuButtons.minOfOrNull { it.x } ?: return
         val menuRight = menuButtons.maxOf { it.x + it.getWidth() }
+        buttons.add(ButtonWidget(LEGACY_CUSTOMIZE_ID, CUSTOMIZE_MARGIN, CUSTOMIZE_MARGIN, customizeWidth(), BUTTON_HEIGHT, CUSTOMIZE_LABEL))
         val layout = layout(screen.width, screen.height, menuLeft, menuRight, menuButtons.map { it.y })
         if (layout == null) {
             layouts.remove(screen)
@@ -415,6 +432,7 @@ object PauseMenuPanel {
             LEGACY_WARDROBE_ID -> openWardrobe(screen)
             LEGACY_HOST_WORLD_ID -> openHostWorld(screen)
             LEGACY_SETTINGS_ID -> openSettings()
+            LEGACY_CUSTOMIZE_ID -> openCustomize(screen)
             else -> return false
         }
         return true

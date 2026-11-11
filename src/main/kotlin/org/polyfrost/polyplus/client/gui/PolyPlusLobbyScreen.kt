@@ -22,7 +22,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 
-class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeScreen(RenderMode.CONTINUOUS) {
+class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeScreen(RenderMode.ON_DEMAND) {
     constructor() : this(LobbyPage.Home)
 
     internal val lobby = LobbyShell(this, firstPage)
@@ -68,7 +68,9 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         LobbyScene.start()
         if (!LobbyScene.showing()) ctx.fill(0, 0, width, height, 0xFF11171C.toInt())
+        lobby.feed.pull()
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
+        lobby.feed.push()
         StartupAccessibility.frame()
         LobbyA11y.frame()
         StartupOverlay.screenFrame(client, ctx)
@@ -80,7 +82,9 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
     /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         LobbyScene.start()
         if (!LobbyScene.showing()) fill(0, 0, width, height, 0xFF11171C.toInt())
+        lobby.feed.pull()
         super.render(mouseX, mouseY, tickDelta)
+        lobby.feed.push()
         StartupAccessibility.frame()
         LobbyA11y.frame()
         StartupOverlay.legacyFrame()
@@ -89,7 +93,9 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         LobbyScene.start()
         if (!LobbyScene.showing()) ctx.fill(0, 0, width, height, 0xFF11171C.toInt())
+        lobby.feed.pull()
         super.render(ctx, mouseX, mouseY, tickDelta)
+        lobby.feed.push()
         StartupAccessibility.frame()
         LobbyA11y.frame()
         StartupOverlay.screenFrame(client, ctx)

@@ -35,6 +35,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.SnapshotMutationPolicy
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,10 +44,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -171,9 +173,11 @@ private fun LobbyTab.activeOn(page: LobbyPage): Boolean = when (this.page) {
 
 @Composable
 internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
-    var labels by remember { mutableStateOf(emptyList<LobbyScene.Label>()) }
-    var chrome by remember { mutableFloatStateOf(LobbyScene.overlayAlpha) }
-    var depart by remember { mutableFloatStateOf(0f) }
+    val feed = lobby.feed
+    val chrome by feed.chrome
+    val depart by feed.depart
+    val chromeShown by remember { derivedStateOf { chrome > 0f } }
+    val departing by remember { derivedStateOf { depart > 0f } }
     LaunchedEffect(Unit) { NewsFeed.refresh() }
     val frost = animateFloatAsState(if (lobby.page.frosted) 1f else 0f, tween(FROST_MILLIS))
     val reveal = animateFloatAsState(if (lobby.setup) 0f else 1f, tween(REVEAL_MILLIS))
@@ -182,14 +186,13 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
             MainMenuRasterAssets.preload()
             Outfit
         }
-        while (true) {
-            withFrameNanos { }
-            labels = LobbyScene.labels
-            chrome = if (LobbyWardrobe.open) 1f else LobbyScene.overlayAlpha
-            depart = LobbyScene.departProgress
+    }
+    DisposableEffect(feed, frost, reveal) {
+        feed.glass = {
             LobbyGlass.pageFrost = frost.value
-            LobbyGlass.chrome = if (lobby.setup) chrome else chrome * reveal.value
+            LobbyGlass.chrome = if (lobby.setup) feed.chrome.floatValue else feed.chrome.floatValue * reveal.value
         }
+        onDispose { feed.glass = null }
     }
     LaunchedEffect(Unit) { launch { SocialErrors.events.collect(A11y::announce) }; SocialNotices.events.collect(A11y::announce) }
     var measured by remember { mutableStateOf(IntSize.Zero) }
@@ -203,17 +206,17 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             if (lobby.setup) {
-                if (chrome > 0f || StartupOverlay.active) {
+                if (chromeShown || StartupOverlay.active) {
                     Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome }) { LobbySetup(lobby) }
                 }
             } else {
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome * reveal.value }) {
-                    LobbyChrome(lobby, screen, labels, IntSize(widthPx.roundToInt(), heightPx.roundToInt()))
+                    LobbyChrome(lobby, screen, feed, IntSize(widthPx.roundToInt(), heightPx.roundToInt()))
                 }
                 lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors, lobby::endTour) }
             }
             if (lobby.accountsOpen) AccountsDialog(lobby)
-            if (depart > 0f) {
+            if (departing) {
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = depart * depart }.background(Color.White))
             }
         }
@@ -235,7 +238,7 @@ private fun AccountsDialog(lobby: LobbyShell) {
 }
 
 @Composable
-private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List<LobbyScene.Label>, root: IntSize) {
+private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyFeed, root: IntSize) {
     LobbyHighlight { ContextMenuHost {
         LobbyDarkChrome {
             val sceneScrim = OneConfigTheme.current.pageBackground.copy(alpha = 1f)
@@ -256,7 +259,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
         Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page)) { when (lobby.page) {
             LobbyPage.Home -> {
                 Box(Modifier.fillMaxSize().avatarTaps(lobby))
-                SceneTags(labels, root)
+                SceneTags(feed, root)
                 LobbyCornerCard(lobby, Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top))
             }
             LobbyPage.Wardrobe -> WardrobePage(onBack = { lobby.show(LobbyPage.Home) }, onMarketplace = { lobby.show(LobbyPage.Marketplace) })
@@ -594,23 +597,81 @@ private fun Modifier.avatarTaps(lobby: LobbyShell): Modifier = pointerInput(lobb
 }
 
 @Composable
-private fun BoxScope.SceneTags(labels: List<LobbyScene.Label>, root: IntSize) {
+private fun BoxScope.SceneTags(feed: LobbyFeed, root: IntSize) {
     val accent = OneConfigTheme.accent
-    SideEffect { LobbyHologram.accent = accent.toArgb() and 0xFFFFFF }
-    labels.forEach { label ->
+    SideEffect {
+        LobbyHologram.accent = accent.toArgb() and 0xFFFFFF
+        feed.root = root
+    }
+    val tags by feed.tags
+    tags.forEach { label ->
         key(label.name) {
-            val x = ((label.x + 1f) * 0.5f * root.width).roundToInt()
-            val y = ((1f - label.y) * 0.5f * root.height).roundToInt()
+            val spot = remember(feed, label.name) { feed.spot(label.name) }
             SceneTag(
                 label,
                 Modifier.align(Alignment.TopStart).layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                    layout(0, 0) { placeable.place(x - placeable.width / 2, y - placeable.height) }
+                    layout(0, 0) {
+                        spot.at.longValue
+                        val live = spot.label ?: label
+                        placeable.placeWithLayer(live.pixelX(root.width) - placeable.width / 2, live.pixelY(root.height) - placeable.height)
+                    }
                 },
             )
         }
     }
 }
+
+internal class LobbyFeed {
+    val chrome = mutableFloatStateOf(LobbyScene.overlayAlpha)
+    val depart = mutableFloatStateOf(LobbyScene.departProgress)
+    val tags = mutableStateOf(emptyList<LobbyScene.Label>(), SameTags)
+    var root = IntSize.Zero
+    var glass: (() -> Unit)? = null
+    private val spots = HashMap<String, TagSpot>()
+    private var placed: List<LobbyScene.Label>? = null
+    private var placedRoot = IntSize.Zero
+
+    fun pull() {
+        chrome.floatValue = if (LobbyWardrobe.open) 1f else LobbyScene.overlayAlpha
+        depart.floatValue = LobbyScene.departProgress
+        val labels = LobbyScene.labels
+        tags.value = labels
+        if (labels === placed && root == placedRoot) return
+        placed = labels
+        placedRoot = root
+        for (i in labels.indices.reversed()) {
+            val label = labels[i]
+            val spot = spot(label.name)
+            spot.label = label
+            spot.at.longValue = (label.pixelX(root.width).toLong() shl 32) or (label.pixelY(root.height).toLong() and 0xFFFFFFFFL)
+        }
+        if (spots.size > labels.size) spots.keys.retainAll { name -> labels.any { it.name == name } }
+    }
+
+    fun push() {
+        glass?.invoke()
+    }
+
+    fun spot(name: String): TagSpot = spots.getOrPut(name) { TagSpot() }
+}
+
+internal class TagSpot {
+    var label: LobbyScene.Label? = null
+    val at = mutableLongStateOf(Long.MIN_VALUE)
+}
+
+private fun LobbyScene.Label.pixelX(width: Int): Int = ((x + 1f) * 0.5f * width).roundToInt()
+
+private fun LobbyScene.Label.pixelY(height: Int): Int = ((1f - y) * 0.5f * height).roundToInt()
+
+private object SameTags : SnapshotMutationPolicy<List<LobbyScene.Label>> {
+    override fun equivalent(a: List<LobbyScene.Label>, b: List<LobbyScene.Label>): Boolean =
+        a.size == b.size && a.indices.all { a[it].sameTag(b[it]) }
+}
+
+private fun LobbyScene.Label.sameTag(other: LobbyScene.Label): Boolean =
+    name == other.name && isLocal == other.isLocal && invite == other.invite && whereabouts == other.whereabouts
 
 @Composable
 private fun SceneTag(label: LobbyScene.Label, modifier: Modifier) {

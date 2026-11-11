@@ -31,6 +31,8 @@
     //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
+    //? if = 1.8.9
+    //"client.MixinEffect",
     "client.MixinEntityRenderer",
     "client.MixinFramerateLimitTracker",
     //? if > 1.8.9
@@ -303,6 +305,8 @@
     "compat.oneconfig.MixinExternalSounds",
     "compat.oneconfig.MixinUiSounds",
     "compat.oneconfig.MixinGlHost",
+    "compat.polyblur.MixinPolyBlurConfigLobby",
+    "compat.polyhitbox.MixinPolyHitboxRenderer",
     //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2 {

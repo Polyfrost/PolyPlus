@@ -1,8 +1,17 @@
 package org.polyfrost.polyplus.client.ping
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.resources.language.I18n
 import net.minecraft.world.entity.Entity
 import kotlin.math.max
+
+//? if >= 1.21.11 {
+import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart
+//?} else if > 1.8.9 {
+/*import net.minecraft.world.entity.boss.EnderDragonPart
+*///?} else {
+/*import net.minecraft.entity.living.mob.monster.boss.EnderDragonPart
+*///?}
 
 //? if > 1.8.9 {
 import net.minecraft.core.Direction
@@ -53,6 +62,16 @@ internal object PingTargeting {
         "hopper", "dispenser", "dropper", "brewing_stand", "crafter", "decorated_pot", "chiseled_bookshelf",
     )
     private val ORE_BLOCKS = setOf("ancient_debris")
+    private val LEGACY_KEY = Regex("(?:entity|item|tile)\\.(?:[A-Za-z0-9_]+\\.)*?([A-Za-z0-9_]+)\\.name")
+    private val WORD_BREAK = Regex("(?<=[a-z0-9])(?=[A-Z])|_")
+
+    fun localLabel(label: String?): String? {
+        val match = label?.let { LEGACY_KEY.matchEntire(it) } ?: return label
+        val translated = I18n.get(label)
+        if (translated.isNotBlank() && translated != label) return translated
+        return match.groupValues[1].split(WORD_BREAK).filter { it.isNotEmpty() }
+            .joinToString(" ") { word -> word.replaceFirstChar { it.uppercaseChar() } }
+    }
 
     private fun isContainer(path: String) = path in CONTAINER_BLOCKS || path.endsWith("shulker_box")
 
@@ -91,7 +110,7 @@ internal object PingTargeting {
 
         (mc.hitResult as? EntityHitResult)?.let { vanilla ->
             val entity = vanilla.entity
-            if (pingable(entity, camera)) return entityHit(entity, vanilla.location)
+            if (pingable(entity, camera)) return entityHit(owner(entity), vanilla.location)
         }
 
         val blocks = level.clip(ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.ANY, camera))
@@ -113,7 +132,7 @@ internal object PingTargeting {
             }
         }
 
-        picked?.let { return entityHit(it, pickedAt) }
+        picked?.let { return entityHit(owner(it), pickedAt) }
         if (blockMissed) return null
         val pos = blocks.blockPos
         val state = level.getBlockState(pos)
@@ -129,8 +148,11 @@ internal object PingTargeting {
         return entity.isPickable || entity is ItemEntity
     }
 
+    internal fun owner(entity: Entity): Entity = (entity as? EnderDragonPart)?.parentMob ?: entity
+
     private fun entityHit(entity: Entity, at: Vec3): PingHit {
         val uuid = entity.uuid.toString()
+        val net = entity.id
         val x = entity.x
         val y = entity.y + entity.bbHeight + LABEL_LIFT
         val z = entity.z
@@ -140,13 +162,13 @@ internal object PingTargeting {
             is ItemEntity -> {
                 val stack = entity.item
                 val id = BuiltInRegistries.ITEM.getKey(stack.item).toString()
-                PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ITEM, id, uuid), stack.hoverName.string)
+                PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ITEM, id, uuid, net), stack.hoverName.string)
             }
-            is Player -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.PLAYER, null, uuid), name)
-            is Enemy -> PingHit(PingKind.ENEMY, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            is ContainerEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            is LivingEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            else -> PingHit(PingKind.LOOK, x, max(y, at.y), z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
+            is Player -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.PLAYER, null, uuid, net), name)
+            is Enemy -> PingHit(PingKind.ENEMY, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            is ContainerEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            is LivingEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            else -> PingHit(PingKind.LOOK, x, max(y, at.y), z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
         }
     }
     //?} else {
@@ -161,7 +183,7 @@ internal object PingTargeting {
 
         mc.crosshairTarget?.takeIf { it.type == HitResult.Type.ENTITY }?.let { vanilla ->
             val entity = vanilla.entity
-            if (entity != null && pingable(entity, camera)) return entityHit(entity, vanilla.facePos ?: eye)
+            if (entity != null && pingable(entity, camera)) return entityHit(owner(entity), vanilla.facePos ?: eye)
         }
 
         val blocks = world.rayTrace(eye, end, true, false, false)
@@ -184,13 +206,13 @@ internal object PingTargeting {
             }
         }
 
-        picked?.let { return entityHit(it, pickedAt) }
+        picked?.let { return entityHit(owner(it), pickedAt) }
         if (!blockFound) return null
         val pos = blocks!!.pos
         val block = world.getBlockState(pos).block
         val id = Block.REGISTRY.getKey(block)?.toString() ?: return null
         val at = blocks.facePos
-        return blockHit(id, block.name, at.x, at.y, at.z, pos.x, pos.y, pos.z, blocks.face == Direction.UP)
+        return blockHit(id, localLabel(block.name) ?: block.name, at.x, at.y, at.z, pos.x, pos.y, pos.z, blocks.face == Direction.UP)
     }
 
     private fun pingable(entity: Entity, camera: Entity): Boolean {
@@ -201,20 +223,23 @@ internal object PingTargeting {
         return entity.hasCollision() || entity is ItemEntity
     }
 
+    internal fun owner(entity: Entity): Entity = ((entity as? EnderDragonPart)?.dragon as? Entity) ?: entity
+
     private fun entityHit(entity: Entity, at: Vec3d): PingHit {
         val uuid = entity.uuid.toString()
+        val net = entity.networkId
         val x = entity.x
         val y = entity.y + entity.height + LABEL_LIFT
         val z = entity.z
         val typeId = Entities.getKey(entity)
-        val name = entity.name
+        val name = localLabel(entity.name)
         return when (entity) {
-            is ItemEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ITEM, null, uuid), entity.item?.hoverName)
-            is PlayerEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.PLAYER, null, uuid), name)
-            is Monster -> PingHit(PingKind.ENEMY, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            is InventoryMinecartEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            is LivingEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
-            else -> PingHit(PingKind.LOOK, x, max(y, at.y), z, PingTarget(PingTargetType.ENTITY, typeId, uuid), name)
+            is ItemEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ITEM, null, uuid, net), localLabel(entity.item?.hoverName))
+            is PlayerEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.PLAYER, null, uuid, net), name)
+            is Monster -> PingHit(PingKind.ENEMY, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            is InventoryMinecartEntity -> PingHit(PingKind.LOOT, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            is LivingEntity -> PingHit(PingKind.LOOK, x, y, z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
+            else -> PingHit(PingKind.LOOK, x, max(y, at.y), z, PingTarget(PingTargetType.ENTITY, typeId, uuid, net), name)
         }
     }
     *///?}

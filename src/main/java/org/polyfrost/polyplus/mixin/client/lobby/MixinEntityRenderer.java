@@ -7,6 +7,7 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.Entity;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
+import org.polyfrost.polyplus.client.lobby.LobbyHologram;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +17,7 @@ public class MixinEntityRenderer {
     //? if >= 1.21.10 {
     @ModifyExpressionValue(method = "extractShadow", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/OptionInstance;get()Ljava/lang/Object;"))
     private Object polyplus$forceLobbyShadows(Object original) {
+        if (LobbyHologram.extracting) return Boolean.FALSE;
         return LobbyScene.terrainActive() ? Boolean.TRUE : original;
     }
 

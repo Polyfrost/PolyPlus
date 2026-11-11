@@ -13,7 +13,7 @@
 
 uniform sampler2D InSampler;
 uniform sampler2D BloomSampler;
-uniform sampler2D SoftSampler;
+uniform sampler2D DofSampler;
 uniform sampler2D FrostSampler;
 uniform sampler2D DepthSampler;
 
@@ -22,7 +22,7 @@ layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 InSize;
     vec2 BloomSize;
-    vec2 SoftSize;
+    vec2 DofSize;
     vec2 FrostSize;
     vec2 DepthSize;
 };
@@ -55,7 +55,7 @@ float radiusAt(int index) {
 /*uniform vec2 OutSize;
 uniform vec2 InSize;
 uniform vec2 BloomSize;
-uniform vec2 SoftSize;
+uniform vec2 DofSize;
 uniform vec2 FrostSize;
 uniform vec2 DepthSize;
 uniform vec4 Forward;
@@ -104,16 +104,15 @@ out vec4 fragColor;
 /*varying vec2 texCoord;
 *///?}
 
-const int GATHER_TAPS = 40;
-const float GOLDEN_ANGLE = 2.39996;
 const float DOF_RADIUS = 11.0;
-const float SKY_RADIUS = 18.0;
 const float REFERENCE_HEIGHT = 1080.0;
 const float COC_DEADZONE = 0.14;
 const float COC_FULL = 0.85;
 const float FAR_DEPTH = 1000000.0;
-const float SOFT_FROM = 5.0;
-const float SOFT_TO = 12.0;
+const float DEPTH_SOFTNESS = 0.03;
+const float EDGE_FLOOR = 0.3;
+const float OWN_FROM = 0.5;
+const float OWN_TO = 2.0;
 const float DITHER = 1.3 / 255.0;
 
 bool finiteColor(vec3 color) {
@@ -180,17 +179,17 @@ bool waveLive() {
     return ringMode() > 0 && dot(Wave.xy, Wave.xy) > 0.5;
 }
 
-float behindFront(vec2 uv, float depth) {
-    vec3 pos = viewRay(uv) * linearDepth(depth);
+float behindFront(vec2 uv, float z) {
+    vec3 pos = viewRay(uv) * z;
     return Wave.w - max(dot(pos.xz, Wave.xy) - Wave.z, 0.0);
 }
 
-bool masked(vec2 uv, float depth) {
-    return ringMode() == 2 && waveLive() && !isSkyDepth(depth) && behindFront(uv, depth) <= 0.0;
+bool masked(vec2 uv, float depth, float z) {
+    return ringMode() == 2 && waveLive() && !isSkyDepth(depth) && behindFront(uv, z) <= 0.0;
 }
 
-bool skyAt(vec2 uv, float depth) {
-    return isSkyDepth(depth) || masked(uv, depth);
+bool skyAt(vec2 uv, float depth, float z) {
+    return isSkyDepth(depth) || masked(uv, depth, z);
 }
 
 float pixelScale() {
@@ -201,16 +200,11 @@ float dofRadius() {
     return DOF_RADIUS * pixelScale();
 }
 
-float skyRadius() {
-    return SKY_RADIUS * pixelScale();
-}
-
 float focusDistance() {
     return max(Lens.x, 0.001);
 }
 
-float lensCoc(float depth) {
-    float z = linearDepth(depth);
+float lensCoc(float z) {
     float focus = focusDistance();
     if (z < focus) {
         return smoothstep(0.45, 1.5, (focus - z) / focus) * Lens.y;
@@ -223,16 +217,26 @@ float panelCoverage(int index, vec2 pixel) {
     float radius = radiusAt(index) * OutSize.y;
     vec2 centre = vec2(panel.x, 1.0 - panel.y) * OutSize;
     vec2 half_size = panel.zw * OutSize;
-    vec2 corner = abs(pixel - centre) - half_size + radius;
+    vec2 outside = abs(pixel - centre) - half_size;
+    if (max(outside.x, outside.y) > 1.0) {
+        return 0.0;
+    }
+    vec2 corner = outside + radius;
     float distance = length(max(corner, 0.0)) + min(max(corner.x, corner.y), 0.0) - radius;
     return clamp(0.5 - distance, 0.0, 1.0);
 }
 
 float frostAmount() {
+    if (Glass.y == 0.0) {
+        return 0.0;
+    }
     float amount = Glass.x;
     vec2 pixel = texCoord * OutSize;
     int count = int(Glass.z);
     for (int index = 0; index < count; index++) {
+        if (amount >= 1.0) {
+            break;
+        }
         amount = max(amount, panelCoverage(index, pixel));
     }
     return amount * Glass.y;
@@ -257,82 +261,93 @@ int revealMode() {
     return int(Lens.z + 0.5);
 }
 
-float focusPullBlur(float depth) {
+float focusPullBlur(float z) {
     float focus = focusDistance() * mix(PULL_FAR, 1.0, smoothstep(PULL_START, PULL_END, Lens.w));
     float aperture = mix(PULL_APERTURE, 1.0, smoothstep(PULL_END, 1.0, Lens.w));
-    return smoothstep(focus * 0.45 * aperture, focus * 1.5 * aperture, abs(linearDepth(depth) - focus)) * Lens.y;
+    return smoothstep(focus * 0.45 * aperture, focus * 1.5 * aperture, abs(z - focus)) * Lens.y;
 }
 
-float blurAmount(float depth) {
-    return clamp(revealMode() == 1 ? focusPullBlur(depth) : lensCoc(depth), 0.0, 1.0);
+float blurAmount(float z) {
+    return clamp(revealMode() == 1 ? focusPullBlur(z) : lensCoc(z), 0.0, 1.0);
 }
 
-vec2 tapLens(vec2 uv) {
+float sceneDepth(vec2 uv) {
     float depth = textureLod(DepthSampler, uv, 0.0).r;
     if (!validDepth(depth)) {
-        return vec2(0.0, FAR_DEPTH);
+        return FAR_DEPTH;
     }
-    if (skyAt(uv, depth)) {
-        return vec2(skyRadius(), FAR_DEPTH);
+    float z = linearDepth(depth);
+    if (skyAt(uv, depth, z)) {
+        return FAR_DEPTH;
     }
-    return vec2(blurAmount(depth) * dofRadius(), linearDepth(depth));
+    return z;
 }
 
-vec3 tapColor(vec2 uv, float soften) {
-    if (soften <= 0.01) {
-        return textureLod(InSampler, uv, 0.0).rgb;
-    }
-    vec3 soft = textureLod(SoftSampler, uv, 0.0).rgb;
-    if (soften >= 0.99) {
-        return soft;
-    }
-    return mix(textureLod(InSampler, uv, 0.0).rgb, soft, soften);
+vec2 dofSize() {
+    return max(DofSize, vec2(1.0));
 }
 
-vec3 gather(vec3 center, float centerReach, float centerDepth, float search, float seed, float behindMix) {
-    float soften = smoothstep(SOFT_FROM * pixelScale(), SOFT_TO * pixelScale(), centerReach);
-    vec3 back = mix(center, tapColor(texCoord, soften), soften);
-    float backWeight = 1.0;
-    vec3 front = vec3(0.0);
-    float frontWeight = 0.0;
-    float area = search * search / float(GATHER_TAPS);
-    float ahead = max(0.15, centerDepth * 0.03);
-    float spin = seed * 6.28318 * (1.0 - soften);
-    for (int i = 0; i < GATHER_TAPS; i++) {
-        float angle = float(i) * GOLDEN_ANGLE + spin;
-        float reach = sqrt((float(i) + 0.5) / float(GATHER_TAPS)) * search;
-        vec2 uv = texCoord + vec2(cos(angle), sin(angle)) * reach / OutSize;
-        vec2 lens = tapLens(uv);
-        vec3 taken = tapColor(uv, soften);
-        if (!finiteColor(taken)) {
-            continue;
-        }
-        float frontness = smoothstep(ahead * 0.5, ahead * 1.5, centerDepth - lens.y);
-        if (frontness > 0.0) {
-            float covers = clamp(lens.x - reach + 1.0, 0.0, 1.0) * smoothstep(0.25 * search, 0.5 * search, lens.x);
-            float share = min(area / max(lens.x * lens.x, 1.0), 0.25) * covers * frontness;
-            front += taken * share;
-            frontWeight += share;
-        }
-        float weight = clamp(min(lens.x, centerReach) - reach + 1.0, 0.0, 1.0) * (1.0 - frontness);
-        back += taken * weight;
-        backWeight += weight;
+float depthWeight(float a, float b) {
+    float difference = abs(a - b) / (max(min(a, b), 0.001) * DEPTH_SOFTNESS);
+    return 1.0 / (1.0 + difference * difference);
+}
+
+vec4 jointUpsample(float z, float relax) {
+    vec2 grid = texCoord * dofSize() - 0.5;
+    vec2 base = floor(grid);
+    vec2 f = grid - base;
+    vec2 uv00 = (base + 0.5) / dofSize();
+    vec2 uv10 = (base + vec2(1.5, 0.5)) / dofSize();
+    vec2 uv01 = (base + vec2(0.5, 1.5)) / dofSize();
+    vec2 uv11 = (base + 1.5) / dofSize();
+    vec4 dof00 = textureLod(DofSampler, uv00, 0.0);
+    vec4 dof10 = textureLod(DofSampler, uv10, 0.0);
+    vec4 dof01 = textureLod(DofSampler, uv01, 0.0);
+    vec4 dof11 = textureLod(DofSampler, uv11, 0.0);
+    if (dof00 + dof10 + dof01 + dof11 == vec4(0.0)) {
+        return vec4(0.0);
     }
-    vec3 behind = mix(center, back / backWeight, behindMix);
-    if (frontWeight <= 0.0) {
-        return behind;
+    float w00 = (1.0 - f.x) * (1.0 - f.y) * mix(depthWeight(z, sceneDepth(uv00)), 1.0, relax);
+    float w10 = f.x * (1.0 - f.y) * mix(depthWeight(z, sceneDepth(uv10)), 1.0, relax);
+    float w01 = (1.0 - f.x) * f.y * mix(depthWeight(z, sceneDepth(uv01)), 1.0, relax);
+    float w11 = f.x * f.y * mix(depthWeight(z, sceneDepth(uv11)), 1.0, relax);
+    vec4 sum = dof00 * w00 + dof10 * w10 + dof01 * w01 + dof11 * w11;
+    return sum / max(w00 + w10 + w01 + w11, EDGE_FLOOR);
+}
+
+vec4 tentUpsample(float z) {
+    //? if = 1.8.9 {
+    /*return jointUpsample(z, 1.0);
+    *///?} else {
+    vec2 half_texel = 0.5 / dofSize();
+    vec4 sum = textureLod(DofSampler, texCoord + vec2(-half_texel.x, -half_texel.y), 0.0);
+    sum += textureLod(DofSampler, texCoord + vec2(half_texel.x, -half_texel.y), 0.0);
+    sum += textureLod(DofSampler, texCoord + vec2(-half_texel.x, half_texel.y), 0.0);
+    sum += textureLod(DofSampler, texCoord + vec2(half_texel.x, half_texel.y), 0.0);
+    return sum * 0.25;
+    //?}
+}
+
+vec4 depthOfField(float z, float own) {
+    if (own >= 0.99) {
+        return tentUpsample(z);
     }
-    return mix(behind, front / frontWeight, clamp(frontWeight, 0.0, 1.0));
+    vec4 sharp = jointUpsample(z, own);
+    if (own <= 0.01) {
+        return sharp;
+    }
+    return mix(sharp, tentUpsample(z), own);
 }
 
 vec3 firstLightGain(float depth) {
     float progress = clamp((Lens.w - LIGHT_START) / (LIGHT_END - LIGHT_START), 0.0, 1.0);
     float radius = LIGHT_REACH * progress * progress;
-    if (!depthKnown() || !validDepth(depth) || skyAt(texCoord, depth)) {
+    float z = linearDepth(depth);
+    if (!depthKnown() || !validDepth(depth) || skyAt(texCoord, depth, z)) {
         return mix(LIGHT_DARK, vec3(1.0), smoothstep(70.0, 125.0, radius));
     }
     vec3 ray = viewRay(texCoord);
-    float reach = length(ray * linearDepth(depth) - Forward.xyz * Lens.x);
+    float reach = length(ray * z - Forward.xyz * Lens.x);
     float lit = 1.0 - smoothstep(radius - LIGHT_SOFTNESS, radius, reach);
     float front = (reach - radius + LIGHT_SOFTNESS * 0.5) / LIGHT_EDGE;
     float flare = exp(-front * front) * (1.0 - progress);
@@ -342,23 +357,17 @@ vec3 firstLightGain(float depth) {
 vec3 scene() {
     vec3 color = textureLod(InSampler, texCoord, 0.0).rgb;
     float depth = textureLod(DepthSampler, texCoord, 0.0).r;
-    float day = 1.0 - Mood.y;
-    float seed = noise(gl_FragCoord.xy);
     float blur = 0.0;
-    bool known = depthKnown() && validDepth(depth);
-    bool sky = known && skyAt(texCoord, depth);
-    if (known && !sky) {
-        blur = blurAmount(depth);
-        float radius = blur * dofRadius();
-        float search = max(radius, dofRadius() * Lens.y);
-        if (search > 0.5) {
-            color = gather(color, radius, linearDepth(depth), search, seed, 1.0);
+    if (depthKnown() && validDepth(depth)) {
+        float z = linearDepth(depth);
+        bool sky = skyAt(texCoord, depth, z);
+        if (!sky) {
+            blur = blurAmount(z);
         }
-    } else if (sky) {
-        float search = mix(dofRadius() * Lens.y, skyRadius(), day);
-        if (search > 0.5) {
-            color = gather(color, search, FAR_DEPTH, search, seed, day);
-        }
+        float texel = max(OutSize.y, 1.0) / dofSize().y;
+        float own = sky ? 1.0 - Mood.y : smoothstep(OWN_FROM * texel, OWN_TO * texel, blur * dofRadius());
+        vec4 dof = depthOfField(sky ? FAR_DEPTH : z, own);
+        color = color * (1.0 - dof.a) + dof.rgb;
     }
     if (revealMode() == 2) {
         color *= firstLightGain(depth);

@@ -130,6 +130,7 @@ private fun ScenePicker(onClose: () -> Unit) {
     val member = PartyScene.isMember(party)
     val keepOwn = PartyScene.keepOwnBackdrop
     val following = member && !keepOwn
+    val pinned = LobbySceneStore.pinned
     Column(Modifier.fillMaxWidth().panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Label("Lobby scene", 16.sp, Modifier.weight(1f), weight = FontWeight.Medium)
@@ -155,18 +156,18 @@ private fun ScenePicker(onClose: () -> Unit) {
             Modifier.heightIn(max = PickerHeight).scrollMask(scroll, FadeHeight).verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SceneRow("Automatic", "Best recent scene", !following && LobbySceneStore.pinned == null, { pick(null) }, enabled = !following)
+            SceneRow("Automatic", "Best recent scene", !following && pinned == null, { pick(null) }, enabled = !following)
             Heading("Your captures")
             key(LobbyPacks.revision) {
                 val captures = LobbySceneStore.usableScenes
                 val locked = LobbySceneStore.lockedScenes
                 if (captures.isEmpty() && locked.isEmpty()) Note("No captures yet. Good spots appear here after you play your worlds.")
-                captures.forEach { CaptureRow(it, following = following) }
-                locked.forEach { (entry, reason) -> CaptureRow(entry, following, reason) }
+                captures.forEach { CaptureRow(it, following, pinned) }
+                locked.forEach { (entry, reason) -> CaptureRow(entry, following, pinned, reason) }
             }
             Heading("Polyfrost scenes")
             LobbySceneStore.bundledScenes.forEach { entry ->
-                SceneRow(entry.label, describe(entry), !following && LobbySceneStore.pinned == entry.id, { pick(entry.id) }, enabled = !following)
+                SceneRow(entry.label, describe(entry), !following && pinned == entry.id, { pick(entry.id) }, enabled = !following)
             }
             Heading("Music")
             MusicPicker()
@@ -177,10 +178,10 @@ private fun ScenePicker(onClose: () -> Unit) {
 }
 
 @Composable
-private fun CaptureRow(entry: LobbySceneEntry, following: Boolean, locked: String? = null) {
+private fun CaptureRow(entry: LobbySceneEntry, following: Boolean, pinned: String?, locked: String? = null) {
     var deleting by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
-    SceneRow(entry.label, locked ?: describe(entry), !following && LobbySceneStore.pinned == entry.id, { pick(entry.id) }, enabled = locked == null && !following) {
+    SceneRow(entry.label, locked ?: describe(entry), !following && pinned == entry.id, { pick(entry.id) }, enabled = locked == null && !following) {
         if (LobbySceneStore.canRename(entry)) IconButton(themedIcon(SOCIAL_ASSETS + "edit-02.svg"), "Rename capture", Modifier) { renaming = true }
         IconButton(themedIcon(SOCIAL_ASSETS + "trash-01.svg"), "Delete capture", Modifier) { deleting = true }
     }

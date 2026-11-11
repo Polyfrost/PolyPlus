@@ -80,7 +80,7 @@ object PartyPings {
         if (!synchronized(lock) { hasRoom(sendTimes, SEND_LIMIT, now) }) return false
 
         val id = UUID.randomUUID().toString()
-        val cleanTarget = target?.let { PingTarget(it.type, it.id?.takeIf(::fits), it.entity?.takeIf(::fits)) }
+        val cleanTarget = target?.let { PingTarget(it.type, it.id?.takeIf(::fits), it.entity?.takeIf(::fits), it.entityId) }
         val cleanLabel = label?.let(::cleanLabel)
         val shared = key != null && canShare() &&
             PolyConnection.sendPacket(ServerboundPacket.SendPing(id, key, dimension, x, y, z, kind, cleanTarget, cleanLabel)).isSuccess

@@ -25,6 +25,10 @@
       "width": 320,
       "height": 180
     },
+    "dof": {
+      "width": 960,
+      "height": 540
+    },
     "lobby_out": {}
   },
   "passes": [
@@ -305,6 +309,28 @@
       ]
     },
     {
+      "program": "polyplus:post/lobby_dof",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sky",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Soft",
+          "target": "soft_b",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "dof",
+      "uniforms": []
+    },
+    {
       "program": "polyplus:post/lobby_final",
       "inputs": [
         {
@@ -317,8 +343,8 @@
           "bilinear": true
         },
         {
-          "sampler_name": "Soft",
-          "target": "soft_b",
+          "sampler_name": "Dof",
+          "target": "dof",
           "bilinear": true
         },
         {

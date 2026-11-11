@@ -57,7 +57,7 @@ private fun PingReplyContent(session: WheelSession, ping: Ping, current: PingRep
         entries = entries,
         session = session,
         title = "Reply",
-        subtitle = ping.label ?: ping.kind.title,
+        subtitle = PingTargeting.localLabel(ping.label) ?: ping.kind.title,
     )
 }
 

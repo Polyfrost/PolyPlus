@@ -3,8 +3,7 @@
 package org.polyfrost.polyplus.client.gui.gamesocial
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -52,7 +52,7 @@ import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialBorderWidth
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
-import org.polyfrost.polyplus.client.gui.SocialWindowScrim
+import org.polyfrost.polyplus.client.gui.SocialOpenAnimation
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
@@ -90,6 +90,7 @@ import kotlin.math.max
 import kotlin.math.min
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
+import org.polyfrost.polyplus.client.gui.trackScreenFocus
 
 private const val DESIGN_WIDTH = 1280f
 private const val DESIGN_HEIGHT = 720f
@@ -245,7 +246,7 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
     val connecting = availability == SocialAvailability.Connecting
     val blocked = if (connecting) !reached else availability != SocialAvailability.Ready
     var measured by remember { mutableStateOf(IntSize.Zero) }
-    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }) {
+    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }.trackScreenFocus()) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
@@ -263,22 +264,23 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(SocialWindowScrim)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClose),
+                    .pointerInput(onClose) { detectTapGestures { onClose() } },
             ) {
-                ContextMenuHost {
-                    val snapshot = state.source.snapshot()
-                    if (blocked) {
-                        BlockedWindow(window, layout, availability, state, snapshot, onClose)
-                    } else {
-                        FollowSocialChanges(state, snapshot)
-                        SelectionEffects(window, state)
-                        TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                SocialOpenAnimation {
+                    ContextMenuHost {
+                        val snapshot = state.source.snapshot()
+                        if (blocked) {
+                            BlockedWindow(window, layout, availability, state, snapshot, onClose)
+                        } else {
+                            FollowSocialChanges(state, snapshot)
+                            SelectionEffects(window, state)
+                            TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                        }
+                        SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
+                        SocialDialogHost(state)
+                        PlayTogetherHooks(WindowHost)
+                        LeaderJoinEffect(WindowHost)
                     }
-                    SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
-                    SocialDialogHost(state)
-                    PlayTogetherHooks(WindowHost)
-                    LeaderJoinEffect(WindowHost)
                 }
             }
         }
@@ -318,7 +320,7 @@ private fun Modifier.windowFrame(layout: SocialWindowLayout): Modifier {
         .width(layout.width)
         .height(layout.height)
         .panel()
-        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { focus.clearFocus() }
+        .pointerInput(focus) { detectTapGestures { focus.clearFocus() } }
 }
 
 @Composable

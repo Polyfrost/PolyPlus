@@ -37,12 +37,33 @@ object LobbyGlass : GlassRegistry {
     }
 
     fun write(target: ByteBuffer) {
-        val shown = (floating.values + panels.values).take(MAX_PANELS)
-        target.putFloat(pageFrost).putFloat(chrome).putFloat(shown.size.toFloat()).putFloat(0f)
-        repeat(MAX_PANELS) { index ->
-            val panel = shown.getOrNull(index)
-            target.putFloat(panel?.centerX ?: 0f).putFloat(panel?.centerY ?: 0f).putFloat(panel?.halfWidth ?: 0f).putFloat(panel?.halfHeight ?: 0f)
+        val shown = minOf(floating.size + panels.size, MAX_PANELS)
+        target.putFloat(pageFrost).putFloat(chrome).putFloat(shown.toFloat()).putFloat(0f)
+        var bounds = writeBounds(target, floating.values, 0)
+        bounds = writeBounds(target, panels.values, bounds)
+        repeat(MAX_PANELS - bounds) { target.putFloat(0f).putFloat(0f).putFloat(0f).putFloat(0f) }
+        var radii = writeRadii(target, floating.values, 0)
+        radii = writeRadii(target, panels.values, radii)
+        repeat(RADIUS_ROWS * 4 - radii) { target.putFloat(0f) }
+    }
+
+    private fun writeBounds(target: ByteBuffer, source: Collection<Panel>, start: Int): Int {
+        var written = start
+        for (panel in source) {
+            if (written >= MAX_PANELS) break
+            target.putFloat(panel.centerX).putFloat(panel.centerY).putFloat(panel.halfWidth).putFloat(panel.halfHeight)
+            written++
         }
-        repeat(RADIUS_ROWS * 4) { index -> target.putFloat(shown.getOrNull(index)?.radius ?: 0f) }
+        return written
+    }
+
+    private fun writeRadii(target: ByteBuffer, source: Collection<Panel>, start: Int): Int {
+        var written = start
+        for (panel in source) {
+            if (written >= RADIUS_ROWS * 4) break
+            target.putFloat(panel.radius)
+            written++
+        }
+        return written
     }
 }

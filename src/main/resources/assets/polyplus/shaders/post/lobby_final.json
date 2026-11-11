@@ -9,7 +9,7 @@
       "name": "BloomSampler"
     },
     {
-      "name": "SoftSampler"
+      "name": "DofSampler"
     },
     {
       "name": "FrostSampler"
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "name": "SoftSize",
+      "name": "DofSize",
       "type": "float",
       "count": 2,
       "values": [
