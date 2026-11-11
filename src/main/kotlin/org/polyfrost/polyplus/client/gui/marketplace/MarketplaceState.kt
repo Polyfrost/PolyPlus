@@ -88,6 +88,10 @@ internal class MarketplaceState {
     var showCart by mutableStateOf(false)
     private var checkoutPending = false
 
+    init {
+        pruneOwned()
+    }
+
     val variantPicks = mutableStateMapOf<Int, Int>()
     val fitting = mutableStateMapOf<BodySlot, MarketPiece>()
     val cart get() = MarketplaceCart.entries
@@ -154,7 +158,7 @@ internal class MarketplaceState {
         var page = 1
         do {
             val response = CosmeticStore.search(page = page, perPage = CosmeticStore.MAX_PAGE_SIZE, sort = CosmeticStore.Sort.Popularity).getOrNull()
-                ?: return if (page == 1) null else results.values.toList()
+                ?: return null
             response.results.filter { it.type != CosmeticType.Unknown }.forEach { results.putIfAbsent(it.id, it) }
             page++
         } while (page <= response.pagination.totalPages && page <= MAX_PAGES)
@@ -171,13 +175,15 @@ internal class MarketplaceState {
 
     fun syncPlayer() {
         val owned = CosmeticCatalog.ownedIds()
-        if (owned != ownedIds) {
-            ownedIds = owned
-            val bought = owned.mapTo(HashSet(), ::cosmeticCartKey)
-            cart.removeAll { it.key in bought }
-        }
+        if (owned != ownedIds) ownedIds = owned
+        pruneOwned()
         val worn = CosmeticCatalog.localEquipped().equipped
         if (worn != look) look = worn
+    }
+
+    private fun pruneOwned() {
+        val bought = ownedIds.mapTo(HashSet(), ::cosmeticCartKey)
+        if (cart.any { it.key in bought }) cart.removeAll { it.key in bought }
     }
 
     private fun visible(): List<CosmeticStoreInfo> {
@@ -280,6 +286,7 @@ internal class MarketplaceState {
     }
 
     fun checkout() {
+        syncPlayer()
         val productIds = cart.mapNotNull { it.storeProductId }
         if (productIds.isEmpty()) notice = "Nothing purchasable in your cart yet." else if (!checkoutPending) openCheckout(productIds)
     }
