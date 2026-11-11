@@ -35,6 +35,9 @@
         { "name": "anchorPosition", "value": { "anchor": "TOP_LEFT", "relativX": 5.0, "relativY": 0.0 } }
       ]
     },
-    { "name": "Not A Hud", "values": [ { "name": "isEnabled", "value": true } ] }
+    { "name": "Not A Hud", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "FullBright", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "TNT_Timer", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "MotionBlur", "values": [ { "name": "isEnabled", "value": false } ] }
   ]
 }

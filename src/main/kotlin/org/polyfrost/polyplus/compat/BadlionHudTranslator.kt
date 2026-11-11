@@ -149,6 +149,9 @@ internal object BadlionHudTranslator {
         return (a shl 24) or (r shl 16) or (g shl 8) or b
     }
 
+    /** The first Badlion mod profile among [sources], parsed. */
+    internal fun readProfile(sources: List<Path>): JsonObject? = sources.firstOrNull(::isBadlionProfile)?.let { readProfile(it) }
+
     private fun readProfile(path: Path): JsonObject? = runCatching {
         ZipFile(path.toFile()).use { zip ->
             val entry = zip.getEntry("data.json") ?: return@use null
