@@ -267,8 +267,6 @@
     //"compat.blur.MixinBlurRenderer",
     //? if = 1.8.9
     //"compat.fullbright.MixinLegacyLight",
-    //? if = 1.8.9
-    //"compat.argentum.MixinTextBatcher",
     //? if dh {
     "compat.distanthorizons.MixinDhClientApi",
     "compat.distanthorizons.MixinDhClientWorlds",

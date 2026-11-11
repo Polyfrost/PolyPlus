@@ -27,8 +27,7 @@ import net.minecraft.client.multiplayer.PlayerInfo
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 //?} else {
-/*import net.minecraft.client.entity.living.player.ClientPlayerEntity
-import net.minecraft.client.gui.GuiElement
+/*import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.network.PlayerInfo
 import net.minecraft.client.render.platform.GlStateManager
 import org.polyfrost.polyplus.client.emoji.EmojiFont
@@ -214,6 +213,9 @@ object PolyPlusBadge {
     }
 
     const val LEGACY_CHAR = '\uE000'
+    const val LEGACY_GAP = '\uE001'
+    const val LEGACY_CHAR_ADVANCE = PAD_LEFT + BADGE_W
+    const val LEGACY_GAP_ADVANCE = PAD_RIGHT
 
     @JvmStatic
     fun drawInline(x: Float, y: Float, alpha: Float) {
@@ -223,10 +225,8 @@ object PolyPlusBadge {
     }
 
     @JvmStatic
-    fun badgesNameTag(entity: Any?, name: String): Boolean =
-        entity is ClientPlayerEntity &&
-            name == entity.displayName.formattedString &&
-            shouldBadge(entity.uuid)
+    fun decorate(name: String, uuid: UUID): String =
+        if (shouldBadge(uuid)) "$LEGACY_CHAR$LEGACY_GAP$name" else name
     *///?}
     //?}
 }
