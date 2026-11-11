@@ -222,7 +222,12 @@ private class Particle(
 
 private val Particles: List<Particle> = (0 until PARTICLE_COUNT).map { i ->
     fun h(salt: Int): Float {
-        val v = (i * 73856093) xor (salt * 19349663)
+        var v = i * 73856093 + salt * 19349663
+        v = v xor (v ushr 16)
+        v *= 0x85EBCA6B.toInt()
+        v = v xor (v ushr 13)
+        v *= 0xC2B2AE35.toInt()
+        v = v xor (v ushr 16)
         return (v and 0xFFFF) / 65535f
     }
     Particle(
