@@ -266,7 +266,7 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
             if (item.type == CosmeticType.Emote) {
                 CosmeticService.equipEmote(variantId)
             } else {
-                CosmeticService.equip(variantId)
+                CosmeticService.equipBothSides(variantId)
             }
         }
         ClientPlatform.runOnMain {
@@ -286,13 +286,14 @@ internal fun unequip(item: CosmeticUiItem, onComplete: (String) -> Unit) {
             if (item.type == CosmeticType.Emote) {
                 CosmeticService.clearEmote()
             } else {
-                val slot = CosmeticCatalog.localEquipped().equipped.entries
-                    .firstOrNull { it.value == item.equippedCosmeticId }?.key
-                if (slot == null) {
-                    Result.success(Unit)
-                } else {
-                    CosmeticService.clearSlot(slot)
-                }
+                val groupIds = CosmeticCatalog.cosmeticGroupViews()
+                    .firstOrNull { it.groupId == item.groupId }
+                    ?.variants?.mapTo(HashSet()) { it.id }
+                    .orEmpty() + listOfNotNull(item.equippedCosmeticId)
+                val slots = CosmeticCatalog.localEquipped().equipped.entries
+                    .filter { it.value in groupIds }
+                    .map { it.key }
+                CosmeticService.clearSlots(slots)
             }
         }
         ClientPlatform.runOnMain {
