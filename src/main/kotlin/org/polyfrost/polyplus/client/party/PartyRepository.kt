@@ -58,6 +58,12 @@ object PartyRepository {
     private val partyLock = Any()
     @Volatile private var partyVersion = 0L
 
+    private val inviteLock = Any()
+    @Volatile private var inviteVersion = 0L
+    private val removedInvites = HashMap<String, Long>()
+    private val addedInvites = HashMap<String, Long>()
+    private var inviteResetAt = 0L
+
     fun earlyInitialize() {
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
@@ -105,21 +111,54 @@ object PartyRepository {
     }
 
     private suspend fun refreshInvites() {
+        val since = inviteVersion
         PartyApi.incomingInvites()
-            .onSuccess { invites -> _incomingInvites.value = invites.filter { it.status == PartyInviteStatus.Pending } }
-            .onFailure { if (missing(it)) { _incomingInvites.value = emptyList() } else { LOGGER.error("Failed to refresh incoming party invites", it) } }
+            .onSuccess { invites -> applyInvites(_incomingInvites, invites.filter { it.status == PartyInviteStatus.Pending }, since) }
+            .onFailure { if (missing(it)) { applyInvites(_incomingInvites, emptyList(), since) } else { LOGGER.error("Failed to refresh incoming party invites", it) } }
         PartyApi.outgoingInvites()
-            .onSuccess { invites -> _outgoingInvites.value = invites.filter { it.status == PartyInviteStatus.Pending } }
-            .onFailure { if (missing(it)) { _outgoingInvites.value = emptyList() } else { LOGGER.error("Failed to refresh outgoing party invites", it) } }
+            .onSuccess { invites -> applyInvites(_outgoingInvites, invites.filter { it.status == PartyInviteStatus.Pending }, since) }
+            .onFailure { if (missing(it)) { applyInvites(_outgoingInvites, emptyList(), since) } else { LOGGER.error("Failed to refresh outgoing party invites", it) } }
         PlayerNamesRepository.resolve(_incomingInvites.value.map { it.sender } + _outgoingInvites.value.map { it.recipient })
+    }
+
+    private fun applyInvites(target: MutableStateFlow<List<PartyInvite>>, snapshot: List<PartyInvite>, since: Long) = synchronized(inviteLock) {
+        if (since < inviteResetAt) return@synchronized
+        if (since == inviteVersion) {
+            target.value = snapshot
+            return@synchronized
+        }
+        val kept = snapshot.filterNot { invite -> removedInvites[invite.id]?.let { it > since } == true }
+        val ids = kept.mapTo(HashSet()) { it.id }
+        target.value = kept + target.value.filter { it.id !in ids && (addedInvites[it.id] ?: 0L) > since }
+    }
+
+    private fun addInvite(target: MutableStateFlow<List<PartyInvite>>, invite: PartyInvite) = synchronized(inviteLock) {
+        inviteVersion++
+        removedInvites.remove(invite.id)
+        addedInvites[invite.id] = inviteVersion
+        target.update { list -> list.filterNot { it.id == invite.id } + invite }
+    }
+
+    private fun removeInvite(inviteId: String) = synchronized(inviteLock) {
+        inviteVersion++
+        removedInvites[inviteId] = inviteVersion
+        addedInvites.remove(inviteId)
+        _incomingInvites.update { list -> list.filterNot { it.id == inviteId } }
+        _outgoingInvites.update { list -> list.filterNot { it.id == inviteId } }
     }
 
     private fun missing(error: Throwable): Boolean = error is PartyApiException && error.status == 404
 
     fun reset() {
         updateParty { null }
-        _incomingInvites.value = emptyList()
-        _outgoingInvites.value = emptyList()
+        synchronized(inviteLock) {
+            inviteVersion++
+            inviteResetAt = inviteVersion
+            removedInvites.clear()
+            addedInvites.clear()
+            _incomingInvites.value = emptyList()
+            _outgoingInvites.value = emptyList()
+        }
         _confirmLeave.value = null
         inviteNotices.keys.toList().forEach(::retireNotice)
     }
@@ -165,7 +204,7 @@ object PartyRepository {
     }
 
     private fun onInviteReceived(invite: PartyInvite) {
-        _incomingInvites.update { list -> list.filterNot { it.id == invite.id } + invite }
+        addInvite(_incomingInvites, invite)
         if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("party_invite:${invite.id}")) return
         PlayerNamesRepository.resolve(listOf(invite.sender))
@@ -196,8 +235,7 @@ object PartyRepository {
 
     private fun onInviteUpdated(inviteId: String, status: PartyInviteStatus) {
         if (status == PartyInviteStatus.Pending) return
-        _incomingInvites.update { list -> list.filterNot { it.id == inviteId } }
-        _outgoingInvites.update { list -> list.filterNot { it.id == inviteId } }
+        removeInvite(inviteId)
         if (_confirmLeave.value?.id == inviteId) _confirmLeave.value = null
         retireNotice(inviteId)
     }
@@ -216,7 +254,7 @@ object PartyRepository {
     fun invite(player: String) = PolyPlusClient.SCOPE.launch {
         PartyApi.invite(player)
             .onSuccess { invite ->
-                _outgoingInvites.update { list -> list.filterNot { it.id == invite.id } + invite }
+                addInvite(_outgoingInvites, invite)
                 if (_party.value?.id != invite.partyId) refresh()
             }
             .onFailure { report("invite", "Couldn't send party invite", it) }
@@ -250,7 +288,7 @@ object PartyRepository {
     private suspend fun acceptInvite(invite: PartyInvite, leaveCurrent: Boolean, fromNotice: Boolean) {
         PartyApi.acceptInvite(invite.id, leaveCurrent)
             .onSuccess { party ->
-                _incomingInvites.update { list -> list.filterNot { it.id == invite.id } }
+                removeInvite(invite.id)
                 retireNotice(invite.id)
                 applyParty(party)
             }
@@ -262,14 +300,14 @@ object PartyRepository {
                     return@onFailure
                 }
                 if (error is PartyApiException && (error.status == 404 || error.status == 410)) {
-                    _incomingInvites.update { list -> list.filterNot { it.id == invite.id } }
+                    removeInvite(invite.id)
                 }
                 report("accept", "Couldn't join the party", error)
             }
     }
 
     fun decline(invite: PartyInvite) = PolyPlusClient.SCOPE.launch {
-        _incomingInvites.update { list -> list.filterNot { it.id == invite.id } }
+        removeInvite(invite.id)
         retireNotice(invite.id)
         PartyApi.declineInvite(invite.id).onFailure { error ->
             if (error is PartyApiException && (error.status == 404 || error.status == 410)) return@onFailure
@@ -279,7 +317,7 @@ object PartyRepository {
     }
 
     fun cancel(invite: PartyInvite) = PolyPlusClient.SCOPE.launch {
-        _outgoingInvites.update { list -> list.filterNot { it.id == invite.id } }
+        removeInvite(invite.id)
         PartyApi.cancelInvite(invite.id).onFailure { error ->
             if (error is PartyApiException && error.status == 404) return@onFailure
             report("cancel", "Couldn't cancel the invite", error)
@@ -287,22 +325,32 @@ object PartyRepository {
         }
     }
 
+    private fun clearParty(partyId: String?): Boolean {
+        var cleared = false
+        updateParty { current ->
+            if (partyId == null || current?.id != partyId) return@updateParty current
+            cleared = true
+            null
+        }
+        return cleared
+    }
+
     fun leave() = PolyPlusClient.SCOPE.launch {
+        val partyId = _party.value?.id
         PartyApi.leave()
             .onSuccess {
-                updateParty { null }
-                _left.emit(PartyLeftReason.Left)
+                if (clearParty(partyId)) _left.emit(PartyLeftReason.Left)
             }
             .onFailure { error ->
-                if (error is PartyApiException && error.status == 404) updateParty { null } else report("leave", "Couldn't leave the party", error)
+                if (error is PartyApiException && error.status == 404) clearParty(partyId) else report("leave", "Couldn't leave the party", error)
             }
     }
 
     fun disband() = PolyPlusClient.SCOPE.launch {
+        val partyId = _party.value?.id
         PartyApi.disband()
             .onSuccess {
-                updateParty { null }
-                _left.emit(PartyLeftReason.Disbanded)
+                if (clearParty(partyId)) _left.emit(PartyLeftReason.Disbanded)
             }
             .onFailure { report("disband", "Couldn't disband the party", it) }
     }
@@ -328,14 +376,16 @@ object PartyRepository {
     }
 
     fun setVoiceMode(mode: PartyVoiceMode) = PolyPlusClient.SCOPE.launch {
+        val since = partyVersion
         PartyApi.updateSettings(voiceMode = mode)
-            .onSuccess { applyParty(it) }
+            .onSuccess { applyParty(it, since) }
             .onFailure { report("settings", "Couldn't change party settings", it) }
     }
 
     fun setInvitePolicy(policy: PartyInvitePolicy) = PolyPlusClient.SCOPE.launch {
+        val since = partyVersion
         PartyApi.updateSettings(invitePolicy = policy)
-            .onSuccess { applyParty(it) }
+            .onSuccess { applyParty(it, since) }
             .onFailure { report("settings", "Couldn't change party settings", it) }
     }
 }
