@@ -31,6 +31,8 @@
     //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
+    //? if = 1.8.9
+    //"client.MixinEffect",
     "client.MixinEntityRenderer",
     "client.MixinFramerateLimitTracker",
     //? if > 1.8.9
