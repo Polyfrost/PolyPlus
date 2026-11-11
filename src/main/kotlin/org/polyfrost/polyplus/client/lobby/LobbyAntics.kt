@@ -9,7 +9,6 @@ import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.entity.Pose
 //? if = 1.8.9
 /*import net.minecraft.resource.Identifier*/
-import net.minecraft.world.phys.Vec3
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
@@ -138,12 +137,12 @@ object LobbyAntics {
     }
     *///?}
 
-    fun sight(avatar: LobbyAvatar, feet: Vec3, head: Vec3, side: Vec3) {
+    fun sight(avatar: LobbyAvatar, feetX: Double, feetY: Double, headX: Double, headY: Double, sideX: Double) {
         avatarId = avatar.id
-        centerX = ((feet.x + head.x) / 2.0).toFloat()
-        halfWidth = abs(side.x - (feet.x + head.x) / 2.0).toFloat()
-        bottom = minOf(feet.y, head.y).toFloat()
-        top = maxOf(feet.y, head.y).toFloat()
+        centerX = ((feetX + headX) / 2.0).toFloat()
+        halfWidth = abs(sideX - (feetX + headX) / 2.0).toFloat()
+        bottom = minOf(feetY, headY).toFloat()
+        top = maxOf(feetY, headY).toFloat()
     }
 
     fun lose() {

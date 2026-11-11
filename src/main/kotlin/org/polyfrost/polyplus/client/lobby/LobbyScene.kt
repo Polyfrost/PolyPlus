@@ -146,6 +146,10 @@ import org.lwjgl.sdl.SDLMouse
 /*import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.Display
 *///?}
+//? if >= 26.2 {
+import org.joml.Matrix4f
+import org.joml.Vector3f
+//?}
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Collections
@@ -1920,16 +1924,60 @@ object LobbyScene {
     }
     *///?}
 
-    private fun sightAvatar(renderer: GameRenderer, avatar: LobbyAvatar, right: Vec3) {
+    private class Projector {
+        var x = 0.0
+        var y = 0.0
+        //? if >= 26.2 {
+        private val matrix = Matrix4f()
+        private val point = Vector3f()
+        private var originX = 0.0
+        private var originY = 0.0
+        private var originZ = 0.0
+        //?} else {
+        /*private var renderer: GameRenderer? = null
+        private var fov = 0f
+        *///?}
+
+        fun begin(renderer: GameRenderer, fov: Float) {
+            //? if >= 26.2 {
+            val camera = LobbyCompat.camera(renderer)
+            camera.getViewRotationProjectionMatrix(matrix)
+            val origin = camera.position()
+            originX = origin.x
+            originY = origin.y
+            originZ = origin.z
+            //?} else {
+            /*this.renderer = renderer
+            this.fov = fov
+            *///?}
+        }
+
+        fun project(px: Double, py: Double, pz: Double) {
+            //? if >= 26.2 {
+            matrix.transformProject(point.set((px - originX).toFloat(), (py - originY).toFloat(), (pz - originZ).toFloat()))
+            x = point.x.toDouble()
+            y = point.y.toDouble()
+            //?} else {
+            /*val screen = LobbyCompat.project(renderer!!, Vec3(px, py, pz), fov)
+            x = screen.x
+            y = screen.y
+            *///?}
+        }
+    }
+
+    private val projector = Projector()
+
+    private fun sightAvatar(avatar: LobbyAvatar, right: Vec3) {
         val feet = avatar.position()
         val middle = avatar.bbHeight / 2.0
-        val side = Vec3(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
-        LobbyAntics.sight(
-            avatar,
-            LobbyCompat.project(renderer, feet, currentFov),
-            LobbyCompat.project(renderer, Vec3(feet.x, feet.y + avatar.bbHeight, feet.z), currentFov),
-            LobbyCompat.project(renderer, side, currentFov),
-        )
+        projector.project(feet.x, feet.y, feet.z)
+        val feetX = projector.x
+        val feetY = projector.y
+        projector.project(feet.x, feet.y + avatar.bbHeight, feet.z)
+        val headX = projector.x
+        val headY = projector.y
+        projector.project(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
+        LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
     }
 
     private fun sectionsSettled(mc: Minecraft): Boolean = LobbyCompat.sectionsDone(mc)
@@ -1945,14 +1993,17 @@ object LobbyScene {
         scene.sightEye = eye
         var next: ArrayList<Label>? = null
         LobbyAntics.lose()
+        projector.begin(renderer, currentFov)
         for (avatar in scene.avatars) {
             if (avatar.arrival != LobbyAvatar.Arrival.LANDED || avatar.dismissed || !ahead(eye, look, avatar)) continue
             val sight = (if (driven == null) scene.sight[avatar] else null) ?: survey(scene, eye, avatar)
             if (!sight.clear) continue
-            val head = avatar.position().add(0.0, avatar.bbHeight + HEAD_LABEL_OFFSET, 0.0)
-            val screen = LobbyCompat.project(renderer, head, currentFov)
-            if (avatar.isLocal && driven == null) sightAvatar(renderer, avatar, right)
-            val label = Label(avatar.displayName, screen.x.toFloat(), screen.y.toFloat(), avatar.isLocal, sight.invite, avatar.whereabouts)
+            val feet = avatar.position()
+            projector.project(feet.x, feet.y + (avatar.bbHeight + HEAD_LABEL_OFFSET), feet.z)
+            val screenX = projector.x.toFloat()
+            val screenY = projector.y.toFloat()
+            if (avatar.isLocal && driven == null) sightAvatar(avatar, right)
+            val label = Label(avatar.displayName, screenX, screenY, avatar.isLocal, sight.invite, avatar.whereabouts)
             (next ?: ArrayList<Label>(scene.avatars.size).also { next = it }) += label
         }
         val published = next ?: emptyList()

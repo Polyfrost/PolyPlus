@@ -238,11 +238,21 @@ object LobbySky {
     }
 
     //? if >= 1.21.8 {
+    private val glassSent = MemoryUtil.memAlloc(LobbyGlass.BLOCK_BYTES)
+    private val glassTargets = ArrayList<GpuBuffer>()
+
     private fun uploadGlass(chain: PostChainAccessor) {
         val device = RenderSystem.getDevice()
         glass.clear()
         LobbyGlass.write(glass)
         glass.flip()
+        glassSent.clear()
+        val changed = glass != glassSent
+        if (changed) {
+            glassSent.put(glass)
+            glass.rewind()
+        }
+        var index = 0
         for (pass in chain.`polyplus$passes`()) {
             val uniforms = (pass as PostPassAccessor).`polyplus$customUniforms`()
             var buffer = uniforms[GLASS_BLOCK] ?: continue
@@ -251,9 +261,15 @@ object LobbySky {
                 buffer = device.createBuffer({ "polyplus lobby glass" }, GpuBuffer.USAGE_UNIFORM or GpuBuffer.USAGE_COPY_DST, bufferSize(LobbyGlass.BLOCK_BYTES))
                 uniforms[GLASS_BLOCK] = buffer
             }
-            device.createCommandEncoder().writeToBuffer(buffer.slice(), glass)
-            glass.rewind()
+            val known = index < glassTargets.size && glassTargets[index] === buffer
+            if (changed || !known) {
+                device.createCommandEncoder().writeToBuffer(buffer.slice(), glass)
+                glass.rewind()
+                if (index < glassTargets.size) glassTargets[index] = buffer else glassTargets += buffer
+            }
+            index++
         }
+        while (glassTargets.size > index) glassTargets.removeAt(glassTargets.size - 1)
     }
     //?}
 
