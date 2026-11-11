@@ -25,6 +25,9 @@ import java.io.RandomAccessFile
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipFile
 
 @Serializable
@@ -34,12 +37,13 @@ data class LobbyScenePack(
     val size: Long = 0L,
     val hash: String = "",
     val format: Int = 0,
+    val fullHash: String = "",
 )
 
 object LobbyPacks {
     private class Local(val id: String, val supported: Boolean)
 
-    private class Print(val size: Long, val hash: String, val format: Int, val legacy: String = "", val until: Long = Long.MAX_VALUE)
+    private class Print(val size: Long, val hash: String, val format: Int, val full: String, val until: Long)
 
     private const val FILE_PREFIX = "file/"
     private const val ZIP_SUFFIX = ".zip"
@@ -54,6 +58,16 @@ object LobbyPacks {
     private val FORMATTING = Regex("§.")
 
     private val prints = ConcurrentHashMap<String, Print>()
+    private val glances = ConcurrentHashMap<String, Print>()
+    private val pending = ConcurrentHashMap<String, FutureTask<Print?>>()
+    private val waiting = ConcurrentHashMap.newKeySet<String>()
+    private val settled = AtomicBoolean(false)
+    private val hasher = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "PolyPlus Lobby Packs").apply {
+            isDaemon = true
+            priority = Thread.MIN_PRIORITY
+        }
+    }
     private var lastStack: List<String>? = null
 
     var revision by mutableIntStateOf(0)
@@ -65,14 +79,18 @@ object LobbyPacks {
         val stack = activeIds()
         val previous = lastStack
         lastStack = stack
-        if (previous == null || previous == stack) return false
+        if (previous != stack) stack.forEach { id -> fileOf(id)?.takeIf(File::exists)?.let { prefetch(it, key(it)) } }
+        val ready = settled.getAndSet(false)
+        if (previous == null || (previous == stack && !ready)) return false
         revision++
         return true
     }
 
     fun record(ids: Collection<String>): List<LobbyScenePack> = ids.map { id ->
-        val print = fileOf(id)?.let(::print)
-        LobbyScenePack(id, title(id), print?.size ?: 0L, print?.hash.orEmpty(), print?.format ?: 0)
+        val file = fileOf(id)
+        val print = file?.let(::print)
+        val size = if (file?.isDirectory == true) 0L else print?.size ?: 0L
+        LobbyScenePack(id, title(id), size, print?.hash.orEmpty(), print?.format ?: 0, print?.full.orEmpty())
     }
 
     fun problem(packs: List<LobbyScenePack>, version: String): String? {
@@ -95,6 +113,7 @@ object LobbyPacks {
                     putLong("size", pack.size)
                     putString("hash", pack.hash)
                     putInt("format", pack.format)
+                    if (pack.fullHash.isNotEmpty()) putString("full_hash", pack.fullHash)
                 },
             )
         }
@@ -107,6 +126,7 @@ object LobbyPacks {
             tag.getLongOr("size", 0L),
             tag.getStringOr("hash", ""),
             tag.getIntOr("format", 0),
+            tag.getStringOr("full_hash", ""),
         )
     }
 
@@ -122,8 +142,17 @@ object LobbyPacks {
 
     private fun same(need: LobbyScenePack, id: String): Boolean {
         if (need.hash.isEmpty()) return need.id == id
-        val print = fileOf(id)?.let(::print) ?: return false
-        return (print.hash == need.hash && print.size == need.size) || (need.size == 0L && print.legacy == need.hash)
+        val file = fileOf(id)?.takeIf(File::exists) ?: return false
+        val key = key(file)
+        val done = fresh(prints, key) ?: run {
+            waiting.add(key)
+            prefetch(file, key)
+            fresh(prints, key)?.also { waiting.remove(key) }
+        }
+        if (file.isDirectory && need.size > 0L && need.fullHash.isEmpty()) return done == null || (done.full == need.hash && done.size == need.size)
+        val print = done ?: glance(file, key) ?: return false
+        if (print.hash != need.hash || (need.size != 0L && need.size != print.size)) return false
+        return done == null || need.fullHash.isEmpty() || done.full == need.fullHash
     }
 
     private fun title(id: String): String =
@@ -133,18 +162,53 @@ object LobbyPacks {
 
     private fun print(file: File): Print? {
         if (!file.exists()) return null
-        val key = "${file.path}|${file.length()}|${file.lastModified()}"
-        prints[key]?.takeIf { System.currentTimeMillis() < it.until }?.let { return it }
-        return runCatching { read(file) }
+        val key = key(file)
+        fresh(prints, key)?.let { return it }
+        val task = task(file, key)
+        task.run()
+        return runCatching { task.get() }.getOrNull()
+    }
+
+    private fun prefetch(file: File, key: String) {
+        if (fresh(prints, key) == null && !pending.containsKey(key)) hasher.execute(task(file, key))
+    }
+
+    private fun glance(file: File, key: String): Print? {
+        fresh(glances, key)?.let { return it }
+        return runCatching {
+            if (file.isDirectory) {
+                Print(0L, sha1(meta(file)), 0, "", System.currentTimeMillis() + DIR_RECHECK_MS)
+            } else {
+                RandomAccessFile(file, "r").use { data -> Print(data.length(), edge(data), 0, "", Long.MAX_VALUE) }
+            }
+        }
             .onFailure { LOBBY_LOGGER.warn("Could not read resource pack {}", file.name, it) }
             .getOrNull()
-            ?.also { prints[key] = it }
+            ?.also { glances[key] = it }
+    }
+
+    private fun key(file: File): String = "${file.path}|${file.length()}|${file.lastModified()}"
+
+    private fun fresh(cache: Map<String, Print>, key: String): Print? = cache[key]?.takeIf { System.currentTimeMillis() < it.until }
+
+    private fun task(file: File, key: String): FutureTask<Print?> {
+        val task = FutureTask<Print?> {
+            try {
+                runCatching { read(file) }
+                    .onFailure { LOBBY_LOGGER.warn("Could not read resource pack {}", file.name, it) }
+                    .getOrNull()
+                    ?.also { prints[key] = it }
+            } finally {
+                pending.remove(key)
+                if (waiting.remove(key) && prints.containsKey(key)) settled.set(true)
+            }
+        }
+        return pending.putIfAbsent(key, task) ?: task
     }
 
     private fun read(file: File): Print {
         if (file.isDirectory) {
-            val meta = File(file, META_FILE).takeIf(File::isFile)?.readBytes() ?: ByteArray(0)
-            val legacy = hex(MessageDigest.getInstance("SHA-1").digest(meta))
+            val meta = meta(file)
             val digest = MessageDigest.getInstance("SHA-1")
             digest.update(meta)
             var total = 0L
@@ -167,20 +231,39 @@ object LobbyPacks {
                 }
             }
             walk(file, "", 0)
-            return Print(total, hex(digest.digest()), format(meta), legacy, System.currentTimeMillis() + DIR_RECHECK_MS)
+            return Print(total, sha1(meta), format(meta), hex(digest.digest()), System.currentTimeMillis() + DIR_RECHECK_MS)
         }
         val digest = MessageDigest.getInstance("SHA-1")
-        val size = RandomAccessFile(file, "r").use { data ->
-            val edge = ByteArray(minOf(EDGE_BYTES, data.length()).toInt())
-            data.readFully(edge)
-            digest.update(edge)
-            data.seek(data.length() - edge.size)
-            data.readFully(edge)
-            digest.update(edge)
-            data.length()
+        val (size, edge) = RandomAccessFile(file, "r").use { data ->
+            val edge = edge(data)
+            data.seek(0L)
+            val buffer = ByteArray(EDGE_BYTES.toInt())
+            while (true) {
+                val read = data.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+            data.length() to edge
         }
-        return Print(size, hex(digest.digest()), runCatching { zippedFormat(file) }.getOrDefault(0))
+        return Print(size, edge, runCatching { zippedFormat(file) }.getOrDefault(0), hex(digest.digest()), Long.MAX_VALUE)
     }
+
+    private fun edge(data: RandomAccessFile): String {
+        val length = data.length()
+        val edge = ByteArray(minOf(EDGE_BYTES, length).toInt())
+        val digest = MessageDigest.getInstance("SHA-1")
+        data.seek(0L)
+        data.readFully(edge)
+        digest.update(edge)
+        data.seek(length - edge.size)
+        data.readFully(edge)
+        digest.update(edge)
+        return hex(digest.digest())
+    }
+
+    private fun meta(dir: File): ByteArray = File(dir, META_FILE).takeIf(File::isFile)?.readBytes() ?: ByteArray(0)
+
+    private fun sha1(bytes: ByteArray): String = hex(MessageDigest.getInstance("SHA-1").digest(bytes))
 
     private fun zippedFormat(file: File): Int = ZipFile(file).use { zip ->
         zip.getEntry(META_FILE)?.let { entry -> zip.getInputStream(entry).use { format(it.readBytes()) } } ?: 0
