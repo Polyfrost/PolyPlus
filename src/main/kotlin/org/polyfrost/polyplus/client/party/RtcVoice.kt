@@ -51,6 +51,7 @@ internal object RtcVoice {
     private val speaking = ConcurrentHashMap.newKeySet<String>()
     private val volumes = ConcurrentHashMap<String, Volume>()
     private val receiving = ConcurrentHashMap<String, Boolean>()
+    private val present = ConcurrentHashMap.newKeySet<String>()
 
     @Volatile var joined = false
         private set
@@ -129,6 +130,7 @@ internal object RtcVoice {
         uninstall()
         room = null
         speaking.clear()
+        present.clear()
         LOGGER.info("Left party voice room ({})", reason)
         return when (reason) {
             EosResult.Success -> if (partyId == null) null else Outcome.Left
@@ -140,14 +142,18 @@ internal object RtcVoice {
     private fun install(platform: EosPlatform, user: ProductUserId, room: String, disconnected: CompletableDeferred<EosResult>) {
         val rtc = platform.rtc
         val handles = ArrayList<(EosPlatform) -> Unit>()
+        present.clear()
         val onDisconnect = rtc.addNotifyDisconnected(user, room) { info -> disconnected.complete(info.result) }
         handles += { it.rtc.removeNotifyDisconnected(onDisconnect) }
         val onStatus = rtc.addNotifyParticipantStatusChanged(user, room) { info ->
-            if (info.status == EosRtcParticipantStatus.Left) {
-                val id = info.participantId.toStringValue()
+            val id = info.participantId.toStringValue()
+            volumes.remove(id)
+            receiving.remove(id)
+            if (info.status == EosRtcParticipantStatus.Joined) {
+                present.add(id)
+            } else {
+                present.remove(id)
                 speaking.remove(id)
-                volumes.remove(id)
-                receiving.remove(id)
             }
         }
         handles += { it.rtc.removeNotifyParticipantStatusChanged(onStatus) }
@@ -185,6 +191,7 @@ internal object RtcVoice {
         speaking.clear()
         volumes.clear()
         receiving.clear()
+        present.clear()
         if (party != null) LOGGER.info("Stopped EOS party voice for party {}", party)
     }
 
@@ -238,10 +245,15 @@ internal object RtcVoice {
         if (!joined) return
         val now = System.currentTimeMillis()
         mix.forEach { (puid, peer) ->
+            if (puid !in present) return@forEach
             val receive = !peer.silenced
             if (receiving[puid] != receive) {
                 receiving[puid] = receive
-                onRoom { platform, user, room -> platform.rtc.audio.updateReceiving(user, room, ProductUserId.fromString(puid), receive) }
+                onRoom { platform, user, room ->
+                    platform.rtc.audio.updateReceiving(user, room, ProductUserId.fromString(puid), receive).whenComplete { result, _ ->
+                        if (result != EosResult.Success) receiving.remove(puid, receive)
+                    }
+                }
             }
             val target = (UNCHANGED * peer.gain * outputGain).coerceIn(0f, 100f)
             val last = volumes[puid]
@@ -249,8 +261,13 @@ internal object RtcVoice {
                 val close = target > 0f && abs(last.value - target) <= VOLUME_STEP
                 if (last.value == target || close || now - last.at < VOLUME_INTERVAL_MS) return@forEach
             }
-            volumes[puid] = Volume(target, now)
-            onRoom { platform, user, room -> platform.rtc.audio.updateParticipantVolume(user, room, ProductUserId.fromString(puid), target) }
+            val sent = Volume(target, now)
+            volumes[puid] = sent
+            onRoom { platform, user, room ->
+                platform.rtc.audio.updateParticipantVolume(user, room, ProductUserId.fromString(puid), target).whenComplete { result, _ ->
+                    if (result != EosResult.Success) volumes.remove(puid, sent)
+                }
+            }
         }
     }
 
