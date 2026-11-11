@@ -58,10 +58,10 @@ object SocialOverlay {
 
         when {
             current is SocialOverlayScreen -> close()
-            current is PolyPlusLobbyScreen -> current.showPage(if (current.lobby.page == LobbyPage.Social) LobbyPage.Home else LobbyPage.Social)
+            current is PolyPlusLobbyScreen -> if (!current.lobby.setup) current.showPage(if (current.lobby.page == LobbyPage.Social) LobbyPage.Home else LobbyPage.Social)
             current == null || current is TitleScreen || MainMenuReplacement.isMenu(current) -> open(current)
             current is OneClientPauseScreen || current is PauseScreen -> if (PrivacyConsent.allowsOnlineServices()) open(current)
-            else -> logger.debug("Ignoring Shift+P: {} is open and isn't safe to interrupt", current.javaClass.simpleName)
+            else -> logger.debug("Ignoring socials shortcut: {} is open and isn't safe to interrupt", current.javaClass.simpleName)
         }
     }
 
