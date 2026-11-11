@@ -156,7 +156,7 @@ object LobbyAmbience {
         if (introClaimed) return
         introClaimed = true
         val mc = Minecraft.getInstance()
-        if (!audible(mc) || !lobbyUp(mc)) return
+        if (!loops() || !audible(mc) || !lobbyUp(mc)) return
         val seconds = read(mc, file(STARTUP))?.let(::oggSeconds) ?: return
         halt(mc)
         mc.musicManager.stopPlaying()
