@@ -145,7 +145,10 @@ internal class LobbyServers(private val minecraft: Minecraft) {
     }
 
     fun rebuild() {
-        saved = (0 until list.size()).map { ServerEntry(list.get(it), ServerKind.SAVED, savedIndex = it) }
+        saved = (0 until list.size()).map {
+            SAVED_INDICES[list.get(it)] = it
+            ServerEntry(list.get(it), ServerKind.SAVED, savedIndex = it)
+        }
         recent = PolyPlusRecentServers.recent().map(::entryFor)
         hero = recent.firstOrNull() ?: saved.firstOrNull()
         rebuildFeatured()
@@ -173,11 +176,13 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         var from = (0 until list.size()).firstOrNull { list.get(it) === entry.data } ?: return
         val to = target.coerceIn(0, list.size() - 1)
         if (from == to) return
+        val moved = list.get(from)
         val step = if (to > from) 1 else -1
         while (from != to) {
-            list.swap(from, from + step)
+            list.replace(from, list.get(from + step))
             from += step
         }
+        list.replace(to, moved)
         persistAndRebuild()
     }
 
@@ -194,9 +199,13 @@ internal class LobbyServers(private val minecraft: Minecraft) {
 
     fun resolve(old: ServerData): ServerData {
         if (old.isLan) return old
-        val known = (saved + recent + featured + sponsored).firstOrNull { it.data.ip.equals(old.ip, ignoreCase = true) }
+        SAVED_INDICES[old]?.takeIf { it in 0 until list.size() }?.let { list.get(it) }?.takeIf { it.sameAs(old) }?.let { return it }
+        val known = saved.firstOrNull { it.data.sameAs(old) }
+            ?: (saved + recent + featured + sponsored).firstOrNull { it.data.ip.equals(old.ip, ignoreCase = true) }
         return known?.data ?: unsavedData(old.name, old.ip)
     }
+
+    private fun ServerData.sameAs(other: ServerData) = name == other.name && ip.equals(other.ip, ignoreCase = true)
 
     fun dataFor(server: FeaturedServer): ServerData = unsavedData(server.name, server.address)
 
@@ -247,6 +256,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
     companion object {
         const val QUICK_ROWS = 3
         private val PING_DISPATCHER = Dispatchers.IO.limitedParallelism(5)
+        private val SAVED_INDICES = WeakHashMap<ServerData, Int>()
 
         fun failed(data: ServerData): Boolean {
             if (data.state() == ServerData.State.UNREACHABLE) return true

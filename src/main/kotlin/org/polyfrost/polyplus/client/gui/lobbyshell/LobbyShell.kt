@@ -78,7 +78,7 @@ internal enum class PlaySource(val page: LobbyPage) {
         get() = this != Replays || ReplayLibrary.enabled
 }
 
-internal class ServerEdit(val server: ServerData?) {
+internal class ServerEdit(val server: ServerData?, val index: Int = -1) {
     val address = server?.ip
 }
 
@@ -325,7 +325,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     fun editServer(entry: ServerEntry) {
-        editing = ServerEdit(entry.data)
+        editing = ServerEdit(entry.data, entry.savedIndex)
     }
 
     private fun escapeForm(): Boolean {

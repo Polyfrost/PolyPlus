@@ -191,6 +191,11 @@ class LobbyServerList(private val minecraft: Minecraft) {
         rows[first] = rows[second].also { rows[second] = rows[first] }
     }
 
+    fun replace(index: Int, data: LobbyServerData) {
+        list.set(index, data.entry)
+        rows[index] = data
+    }
+
     fun unhide(address: String): LobbyServerData? {
         val data = hiddenRows.firstOrNull { it.ip == address } ?: return null
         hiddenRows.remove(data)

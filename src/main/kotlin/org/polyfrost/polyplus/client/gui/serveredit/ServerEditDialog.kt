@@ -121,6 +121,7 @@ private fun TextFieldValue.limited(maxLength: Int) = if (text.length > maxLength
 @Composable
 internal fun ServerEditDialog(
     server: ServerData?,
+    serverIndex: Int,
     onDone: () -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
@@ -135,14 +136,14 @@ internal fun ServerEditDialog(
     val save: () -> Unit = save@{
         if (form.finished || form.confirmingDelete || !form.addressValid) return@save
         form.finished = true
-        ServerEditStore.save(server, form.displayName, form.address.text, form.packStatus)
+        ServerEditStore.save(server, serverIndex, form.displayName, form.address.text, form.packStatus)
         if (form.showCapture) form.applyCapture()
         onDone()
     }
     val delete: () -> Unit = delete@{
         if (form.finished || server == null) return@delete
         form.finished = true
-        ServerEditStore.delete(server)
+        ServerEditStore.delete(server, serverIndex)
         onDelete?.invoke()
     }
 

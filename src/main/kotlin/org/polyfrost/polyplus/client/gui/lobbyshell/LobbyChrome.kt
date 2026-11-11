@@ -318,6 +318,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, labels: List
         lobby.editing?.let { edit ->
             ServerEditDialog(
                 server = edit.server,
+                serverIndex = edit.index,
                 onDone = lobby::finishEdit,
                 onDelete = edit.server?.let { lobby::finishDelete },
                 onDismiss = { lobby.editing = null },
