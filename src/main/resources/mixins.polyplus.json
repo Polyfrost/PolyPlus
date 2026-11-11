@@ -221,6 +221,8 @@
     //"client.lobby.MixinWorldRenderer",
     //? if >= 1.21.4
     "compat.renderscale.MixinRenderScaleLobby",
+    //? if > 1.8.9
+    "compat.spatialgui.MixinSpatialGUIClient",
     //? if >= 26.3
     "compat.polytime.MixinPolyTimeClockInstance",
     //? if >= 26.1 && < 26.3
