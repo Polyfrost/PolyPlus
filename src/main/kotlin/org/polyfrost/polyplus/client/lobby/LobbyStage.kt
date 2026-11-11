@@ -90,8 +90,10 @@ data class LobbyStage(
 
         fun canStand(pos: BlockPos): Boolean = standing.getOrPut(pos.asLong()) { LobbyStage.canStand(level, pos) && firmGround(level, pos) }
 
-        fun surface(near: BlockPos, above: Int, below: Int): BlockPos? =
-            (above downTo -below).firstNotNullOfOrNull { dy -> near.offset(0, dy, 0).takeIf(::canStand) }
+        fun surface(near: BlockPos, above: Int, below: Int): BlockPos? {
+            val order = if (interior) (-below..above).sortedWith(compareBy({ kotlin.math.abs(it) }, { it })) else (above downTo -below).toList()
+            return order.firstNotNullOfOrNull { dy -> near.offset(0, dy, 0).takeIf(::canStand) }
+        }
 
         fun open(pos: BlockPos): Boolean = open.getOrPut(pos.asLong()) {
             if (interior) (2..INTERIOR_HEADROOM).all { clear(level, pos.above(it)) } else (2..SKY_CHECK).all { level.getBlockState(pos.above(it)).isAir }
