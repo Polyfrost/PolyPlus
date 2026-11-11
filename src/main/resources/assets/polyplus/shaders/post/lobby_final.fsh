@@ -160,6 +160,12 @@ bool isSkyDepth(float depth) {
     *///?}
 }
 
+bool depthPresent() {
+    return !isSkyDepth(textureLod(DepthSampler, vec2(0.5, 0.08), 0.0).r)
+        || !isSkyDepth(textureLod(DepthSampler, vec2(0.2, 0.08), 0.0).r)
+        || !isSkyDepth(textureLod(DepthSampler, vec2(0.8, 0.08), 0.0).r);
+}
+
 float linearDepth(float depth) {
     float near = Params.z;
     float far = Params.w;
@@ -343,7 +349,7 @@ vec3 firstLightGain(float depth) {
     float progress = clamp((Lens.w - LIGHT_START) / (LIGHT_END - LIGHT_START), 0.0, 1.0);
     float radius = LIGHT_REACH * progress * progress;
     float z = linearDepth(depth);
-    if (!depthKnown() || !validDepth(depth) || skyAt(texCoord, depth, z)) {
+    if (!depthKnown() || !depthPresent() || !validDepth(depth) || skyAt(texCoord, depth, z)) {
         return mix(LIGHT_DARK, vec3(1.0), smoothstep(70.0, 125.0, radius));
     }
     vec3 ray = viewRay(texCoord);
@@ -358,7 +364,7 @@ vec3 scene() {
     vec3 color = textureLod(InSampler, texCoord, 0.0).rgb;
     float depth = textureLod(DepthSampler, texCoord, 0.0).r;
     float blur = 0.0;
-    if (depthKnown() && validDepth(depth)) {
+    if (depthKnown() && depthPresent() && validDepth(depth)) {
         float z = linearDepth(depth);
         bool sky = skyAt(texCoord, depth, z);
         if (!sky) {

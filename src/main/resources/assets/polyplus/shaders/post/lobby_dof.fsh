@@ -118,6 +118,12 @@ bool isSkyDepth(float depth) {
     *///?}
 }
 
+bool depthPresent() {
+    return !isSkyDepth(textureLod(DepthSampler, vec2(0.5, 0.08), 0.0).r)
+        || !isSkyDepth(textureLod(DepthSampler, vec2(0.2, 0.08), 0.0).r)
+        || !isSkyDepth(textureLod(DepthSampler, vec2(0.8, 0.08), 0.0).r);
+}
+
 float linearDepth(float depth) {
     float near = Params.z;
     float far = Params.w;
@@ -294,7 +300,7 @@ vec4 gather(vec3 center, float centerReach, float centerDepth, float search, flo
 void main() {
     vec4 result = vec4(0.0);
     float depth = textureLod(DepthSampler, texCoord, 0.0).r;
-    if (depthKnown() && validDepth(depth)) {
+    if (depthKnown() && depthPresent() && validDepth(depth)) {
         vec3 center = textureLod(InSampler, texCoord, 0.0).rgb;
         float seed = noise(gl_FragCoord.xy);
         float z = linearDepth(depth);

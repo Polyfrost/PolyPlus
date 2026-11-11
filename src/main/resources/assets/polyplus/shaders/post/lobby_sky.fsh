@@ -94,6 +94,12 @@ bool isSkyDepth(float depth) {
     *///?}
 }
 
+bool depthPresent() {
+    return !isSkyDepth(texture(DepthSampler, vec2(0.5, 0.08)).r)
+        || !isSkyDepth(texture(DepthSampler, vec2(0.2, 0.08)).r)
+        || !isSkyDepth(texture(DepthSampler, vec2(0.8, 0.08)).r);
+}
+
 float linearDepth(float depth) {
     float near = Params.z;
     float far = Params.w;
@@ -171,7 +177,7 @@ vec3 ringGlow(float front) {
 void main() {
     vec3 color = texture(InSampler, texCoord).rgb;
     float depth = texture(DepthSampler, texCoord).r;
-    if (!depthKnown() || !(depth >= 0.0 && depth <= 1.0)) {
+    if (!depthKnown() || !depthPresent() || !(depth >= 0.0 && depth <= 1.0)) {
         fragColor = vec4(color, 1.0);
         return;
     }
