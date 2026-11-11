@@ -76,6 +76,26 @@ public class MixinScreen {
         //?} else {
         /*method = "renderPanorama",
         *///?}
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void polyplus$drawComposeBackdrop(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        float tickDelta, CallbackInfo ci
+    ) {
+        if (MenuPanorama.drawComposeBackdrop(graphics, (Screen) (Object) this)) ci.cancel();
+    }
+
+    @Inject(
+        //? if >= 26.1 {
+        method = "extractPanorama",
+        //?} else {
+        /*method = "renderPanorama",
+        *///?}
         at = @At("TAIL")
     )
     private void polyplus$drawBackdrop(

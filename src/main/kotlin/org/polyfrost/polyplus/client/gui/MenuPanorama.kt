@@ -81,6 +81,9 @@ object MenuPanorama {
 
     private var drawnThisPass = false
 
+    private fun classicMenuActive(): Boolean =
+        MainMenuReplacement.replacesTitleScreen() && !MainMenuReplacement.enabled()
+
     @JvmStatic
     fun beginPass() {
         drawnThisPass = false
@@ -98,12 +101,32 @@ object MenuPanorama {
         if (drew) drawnThisPass = true
         return drew
     }
+
+    @JvmStatic
+    fun drawComposeBackdrop(ctx: GuiGraphicsExtractor, screen: Screen): Boolean {
+        if (!classicMenuActive() || screen !is ComposeScreen) return false
+        if (!backdropWanted(screen, true)) return false
+        if (drawnThisPass) return true
+        val drew = MenuFxPass.renderInline(ctx)
+        if (drew) drawnThisPass = true
+        return drew
+    }
     //?} elif > 1.8.9 {
     /*@JvmStatic
     fun drawBackdrop(ctx: GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!backdropWanted(screen, onPanoramaPass)) return false
         if (drawnThisPass) return true
         val drew = MenuBackgroundPass.renderInline(ctx)
+        if (drew) drawnThisPass = true
+        return drew
+    }
+
+    @JvmStatic
+    fun drawComposeBackdrop(ctx: GuiGraphics, screen: Screen): Boolean {
+        if (!classicMenuActive() || screen !is ComposeScreen) return false
+        if (!backdropWanted(screen, true)) return false
+        if (drawnThisPass) return true
+        val drew = MenuFxPass.renderInline(ctx)
         if (drew) drawnThisPass = true
         return drew
     }
@@ -116,6 +139,16 @@ object MenuPanorama {
             GuiElement.fill(0, 0, screen.width, screen.height, BASE_COLOR)
         }
         val drew = MenuBackgroundPass.renderInline()
+        if (drew) drawnThisPass = true
+        return drew
+    }
+
+    @JvmStatic
+    fun drawComposeBackdrop(screen: Screen): Boolean {
+        if (!classicMenuActive()) return drawBackdrop(screen, false)
+        if (!backdropWanted(screen, false)) return false
+        if (drawnThisPass) return true
+        val drew = MenuFxPass.renderInline()
         if (drew) drawnThisPass = true
         return drew
     }

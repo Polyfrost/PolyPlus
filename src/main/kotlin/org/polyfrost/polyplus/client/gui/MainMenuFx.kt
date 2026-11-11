@@ -42,6 +42,20 @@ import kotlin.math.sqrt
 //? if = 1.8.9
 //import org.lwjgl.input.Mouse
 
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas as ComposeCanvas
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?}
+
+//? if < 26.1 && > 1.8.9 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+
 private const val PARALLAX_EASE = 0.02f
 private const val BLUR_SPREAD = 2.6f
 private const val MIN_SPOT_ALPHA = 1f / 255f
@@ -112,24 +126,59 @@ internal class MenuGlass : GlassRegistry {
     }
 }
 
+private val MenuFxStartNanos = System.nanoTime()
+private val MenuFxMouse = floatArrayOf(0.5f, 0.5f)
+
+private fun menuFxTime(nanos: Long): Float = (nanos - MenuFxStartNanos) / 1_000_000_000f
+
+private fun easedMenuMouse(): Offset {
+    val target = if (Motion.reduced) Offset(0.5f, 0.5f) else menuMouse()
+    MenuFxMouse[0] += (target.x - MenuFxMouse[0]) * PARALLAX_EASE
+    MenuFxMouse[1] += (target.y - MenuFxMouse[1]) * PARALLAX_EASE
+    return Offset(MenuFxMouse[0], MenuFxMouse[1])
+}
+
 @Composable
 internal fun MenuBackdrop(modifier: Modifier, glass: MenuGlass) {
     var time by remember { mutableFloatStateOf(0f) }
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val eased = remember { floatArrayOf(0.5f, 0.5f) }
     val frosted = !OneConfigTheme.current.isMinecraftStyle
     LaunchedEffect(Unit) {
         if (Motion.reduced) return@LaunchedEffect
-        val start = withFrameNanos { it }
-        while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
+        while (true) withFrameNanos { time = menuFxTime(it) }
     }
     Canvas(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
-        val target = if (Motion.reduced) Offset(0.5f, 0.5f) else menuMouse()
-        eased[0] += (target.x - eased[0]) * PARALLAX_EASE
-        eased[1] += (target.y - eased[1]) * PARALLAX_EASE
-        val mouse = Offset(eased[0], eased[1])
+        val mouse = easedMenuMouse()
         drawMenuBackground(time, mouse)
         if (frosted && ThemeConfig.enableBackgroundBlur) drawFrost(glass.panels.values, origin, time, mouse)
+    }
+}
+
+internal object MenuFxPass {
+    private val drawScope = CanvasDrawScope()
+    private val inline = InlineCanvas("menu_fx")
+
+    //? if >= 26.1 {
+    @JvmStatic
+    fun renderInline(ctx: GuiGraphicsExtractor): Boolean = inline.draw(ctx) { render(it) }
+    //?} elif > 1.8.9 {
+    /*@JvmStatic
+    fun renderInline(ctx: GuiGraphics): Boolean = inline.draw(ctx) { render(it) }
+    *///?} else {
+    /*@JvmStatic
+    fun renderInline(): Boolean = inline.draw { render(it) }
+    *///?}
+
+    private fun render(canvas: ComposeCanvas) {
+        val mc = Minecraft.getInstance()
+        val w = mc.window.width
+        val h = mc.window.height
+        if (w <= 0 || h <= 0) return
+        val time = if (Motion.reduced) 0f else menuFxTime(System.nanoTime())
+        val mouse = easedMenuMouse()
+        drawScope.draw(Density(1f), LayoutDirection.Ltr, canvas, Size(w.toFloat(), h.toFloat())) {
+            drawMenuBackground(time, mouse)
+        }
     }
 }
 
