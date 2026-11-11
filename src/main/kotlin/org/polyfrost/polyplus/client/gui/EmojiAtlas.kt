@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -16,13 +17,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import kotlin.math.roundToInt
 
@@ -96,16 +102,38 @@ internal fun SocialEmojiText(
         return
     }
 
-    FlowRow(modifier, maxLines = maxLines) {
-        segments.forEach { segment ->
-            when (segment) {
-                is EmojiRegistry.Segment.Text -> WORD.findAll(segment.text).forEach {
-                    SocialText(it.value, fontSize, Modifier.align(Alignment.CenterVertically), color, fontWeight, maxLines = 1)
+    BoxWithConstraints(modifier) {
+        val widthPx = constraints.maxWidth
+        val measurer = rememberTextMeasurer()
+        val fontFamily = OneConfigTheme.current.fontFamily
+        val pieces = remember(segments, widthPx, fontSize, fontWeight, fontFamily) {
+            val style = TextStyle(fontSize = fontSize, fontWeight = fontWeight, fontFamily = fontFamily)
+            segments.flatMap { segment ->
+                when (segment) {
+                    is EmojiRegistry.Segment.Text -> WORD.findAll(segment.text)
+                        .flatMap { fitToWidth(it.value, measurer, style, widthPx) }
+                        .map { EmojiRegistry.Segment.Text(it) }
+                        .toList()
+                    is EmojiRegistry.Segment.Emoji -> listOf(segment)
                 }
-                is EmojiRegistry.Segment.Emoji -> EmojiGlyph(segment.glyph, Modifier.align(Alignment.CenterVertically).size(glyphSize))
+            }
+        }
+        FlowRow(maxLines = maxLines) {
+            pieces.forEach { piece ->
+                when (piece) {
+                    is EmojiRegistry.Segment.Text -> SocialText(piece.text, fontSize, Modifier.align(Alignment.CenterVertically), color, fontWeight, maxLines = 1)
+                    is EmojiRegistry.Segment.Emoji -> EmojiGlyph(piece.glyph, Modifier.align(Alignment.CenterVertically).size(glyphSize))
+                }
             }
         }
     }
+}
+
+private fun fitToWidth(word: String, measurer: TextMeasurer, style: TextStyle, maxWidth: Int): List<String> {
+    if (maxWidth == Constraints.Infinity || word.isBlank()) return listOf(word)
+    val layout = measurer.measure(word, style, constraints = Constraints(maxWidth = maxWidth))
+    if (layout.lineCount <= 1) return listOf(word)
+    return List(layout.lineCount) { word.substring(layout.getLineStart(it), layout.getLineEnd(it)) }
 }
 
 private const val GLYPH_SCALE = 1.25f
