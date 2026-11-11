@@ -3,8 +3,7 @@
 package org.polyfrost.polyplus.client.gui.gamesocial
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -264,7 +264,7 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
                 Modifier
                     .fillMaxSize()
                     .background(SocialWindowScrim)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClose),
+                    .pointerInput(onClose) { detectTapGestures { onClose() } },
             ) {
                 ContextMenuHost {
                     val snapshot = state.source.snapshot()
@@ -318,7 +318,7 @@ private fun Modifier.windowFrame(layout: SocialWindowLayout): Modifier {
         .width(layout.width)
         .height(layout.height)
         .panel()
-        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { focus.clearFocus() }
+        .pointerInput(focus) { detectTapGestures { focus.clearFocus() } }
 }
 
 @Composable
