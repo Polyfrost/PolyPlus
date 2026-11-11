@@ -1960,7 +1960,7 @@ object LobbyScene {
         overlayAlpha = (((time - overlayDelay) / OVERLAY_FADE_SECONDS).toFloat()).coerceIn(0f, 1f) * (1f - departProgress * 4f).coerceIn(0f, 1f)
         scene.extracted = true
         scene.frames++
-        if (!scene.started && scene.frames > 30 && (sectionsSettled(mc) || Util.getNanos() - scene.builtNanos > START_WAIT_NANOS)) {
+        if (!scene.started && ((scene.frames > 30 && sectionsSettled(mc)) || (scene.frames > 2 && Util.getNanos() - scene.builtNanos > START_WAIT_NANOS))) {
             scene.started = true
             scene.startNanos = Util.getNanos()
             LobbyCompat.setGameTime(scene.level, 0L)
