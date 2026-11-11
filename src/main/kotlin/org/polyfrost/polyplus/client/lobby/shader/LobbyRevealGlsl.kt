@@ -13,7 +13,7 @@ object LobbyRevealGlsl {
     private const val LOOK_BEHIND = 32
 
     private val VERSION = Regex("""^[ \t]*#[ \t]*version[ \t]+(\d+)(?:[ \t]+(\w+))?""", RegexOption.MULTILINE)
-    private val DIRECTIVE = Regex("""^[ \t]*#[ \t]*(?:version|extension)\b""")
+    private val DIRECTIVE = Regex("""^[ \t]*#[ \t]*(\w*)""")
     private val MAIN = Regex("""\bvoid\s+main\s*\(\s*(?:void\s*)?\)\s*\{""")
     private val GL_VERTEX = Regex("""\bgl_Vertex\b""")
     private val FTRANSFORM = Regex("""\bftransform\s*\(\s*\)""")
@@ -59,13 +59,33 @@ object LobbyRevealGlsl {
         fun header(): Int {
             var at = 0
             var after = -1
+            var depth = 0
+            var pending = false
             while (at < masked.length) {
-                val end = masked.indexOf('\n', at).let { if (it < 0) masked.length else it + 1 }
+                var end = at
+                do {
+                    end = masked.indexOf('\n', end).let { if (it < 0) masked.length else it + 1 }
+                } while (end < masked.length && masked.substring(at, end).trimEnd('\n', '\r').endsWith('\\'))
                 val line = masked.substring(at, end)
-                if (DIRECTIVE.containsMatchIn(line)) after = end else if (line.isNotBlank()) break
                 at = end
+                val name = DIRECTIVE.find(line)?.groupValues?.get(1)
+                if (name == null) {
+                    if (line.isNotBlank()) break
+                    continue
+                }
+                when (name) {
+                    "if", "ifdef", "ifndef" -> depth++
+                    "endif" -> {
+                        if (depth > 0) depth--
+                        if (depth == 0 && pending) {
+                            after = end
+                            pending = false
+                        }
+                    }
+                    "version", "extension" -> if (depth == 0) after = end else pending = true
+                }
             }
-            return after
+            return if (pending) -1 else after
         }
 
         fun mainBody(): Int? = MAIN.findAll(masked).toList().singleOrNull()?.range?.last?.plus(1)
