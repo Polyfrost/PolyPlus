@@ -306,8 +306,8 @@ internal fun OnboardingFlow(
     var blurMode by remember { mutableIntStateOf(OnboardingFeatures.MOTION_BLUR_UNSET) }
     var blurSampleTimedOut by remember { mutableStateOf(false) }
     var blurPickedManually by remember { mutableStateOf(false) }
-    val maxGuiScale = remember { OnboardingFeatures.maxGuiScale() }
-    var guiScale by remember {
+    var maxGuiScale by remember { mutableIntStateOf(OnboardingFeatures.maxGuiScale()) }
+    var chosenGuiScale by remember {
         mutableIntStateOf(
             //? if > 1.8.9 {
             Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
@@ -315,6 +315,16 @@ internal fun OnboardingFlow(
             /*Minecraft.getInstance().options.guiScale.coerceIn(0, maxGuiScale),
             *///?}
         )
+    }
+    val guiScale = if (chosenGuiScale <= 0) 0 else minOf(chosenGuiScale, maxGuiScale)
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { }
+            val latest = OnboardingFeatures.maxGuiScale()
+            if (latest == maxGuiScale) continue
+            maxGuiScale = latest
+            OnboardingFeatures.applyGuiScale(if (chosenGuiScale <= 0) 0 else minOf(chosenGuiScale, latest), persist = false)
+        }
     }
     var themeShown by remember { mutableStateOf(false) }
     LaunchedEffect(lightTheme, uiStyle) {
@@ -326,7 +336,7 @@ internal fun OnboardingFlow(
         if (needsSettings) {
             PolyPlusConfig.onboardingLightTheme = lightTheme
             PolyPlusConfig.onboardingUiStyle = uiStyle
-            PolyPlusConfig.onboardingGuiScale = guiScale
+            PolyPlusConfig.onboardingGuiScale = chosenGuiScale
             PolyPlusConfig.onboardingToggleSprint = toggleSprint
             if (alphabeticalMods != PolyPlusConfig.alphabeticalModOrder) {
                 PolyPlusConfig.alphabeticalModOrder = alphabeticalMods
@@ -484,7 +494,7 @@ internal fun OnboardingFlow(
                 LookAndFeelPage(
                     lightTheme, { lightTheme = it },
                     uiStyle, { uiStyle = it },
-                    guiScale, maxGuiScale, { guiScale = it },
+                    guiScale, maxGuiScale, { chosenGuiScale = it },
                 )
             OnboardingStep.ModOrder -> ModOrderPage(alphabeticalMods) { alphabeticalMods = it }
             OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
