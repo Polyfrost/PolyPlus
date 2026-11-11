@@ -321,8 +321,8 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
     DetailHeading(info.name, info.type.displayName) {
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
     }
-    if (variants.size > 1) VariantRow(variants, variant) { state.pickVariant(info.id, it) }
     info.description?.takeIf { it.isNotBlank() }?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    if (variants.size > 1) VariantRow(variants, variant) { state.pickVariant(info.id, it) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (owned) {
             TextButton("Open in Wardrobe", themedIcon("profiles"), Modifier.height(38.dp), ButtonStyle.Primary, true, onWardrobe)
@@ -342,8 +342,8 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VariantRow(variants: List<CosmeticVariantUi>, selected: CosmeticVariantUi, onPick: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             variants.forEach { VariantSwatch(it, it.id == selected.id) { onPick(it.id) } }
         }
         Label(selected.name, 12.sp, color = MutedText)
