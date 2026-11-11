@@ -422,7 +422,7 @@ private fun GroupsBody(state: SocialPageState, list: SocialListState, snapshot: 
 @Composable
 private fun FriendsBody(window: SocialWindowState, state: SocialPageState, snapshot: SocialSnapshot, modifier: Modifier) {
     val requests = requestItems(snapshot, state.source)
-    if (snapshot.friends.isEmpty() && requests.isEmpty()) {
+    if (snapshot.friends.isEmpty() && requests.isEmpty() && snapshot.blocked.isEmpty()) {
         NoFriendsMessage(state, modifier)
         return
     }
