@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -72,9 +73,9 @@ internal fun SmallButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(iconPath, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, modifier = Modifier.size(14.dp))
+        Icon(iconPath, color = if (primary) contentOnAccent() else OneConfigTheme.current.textColor, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(8.dp))
-        SocialText(label, color = if (primary) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        SocialText(label, color = if (primary) contentOnAccent() else OneConfigTheme.current.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -189,6 +190,27 @@ internal fun TooltipPopup(text: String) {
 
 @Composable
 internal fun cardBrush(): Brush = SolidColor(OneConfigTheme.current.modCardBackground)
+
+private const val MIN_TEXT_CONTRAST = 4.5f
+private const val CONTRAST_OFFSET = 0.05f
+private const val MUTED_TEXT_ALPHA = 0.72f
+
+private fun contrast(a: Color, b: Color): Float {
+    val la = a.luminance() + CONTRAST_OFFSET
+    val lb = b.luminance() + CONTRAST_OFFSET
+    return if (la > lb) la / lb else lb / la
+}
+
+@Composable
+internal fun contentOnAccent(): Color {
+    val accent = OneConfigTheme.accent
+    val preferred = OneConfigTheme.current.accentTextColor
+    if (contrast(preferred, accent) >= MIN_TEXT_CONTRAST) return preferred
+    return if (contrast(Color.White, accent) >= contrast(Color.Black, accent)) Color.White else Color.Black
+}
+
+@Composable
+internal fun mutedText(): Color = OneConfigTheme.current.textColor.copy(alpha = MUTED_TEXT_ALPHA)
 
 @Composable
 internal fun Modifier.wardrobePanel(): Modifier =

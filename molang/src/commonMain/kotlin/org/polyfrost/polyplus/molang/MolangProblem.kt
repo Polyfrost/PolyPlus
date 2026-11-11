@@ -1,0 +1,27 @@
+package org.polyfrost.polyplus.molang
+
+enum class MolangProblem(val id: String) {
+    EMPTY("empty"),
+    UNEXPECTED("unexpected"),
+    TOO_LONG("too_long"),
+    TOO_DEEP("too_deep"),
+    TOO_BIG("too_big"),
+    UNTERMINATED("unterminated"),
+    CHARACTER("character"),
+    STRING("string"),
+    VALUE("value"),
+    UNCALLED("uncalled"),
+    UNKNOWN_NAME("unknown_name"),
+    NOT_QUERY("not_query"),
+    UNKNOWN_QUERY("unknown_query"),
+    QUERY_PLACE("query_place"),
+    ASSIGN("assign"),
+    VARIABLE_NAME("variable_name"),
+    VARIABLES("variables"),
+    UNKNOWN_FUNCTION("unknown_function"),
+    UNKNOWN_MATH("unknown_math"),
+    PARAM_CALL("param_call"),
+    UNKNOWN_PARAM("unknown_param"),
+    ARGUMENTS("arguments"),
+    COST("cost"),
+}

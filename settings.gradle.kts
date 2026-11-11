@@ -11,10 +11,12 @@ pluginManagement {
 
     plugins {
         kotlin("jvm") version "2.4.20"
+        kotlin("multiplatform") version "2.4.20"
         kotlin("plugin.serialization") version "2.4.20"
         kotlin("plugin.compose") version "2.4.20"
         id("com.gradleup.shadow") version "9.6.1"
         id("me.modmuss50.mod-publish-plugin") version "2.2.0"
+        id("dev.detekt") version "2.0.0-alpha.6"
     }
 }
 
@@ -46,5 +48,8 @@ stonecutter.create(rootProject) {
     version("1.8.9-ornithe", "1.8.9")
     vcsVersion = "26.3-fabric"
 }
+
+include(":molang")
+include(":nameplate-engine")
 
 rootProject.name = "PolyPlus"

@@ -4,9 +4,8 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
-import org.polyfrost.polyplus.client.bedrock.molang.MolangParser
+import org.polyfrost.polyplus.client.bedrock.molang.BedrockMolang
+import org.polyfrost.polyplus.client.bedrock.molang.MolangScalar
 import org.polyfrost.polyplus.client.bedrock.molang.molangScripts
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -33,10 +32,11 @@ object BedrockAnimationControllerParser {
     }
 
     private fun parseController(name: String, obj: JsonObject): BedrockAnimationController {
+        val molang = BedrockMolang()
         val states = LinkedHashMap<String, ControllerState>()
         val statesObj = obj.getAsJsonObject("states") ?: JsonObject()
         for ((stateName, stateElement) in statesObj.entrySet()) {
-            states[stateName] = parseState(stateName, stateElement.asJsonObject)
+            states[stateName] = parseState(stateName, stateElement.asJsonObject, molang)
         }
 
         val initialState = obj.get("initial_state")?.takeIf { it.isJsonPrimitive }?.asString
@@ -50,17 +50,17 @@ object BedrockAnimationControllerParser {
         )
     }
 
-    private fun parseState(name: String, obj: JsonObject): ControllerState {
+    private fun parseState(name: String, obj: JsonObject, molang: BedrockMolang): ControllerState {
         return ControllerState(
             name = name,
-            animations = parseAnimations(obj.getAsJsonArray("animations")),
-            onEntry = obj.molangScripts("on_entry"),
-            onExit = obj.molangScripts("on_exit"),
-            transitions = parseTransitions(obj.getAsJsonArray("transitions")),
+            animations = parseAnimations(obj.getAsJsonArray("animations"), molang),
+            onEntry = obj.molangScripts("on_entry", molang),
+            onExit = obj.molangScripts("on_exit", molang),
+            transitions = parseTransitions(obj.getAsJsonArray("transitions"), molang),
         )
     }
 
-    private fun parseAnimations(array: JsonArray?): List<StateAnimation> {
+    private fun parseAnimations(array: JsonArray?, molang: BedrockMolang): List<StateAnimation> {
         if (array == null) {
             return emptyList()
         }
@@ -75,11 +75,11 @@ object BedrockAnimationControllerParser {
                     val entry = element.asJsonObject.entrySet().firstOrNull() ?: continue
                     val weight = entry.value.takeIf { it.isJsonPrimitive }?.let { primitive ->
                         when {
-                            primitive.asJsonPrimitive.isString -> MolangParser.parseExpression(primitive.asString)
-                            primitive.asJsonPrimitive.isNumber -> Number(primitive.asDouble)
+                            primitive.asJsonPrimitive.isString -> molang.expression(primitive.asString)
+                            primitive.asJsonPrimitive.isNumber -> MolangScalar.Constant(primitive.asDouble)
                             else -> null
                         }
-                    } ?: Number(1.0)
+                    } ?: MolangScalar.ONE
                     result += StateAnimation(entry.key, weight)
                 }
             }
@@ -88,7 +88,7 @@ object BedrockAnimationControllerParser {
         return result
     }
 
-    private fun parseTransitions(array: JsonArray?): List<ControllerTransition> {
+    private fun parseTransitions(array: JsonArray?, molang: BedrockMolang): List<ControllerTransition> {
         if (array == null) {
             return emptyList()
         }
@@ -97,21 +97,21 @@ object BedrockAnimationControllerParser {
         for (element in array) {
             if (!element.isJsonObject) continue
             val entry = element.asJsonObject.entrySet().firstOrNull() ?: continue
-            val condition = readExpression(entry.value)
+            val condition = readExpression(entry.value, molang)
             result += ControllerTransition(entry.key, condition)
         }
 
         return result
     }
 
-    private fun readExpression(element: JsonElement): MolangExpr {
-        if (!element.isJsonPrimitive) return Number(0.0)
+    private fun readExpression(element: JsonElement, molang: BedrockMolang): MolangScalar {
+        if (!element.isJsonPrimitive) return MolangScalar.ZERO
         val primitive = element.asJsonPrimitive
         return when {
-            primitive.isString -> MolangParser.parseExpression(primitive.asString)
-            primitive.isNumber -> Number(primitive.asDouble)
-            primitive.isBoolean -> Number(if (primitive.asBoolean) 1.0 else 0.0)
-            else -> Number(0.0)
+            primitive.isString -> molang.expression(primitive.asString)
+            primitive.isNumber -> MolangScalar.Constant(primitive.asDouble)
+            primitive.isBoolean -> if (primitive.asBoolean) MolangScalar.ONE else MolangScalar.ZERO
+            else -> MolangScalar.ZERO
         }
     }
 }

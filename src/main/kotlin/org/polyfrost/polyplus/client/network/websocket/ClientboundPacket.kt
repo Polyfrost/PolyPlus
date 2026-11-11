@@ -73,6 +73,10 @@ sealed interface ClientboundPacket {
     ) : ClientboundPacket
 
     @Serializable
+    @SerialName("CatalogUpdated")
+    data class CatalogUpdated(val version: Long = 0) : ClientboundPacket
+
+    @Serializable
     @SerialName("EmotePlay")
     data class EmotePlay(
         val player: String,

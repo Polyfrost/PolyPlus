@@ -24,12 +24,5 @@ public class MixinTextBatcher {
         }
         return true;
     }
-
-    // Argentum computes widths itself instead of going through TextRenderer.getWidth(C)
-    @Inject(method = "charWidth(CZ[B)F", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
-    private void polyplus$emojiWidth(char chr, boolean unicode, byte[] glyphSizes, CallbackInfoReturnable<Float> cir) {
-        if (chr == PolyPlusBadge.LEGACY_CHAR) cir.setReturnValue((float) PolyPlusBadge.BADGE_ADVANCE);
-        else if (EmojiFont.legacyIndex(chr) >= 0) cir.setReturnValue(EmojiFont.LEGACY_ADVANCE);
-    }
 }
 *///?}

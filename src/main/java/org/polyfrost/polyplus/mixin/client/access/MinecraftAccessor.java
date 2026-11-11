@@ -7,6 +7,7 @@ import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 //?} else {
 /*import com.mojang.authlib.properties.PropertyMap;
 import net.minecraft.client.Session;
+import net.minecraft.client.TickTimer;
 import net.minecraft.client.render.pipeline.RenderTarget;
 *///?}
 import net.minecraft.client.Minecraft;
@@ -60,6 +61,9 @@ public interface MinecraftAccessor {
 
     @Accessor("renderTarget")
     void polyplus$setMainRenderTarget(RenderTarget target);
+
+    @Accessor("timer")
+    TickTimer polyplus$nameplateTimer();
     *///?}
 
     //? if < 1.21.8 && > 1.8.9 {

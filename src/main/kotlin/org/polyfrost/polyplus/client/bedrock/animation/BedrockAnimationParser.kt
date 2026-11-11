@@ -8,11 +8,9 @@ import com.google.gson.JsonPrimitive
 import org.apache.logging.log4j.LogManager
 import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
+import org.polyfrost.polyplus.client.bedrock.molang.BedrockMolang
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
-import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr
-import org.polyfrost.polyplus.client.bedrock.molang.MolangExpr.Number
-import org.polyfrost.polyplus.client.bedrock.molang.MolangParser
+import org.polyfrost.polyplus.client.bedrock.molang.MolangScalar
 import org.polyfrost.polyplus.client.bedrock.molang.MolangVector3
 import org.polyfrost.polyplus.client.bedrock.molang.molangScripts
 import org.polyfrost.polyplus.client.utils.optionalString
@@ -59,7 +57,8 @@ object BedrockAnimationParser {
         else
             0f
 
-        val boneAnimations = parseBones(obj.getAsJsonObject("bones"))
+        val molang = BedrockMolang()
+        val boneAnimations = parseBones(obj.getAsJsonObject("bones"), molang)
         val resolvedLength = if (lengthTicks > 0f) {
             lengthTicks
         } else {
@@ -70,8 +69,8 @@ object BedrockAnimationParser {
             name = name,
             lengthTicks = resolvedLength,
             loop = readLoopMode(obj),
-            initialize = obj.molangScripts("initialize"),
-            preAnimation = obj.molangScripts("pre_animation"),
+            initialize = obj.molangScripts("initialize", molang),
+            preAnimation = obj.molangScripts("pre_animation", molang),
             boneAnimations = boneAnimations,
         )
     }
@@ -99,7 +98,7 @@ object BedrockAnimationParser {
         }
     }
 
-    private fun parseBones(bonesObj: JsonObject?): Map<String, BoneAnimation> {
+    private fun parseBones(bonesObj: JsonObject?, molang: BedrockMolang): Map<String, BoneAnimation> {
         if (bonesObj == null) {
             return emptyMap()
         }
@@ -108,9 +107,9 @@ object BedrockAnimationParser {
         for ((boneName, element) in bonesObj.entrySet()) {
             val boneObj = element.asJsonObject
             result[boneName] = BoneAnimation(
-                rotation = parseVectorChannel(boneObj.get("rotation"), Vector3f(), isRotation = true),
-                position = parseVectorChannel(boneObj.get("position"), Vector3f(), isRotation = false),
-                scale = parseVectorChannel(boneObj.get("scale"), Vector3f(1f, 1f, 1f), isRotation = false),
+                rotation = parseVectorChannel(boneObj.get("rotation"), Vector3f(), isRotation = true, molang),
+                position = parseVectorChannel(boneObj.get("position"), Vector3f(), isRotation = false, molang),
+                scale = parseVectorChannel(boneObj.get("scale"), Vector3f(1f, 1f, 1f), isRotation = false, molang),
             )
         }
 
@@ -121,6 +120,7 @@ object BedrockAnimationParser {
         element: JsonElement?,
         default: Vector3f,
         isRotation: Boolean,
+        molang: BedrockMolang,
     ): VectorChannel {
         if (element == null) {
             return VectorChannel.empty()
@@ -130,7 +130,7 @@ object BedrockAnimationParser {
             is JsonPrimitive, is JsonArray -> {
                 return VectorChannel.keyframed(
                     MolangKeyframeTrack.of(
-                        listOf(Keyframe(0f, readVector(element, default, isRotation))),
+                        listOf(Keyframe(0f, readVector(element, default, isRotation, molang))),
                     ),
                 )
             }
@@ -143,7 +143,7 @@ object BedrockAnimationParser {
                                 listOf(
                                     Keyframe(
                                         0f,
-                                        readVector(element.get("vector"), default, isRotation),
+                                        readVector(element.get("vector"), default, isRotation, molang),
                                         readEasing(element),
                                     ),
                                 ),
@@ -152,10 +152,10 @@ object BedrockAnimationParser {
                     }
 
                     element.has("value") -> {
-                        val value = readComponentExpression(element.get("value"))
+                        val value = readComponentExpression(element.get("value"), molang)
                         return VectorChannel.keyframed(
                             MolangKeyframeTrack.of(
-                                listOf(Keyframe(0f, MolangVector3(value, Number(0.0), Number(0.0), isRotation))),
+                                listOf(Keyframe(0f, MolangVector3(value, MolangScalar.ZERO, MolangScalar.ZERO, isRotation))),
                             ),
                         )
                     }
@@ -163,7 +163,7 @@ object BedrockAnimationParser {
                     else -> {
                         if (element.entrySet().all { isAnimTimeKey(it.key) }) {
                             val frame = element.entrySet().first().value
-                            return VectorChannel.procedural(readVectorFrame(frame, default, isRotation))
+                            return VectorChannel.procedural(readVectorFrame(frame, default, isRotation, molang))
                         }
 
                         val keyframes = mutableListOf<Keyframe<MolangVector3>>()
@@ -175,8 +175,8 @@ object BedrockAnimationParser {
                             val time = readTimestamp(timeKey)
                             keyframes += Keyframe(
                                 timeTicks = time * TICKS_PER_SECOND,
-                                valuePre = readVectorFrame(frameElement, default, isRotation, preferPre = true),
-                                valuePost = readVectorFrame(frameElement, default, isRotation, preferPre = false),
+                                valuePre = readVectorFrame(frameElement, default, isRotation, molang, preferPre = true),
+                                valuePost = readVectorFrame(frameElement, default, isRotation, molang, preferPre = false),
                                 easing = if (frameElement is JsonObject) readEasing(frameElement) else EasingMode.LINEAR,
                             )
                         }
@@ -194,6 +194,7 @@ object BedrockAnimationParser {
         frameElement: JsonElement,
         default: Vector3f,
         isRotation: Boolean,
+        molang: BedrockMolang,
         preferPre: Boolean = false,
     ): MolangVector3 {
         return when (frameElement) {
@@ -206,10 +207,10 @@ object BedrockAnimationParser {
                     ?: frameElement.get(otherKey)
                     ?: frameElement
 
-                readVector(vectorElement, default, isRotation)
+                readVector(vectorElement, default, isRotation, molang)
             }
 
-            else -> readVector(frameElement, default, isRotation)
+            else -> readVector(frameElement, default, isRotation, molang)
         }
     }
 
@@ -220,10 +221,7 @@ object BedrockAnimationParser {
         }
 
         return runCatching {
-            MolangEvaluator.eval(
-                MolangParser.parseExpression(key),
-                MolangContext.forAnimation(0f),
-            ).toFloat()
+            BedrockMolang().expression(key).evaluate(MolangContext.forAnimation(0f)).toFloat()
         }.getOrDefault(0f)
     }
 
@@ -237,18 +235,18 @@ object BedrockAnimationParser {
         return EasingMode.of(obj.optionalString("lerp_mode"))
     }
 
-    private fun readVector(element: JsonElement, default: Vector3f, isRotation: Boolean): MolangVector3 {
+    private fun readVector(element: JsonElement, default: Vector3f, isRotation: Boolean, molang: BedrockMolang): MolangVector3 {
         return when (element) {
             is JsonPrimitive -> {
-                val scalar = readComponentExpression(element)
-                MolangVector3(scalar, Number(0.0), Number(0.0), isRotation)
+                val scalar = readComponentExpression(element, molang)
+                MolangVector3(scalar, MolangScalar.ZERO, MolangScalar.ZERO, isRotation)
             }
 
             is JsonArray -> {
                 MolangVector3(
-                    x = readComponentExpression(element, 0),
-                    y = readComponentExpression(element, 1),
-                    z = readComponentExpression(element, 2),
+                    x = readComponentExpression(element, 0, molang),
+                    y = readComponentExpression(element, 1, molang),
+                    z = readComponentExpression(element, 2, molang),
                     isRotation = isRotation,
                 )
             }
@@ -257,24 +255,24 @@ object BedrockAnimationParser {
         }
     }
 
-    private fun readComponentExpression(array: JsonArray, index: Int): MolangExpr {
+    private fun readComponentExpression(array: JsonArray, index: Int, molang: BedrockMolang): MolangScalar {
         if (index >= array.size()) {
-            return Number(0.0)
+            return MolangScalar.ZERO
         }
 
-        return readComponentExpression(array[index])
+        return readComponentExpression(array[index], molang)
     }
 
-    private fun readComponentExpression(element: JsonElement): MolangExpr {
+    private fun readComponentExpression(element: JsonElement, molang: BedrockMolang): MolangScalar {
         if (!element.isJsonPrimitive) {
-            return Number(0.0)
+            return MolangScalar.ZERO
         }
 
         val primitive = element.asJsonPrimitive
         return when {
-            primitive.isString -> MolangParser.parseExpression(primitive.asString)
-            primitive.isNumber -> Number(primitive.asDouble)
-            else -> Number(0.0)
+            primitive.isString -> molang.expression(primitive.asString)
+            primitive.isNumber -> MolangScalar.Constant(primitive.asDouble)
+            else -> MolangScalar.ZERO
         }
     }
 
@@ -287,10 +285,7 @@ object BedrockAnimationParser {
             }
 
             if (primitive.isString) {
-                return MolangEvaluator.eval(
-                    MolangParser.parseExpression(primitive.asString),
-                    MolangContext.forAnimation(0f),
-                ).toFloat()
+                return BedrockMolang().expression(primitive.asString).evaluate(MolangContext.forAnimation(0f)).toFloat()
             }
         }
 

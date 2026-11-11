@@ -16,6 +16,7 @@ data class CosmeticDefinition(
     val variantName: String = name,
     // "slim"/"wide" or null when the variant is model-independent
     val model: String? = null,
+    val variantKey: String? = null,
 ) {
     fun preferredSlot(): BodySlot? {
         val default = type.defaultSlot()

@@ -100,6 +100,59 @@
     //"client.cosmetics.MixinLivingEntityRenderer",
     "client.cosmetics.MixinPlayerModel",
     //? if > 1.8.9
+    "client.nameplate.MixinAvatarRenderer",
+    //? if >= 1.21.4
+    "client.nameplate.MixinAvatarRenderState",
+    //? if >= 1.21.8
+    "client.nameplate.MixinDynamicGpuData",
+    //? if = 1.8.9
+    //"client.nameplate.MixinEntityRenderDispatcher",
+    //? if < 1.21.10 || >= 26.1
+    "client.nameplate.MixinEntityRenderer",
+    //? if = 1.8.9 || = 1.21.1
+    //"client.nameplate.MixinGameRenderer",
+    //? if >= 26.3
+    "client.nameplate.MixinGlRenderPipeline",
+    //? if >= 1.21.10
+    "client.nameplate.MixinLevelRenderer",
+    "client.nameplate.MixinLivingEntityRenderer",
+    //? if >= 1.21.10 && < 26.2
+    //"client.nameplate.MixinNameTagFeatureRendererStorage",
+    //? if >= 26.2
+    "client.nameplate.MixinPreparedRenderType",
+    //? if >= 1.21.1 && < 1.21.10
+    //"client.nameplate.MixinRenderSystem",
+    //? if >= 1.21.11 && < 26.3
+    //"client.nameplate.MixinRenderType",
+    //? if >= 26.3
+    "client.nameplate.MixinRenderTypeFeatureRendererGroup",
+    //? if >= 1.21.4
+    "client.nameplate.MixinShaderManager",
+    //? if >= 26.3
+    "client.nameplate.MixinShaderManagerConfigs",
+    //? if >= 26.2
+    "client.nameplate.MixinSubmitNodeCollection",
+    //? if >= 1.21.4
+    "client.nameplate.MixinTextDisplayEntityRenderState",
+    //? if > 1.8.9
+    "client.nameplate.MixinTextDisplayRenderer",
+    //? if >= 26.3
+    "client.nameplate.PipelineCacheAccessor",
+    //? if >= 1.21.11
+    "client.nameplate.RenderTypeInvoker",
+    //? if >= 1.21.1
+    "client.nameplate.SpriteContentsAccessor",
+    //? if >= 1.21.1
+    "client.nameplate.StringSplitterAccessor",
+    //? if = 1.8.9
+    //"client.nameplate.BufferBuilderAccessor",
+    //? if = 1.21.4
+    //"client.nameplate.iris.MixinCompiledShaderProgram",
+    //? if >= 1.21.5 && < 26.3
+    //"client.nameplate.iris.MixinGlCommandEncoder",
+    //? if = 1.21.1 || = 1.21.4
+    //"client.nameplate.iris.MixinVertexBuffer",
+    //? if > 1.8.9
     "client.privacy.MixinAbstractSignEditScreen",
     //? if > 1.8.9
     "client.privacy.MixinClientLanguage",

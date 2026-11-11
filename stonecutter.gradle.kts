@@ -1,5 +1,7 @@
 plugins {
     id("dev.kikugie.stonecutter")
+    kotlin("jvm") apply false
+    kotlin("multiplatform") apply false
 }
 
 stonecutter active "26.3-fabric"

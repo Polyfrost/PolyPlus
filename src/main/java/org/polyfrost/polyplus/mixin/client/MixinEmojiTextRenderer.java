@@ -28,7 +28,7 @@ public abstract class MixinEmojiTextRenderer {
     @Inject(method = "drawGlyph", at = @At("HEAD"), cancellable = true)
     private void polyplus$drawEmoji(char chr, boolean italic, CallbackInfoReturnable<Float> cir) {
         if (chr == PolyPlusBadge.LEGACY_CHAR) {
-            if (!polyplus$shadowLayer) PolyPlusBadge.drawInline(x, y, a);
+            if (!polyplus$shadowLayer && !PolyPlusBadge.inlineSuppressed) PolyPlusBadge.drawInline(x, y, a);
             cir.setReturnValue((float) PolyPlusBadge.BADGE_ADVANCE);
             return;
         }

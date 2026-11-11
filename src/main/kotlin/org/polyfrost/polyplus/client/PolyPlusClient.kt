@@ -42,6 +42,7 @@ import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.launcher.SessionAccounts
 import org.polyfrost.polyplus.client.launcher.SessionRefresh
 import org.polyfrost.polyplus.client.legal.LegalDocuments
+import org.polyfrost.polyplus.client.nameplate.NameplateRegistry
 import org.polyfrost.polyplus.client.network.http.MinecraftLoginGate
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
@@ -82,6 +83,7 @@ import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 object PolyPlusClient {
     private val LOGGER = LogManager.getLogger(PolyPlusConstants.NAME)
     private val cosmeticsRefreshInProgress = AtomicBoolean(false)
+    private val cosmeticsRefreshQueued = AtomicBoolean(false)
 
     private val EXCEPTION_HANDLER = CoroutineExceptionHandler { _, throwable ->
         LOGGER.error("Uncaught exception in PolyPlus coroutine", throwable)
@@ -187,6 +189,7 @@ object PolyPlusClient {
 
         //? if >= 1.21.1 || = 1.8.9
         step("early init CosmeticSync") { CosmeticSync.earlyInitialize() }
+        step("nameplates") { NameplateRegistry.initialize() }
         step("early init FriendsRepository") { FriendsRepository.earlyInitialize() }
         step("early init GroupsRepository") { GroupsRepository.earlyInitialize() }
         // global chat is disabled for now
@@ -252,9 +255,10 @@ object PolyPlusClient {
     }
 
     // Refetches cosmetics without wiping auth or caches
-    fun refreshCosmetics() {
+    fun refreshCosmetics(queueIfBusy: Boolean = false) {
         if (!PrivacyConsent.allowsOnlineServices()) return
         if (!cosmeticsRefreshInProgress.compareAndSet(false, true)) {
+            if (queueIfBusy) cosmeticsRefreshQueued.set(true)
             return
         }
 
@@ -263,6 +267,7 @@ object PolyPlusClient {
                 refreshCosmeticsInternal()
             } finally {
                 cosmeticsRefreshInProgress.set(false)
+                if (cosmeticsRefreshQueued.getAndSet(false)) refreshCosmetics(queueIfBusy = true)
             }
         }
     }

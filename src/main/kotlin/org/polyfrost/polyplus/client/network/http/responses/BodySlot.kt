@@ -16,6 +16,7 @@ enum class BodySlot(val serializedName: String, val displayName: String) {
     Boots("boots", "Boots"),
     Shoulder("shoulder", "Shoulder"),
     Pet("pet", "Pet"),
+    Nameplate("nameplate", "Nameplate"),
     Unknown("unknown", "Unknown");
 
     fun cosmeticType(): CosmeticType = when (this) {
@@ -29,6 +30,7 @@ enum class BodySlot(val serializedName: String, val displayName: String) {
         Boots -> CosmeticType.Boots
         Shoulder -> CosmeticType.Shoulder
         Pet -> CosmeticType.Pet
+        Nameplate -> CosmeticType.Nameplate
         Unknown -> CosmeticType.Unknown
     }
 
