@@ -132,6 +132,9 @@ void main() {
         discard;
     }
     #endif
+    //? if >= 1.21.11 {
+    color = mix(FogColor * vec4(1.0, 1.0, 1.0, color.a), color, chunkVisibility);
+    //?}
     float ring = 1.0 - clamp(waveFront / RING_WIDTH, 0.0, 1.0);
     ring *= smoothstep(RING_WIDTH, RING_WIDTH + RING_RAMP, GameTime * SECONDS_PER_DAY * WAVE_SPEED);
     vec3 tint = FogColor.rgb / max(max(FogColor.r, max(FogColor.g, FogColor.b)), 0.05);
