@@ -185,7 +185,6 @@ if (isOrnithe) {
             "**/mixin/compat/euphoria/**",
             "**/mixin/compat/mountopacity/**",
             "**/mixin/compat/polytone/**",
-            "**/mixin/compat/rrls/**",
             "**/mixin/compat/sodium/**",
             "**/mixin/compat/voicechat/**",
             "**/mixin/compat/waveycapes/**",

@@ -74,9 +74,6 @@ import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseMediaWidgets
 
-//? if >= 26.2 {
-import org.polyfrost.polyplus.compat.RrlsCrashGuard
-//?}
 //? if wwaypoints
 import org.polyfrost.polyplus.compat.WWaypointsCompat
 
@@ -188,8 +185,6 @@ object PolyPlusClient {
         step("onboarding") { OnboardingFeatures.initialize() }
         //? if < 1.21.4 && > 1.8.9
         /*step("lobby shaders") { LobbyPipelines.register() }*/
-        //? if >= 26.2
-        step("rrls crash guard") { RrlsCrashGuard.initialize() }
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("modpack diff") { ModpackDiff.logAsync() }
