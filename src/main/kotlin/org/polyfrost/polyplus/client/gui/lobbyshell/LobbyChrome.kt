@@ -563,9 +563,9 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
             onClose()
             MainMenuReplacement.switchToPolyPlusMenu()
         }
-        MenuItem("Use vanilla Minecraft menus", themedIcon(SOCIAL_ASSETS + "minecraft-block.svg"), "Main menu, pause screen and startup go back to Minecraft's own", MenuItemSize.Regular, false, false, true, null, Modifier, null) {
+        MenuItem("Switch to vanilla main menu", themedIcon(SOCIAL_ASSETS + "minecraft-block.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
-            MainMenuReplacement.returnToVanilla()
+            MainMenuReplacement.switchToVanilla()
         }
         MenuItem("Replay tour", themedIcon(SOCIAL_ASSETS + "play-circle.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
