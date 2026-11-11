@@ -40,6 +40,7 @@ internal object LunarHudTranslator {
             "ACTION_BAR" to ACTION_BAR,
             "TITLES" to TITLES,
             "BOSSBAR" to BOSS_BAR,
+            "HEIGHT_LIMIT" to HEIGHT_LIMIT,
         )
     }
 

@@ -63,7 +63,8 @@ class ClientFeatureImportTest {
     fun `badlion ignores the off state it saves for untouched mods`() {
         val patches = ClientFeatureTranslator.fromBadlion(resource("badlion-data.json"))
 
-        assertEquals(setOf("damagetint.json", "fullbright.json"), patches.configs())
+        assertEquals(setOf("damagetint.json", "fullbright.json", "hybedwars.json"), patches.configs())
+        assertEquals(JsonPrimitive(true), patches.of("hybedwars.json").values["heightOverlay"])
         assertEquals(JsonPrimitive(true), patches.of("fullbright.json").values["enable"])
     }
 
