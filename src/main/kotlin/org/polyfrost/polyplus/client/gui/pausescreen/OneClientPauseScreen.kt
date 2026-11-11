@@ -63,6 +63,10 @@ class OneClientPauseScreen(
 
     private fun overResume(): Boolean = resumeBounds.contains(pointerPosition())
 
+    private fun armResume() {
+        resumeArmed = !moreOpen && !customizeOpen && overResume()
+    }
+
     private fun resumeOnRelease() {
         val armed = resumeArmed
         resumeArmed = false
@@ -124,7 +128,7 @@ class OneClientPauseScreen(
 
     //? if >= 1.21.10 {
     override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) resumeArmed = overResume()
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) armResume()
         return super.mouseClicked(event, doubleClick)
     }
 
@@ -135,7 +139,7 @@ class OneClientPauseScreen(
     }
     //?} elif > 1.8.9 {
     /*override fun mouseClicked(x: Double, y: Double, button: Int): Boolean {
-        if (button == InputConstants.MOUSE_BUTTON_LEFT) resumeArmed = overResume()
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) armResume()
         return super.mouseClicked(x, y, button)
     }
 
@@ -146,7 +150,7 @@ class OneClientPauseScreen(
     }
     *///?} else {
     /*override fun mouseClicked(x: Int, y: Int, button: Int) {
-        if (button == 0) resumeArmed = overResume()
+        if (button == 0) armResume()
         super.mouseClicked(x, y, button)
     }
 
