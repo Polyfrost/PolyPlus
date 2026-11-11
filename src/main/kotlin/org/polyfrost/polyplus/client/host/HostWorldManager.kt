@@ -100,9 +100,9 @@ object HostWorldManager {
                 iconBytes = null,
                 gameMode = save.gameMode,
                 lastPlayed = save.lastPlayed,
-                requiresConversion = !save.isSameVersion,
+                requiresConversion = save.isSameVersion,
                 versionName = clientVersionName,
-                compat = if (save.isSameVersion) Compat.CURRENT else Compat.OLDER,
+                compat = if (save.isSameVersion) Compat.OLDER else Compat.CURRENT,
             )
         }.sortedByDescending { it.lastPlayed }
     }
