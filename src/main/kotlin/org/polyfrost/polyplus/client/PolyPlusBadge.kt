@@ -30,6 +30,9 @@ import net.minecraft.network.chat.Style
 /*import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.network.PlayerInfo
 import net.minecraft.client.render.platform.GlStateManager
+import net.minecraft.client.render.vertex.DefaultVertexFormat
+import net.minecraft.client.render.vertex.Tesselator
+import org.lwjgl.opengl.GL11
 import org.polyfrost.polyplus.client.emoji.EmojiFont
 *///?}
 
@@ -222,6 +225,25 @@ object PolyPlusBadge {
         val bx = x + PAD_LEFT
         val by = y + BADGE_Y_OFFSET
         EmojiFont.drawLegacyQuad(BADGE_TEXTURE, bx, by, bx + BADGE_W, by + BADGE_H, 0f, 0f, 1f, 1f, alpha)
+    }
+
+    @JvmStatic
+    fun drawTesselated(x: Float, y: Float, alpha: Float) {
+        val x0 = (x + PAD_LEFT).toDouble()
+        val y0 = (y + BADGE_Y_OFFSET).toDouble()
+        val x1 = x0 + BADGE_W
+        val y1 = y0 + BADGE_H
+        val previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
+        Minecraft.getInstance().textureManager.bind(BADGE_TEXTURE)
+        val tesselator = Tesselator.getInstance()
+        val buffer = tesselator.buffer
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormat.POSITION_TEX_COLOR)
+        buffer.vertex(x0, y0, 0.0).texture(0.0, 0.0).color(1f, 1f, 1f, alpha).nextVertex()
+        buffer.vertex(x0, y1, 0.0).texture(0.0, 1.0).color(1f, 1f, 1f, alpha).nextVertex()
+        buffer.vertex(x1, y1, 0.0).texture(1.0, 1.0).color(1f, 1f, 1f, alpha).nextVertex()
+        buffer.vertex(x1, y0, 0.0).texture(1.0, 0.0).color(1f, 1f, 1f, alpha).nextVertex()
+        tesselator.end()
+        GlStateManager.bindTexture(previousTexture)
     }
 
     @JvmStatic
