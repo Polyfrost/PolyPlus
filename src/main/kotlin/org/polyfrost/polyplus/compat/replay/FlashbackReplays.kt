@@ -61,7 +61,6 @@ object FlashbackReplays : ReplayProvider {
         val cancel: Method,
         val openReplay: Method,
         val writtenTicks: Field?,
-        val chunkTicks: Field?,
     )
 
     private val hooks: Hooks? by lazy {
@@ -79,7 +78,6 @@ object FlashbackReplays : ReplayProvider {
                 cancel = main.getMethod("cancelRecordingReplay"),
                 openReplay = main.getMethod("openReplayWorld", Path::class.java),
                 writtenTicks = privateField(recorder.type, "writtenTicks"),
-                chunkTicks = privateField(recorder.type, "writtenTicksInChunk"),
             )
         }.getOrNull()
     }
@@ -155,14 +153,14 @@ object FlashbackReplays : ReplayProvider {
             val meta = InputStreamReader(zip.getInputStream(metaEntry), Charsets.UTF_8).use { gson.fromJson(it, JsonObject::class.java) }
                 ?: return@runCatching null
             val hasIcon = zip.getEntry(ICON) != null
-            val dataVersion = meta.intOrNull("dataVersion")
+            val dataVersion = meta.intOrNull("data_version")
             val tooNew = dataVersion != null && currentDataVersion != null && dataVersion > currentDataVersion
             ReplayEntry(
                 provider = this,
                 path = file,
                 name = meta.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: file.fileName.toString().removeSuffix(".zip"),
-                world = meta.stringOrNull("worldName")?.takeIf { it.isNotBlank() },
-                durationMillis = meta.intOrNull("totalTicks")?.let { it.toLong() * MILLIS_PER_TICK },
+                world = meta.stringOrNull("world_name")?.takeIf { it.isNotBlank() },
+                durationMillis = meta.intOrNull("total_ticks")?.let { it.toLong() * MILLIS_PER_TICK },
                 modified = replay.modified,
                 size = replay.size,
                 iconSource = { if (hasIcon) readIcon(file) else null },
@@ -237,11 +235,8 @@ object FlashbackReplays : ReplayProvider {
         }
 
     private fun elapsedMillis(hooks: Hooks, recorder: Any, paused: Boolean): Long? {
-        val written = hooks.writtenTicks
-        val chunk = hooks.chunkTicks
-        if (written != null && chunk != null) {
-            runCatching { (written.getInt(recorder).toLong() + chunk.getInt(recorder).toLong()) * MILLIS_PER_TICK }
-                .getOrNull()?.let { return it }
+        hooks.writtenTicks?.let { written ->
+            runCatching { written.getInt(recorder).toLong() * MILLIS_PER_TICK }.getOrNull()?.let { return it }
         }
         val now = System.currentTimeMillis()
         val current = session?.takeIf { it.recorder === recorder } ?: Session(recorder, now).also { session = it }
