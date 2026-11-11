@@ -146,7 +146,7 @@ float auroraBand(vec3 dir, float t) {
     return rise * fall * smoothstep(0.2, 0.75, sweep);
 }
 
-vec3 aurora(vec3 dir, float t, float jitter) {
+vec3 aurora(vec3 dir, float t, float jitter, float coverage) {
     vec3 total = vec3(0.0);
     const int STEPS = 26;
     for (int i = 0; i < STEPS; i++) {
@@ -158,7 +158,7 @@ vec3 aurora(vec3 dir, float t, float jitter) {
         tint = mix(tint, vec3(0.92, 0.16, 0.86), smoothstep(0.5, 1.0, f));
         total += band * tint * pow(1.0 - f, 1.6);
     }
-    return total * 0.3 * auroraBand(dir, t);
+    return total * 0.3 * coverage;
 }
 
 vec3 ringGlow(float front) {
@@ -171,8 +171,6 @@ vec3 ringGlow(float front) {
 void main() {
     vec3 color = texture(InSampler, texCoord).rgb;
     float depth = texture(DepthSampler, texCoord).r;
-    vec2 ndc = texCoord * 2.0 - 1.0;
-    vec3 dir = normalize(Forward.xyz + Right.xyz * ndc.x * Forward.w * Right.w + Up.xyz * ndc.y * Forward.w);
     if (!depthKnown() || !(depth >= 0.0 && depth <= 1.0)) {
         fragColor = vec4(color, 1.0);
         return;
@@ -186,10 +184,17 @@ void main() {
             color += ringGlow(front);
         }
     }
-    if (sky && dir.y > 0.08 && Mood.x > 0.01) {
-        vec3 glow = aurora(dir, Up.w, hash(texCoord + fract(Up.w)));
-        float glowLuma = dot(glow, vec3(0.2126, 0.7152, 0.0722));
-        color += mix(vec3(glowLuma), glow, AURORA_SATURATION) * AURORA_STRENGTH * Mood.x;
+    if (sky && Mood.x > 0.01) {
+        vec2 ndc = texCoord * 2.0 - 1.0;
+        vec3 dir = normalize(Forward.xyz + Right.xyz * ndc.x * Forward.w * Right.w + Up.xyz * ndc.y * Forward.w);
+        if (dir.y > 0.08) {
+            float coverage = auroraBand(dir, Up.w);
+            if (coverage > 0.0) {
+                vec3 glow = aurora(dir, Up.w, hash(texCoord + fract(Up.w)), coverage);
+                float glowLuma = dot(glow, vec3(0.2126, 0.7152, 0.0722));
+                color += mix(vec3(glowLuma), glow, AURORA_SATURATION) * AURORA_STRENGTH * Mood.x;
+            }
+        }
     }
     fragColor = vec4(color, 1.0);
 }

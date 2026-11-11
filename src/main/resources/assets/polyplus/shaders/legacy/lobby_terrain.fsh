@@ -20,10 +20,12 @@ void main() {
         discard;
     }
     vec4 color = texture2D(Sampler0, texCoord0) * vertexColor * texture2D(Sampler2, lightCoord);
-    float ring = 1.0 - clamp(waveFront / RING_WIDTH, 0.0, 1.0);
-    ring *= smoothstep(RING_WIDTH, RING_WIDTH + RING_RAMP, Seconds * WAVE_SPEED);
-    vec3 tint = gl_Fog.color.rgb / max(max(gl_Fog.color.r, max(gl_Fog.color.g, gl_Fog.color.b)), 0.05);
-    color.rgb += mix(tint, vec3(1.0), ring) * RING_GAIN * ring * ring;
+    if (waveFront < RING_WIDTH) {
+        float ring = 1.0 - clamp(waveFront / RING_WIDTH, 0.0, 1.0);
+        ring *= smoothstep(RING_WIDTH, RING_WIDTH + RING_RAMP, Seconds * WAVE_SPEED);
+        vec3 tint = gl_Fog.color.rgb / max(max(gl_Fog.color.r, max(gl_Fog.color.g, gl_Fog.color.b)), 0.05);
+        color.rgb += mix(tint, vec3(1.0), ring) * RING_GAIN * ring * ring;
+    }
     float fogValue = clamp((fogDistance - gl_Fog.start) * gl_Fog.scale, 0.0, 1.0);
     gl_FragColor = vec4(mix(color.rgb, gl_Fog.color.rgb, fogValue), color.a);
 }
