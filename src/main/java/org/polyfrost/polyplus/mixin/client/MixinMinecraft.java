@@ -3,6 +3,8 @@ package org.polyfrost.polyplus.mixin.client;
 //? if > 1.8.9
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
+import org.objectweb.asm.Opcodes;
+import org.polyfrost.polyplus.client.features.DefaultSettings;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +21,11 @@ import org.polyfrost.polyplus.PolyPlusEntrypoint;
 @Mixin(value = Minecraft.class, priority = 1500)
 public class MixinMinecraft {
     //? if > 1.8.9 {
+    @Inject(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;options:Lnet/minecraft/client/Options;", opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER))
+    private void polyplus$applyVsyncDefaultBeforeWindow(CallbackInfo ci) {
+        DefaultSettings.applyVsyncBeforeWindow();
+    }
+
     @Inject(method = "runTick", at = @At("HEAD"))
     private void polyplus$beginMenuBackdropFrame(boolean renderLevel, CallbackInfo ci) {
         MenuPanorama.beginPass();

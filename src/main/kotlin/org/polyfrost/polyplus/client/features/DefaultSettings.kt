@@ -28,6 +28,7 @@ import kotlin.io.path.writeText
 object DefaultSettings {
     private val logger = LogManager.getLogger("PolyPlus/DefaultSettings")
 
+    private const val VANILLA_OPTIONS_ID = "vanilla-options"
     private const val TICK_SCAN_INTERVAL = 20
     private const val RETRY_SCAN_LIMIT = 100
 
@@ -97,7 +98,7 @@ object DefaultSettings {
     }
 
     private val TICK_TASKS = buildList {
-        add(Task("vanilla-options", "Minecraft options", { true }, ::applyVanillaOptions))
+        add(Task(VANILLA_OPTIONS_ID, "Minecraft options", { true }, ::applyVanillaOptions))
         //? if > 1.8.9 {
         add(
             Task(
@@ -246,14 +247,25 @@ object DefaultSettings {
     private val classCache = HashMap<String, Class<*>?>()
     private var ticks = 0
     private var done = false
+    private var loaded = false
 
     fun initialize() {
         applied += PolyPlusConfig.appliedDefaults.split(',').filter(String::isNotEmpty)
+        loaded = true
 
         eventHandler { _: TickEvent.End ->
             if (!done && ticks++ % TICK_SCAN_INTERVAL == 0) scan()
         }
     }
+
+    //? if > 1.8.9 {
+    @JvmStatic
+    fun applyVsyncBeforeWindow() {
+        if (!loaded || PolyPlusConfig.defaultSettingsApplied || VANILLA_OPTIONS_ID in applied) return
+        runCatching { Minecraft.getInstance().options.enableVsync().set(false) }
+            .onFailure { logger.warn("Could not turn vsync off before window creation", it) }
+    }
+    //?}
 
     private fun scan() {
         migrateLegacyFlag()
