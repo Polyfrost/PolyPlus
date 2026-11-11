@@ -87,7 +87,10 @@ public class MixinScreen {
         *///?}
         float tickDelta, CallbackInfo ci
     ) {
-        if (MenuPanorama.drawComposeBackdrop(graphics, (Screen) (Object) this)) ci.cancel();
+        if (!MenuPanorama.drawComposeBackdrop(graphics, (Screen) (Object) this)) return;
+        //? if >= 1.21.11
+        graphics.nextStratum();
+        ci.cancel();
     }
 
     @Inject(
