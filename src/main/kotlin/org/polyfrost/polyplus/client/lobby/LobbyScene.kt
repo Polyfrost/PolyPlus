@@ -338,6 +338,8 @@ object LobbyScene {
     var currentId by mutableStateOf<String?>(null)
         private set
 
+    private var currentEntry: LobbySceneEntry? = null
+
     private var live: Live? = null
     private var session: LobbySession? = null
     private var loadGeneration = 0
@@ -624,7 +626,9 @@ object LobbyScene {
     fun isSceneLevel(level: Level?): Boolean = level != null && level === sceneLevel
 
     fun findScene(id: String): LobbySceneEntry? {
-        val known = listOfNotNull(LobbyCapture.returnEntry()) + LobbySceneStore.usableScenes + LobbySceneStore.bundledScenes
+        val shown = currentEntry?.takeIf { it.origin == LobbySceneEntry.ORIGIN_PARTY && it.id == currentId }
+        val followed = PartyScene.startEntries().filter { it.origin == LobbySceneEntry.ORIGIN_PARTY }
+        val known = listOfNotNull(LobbyCapture.returnEntry(), shown) + followed + LobbySceneStore.usableScenes + LobbySceneStore.bundledScenes
         val entry = known.firstOrNull { it.id == id } ?: return null
         val file = if (entry.origin == LobbySceneEntry.ORIGIN_PARTY) Path.of(entry.file) else LobbySceneStore.fileOf(entry)
         return entry.takeIf { file == null || Files.exists(file) }
@@ -775,11 +779,12 @@ object LobbyScene {
         CompletableFuture.supplyAsync({
             val root = LobbySceneStore.read(entry)
             check(LobbySnapshot.compatible(root, entry.bundled)) { "Scene ${entry.id} was saved by another game version" }
+            val resolved = LobbySnapshot.withDimension(entry, root)
             //? if > 1.8.9 {
             val registries = cachedRegistries ?: LobbyRegistries.load()
-            Loaded(entry, root, registries)
+            Loaded(resolved, root, registries)
             //?} else {
-            /*Loaded(entry, root)
+            /*Loaded(resolved, root)
             *///?}
         }, Util.ioPool()).whenCompleteAsync({ loaded, error ->
             if (generation != loadGeneration) {
@@ -828,6 +833,7 @@ object LobbyScene {
             building = false
         }
         currentId = loaded.entry.id
+        currentEntry = loaded.entry
         LobbyReveal.next()
         //? if >= 1.21.10
         if (embedded) created.particles = ParticleEngine(created.level, (mc.particleEngine as ParticleEngineAccessor).`polyplus$resources`())

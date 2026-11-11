@@ -1099,7 +1099,7 @@ object LobbyCapture {
                 }
                 val encodeStart = Util.getNanos()
                 val packs = LobbyPacks.record(job.source.stack)
-                val meta = LobbySnapshot.Meta(anchor, clock, job.radius, job.minSection, job.topSection, biome, job.source.privacy, stage.toTag(), packs, job.entities)
+                val meta = LobbySnapshot.Meta(anchor, clock, job.radius, job.minSection, job.topSection, biome, job.source.privacy, stage.toTag(), packs, job.entities, dimension)
                 //? if > 1.8.9 {
                 val root = LobbySnapshot.encode(job.chunks, meta, factory)
                 //?} else {

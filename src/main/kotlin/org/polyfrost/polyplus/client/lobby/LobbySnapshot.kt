@@ -164,6 +164,7 @@ object LobbySnapshot {
         val stage: CompoundTag?,
         val packs: List<LobbyScenePack> = emptyList(),
         val entities: ListTag? = null,
+        val dimension: String = "",
     )
 
     //? if = 1.8.9 {
@@ -250,6 +251,7 @@ object LobbySnapshot {
             putInt("max_section", meta.maxSection)
             putString("biome", meta.biome)
             putString("privacy", meta.privacy.name)
+            if (meta.dimension.isNotEmpty()) putString("dimension", meta.dimension)
             meta.stage?.let { put("stage", it) }
             meta.entities?.let { if (it.size > 0) put("entities", it) }
             if (meta.packs.isNotEmpty()) {
@@ -405,6 +407,12 @@ object LobbySnapshot {
     *///?}
 
     private const val MAX_NBT_BYTES = 64L * 1024L * 1024L
+
+    fun withDimension(entry: LobbySceneEntry, root: CompoundTag): LobbySceneEntry {
+        if (entry.dimension.isNotEmpty()) return entry
+        val dimension = root.getStringOr("dimension", "")
+        return if (dimension.isEmpty()) entry else entry.copy(dimension = dimension)
+    }
 
     fun native(root: CompoundTag): Boolean = root.getIntOr("data_version", 0) == dataVersion
 
