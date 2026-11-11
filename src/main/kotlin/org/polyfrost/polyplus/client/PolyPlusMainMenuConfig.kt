@@ -52,6 +52,14 @@ object PolyPlusMainMenuConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Swap Quickplay and Player Preview",
+        description = "Show Quickplay on the right and your player preview on the left in the PolyPlus menu.",
+        subcategory = "Elements",
+    )
+    var swapMainMenuSideColumns = false
+
+    @JvmStatic
+    @Switch(
         title = "Hide Alt Manager",
         description = "Hide the account/alt manager in the lobby.",
         subcategory = "Elements",

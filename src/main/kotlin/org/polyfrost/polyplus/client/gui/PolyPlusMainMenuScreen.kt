@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -127,6 +126,7 @@ import net.minecraft.server.network.EventLoopGroupHolder
 *///?}
 
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
+    private val openedAt = System.currentTimeMillis()
     private var menuGuiScale by mutableStateOf(mcGuiScale())
 
     private fun syncGuiScaleState() {
@@ -258,7 +258,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                     },
                     mods = { PolyPlusOneConfigIntegration.openMods() },
                     fullscreen = ::toggleFullscreen,
-                    quit = { mc.stop() },
+                    quit = { if (System.currentTimeMillis() - openedAt >= QUIT_COOLDOWN_MILLIS) mc.stop() },
                     connect = { server -> connectTo(mc, server) },
                 ),
                 quickplay = quickplay,
@@ -357,34 +357,35 @@ private fun MainMenu(
                 val edgeX = { dp: Float -> minOf(dp / safeScale, dp + (innerWidth - BASE_WIDTH) / 2f).coerceAtLeast(0f).dp }
                 val edgeY = { dp: Float -> minOf(dp / safeScale, dp + (innerHeight - BASE_HEIGHT) / 2f).coerceAtLeast(0f).dp }
                 CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
-                    var rightColumnHeightPx by remember { mutableStateOf(0) }
-                    val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
-                    val columnBottomPadding = ((BASE_HEIGHT.dp - rightColumnHeight) / 2).coerceAtLeast(0.dp)
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
                     ) {
                         CenterColumn(
-                            Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding),
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = COLUMN_INSET.dp),
                             actions,
                         )
                     }
-                    if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
-                        LeftColumn(
-                            Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = edgeX(50f)),
-                            quickplay,
-                            pingTick,
-                            actions,
-                        )
+                    val sideTop = ((innerHeight - BASE_HEIGHT) / 2f + COLUMN_INSET).coerceAtLeast(0f).dp
+                    val swapped = PolyPlusMainMenuConfig.swapMainMenuSideColumns
+                    val quickplaySide = if (swapped) Alignment.TopEnd else Alignment.TopStart
+                    val previewSide = if (swapped) Alignment.TopStart else Alignment.TopEnd
+                    Column(
+                        modifier = Modifier
+                            .align(quickplaySide)
+                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        FeaturedServerCard(Modifier, pingTick, actions)
+                        if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
+                            LeftColumn(Modifier, quickplay, pingTick, actions)
+                        }
                     }
                     RightColumn(
                         Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = edgeX(50f))
-                            .onSizeChanged { rightColumnHeightPx = it.height },
+                            .align(previewSide)
+                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
                         screen,
                         onAccounts = { accountsOpen = true },
                     )
@@ -400,13 +401,6 @@ private fun MainMenu(
                             screen,
                         )
                     }
-                    FeaturedServerCard(
-                        Modifier
-                            .align(Alignment.TopStart)
-                            .padding(start = edgeX(50f), top = edgeY(50f)),
-                        pingTick,
-                        actions,
-                    )
                     if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
                 }
             }
@@ -417,6 +411,7 @@ private fun MainMenu(
 
 private const val BASE_WIDTH = 1240f
 private const val QUICKPLAY_MAX = 3
+private const val QUIT_COOLDOWN_MILLIS = 500L
 
 private sealed interface QuickplayEntry {
     val lastPlayed: Long
@@ -428,6 +423,8 @@ private sealed interface QuickplayEntry {
     }
 }
 private const val BASE_HEIGHT = 720f
+private const val FULL_SIDE_COLUMN_HEIGHT = 446f
+private const val COLUMN_INSET = (BASE_HEIGHT - FULL_SIDE_COLUMN_HEIGHT) / 2f
 
 @Composable
 private fun Icon(path: String, color: Color, modifier: Modifier) =
