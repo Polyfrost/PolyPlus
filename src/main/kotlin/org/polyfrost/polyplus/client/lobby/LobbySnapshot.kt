@@ -287,7 +287,8 @@ object LobbySnapshot {
     private fun CompoundTag.putLight(name: String, layer: DataLayer?) {
         if (layer == null) return
         val bytes = layer.data
-        if (bytes.all { it == bytes[0] }) {
+        val first = bytes[0].toInt()
+        if ((first and 0xF) == ((first shr 4) and 0xF) && bytes.all { it == bytes[0] }) {
             putByte("${name}_fill", (bytes[0].toInt() and 0xF).toByte())
         } else {
             putByteArray(name, bytes)
