@@ -32,6 +32,7 @@ import org.polyfrost.polyplus.mixin.client.access.TooltipAccessor
 //?} else {
 /*import net.minecraft.client.gui.screen.menu.GameMenuScreen as PauseScreen
 import net.minecraft.client.gui.widget.ButtonWidget
+import net.minecraft.client.resource.language.I18n
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 *///?}
 
@@ -54,6 +55,7 @@ internal class PauseEntry(
     val sprite: ImageBitmap?,
     val glyph: String,
     val modMenu: Boolean = false,
+    val relabelled: Boolean = false,
     val press: () -> Unit,
 ) {
     fun same(other: PauseEntry): Boolean =
@@ -90,7 +92,18 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
     }
 
     fun tick() {
+        //? if > 1.8.9 {
         vanilla.tick()
+        //?} else {
+        /*val mc = Minecraft.getInstance()
+        val shown = mc.screen
+        mc.screen = vanilla
+        try {
+            vanilla.tick()
+        } finally {
+            if (mc.screen === vanilla) mc.screen = shown
+        }
+        *///?}
     }
 
     fun refresh() {
@@ -148,7 +161,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
                 Slotted(PauseSlot.WORLD, GROUP_GAME, GLYPH_WORLD)
             "gui.advancements" -> Slotted(PauseSlot.ADVANCEMENTS, GROUP_GAME, "star")
             "gui.stats" -> Slotted(PauseSlot.STATS, GROUP_GAME, "align")
-            "menu.returnToMenu", "menu.disconnect", "gui.toTitle" -> Slotted(PauseSlot.QUIT, GROUP_GAME, GLYPH_LEAVE)
+            in VANILLA_QUIT_KEYS -> Slotted(PauseSlot.QUIT, GROUP_GAME, GLYPH_LEAVE)
             "menu.sendFeedback", "menu.reportBugs", "menu.feedback", "menu.playerReporting" -> Slotted(PauseSlot.MORE, GROUP_HELP, GLYPH_ROW)
             "menu.server_links" -> Slotted(PauseSlot.MORE, GROUP_SERVER, GLYPH_ROW)
             else -> Slotted(PauseSlot.MORE, GROUP_OTHER, GLYPH_ROW)
@@ -171,6 +184,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
             spriteOf(widget),
             slotted.glyph,
             slotted.slot == PauseSlot.MORE && isModMenu(widget, handler),
+            slotted.slot == PauseSlot.QUIT && (widget.message.contents as? TranslatableContents)?.key !in VANILLA_QUIT_KEYS,
         ) { press(widget) }
     }
 
@@ -263,6 +277,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
                     PauseSlot.QUIT -> GLYPH_LEAVE
                     else -> GLYPH_ROW
                 },
+                relabelled = slot == PauseSlot.QUIT && VANILLA_QUIT_KEYS.none { I18n.translate(it) == button.message },
             ) { press(button) }
         }
     }
@@ -285,6 +300,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         const val UNNAMED = "Mod button"
         const val MOD_MENU_KEY = "modmenu.title"
         const val MOD_MENU_PACKAGE = "com.terraformersmc.modmenu."
+        val VANILLA_QUIT_KEYS = setOf("menu.returnToMenu", "menu.disconnect", "gui.toTitle")
         //? if = 1.8.9 {
         /*const val LEGACY_OPTIONS = 0
         const val LEGACY_QUIT = 1
