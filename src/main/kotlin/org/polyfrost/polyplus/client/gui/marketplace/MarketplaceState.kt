@@ -167,7 +167,7 @@ internal class MarketplaceState {
 
     private suspend fun liveBundle(items: List<CosmeticStoreInfo>): MarketBundle? {
         val live = BundleCatalog.featured() ?: return null
-        val pieces = live.cosmetics.mapNotNull { id ->
+        val pieces = (live.cosmetics + live.emotes).mapNotNull { id ->
             items.firstOrNull { info -> info.variantList.any { it.id == id } }?.let { MarketPiece(it, id) }
         }
         return MarketBundle(live.info, "Bundle", pieces)
@@ -232,7 +232,7 @@ internal class MarketplaceState {
         showCart = false
         selection = WardrobeSelection.Bundle(target.id)
         fitting.clear()
-        current.pieces.forEach { fit(it.info, it.variantId) }
+        current.pieces.filter { it.info.type != CosmeticType.Emote }.forEach { fit(it.info, it.variantId) }
     }
 
     fun pickVariant(infoId: Int, variantId: Int) {

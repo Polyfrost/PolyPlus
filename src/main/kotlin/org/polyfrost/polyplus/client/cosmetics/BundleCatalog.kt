@@ -11,7 +11,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BundleSearchResponse
 import org.polyfrost.polyplus.client.network.http.responses.BundleViewResponse
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
-class FeaturedBundle(val info: BundleInfo, val cosmetics: List<Int>)
+class FeaturedBundle(val info: BundleInfo, val cosmetics: List<Int>, val emotes: List<Int>)
 
 object BundleCatalog {
     private val LOGGER = LogManager.getLogger()
@@ -35,7 +35,8 @@ object BundleCatalog {
     }.onFailure { LOGGER.error("Failed to view bundle {}", id, it) }
 
     suspend fun featured(): FeaturedBundle? {
-        val info = search(perPage = 1).getOrNull()?.bundles?.firstOrNull { it.purchasable } ?: return null
-        return FeaturedBundle(info, view(info.id).getOrNull()?.cosmetics.orEmpty())
+        val info = search(perPage = MAX_PAGE_SIZE).getOrNull()?.bundles?.firstOrNull { it.purchasable } ?: return null
+        val contents = view(info.id).getOrNull() ?: return null
+        return FeaturedBundle(info, contents.cosmetics, contents.emotes)
     }
 }

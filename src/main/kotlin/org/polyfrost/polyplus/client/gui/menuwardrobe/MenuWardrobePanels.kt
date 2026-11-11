@@ -267,9 +267,9 @@ private class BundleOffer(val label: String, val name: String, val description: 
 
 private fun bundleOffer(items: List<CosmeticUiItem>, live: FeaturedBundle?): BundleOffer {
     val unowned = items.filter { !it.owned && it.type != CosmeticType.Emote }
-    fun within(ids: Collection<Int>) = unowned.filter { item -> item.variants.any { it.id in ids } }.take(OFFER_COUNT)
+    fun within(ids: Collection<Int>) = items.filter { item -> !item.owned && item.variants.any { it.id in ids } }.take(OFFER_COUNT)
     return when {
-        live != null -> BundleOffer("Bundle", live.info.name, live.info.description, live.info, within(live.cosmetics))
+        live != null -> BundleOffer("Bundle", live.info.name, live.info.description, live.info, within(live.cosmetics + live.emotes))
         else -> BundleOffer("Marketplace", "Not in your collection yet", null, null, unowned.take(OFFER_COUNT))
     }
 }
