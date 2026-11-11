@@ -31,7 +31,7 @@ object PingInput {
     private const val DOUBLE_TAP_MS = 350L
     private var lastTap: LastTap? = null
 
-    private const val HOLD_MS = 200L
+    private const val HOLD_MS = 350L
     private const val DRAG_OPEN_PX = 7.0
     private const val CLEAR_RADIUS = 14f
     private const val SEND_PITCH = 1.6f
