@@ -199,7 +199,9 @@ object LeaderFollow {
     }
 
     private fun onResolved(packet: ClientboundPacket.HostedJoinResolved) {
-        val current = hosted?.takeIf { it.requestId == packet.requestId } ?: return
+        val current = hosted?.takeIf {
+            it.requestId == packet.requestId || (it.requestId == null && it.requested && it.sessionId == packet.sessionId)
+        } ?: return
         current.requested = false
         current.requestId = null
         when (packet.result) {
