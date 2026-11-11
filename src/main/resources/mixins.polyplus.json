@@ -318,10 +318,6 @@
     "compat.polyhitbox.MixinPolyHitboxRenderer",
     //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
-    //? if >= 26.2 {
-    "compat.rrls.MixinOverlayHelper",
-    "compat.rrls.MixinRrlsAbstractTexture",
-    //?}
     //? if >= 26.2
     "compat.sodium.MixinDefaultChunkRendererLobby",
     //? if > 1.8.9

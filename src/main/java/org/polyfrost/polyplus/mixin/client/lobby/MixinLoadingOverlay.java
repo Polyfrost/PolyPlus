@@ -6,7 +6,6 @@ import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.server.packs.resources.ReloadInstance;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.client.lobby.StartupOverlay;
-import org.polyfrost.polyplus.compat.RrlsOverlay;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -71,7 +70,7 @@ public class MixinLoadingOverlay {
         //?} else {
         /*boolean polyplus$visible = graphics.getClass() == GuiGraphics.class;
         *///?}
-        if (!polyplus$visible || RrlsOverlay.hides(this)) {
+        if (!polyplus$visible) {
             polyplus$branded = false;
             StartupOverlay.abandon(reload.done());
             return;
