@@ -19,12 +19,12 @@ import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
+import org.polyfrost.polyplus.client.party.PartyPresence
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.security.MessageDigest
-import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
 
@@ -273,7 +273,7 @@ object PartyPings {
         if (integrated) return P2PSessionManager.currentSessionId?.let { "p2p:$it" }
         val address = mc.currentServer?.ip?.trim() ?: return null
         if (address == P2PSessionManager.P2P_PLACEHOLDER_IP) return P2PSessionManager.joinedSessionId?.let { "p2p:$it" }
-        return address.lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
+        return address.takeIf { it.isNotEmpty() }?.let(PartyPresence::serverKey)
     }
 
     private fun hash(input: String): String = synchronized(lock) {
