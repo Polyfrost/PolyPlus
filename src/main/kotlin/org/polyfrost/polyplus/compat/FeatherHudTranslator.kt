@@ -83,7 +83,12 @@ internal object FeatherHudTranslator {
             1.0 to 1.0
         }
 
-        return root.mapNotNull { (key, value) ->
+        return requests(root, factorX, factorY)
+    }
+
+    /** Pure translation of a Feather profile; [factorX]/[factorY] turn Feather GUI pixels into HUD units. */
+    internal fun requests(root: JsonObject, factorX: Double, factorY: Double): List<Request> =
+        root.mapNotNull { (key, value) ->
             val module = modules[key] ?: return@mapNotNull null
             val settings = value as? JsonObject ?: return@mapNotNull null
             val x = settings.number("hudRelativeX")
@@ -99,7 +104,6 @@ internal object FeatherHudTranslator {
                 y = y * factorY,
             )
         }
-    }
 
     /** Positive offsets are measured from the left/top edge, negative ones from the right/bottom edge. */
     private fun inferredSection(x: Double, y: Double): String =

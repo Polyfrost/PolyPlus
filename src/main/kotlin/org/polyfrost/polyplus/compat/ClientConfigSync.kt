@@ -287,54 +287,62 @@ object ClientConfigSync {
             .flatMap { path -> runCatching { readOptionEntries(path) }.getOrDefault(emptyList()) }
             .filter { it.first !in excludedOptions }
             .distinctBy { it.first }
-        if (options.isNotEmpty()) {
-            add("Minecraft options · ${options.size} settings")
-        }
-        readOnboardingPreferences(paths).forEach { (preference, enabled) ->
-            when (preference) {
-                OnboardingPreference.SKIN_LAYERS ->
-                    add("3D Skin Layers · ${if (enabled) "Enabled" else "Disabled"} (from client)")
+        // Onboarding shows only a few lines per source, so keep to one line per category.
+        if (options.isNotEmpty()) add("Game settings · ${options.size} options")
+
+        val modSettings = buildList {
+            paths.forEach { path ->
+                sharedModConfigs.entries.firstOrNull {
+                    it.value == path.fileName?.toString() && FabricLoader.getInstance().isModLoaded(it.key)
+                }?.let { add(it.key.toPreviewLabel()) }
             }
-        }
+            readOnboardingPreferences(paths).forEach { (preference, enabled) ->
+                when (preference) {
+                    OnboardingPreference.SKIN_LAYERS -> add("3D skin layers ${if (enabled) "on" else "off"}")
+                }
+            }
+        }.distinct()
+        if (modSettings.isNotEmpty()) add("Mod settings · ${modSettings.joinToString(", ")}")
 
-        val configNames = paths.mapNotNull { path ->
-            sharedModConfigs.entries.firstOrNull { it.value == path.fileName?.toString() && FabricLoader.getInstance().isModLoaded(it.key) }
-                ?.key?.toPreviewLabel()
+        val huds = buildList {
+            importableHudFiles(paths).values.forEach { add(it.substringAfterLast('.').removeSuffix("Hud")) }
+            paths.filter { oneConfigProfileHudMod(it)?.let(::isHudModLoaded) == true }
+                .forEach { add(it.fileName.toString().removeSuffix(".json")) }
+            addAll(LunarHudTranslator.preview(paths))
+            addAll(NoRiskHudTranslator.preview(paths))
+            addAll(FeatherHudTranslator.preview(paths))
+            addAll(BadlionHudTranslator.preview(paths))
+        }.map { it.toHudLabel() }.distinct()
+        val hasHudLayout = paths.any {
+            BadlionHudTranslator.isBadlionProfile(it) || FeatherHudTranslator.isFeatherProfile(it) ||
+                it.fileName?.toString() == "mods.json" ||
+                it.parent?.fileName?.toString() == "profiles" && it.fileName?.toString()?.endsWith(".json") == true
         }
-        if (configNames.isNotEmpty()) add("Mod configs · ${configNames.distinct().joinToString(", ")}")
-
-        val hudCount = importableHudFiles(paths).size
-        if (hudCount > 0) add("HUD layouts · $hudCount")
-        val profileHudCount = paths.count { path ->
-            oneConfigProfileHudMod(path)?.let(::isHudModLoaded) == true
+        when {
+            huds.isNotEmpty() -> {
+                val shown = huds.take(PREVIEW_HUD_NAMES)
+                val more = huds.size - shown.size
+                add("HUDs · ${huds.size}: ${shown.joinToString(", ")}${if (more > 0) ", +$more more" else ""}")
+            }
+            hasHudLayout -> add("HUDs · none of this client's HUDs have a match here")
         }
-        if (profileHudCount > 0) add("HUD elements · $profileHudCount compatible layouts")
-        val translatedHudElements = NoRiskHudTranslator.preview(paths)
-        if (translatedHudElements.isNotEmpty()) {
-            add("Matching HUD elements · ${translatedHudElements.joinToString(", ")}")
-        } else if (paths.any { it.parent?.fileName?.toString() == "profiles" && it.fileName?.toString()?.endsWith(".json") == true }) {
-            add("No matching HUD elements installed in this instance")
-        }
-        val lunarHudElements = LunarHudTranslator.preview(paths)
-        if (lunarHudElements.isNotEmpty()) {
-            add("Lunar HUD elements · ${lunarHudElements.joinToString(", ")}")
-        }
-        val featherHudElements = FeatherHudTranslator.preview(paths)
-        if (featherHudElements.isNotEmpty()) {
-            add("Feather HUD elements · ${featherHudElements.joinToString(", ")}")
-        }
-        val badlionHudElements = BadlionHudTranslator.preview(paths)
-        if (badlionHudElements.isNotEmpty()) {
-            add("Badlion HUD elements · ${badlionHudElements.joinToString(", ")}")
-        }
-        options.take(2).forEach { (key, value) -> add("${key.toPreviewLabel()}: $value") }
         if (isEmpty()) add("Compatible settings found")
     }
+
+    private const val PREVIEW_HUD_NAMES = 5
+    private val previewAcronyms = setOf("fps", "cps", "tps")
 
     private fun String.toPreviewLabel(): String =
         replace(Regex("([a-z])([A-Z])"), "$1 $2")
             .replace('-', ' ')
             .replaceFirstChar { it.uppercase() }
+
+    /** `DAY_COUNTER`, `comboDisplay` and `reach display` all become sentence-case labels like "Day counter". */
+    private fun String.toHudLabel(): String {
+        val words = replace(Regex("([a-z])([A-Z])"), "$1 $2").replace('_', ' ').replace('-', ' ').trim().lowercase()
+        if (words in previewAcronyms) return words.uppercase()
+        return words.replaceFirstChar { it.uppercase() }
+    }
 
     private fun findSources(): Sequence<Path> = sequence {
         val launcherRoots = launcherRoots()

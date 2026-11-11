@@ -1,0 +1,26 @@
+{
+  "FPS": {
+    "enabled": true,
+    "x": 3.0,
+    "y": 22.0,
+    "position": "topLeft",
+    "options": { "background": false }
+  },
+  "PING": {
+    "enabled": true,
+    "PING_HUD": { "y": 66.0, "position": "topLeft" }
+  },
+  "COORDINATES": {
+    "x": 6.0,
+    "y": 113.0,
+    "position": "topLeft",
+    "options": {
+      "backgroundColor": { "value": 1543767044, "chroma": true },
+      "showDirection": true,
+      "showAxisLabels": true
+    }
+  },
+  "MEMORY": { "enabled": true, "x": -8.0, "y": 64.25, "position": "middleRight", "scale": 1.5 },
+  "DIRECTION_HUD": { "enabled": false, "position": "bottomRight" },
+  "MOTION_BLUR": { "enabled": true, "options": { "value": 4 } }
+}
