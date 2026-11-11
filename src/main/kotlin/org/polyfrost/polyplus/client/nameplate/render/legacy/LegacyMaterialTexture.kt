@@ -81,8 +81,8 @@ object LegacyMaterialTexture {
 
     private fun draw(frame: NameplateFrame, op: LayerPainter.Painted, entry: Entry) {
         var color = NameplatePaint.scaleAlpha(WHITE, op.opacity)
-        if (frame.alpha < 1f) {
-            color = NameplateFrame.fade(color, frame.alpha)
+        if (frame.plateAlpha < 1f) {
+            color = NameplateFrame.fade(color, frame.plateAlpha)
         }
         if (color ushr ALPHA_SHIFT == 0) {
             return

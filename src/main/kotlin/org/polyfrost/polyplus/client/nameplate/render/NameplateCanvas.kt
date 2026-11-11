@@ -237,7 +237,7 @@ object NameplateCanvas {
         }
 
         val light = frame.lightCoords
-        val alpha = frame.alpha
+        val alpha = frame.plateAlpha
         val now = System.nanoTime()
         NameplateStrips.sweep(now)
         val rows = stripRows(ops, palette, now)

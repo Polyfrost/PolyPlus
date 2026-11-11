@@ -16,6 +16,9 @@ import org.polyfrost.polyplus.nameplate.engine.api.text.ResolvedText
 import java.util.UUID
 
 object PlayerNameplateRenderer {
+    private const val VANILLA_BACKGROUND_OPACITY = 0.25f
+    private const val PLATE_OPACITY = 0.7f
+
     fun interface NameDraw {
         fun draw(name: Component)
     }
@@ -76,7 +79,10 @@ object PlayerNameplateRenderer {
         val background = PolyNametagPadding.backgroundRect(layout.textWidth, TagBlock.GLYPH_HEIGHT)
         val block = NameplateTextCache.placed(tag.profileName, layout, background)
         val plate = NameplatePaint.plate(tag.nameplate, block, tag.frame, tag.state)
-        val frame = NameplateFrame(poseStack, collector, x + plate.dx, y + plate.dy, NameplateFrame.alphaOf(color), lightCoords, block)
+        val alpha = NameplateFrame.alphaOf(color)
+        val opacity = Minecraft.getInstance().options.getBackgroundOpacity(VANILLA_BACKGROUND_OPACITY)
+        val plateAlpha = alpha * minOf(1f, PLATE_OPACITY * opacity / VANILLA_BACKGROUND_OPACITY)
+        val frame = NameplateFrame(poseStack, collector, x + plate.dx, y + plate.dy, alpha, lightCoords, block, plateAlpha)
         NameplateDecorations.submit(frame, tag.nameplate, tag.frame, tag.state, tag.detailed, tag.badge, layout.badgeX)
         return frame
     }
