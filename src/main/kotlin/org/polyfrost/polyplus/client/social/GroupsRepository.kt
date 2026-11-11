@@ -18,6 +18,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +61,12 @@ object GroupsRepository {
     private val readFence = ConcurrentHashMap<Int, Long>()
     private val refreshTicket = AtomicLong(0)
 
+    private const val MARK_READ_BASE_BACKOFF_MS = 2_000L
+    private const val MARK_READ_MAX_BACKOFF_MS = 60_000L
+    private val markReadFailures = ConcurrentHashMap<Int, Int>()
+    private val markReadRetryAt = ConcurrentHashMap<Int, Long>()
+    private val markReadPending = ConcurrentHashMap<Int, Long>()
+
     @Volatile
     private var appliedTicket = 0L
 
@@ -100,6 +107,9 @@ object GroupsRepository {
         messagesByGroup.clear()
         readThrough.clear()
         readFence.clear()
+        markReadFailures.clear()
+        markReadRetryAt.clear()
+        markReadPending.clear()
         messageToasts.keys.toList().forEach(::clearMessageToasts)
         _groups.value = emptyList()
         refreshGroups()
@@ -197,6 +207,10 @@ object GroupsRepository {
     fun markRead(groupId: Int, messageId: Long) {
         if (isPending(messageId)) return
         clearMessageToasts(groupId)
+        if (System.currentTimeMillis() < (markReadRetryAt[groupId] ?: 0L)) {
+            markReadPending.merge(groupId, messageId) { a, b -> maxOf(a, b) }
+            return
+        }
         val reported = readThrough[groupId]
         val unread = _groups.value.any { it.id == groupId && it.unread }
         if (!unread && reported != null && reported >= messageId) return
@@ -207,10 +221,22 @@ object GroupsRepository {
         PolyPlusClient.SCOPE.launch {
             val result = GroupsApi.markRead(groupId, target)
             readFence.replace(groupId, Long.MAX_VALUE, if (result.isSuccess) refreshTicket.get() else 0L)
+            result.onSuccess {
+                markReadFailures.remove(groupId)
+                markReadRetryAt.remove(groupId)
+            }
             result.onFailure {
                 LOGGER.error("Failed to mark group $groupId read up to $target", it)
+                val failures = markReadFailures.merge(groupId, 1, Int::plus) ?: 1
+                val backoff = minOf(MARK_READ_BASE_BACKOFF_MS shl (failures - 1).coerceAtMost(5), MARK_READ_MAX_BACKOFF_MS)
+                markReadRetryAt[groupId] = System.currentTimeMillis() + backoff
                 readThrough.remove(groupId)
                 refreshGroups()
+                delay(backoff)
+                val pending = markReadPending.remove(groupId)
+                val latest = if (groupId in readingConversations) messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }?.id ?: target else null
+                val retry = listOfNotNull(pending, latest).maxOrNull()
+                if (retry != null) markRead(groupId, retry)
             }
         }
     }
