@@ -106,7 +106,7 @@ private fun ReplayBanner(entry: ReplayEntry) {
 @Composable
 private fun ReplayTagItems(entry: ReplayEntry) {
     if (ReplayLibrary.providers.size > 1) Tag(entry.provider.name)
-    if (!entry.playable) Tag("Can't open", TagTone.Danger)
+    if (!entry.playable) Tag("Can't open", TagTone.Danger) else if (!entry.warning.isNullOrBlank()) Tag("May not load", TagTone.Danger)
 }
 
 @Composable
@@ -186,7 +186,7 @@ internal fun ReplayDetailsPanel(entry: ReplayEntry?, onWatch: (ReplayEntry) -> U
             DetailRow("Size", entry.sizeText)
             DetailRow("Recorded with", entry.provider.name)
         }
-        if (!entry.playable) SocialText(entry.problem, 12.sp, color = SocialDangerText, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        if (!entry.playable || !entry.warning.isNullOrBlank()) SocialText(entry.problem, 12.sp, color = SocialDangerText, maxLines = 4, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton("Watch", themedIcon(VIDEO_ICON), Modifier.fillMaxWidth().height(BUTTON_HEIGHT), ButtonStyle.Primary, entry.playable) { onWatch(entry) }

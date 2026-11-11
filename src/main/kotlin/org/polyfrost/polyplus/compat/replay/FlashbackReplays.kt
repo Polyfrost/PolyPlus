@@ -38,7 +38,8 @@ object FlashbackReplays : ReplayProvider {
     private const val METADATA = "metadata.json"
     private const val ICON = "icon.png"
     private const val MILLIS_PER_TICK = 50L
-    private const val NEWER_VERSION_WARNING = "Recorded on a newer game version"
+    private const val INCOMPATIBLE = "Recorded on a different game version, can't be played on this one"
+    private const val MAYBE_INCOMPATIBLE = "Recorded on a different game version, may not load on this one"
     private const val MAX_DEPTH = 8
     private const val MAX_FILES = 5000
 
@@ -111,10 +112,12 @@ object FlashbackReplays : ReplayProvider {
         }
         val files = replayFiles(folder)
         cache.keys.retainAll(files.mapTo(HashSet()) { it.path })
-        val currentDataVersion = runCatching { LobbyCompat.dataVersion() }.getOrNull()
+        val current = runCatching {
+            GameVersion(FabricLoader.getInstance().rawGameVersion, LobbyCompat.protocolVersion(), LobbyCompat.dataVersion())
+        }.getOrNull()
         return files.mapNotNull { file ->
             cache[file.path]?.takeIf { it.sameFile(file.modified, file.size) }
-                ?: read(file, currentDataVersion)?.also { cache[file.path] = it }
+                ?: read(file, current)?.also { cache[file.path] = it }
         }.sortedByDescending { it.modified }
     }
 
@@ -146,15 +149,30 @@ object FlashbackReplays : ReplayProvider {
         zip.getEntry(ICON)?.let { entry -> zip.getInputStream(entry).use { it.readBytes() } }
     }
 
-    private fun read(replay: ReplayFile, currentDataVersion: Int?): ReplayEntry? = runCatching {
+    private class GameVersion(val name: String, val protocol: Int, val data: Int)
+
+    private fun compatibility(meta: JsonObject, current: GameVersion?): Pair<Boolean, String?> {
+        if (current == null) return true to null
+        val recordedIn = meta.stringOrNull("version_string")?.takeIf { it.isNotBlank() && it != current.name }
+        val protocol = meta.intOrNull("protocol_version") ?: 0
+        if (protocol != 0 && protocol != current.protocol) {
+            return false to (recordedIn?.let { "Recorded in $it, can't be played on this version" } ?: INCOMPATIBLE)
+        }
+        val data = meta.intOrNull("data_version") ?: 0
+        if (data != 0 && data != current.data) {
+            return true to (recordedIn?.let { "Recorded in $it, may not load on this version" } ?: MAYBE_INCOMPATIBLE)
+        }
+        return true to null
+    }
+
+    private fun read(replay: ReplayFile, current: GameVersion?): ReplayEntry? = runCatching {
         val file = replay.path
         ZipFile(file.toFile()).use { zip ->
             val metaEntry = zip.getEntry(METADATA) ?: return@runCatching null
             val meta = InputStreamReader(zip.getInputStream(metaEntry), Charsets.UTF_8).use { gson.fromJson(it, JsonObject::class.java) }
                 ?: return@runCatching null
             val hasIcon = zip.getEntry(ICON) != null
-            val dataVersion = meta.intOrNull("data_version")
-            val tooNew = dataVersion != null && currentDataVersion != null && dataVersion > currentDataVersion
+            val (playable, warning) = compatibility(meta, current)
             ReplayEntry(
                 provider = this,
                 path = file,
@@ -164,8 +182,8 @@ object FlashbackReplays : ReplayProvider {
                 modified = replay.modified,
                 size = replay.size,
                 iconSource = { if (hasIcon) readIcon(file) else null },
-                playable = !tooNew,
-                warning = if (tooNew) NEWER_VERSION_WARNING else null,
+                playable = playable,
+                warning = warning,
             )
         }
     }.onFailure { logUnreadable(replay.path, it) }.getOrNull()
