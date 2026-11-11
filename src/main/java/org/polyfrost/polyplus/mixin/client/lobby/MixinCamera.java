@@ -12,11 +12,13 @@ import org.polyfrost.polyplus.client.gui.pausescreen.PauseStage;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 //? if >= 26.1 {
-@Mixin(Camera.class)
+@Mixin(value = Camera.class, priority = 2000)
 //?} else {
-/*@Mixin(GameRenderer.class)
+/*@Mixin(value = GameRenderer.class, priority = 2000)
 *///?}
 public class MixinCamera {
     //? if >= 26.1 {
@@ -31,6 +33,21 @@ public class MixinCamera {
     //?} else {
     /*private double polyplus$lobbyFov(double original) {
         return PauseStage.fov(LobbyScene.cameraFov((float) original));
+    }
+    *///?}
+
+    //? if >= 26.1 {
+    @Inject(method = "calculateFov", at = @At("HEAD"), cancellable = true)
+    //?} else {
+    /*@Inject(method = "getFov", at = @At("HEAD"), cancellable = true)
+    *///?}
+    //? if >= 1.21.4 {
+    private void polyplus$holdLobbyFov(CallbackInfoReturnable<Float> cir) {
+        if (LobbyScene.terrainActive()) cir.setReturnValue(PauseStage.fov(LobbyScene.cameraFov(0f)));
+    }
+    //?} else {
+    /*private void polyplus$holdLobbyFov(CallbackInfoReturnable<Double> cir) {
+        if (LobbyScene.terrainActive()) cir.setReturnValue((double) PauseStage.fov(LobbyScene.cameraFov(0f)));
     }
     *///?}
 

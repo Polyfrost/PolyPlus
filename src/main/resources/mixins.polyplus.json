@@ -161,6 +161,8 @@
     //? if > 1.8.9
     "client.lobby.MixinCamera",
     //? if > 1.8.9
+    "client.lobby.MixinLobbyCamera",
+    //? if > 1.8.9
     "client.lobby.MixinChannel",
     //? if >= 1.21.8
     "client.lobby.MixinChunkSectionLayer",

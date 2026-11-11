@@ -422,6 +422,9 @@ object LobbyScene {
     fun terrainActive(): Boolean = swappedIn
 
     @JvmStatic
+    fun heldRig(): Entity? = if (swappedIn) live?.rig else null
+
+    @JvmStatic
     fun hasRealPlayer(): Boolean = if (swappedIn) saved?.player != null else Minecraft.getInstance().player != null
 
     @JvmStatic
