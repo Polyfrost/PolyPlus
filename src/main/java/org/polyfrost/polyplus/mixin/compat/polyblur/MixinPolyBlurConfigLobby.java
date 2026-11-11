@@ -12,6 +12,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinPolyBlurConfigLobby {
     @Inject(method = "isEnabled", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
     private void polyplus$sharpLobby(CallbackInfoReturnable<Boolean> cir) {
-        if (LobbyScene.terrainActive()) cir.setReturnValue(false);
+        if (LobbyScene.terrainActive() || LobbyScene.INSTANCE.showing()) cir.setReturnValue(false);
     }
 }
