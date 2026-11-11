@@ -48,9 +48,9 @@ internal object PlaySessions {
     @Serializable
     private data class State(val players: Map<String, PlayLog> = emptyMap())
 
-    private class Place(val key: String, val name: String, val server: Boolean)
+    private class Place(val key: String, val name: String, val server: Boolean, val unresolvedHost: String? = null)
 
-    private class Session(val player: UUID, val place: Place) {
+    private class Session(val player: UUID, var place: Place) {
         var lastNanos = System.nanoTime()
         var elapsed = 0L
         var pending = 0L
@@ -94,6 +94,7 @@ internal object PlaySessions {
         }
         if (place != null && session == null) session = Session(ClientPlatform.localPlayerUuid(), place)
         session?.let {
+            if (place != null) it.place = place
             advance(it, mc)
             if (it.elapsed - it.savedAt >= SAVE_EVERY_MILLIS) flush(it)
         }
@@ -119,13 +120,14 @@ internal object PlaySessions {
         if (open.elapsed < MIN_SESSION_MILLIS) return
         val millis = open.pending
         val started = !open.counted
+        val place = open.place
         open.pending = 0L
         open.savedAt = open.elapsed
         open.counted = true
         if (async) {
-            PolyPlusClient.SCOPE.launch(Dispatchers.IO) { record(open.player, open.place, millis, started) }
+            PolyPlusClient.SCOPE.launch(Dispatchers.IO) { record(open.player, place, millis, started) }
         } else {
-            record(open.player, open.place, millis, started)
+            record(open.player, place, millis, started)
         }
     }
 
@@ -192,12 +194,20 @@ internal object PlaySessions {
 
     private fun hostedPlace(): Place {
         val joined = P2PSessionManager.joinedSessionId
-        hosted?.let { (id, place) -> if (id == joined) return place }
+        val cached = hosted?.takeIf { it.first == joined }?.second
+        if (cached != null) {
+            val pending = cached.unresolvedHost ?: return cached
+            val name = hostWorldName(pending) ?: return cached
+            return Place(cached.key, name, true).also { hosted = joined to it }
+        }
         val host = joined?.let { id -> SessionsRepository.incomingInvites.value.firstOrNull { it.sessionId == id }?.sender }
         host?.let { PlayerNamesRepository.resolve(listOf(it)) }
-        val name = host?.let { PlayerNamesRepository.names.value[it] }?.let { "$it's world" } ?: FRIEND_WORLD
+        val name = host?.let(::hostWorldName)
         val owner = host ?: joined
         val key = SERVER_PREFIX + P2PSessionManager.P2P_PLACEHOLDER_IP + if (owner != null) "/$owner" else ""
-        return Place(key, name, true).also { hosted = joined to it }
+        val place = if (name != null) Place(key, name, true) else Place(key, FRIEND_WORLD, true, host)
+        return place.also { hosted = joined to it }
     }
+
+    private fun hostWorldName(host: String): String? = PlayerNamesRepository.names.value[host]?.let { "$it's world" }
 }
