@@ -50,11 +50,11 @@ object AccountSwitch {
             *///?}
 
             val accessor = mc as MinecraftAccessor
-            accessor.setUser(user)
-            accessor.setProfileFuture(CompletableFuture.completedFuture(profile))
-            accessor.setUserApiService(userApiService)
-            userProperties?.let { accessor.setUserPropertiesFuture(CompletableFuture.completedFuture(it)) }
-            accessor.setProfileKeyPairManager(keyPairManager(mc, user, userApiService, microsoft))
+            accessor.`polyplus$setUser`(user)
+            accessor.`polyplus$setProfileFuture`(CompletableFuture.completedFuture(profile))
+            accessor.`polyplus$setUserApiService`(userApiService)
+            userProperties?.let { accessor.`polyplus$setUserPropertiesFuture`(CompletableFuture.completedFuture(it)) }
+            accessor.`polyplus$setProfileKeyPairManager`(keyPairManager(mc, user, userApiService, microsoft))
             AccountSwitchCompat.notifySwitch(user.profileId, user.name, user.accessToken)
             previousId != newId
         }
@@ -64,7 +64,7 @@ object AccountSwitch {
             val mc = Minecraft.getInstance()
             val previousId = mc.session.profile.id
             val accessor = mc as MinecraftAccessor
-            accessor.setSession(
+            accessor.`polyplus$setSession`(
                 Session(account.username, UUIDTypeAdapter.fromUUID(newId), account.accessToken, if (microsoft) "mojang" else "legacy"),
             )
             accessor.`polyplus$getProfileProperties`().apply {

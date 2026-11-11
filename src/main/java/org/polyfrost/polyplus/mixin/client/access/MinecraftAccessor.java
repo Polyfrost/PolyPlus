@@ -44,28 +44,28 @@ public interface MinecraftAccessor {
     //? if > 1.8.9 {
     @Mutable
     @Accessor("user")
-    void setUser(User user);
+    void polyplus$setUser(User user);
 
     @Mutable
     @Accessor("profileFuture")
-    void setProfileFuture(CompletableFuture<ProfileResult> profileFuture);
+    void polyplus$setProfileFuture(CompletableFuture<ProfileResult> profileFuture);
 
     @Mutable
     @Accessor("userApiService")
-    void setUserApiService(UserApiService userApiService);
+    void polyplus$setUserApiService(UserApiService userApiService);
 
     @Mutable
     @Accessor("userPropertiesFuture")
-    void setUserPropertiesFuture(CompletableFuture<UserApiService.UserProperties> userPropertiesFuture);
+    void polyplus$setUserPropertiesFuture(CompletableFuture<UserApiService.UserProperties> userPropertiesFuture);
 
     @Mutable
     @Accessor("profileKeyPairManager")
-    void setProfileKeyPairManager(ProfileKeyPairManager profileKeyPairManager);
+    void polyplus$setProfileKeyPairManager(ProfileKeyPairManager profileKeyPairManager);
 
     //?} else {
     /*@Mutable
     @Accessor("session")
-    void setSession(Session session);
+    void polyplus$setSession(Session session);
 
     @Accessor("profileProperties")
     PropertyMap polyplus$getProfileProperties();
