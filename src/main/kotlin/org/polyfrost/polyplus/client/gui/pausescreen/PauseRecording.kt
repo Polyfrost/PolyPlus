@@ -217,7 +217,7 @@ private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: 
                 refresh()
             }
         }
-        ChipButton(asset("check-circle"), "Finish and save", size, icon) {
+        ChipButton(asset("check-circle"), provider.finishLabel, size, icon) {
             runCatching { provider.finish() }
             screen.closeIfCurrent()
         }

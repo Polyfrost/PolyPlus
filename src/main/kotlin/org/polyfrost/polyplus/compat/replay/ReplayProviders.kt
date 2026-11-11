@@ -42,6 +42,7 @@ interface ReplayProvider {
     val canPause: Boolean
     val canDiscard: Boolean
     val controlKeyPrefixes: List<String>
+    val finishLabel: String get() = "Finish and save"
 
     fun start()
     fun setPaused(paused: Boolean)

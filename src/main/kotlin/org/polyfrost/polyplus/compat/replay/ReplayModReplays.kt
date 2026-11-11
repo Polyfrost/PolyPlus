@@ -44,6 +44,13 @@ object ReplayModReplays : ReplayProvider {
         val isCompatible: Method = modClass.getMethod("isCompatible", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
     }
 
+    private class Settings {
+        val registry: Method = Class.forName("com.replaymod.core.ReplayMod").getMethod("getSettingsRegistry")
+        val get: Method = Class.forName("com.replaymod.core.SettingsRegistry")
+            .getMethod("get", Class.forName("com.replaymod.core.SettingsRegistry\$SettingKey"))
+        val showServerIps: Any = Class.forName("com.replaymod.replay.Setting").getField("SHOW_SERVER_IPS").get(null)
+    }
+
     private class Replay {
         val replayClass: Class<*> = Class.forName("com.replaymod.replay.ReplayModReplay")
         val instance: Field = replayClass.getField("instance")
@@ -92,6 +99,19 @@ object ReplayModReplays : ReplayProvider {
     private val core: Core? by lazy { if (loaded) runCatching { Core() }.getOrNull() else null }
     private val replay: Replay? by lazy { if (loaded) runCatching { Replay() }.getOrNull() else null }
     private val recordingHandles: Recording? by lazy { if (loaded) runCatching { Recording() }.getOrNull() else null }
+    private val settings: Settings? by lazy { if (loaded) runCatching { Settings() }.getOrNull() else null }
+
+    @Volatile
+    private var listedWithServerIps: Boolean? = null
+
+    private fun showServerIps(): Boolean {
+        val c = core ?: return false
+        val s = settings ?: return false
+        return runCatching {
+            val mod = c.instance.get(null) ?: return@runCatching false
+            s.get.invoke(s.registry.invoke(mod), s.showServerIps) as Boolean
+        }.getOrDefault(false)
+    }
 
     override val available: Boolean
         get() = loaded && core != null && replay != null
@@ -125,17 +145,22 @@ object ReplayModReplays : ReplayProvider {
         val files = Files.list(dir).use { stream ->
             stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(EXTENSION, ignoreCase = true) }.collect(Collectors.toList())
         }
+        val showIps = showServerIps()
+        if (listedWithServerIps != showIps) {
+            cache.clear()
+            listedWithServerIps = showIps
+        }
         cache.keys.retainAll(files.toSet())
         return files.mapNotNull { path ->
             runCatching {
                 val modified = runCatching { Files.getLastModifiedTime(path).toMillis() }.getOrDefault(0L)
                 val size = runCatching { Files.size(path) }.getOrDefault(0L)
-                cache[path]?.takeIf { it.sameFile(modified, size) } ?: read(path, modified, size).also { cache[path] = it }
+                cache[path]?.takeIf { it.sameFile(modified, size) } ?: read(path, modified, size, showIps).also { cache[path] = it }
             }.getOrNull()
         }.sortedByDescending { it.modified }
     }
 
-    private fun read(path: Path, modified: Long, size: Long): ReplayEntry {
+    private fun read(path: Path, modified: Long, size: Long, showIps: Boolean): ReplayEntry {
         val fileName = path.fileName.toString()
         val name = fileName.substring(0, fileName.length - EXTENSION.length)
         var meta: JsonObject? = null
@@ -147,9 +172,16 @@ object ReplayModReplays : ReplayProvider {
             }
         }
         val data = meta
+        val customName = data?.string("customServerName")?.takeIf { it.isNotBlank() }
         val serverName = data?.string("serverName")?.takeIf { it.isNotBlank() }
         val singleplayer = data?.bool("singleplayer") == true
-        val world = serverName ?: if (singleplayer) "Singleplayer" else null
+        val world = when {
+            customName != null -> customName
+            serverName != null && (singleplayer || showIps) -> serverName
+            serverName != null -> "Server address hidden"
+            singleplayer -> "Singleplayer"
+            else -> null
+        }
         val duration = data?.long("duration")?.takeIf { it > 0 }
         val compatible = data?.let { compatible(it) } ?: true
         val mcVersion = data?.string("mcversion")?.takeIf { it.isNotBlank() }
@@ -283,6 +315,8 @@ object ReplayModReplays : ReplayProvider {
         get() = session()?.let { it.controls != null && !it.stopped() } ?: false
 
     override val canDiscard = false
+
+    override val finishLabel = "Stop recording (saves when you leave)"
 
     override val controlKeyPrefixes: List<String> = listOf("replaymod.gui.recording.")
 
