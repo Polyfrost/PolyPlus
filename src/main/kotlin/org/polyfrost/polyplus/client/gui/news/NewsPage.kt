@@ -72,7 +72,7 @@ internal fun BoxScope.NewsPage(onBack: () -> Unit) {
     LaunchedEffect(Unit) { NewsFeed.refresh() }
     LaunchedEffect(NewsFeed.posts) { NewsFeed.markSeen() }
     var selectedLink by remember { mutableStateOf<String?>(null) }
-    val posts = NewsFeed.posts
+    val posts = if (NewsFeed.enabled) NewsFeed.posts else emptyList()
     val selected = posts.firstOrNull { it.link == selectedLink } ?: posts.firstOrNull()
     PageScrim()
     Column(
@@ -108,6 +108,7 @@ private fun NewsHeader(onBack: () -> Unit) {
 @Composable
 private fun NewsStatus(modifier: Modifier) {
     when {
+        !NewsFeed.enabled -> EmptyState("News is off", modifier, "Turn on online features to see posts from the Polyfrost blog.")
         NewsFeed.loading || !NewsFeed.loaded -> EmptyState("Loading news", modifier)
         NewsFeed.failed -> EmptyState("Couldn't load news", modifier, "Check your connection and try again.") {
             TextButton("Try again", null, Modifier.height(ButtonHeight), ButtonStyle.Primary, true) { NewsFeed.refresh(force = true) }

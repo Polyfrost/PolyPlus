@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.statement.bodyAsText
 import org.polyfrost.polyplus.libs.ktor.http.isSuccess
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.w3c.dom.Element
 import java.io.StringReader
 import java.net.URI
@@ -51,10 +52,14 @@ internal object NewsFeed {
     private var fetchedAt = 0L
     private var job: Job? = null
 
+    val enabled: Boolean
+        get() = PrivacyConsent.allowsOnlineServices()
+
     val unread: Boolean
-        get() = (posts.firstOrNull()?.published ?: 0L) > seen
+        get() = enabled && (posts.firstOrNull()?.published ?: 0L) > seen
 
     fun refresh(force: Boolean = false) {
+        if (!enabled) return
         if (job?.isActive == true) return
         if (!force && loaded && !failed && System.currentTimeMillis() - fetchedAt < REFRESH_MS) return
         loading = true
