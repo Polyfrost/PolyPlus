@@ -26,8 +26,10 @@ object MacSafeArea {
         @JvmField var height = 0.0
     }
 
+    fun fullscreen(): Boolean = Minecraft.getInstance().options.fullscreen().get()
+
     fun topShare(): Float {
-        if (!supported || failed || !Minecraft.getInstance().options.fullscreen().get()) return 0f
+        if (!supported || failed || !fullscreen()) return 0f
         return runCatching { query() }.getOrElse {
             failed = true
             0f
@@ -51,6 +53,8 @@ object MacSafeArea {
 }
 //?} else {
 /*object MacSafeArea {
+    fun fullscreen(): Boolean = false
+
     fun topShare(): Float = 0f
 }
 *///?}
