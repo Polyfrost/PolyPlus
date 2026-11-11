@@ -89,6 +89,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     val servers = LobbyServers(mc)
     val worlds = LobbyWorlds(mc)
+    val feed = LobbyFeed()
 
     var page by mutableStateOf(firstPage)
         private set
@@ -124,6 +125,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         if (!source.shown) source = PlaySource.Multiplayer
         if (ReplayLibrary.enabled) ReplayLibrary.reload()
         show(page)
+        feed.pull()
     }
 
     fun close() {
