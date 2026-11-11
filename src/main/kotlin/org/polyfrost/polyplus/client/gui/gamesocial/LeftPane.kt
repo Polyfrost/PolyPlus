@@ -158,7 +158,7 @@ internal fun LeftPane(
         }
         val body = Modifier.fillMaxWidth().weight(1f)
         when {
-            list.query.isNotBlank() -> SearchResults(state, list, snapshot, body)
+            list.query.isNotBlank() -> SearchResults(state, list, snapshot, tab != LeftTab.Friends, body)
             tab == LeftTab.Friends -> FriendsBody(window, state, snapshot, body)
             tab == LeftTab.Groups -> GroupsBody(state, list, snapshot, body)
             else -> ThreadList(state, list, snapshot, body)
@@ -395,8 +395,8 @@ private fun AddFriendButton(state: SocialPageState, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun SearchResults(state: SocialPageState, list: SocialListState, snapshot: SocialSnapshot, modifier: Modifier) {
-    val threads = list.matching(snapshot)
+private fun SearchResults(state: SocialPageState, list: SocialListState, snapshot: SocialSnapshot, filtered: Boolean, modifier: Modifier) {
+    val threads = list.matching(snapshot, SocialChatLink.active?.id, filtered)
     val friends = visibleFriends(state, snapshot, FriendFilter.All)
     if (threads.isEmpty() && friends.isEmpty()) {
         EmptyState("No friends or chats match that", modifier)
