@@ -145,6 +145,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.stats.PlaySessions
+import org.polyfrost.polyplus.client.utils.MacSafeArea
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.time.LocalDate
 import java.util.UUID
@@ -202,15 +203,17 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
         if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
         StartupOverlay.rootWidth = widthPx
-        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT)
+        val notchPx = remember(widthPx, heightPx) { MacSafeArea.topShare() * heightPx }
+        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT)
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
+        val notch = with(density) { notchPx.toDp() }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             if (lobby.setup) {
                 if (chromeShown || StartupOverlay.active) {
-                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome }) { LobbySetup(lobby) }
+                    Box(Modifier.fillMaxSize().padding(top = notch).graphicsLayer { alpha = chrome }) { LobbySetup(lobby) }
                 }
             } else {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = chrome * reveal.value }) {
+                Box(Modifier.fillMaxSize().padding(top = notch).graphicsLayer { alpha = chrome * reveal.value }) {
                     LobbyChrome(lobby, screen, feed, IntSize(widthPx.roundToInt(), heightPx.roundToInt()))
                 }
                 lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors, lobby::endTour) }
