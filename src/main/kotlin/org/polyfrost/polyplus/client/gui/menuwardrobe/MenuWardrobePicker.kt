@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +43,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
@@ -87,6 +90,8 @@ private val CarouselTileGap = 8.dp
 private val CarouselWidth = 700.dp
 private val FadingEdge = 32.dp
 private val CarouselWheelStep = 108.dp
+private val VariantWheelStep = 40.dp
+private const val WheelNotchDp = 150f
 private val NoteTileWidth = 260.dp
 internal val CarouselHeight = CarouselPadding * 2 + CarouselHeaderHeight + CarouselRowGap + CarouselTileHeight
 
@@ -195,7 +200,15 @@ private fun AuraControl(aura: AuraChoice) {
 @Composable
 private fun CarouselVariants(model: PickerModel) {
     val item = (model.selected ?: model.target)?.item?.takeIf { it.hasVariants } ?: return
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val wheelStep = with(LocalDensity.current) { VariantWheelStep.toPx() }
+    Row(
+        Modifier
+            .wheelSteps(scroll, scope, wheelStep)
+            .horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         for (variant in item.variants) {
             Box(Modifier) {
                 Chip(variant.name, selected = variant.id == model.variantOf(item)) { model.onPickVariant(item, variant.id) }
@@ -203,6 +216,21 @@ private fun CarouselVariants(model: PickerModel) {
         }
     }
 }
+
+private fun Modifier.wheelSteps(scroll: ScrollState, scope: CoroutineScope, step: Float): Modifier =
+    pointerInput(scroll, step) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.type != PointerEventType.Scroll) continue
+                val change = event.changes.firstOrNull() ?: continue
+                val delta = change.scrollDelta
+                val notches = (if (abs(delta.x) > abs(delta.y)) delta.x else delta.y) / WheelNotchDp
+                scope.launch { scroll.animateScrollBy(notches * step) }
+                change.consume()
+            }
+        }
+    }
 
 @Composable
 private fun CarouselStrip(model: PickerModel) {
@@ -216,19 +244,7 @@ private fun CarouselStrip(model: PickerModel) {
         Modifier
             .fillMaxWidth()
             .height(CarouselTileHeight)
-            .pointerInput(scroll) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type != PointerEventType.Scroll) continue
-                        val change = event.changes.firstOrNull() ?: continue
-                        val delta = change.scrollDelta
-                        val amount = (if (abs(delta.x) > abs(delta.y)) delta.x else delta.y) * wheelStep
-                        scope.launch { scroll.animateScrollBy(amount) }
-                        change.consume()
-                    }
-                }
-            }
+            .wheelSteps(scroll, scope, wheelStep)
             .drawWithContent {
                 drawContent()
                 val length = FadingEdge.toPx()
