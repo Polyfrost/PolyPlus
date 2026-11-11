@@ -68,6 +68,11 @@ object SocialOverlay {
     /** Explicit open, e.g. from a button - always allowed regardless of the current screen. */
     fun open(from: Screen? = currentScreen()) {
         val mc = Minecraft.getInstance()
+        //? if > 1.8.9 {
+        mc.gameMode?.stopDestroyBlock()
+        //?} else {
+        /*mc.interactionManager?.stopMiningBlock()
+        *///?}
         //? if >= 26.2 {
         mc.gui.setScreen(SocialOverlayScreen(from))
         //?} else {
