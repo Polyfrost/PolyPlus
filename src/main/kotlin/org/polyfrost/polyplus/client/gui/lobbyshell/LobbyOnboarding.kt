@@ -12,6 +12,7 @@ import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.OnboardingFlow
 import org.polyfrost.polyplus.client.gui.OnboardingHost
 import org.polyfrost.polyplus.client.lobby.LobbyFraming
+import org.polyfrost.polyplus.compat.ClientConfigSync
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import kotlin.math.roundToInt
 
@@ -21,6 +22,7 @@ internal fun onboardingPending(): Boolean =
     !PolyPlusConfig.onboardingCompleted ||
         StartupAccessibility.pending() ||
         PrivacyConsent.needsPrompt() ||
+        ClientConfigSync.needsImportRecovery() ||
         OnboardingFeatures.needsModSettingsChoice() ||
         OnboardingFeatures.needsMotionBlurChoice() ||
         OnboardingFeatures.needsGuides()

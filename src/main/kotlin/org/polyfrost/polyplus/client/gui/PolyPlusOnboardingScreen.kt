@@ -41,8 +41,10 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -91,6 +93,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -141,6 +144,7 @@ import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.ClientConfigSync
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Locale
 import kotlin.io.path.exists
@@ -231,6 +235,28 @@ internal fun OnboardingFlow(
     val accessibilityStep = remember { StartupAccessibility.pending() }
     val needsTerms = remember { withTerms && PrivacyConsent.needsPrompt() }
     val needsSettings = remember { !PolyPlusConfig.onboardingCompleted }
+    val needsImportRecovery = remember { ClientConfigSync.needsImportRecovery() }
+    val importSources = remember(needsSettings, needsImportRecovery) {
+        if (needsSettings || needsImportRecovery) ClientConfigSync.availableSources() else emptyList()
+    }
+    var importConfigs by remember { mutableStateOf<Boolean?>(null) }
+    val importClients = remember(importSources) { importSources.map { it.client }.distinct() }
+    var selectedImportClient by remember(importSources) { mutableStateOf(importClients.singleOrNull()) }
+    var selectedImportSourceId by remember(importSources) { mutableStateOf(importSources.singleOrNull()?.id) }
+    val clientImportSources = importSources.filter { it.client == selectedImportClient }
+    val selectedImportSource = clientImportSources.firstOrNull { it.id == selectedImportSourceId }
+        ?: clientImportSources.singleOrNull()
+    val importedOnboardingPreferences: Map<ClientConfigSync.OnboardingPreference, Boolean> = if (importConfigs == true) {
+        selectedImportSource?.onboardingPreferences.orEmpty()
+    } else emptyMap()
+    val importCoveredCards = remember(importedOnboardingPreferences) {
+        buildSet {
+            if (
+                OnboardingFeatures.skinLayersAvailable &&
+                ClientConfigSync.OnboardingPreference.SKIN_LAYERS in importedOnboardingPreferences
+            ) add(ModCard.SKIN_LAYERS)
+        }
+    }
     val needsModSettings = remember { OnboardingFeatures.needsModSettingsChoice() }
     val needsBlurChoice = remember { OnboardingFeatures.needsMotionBlurChoice() }
     val owedGuides = remember { OnboardingFeatures.pendingGuides().mapNotNull(ModGuide::of).toSet() }
@@ -238,15 +264,19 @@ internal fun OnboardingFlow(
         (needsSettings || needsModSettings) && OnboardingFeatures.modsPageAvailable
     }
     val modReads = remember { ModReads.read(showsModSettings) }
-    val offeredCards = remember {
+    val offeredCards = remember(importCoveredCards) {
         OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
+            .filterNot { it in importCoveredCards }
     }
     val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
     var guides by remember { mutableStateOf(owedGuides) }
-    val pages = remember(guides) {
+    val pages = remember(guides, offeredCards) {
         buildList {
             if (accessibilityStep) add(OnboardingStep.Accessibility)
             if (needsTerms) add(OnboardingStep.Terms)
+            if ((needsSettings || needsImportRecovery) && importSources.isNotEmpty()) {
+                add(OnboardingStep.ImportConfigs)
+            }
             if (needsSettings) add(OnboardingStep.LookAndFeel)
             if (needsSettings) add(OnboardingStep.ModOrder)
             if (showsModSettings) {
@@ -258,7 +288,7 @@ internal fun OnboardingFlow(
             }
             if (needsBlurChoice) add(OnboardingStep.MotionBlur)
             guides.sortedBy { it.ordinal }.forEach { add(OnboardingStep.Guide(it)) }
-            if (!lobbyHost && (needsSettings || needsModSettings)) add(OnboardingStep.Done)
+            if (!lobbyHost && (needsSettings || needsModSettings || needsImportRecovery)) add(OnboardingStep.Done)
         }.ifEmpty { listOf(OnboardingStep.Done) }
     }
     var page by remember { mutableIntStateOf(0) }
@@ -408,6 +438,9 @@ internal fun OnboardingFlow(
             PolyPlusConfig.onboardingModSettingsVersion =
                 OnboardingFeatures.completedModSettingsVersion(startedAtVersion, available)
         }
+        importedOnboardingPreferences[ClientConfigSync.OnboardingPreference.SKIN_LAYERS]?.let {
+            PolyPlusConfig.onboardingSkinLayers = it
+        }
         if (needsBlurChoice && blurMode != OnboardingFeatures.MOTION_BLUR_UNSET) {
             PolyPlusConfig.onboardingMotionBlurMode = blurMode
             PolyPlusConfig.onboardingMotionBlur = motionBlur
@@ -423,6 +456,21 @@ internal fun OnboardingFlow(
             if (showsModSettings) OnboardingFeatures.applySavedModSettings()
             if (needsBlurChoice) OnboardingFeatures.applySavedMotionBlur()
         }
+        if (importConfigs == true) selectedImportSource?.let { source ->
+            runCatching { ClientConfigSync.apply(source) }
+            source.onboardingPreferences.forEach { (preference, enabled) ->
+                when (preference) {
+                    ClientConfigSync.OnboardingPreference.SKIN_LAYERS -> {
+                        if (OnboardingFeatures.skinLayersAvailable) {
+                            PolyPlusConfig.onboardingSkinLayers = enabled
+                            PolyPlusConfig.onboardingSkinLayersSettled = OnboardingFeatures.applySkinLayers(enabled)
+                            PolyPlusConfig.save()
+                        }
+                    }
+                }
+            }
+        }
+        if (importConfigs == false) ClientConfigSync.dismissImportRecovery()
         onFinished()
     }
 
@@ -475,10 +523,14 @@ internal fun OnboardingFlow(
         onAccessibility -> leaveAccessibility
         else -> advance
     }
-    val nextEnabled = !waitingForOptimization && !blurUnanswered
+    val importUnanswered = current == OnboardingStep.ImportConfigs &&
+        (importConfigs == null || importConfigs == true && selectedImportSource == null)
+    val nextEnabled = !waitingForOptimization && !blurUnanswered && !importUnanswered
     val nextBlocked = when {
         waitingForOptimization -> "Checking your frame rate. Wait a few seconds or pick manually."
         blurUnanswered -> "Choose a mode to continue."
+        importUnanswered ->
+            if (importConfigs == true) "Choose a client and profile to continue." else "Choose whether to import to continue."
         else -> null
     }
     val onBack: (() -> Unit)? = if (page > 0) ({ page-- }) else null
@@ -494,6 +546,21 @@ internal fun OnboardingFlow(
                     legalDocument,
                     { legalDocument = it },
                     if (lobbyHost) LOBBY_TERMS_TOP else TERMS_CONTENT_TOP,
+                )
+            OnboardingStep.ImportConfigs ->
+                ImportConfigsPage(
+                    importConfigs,
+                    importSources,
+                    selectedImportClient,
+                    selectedImportSourceId,
+                    onImportConfigs = { importConfigs = it },
+                    onClientSelected = { client ->
+                        selectedImportClient = client
+                        selectedImportSourceId = importSources
+                            .filter { it.client == client }
+                            .singleOrNull()?.id
+                    },
+                    onSourceSelected = { selectedImportSourceId = it },
                 )
             OnboardingStep.LookAndFeel ->
                 LookAndFeelPage(
@@ -904,10 +971,15 @@ private fun CardToggle(label: String, enabled: Boolean, interactive: Boolean = t
  * a negative offset would not — Compose does not hit-test children drawn outside their parent.
  */
 @Composable
-private fun CardDropdown(label: String, options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+private fun CardDropdown(
+    label: String,
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    placeholder: String? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     val shape = ppShape(6.dp)
-    val menuHeight = options.size * CARD_MENU_ITEM_HEIGHT + CARD_MENU_PADDING * 2f
     val trigger = remember { FocusRequester() }
     val chosen = remember { FocusRequester() }
     val spoken = cardSpeech(label)
@@ -922,6 +994,10 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
     LaunchedEffect(expanded) {
         if (expanded && A11y.keyboardMode) chosen.requestFocus()
     }
+    val menuHeight = minOf(
+        options.size * CARD_MENU_ITEM_HEIGHT + CARD_MENU_PADDING * 2f,
+        CARD_MENU_ITEM_HEIGHT * 4 + CARD_MENU_PADDING * 2f,
+    )
     Box(Modifier.width(CARD_CONTENT_WIDTH.dp).height((menuHeight + CARD_MENU_GAP + CARD_ROW_HEIGHT).dp)) {
         if (expanded) {
             Column(
@@ -932,7 +1008,8 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
                     .clip(shape)
                     .background(MenuBackground)
                     .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape)
-                    .padding(vertical = CARD_MENU_PADDING.dp),
+                    .padding(vertical = CARD_MENU_PADDING.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 options.forEachIndexed { index, option ->
                     CardMenuItem(option, index == selected, if (index == selected) chosen else null) {
@@ -957,19 +1034,21 @@ private fun CardDropdown(label: String, options: List<String>, selected: Int, on
                     .border(SocialPanelBorderWidth, if (expanded) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
                     .focusRequester(trigger)
                     .clickableWithSound(
-                        "$spoken: ${options.getOrElse(selected) { options.first() }}, " + if (expanded) "expanded" else "collapsed",
+                        "$spoken: ${options.getOrElse(selected) { placeholder ?: options.first() }}, " + if (expanded) "expanded" else "collapsed",
                         shape = shape,
                     ) { expanded = !expanded }
                     .padding(horizontal = CARD_MENU_INSET.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SocialText(
-                    options.getOrElse(selected) { options.first() },
+                    options.getOrElse(selected) { placeholder ?: options.first() },
                     12.sp,
                     Modifier.weight(1f),
                     SocialTextPrimary,
                     FontWeight.Medium,
                     TextAlign.Start,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Icon(ONBOARDING_ASSETS + "chevron-selector.svg", SocialTextSecondary, Modifier.size(13.dp))
             }
@@ -996,6 +1075,8 @@ private fun CardMenuItem(label: String, selected: Boolean, requester: FocusReque
             SocialTextPrimary,
             if (selected) FontWeight.Medium else FontWeight.Light,
             TextAlign.Start,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         if (selected) Icon(MAIN_MENU_ASSETS + "check.svg", OneConfigTheme.accent, Modifier.size(12.dp))
     }
@@ -1021,6 +1102,101 @@ private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit)
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f, option = true) { onToggleSprint(true) }
             ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f, option = true) { onToggleSprint(false) }
+        }
+    }
+}
+
+@Composable
+private fun ImportConfigsPage(
+    importConfigs: Boolean?,
+    sources: List<ClientConfigSync.ImportSource>,
+    selectedClient: String?,
+    selectedSourceId: String?,
+    onImportConfigs: (Boolean) -> Unit,
+    onClientSelected: (String) -> Unit,
+    onSourceSelected: (String) -> Unit,
+) {
+    Header("Make yourself at home", "Import Your Settings")
+    Column(
+        Modifier.fillMaxSize().padding(top = CONTENT_TOP.dp, bottom = (PANEL_HEIGHT - CONTENT_BOTTOM).dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        SocialText(
+            "We found compatible settings from another launcher. Would you like to import them into this game?",
+            14.sp,
+            Modifier.width(490.dp),
+            SocialTextSecondary,
+            FontWeight.Light,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            ChoiceButton(
+                "Yes, import",
+                ONBOARDING_ASSETS + "check-verified.svg",
+                importConfigs == true,
+                198f,
+            ) { onImportConfigs(true) }
+            ChoiceButton(
+                "No, thanks",
+                MAIN_MENU_ASSETS + "x-close.svg",
+                importConfigs == false,
+                198f,
+            ) { onImportConfigs(false) }
+        }
+        if (importConfigs == true) {
+            Spacer(Modifier.height(20.dp))
+            SocialText(
+                "Choose a client, then choose a profile to preview:",
+                13.sp,
+                color = SocialTextPrimary,
+                fontWeight = FontWeight.Normal,
+            )
+            val clients = sources.map { it.client }.distinct()
+            val selectedClientIndex = clients.indexOf(selectedClient)
+            CardDropdown(
+                label = "Client",
+                options = clients,
+                selected = selectedClientIndex,
+                onSelect = { index -> clients.getOrNull(index)?.let(onClientSelected) },
+                placeholder = "Select a client",
+            )
+            val profiles = sources.filter { it.client == selectedClient }
+            val selectedProfileIndex = profiles.indexOfFirst { it.id == selectedSourceId }
+                .takeIf { it >= 0 } ?: if (profiles.size == 1) 0 else -1
+            if (selectedClient != null) {
+                CardDropdown(
+                    label = "Profile",
+                    options = profiles.map { it.profile },
+                    selected = selectedProfileIndex,
+                    onSelect = { index -> profiles.getOrNull(index)?.let { onSourceSelected(it.id) } },
+                    placeholder = "Select a profile",
+                )
+            }
+            val source = profiles.getOrNull(selectedProfileIndex)
+            if (source != null) {
+                Spacer(Modifier.height(16.dp))
+                Column(
+                    Modifier
+                        .width(500.dp)
+                        .clip(ButtonShape)
+                        .background(ChoiceBackground)
+                        .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ButtonShape)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    SocialText(
+                        "${source.client} · ${source.profile}",
+                        13.sp,
+                        color = SocialTextPrimary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    source.preview.take(5).forEach { line ->
+                        SocialText(line, 11.sp, color = SocialTextSecondary, fontWeight = FontWeight.Light)
+                    }
+                }
+            }
         }
     }
 }
@@ -2644,6 +2820,8 @@ private fun pageSpeech(step: OnboardingStep, page: Int, waiting: Boolean): Strin
         OnboardingStep.Accessibility -> ""
         OnboardingStep.Terms ->
             "Welcome to OneClient. Agree to the Terms of Service and Privacy Policy to use online features. $TERMS_NOTE"
+        OnboardingStep.ImportConfigs ->
+            "Import Your Settings. We found compatible settings from another launcher. Choose whether to import them."
         OnboardingStep.LookAndFeel -> "Look and Feel. Choose the UI colors, UI style and GUI scale."
         OnboardingStep.ModOrder -> "Mod Sorting. $MOD_ORDER_TEXT"
         OnboardingStep.Sprint -> "Toggle Sprint. $SPRINT_TEXT"
@@ -2716,6 +2894,7 @@ private enum class ModGuide(
 private sealed interface OnboardingStep {
     data object Accessibility : OnboardingStep
     data object Terms : OnboardingStep
+    data object ImportConfigs : OnboardingStep
     data object LookAndFeel : OnboardingStep
     data object ModOrder : OnboardingStep
     data object Sprint : OnboardingStep
