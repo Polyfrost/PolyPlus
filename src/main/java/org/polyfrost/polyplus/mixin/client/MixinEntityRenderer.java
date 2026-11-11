@@ -39,19 +39,20 @@ public class MixinEntityRenderer {
     *///?}
 }
 //?} else {
-/*import com.llamalad7.mixinextras.sugar.Local;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.entity.Entity;
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.sugar.Local;
+import net.minecraft.client.entity.living.player.ClientPlayerEntity;
+import net.minecraft.client.render.entity.LivingEntityRenderer;
+import net.minecraft.entity.living.LivingEntity;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-@Mixin(EntityRenderer.class)
+@Mixin(LivingEntityRenderer.class)
 public class MixinEntityRenderer {
-    @ModifyVariable(method = "renderNameTag(Lnet/minecraft/entity/Entity;Ljava/lang/String;DDDI)V", at = @At("HEAD"), argsOnly = true)
-    private String polyplus$badgeNameTag(String name, @Local(argsOnly = true) Entity entity) {
-        return PolyPlusBadge.badgesNameTag(entity, name) ? PolyPlusBadge.LEGACY_CHAR + name : name;
+    @ModifyExpressionValue(method = "renderNameTag(Lnet/minecraft/entity/living/LivingEntity;DDD)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/text/Text;getFormattedString()Ljava/lang/String;"))
+    private String polyplus$badgeNameTag(String name, @Local(argsOnly = true) LivingEntity entity) {
+        return entity instanceof ClientPlayerEntity player ? PolyPlusBadge.decorate(name, player.getUuid()) : name;
     }
 }
 *///?}

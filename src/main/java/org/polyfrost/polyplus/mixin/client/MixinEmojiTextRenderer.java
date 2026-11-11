@@ -29,7 +29,11 @@ public abstract class MixinEmojiTextRenderer {
     private void polyplus$drawEmoji(char chr, boolean italic, CallbackInfoReturnable<Float> cir) {
         if (chr == PolyPlusBadge.LEGACY_CHAR) {
             if (!polyplus$shadowLayer) PolyPlusBadge.drawInline(x, y, a);
-            cir.setReturnValue((float) PolyPlusBadge.BADGE_ADVANCE);
+            cir.setReturnValue((float) PolyPlusBadge.LEGACY_CHAR_ADVANCE);
+            return;
+        }
+        if (chr == PolyPlusBadge.LEGACY_GAP) {
+            cir.setReturnValue((float) PolyPlusBadge.LEGACY_GAP_ADVANCE);
             return;
         }
         int index = EmojiFont.legacyIndex(chr);
@@ -40,7 +44,8 @@ public abstract class MixinEmojiTextRenderer {
 
     @Inject(method = "getWidth(C)I", at = @At("HEAD"), cancellable = true)
     private void polyplus$emojiWidth(char chr, CallbackInfoReturnable<Integer> cir) {
-        if (chr == PolyPlusBadge.LEGACY_CHAR) cir.setReturnValue(PolyPlusBadge.BADGE_ADVANCE);
+        if (chr == PolyPlusBadge.LEGACY_CHAR) cir.setReturnValue(PolyPlusBadge.LEGACY_CHAR_ADVANCE);
+        else if (chr == PolyPlusBadge.LEGACY_GAP) cir.setReturnValue(PolyPlusBadge.LEGACY_GAP_ADVANCE);
         else if (EmojiFont.legacyIndex(chr) >= 0) cir.setReturnValue((int) EmojiFont.LEGACY_ADVANCE);
     }
 }

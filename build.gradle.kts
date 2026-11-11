@@ -496,7 +496,7 @@ tasks.withType<ProcessResources>().configureEach {
     if (isOrnithe) {
         exclude("$shaders/core/**", "$shaders/effect/core/**", "$shaders/effect/lobby_chain.json", "assets/polyplus/lobby/scenes/**")
     } else {
-        exclude("$shaders/legacy/**", "assets/polyplus/lobby/scenes_legacy/**")
+        exclude("$shaders/legacy/**", "assets/polyplus/lobby/scenes_legacy/**", "assets/minecraft/font/default.json")
     }
     filesMatching(listOf("$shaders/**/*.fsh", "$shaders/**/*.vsh")) {
         var inactive = false
