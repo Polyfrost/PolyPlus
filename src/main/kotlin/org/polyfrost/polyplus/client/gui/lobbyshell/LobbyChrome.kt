@@ -193,7 +193,11 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
             LobbyGlass.pageFrost = frost.value
             LobbyGlass.chrome = if (lobby.setup) feed.chrome.floatValue else feed.chrome.floatValue * reveal.value
         }
-        onDispose { feed.glass = null }
+        onDispose {
+            feed.glass = null
+            LobbyGlass.pageFrost = 0f
+            LobbyGlass.chrome = 0f
+        }
     }
     LaunchedEffect(Unit) { launch { SocialErrors.events.collect(A11y::announce) }; SocialNotices.events.collect(A11y::announce) }
     var measured by remember { mutableStateOf(IntSize.Zero) }
