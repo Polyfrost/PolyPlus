@@ -90,6 +90,7 @@ import kotlin.math.max
 import kotlin.math.min
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
+import org.polyfrost.polyplus.client.gui.trackScreenFocus
 
 private const val DESIGN_WIDTH = 1280f
 private const val DESIGN_HEIGHT = 720f
@@ -245,7 +246,7 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
     val connecting = availability == SocialAvailability.Connecting
     val blocked = if (connecting) !reached else availability != SocialAvailability.Ready
     var measured by remember { mutableStateOf(IntSize.Zero) }
-    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }) {
+    BoxWithConstraints(Modifier.fillMaxSize().onSizeChanged { measured = it }.trackScreenFocus()) {
         val outer = LocalDensity.current
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density

@@ -1,11 +1,14 @@
 package org.polyfrost.polyplus.client.social
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
+import org.polyfrost.polyplus.client.gui.ScreenFocus
 import org.polyfrost.polyplus.client.gui.SocialOverlayScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
@@ -56,6 +59,7 @@ object SocialOverlay {
         /*val current = mc.screen
         *///?}
 
+        if (PolyPlusConfig.socialsMenuKeybind.keyCodes?.contains(InputConstants.KEY_TAB) == true && ScreenFocus.holds(current)) return
         when {
             current is SocialOverlayScreen -> close()
             current is PolyPlusLobbyScreen -> if (!current.lobby.setup) current.showPage(if (current.lobby.page == LobbyPage.Social) LobbyPage.Home else LobbyPage.Social)
