@@ -245,7 +245,7 @@ internal fun VoiceButtons(party: Party?, leave: Boolean = true) {
     val voice by PartyVoice.ui.collectAsState()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (party != null && voice.inVoice) {
-            if (voice.micBlocked) MicBlockedButton(voice.blockedNotice.orEmpty())
+            if (voice.micBlocked || voice.micSilent) MicBlockedButton(voice.blockedNotice.orEmpty(), voice.micBlocked)
             IconButton(
                 themedIcon(if (voice.muted) PartyIcons.MIC_OFF else PartyIcons.MIC),
                 if (voice.muted) "Unmute" else "Mute",
@@ -286,15 +286,15 @@ internal fun PartyButtons(party: Party?, onVoice: (() -> Unit)? = null) {
 }
 
 @Composable
-private fun MicBlockedButton(notice: String) {
+private fun MicBlockedButton(notice: String, blocked: Boolean) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(themedIcon(WARNING), if (open) null else "Can't talk", null, Modifier, null, SocialDangerColor, TooltipPlacement.BelowStart) { open = !open }
+        IconButton(themedIcon(WARNING), if (open) null else if (blocked) "Can't talk" else "No sound yet", null, Modifier, null, SocialDangerColor, TooltipPlacement.BelowStart) { open = !open }
         if (open) {
             EscapeCloses { open = false }
             AbovePopup(alignEnd = true, onDismiss = { open = false }) {
                 Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Label("Your microphone is blocked", 14.sp, weight = FontWeight.Medium)
+                    Label(if (blocked) "Your microphone is blocked" else "We can't hear your microphone", 14.sp, weight = FontWeight.Medium)
                     SocialText(notice, 12.sp, color = MutedText)
                     TextButton("Try again", Modifier.fillMaxWidth().height(38.dp)) {
                         open = false

@@ -20,7 +20,7 @@ object PartyVoice {
 
     private const val RTC_RETRY_MS = 5 * 60_000L
     private const val VAD_HANGOVER_MS = 400L
-    private const val SILENCE_BLOCK_MS = 3_000L
+    private const val SILENCE_HINT_MS = 10_000L
 
     data class Ui(
         val inVoice: Boolean = false,
@@ -28,6 +28,7 @@ object PartyVoice {
         val muted: Boolean = false,
         val deafened: Boolean = false,
         val micBlocked: Boolean = false,
+        val micSilent: Boolean = false,
         val blockedNotice: String? = null,
         val talking: Boolean = false,
         val speaking: Set<String> = emptySet(),
@@ -54,6 +55,7 @@ object PartyVoice {
     @Volatile private var lastLoud = 0L
     @Volatile private var silentSince = 0L
     @Volatile private var micHeard = false
+    @Volatile private var micSilent = false
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -240,6 +242,7 @@ object PartyVoice {
         if (capture != null) return
         silentSince = 0L
         micHeard = false
+        micSilent = false
         val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain, ::onFrame)
         if (mic != null) {
             capture = mic
@@ -255,15 +258,17 @@ object PartyVoice {
 
     private fun onFrame(frame: ShortArray, level: Float) {
         val now = System.currentTimeMillis()
-        if (EosRtcSupport.isMac && !micHeard && !muted && PartyVoiceSettings.inputGain() > 0f) {
-            if (level == 0f) {
-                if (silentSince == 0L) silentSince = now else if (now - silentSince >= SILENCE_BLOCK_MS) {
-                    onCaptureFailed()
-                    return
-                }
-            } else {
+        if (EosRtcSupport.isMac && !micHeard) {
+            if (level != 0f) {
                 silentSince = 0L
                 micHeard = true
+                setMicSilent(false)
+            } else if (muted || PartyVoiceSettings.inputGain() <= 0f) {
+                silentSince = 0L
+            } else if (silentSince == 0L) {
+                silentSince = now
+            } else if (now - silentSince >= SILENCE_HINT_MS) {
+                setMicSilent(true)
             }
         }
         if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
@@ -276,6 +281,13 @@ object PartyVoice {
             VoiceTransport.Rtc -> RtcVoice.setTransmit(talk)
             else -> Unit
         }
+    }
+
+    private fun setMicSilent(silent: Boolean) {
+        if (micSilent == silent) return
+        micSilent = silent
+        if (silent) LOGGER.warn("The microphone has sent only silence so far; macOS may be blocking it")
+        publish()
     }
 
     private fun desiredTransport(party: Party): VoiceTransport =
@@ -365,9 +377,14 @@ object PartyVoice {
     }
 
     private fun blockedNotice(): String? {
-        if (!micBlocked) return null
+        if (!micBlocked && !micSilent) return null
         if (!EosRtcSupport.isMac) return "No microphone found. You can still hear your party."
         val name = launcher ?: "your launcher"
+        if (!micBlocked) {
+            return "Your microphone hasn't picked up any sound yet. If you're talking, macOS may not be giving $name " +
+                "your microphone. Allow it in System Settings > Privacy & Security > Microphone if $name is listed there, " +
+                "or play through OneLauncher. This goes away as soon as you're heard."
+        }
         return "macOS isn't giving $name your microphone. Allow it in System Settings > Privacy & Security > Microphone " +
             "if $name is listed there, or play through OneLauncher to talk. You can still hear your party."
     }
@@ -382,6 +399,7 @@ object PartyVoice {
             muted = muted,
             deafened = deafened,
             micBlocked = micBlocked,
+            micSilent = micSilent && !micBlocked,
             blockedNotice = blockedNotice(),
             talking = talkingNow,
             speaking = speaking,
