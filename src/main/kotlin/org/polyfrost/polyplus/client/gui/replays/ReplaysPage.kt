@@ -96,6 +96,9 @@ private fun ReplaysHeader(view: ReplaysView, onBack: () -> Unit) {
             null
         },
     ) {
+        if (ReplayLibrary.failed && ReplayLibrary.entries.isNotEmpty()) {
+            TextButton("Some replays didn't load. Try again", null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { ReplayLibrary.reload() }
+        }
         if (focus != null) {
             TextButton("Open folder", themedIcon(FOLDER_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openFolderSafely() }
             TextButton("Open ${focus.name}", themedIcon(VIDEO_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openBrowserSafely() }
