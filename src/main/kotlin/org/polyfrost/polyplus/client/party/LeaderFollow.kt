@@ -294,6 +294,7 @@ object LeaderFollow {
         val location = leader?.state?.location
         val key = location?.takeIf { it.kind == LocationKind.Server && it.display != null }?.key
         if (party.id != lastParty) {
+            if (card != null) dismiss()
             lastParty = party.id
             lastKey = key
             return
