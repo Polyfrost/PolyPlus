@@ -101,7 +101,8 @@ object ClientConfigSync {
         val grouped = findSources().filter { !it.startsWith(gameDir) && it.isRegularFile() }
             .distinct()
             .groupBy { path ->
-                val root = roots.lastOrNull { path.startsWith(it.path) }
+                // The most specific folder wins, e.g. Badlion's profiles inside the shared .minecraft folder.
+                val root = roots.filter { path.startsWith(it.path) }.maxByOrNull { it.path.nameCount }
                 if (root == null) "Other" to (path.parent?.fileName?.toString() ?: "Default")
                 else {
                     val relative = root.path.relativize(path)
@@ -112,7 +113,7 @@ object ClientConfigSync {
                         relative.getName(1).toString() == "profiles"
                     ) {
                         relative.getName(2).toString().removeSuffix(" Profile")
-                    } else if (relative.nameCount == 1 && relativeName.endsWith(".json")) {
+                    } else if (relative.nameCount == 1 && (relativeName.endsWith(".json") || relativeName.endsWith(".zip"))) {
                         relative.fileName.toString().substringBeforeLast('.')
                     } else if (relative.nameCount == 1 && relativeName in (sharedModConfigs.values + optionFileNames)) {
                         "Default"
@@ -211,7 +212,8 @@ object ClientConfigSync {
         val importedHudConfigs = importedHudFiles.size + importedProfileHudFiles
         val translatedHudLayouts = NoRiskHudTranslator.import(sources, importedHudFiles) +
             LunarHudTranslator.import(sources, importedHudFiles) +
-            FeatherHudTranslator.import(sources, importedHudFiles)
+            FeatherHudTranslator.import(sources, importedHudFiles) +
+            BadlionHudTranslator.import(sources, importedHudFiles)
         val refreshedHudConfigs = reloadOneConfigProfileHudConfigs(sources)
         if (importedHudFiles.isNotEmpty() || translatedHudLayouts > 0) OneConfigHudInstances.reloadFromDisk()
         Files.writeString(
@@ -248,6 +250,8 @@ object ClientConfigSync {
                         LauncherRoot("Modrinth", roaming.resolve("ModrinthApp/profiles")),
                         LauncherRoot("ATLauncher", roaming.resolve("ATLauncher/instances")),
                         LauncherRoot("Badlion Client", roaming.resolve("Badlion Client")),
+                        // Badlion keeps its mod profiles (HUD layouts included) as zips inside .minecraft.
+                        LauncherRoot("Badlion Client", roaming.resolve(".minecraft/BLClient-Mod-Profiles")),
                         // LabyMod import is disabled for now.
                         LauncherRoot("NoRisk Client", roaming.resolve("norisk/NoRiskClientV3/data/profiles")),
                         LauncherRoot("Dawn", roaming.resolve(".dawn/profiles")),
@@ -319,6 +323,10 @@ object ClientConfigSync {
         if (featherHudElements.isNotEmpty()) {
             add("Feather HUD elements · ${featherHudElements.joinToString(", ")}")
         }
+        val badlionHudElements = BadlionHudTranslator.preview(paths)
+        if (badlionHudElements.isNotEmpty()) {
+            add("Badlion HUD elements · ${badlionHudElements.joinToString(", ")}")
+        }
         options.take(2).forEach { (key, value) -> add("${key.toPreviewLabel()}: $value") }
         if (isEmpty()) add("Compatible settings found")
     }
@@ -375,8 +383,9 @@ object ClientConfigSync {
                         val isNoRiskProfile = root.name == "NoRisk Client" &&
                             fileName?.endsWith(".json") == true
                         val isFeatherProfile = root.name == "Dawn" && FeatherHudTranslator.isFeatherProfile(path)
+                        val isBadlionProfile = root.name == "Badlion Client" && BadlionHudTranslator.isBadlionProfile(path)
                         if ((fileName in optionFileNames || isConfig || isHudConfig || isLunarHudConfig || isNoRiskProfile ||
-                                isFeatherProfile) &&
+                                isFeatherProfile || isBadlionProfile) &&
                             Files.isRegularFile(path) && !isBackupPath(path)
                         ) {
                             yield(path)
