@@ -1176,7 +1176,11 @@ object LobbyCapture {
             return
         }
         val entry = entry(source, outcome, data.size.toLong())
-        val kept = LobbySceneStore.admit(entry, data)
+        val action = source.action
+        val report = LobbySceneScore.report(job.verdict.breakdown, null, true, job.weaker, false, realm = job.verdict.realm)
+        val kept = LobbySceneStore.admit(entry, data) { saved ->
+            action?.let { spot = LobbySpotState.Done(it, report, saved, if (saved) "Saved to your lobby scenes" else "Could not save this scene") }
+        }
         if (kept) {
             wait = CAPTURED_TICKS
             val stored = LobbySceneStore.named(entry)
@@ -1184,10 +1188,7 @@ object LobbyCapture {
             if (source.connection != null && source.connection === session.get()) sessionScenes += stored
             returning?.takeIf { it.world == source.world }?.entry = stored
         }
-        source.action?.let {
-            val report = LobbySceneScore.report(job.verdict.breakdown, null, true, job.weaker, false, realm = job.verdict.realm)
-            spot = LobbySpotState.Done(it, report, kept, if (kept) "Saved to your lobby scenes" else "Could not save this scene")
-        }
+        if (!kept) action?.let { spot = LobbySpotState.Done(it, report, false, "Could not save this scene") }
         report(
             source,
             outcome.anchor,

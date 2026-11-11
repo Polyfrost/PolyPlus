@@ -216,15 +216,19 @@ object LobbySceneStore {
         return near.isNotEmpty() || rivals.size < MAX_PER_WORLD || rivals.any { it.score < score }
     }
 
-    fun admit(candidate: LobbySceneEntry, data: ByteArray): Boolean {
+    fun admit(candidate: LobbySceneEntry, data: ByteArray, saved: (Boolean) -> Unit = {}): Boolean {
+        if (data.size > MAX_TOTAL_BYTES) return false
+        ensureLoaded()
         val stack = stackOf(candidate)
         if (!candidate.manual && !wouldKeep(candidate.world, candidate.x, candidate.z, candidate.score, stack, candidate.realm)) return false
+        val selected = state.pinned
         val inWorld = state.scenes.filter { it.world == candidate.world && it.realm == candidate.realm }
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
-        val rivals = current.filter { !it.manual && stackOf(it) == stack }
+        val rivals = current.filter { !it.manual && it.id != selected && stackOf(it) == stack }
         val replaced = ArrayList<LobbySceneEntry>()
         val legacy = fileName(candidate, legacy = true)
         val sameFile = state.scenes.filter { it.file == fileName(candidate) || (it.y == null && it.dataVersion == candidate.dataVersion && it.file == legacy) }
+        if (!candidate.manual && sameFile.any { it.id == selected }) return false
         val sameSpot = if (candidate.manual) sameFile else sameFile + inWorld.filter { !it.manual && stackOf(it) == stack && near(it, candidate) }
         val custom = sameSpot.filter { it.renamed }.maxByOrNull { it.capturedAt }
         replaced += sameFile
@@ -235,29 +239,46 @@ object LobbySceneStore {
         }
         var kept = state.scenes - replaced.toSet()
         var total = kept.sumOf { it.bytes } + data.size
-        val spare = kept.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, ::rank)).toMutableList()
+        val spare = kept.filterNot { it.manual || it.id == selected }.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, ::rank)).toMutableList()
         while (total > MAX_TOTAL_BYTES && spare.isNotEmpty()) {
             val dropped = spare.removeAt(0)
             replaced += dropped
             kept = kept - dropped
             total -= dropped.bytes
         }
+        if (total > MAX_TOTAL_BYTES) return false
         val entry = named(candidate).copy(
             bytes = data.size.toLong(),
             label = custom?.label ?: candidate.label,
             renamed = custom != null,
         )
         val name = entry.file
-        val stale = replaced.filter { it.file != name }.map { folder.resolve(it.file) }
-        state = state.copy(scenes = kept + entry, pinned = state.pinned?.takeUnless { id -> replaced.any { it.id == id && it.file != name } })
+        val stale = replaced.filter { it.file != name }
+        state = state.copy(scenes = kept + entry, pinned = state.pinned?.takeUnless { id -> stale.any { it.id == id } })
         val index = encoded()
         writer.execute {
-            runCatching {
+            var written = false
+            val ok = runCatching {
                 Files.createDirectories(folder)
                 atomicWrite(folder.resolve(name), data)
-                stale.forEach(Path::deleteIfExists)
+                written = true
                 atomicWrite(indexFile, index.toByteArray(Charsets.UTF_8))
-            }.onFailure { LOBBY_LOGGER.warn("Could not save a scene", it) }
+            }.onFailure { LOBBY_LOGGER.warn("Could not save a scene", it) }.isSuccess
+            if (ok) {
+                stale.forEach { old ->
+                    runCatching { folder.resolve(old.file).deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a replaced scene", it) }
+                }
+            }
+            Minecraft.getInstance().execute {
+                if (!ok) {
+                    val lost = if (written) stale else replaced
+                    update {
+                        val rest = scenes.filterNot { it.id == entry.id }
+                        copy(scenes = rest + lost.filter { old -> rest.none { it.id == old.id } }, pinned = pinned ?: selected?.takeIf { id -> lost.any { it.id == id } })
+                    }
+                }
+                saved(ok)
+            }
         }
         return true
     }
@@ -308,7 +329,7 @@ object LobbySceneStore {
         val place = when {
             legacy -> ""
             entry.manual -> "|${entry.dataVersion}|${entry.dimension}|${entry.y}"
-            else -> "|${entry.dataVersion}"
+            else -> "|${entry.dataVersion}|${entry.dimension}"
         }
         val digest = MessageDigest.getInstance("SHA-1").digest("${entry.world}|${entry.x}|${entry.z}$stack$kind$place".toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest, 0, NAME_BYTES) + ".nbt.gz"
