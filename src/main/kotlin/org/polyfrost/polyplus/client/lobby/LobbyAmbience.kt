@@ -129,11 +129,20 @@ object LobbyAmbience {
     *///?}
 
     @JvmStatic
-    fun holdsMusic(): Boolean = playing() || silent(Minecraft.getInstance())
+    fun holdsMusic(): Boolean = playing() || ownsMusic(Minecraft.getInstance())
 
     private fun playing(): Boolean = voices.isNotEmpty() || intro != null
 
-    private fun silent(mc: Minecraft): Boolean = PolyPlusLobbyConfig.lobbyMusic == LobbyMusic.OFF && lobbyUp(mc)
+    private fun ownsMusic(mc: Minecraft): Boolean = PolyPlusLobbyConfig.lobbyMusic != LobbyMusic.MINECRAFT && lobbyUp(mc)
+
+    private fun handingOff(): Boolean {
+        //? if > 1.8.9 {
+        val gate = introGate ?: return false
+        return gate.startedAt == 0L || System.nanoTime() - gate.startedAt < introDelay
+        //?} else {
+        /*return dueNanos != 0L
+        *///?}
+    }
 
     private fun loops(): Boolean = when (PolyPlusLobbyConfig.lobbyMusic) {
         LobbyMusic.MINECRAFT, LobbyMusic.OFF -> false
@@ -199,7 +208,7 @@ object LobbyAmbience {
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
-        val quiet = silent(mc)
+        val quiet = ownsMusic(mc)
         if (quiet && !silenced) {
             mc.musicManager.stopPlaying()
             UiSounds.releaseAmbience()
@@ -216,9 +225,10 @@ object LobbyAmbience {
         intro?.let { if (clock - introBorn > SETTLE_TICKS && !active(mc, it)) intro = null }
         voices.filter { clock - it.born > SETTLE_TICKS && !active(mc, it.sound) }.forEach { drop(mc, it, true) }
         val layers = desired()
-        if (!leaving) join(mc, layers, null)
+        val handoff = handingOff()
+        if (!leaving && !handoff) join(mc, layers, null)
         val targets = targets(layers)
-        for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
+        if (!handoff) for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
         voices.filter { it.layer !in layers && it.weight < SILENT_FLOOR }.forEach { drop(mc, it, false) }
         presence = if (leaving) presence - TICK_SECONDS / (if (departing) DEPART_FADE_SECONDS else FADE_OUT_SECONDS) else minOf(1f, presence + TICK_SECONDS / FADE_IN_SECONDS)
         if (presence <= 0f || !playing()) {
@@ -362,7 +372,8 @@ object LobbyAmbience {
         return ClientPlatform.currentScreen() is PolyPlusLobbyScreen || LobbyScene.showing()
     }
 
-    private fun volume(): Float = AMBIENCE_GAIN * OneConfigConfig.uiAmbienceVolume.coerceIn(0f, 1f)
+    private fun volume(): Float =
+        AMBIENCE_GAIN * (OneConfigConfig.uiAmbienceVolume / 100f).coerceIn(0f, 1f)
 
     private fun audible(mc: Minecraft): Boolean =
         OneConfigConfig.enableUIAmbience && volume() > 0f &&
