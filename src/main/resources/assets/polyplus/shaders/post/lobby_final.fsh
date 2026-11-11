@@ -109,7 +109,6 @@ const float REFERENCE_HEIGHT = 1080.0;
 const float COC_DEADZONE = 0.14;
 const float COC_FULL = 0.85;
 const float FAR_DEPTH = 1000000.0;
-const vec2 DOF_SIZE = vec2(960.0, 540.0);
 const float DEPTH_SOFTNESS = 0.03;
 const float EDGE_FLOOR = 0.3;
 const float OWN_FROM = 0.5;
@@ -284,19 +283,23 @@ float sceneDepth(vec2 uv) {
     return z;
 }
 
+vec2 dofSize() {
+    return max(DofSize, vec2(1.0));
+}
+
 float depthWeight(float a, float b) {
     float difference = abs(a - b) / (max(min(a, b), 0.001) * DEPTH_SOFTNESS);
     return 1.0 / (1.0 + difference * difference);
 }
 
 vec4 jointUpsample(float z, float relax) {
-    vec2 grid = texCoord * DOF_SIZE - 0.5;
+    vec2 grid = texCoord * dofSize() - 0.5;
     vec2 base = floor(grid);
     vec2 f = grid - base;
-    vec2 uv00 = (base + 0.5) / DOF_SIZE;
-    vec2 uv10 = (base + vec2(1.5, 0.5)) / DOF_SIZE;
-    vec2 uv01 = (base + vec2(0.5, 1.5)) / DOF_SIZE;
-    vec2 uv11 = (base + 1.5) / DOF_SIZE;
+    vec2 uv00 = (base + 0.5) / dofSize();
+    vec2 uv10 = (base + vec2(1.5, 0.5)) / dofSize();
+    vec2 uv01 = (base + vec2(0.5, 1.5)) / dofSize();
+    vec2 uv11 = (base + 1.5) / dofSize();
     vec4 dof00 = textureLod(DofSampler, uv00, 0.0);
     vec4 dof10 = textureLod(DofSampler, uv10, 0.0);
     vec4 dof01 = textureLod(DofSampler, uv01, 0.0);
@@ -316,7 +319,7 @@ vec4 tentUpsample(float z) {
     //? if = 1.8.9 {
     /*return jointUpsample(z, 1.0);
     *///?} else {
-    vec2 half_texel = 0.5 / DOF_SIZE;
+    vec2 half_texel = 0.5 / dofSize();
     vec4 sum = textureLod(DofSampler, texCoord + vec2(-half_texel.x, -half_texel.y), 0.0);
     sum += textureLod(DofSampler, texCoord + vec2(half_texel.x, -half_texel.y), 0.0);
     sum += textureLod(DofSampler, texCoord + vec2(-half_texel.x, half_texel.y), 0.0);
@@ -361,7 +364,7 @@ vec3 scene() {
         if (!sky) {
             blur = blurAmount(z);
         }
-        float texel = max(OutSize.y, 1.0) / DOF_SIZE.y;
+        float texel = max(OutSize.y, 1.0) / dofSize().y;
         float own = sky ? 1.0 - Mood.y : smoothstep(OWN_FROM * texel, OWN_TO * texel, blur * dofRadius());
         vec4 dof = depthOfField(sky ? FAR_DEPTH : z, own);
         color = color * (1.0 - dof.a) + dof.rgb;

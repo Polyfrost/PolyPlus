@@ -312,9 +312,11 @@ object LobbySky {
         glass.flip()
         //? if = 1.8.9
         /*if (!depthFresh) data.putFloat(FLAGS_DEPTH_AT, DEPTH_UNKNOWN.toFloat())*/
+        val dof = loaded.getTempTarget("dof")
         for (pass in (loaded as PostChainAccessor).`polyplus$passes`()) {
             setAll(pass.effect, SKY_NAMES, data)
             setAll(pass.effect, GLASS_NAMES, glass)
+            if (dof != null) pass.effect.getUniform("DofSize")?.set(dof.width.toFloat(), dof.height.toFloat())
         }
         //? if = 1.8.9 {
         /*GlStateManager.disableCull()
