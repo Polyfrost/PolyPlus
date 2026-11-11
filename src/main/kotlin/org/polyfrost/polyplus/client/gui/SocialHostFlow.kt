@@ -130,7 +130,7 @@ internal fun HostWorldFlow(
         val loaded = HostWorldManager.loadWorlds()
         state.worlds = loaded
         state.selected = if (worldId == null) loaded.firstOrNull() else loaded.firstOrNull { it.id == worldId }
-        if (state.selected == null) {
+        if (worldId != null && state.selected == null) {
             onDismiss()
             return@LaunchedEffect
         }
