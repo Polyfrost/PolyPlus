@@ -1,18 +1,14 @@
 package org.polyfrost.polyplus.mixin.compat.argentum;
 
 //? if = 1.8.9 {
-/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
 import org.polyfrost.polyplus.client.emoji.EmojiFont;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 // Argentum tints every glyph with the text color; draw the badge and emoji untinted and without a shadow,
@@ -20,18 +16,8 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Pseudo
 @Mixin(targets = "dev.rdh.argentum.impl.render.gui.TextBatcher", remap = false)
 public abstract class MixinTextBatcher {
-    @Shadow private float red;
-    @Shadow private float green;
-    @Shadow private float blue;
-    @Shadow private float alpha;
-
     @Unique private boolean polyplus$colorGlyph;
-    @Unique private boolean polyplus$badgeGlyph;
-
-    @ModifyReturnValue(method = "cacheable", at = @At("RETURN"), require = 0)
-    private static boolean polyplus$skipBadgeText(boolean cacheable, String text) {
-        return cacheable && text.indexOf(PolyPlusBadge.LEGACY_CHAR) < 0;
-    }
+    @Unique private boolean polyplus$untint;
 
     @ModifyArg(
         method = "layout",
@@ -40,34 +26,42 @@ public abstract class MixinTextBatcher {
         require = 0
     )
     private int polyplus$trackGlyph(int codepoint) {
-        polyplus$badgeGlyph = codepoint == PolyPlusBadge.LEGACY_CHAR;
         polyplus$colorGlyph = codepoint <= Character.MAX_VALUE
             && (codepoint == PolyPlusBadge.LEGACY_CHAR || EmojiFont.legacyIndex((char) codepoint) >= 0);
+        polyplus$untint = false;
         return codepoint;
     }
 
-    @WrapOperation(
+    @ModifyExpressionValue(
         method = "layout",
-        at = @At(value = "INVOKE", target = "Ldev/rdh/argentum/impl/render/gui/TextBatcher;glyph"),
+        at = @At(value = "INVOKE", target = "Ldev/rdh/argentum/impl/render/gui/font/Glyph;visible()Z"),
         require = 0
     )
-    private void polyplus$untintGlyph(@Coerce Object batcher, @Coerce Object glyph, float x, float y, boolean italic, @Coerce Object textureManager,
-                                      Operation<Void> original, @Local(argsOnly = true, ordinal = 0) boolean shadow) {
-        if (!polyplus$colorGlyph) {
-            original.call(batcher, glyph, x, y, italic, textureManager);
-            return;
-        }
-        if (shadow) return;
-        if (polyplus$badgeGlyph) {
-            PolyPlusBadge.drawTesselated(x, y, alpha);
-            return;
-        }
-        float r = red, g = green, b = blue;
-        red = green = blue = 1.0F;
-        original.call(batcher, glyph, x, y, italic, textureManager);
-        red = r;
-        green = g;
-        blue = b;
+    private boolean polyplus$skipShadow(boolean visible, @Local(argsOnly = true, ordinal = 0) boolean shadow) {
+        if (!polyplus$colorGlyph) return visible;
+        polyplus$untint = !shadow;
+        return visible && !shadow;
+    }
+
+    @ModifyArg(method = "layout", at = @At(value = "INVOKE", target = "Ldev/rdh/argentum/impl/render/gui/TextBatcher;decoration"), index = 0, require = 0)
+    private float polyplus$tintDecoration(float x) {
+        polyplus$untint = false;
+        return x;
+    }
+
+    @ModifyArg(method = "vertex", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/vertex/BufferBuilder;color(FFFF)Lnet/minecraft/client/render/vertex/BufferBuilder;", remap = true), index = 0, require = 0)
+    private float polyplus$red(float red) {
+        return polyplus$untint ? 1.0F : red;
+    }
+
+    @ModifyArg(method = "vertex", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/vertex/BufferBuilder;color(FFFF)Lnet/minecraft/client/render/vertex/BufferBuilder;", remap = true), index = 1, require = 0)
+    private float polyplus$green(float green) {
+        return polyplus$untint ? 1.0F : green;
+    }
+
+    @ModifyArg(method = "vertex", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/vertex/BufferBuilder;color(FFFF)Lnet/minecraft/client/render/vertex/BufferBuilder;", remap = true), index = 2, require = 0)
+    private float polyplus$blue(float blue) {
+        return polyplus$untint ? 1.0F : blue;
     }
 }
 *///?}

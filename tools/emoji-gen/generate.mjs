@@ -176,22 +176,10 @@ const fontJson = {
 fs.writeFileSync(OUT_FONT, JSON.stringify(fontJson, null, 2) + '\n');
 console.log(`wrote ${path.relative(process.cwd(), OUT_FONT)}`);
 
-// Argentum skips its built-in ASCII font once any font/default.json exists, so restate it after our glyphs
-const LEGACY_ASCII =
-  'ÀÁÂÈÊËÍÓÔÕÚßãõğİıŒœŞşŴŵžȇ\u0000\u0000\u0000\u0000\u0000\u0000\u0000 !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u0000ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αβΓπΣσμτΦΘΩδ∞∅∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u0000';
-
 const legacyFontJson = {
   providers: [
     ...JSON.parse(fs.readFileSync(BADGE_FONT, 'utf8')).providers,
     { ...fontJson.providers[0], chars: legacyCharsGrid },
-    {
-      type: 'bitmap',
-      file: 'minecraft:font/ascii.png',
-      ascent: 7,
-      height: 8,
-      chars: Array.from({ length: 16 }, (_, row) => LEGACY_ASCII.slice(row * 16, row * 16 + 16)),
-      filter: { uniform: false },
-    },
   ],
 };
 fs.mkdirSync(path.dirname(OUT_LEGACY_FONT), { recursive: true });
