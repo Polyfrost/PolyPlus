@@ -26,5 +26,6 @@
   "TOGGLE_SNEAK": { "enabled": true, "options": { "flyBoostAmount": 6 } },
   "HITBOX": { "enabled": false },
   "ITEM_PHYSICS": { "panelIndex": 3 },
-  "ONE_SEVEN_VISUALS": { "enabled": true }
+  "ONE_SEVEN_VISUALS": { "enabled": true },
+  "HEIGHT_LIMIT": { "enabled": true, "x": -8.0, "y": 94.0, "position": "topRight" }
 }

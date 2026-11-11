@@ -50,6 +50,12 @@ class ClientHudImportTest {
         assertNear(-12.0, memory.x)
         assertEquals(1.5, memory.scale)
 
+        val heightLimit = requests.of("Lunar HEIGHT_LIMIT")
+        assertEquals(OneConfigHudInstances.HEIGHT_LIMIT, heightLimit.target)
+        assertEquals("TopRight", heightLimit.section)
+        assertNear(-12.0, heightLimit.x)
+        assertNear(188.0, heightLimit.y)
+
         // Lunar omits the on flag for HUDs it places by default.
         assertEquals(true, requests.of("Lunar COORDINATES").enabled)
         assertEquals(false, requests.of("Lunar DIRECTION_HUD").enabled)

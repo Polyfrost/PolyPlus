@@ -21,6 +21,7 @@
   "fullbright": { "enabled": true },
   "toggleSprint": { "enabled": false },
   "zoom": { "enabled": true },
+  "heightLimitBlockOverlay": { "enabled": true },
   "boxes": [
     { "identifier": "fps", "quadrant": "TOP_RIGHT", "xPosition": 0.9953125, "yPosition": 0.46944445, "width": 130.0, "height": 30.0, "screenWidth": 1920, "screenHeight": 1080, "type": "box" },
     { "identifier": "reach display", "quadrant": "MIDDLE_RIGHT", "xPosition": 0.9953125, "yPosition": 0.013888889, "width": 130.0, "height": 30.0, "screenWidth": 1920, "screenHeight": 1080, "type": "box" },

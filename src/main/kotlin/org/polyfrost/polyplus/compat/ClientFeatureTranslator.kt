@@ -53,6 +53,7 @@ internal object ClientFeatureTranslator {
         OLD_ANIMATIONS("1.7 animations"),
         SCROLLABLE_TOOLTIPS("Scrollable tooltips"),
         CHAT("Chat tweaks"),
+        HEIGHT_OVERLAY("Height limit overlay"),
     }
 
     private val changes: Map<Feature, Change> = mapOf(
@@ -83,6 +84,7 @@ internal object ClientFeatureTranslator {
         ),
         Feature.SCROLLABLE_TOOLTIPS to change("tooltipscroll", "tooltipscroll.json", "canScroll" to true),
         Feature.CHAT to change("chatting", "chatting.json", "modEnabled" to true),
+        Feature.HEIGHT_OVERLAY to change("hybedwars", "hybedwars.json", "heightOverlay" to true),
     )
 
     // Each client's own name for a feature.
@@ -155,6 +157,7 @@ internal object ClientFeatureTranslator {
         "particles" to Feature.PARTICLES,
         "animations" to Feature.OLD_ANIMATIONS,
         "chat" to Feature.CHAT,
+        "heightLimitBlockOverlay" to Feature.HEIGHT_OVERLAY,
     )
 
     private val noRisk = mapOf(
