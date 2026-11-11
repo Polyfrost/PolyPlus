@@ -804,7 +804,7 @@ object LobbyScene {
     }
 
     private fun fail(entry: LobbySceneEntry, error: Throwable) {
-        LOBBY_LOGGER.warn("Scene {} did not load: {}", entry.id, error.message)
+        LOBBY_LOGGER.warn("Scene {} did not load", entry.id, error)
         tryNext()
     }
 
