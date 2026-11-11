@@ -45,6 +45,8 @@ object LobbyPacks {
 
     private class Print(val size: Long, val hash: String, val format: Int, val full: String, val until: Long)
 
+    private class Stat(val key: String?, val directory: Boolean, val until: Long)
+
     private const val FILE_PREFIX = "file/"
     private const val ZIP_SUFFIX = ".zip"
     private const val META_FILE = "pack.mcmeta"
@@ -52,6 +54,7 @@ object LobbyPacks {
     private const val MAX_DEPTH = 32
     private const val MAX_ENTRIES = 50000
     private const val DIR_RECHECK_MS = 30000L
+    private const val STAT_RECHECK_MS = 2000L
     private val JUNK_FILES = setOf("thumbs.db", "desktop.ini")
     //? if = 1.8.9
     /*private const val LEGACY_FORMAT = 1*/
@@ -59,6 +62,7 @@ object LobbyPacks {
 
     private val prints = ConcurrentHashMap<String, Print>()
     private val glances = ConcurrentHashMap<String, Print>()
+    private val stats = ConcurrentHashMap<String, Stat>()
     private val pending = ConcurrentHashMap<String, FutureTask<Print?>>()
     private val waiting = ConcurrentHashMap.newKeySet<String>()
     private val settled = AtomicBoolean(false)
@@ -133,7 +137,7 @@ object LobbyPacks {
     private fun reason(need: LobbyScenePack): String {
         val local = installed(need.id)
         return when {
-            local == null || fileOf(need.id)?.exists() == false -> "Needs ${need.name} installed"
+            local == null || fileOf(need.id)?.let { stat(it).key == null } == true -> "Needs ${need.name} installed"
             !same(need, local.id) -> "Needs the version of ${need.name} it was made with"
             !local.supported -> "${need.name} doesn't support this version"
             else -> "Turn on ${need.name} to use this scene"
@@ -142,14 +146,15 @@ object LobbyPacks {
 
     private fun same(need: LobbyScenePack, id: String): Boolean {
         if (need.hash.isEmpty()) return need.id == id
-        val file = fileOf(id)?.takeIf(File::exists) ?: return false
-        val key = key(file)
+        val file = fileOf(id) ?: return false
+        val stat = stat(file)
+        val key = stat.key ?: return false
         val done = fresh(prints, key) ?: run {
             waiting.add(key)
             prefetch(file, key)
             fresh(prints, key)?.also { waiting.remove(key) }
         }
-        if (file.isDirectory && need.size > 0L && need.fullHash.isEmpty()) return done == null || (done.full == need.hash && done.size == need.size)
+        if (stat.directory && need.size > 0L && need.fullHash.isEmpty()) return done == null || (done.full == need.hash && done.size == need.size)
         val print = done ?: glance(file, key) ?: return false
         if (print.hash != need.hash || (need.size != 0L && need.size != print.size)) return false
         return done == null || need.fullHash.isEmpty() || done.full == need.fullHash
@@ -188,6 +193,13 @@ object LobbyPacks {
     }
 
     private fun key(file: File): String = "${file.path}|${file.length()}|${file.lastModified()}"
+
+    private fun stat(file: File): Stat {
+        val now = System.currentTimeMillis()
+        stats[file.path]?.takeIf { now < it.until }?.let { return it }
+        val exists = file.exists()
+        return Stat(if (exists) key(file) else null, exists && file.isDirectory, now + STAT_RECHECK_MS).also { stats[file.path] = it }
+    }
 
     private fun fresh(cache: Map<String, Print>, key: String): Print? = cache[key]?.takeIf { System.currentTimeMillis() < it.until }
 

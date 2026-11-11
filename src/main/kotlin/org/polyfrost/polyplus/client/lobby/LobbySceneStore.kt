@@ -147,6 +147,9 @@ object LobbySceneStore {
     val usableScenes: List<LobbySceneEntry>
         get() = scenes.filter { it.dataVersion == LobbySnapshot.dataVersion && problem(it) == null }
 
+    fun usableScene(id: String): LobbySceneEntry? =
+        scenes.firstOrNull { it.id == id && it.dataVersion == LobbySnapshot.dataVersion && problem(it) == null }
+
     val lockedScenes: List<Pair<LobbySceneEntry, String>>
         get() = scenes.filter { it.dataVersion == LobbySnapshot.dataVersion }.mapNotNull { entry -> problem(entry)?.let { entry to it } }
 

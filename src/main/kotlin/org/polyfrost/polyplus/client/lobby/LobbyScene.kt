@@ -633,8 +633,10 @@ object LobbyScene {
     fun findScene(id: String): LobbySceneEntry? {
         val shown = currentEntry?.takeIf { it.origin == LobbySceneEntry.ORIGIN_PARTY && it.id == currentId }
         val followed = PartyScene.startEntries().filter { it.origin == LobbySceneEntry.ORIGIN_PARTY }
-        val known = listOfNotNull(LobbyCapture.returnEntry(), shown) + followed + LobbySceneStore.usableScenes + LobbySceneStore.bundledScenes
-        val entry = known.firstOrNull { it.id == id } ?: return null
+        val entry = (listOfNotNull(LobbyCapture.returnEntry(), shown) + followed).firstOrNull { it.id == id }
+            ?: LobbySceneStore.usableScene(id)
+            ?: LobbySceneStore.bundledScenes.firstOrNull { it.id == id }
+            ?: return null
         val file = if (entry.origin == LobbySceneEntry.ORIGIN_PARTY) Path.of(entry.file) else LobbySceneStore.fileOf(entry)
         return entry.takeIf { file == null || Files.exists(file) }
     }
