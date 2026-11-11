@@ -52,7 +52,7 @@ import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialBorderWidth
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
-import org.polyfrost.polyplus.client.gui.SocialWindowScrim
+import org.polyfrost.polyplus.client.gui.SocialOpenAnimation
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
@@ -263,22 +263,23 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(SocialWindowScrim)
                     .pointerInput(onClose) { detectTapGestures { onClose() } },
             ) {
-                ContextMenuHost {
-                    val snapshot = state.source.snapshot()
-                    if (blocked) {
-                        BlockedWindow(window, layout, availability, state, snapshot, onClose)
-                    } else {
-                        FollowSocialChanges(state, snapshot)
-                        SelectionEffects(window, state)
-                        TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                SocialOpenAnimation {
+                    ContextMenuHost {
+                        val snapshot = state.source.snapshot()
+                        if (blocked) {
+                            BlockedWindow(window, layout, availability, state, snapshot, onClose)
+                        } else {
+                            FollowSocialChanges(state, snapshot)
+                            SelectionEffects(window, state)
+                            TwoPanes(window, layout, state, snapshot, connecting, onClose)
+                        }
+                        SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
+                        SocialDialogHost(state)
+                        PlayTogetherHooks(WindowHost)
+                        LeaderJoinEffect(WindowHost)
                     }
-                    SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
-                    SocialDialogHost(state)
-                    PlayTogetherHooks(WindowHost)
-                    LeaderJoinEffect(WindowHost)
                 }
             }
         }
