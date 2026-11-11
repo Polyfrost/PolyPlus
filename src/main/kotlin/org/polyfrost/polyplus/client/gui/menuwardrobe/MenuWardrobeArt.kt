@@ -6,15 +6,14 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.mojang.blaze3d.platform.NativeImage
@@ -37,7 +36,6 @@ import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticUiItem
 import org.polyfrost.polyplus.client.gui.wardrobe.FRONT_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.rememberCosmeticPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -48,6 +46,7 @@ private const val CAPTURE_SETTLE_ATTEMPTS = 4
 private const val CAPTURE_INTERVAL_MS = 20L
 private const val ALPHA_FLOOR = 0.04f
 private const val FILL = 0.9f
+private const val CACHE_LIMIT = 48
 
 private class Portrait(val image: ImageBitmap, val offset: IntOffset, val size: IntSize)
 
@@ -72,9 +71,23 @@ private object BareSkin {
     }
 }
 
+private class LruCache<K, V>(private val limit: Int) {
+    private val map = object : LinkedHashMap<K, V>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean = size > limit
+    }
+
+    @Synchronized
+    operator fun get(key: K): V? = map[key]
+
+    @Synchronized
+    operator fun set(key: K, value: V) {
+        map[key] = value
+    }
+}
+
 private object Portraits {
-    private val cache = ConcurrentHashMap<String, Portrait>()
-    private val sprites = ConcurrentHashMap<Int, Portrait>()
+    private val cache = LruCache<String, Portrait>(CACHE_LIMIT)
+    private val sprites = LruCache<Int, Portrait>(CACHE_LIMIT)
 
     fun cached(key: String): Portrait? = cache[key]
 
@@ -109,14 +122,18 @@ private object Portraits {
     }
 
     private fun crop(image: ImageBitmap): Portrait? {
-        val pixels = image.toPixelMap()
-        var left = image.width
-        var top = image.height
+        val width = image.width
+        val height = image.height
+        val pixels = IntArray(width * height)
+        image.readPixels(pixels, 0, 0, width, height, 0, width)
+        val floor = ALPHA_FLOOR * 255f
+        var left = width
+        var top = height
         var right = -1
         var bottom = -1
-        for (y in 0 until image.height) {
-            for (x in 0 until image.width) {
-                if (pixels[x, y].alpha <= ALPHA_FLOOR) continue
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if ((pixels[y * width + x] ushr 24) <= floor) continue
                 if (x < left) left = x
                 if (x > right) right = x
                 if (y < top) top = y
@@ -124,7 +141,20 @@ private object Portraits {
             }
         }
         if (right < left) return null
-        return Portrait(image, IntOffset(left, top), IntSize(right - left + 1, bottom - top + 1))
+        val cropWidth = right - left + 1
+        val cropHeight = bottom - top + 1
+        val out = ByteArray(cropWidth * cropHeight * 4)
+        for (y in 0 until cropHeight) {
+            for (x in 0 until cropWidth) {
+                val argb = pixels[(top + y) * width + left + x]
+                val di = (y * cropWidth + x) * 4
+                out[di] = (argb ushr 16).toByte()
+                out[di + 1] = (argb ushr 8).toByte()
+                out[di + 2] = argb.toByte()
+                out[di + 3] = (argb ushr 24).toByte()
+            }
+        }
+        return Portrait(PolyBitmap(cropWidth, cropHeight, out).asComposeImageBitmap(), IntOffset.Zero, IntSize(cropWidth, cropHeight))
     }
 }
 
@@ -155,10 +185,11 @@ internal fun CosmeticArt(item: CosmeticUiItem, variantId: Int?, modifier: Modifi
     }
     val bare = remember(source) { (source as? PlayerPreviewSource.Override)?.copy(skin = BareSkin.skin) }
     val key = "portrait-$id-$tick"
-    val portrait by produceState(Portraits.cached(key), key, bare) {
-        if (value == null && bare != null) value = withContext(Dispatchers.Default) { Portraits.capture(key, bare, framing(item.type)) }
+    val portrait = remember(key, bare) { mutableStateOf(Portraits.cached(key)) }
+    LaunchedEffect(portrait) {
+        if (portrait.value == null && bare != null) portrait.value = withContext(Dispatchers.Default) { Portraits.capture(key, bare, framing(item.type)) }
     }
-    val shown = portrait
+    val shown = portrait.value
     if (shown == null) {
         Box(modifier)
         return
@@ -191,10 +222,11 @@ private val AURA_SCATTER = listOf(
 
 @Composable
 private fun AuraArt(id: Int, tick: Int, modifier: Modifier) {
-    val sprite by produceState(Portraits.cachedSprite(id), id, tick) {
-        if (value == null) value = withContext(Dispatchers.IO) { runCatching { Portraits.sprite(id) }.getOrNull() }
+    val sprite = remember(id, tick) { mutableStateOf(Portraits.cachedSprite(id)) }
+    LaunchedEffect(sprite) {
+        if (sprite.value == null) sprite.value = withContext(Dispatchers.IO) { runCatching { Portraits.sprite(id) }.getOrNull() }
     }
-    val shown = sprite
+    val shown = sprite.value
     if (shown == null) {
         Box(modifier)
         return
