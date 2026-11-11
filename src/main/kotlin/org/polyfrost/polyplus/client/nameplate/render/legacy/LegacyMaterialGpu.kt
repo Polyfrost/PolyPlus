@@ -166,7 +166,7 @@ object LegacyMaterialGpu {
         } else {
             PixelRect(op.x + local.x0, op.y + local.y0, op.x + local.x1, op.y + local.y1)
         }
-        val fade = frame.alpha * op.opacity.coerceIn(0, OPAQUE) / CHANNEL
+        val fade = frame.plateAlpha * op.opacity.coerceIn(0, OPAQUE) / CHANNEL
         if (fade <= 0f) {
             return
         }

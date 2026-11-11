@@ -31,6 +31,7 @@ class NameplateFrame(
     val alpha: Float,
     val lightCoords: Int,
     val block: TagBlock,
+    val plateAlpha: Float = alpha,
 ) {
     val cameraDistance: Float
         get() {
@@ -123,7 +124,7 @@ class NameplateFrame(
         /*target.last().pose().set(poseStack.last().pose())
         target.last().normal().set(poseStack.last().normal())
         *///?}
-        return NameplateFrame(target, collector, x, y, alpha, lightCoords, block)
+        return NameplateFrame(target, collector, x, y, alpha, lightCoords, block, plateAlpha)
     }
 
     //? if < 1.21.10 {
@@ -178,6 +179,7 @@ class NameplateFrame(
     val alpha: Float,
     val lightCoords: Int,
     val block: TagBlock,
+    val plateAlpha: Float = alpha,
 ) {
     fun submitGeometry(order: Int, renderType: NameplateLayer, renderer: NameplateGeometry) {
         LegacyVertexSink.draw(renderType, x, y, renderer)

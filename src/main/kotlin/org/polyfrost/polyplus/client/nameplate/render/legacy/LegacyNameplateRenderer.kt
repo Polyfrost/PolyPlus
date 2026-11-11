@@ -16,6 +16,7 @@ import java.util.UUID
 object LegacyNameplateRenderer {
     private const val SNEAK_TEXT_ALPHA = 0x7F
     private const val SNEAK_ALPHA = SNEAK_TEXT_ALPHA / 255f
+    private const val PLATE_OPACITY = 0.7f
     private const val ALPHA_SHIFT = 24
     private const val RGB = 0xFFFFFF
 
@@ -124,7 +125,7 @@ object LegacyNameplateRenderer {
 
     private fun decorate(tag: LegacyTag, alpha: Float, depthMask: Boolean) {
         val bound = tag.tag
-        val frame = NameplateFrame(tag.x + tag.plateX, tag.y + tag.plateY, alpha, 0, tag.block)
+        val frame = NameplateFrame(tag.x + tag.plateX, tag.y + tag.plateY, alpha, 0, tag.block, alpha * PLATE_OPACITY)
         GlStateManager.enableAlphaTest()
         LegacyVertexSink.record()
         try {

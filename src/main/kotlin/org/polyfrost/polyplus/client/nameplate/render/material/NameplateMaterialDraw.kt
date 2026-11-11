@@ -58,7 +58,7 @@ object NameplateMaterialDraw {
         if (textures.size != registered.samplers.size || area.width <= 0 || area.height <= 0) {
             return false
         }
-        val fade = frame.alpha * opacity.coerceIn(0, OPAQUE) / CHANNEL
+        val fade = frame.plateAlpha * opacity.coerceIn(0, OPAQUE) / CHANNEL
         if (fade <= 0f) {
             return true
         }
