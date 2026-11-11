@@ -5,20 +5,26 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
+import org.polyfrost.oneconfig.api.ui.v1.keybind.KeyModifiers
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
+import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.gui.WheelOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.ping.PingPickInvoker
+import kotlin.experimental.or
 import kotlin.math.abs
 
 //? if > 1.8.9 {
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.world.phys.HitResult
 //?} else {
 /*import net.minecraft.resource.Identifier
 import net.minecraft.world.HitResult
+import org.polyfrost.oneconfig.internal.legacy.InputConstants as LegacyInputConstants
+import org.polyfrost.oneconfig.internal.legacy.KeyCodes
 *///?}
 
 object PingInput {
@@ -95,10 +101,33 @@ object PingInput {
     fun takesPickBlock(): Boolean {
         if (vanillaPick || !canPing()) return false
         val bind = PolyPlusConfig.pingKeybind
-        val buttons = bind.mouseBtns ?: return false
-        if (!pending && buttons.none { KeybindManager.isTriggeredByMouse(bind, it) }) return false
+        if (!bind.isBound || !sharesPickInput(bind)) return false
+        if (!pending && !isBindDown(bind)) return false
         pickDeferred = true
         return true
+    }
+
+    private fun sharesPickInput(bind: OneConfigKeybind): Boolean {
+        //? if > 1.8.9 {
+        val key = InputConstants.getKey(Minecraft.getInstance().options.keyPickItem.saveString())
+        if (key.type == InputConstants.Type.MOUSE) return bind.mouseBtns?.contains(key.value) == true
+        return bind.keyCodes?.contains(key.value) == true
+        //?} else {
+        /*val code = Minecraft.getInstance().options.pickItemKey.keyCode
+        if (code == 0) return false
+        val key = KeyCodes.fromLegacy(code)
+        if (key.type == LegacyInputConstants.Type.MOUSE) return bind.mouseBtns?.contains(key.value) == true
+        return bind.keyCodes?.contains(key.value) == true
+        *///?}
+    }
+
+    private fun isBindDown(bind: OneConfigKeybind): Boolean {
+        val buttons = bind.mouseBtns
+        if (buttons != null && buttons.isNotEmpty()) return buttons.any { KeybindManager.isTriggeredByMouse(bind, it) }
+        val keys = KeybindManager.heldKeys
+        var mods = KeyModifiers.NONE
+        for (key in keys) mods = mods or KeyModifiers.of(key)
+        return bind.test(keys, emptySet(), mods)
     }
 
     fun canPing(): Boolean {
