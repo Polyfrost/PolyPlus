@@ -47,44 +47,19 @@ object CosmeticService {
         return setEquippedAndSync(mapOf(targetSlot to resolvedId))
     }
 
-    suspend fun equipBothSides(cosmeticId: Int): Result<Unit> {
-        val requested = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
-            ?: return Result.failure(IllegalArgumentException("Unknown cosmetic id $cosmeticId"))
-        if (oppositeSideVariant(requested) == null) return equip(cosmeticId)
-        return setEquippedAndSync(bothSides(requested).getOrElse { return Result.failure(it) })
+    suspend fun equipPieces(cosmeticIds: List<Int>, clear: Collection<BodySlot> = emptyList()): Result<Unit> {
+        val changes = LinkedHashMap<BodySlot, Int?>()
+        for (slot in clear) changes[slot] = null
+        for (cosmeticId in cosmeticIds) {
+            val requested = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
+                ?: return Result.failure(IllegalArgumentException("Unknown cosmetic id $cosmeticId"))
+            val (slot, resolvedId) = resolveEquip(requested, null).getOrElse { return Result.failure(it) }
+            changes[slot] = resolvedId
+        }
+        return setEquippedAndSync(changes)
     }
 
-    internal fun bothSides(requested: CosmeticDefinition): Result<Map<BodySlot, Int>> {
-        val first = resolveEquip(requested, null).getOrElse { return Result.failure(it) }
-        val second = oppositeSideVariant(requested)?.let { resolveEquip(it, null).getOrNull() }
-        if (second == null || second.first == first.first) {
-            return Result.success(mapOf(first))
-        }
-        return Result.success(mapOf(first, second))
-    }
-
-    private fun oppositeSideVariant(definition: CosmeticDefinition): CosmeticDefinition? {
-        val side = definition.preferredSlot()
-        val opposite = when (side) {
-            BodySlot.LeftHand -> BodySlot.RightHand
-            BodySlot.RightHand -> BodySlot.LeftHand
-            else -> return null
-        }
-        if (definition.allowsSlot(opposite)) return null
-        val group = CosmeticCatalog.cosmeticGroupViews().firstOrNull { it.groupId == definition.groupId } ?: return null
-        val worn = CosmeticCatalog.localEquipped().equipped[opposite]
-        if (worn != null && group.variants.none { it.id == worn }) return null
-        val candidates = group.variants.filter {
-            it.allowsSlot(opposite) && !it.allowsSlot(side) && it.model == definition.model
-        }
-        val name = withoutSide(definition.variantName)
-        return candidates.firstOrNull { withoutSide(it.variantName) == name } ?: candidates.singleOrNull()
-    }
-
-    private fun withoutSide(name: String): String =
-        name.split(' ')
-            .filterNot { it.equals("left", ignoreCase = true) || it.equals("right", ignoreCase = true) }
-            .joinToString(" ")
+    internal fun equipTarget(requested: CosmeticDefinition): Result<Pair<BodySlot, Int>> = resolveEquip(requested, null)
 
     private fun resolveEquip(requested: CosmeticDefinition, slot: BodySlot?): Result<Pair<BodySlot, Int>> {
         val cosmeticId = requested.id

@@ -173,7 +173,7 @@ internal fun bareSkin(): PreviewSkin = BareSkin.skin
 
 @Composable
 internal fun CosmeticArt(item: CosmeticUiItem, variantId: Int?, modifier: Modifier) {
-    val id = variantId ?: item.variants.firstOrNull()?.id
+    val id = item.artId(variantId) ?: item.variants.firstOrNull()?.id
     if (id == null || item.type == CosmeticType.Emote) {
         ItemArt(item, variantId, modifier)
         return

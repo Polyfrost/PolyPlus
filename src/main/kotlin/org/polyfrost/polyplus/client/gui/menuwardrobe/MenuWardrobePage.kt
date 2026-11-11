@@ -197,7 +197,7 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
             item.equipped && variantId == item.equippedVariantId -> {
                 selected = null
                 status = "Unequipping ${item.name}..."
-                unequip(item, ::completed)
+                unequip(item, variantId, ::completed)
             }
             variantId == null -> status = "${item.name} has no variant to equip."
             else -> {

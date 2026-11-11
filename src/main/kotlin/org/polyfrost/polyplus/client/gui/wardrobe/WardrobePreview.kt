@@ -166,17 +166,26 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
     val textureVersion = MojangCapeService.textureVersion
     val mojangState = MojangCapeService.state
 
-    var previewPieces by remember(variantId, slot) {
-        mutableStateOf(if (slot != null && variantId != null) mapOf(slot to variantId) else emptyMap())
+    val pieceIds = owned?.variant(variantId)?.pieces ?: listOfNotNull(variantId)
+    var previewPieces by remember(pieceIds, slot) {
+        mutableStateOf(
+            if (slot == null) {
+                emptyMap()
+            } else {
+                pieceIds.associateBy { CosmeticCatalog.getCosmeticDefinition(it)?.preferredSlot() ?: slot }
+            },
+        )
     }
-    LaunchedEffect(variantId, previewsOwned) {
-        if (!previewsOwned || variantId == null || slot == null) return@LaunchedEffect
-        val pieces = CosmeticCatalog.getCosmeticDefinition(variantId)
-            ?.let { CosmeticService.bothSides(it).getOrNull() }
-            ?: run {
-                val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
-                mapOf(slot to CosmeticCatalog.resolveVariantForSkin(variantId, slim))
-            }
+    LaunchedEffect(pieceIds, previewsOwned) {
+        if (!previewsOwned || slot == null) return@LaunchedEffect
+        val pieces = pieceIds.associate { pieceId ->
+            CosmeticCatalog.getCosmeticDefinition(pieceId)
+                ?.let { CosmeticService.equipTarget(it).getOrNull() }
+                ?: run {
+                    val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+                    slot to CosmeticCatalog.resolveVariantForSkin(pieceId, slim)
+                }
+        }
         previewPieces = pieces
         for ((pieceSlot, id) in pieces) {
             if (!isPreviewAssetLoaded(id, pieceSlot == BodySlot.Cape, pieceSlot == BodySlot.Pet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
@@ -184,10 +193,10 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
     }
 
     val base = CosmeticCatalog.localEquipped().equipped
-    val look = remember(base, owned?.equippedCosmeticId, previewPieces, previewsOwned, mojang?.id) {
+    val look = remember(base, owned?.memberIds, previewPieces, previewsOwned, mojang?.id) {
         base.toMutableMap().apply {
             if (previewsOwned && previewPieces.isNotEmpty()) {
-                owned?.equippedCosmeticId?.let { equippedId -> values.removeAll { it == equippedId } }
+                owned?.memberIds?.let { members -> values.removeAll { it in members } }
                 putAll(previewPieces)
             }
             if (mojang != null) remove(BodySlot.Cape)
@@ -300,7 +309,7 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
-    val art = remember(variant.id, swatchVersion) { CosmeticSwatches.get(variant.id) }
+    val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
     Row(
         modifier = Modifier.height(28.dp)
             .graphicsLayer { alpha = if (dimmed) 0.55f else 1f }

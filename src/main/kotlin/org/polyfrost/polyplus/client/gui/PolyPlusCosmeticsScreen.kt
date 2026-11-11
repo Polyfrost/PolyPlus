@@ -141,7 +141,7 @@ internal fun PolyPlusCosmeticsScreen() {
             val variantId = selectedVariantId(item, variantPicks)
             if (item.equipped && variantId == item.equippedVariantId) {
                 status = "Unequipping ${item.name}..."
-                unequip(item) {
+                unequip(item, variantId) {
                     refreshKey++
                     status = it
                 }
