@@ -39,12 +39,16 @@ data class LobbyScenePack(
 object LobbyPacks {
     private class Local(val id: String, val supported: Boolean)
 
-    private class Print(val size: Long, val hash: String, val format: Int)
+    private class Print(val size: Long, val hash: String, val format: Int, val legacy: String = "", val until: Long = Long.MAX_VALUE)
 
     private const val FILE_PREFIX = "file/"
     private const val ZIP_SUFFIX = ".zip"
     private const val META_FILE = "pack.mcmeta"
     private const val EDGE_BYTES = 65536L
+    private const val MAX_DEPTH = 32
+    private const val MAX_ENTRIES = 50000
+    private const val DIR_RECHECK_MS = 30000L
+    private val JUNK_FILES = setOf("thumbs.db", "desktop.ini")
     //? if = 1.8.9
     /*private const val LEGACY_FORMAT = 1*/
     private val FORMATTING = Regex("§.")
@@ -75,7 +79,11 @@ object LobbyPacks {
         if (packs.isEmpty()) return null
         if (version.isNotEmpty() && version != PartyScene.mcVersion) return "Made with ${packs.first().name} on $version"
         val active = selected()
-        return packs.firstNotNullOfOrNull { need -> if (active.any { same(need, it.id) }) null else reason(need) }
+        val spots = packs.map { need -> active.indexOfFirst { same(need, it.id) } }
+        packs.indices.firstOrNull { spots[it] < 0 }?.let { return reason(packs[it]) }
+        (1 until packs.size).firstOrNull { spots[it] < spots[it - 1] }?.let { return "Needs ${packs[it].name} above ${packs[it - 1].name}" }
+        val extra = active.indices.lastOrNull { it > spots.first() && it !in spots } ?: return null
+        return "Turn off ${title(active[extra].id)} to use this scene"
     }
 
     fun write(packs: List<LobbyScenePack>): ListTag = ListTag().also { list ->
@@ -115,7 +123,7 @@ object LobbyPacks {
     private fun same(need: LobbyScenePack, id: String): Boolean {
         if (need.hash.isEmpty()) return need.id == id
         val print = fileOf(id)?.let(::print) ?: return false
-        return print.hash == need.hash && print.size == need.size
+        return (print.hash == need.hash && print.size == need.size) || (need.size == 0L && print.legacy == need.hash)
     }
 
     private fun title(id: String): String =
@@ -126,7 +134,7 @@ object LobbyPacks {
     private fun print(file: File): Print? {
         if (!file.exists()) return null
         val key = "${file.path}|${file.length()}|${file.lastModified()}"
-        prints[key]?.let { return it }
+        prints[key]?.takeIf { System.currentTimeMillis() < it.until }?.let { return it }
         return runCatching { read(file) }
             .onFailure { LOBBY_LOGGER.warn("Could not read resource pack {}", file.name, it) }
             .getOrNull()
@@ -136,7 +144,30 @@ object LobbyPacks {
     private fun read(file: File): Print {
         if (file.isDirectory) {
             val meta = File(file, META_FILE).takeIf(File::isFile)?.readBytes() ?: ByteArray(0)
-            return Print(0L, hex(MessageDigest.getInstance("SHA-1").digest(meta)), format(meta))
+            val legacy = hex(MessageDigest.getInstance("SHA-1").digest(meta))
+            val digest = MessageDigest.getInstance("SHA-1")
+            digest.update(meta)
+            var total = 0L
+            var count = 0
+            fun walk(dir: File, path: String, depth: Int) {
+                if (depth > MAX_DEPTH) return
+                val children = dir.listFiles()?.sortedBy(File::getName) ?: return
+                for (child in children) {
+                    if (count >= MAX_ENTRIES) return
+                    if (child.name.startsWith('.') || child.name.lowercase() in JUNK_FILES) continue
+                    val rel = if (path.isEmpty()) child.name else "$path/${child.name}"
+                    if (child.isDirectory) {
+                        walk(child, rel, depth + 1)
+                    } else {
+                        val length = child.length()
+                        total += length
+                        count++
+                        digest.update("$rel\u0000$length\n".toByteArray(Charsets.UTF_8))
+                    }
+                }
+            }
+            walk(file, "", 0)
+            return Print(total, hex(digest.digest()), format(meta), legacy, System.currentTimeMillis() + DIR_RECHECK_MS)
         }
         val digest = MessageDigest.getInstance("SHA-1")
         val size = RandomAccessFile(file, "r").use { data ->
