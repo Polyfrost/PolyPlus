@@ -170,8 +170,10 @@ import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
 /*import com.mojang.blaze3d.vertex.VertexSorting
 import com.mojang.serialization.Lifecycle
 import net.minecraft.client.Camera
+import net.minecraft.client.ClientRecipeBook
 import net.minecraft.client.multiplayer.ClientPacketListener
 import net.minecraft.client.multiplayer.PlayerInfo
+import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.Holder
 import net.minecraft.core.MappedRegistry
 import net.minecraft.core.Registry
@@ -182,6 +184,7 @@ import net.minecraft.core.registries.Registries
 import net.minecraft.data.worldgen.DimensionTypes
 import net.minecraft.resources.Identifier
 import net.minecraft.resources.ResourceKey
+import net.minecraft.stats.StatsCounter
 import net.minecraft.util.profiling.InactiveProfiler
 import net.minecraft.world.Difficulty
 import net.minecraft.world.damagesource.DamageScaling
@@ -197,6 +200,7 @@ import net.minecraft.world.level.biome.MobSpawnSettings
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes
 import net.minecraft.world.level.dimension.DimensionType
 import net.minecraft.world.scores.Scoreboard
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.mixin.client.access.CameraAccessor
 import org.polyfrost.polyplus.mixin.client.access.ClientPacketListenerAccessor
 import sun.misc.Unsafe
@@ -314,6 +318,7 @@ object PlayerPreviewRenderer {
             //?} else {
             /*val dummyLevel = legacyDummy?.level()
             if (dummyLevel !== level && dummyLevel !== PreviewWorld.cached) legacyDummy = null
+            if (standIn?.level() !== PreviewWorld.cached) standIn = null
             *///?}
         }
     }
@@ -1042,11 +1047,56 @@ object PlayerPreviewRenderer {
         override fun isModelPartShown(part: PlayerModelPart): Boolean = true
     }
 
+    private var standIn: PreviewStandIn? = null
+    private var standInFailed = false
+
+    private fun swapInStandIn(mc: Minecraft, level: ClientLevel): Boolean {
+        if (mc.player != null || LobbyScene.terrainActive()) return false
+        val preview = PreviewWorld.cached ?: return false
+        if (level !== preview || (mc.level != null && mc.level !== preview)) return false
+        mc.player = standIn(mc, preview) ?: return false
+        return true
+    }
+
+    private fun standIn(mc: Minecraft, level: ClientLevel): PreviewStandIn? {
+        val profile = mc.gameProfile
+        standIn?.let { if (it.level() === level && it.uuid == profile.id) return it }
+        if (standInFailed) return null
+        val connection = PreviewWorld.connection ?: return null
+        return runCatching {
+            setField(ClientPacketListener::class.java, connection, GameProfile::class.java, profile)
+            PreviewStandIn(mc, level, connection).also {
+                setField(LocalPlayer::class.java, it, ClientPacketListener::class.java, null)
+                it.id = LEGACY_PREVIEW_ENTITY_ID + 1
+            }
+        }.onFailure {
+            standInFailed = true
+            LEGACY_LOG.warn("[preview] stand-in player build failed", it)
+        }.getOrNull()?.also { standIn = it }
+    }
+
+    private fun setField(owner: Class<*>, target: Any, type: Class<*>, value: Any?) {
+        val field = owner.declaredFields.single { !Modifier.isStatic(it.modifiers) && it.type == type }
+        field.isAccessible = true
+        field.set(target, value)
+    }
+
+    private class PreviewStandIn(mc: Minecraft, level: ClientLevel, connection: ClientPacketListener) :
+        LocalPlayer(mc, level, connection, StatsCounter(), ClientRecipeBook(), false, false) {
+        override fun tick() {}
+        override fun aiStep() {}
+        override fun isSpectator(): Boolean = false
+        override fun isCreative(): Boolean = false
+        override fun getPlayerInfo(): PlayerInfo? = null
+    }
+
     private fun withoutCape(skin: PlayerSkin): PlayerSkin =
         PlayerSkin(skin.texture(), skin.textureUrl(), null, skin.elytraTexture(), skin.model(), skin.secure())
 
     private object PreviewWorld {
         var cached: ClientLevel? = null
+            private set
+        var connection: ClientPacketListener? = null
             private set
         private var cachedCamera: Camera? = null
 
@@ -1083,10 +1133,11 @@ object PlayerPreviewRenderer {
                 .lookupOrThrow(Registries.DIMENSION_TYPE)
                 .getOrThrow(BuiltinDimensionTypes.OVERWORLD)
             val data = ClientLevel.ClientLevelData(Difficulty.NORMAL, false, true)
+            val stub = stubConnection(registries)
             return ClientLevel(
-                stubConnection(registries), data, Level.OVERWORLD, dimHolder, 2, 2,
+                stub, data, Level.OVERWORLD, dimHolder, 2, 2,
                 { InactiveProfiler.INSTANCE }, mc.levelRenderer, false, 0L,
-            )
+            ).also { connection = stub }
         }
 
         private fun damageRegistry(): Registry<DamageType> {
@@ -1306,6 +1357,7 @@ object PlayerPreviewRenderer {
         val dispatcher = mc.entityRenderDispatcher
         //? if < 1.21.4 {
         /*val prevCamera = dispatcher.camera
+        val standInSwapped = swapInStandIn(mc, level)
         *///?}
         val realMainTarget = mc.mainRenderTarget
         try {
@@ -1333,6 +1385,7 @@ object PlayerPreviewRenderer {
             dispatcher.setRenderShadow(true)
             //? if < 1.21.4 {
             /*dispatcher.camera = prevCamera
+            if (standInSwapped) mc.player = null
             *///?}
             RenderSystem.restoreProjectionMatrix()
             //? if < 1.21.5 {
