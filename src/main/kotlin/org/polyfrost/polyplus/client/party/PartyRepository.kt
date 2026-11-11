@@ -149,7 +149,10 @@ object PartyRepository {
     }
 
     private fun onLeft(partyId: String, reason: PartyLeftReason) {
-        if (_party.value?.id != partyId) return
+        if (_party.value?.id != partyId) {
+            synchronized(partyLock) { if (_party.value == null) partyVersion++ }
+            return
+        }
         updateParty { null }
         _left.tryEmit(reason)
         when (reason) {
