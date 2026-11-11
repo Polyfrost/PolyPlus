@@ -67,7 +67,8 @@ object PlayTogether {
         internal var retries = 0
         internal var partyId: String? = null
         internal var connectAt = 0L
-        internal var pendingInvite: Pair<Int, String>? = null
+        internal var offered = false
+        internal val pendingInvites = HashMap<String, Int>()
         val leaderName: String get() = PlayerNamesRepository.nameOr(leader)
     }
 
@@ -128,7 +129,7 @@ object PlayTogether {
     }
 
     fun canJoinLate(current: Active): Boolean =
-        current.response == PlayResponse.Busy &&
+        (current.response == PlayResponse.Busy || (current.offered && current.response == PlayResponse.Cancelled)) &&
             current.stage == Stage.DONE &&
             current.destination.kind == PlayDestinationKind.Server &&
             current.destination.address != null
@@ -199,18 +200,15 @@ object PlayTogether {
         if (PartyPresence.local.location.kind != LocationKind.Menu) {
             respond(current, PlayResponse.Busy)
             current.stage = Stage.DONE
-            if (canJoinLate(current)) {
-                PartyNotices.send("${current.leaderName} started Play together on $where", PartyNotices.MOVE_MS, "Join", { joinFromNotice(current) })
-            } else {
-                Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where. Open Social to join.")
-            }
+            offerJoin(current)
             return
         }
         if (!PolyPlusPartyConfig.partyPlayTogetherJoin) {
+            current.offered = true
             respond(current, PlayResponse.Cancelled)
             current.stage = Stage.DONE
             current.message = "${current.leaderName} started Play together on $where"
-            Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where")
+            offerJoin(current)
             return
         }
         respond(current, PlayResponse.Joining)
@@ -224,7 +222,16 @@ object PlayTogether {
         }
     }
 
-    private val HOST_PORT = Regex("^(\\[[0-9A-Fa-f:.]{2,45}]|[A-Za-z0-9_](?:[A-Za-z0-9_.-]{0,252}[A-Za-z0-9_])?)(?::(\\d{1,5}))?$")
+    private fun offerJoin(current: Active) {
+        val where = current.destination.name
+        if (canJoinLate(current)) {
+            PartyNotices.send("${current.leaderName} started Play together on $where", PartyNotices.MOVE_MS, "Join", { joinFromNotice(current) })
+        } else {
+            Notifications.info("PolyPlus", "${current.leaderName} started Play together on $where. Open Social to join.")
+        }
+    }
+
+    private val HOST_PORT =Regex("^(\\[[0-9A-Fa-f:.]{2,45}]|[A-Za-z0-9_](?:[A-Za-z0-9_.-]{0,252}[A-Za-z0-9_])?)(?::(\\d{1,5}))?$")
 
     fun isSafeServerAddress(address: String?): Boolean {
         if (address.isNullOrEmpty() || address.length > 260) return false
@@ -342,11 +349,11 @@ object PlayTogether {
         if (current.leading || current.response != PlayResponse.Joining) return
         val linked = current.sessionId
         if (linked == null || current.stage != Stage.WAITING) {
-            current.pendingInvite = inviteId to sessionId
+            current.pendingInvites[sessionId] = inviteId
             return
         }
         if (linked != sessionId) return
-        current.pendingInvite = null
+        current.pendingInvites.clear()
         current.stage = Stage.CONNECTING
         current.connectAt = System.currentTimeMillis()
         PolyPlusClient.SCOPE.launch {
@@ -390,7 +397,7 @@ object PlayTogether {
         }
         when (current.stage) {
             Stage.COUNTDOWN, Stage.CHECKING -> if (now >= current.startsAt) go(current)
-            Stage.WAITING -> current.pendingInvite?.let { (invite, session) -> if (current.sessionId != null) onSessionInvite(invite, session) }
+            Stage.WAITING -> current.sessionId?.let { session -> current.pendingInvites[session]?.let { onSessionInvite(it, session) } }
             Stage.CONNECTING -> watch(current, now)
             Stage.DONE -> Unit
         }
