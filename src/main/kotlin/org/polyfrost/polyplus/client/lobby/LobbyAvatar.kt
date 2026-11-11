@@ -105,7 +105,7 @@ class LobbyAvatar(
     override fun getCapeTextureLocation(): Identifier? {
         if (isLocal) LobbyWardrobe.previewCape()?.let { return it }
         CosmeticAssetCache.getCapeTexture(uuid)?.let { return it }
-        if (isLocal) {
+        if (isLocal && MojangCapeService.overridesLocalCape(uuid)) {
             MojangCapeService.localCapeTexture()?.let { return it }
             if (MojangCapeService.localCapeHidden()) return null
         }

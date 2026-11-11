@@ -983,14 +983,16 @@ object PlayerPreviewRenderer {
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let {
                 CosmeticAssetCache.getCapeResource(it)
-            } ?: MojangCapeService.localCapeTexture()
+            } ?: MojangCapeService.localCapeTexture()?.takeIf { mojangCapeChosen() }
     }
 
     private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
         is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
         PlayerPreviewSource.LocalLive ->
-            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden()
+            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden() && mojangCapeChosen()
     }
+
+    private fun mojangCapeChosen(): Boolean = MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())
 
     //? if >= 1.21.10 {
     private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
@@ -1713,10 +1715,12 @@ object PlayerPreviewRenderer {
             else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
-                ?: MojangCapeService.localCapeTexture()
-                ?: if (MojangCapeService.localCapeHidden()) null
-                else mc.player?.capeTextureLocation ?: optifineCape(mc) ?: accountCape(mc)
+                ?: if (!MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())) playerCape(mc)
+                else MojangCapeService.localCapeTexture()
+                    ?: if (MojangCapeService.localCapeHidden()) null else playerCape(mc)
     }
+
+    private fun playerCape(mc: Minecraft): Identifier? = mc.player?.capeTextureLocation ?: optifineCape(mc) ?: accountCape(mc)
 
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
         is PlayerPreviewSource.Override -> source.equipment
