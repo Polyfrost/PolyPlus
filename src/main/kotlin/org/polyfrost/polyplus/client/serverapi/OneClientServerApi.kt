@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.serverapi
 
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.ui.v1.ServerRestrictions
 import org.polyfrost.polyplus.PolyPlusConstants
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -83,6 +84,7 @@ object OneClientServerApi {
         helloSent.set(false)
         serverApiVersion = null
         scenePolicy = ServerApiProtocol.ScenePolicy.UNSET
+        ServerRestrictions.clear()
     }
 
     private fun sendHello() {
@@ -117,6 +119,7 @@ object OneClientServerApi {
                 scenePolicy = packet.policy
                 LOGGER.info("Server set lobby scene capture to {}", packet.policy)
             }
+            is ServerApiProtocol.Restrictions -> ServerRestrictions.set(packet.mods, packet.huds)
             null -> Unit
         }
     }
