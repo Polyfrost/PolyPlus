@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.server.packs.resources.ReloadInstance;
 import org.polyfrost.polyplus.client.lobby.StartupOverlay;
+import org.polyfrost.polyplus.compat.RrlsOverlay;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -63,6 +64,11 @@ public class MixinLoadingOverlay {
     private void polyplus$drawStartup(GuiGraphics graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
     *///?}
         if (!polyplus$branded) return;
+        if (RrlsOverlay.hides(this)) {
+            polyplus$branded = false;
+            StartupOverlay.abandon(reload.done());
+            return;
+        }
         ci.cancel();
         //? if < 1.21.10 {
         /*if (fadeOutStart == -1L && reload.isDone()) {

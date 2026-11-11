@@ -7,8 +7,13 @@ import java.util.concurrent.Executor
 import net.minecraft.client.Camera
 //? if >= 26.1
 import net.minecraft.client.DeltaTracker
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GameRenderer
+import net.minecraft.network.Connection
+import net.minecraft.network.protocol.PacketFlow
+import org.polyfrost.polyplus.mixin.client.access.ConnectionAccessor
 //? if >= 26.2 {
 import net.minecraft.client.renderer.extract.LevelExtractor
 //?} else {
@@ -84,6 +89,12 @@ val LevelHeightAccessor.maxSectionY: Int get() = maxSection - 1
 *///?}
 
 object LobbyCompat {
+    fun offlineConnection(): Connection {
+        val connection = Connection(PacketFlow.CLIENTBOUND)
+        (connection as ConnectionAccessor).`polyplus$setAddress`(InetSocketAddress(InetAddress.getLoopbackAddress(), 0))
+        return connection
+    }
+
     fun blockAt(point: Vec3): BlockPos = BlockPos.containing(point)
 
     fun blockAt(x: Double, y: Double, z: Double): BlockPos = BlockPos.containing(x, y, z)

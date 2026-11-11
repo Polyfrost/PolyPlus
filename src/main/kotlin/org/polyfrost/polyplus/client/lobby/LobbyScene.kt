@@ -59,9 +59,6 @@ import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.CompoundTag
 //? if > 1.8.9
 import net.minecraft.nbt.NbtOps
-import net.minecraft.network.Connection
-//? if > 1.8.9
-import net.minecraft.network.protocol.PacketFlow
 //? if > 1.8.9
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData
 import net.minecraft.resources.Identifier
@@ -970,7 +967,7 @@ object LobbyScene {
             //?}
         )
         //?}
-        val listener = ClientPacketListener(mc, Connection(PacketFlow.CLIENTBOUND), cookie)
+        val listener = ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie)
         val realm = loaded.entry.realm
         val dimensionKey = when (realm) {
             LobbyRealm.NETHER -> BuiltinDimensionTypes.NETHER

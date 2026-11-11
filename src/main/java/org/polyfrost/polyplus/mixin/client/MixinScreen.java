@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
+import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
@@ -45,7 +46,7 @@ public class MixinScreen {
     ) {
         Screen self = (Screen) (Object) this;
         if (!MainMenuReplacement.enabled() || Minecraft.getInstance().level != null) return;
-        if (self instanceof ConnectScreen || self instanceof DisconnectedScreen || self instanceof GenericMessageScreen) {
+        if (self instanceof ConnectScreen || self instanceof DisconnectedScreen || self instanceof GenericMessageScreen || self instanceof ProgressScreen) {
             graphics.fill(0, 0, self.width, self.height, 0xFF0B1013);
             ci.cancel();
         }

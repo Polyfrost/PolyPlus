@@ -39,6 +39,8 @@
     "client.MixinGameNarrator",
     //? if > 1.8.9
     "client.MixinGenericMessageScreen",
+    //? if > 1.8.9
+    "client.MixinLevelLoadingScreen",
     //? if = 1.8.9
     //"client.MixinGameOptions",
     "client.MixinGameRenderer",
@@ -101,8 +103,7 @@
     "client.access.ClientCommonPacketListenerAccessor",
     "client.access.ClientHandshakePacketListenerAccessor",
     "client.access.ClientPacketListenerAccessor",
-    //? if = 1.8.9
-    //"client.access.ConnectionAccessor",
+    "client.access.ConnectionAccessor",
     "client.access.GameRendererAccessor",
     //? if = 1.8.9
     //"client.access.GuiElementInvoker",
@@ -277,6 +278,10 @@
     "compat.distanthorizons.MixinDhSharedApi",
     "compat.distanthorizons.MixinDhVanillaFog",
     //?}
+    //? if > 1.8.9
+    "compat.confirmdisconnect.MixinConfirmDisconnectPauseScreen",
+    //? if < 1.21.8 && > 1.8.9
+    //"compat.confirmdisconnect.MixinConfirmDisconnectScreen",
     "compat.dynamicfps.MixinDynamicFPSMod",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",

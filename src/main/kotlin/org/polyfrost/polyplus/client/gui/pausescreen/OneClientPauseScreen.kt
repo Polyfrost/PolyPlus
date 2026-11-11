@@ -43,7 +43,7 @@ import net.minecraft.client.input.MouseButtonEvent
 //?}
 
 class OneClientPauseScreen(
-    private val vanilla: PauseScreen,
+    val vanilla: PauseScreen,
     private val style: PauseScreenStyle,
     customizing: Boolean = false,
     internal val fromVanilla: Boolean = false,

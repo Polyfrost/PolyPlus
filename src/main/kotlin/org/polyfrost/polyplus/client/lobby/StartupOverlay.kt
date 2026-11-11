@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.Easing
+import java.util.concurrent.CompletableFuture
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -126,6 +127,14 @@ object StartupOverlay {
         *///?}
 
     //? if > 1.8.9 {
+    @JvmStatic
+    fun abandon(reload: CompletableFuture<*>) {
+        if (!active) return
+        val mc = Minecraft.getInstance()
+        if (holdNanos == 0L) reload.whenCompleteAsync({ _, _ -> StartupSounds.gameLoaded() }, LobbyCompat.mainExecutor(mc))
+        finished(mc)
+    }
+
     fun screenFrame(mc: Minecraft, g: StartupGraphics) {
         if (!active || overlayOpen(mc)) return
         StartupTextures.load(mc)
@@ -238,7 +247,7 @@ object StartupOverlay {
         val lineFrom = Box(from.left, from.bottom + LINE_GAP * designUnit(w, h), from.width, thick)
         val lineTo = toLine ?: Box(toWord.x, toWord.y + toWord.h, 0f, thick)
         val current = lineFrom.mix(lineTo, cubic((t - 0.04f) / 0.92f))
-        canvas.rect(current.x, current.y, current.w, current.h, tint(WHITE, 0.1f * (1f - smooth(0f, 0.25f, t))))
+        canvas.rect(current.x, current.y, current.w, current.h, track(0.1f * (1f - smooth(0f, 0.25f, t)), t))
         canvas.rect(current.x, current.y, current.w * (if (t > 0f) 1f else line), current.h, tint(accent, 1f - smooth(1.15f, 1.6f, t)))
         return t >= RISE_SECONDS
     }
@@ -259,7 +268,7 @@ object StartupOverlay {
         val shrink = 1f - cubic(t / 0.5f)
         val lineW = from.width * shrink
         val lineY = from.bottom + LINE_GAP * designUnit(w, h)
-        canvas.rect((w - from.width) / 2f, lineY, from.width, thick, tint(WHITE, 0.1f * (if (t > 0f) shrink else 1f)))
+        canvas.rect((w - from.width) / 2f, lineY, from.width, thick, track(0.1f * (if (t > 0f) shrink else 1f), t))
         canvas.rect((w - lineW) / 2f, lineY, lineW * (if (t > 0f) 1f else line), thick, tint(accent, 1f - smooth(0.35f, 0.55f, t)))
         return t >= CARD_SECONDS
     }
@@ -335,6 +344,8 @@ object StartupOverlay {
         val u = -2f * t + 2f
         return 1f - u * u * u / 2f
     }
+
+    private fun track(alpha: Float, t: Float): Int = if (t > 0f) tint(WHITE, alpha) else tint(mix(DARK, WHITE, alpha), 1f)
 
     private fun tint(rgb: Int, alpha: Float): Int = ((clamp(alpha) * 255f).toInt() shl 24) or (rgb and WHITE)
 

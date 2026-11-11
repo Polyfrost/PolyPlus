@@ -11,6 +11,8 @@ import net.minecraft.tags.TagKey
 *///?}
 import net.minecraft.core.Registry
 import net.minecraft.core.RegistryAccess
+//? if >= 26.1
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.RegistryDataLoader
 import net.minecraft.server.RegistryLayer
 import net.minecraft.server.packs.PackType
@@ -35,11 +37,14 @@ class LobbyRegistries private constructor(
         //?} else {
         /*staticTags.forEach { it() }
         *///?}
+        //? if >= 26.1
+        runCatching { BuiltInRegistries.DATA_COMPONENT_INITIALIZERS.build(access) }.onSuccess { it.forEach { c -> c.apply() } }.onFailure { LOBBY_LOGGER.warn("Lobby item components did not bind", it) }
     }
 
     companion object {
         fun load(): LobbyRegistries {
-            val packs = ServerPacksSource.createVanillaTrustedRepository()
+            val mc = Minecraft.getInstance()
+            val packs = ServerPacksSource.createPackRepository(mc.gameDirectory.toPath().resolve("polyplus/lobby/datapacks"), mc.directoryValidator())
             packs.reload()
             packs.setSelected(listOf("vanilla"))
             return MultiPackResourceManager(PackType.SERVER_DATA, packs.openAllSelected()).use { resources ->
