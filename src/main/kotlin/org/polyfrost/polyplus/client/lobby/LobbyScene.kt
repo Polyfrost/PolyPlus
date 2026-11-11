@@ -340,6 +340,7 @@ object LobbyScene {
 
     private var live: Live? = null
     private var session: LobbySession? = null
+    private var loadGeneration = 0
     private var saved: Saved? = null
     private var binding: Binding? = null
 
@@ -592,6 +593,8 @@ object LobbyScene {
         reloadAfterLoad = false
         //? if = 1.8.9
         /*if (LobbyCompat.joiningWorld(Minecraft.getInstance())) return*/
+        if (Minecraft.getInstance().level != null) return
+        loadGeneration++
         session = LobbySession(LobbyMode.STANDALONE, null)
         attempts.clear()
         attempts += LobbySceneStore.queue()
@@ -632,6 +635,7 @@ object LobbyScene {
         session?.let(::stopSession)
         if (live != null) stop()
         val owner = LobbySession(mode, inputs)
+        loadGeneration++
         session = owner
         switching = false
         reloadAfterLoad = false
@@ -649,6 +653,7 @@ object LobbyScene {
             stop()
             return
         }
+        loadGeneration++
         session = null
         attempts.clear()
         phase = Phase.IDLE
@@ -766,7 +771,7 @@ object LobbyScene {
             return
         }
         val mc = Minecraft.getInstance()
-        val owner = session
+        val generation = loadGeneration
         CompletableFuture.supplyAsync({
             val root = LobbySceneStore.read(entry)
             check(LobbySnapshot.compatible(root, entry.bundled)) { "Scene ${entry.id} was saved by another game version" }
@@ -777,7 +782,7 @@ object LobbyScene {
             /*Loaded(entry, root)
             *///?}
         }, Util.ioPool()).whenCompleteAsync({ loaded, error ->
-            if (owner !== session) {
+            if (generation != loadGeneration) {
                 LOBBY_LOGGER.debug("Scene {} load abandoned", entry.id)
             } else if (error != null) {
                 fail(entry, error)
@@ -2245,6 +2250,7 @@ object LobbyScene {
         swappedIn = false
         binding = null
         val owner = session
+        loadGeneration++
         live = null
         session = null
         sceneLevel = null
@@ -2273,6 +2279,7 @@ object LobbyScene {
     fun stop() = release(LobbyPhase.IDLE)
 
     private fun release(final: LobbyPhase) {
+        loadGeneration++
         switching = false
         reloadAfterLoad = false
         val scene = live ?: run {
