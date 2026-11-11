@@ -22,6 +22,10 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.lang.ref.WeakReference
+import java.util.Collections
+import java.util.WeakHashMap
 
 internal enum class A11yRegion { Tour, Nav, Tools, Banner, Play, Page, Bar, Scene }
 
@@ -87,6 +91,7 @@ internal fun Modifier.a11yRoot(): Modifier = composed {
         }
     }
         .onFocusChanged { LobbyA11y.rootFocusChanged(it.hasFocus) }
+        .trackScreenFocus()
         .onKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown || !A11y.keyboardMode) return@onKeyEvent false
             val direction = when (event.key) {
@@ -99,6 +104,28 @@ internal fun Modifier.a11yRoot(): Modifier = composed {
             focus.moveFocus(direction)
         }
         .focusGroup()
+}
+
+internal object ScreenFocus {
+    private val holders = Collections.synchronizedMap(WeakHashMap<Any, WeakReference<Any>>())
+
+    fun holds(screen: Any?): Boolean {
+        if (screen == null || holders.isEmpty()) return false
+        synchronized(holders) {
+            return holders.values.any { it.get() === screen }
+        }
+    }
+
+    internal fun changed(token: Any, focused: Boolean) {
+        val screen = ClientPlatform.currentScreen()
+        if (focused && screen != null) holders[token] = WeakReference(screen) else holders.remove(token)
+    }
+}
+
+internal fun Modifier.trackScreenFocus(): Modifier = composed {
+    val token = remember { Any() }
+    DisposableEffect(token) { onDispose { ScreenFocus.changed(token, false) } }
+    onFocusChanged { ScreenFocus.changed(token, it.hasFocus) }
 }
 
 internal val LocalAnnounceTitles = staticCompositionLocalOf { false }

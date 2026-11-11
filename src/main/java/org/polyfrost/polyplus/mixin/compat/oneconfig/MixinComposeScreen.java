@@ -26,7 +26,7 @@ public abstract class MixinComposeScreen {
             panorama = null;
             return;
         }
-        if (MenuPanorama.drawBackdrop(self, false)) {
+        if (MenuPanorama.drawComposeBackdrop(self)) {
             panorama = null;
         } else if (panorama == null && Minecraft.getInstance().world == null) {
             panorama = MenuPanorama.legacyPanorama();

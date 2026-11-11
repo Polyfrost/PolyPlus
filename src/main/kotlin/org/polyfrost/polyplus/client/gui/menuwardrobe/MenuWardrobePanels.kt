@@ -225,7 +225,7 @@ private fun CompactRow(slot: RailSlot, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 internal fun ItemArt(item: CosmeticUiItem, variantId: Int?, modifier: Modifier, alignment: Alignment = Alignment.Center) {
-    val id = variantId ?: item.variants.firstOrNull()?.id
+    val id = item.artId(variantId) ?: item.variants.firstOrNull()?.id
     val cover = rememberRemoteImage(id?.let { CosmeticCatalog.getDefinition(it)?.coverUrl })
     Box(modifier, contentAlignment = Alignment.Center) {
         if (cover != null) {

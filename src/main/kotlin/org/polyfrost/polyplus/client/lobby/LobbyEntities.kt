@@ -112,16 +112,24 @@ object LobbyEntities {
         if (entity is Display) runCatching { level.tickNonPassenger(entity) }
     }
 
+    private val ticking = ArrayList<Entity>()
+
     fun tick(level: ClientLevel) {
-        for (entity in level.entitiesForRendering().toList()) {
-            if (entity.isRemoved || entity.isPassenger || level.tickRateManager().isEntityFrozen(entity)) continue
-            //? if >= 26.1
-            if (!level.isTickingEntity(entity)) continue
-            try {
-                level.tickNonPassenger(entity)
-            } catch (error: Throwable) {
-                drop(level, entity, "tick", error)
+        ticking.addAll(level.entitiesForRendering())
+        try {
+            for (index in ticking.indices) {
+                val entity = ticking[index]
+                if (entity.isRemoved || entity.isPassenger || level.tickRateManager().isEntityFrozen(entity)) continue
+                //? if >= 26.1
+                if (!level.isTickingEntity(entity)) continue
+                try {
+                    level.tickNonPassenger(entity)
+                } catch (error: Throwable) {
+                    drop(level, entity, "tick", error)
+                }
             }
+        } finally {
+            ticking.clear()
         }
     }
 

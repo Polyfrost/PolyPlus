@@ -144,6 +144,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
                     val variantId = selectedVariantId(item, variantPicks)
+                    val artId = item.artId(variantId)
                     WardrobeCard(
                         name = item.name,
                         detail = { CardDetailText(item.collection) },
@@ -160,15 +161,15 @@ internal fun WardrobeGrid(
                             CardMenuAction(if (item.equipped) "Unequip" else "Equip") { onOwned(item) },
                         ),
                     ) { modifier ->
-                        val (source, loadTick) = if (variantId != null) {
-                            rememberCosmeticPreviewSource(variantId, item.type)
+                        val (source, loadTick) = if (artId != null) {
+                            rememberCosmeticPreviewSource(artId, item.type)
                         } else {
                             null to 0
                         }
                         CosmeticThumbnail(
                             source,
                             item.type,
-                            "card-${item.groupId}-$variantId-$loadTick",
+                            "card-${item.groupId}-$artId-$loadTick",
                             modifier,
                             checker = false,
                             coverAssetId = coverFor(item),
@@ -555,7 +556,7 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
-    val art = remember(variant.id, swatchVersion) { CosmeticSwatches.get(variant.id) }
+    val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
     Box(
         modifier = Modifier.size(width = 14.dp, height = 22.dp)
             .clip(ppShape(5.dp))

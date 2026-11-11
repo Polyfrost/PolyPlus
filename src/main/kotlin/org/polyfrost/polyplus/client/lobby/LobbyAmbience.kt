@@ -120,6 +120,7 @@ object LobbyAmbience {
     private var sceneKey: String? = null
     private var scenePlace: Layer? = null
     private var silenced = false
+    private var unavailable = false
     //? if > 1.8.9 {
     private var introGate: LobbySoundGate.Group? = null
     private var introDelay = 0L
@@ -129,11 +130,21 @@ object LobbyAmbience {
     *///?}
 
     @JvmStatic
-    fun holdsMusic(): Boolean = playing() || silent(Minecraft.getInstance())
+    fun holdsMusic(): Boolean = playing() || ownsMusic(Minecraft.getInstance())
 
     private fun playing(): Boolean = voices.isNotEmpty() || intro != null
 
-    private fun silent(mc: Minecraft): Boolean = PolyPlusLobbyConfig.lobbyMusic == LobbyMusic.OFF && lobbyUp(mc)
+    private fun ownsMusic(mc: Minecraft): Boolean =
+        PolyPlusLobbyConfig.lobbyMusic != LobbyMusic.MINECRAFT && lobbyUp(mc) && !(unavailable && loops() && audible(mc))
+
+    private fun handingOff(): Boolean {
+        //? if > 1.8.9 {
+        val gate = introGate ?: return false
+        return gate.startedAt == 0L || System.nanoTime() - gate.startedAt < introDelay
+        //?} else {
+        /*return dueNanos != 0L
+        *///?}
+    }
 
     private fun loops(): Boolean = when (PolyPlusLobbyConfig.lobbyMusic) {
         LobbyMusic.MINECRAFT, LobbyMusic.OFF -> false
@@ -199,7 +210,7 @@ object LobbyAmbience {
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
-        val quiet = silent(mc)
+        val quiet = ownsMusic(mc)
         if (quiet && !silenced) {
             mc.musicManager.stopPlaying()
             UiSounds.releaseAmbience()
@@ -216,10 +227,15 @@ object LobbyAmbience {
         intro?.let { if (clock - introBorn > SETTLE_TICKS && !active(mc, it)) intro = null }
         voices.filter { clock - it.born > SETTLE_TICKS && !active(mc, it.sound) }.forEach { drop(mc, it, true) }
         val layers = desired()
-        if (!leaving) join(mc, layers, null)
+        val handoff = handingOff()
+        //? if > 1.8.9 {
+        if (handoff) requeue(mc, if (leaving) emptyList() else layers) else if (!leaving) join(mc, layers, null)
+        //?} else {
+        /*if (!leaving && !handoff) join(mc, layers, null)
+        *///?}
         val targets = targets(layers)
-        for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
-        voices.filter { it.layer !in layers && it.weight < SILENT_FLOOR }.forEach { drop(mc, it, false) }
+        if (!handoff) for (voice in voices) voice.weight += (targets[voice.layer.ordinal] - voice.weight) * EASE
+        if (!handoff) voices.filter { it.layer !in layers && it.weight < SILENT_FLOOR }.forEach { drop(mc, it, false) }
         presence = if (leaving) presence - TICK_SECONDS / (if (departing) DEPART_FADE_SECONDS else FADE_OUT_SECONDS) else minOf(1f, presence + TICK_SECONDS / FADE_IN_SECONDS)
         if (presence <= 0f || !playing()) {
             halt(mc)
@@ -230,12 +246,13 @@ object LobbyAmbience {
 
     private fun begin(mc: Minecraft, afterIntro: Boolean): Boolean {
         present = Layer.entries.filterTo(HashSet()) { exists(mc, file(it.key)) }
-        mc.musicManager.stopPlaying()
         if (!afterIntro) presence = 0f
         leaving = false
         val layers = desired()
         join(mc, layers, targets(layers))
-        if (voices.isEmpty()) return false
+        unavailable = voices.isEmpty()
+        if (unavailable) return false
+        mc.musicManager.stopPlaying()
         UiSounds.releaseAmbience()
         if (afterIntro) {
             //? if > 1.8.9 {
@@ -245,15 +262,29 @@ object LobbyAmbience {
             /*val began = System.nanoTime()
             val start = { began }
             *///?}
-            val fade = {
-                val from = start()
-                if (from == 0L) 0f else ((System.nanoTime() - from).toFloat() / INITIAL_FADE_NANOS).coerceIn(0f, 1f)
-            }
+            val fade = fadeFrom(start)
             for (voice in voices) voice.sound.fade = fade
         }
         apply()
         return true
     }
+
+    private fun fadeFrom(start: () -> Long): () -> Float = {
+        val from = start()
+        if (from == 0L) 0f else ((System.nanoTime() - from).toFloat() / INITIAL_FADE_NANOS).coerceIn(0f, 1f)
+    }
+
+    //? if > 1.8.9 {
+    private fun requeue(mc: Minecraft, layers: List<Layer>) {
+        for (voice in voices) voice.weight = if (voice.layer in layers) 1f else 0f
+        val before = voices.size
+        join(mc, layers, targets(layers))
+        if (voices.size == before) return
+        val gate = layerGates.lastOrNull()
+        val fade = fadeFrom { gate?.startedAt ?: 0L }
+        voices.drop(before).forEach { it.sound.fade = fade }
+    }
+    //?}
 
     private fun join(mc: Minecraft, layers: List<Layer>, initial: FloatArray?) {
         val have = voices.mapTo(HashSet()) { it.layer }
@@ -362,7 +393,8 @@ object LobbyAmbience {
         return ClientPlatform.currentScreen() is PolyPlusLobbyScreen || LobbyScene.showing()
     }
 
-    private fun volume(): Float = AMBIENCE_GAIN * OneConfigConfig.uiAmbienceVolume.coerceIn(0f, 1f)
+    private fun volume(): Float =
+        AMBIENCE_GAIN * (OneConfigConfig.uiAmbienceVolume / 100f).coerceIn(0f, 1f)
 
     private fun audible(mc: Minecraft): Boolean =
         OneConfigConfig.enableUIAmbience && volume() > 0f &&

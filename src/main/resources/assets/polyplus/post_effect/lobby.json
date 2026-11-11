@@ -25,6 +25,10 @@
       "width": 320,
       "height": 180
     },
+    "dof": {
+      "width": 960,
+      "height": 540
+    },
     "lobby_out": {}
   },
   "passes": [
@@ -420,6 +424,112 @@
     },
     {
       "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_dof",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sky",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Soft",
+          "target": "soft_b",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "dof",
+      "uniforms": {
+        "LobbySky": [
+          {
+            "name": "Forward",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              1,
+              0.4
+            ]
+          },
+          {
+            "name": "Right",
+            "type": "vec4",
+            "value": [
+              1,
+              0,
+              0,
+              1.78
+            ]
+          },
+          {
+            "name": "Up",
+            "type": "vec4",
+            "value": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Params",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0.05,
+              1024
+            ]
+          },
+          {
+            "name": "Mood",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Lens",
+            "type": "vec4",
+            "value": [
+              12,
+              0.9,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Wave",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Flags",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
       "fragment_shader": "polyplus:post/lobby_final",
       "inputs": [
         {
@@ -432,8 +542,8 @@
           "bilinear": true
         },
         {
-          "sampler_name": "Soft",
-          "target": "soft_b",
+          "sampler_name": "Dof",
+          "target": "dof",
           "bilinear": true
         },
         {

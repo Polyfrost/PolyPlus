@@ -44,10 +44,14 @@ object CapeResolver {
         }
 
     @JvmStatic
+    fun keepsModCape(namespace: String?): Boolean = isModCape(namespace) && !PolyPlusCosmeticsConfig.forcePolyPlusCapes
+
+    private fun isModCape(namespace: String?): Boolean =
+        namespace != null && namespace != VANILLA_NAMESPACE && namespace != PolyPlusConstants.ID
+
+    @JvmStatic
     fun decide(playerId: UUID, currentNamespace: String?): CapeDecision {
-        val foreign = currentNamespace != null &&
-            currentNamespace != VANILLA_NAMESPACE &&
-            currentNamespace != PolyPlusConstants.ID
+        val foreign = isModCape(currentNamespace)
         val local = isLocal(playerId)
         if (local) {
             val modId = if (foreign) currentNamespace else null

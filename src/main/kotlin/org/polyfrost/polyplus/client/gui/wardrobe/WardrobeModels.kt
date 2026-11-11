@@ -5,6 +5,7 @@ import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -45,7 +46,15 @@ internal fun cosmeticCartKey(variantId: Int): String = "cosmetic-$variantId"
 internal fun CosmeticStoreInfo.cartName(variant: CosmeticVariantUi): String =
     if (uiVariants().size > 1 && !variant.name.equals(name, ignoreCase = true)) "$name - ${variant.name}" else name
 
-internal data class CosmeticVariantUi(val id: Int, val name: String)
+internal data class CosmeticVariantUi(
+    val id: Int,
+    val name: String,
+    val pieces: List<Int> = listOf(id),
+    val side: BodySlot? = null,
+) {
+    val artId: Int get() = pieces.first()
+    val sided: Boolean get() = side != null || pieces.size > 1
+}
 
 internal fun CosmeticStoreInfo.uiVariants(): List<CosmeticVariantUi> {
     val byLabel = LinkedHashMap<String, CosmeticVariantUi>()
@@ -97,9 +106,14 @@ internal data class CosmeticUiItem(
     val variants: List<CosmeticVariantUi>,
     val equippedVariantId: Int?,
     val equippedCosmeticId: Int? = equippedVariantId,
+    val memberIds: Set<Int> = emptySet(),
 ) {
     val id: Int get() = groupId
     val hasVariants: Boolean get() = variants.size > 1
+
+    fun variant(variantId: Int?): CosmeticVariantUi? = variantId?.let { id -> variants.firstOrNull { it.id == id } }
+
+    fun artId(variantId: Int?): Int? = variant(variantId)?.artId ?: variantId
 }
 
 internal const val MOJANG_CAPE_COLLECTION = "Minecraft cape"

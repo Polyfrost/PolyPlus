@@ -69,6 +69,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.trackScreenFocus
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.liquidGlassTheme
 import org.polyfrost.oneconfig.internal.ui.components.liquidGlass
@@ -138,6 +139,7 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
         Modifier
             .fillMaxSize()
             .onSizeChanged { measured = it }
+            .trackScreenFocus()
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {

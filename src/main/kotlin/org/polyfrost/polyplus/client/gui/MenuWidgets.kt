@@ -226,13 +226,13 @@ internal class ThemeToggle(val icon: String, val label: String, val toggle: () -
 @Composable
 internal fun themeToggle(): ThemeToggle {
     val light = OneConfigTheme.current.isLightTheme
-    val minecraftStyle = OneConfigTheme.current.isMinecraftStyle
+    val style = OnboardingFeatures.uiStyleOf(OneConfigTheme.current)
     return ThemeToggle(
         icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
         label = if (light) "Switch to dark theme" else "Switch to light theme",
         toggle = {
             PolyPlusConfig.onboardingLightTheme = !light
-            OnboardingFeatures.applyTheme(!light, if (minecraftStyle) 1 else 0)
+            OnboardingFeatures.applyTheme(!light, style)
             PolyPlusConfig.save()
         },
     )

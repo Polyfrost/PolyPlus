@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -65,6 +66,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
@@ -114,6 +116,7 @@ import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
 import org.polyfrost.oneconfig.api.ui.v1.a11y.focusRing
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.oneconfig.internal.ui.screens.ModCard as OneConfigModCard
@@ -260,8 +263,10 @@ internal fun OnboardingFlow(
     }
     var page by remember { mutableIntStateOf(0) }
     var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
-    var lightTheme by remember { mutableStateOf(PolyPlusConfig.onboardingLightTheme) }
-    var uiStyle by remember { mutableIntStateOf(PolyPlusConfig.onboardingUiStyle) }
+    var lightTheme by remember { mutableStateOf(OneConfigTheme.active?.isLightTheme ?: PolyPlusConfig.onboardingLightTheme) }
+    var uiStyle by remember {
+        mutableIntStateOf(OneConfigTheme.active?.let(OnboardingFeatures::uiStyleOf) ?: PolyPlusConfig.onboardingUiStyle)
+    }
     var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
     var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
     var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
@@ -740,9 +745,10 @@ private fun LookAndFeelPage(
     }
     y += colorsHeight + SECTION_GAP
     SectionLabel("UI Style", y)
-    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        StyleCard("PolyGlass", uiStyle == 0, rounded = true) { onUiStyle(0) }
-        StyleCard("Minecraft", uiStyle == 1, rounded = false) { onUiStyle(1) }
+    Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(STYLE_CARD_GAP.dp)) {
+        UiStyleOptions.forEach { option ->
+            StyleCard(option, OnboardingFeatures.uiStyleTheme(option.style, lightTheme), uiStyle == option.style) { onUiStyle(option.style) }
+        }
     }
     y += styleHeight + SECTION_GAP
     GuiScaleSection(y, guiScale, maxGuiScale, onGuiScale)
@@ -2005,37 +2011,72 @@ private fun ChoiceButton(
     }
 }
 
+private class UiStyleOption(val style: Int, val label: String, val caption: String, val rounded: Boolean, val glass: Boolean)
+
+private val UiStyleOptions = listOf(
+    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYFROSTED, "Polyfrosted", "Frosted panels, the OneConfig look", rounded = true, glass = false),
+    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYGLASS, "PolyGlass", "See-through glass over your game", rounded = true, glass = true),
+    UiStyleOption(OnboardingFeatures.UI_STYLE_MINECRAFT, "Minecraft", "Blocky, like the vanilla menus", rounded = false, glass = false),
+)
+
+private val StylePreviewBackdrop = Brush.verticalGradient(
+    0f to Color(0xFF4F86D1),
+    0.58f to Color(0xFFA3CBEF),
+    0.59f to Color(0xFF5E9E3A),
+    1f to Color(0xFF3B6A25),
+)
+
+private val StylePreviewSheen = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.04f)))
+
 @Composable
-private fun StyleCard(label: String, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.size(198.dp, 155.dp).clip(ButtonShape)
+private fun StyleCard(option: UiStyleOption, theme: OneConfigUITheme, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.size(STYLE_CARD_WIDTH.dp, 155.dp).clip(ButtonShape)
             .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
             .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
-            .clickableWithSound("$label style", A11yRole.Option, selected, shape = ButtonShape, onClick = onClick),
+            .clickableWithSound("${option.label} style. ${option.caption}", A11yRole.Option, selected, shape = ButtonShape, onClick = onClick)
+            .padding(9.dp),
     ) {
-        UiPreview(Modifier.offset(13.dp, 12.dp), rounded)
-        SocialText(label, 14.sp, Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), SocialTextPrimary, FontWeight.Medium, textAlign = TextAlign.Center)
+        UiPreview(option, theme)
+        Spacer(Modifier.height(7.dp))
+        SocialText(option.label, 14.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, fontFamily = theme.fontFamily, maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        SocialText(option.caption, 11.sp, color = SocialTextSecondary, maxLines = 2)
     }
 }
 
 @Composable
-private fun UiPreview(modifier: Modifier, rounded: Boolean) {
-    val shape = if (rounded) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp)
-    Row(modifier.size(172.dp, 108.dp).clip(shape).border(1.dp, Color(0x1AFFFFFF), shape)) {
-        Column(Modifier.width(44.dp).height(108.dp).background(Color(0xB3151C22)).padding(8.dp, 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(Modifier.size(29.dp, 7.dp).background(OneConfigTheme.accent))
-            repeat(3) { Box(Modifier.width(if (it == 0) 20.dp else 29.dp).height(4.dp).background(if (it == 0) SocialTextSecondary else SocialTextPrimary)) }
-        }
-        Column(Modifier.width(128.dp).height(108.dp).background(Color(0xF211171C)).padding(8.dp, 7.dp)) {
-            Row { Box(Modifier.width(43.dp).height(7.dp).background(SocialTextPrimary)); Spacer(Modifier.width(61.dp)); Box(Modifier.size(7.dp).background(SocialTextPrimary)) }
-            Spacer(Modifier.height(8.dp))
-            repeat(3) {
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    repeat(3) { Box(Modifier.size(34.dp, 23.dp).background(Color(0xFF1A2229)).border(0.dp, Color.Transparent).padding(top = 17.dp).background(OneConfigTheme.accent)) }
+private fun UiPreview(option: UiStyleOption, theme: OneConfigUITheme) {
+    val accent = OneConfigTheme.accent
+    val window = RoundedCornerShape(if (option.rounded) 7.dp else 0.dp)
+    val small = RoundedCornerShape(if (option.rounded) 3.dp else 0.dp)
+    Box(Modifier.size(STYLE_PREVIEW_WIDTH.dp, STYLE_PREVIEW_HEIGHT.dp).clip(RoundedCornerShape(4.dp)).background(StylePreviewBackdrop)) {
+        val windowModifier = Modifier.fillMaxSize().padding(8.dp, 7.dp).clip(window)
+        Row(windowModifier.background(theme.pageBackground).border(1.dp, theme.borderColor, window)) {
+            Column(
+                Modifier.width(26.dp).fillMaxHeight().background(theme.sidebarBackground).padding(5.dp, 6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(Modifier.size(16.dp, 4.dp).clip(small).background(accent))
+                repeat(3) {
+                    Box(Modifier.width(if (it == 0) 11.dp else 16.dp).height(3.dp).clip(small).background(if (it == 0) theme.textColorSecondary else theme.textColor))
                 }
-                Spacer(Modifier.height(5.dp))
+            }
+            Column(Modifier.fillMaxSize().padding(5.dp, 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.size(24.dp, 4.dp).clip(small).background(theme.textColor))
+                repeat(2) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(3) { column ->
+                            Box(Modifier.size(17.dp, 15.dp).clip(small).background(theme.modCardBackground).border(0.5.dp, theme.borderColor, small)) {
+                                val bar = if (row == 0 && column == 0) accent else theme.textColorSecondary
+                                Box(Modifier.align(Alignment.BottomStart).padding(3.dp).size(9.dp, 2.dp).clip(small).background(bar))
+                            }
+                        }
+                    }
+                }
             }
         }
+        if (option.glass) Box(windowModifier.background(StylePreviewSheen))
     }
 }
 
@@ -2784,6 +2825,10 @@ private const val MOTION_BLUR_MAX = 10
 private const val CONTENT_TOP = 140f
 private const val CONTENT_BOTTOM = 557f
 private const val SECTION_GAP = 24f
+private const val STYLE_CARD_WIDTH = 130f
+private const val STYLE_CARD_GAP = 12f
+private const val STYLE_PREVIEW_WIDTH = 112f
+private const val STYLE_PREVIEW_HEIGHT = 72f
 private const val LABEL_HEIGHT = 32f
 private const val MOD_CARDS_PER_PAGE = 2
 private const val MOD_ORDER_PREVIEW_ROWS = 2

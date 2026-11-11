@@ -104,12 +104,14 @@ class LobbyAvatar(
 
     override fun getCapeTextureLocation(): Identifier? {
         if (isLocal) LobbyWardrobe.previewCape()?.let { return it }
+        val game = super.getCapeTextureLocation()
+        if (game != null && CapeResolver.keepsModCape(game.namespace)) return game
         CosmeticAssetCache.getCapeTexture(uuid)?.let { return it }
         if (isLocal && MojangCapeService.overridesLocalCape(uuid)) {
             MojangCapeService.localCapeTexture()?.let { return it }
             if (MojangCapeService.localCapeHidden()) return null
         }
-        return account.cape ?: super.getCapeTextureLocation()
+        return account.cape ?: game
     }
 
     var scale = 1f

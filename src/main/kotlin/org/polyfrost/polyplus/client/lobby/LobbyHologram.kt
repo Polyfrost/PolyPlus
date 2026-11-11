@@ -46,6 +46,9 @@ object LobbyHologram {
     @JvmField
     var drawing = false
 
+    @JvmField
+    var extracting = false
+
     @Volatile
     var accent = 0x1A7CFF
 
@@ -67,19 +70,27 @@ object LobbyHologram {
 
     fun reset() {
         drawing = false
+        extracting = false
         //? if >= 1.21.10
-        figures = emptyList()
+        figures.clear()
     }
 
     //? if >= 1.21.10 {
     private class Figure(val avatar: LobbyAvatar, val state: EntityRenderState)
 
-    private var figures = emptyList<Figure>()
+    private val figures = ArrayList<Figure>()
 
     fun extract(avatars: List<LobbyAvatar>, partialTicks: Float) {
+        figures.clear()
         val dispatcher = Minecraft.getInstance().entityRenderDispatcher
-        figures = avatars.filter { it.projecting }.map { avatar ->
-            Figure(avatar, dispatcher.extractEntity(avatar, partialTicks).also { it.shadowPieces.clear() })
+        extracting = true
+        try {
+            for (avatar in avatars) {
+                if (!avatar.projecting) continue
+                figures += Figure(avatar, dispatcher.extractEntity(avatar, partialTicks).also { it.shadowPieces.clear() })
+            }
+        } finally {
+            extracting = false
         }
     }
 

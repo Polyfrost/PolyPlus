@@ -40,14 +40,18 @@ out vec4 fragColor;
 /*varying vec2 texCoord;
 *///?}
 
-vec3 fetch(vec2 uv) {
+vec3 plain(vec2 uv) {
     vec3 c = texture(InSampler, uv).rgb;
-    if (!all(lessThan(abs(c), vec3(1000000.0)))) {
+    //? if = 1.8.9 {
+    /*if (!all(lessThan(abs(c), vec3(1000000.0)))) {
         return vec3(0.0);
     }
-    if (Threshold <= 0.0) {
-        return c;
-    }
+    *///?}
+    return c;
+}
+
+vec3 bright(vec2 uv) {
+    vec3 c = plain(uv);
     float peak = max(c.r, max(c.g, c.b));
     float excess = clamp((peak - Threshold) / (1.0 - Threshold), 0.0, 1.0);
     float chroma = (peak - min(c.r, min(c.g, c.b))) / max(peak, 0.001);
@@ -56,9 +60,17 @@ vec3 fetch(vec2 uv) {
 
 void main() {
     vec2 offset = Dir / OutSize;
-    vec3 sum = fetch(texCoord) * 0.2;
-    sum += (fetch(texCoord + offset * 1.4) + fetch(texCoord - offset * 1.4)) * 0.18;
-    sum += (fetch(texCoord + offset * 3.3) + fetch(texCoord - offset * 3.3)) * 0.14;
-    sum += (fetch(texCoord + offset * 5.2) + fetch(texCoord - offset * 5.2)) * 0.08;
+    vec3 sum;
+    if (Threshold <= 0.0) {
+        sum = plain(texCoord) * 0.2;
+        sum += (plain(texCoord + offset * 1.4) + plain(texCoord - offset * 1.4)) * 0.18;
+        sum += (plain(texCoord + offset * 3.3) + plain(texCoord - offset * 3.3)) * 0.14;
+        sum += (plain(texCoord + offset * 5.2) + plain(texCoord - offset * 5.2)) * 0.08;
+    } else {
+        sum = bright(texCoord) * 0.2;
+        sum += (bright(texCoord + offset * 1.4) + bright(texCoord - offset * 1.4)) * 0.18;
+        sum += (bright(texCoord + offset * 3.3) + bright(texCoord - offset * 3.3)) * 0.14;
+        sum += (bright(texCoord + offset * 5.2) + bright(texCoord - offset * 5.2)) * 0.08;
+    }
     fragColor = vec4(sum, 1.0);
 }

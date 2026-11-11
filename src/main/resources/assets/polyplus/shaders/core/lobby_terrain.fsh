@@ -82,6 +82,9 @@ vec4 sampleRGSS(sampler2D source, vec2 uv, vec2 pixelSize) {
     float transitionStart = minPixelSize * 1.0;
     float transitionEnd = minPixelSize * 2.0;
     float blendFactor = smoothstep(transitionStart, transitionEnd, maxTexelSize);
+    if (blendFactor <= 0.0) {
+        return sampleNearest(source, uv, pixelSize, du, dv, texelScreenSize);
+    }
     float duLength = length(du);
     float dvLength = length(dv);
     float minDerivative = min(duLength, dvLength);
@@ -107,6 +110,9 @@ vec4 sampleRGSS(sampler2D source, vec2 uv, vec2 pixelSize) {
     rgssColorLow *= 0.25;
     rgssColorHigh *= 0.25;
     vec4 rgssColor = mix(rgssColorLow, rgssColorHigh, mipBlend);
+    if (blendFactor >= 1.0) {
+        return rgssColor;
+    }
     vec4 nearestColor = sampleNearest(source, uv, pixelSize, du, dv, texelScreenSize);
     return mix(nearestColor, rgssColor, blendFactor);
 }
@@ -135,10 +141,12 @@ void main() {
     //? if >= 1.21.11 {
     color = mix(FogColor * vec4(1.0, 1.0, 1.0, color.a), color, chunkVisibility);
     //?}
-    float ring = 1.0 - clamp(waveFront / RING_WIDTH, 0.0, 1.0);
-    ring *= smoothstep(RING_WIDTH, RING_WIDTH + RING_RAMP, GameTime * SECONDS_PER_DAY * WAVE_SPEED);
-    vec3 tint = FogColor.rgb / max(max(FogColor.r, max(FogColor.g, FogColor.b)), 0.05);
-    color.rgb += mix(tint, vec3(1.0), ring) * RING_GAIN * ring * ring;
+    if (waveFront < RING_WIDTH) {
+        float ring = 1.0 - clamp(waveFront / RING_WIDTH, 0.0, 1.0);
+        ring *= smoothstep(RING_WIDTH, RING_WIDTH + RING_RAMP, GameTime * SECONDS_PER_DAY * WAVE_SPEED);
+        vec3 tint = FogColor.rgb / max(max(FogColor.r, max(FogColor.g, FogColor.b)), 0.05);
+        color.rgb += mix(tint, vec3(1.0), ring) * RING_GAIN * ring * ring;
+    }
     //? if >= 1.21.8 {
     fragColor = apply_fog(color, sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd, FogColor);
     //?} else {

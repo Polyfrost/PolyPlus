@@ -16,9 +16,9 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.familyVariant
-import org.polyfrost.polyplus.client.gui.isMinecraftStyle
 import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
@@ -376,15 +376,21 @@ object OnboardingFeatures {
         *///?}
     }.getOrDefault(4).coerceAtLeast(1)
 
+    fun uiStyleOf(theme: OneConfigUITheme?): Int = when (theme?.name) {
+        OneConfigTheme.MINECRAFT_DARK.name, OneConfigTheme.MINECRAFT_LIGHT.name -> UI_STYLE_MINECRAFT
+        OneConfigTheme.GLASS_DARK.name, OneConfigTheme.GLASS_LIGHT.name -> UI_STYLE_POLYGLASS
+        else -> UI_STYLE_POLYFROSTED
+    }
+
+    fun uiStyleTheme(style: Int, light: Boolean): OneConfigUITheme = when (style) {
+        UI_STYLE_MINECRAFT -> if (light) OneConfigTheme.MINECRAFT_LIGHT else OneConfigTheme.MINECRAFT_DARK
+        UI_STYLE_POLYGLASS -> if (light) OneConfigTheme.GLASS_LIGHT else OneConfigTheme.GLASS_DARK
+        else -> if (light) OneConfigTheme.POLYFROSTED_LIGHT else OneConfigTheme.POLYFROSTED_DARK
+    }
+
     fun applyTheme(light: Boolean, style: Int) {
-        val sameFamily = OneConfigTheme.active?.takeIf { it.isMinecraftStyle == (style == 1) }?.familyVariant(light)
-        val theme = sameFamily ?: when {
-            style == 1 && light -> OneConfigTheme.MINECRAFT_LIGHT
-            style == 1 -> OneConfigTheme.MINECRAFT_DARK
-            light -> OneConfigTheme.POLY_GLASS_LIGHT
-            else -> OneConfigTheme.POLY_GLASS_DARK
-        }
-        OneConfigTheme.activate(theme)
+        val sameFamily = OneConfigTheme.active?.takeIf { uiStyleOf(it) == style }?.familyVariant(light)
+        OneConfigTheme.activate(sameFamily ?: uiStyleTheme(style, light))
     }
 
     private fun applyToggleSprint(enabled: Boolean) {
@@ -826,6 +832,9 @@ object OnboardingFeatures {
     }.getOrNull().let { it == java.lang.Double.TYPE || it == java.lang.Float.TYPE }
 
     const val MOD_SETTINGS_VERSION = 6
+    const val UI_STYLE_POLYFROSTED = 0
+    const val UI_STYLE_MINECRAFT = 1
+    const val UI_STYLE_POLYGLASS = 2
 
     private const val MOD_APPLY_RETRY_INITIAL_MS = 1_000L
     private const val MOD_APPLY_RETRY_MAX_MS = 60_000L

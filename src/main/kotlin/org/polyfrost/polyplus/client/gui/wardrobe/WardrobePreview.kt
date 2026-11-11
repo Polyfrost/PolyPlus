@@ -67,6 +67,8 @@ import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
+private val PREVIEW_HEIGHT = 330.dp
+
 @Composable
 internal fun PreviewPanel(
     selected: CosmeticUiItem?,
@@ -83,15 +85,22 @@ internal fun PreviewPanel(
     onPreviewAuraColor: (Int) -> Unit = {},
     onSelectAuraColor: (Int?) -> Unit = {},
 ) {
+    var panelHeight by remember { mutableIntStateOf(0) }
+    var headerHeight by remember { mutableIntStateOf(0) }
+    val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
+    val hasHeader = title != null || status != null
+    val previewHeightPx = with(LocalDensity.current) { PREVIEW_HEIGHT.roundToPx() }
+    val previewShift = if (hasHeader) (headerHeight - (panelHeight - previewHeightPx) / 2).coerceAtLeast(0) else 0
     Box(
         modifier = modifier.clip(ppShape(12.dp))
             .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+            .onSizeChanged { panelHeight = it.height },
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
             ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
         PlayerPreview(
-            Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
+            Modifier.align(Alignment.Center).offset { IntOffset(0, previewShift) }.fillMaxWidth().height(PREVIEW_HEIGHT),
             source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
             autoSpin = false,
             verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
@@ -100,8 +109,10 @@ internal fun PreviewPanel(
             rotation = rotation,
         )
         ResetRotationButton(rotation, onResetRotation)
-        Column(Modifier.align(Alignment.TopStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val (title, subtitle) = heading ?: selected?.let { it.name to it.collection } ?: (null to null)
+        Column(
+            Modifier.align(Alignment.TopStart).onSizeChanged { headerHeight = it.height }.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (title != null) {
                 Column {
                     SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -155,17 +166,26 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
     val textureVersion = MojangCapeService.textureVersion
     val mojangState = MojangCapeService.state
 
-    var previewPieces by remember(variantId, slot) {
-        mutableStateOf(if (slot != null && variantId != null) mapOf(slot to variantId) else emptyMap())
+    val pieceIds = owned?.variant(variantId)?.pieces ?: listOfNotNull(variantId)
+    var previewPieces by remember(pieceIds, slot) {
+        mutableStateOf(
+            if (slot == null) {
+                emptyMap()
+            } else {
+                pieceIds.associateBy { CosmeticCatalog.getCosmeticDefinition(it)?.preferredSlot() ?: slot }
+            },
+        )
     }
-    LaunchedEffect(variantId, previewsOwned) {
-        if (!previewsOwned || variantId == null || slot == null) return@LaunchedEffect
-        val pieces = CosmeticCatalog.getCosmeticDefinition(variantId)
-            ?.let { CosmeticService.bothSides(it).getOrNull() }
-            ?: run {
-                val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
-                mapOf(slot to CosmeticCatalog.resolveVariantForSkin(variantId, slim))
-            }
+    LaunchedEffect(pieceIds, previewsOwned) {
+        if (!previewsOwned || slot == null) return@LaunchedEffect
+        val pieces = pieceIds.associate { pieceId ->
+            CosmeticCatalog.getCosmeticDefinition(pieceId)
+                ?.let { CosmeticService.equipTarget(it).getOrNull() }
+                ?: run {
+                    val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+                    slot to CosmeticCatalog.resolveVariantForSkin(pieceId, slim)
+                }
+        }
         previewPieces = pieces
         for ((pieceSlot, id) in pieces) {
             if (!isPreviewAssetLoaded(id, pieceSlot == BodySlot.Cape, pieceSlot == BodySlot.Pet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
@@ -173,10 +193,10 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
     }
 
     val base = CosmeticCatalog.localEquipped().equipped
-    val look = remember(base, owned?.equippedCosmeticId, previewPieces, previewsOwned, mojang?.id) {
+    val look = remember(base, owned?.memberIds, previewPieces, previewsOwned, mojang?.id) {
         base.toMutableMap().apply {
             if (previewsOwned && previewPieces.isNotEmpty()) {
-                owned?.equippedCosmeticId?.let { equippedId -> values.removeAll { it == equippedId } }
+                owned?.memberIds?.let { members -> values.removeAll { it in members } }
                 putAll(previewPieces)
             }
             if (mojang != null) remove(BodySlot.Cape)
@@ -289,7 +309,7 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
-    val art = remember(variant.id, swatchVersion) { CosmeticSwatches.get(variant.id) }
+    val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
     Row(
         modifier = Modifier.height(28.dp)
             .graphicsLayer { alpha = if (dimmed) 0.55f else 1f }
