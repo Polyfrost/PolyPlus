@@ -46,6 +46,9 @@ object LobbySodiumUniforms {
     fun lobbyId(id: Identifier): Identifier = Identifier.fromNamespaceAndPath(NAMESPACE, PREFIX + id.path)
 
     @JvmStatic
+    fun lobbyPipelineId(id: Identifier): Identifier = Identifier.fromNamespaceAndPath("${NAMESPACE}_$SODIUM", "lobby/" + id.path)
+
+    @JvmStatic
     fun lobbySuffix(suffix: String): String = "${NAMESPACE}_lobby_$suffix"
 
     @JvmStatic
