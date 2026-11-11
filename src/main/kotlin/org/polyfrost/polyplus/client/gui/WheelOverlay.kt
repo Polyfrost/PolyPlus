@@ -8,6 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 //? if > 1.8.9 {
 import org.lwjgl.system.Platform
@@ -158,20 +159,21 @@ object WheelOverlay {
     @JvmStatic
     fun consumeButton(button: Int, pressed: Boolean): Boolean {
         val current = session ?: return false
-        if (button != 0 && button != 1) return false
+        if (button != InputConstants.MOUSE_BUTTON_LEFT && button != InputConstants.MOUSE_BUTTON_RIGHT) return false
         if (!pressed) return false
-        if (physical(button) == 0) finish(current.hovered) else finish(null)
+        if (isPhysicalLeft(button)) finish(current.hovered) else finish(null)
         return true
     }
 
-    private fun physical(button: Int): Int {
+    private fun isPhysicalLeft(button: Int): Boolean {
+        val left = button == InputConstants.MOUSE_BUTTON_LEFT
         //? if > 1.8.9 {
         val swapped = runCatching {
             Platform.get() == Platform.WINDOWS && User32.GetSystemMetrics(User32.SM_SWAPBUTTON) != 0
         }.getOrDefault(false)
-        return if (swapped) 1 - button else button
+        return left != swapped
         //?} else {
-        /*return button
+        /*return left
         *///?}
     }
 

@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 //? if > 1.8.9 {
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyboardHandler;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -12,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /*import com.llamalad7.mixinextras.injector.WrapWithCondition;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.living.player.PlayerInventory;
+import org.polyfrost.oneconfig.internal.legacy.KeyCodes;
 import org.spongepowered.asm.mixin.Unique;
 *///?}
 
@@ -28,12 +30,12 @@ public class MixinPingWheelKeys {
     //? if >= 1.21.9 {
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void polyplus$escapeWheel(long window, int action, KeyEvent event, CallbackInfo ci) {
-        if (action == 1 && event.key() == 256 && WheelOverlay.consumeEscape()) ci.cancel();
+        if (action == 1 && event.key() == InputConstants.KEY_ESCAPE && WheelOverlay.consumeEscape()) ci.cancel();
     }
     //?} elif > 1.8.9 {
     /*@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void polyplus$escapeWheel(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
-        if (action == 1 && key == 256 && WheelOverlay.consumeEscape()) ci.cancel();
+        if (action == 1 && key == InputConstants.KEY_ESCAPE && WheelOverlay.consumeEscape()) ci.cancel();
     }
     *///?} else {
     /*@Unique
@@ -46,7 +48,7 @@ public class MixinPingWheelKeys {
 
     @WrapWithCondition(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/options/KeyBinding;set(IZ)V", ordinal = 0))
     private boolean polyplus$clickWheel(int keyCode, boolean pressed) {
-        if (!WheelOverlay.consumeButton(keyCode + 100, pressed)) return true;
+        if (!WheelOverlay.consumeButton(KeyCodes.mouseFromLegacy(keyCode + 100), pressed)) return true;
         polyplus$swallowClick = true;
         return false;
     }
