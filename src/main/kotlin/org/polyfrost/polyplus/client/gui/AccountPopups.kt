@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -123,7 +124,7 @@ internal fun MicrosoftLoginPopup(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Announce("Sign in to Microsoft")
-            SocialText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
+            SocialText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             SocialText(
                 "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
                 fontSize = 13.sp,
@@ -153,7 +154,7 @@ internal fun MicrosoftLoginPopup(
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                SocialText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontFamily = Outfit, textAlign = TextAlign.Center)
+                SocialText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, textAlign = TextAlign.Center)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LoginModalButton(
@@ -161,15 +162,7 @@ internal fun MicrosoftLoginPopup(
                     icon = ASSETS + "copy-01.svg",
                     filled = false,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        runCatching {
-                            //? if > 1.8.9 {
-                            Minecraft.getInstance().keyboardHandler.setClipboard(code)
-                            //?} else {
-                            /*Screen.setClipboard(code)
-                            *///?}
-                        }
-                    },
+                    onClick = { copyToClipboard(code) },
                 )
                 LoginModalButton(
                     label = "Open in browser",
@@ -177,6 +170,27 @@ internal fun MicrosoftLoginPopup(
                     filled = true,
                     modifier = Modifier.weight(1f),
                     onClick = { ClientPlatform.openUri(verificationUri) },
+                )
+            }
+            SocialText(
+                "If your browser doesn't open, go to this link and enter the code:",
+                fontSize = 13.sp,
+                color = SocialTextSecondary,
+                textAlign = TextAlign.Center,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SelectionContainer(Modifier.weight(1f)) {
+                    SocialText(verificationUri, fontSize = 13.sp, color = OneConfigTheme.accent, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+                LoginModalButton(
+                    label = "Copy link",
+                    icon = ASSETS + "copy-01.svg",
+                    filled = false,
+                    onClick = { copyToClipboard(verificationUri) },
                 )
             }
             if (status != null) {
@@ -233,7 +247,7 @@ internal fun OfflineAccountPopup(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Announce("Add offline account")
-            SocialText("Add offline account", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
+            SocialText("Add offline account", fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             TextField(
                 value = username,
                 onValueChange = { username = it },
@@ -313,6 +327,16 @@ private fun LoginModalButton(
     ) {
         ThemedIcon(icon, contentColor, 16.dp)
         SocialText(label, fontSize = 14.sp, color = contentColor, maxLines = 1, textAlign = TextAlign.Center)
+    }
+}
+
+private fun copyToClipboard(text: String) {
+    runCatching {
+        //? if > 1.8.9 {
+        Minecraft.getInstance().keyboardHandler.setClipboard(text)
+        //?} else {
+        /*Screen.setClipboard(text)
+        *///?}
     }
 }
 
