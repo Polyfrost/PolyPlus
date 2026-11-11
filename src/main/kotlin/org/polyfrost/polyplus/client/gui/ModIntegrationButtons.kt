@@ -45,7 +45,20 @@ internal object ModIntegrationButtons {
         logo = ::modMenuGlyph,
     )
 
-    private val all: List<ModIntegrationButton> = listOf(modMenuButton)
+    private val snapper = ParentScreenFactory(
+        "dev.spiritstudios.snapper.gui.screen.ScreenshotListScreen",
+        "dev.spiritstudios.snapper.gui.screen.GalleryScreen",
+        "dev.spiritstudios.snapper.gui.screen.ScreenshotScreen",
+    )
+
+    private val snapperButton = ModIntegrationButton(
+        icon = ASSETS + "image-01.svg",
+        tooltip = "Screenshots",
+        isPresent = { modLoaded("snapper") && snapper.isUsable },
+        onClick = { parent -> snapper.open(parent) },
+    )
+
+    private val all: List<ModIntegrationButton> = listOf(modMenuButton, snapperButton)
 
     fun available(): List<ModIntegrationButton> = all.filter(::isAvailable)
 
@@ -111,12 +124,14 @@ internal object ModIntegrationButtons {
 }
 
 // Reflective so the other mod's class need not be present at compile time
-private class ParentScreenFactory(private val className: String) {
+private class ParentScreenFactory(private vararg val classNames: String) {
     private val constructor by lazy {
-        runCatching {
-            Class.forName(className, false, javaClass.classLoader)
-                .getConstructor(Screen::class.java)
-        }.getOrNull()
+        classNames.firstNotNullOfOrNull { className ->
+            runCatching {
+                Class.forName(className, false, javaClass.classLoader)
+                    .getConstructor(Screen::class.java)
+            }.getOrNull()
+        }
     }
 
     val isUsable: Boolean get() = constructor != null
