@@ -41,12 +41,13 @@ object LobbyFriends {
     private val fetching = ConcurrentHashMap.newKeySet<UUID>()
     private val retries = ConcurrentHashMap<UUID, Retry>()
     private val RETRY_MILLIS = longArrayOf(30_000L, 120_000L, 600_000L)
+    private const val FALLBACK_RETRY_MILLIS = 300_000L
 
     private class Retry(val attempt: Int, val at: Long)
     //? if >= 1.21.10 {
-    private val lookups = HashMap<UUID, Supplier<PlayerSkin>>()
+    private val lookups = HashMap<UUID, Pair<GameProfile, Supplier<PlayerSkin>>>()
     //?} elif = 1.8.9 {
-    /*private val lookups = HashMap<UUID, CompletableFuture<PlayerSkin>>()
+    /*private val lookups = HashMap<UUID, Pair<GameProfile, CompletableFuture<PlayerSkin>>>()
     *///?}
     private var ticks = 0
 
@@ -89,12 +90,17 @@ object LobbyFriends {
             fetch(friend)
             return fallback(friend.uuid)
         }
+        if (retries.containsKey(friend.uuid)) fetch(friend)
         //? if >= 1.21.10 {
-        return lookups.getOrPut(friend.uuid) { Minecraft.getInstance().skinManager.createLookup(profile, false) }.get()
+        val lookup = lookups[friend.uuid]?.takeIf { it.first === profile }
+            ?: (profile to Minecraft.getInstance().skinManager.createLookup(profile, false)).also { lookups[friend.uuid] = it }
+        return lookup.second.get()
         //?} elif > 1.8.9 {
         /*return Minecraft.getInstance().skinManager.getInsecureSkin(profile)
         *///?} else {
-        /*return lookups.getOrPut(friend.uuid) { Minecraft.getInstance().skinManager.getOrLoad(profile) }.getNow(null) ?: fallback(friend.uuid)
+        /*val lookup = lookups[friend.uuid]?.takeIf { it.first === profile }
+            ?: (profile to Minecraft.getInstance().skinManager.getOrLoad(profile)).also { lookups[friend.uuid] = it }
+        return lookup.second.getNow(null) ?: fallback(friend.uuid)
         *///?}
     }
 
@@ -130,8 +136,8 @@ object LobbyFriends {
                     }
                     attempt < RETRY_MILLIS.size -> retries[friend.uuid] = Retry(attempt + 1, System.currentTimeMillis() + RETRY_MILLIS[attempt])
                     else -> {
-                        profiles[friend.uuid] = GameProfile(friend.uuid, friend.name)
-                        retries.remove(friend.uuid)
+                        profiles.putIfAbsent(friend.uuid, GameProfile(friend.uuid, friend.name))
+                        retries[friend.uuid] = Retry(attempt, System.currentTimeMillis() + FALLBACK_RETRY_MILLIS)
                     }
                 }
             } finally {
