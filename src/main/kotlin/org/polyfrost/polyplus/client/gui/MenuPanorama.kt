@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyScene
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.GenericMessageScreen
 import net.minecraft.client.gui.screens.LevelLoadingScreen
+import net.minecraft.client.gui.screens.ProgressScreen
 //?} else {
 /*import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.gui.screen.menu.multiplayer.DownloadingTerrainScreen
@@ -54,6 +55,7 @@ object MenuPanorama {
         //? if > 1.8.9 {
         if (screen is GenericMessageScreen) return true
         if (screen is LevelLoadingScreen) return true
+        if (screen is ProgressScreen) return true
         //?} else {
         /*if (screen is ProgressScreen) return true
         if (screen is DownloadingTerrainScreen) return true
