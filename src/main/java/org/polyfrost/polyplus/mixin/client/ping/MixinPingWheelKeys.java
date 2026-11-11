@@ -10,9 +10,9 @@ import net.minecraft.client.KeyboardHandler;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 //?} else {
-/*import com.llamalad7.mixinextras.injector.WrapWithCondition;
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.WrapWithCondition;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.living.player.PlayerInventory;
 import org.polyfrost.oneconfig.internal.legacy.KeyCodes;
 import org.spongepowered.asm.mixin.Unique;
 *///?}
@@ -60,9 +60,10 @@ public class MixinPingWheelKeys {
         return false;
     }
 
-    @WrapWithCondition(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/living/player/PlayerInventory;scrollInHotbar(I)V"))
-    private boolean polyplus$scrollWheel(PlayerInventory inventory, int amount) {
-        return !WheelOverlay.consumeScroll(Math.signum(amount));
+    @ModifyExpressionValue(method = "tick", at = @At(value = "INVOKE", target = "Lorg/lwjgl/input/Mouse;getEventDWheel()I", remap = false))
+    private int polyplus$scrollWheel(int amount) {
+        if (amount != 0 && WheelOverlay.consumeScroll(Math.signum(amount))) return 0;
+        return amount;
     }
     *///?}
 }
