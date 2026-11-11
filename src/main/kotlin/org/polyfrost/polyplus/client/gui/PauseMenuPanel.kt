@@ -107,10 +107,26 @@ object PauseMenuPanel {
      * above it.
      * [onLeft] puts the column on the left side instead, keeping to the screen's left edge, without Settings and with
      * playtime as its top row, right under the preview.
+     * The compact option puts the buttons under the menu instead, see [compactLayout].
      */
     fun layout(screenWidth: Int, screenHeight: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
         if (!PolyPlusPauseConfig.vanillaPausePlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
+        val social = PrivacyConsent.allowsOnlineServices()
+        // the host flow only ever opens the local world
+        //? if > 1.8.9 {
+        val singleplayer = Minecraft.getInstance().hasSingleplayerServer()
+        //?} else {
+        /*val singleplayer = Minecraft.getInstance().server != null
+        *///?}
+        // MixinPauseScreen already turns the menu's Open to LAN button into Host World; 26.3 moved LAN into World Options
+        //? if < 26.3 {
+        /*val menuHostsWorld = PolyPlusPauseConfig.replacePauseLanButton
+        *///?} else {
+        val menuHostsWorld = false
+        //?}
+        val hostWorld = social && singleplayer && !menuHostsWorld
+        if (PolyPlusPauseConfig.compactPauseMenuPanel) return compactLayout(screenHeight, menuLeft, menuRight, lastRow, social, hostWorld)
         val rightRoom = screenWidth - menuRight - MENU_GAP
         val rightWidth = minOf(WIDTH, rightRoom - MIN_EDGE_MARGIN)
         val leftRoom = menuLeft - MENU_GAP
@@ -128,23 +144,9 @@ object PauseMenuPanel {
         val x = if (onLeft) edgeMargin else screenWidth - width - edgeMargin
         val leftX = if (!onLeft && leftFits) (leftRoom - width).coerceAtMost(EDGE_MARGIN) else null
 
-        val social = PrivacyConsent.allowsOnlineServices()
         val rows = menuRowsY.distinct().sorted()
         val secondLastRow = rows.getOrNull(rows.size - 2) ?: (lastRow - VANILLA_ROW_STEP)
         val socialY = if (social) secondLastRow else null
-        // the host flow only ever opens the local world
-        //? if > 1.8.9 {
-        val singleplayer = Minecraft.getInstance().hasSingleplayerServer()
-        //?} else {
-        /*val singleplayer = Minecraft.getInstance().server != null
-        *///?}
-        // MixinPauseScreen already turns the menu's Open to LAN button into Host World; 26.3 moved LAN into World Options
-        //? if < 26.3 {
-        /*val menuHostsWorld = PolyPlusPauseConfig.replacePauseLanButton
-        *///?} else {
-        val menuHostsWorld = false
-        //?}
-        val hostWorld = social && singleplayer && !menuHostsWorld
         // one row above Social, right under the preview. not the menu's own row there: 1.8.9 leaves a blank row above Options
         val hostWorldY = if (hostWorld && socialY != null) socialY - VANILLA_ROW_STEP else null
         val buttonsTopY = hostWorldY ?: socialY ?: lastRow
@@ -174,6 +176,35 @@ object PauseMenuPanel {
             leftX = leftX,
             playtimeY = playtimeY + rowOffset,
             onLeft = onLeft,
+        )
+    }
+
+    // vanilla's half-width buttons, which sit flush with the full-width ones on both sides
+    private const val COMPACT_WIDTH = 98
+
+    /**
+     * The buttons in rows under the menu's own, paired like vanilla's half-width buttons and without the preview:
+     * Host World on its own row, then playtime beside Social, then Settings beside Wardrobe. Null when they'd run
+     * off the bottom of the screen.
+     */
+    private fun compactLayout(screenHeight: Int, menuLeft: Int, menuRight: Int, lastRow: Int, social: Boolean, hostWorld: Boolean): Layout? {
+        val hostWorldY = if (hostWorld) lastRow + VANILLA_ROW_STEP else null
+        val socialY = (hostWorldY ?: lastRow) + VANILLA_ROW_STEP
+        val wardrobeY = socialY + VANILLA_ROW_STEP
+        if (wardrobeY + BUTTON_HEIGHT > screenHeight - TOP_MARGIN) return null
+        return Layout(
+            x = menuRight - COMPACT_WIDTH,
+            width = COMPACT_WIDTH,
+            previewX = 0,
+            previewY = 0,
+            previewWidth = 0,
+            previewHeight = 0,
+            socialY = if (social) socialY else null,
+            wardrobeY = wardrobeY,
+            hostWorldY = hostWorldY,
+            leftX = menuLeft,
+            playtimeY = socialY,
+            onLeft = false,
         )
     }
 
@@ -306,7 +337,8 @@ object PauseMenuPanel {
                 return@register
             }
             layouts[screen] = layout
-            if (withEssential) hideEssentialLeftSideBar(essentialProxies)
+            // compact mode leaves Essential's player alone, since nothing takes its place
+            if (layout.onLeft) hideEssentialLeftSideBar(essentialProxies)
             val access = screen as ScreenAccessor
             val buttonIcons = mutableListOf<ButtonIcon>()
             fun addIconButton(text: String, icon: String, x: Int, y: Int, onPress: () -> Unit) {

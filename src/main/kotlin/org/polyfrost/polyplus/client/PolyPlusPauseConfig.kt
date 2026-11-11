@@ -42,6 +42,13 @@ object PolyPlusPauseConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Compact Pause Menu Buttons",
+        description = "Put PolyPlus's pause menu buttons in rows under the menu's own buttons, without the player preview.",
+    )
+    var compactPauseMenuPanel = false
+
+    @JvmStatic
+    @Switch(
         title = "Replace Pause Menu LAN Button",
         description = "Replace the vanilla 'Open to LAN' pause menu button with the PolyPlus Host World flow, for hosting your current world over EOS P2P.",
     )
