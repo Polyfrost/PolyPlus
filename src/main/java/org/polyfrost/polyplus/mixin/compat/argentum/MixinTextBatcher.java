@@ -1,8 +1,7 @@
 package org.polyfrost.polyplus.mixin.compat.argentum;
 
 //? if = 1.8.9 {
-/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+/*import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
@@ -23,15 +22,8 @@ public abstract class MixinTextBatcher {
     @Shadow private float red;
     @Shadow private float green;
     @Shadow private float blue;
-    @Shadow private float alpha;
 
     @Unique private boolean polyplus$colorGlyph;
-    @Unique private boolean polyplus$badgeGlyph;
-
-    @ModifyReturnValue(method = "cacheable", at = @At("RETURN"), require = 0)
-    private static boolean polyplus$skipBadgeText(boolean cacheable, String text) {
-        return cacheable && text.indexOf(PolyPlusBadge.LEGACY_CHAR) < 0;
-    }
 
     @ModifyArg(
         method = "layout",
@@ -40,7 +32,6 @@ public abstract class MixinTextBatcher {
         require = 0
     )
     private int polyplus$trackGlyph(int codepoint) {
-        polyplus$badgeGlyph = codepoint == PolyPlusBadge.LEGACY_CHAR;
         polyplus$colorGlyph = codepoint <= Character.MAX_VALUE
             && (codepoint == PolyPlusBadge.LEGACY_CHAR || EmojiFont.legacyIndex((char) codepoint) >= 0);
         return codepoint;
@@ -58,10 +49,6 @@ public abstract class MixinTextBatcher {
             return;
         }
         if (shadow) return;
-        if (polyplus$badgeGlyph) {
-            PolyPlusBadge.drawTesselated(x, y, alpha);
-            return;
-        }
         float r = red, g = green, b = blue;
         red = green = blue = 1.0F;
         original.call(batcher, glyph, x, y, italic, textureManager);
