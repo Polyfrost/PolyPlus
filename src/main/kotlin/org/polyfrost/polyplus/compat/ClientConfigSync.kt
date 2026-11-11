@@ -248,7 +248,7 @@ object ClientConfigSync {
                         LauncherRoot("Modrinth", roaming.resolve("ModrinthApp/profiles")),
                         LauncherRoot("ATLauncher", roaming.resolve("ATLauncher/instances")),
                         LauncherRoot("Badlion Client", roaming.resolve("Badlion Client")),
-                        LauncherRoot("LabyMod", roaming.resolve("LabyMod/instances")),
+                        // LabyMod import is disabled for now.
                         LauncherRoot("NoRisk Client", roaming.resolve("norisk/NoRiskClientV3/data/profiles")),
                         LauncherRoot("Dawn", roaming.resolve(".dawn/profiles")),
                         // Dawn's synced game folders, which hold the bundled Feather client's HUD profiles.
