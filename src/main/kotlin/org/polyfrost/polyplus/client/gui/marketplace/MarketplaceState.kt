@@ -44,9 +44,8 @@ internal class MarketBundle(val info: BundleInfo, val label: String, val pieces:
 
 internal val CosmeticType.pluralName: String
     get() = when (this) {
-        CosmeticType.Backpack -> "Back items"
-        CosmeticType.Glasses, CosmeticType.Wings, CosmeticType.Boots -> displayName
-        else -> "${displayName}s"
+        CosmeticType.Aura, CosmeticType.Pet, CosmeticType.Emote -> "${displayName}s"
+        else -> displayName
     }
 
 internal fun String.titled(): String = replaceFirstChar { it.uppercase() }
@@ -202,7 +201,7 @@ internal class MarketplaceState {
 
     private fun matches(info: CosmeticStoreInfo, needle: String): Boolean =
         info.name.contains(needle, ignoreCase = true) ||
-            info.type.displayName.contains(needle, ignoreCase = true) ||
+            info.type.searchTerms.any { it.contains(needle, ignoreCase = true) } ||
             info.tags.all.any { it.contains(needle, ignoreCase = true) }
 
     fun clearFilters() {

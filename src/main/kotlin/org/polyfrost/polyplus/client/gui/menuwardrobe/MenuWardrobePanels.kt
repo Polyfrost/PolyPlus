@@ -75,9 +75,9 @@ private val RailHeaderHeight = 40.dp
 private val CompactRowHeight = 33.dp
 
 private val RAIL_SLOTS = listOf(
-    CosmeticType.Wings,
-    CosmeticType.Cape,
     CosmeticType.Hat,
+    CosmeticType.Cape,
+    CosmeticType.Wings,
     CosmeticType.Aura,
     CosmeticType.Pet,
     CosmeticType.Emote,
@@ -86,9 +86,9 @@ private val RAIL_SLOTS = listOf(
 private val COMPACT_SLOTS = listOf(
     CosmeticType.Glasses,
     CosmeticType.Backpack,
-    CosmeticType.Boots,
     CosmeticType.Shoulder,
     CosmeticType.Glove,
+    CosmeticType.Boots,
 )
 
 @Composable

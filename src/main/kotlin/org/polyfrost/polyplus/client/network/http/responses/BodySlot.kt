@@ -5,16 +5,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable(with = BodySlot.Serializer::class)
 enum class BodySlot(val serializedName: String, val displayName: String) {
-    Cape("cape", "Cape"),
+    Hat("hat", "Head"),
+    Glasses("glasses", "Face"),
     Backpack("backpack", "Back"),
-    Glasses("glasses", "Glasses"),
+    Cape("cape", "Cape"),
     Wings("wings", "Wings"),
+    Shoulder("shoulder", "Shoulder"),
     LeftHand("left_hand", "Left Hand"),
     RightHand("right_hand", "Right Hand"),
-    Hat("hat", "Hat"),
+    Boots("boots", "Feet"),
     Aura("aura", "Aura"),
-    Boots("boots", "Boots"),
-    Shoulder("shoulder", "Shoulder"),
     Pet("pet", "Pet"),
     Unknown("unknown", "Unknown");
 
