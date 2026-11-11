@@ -24,6 +24,7 @@ object PartyPresence {
     private const val MAX_DISPLAY = 255
 
     @Volatile private var lastSent: MemberState? = null
+    @Volatile private var lastSentParty: String? = null
     @Volatile private var lastSentAt = 0L
     @Volatile var local: MemberState = MemberState()
         private set
@@ -34,21 +35,25 @@ object PartyPresence {
 
     fun reset() {
         lastSent = null
+        lastSentParty = null
         lastSentAt = 0L
     }
 
     fun tick() {
         val next = MemberState(location(), PartyVoice.memberVoice(), scene = PartyScene.localScene())
         local = next
-        if (PartyRepository.party.value == null) {
+        val partyId = PartyRepository.party.value?.id
+        if (partyId == null) {
             lastSent = null
+            lastSentParty = null
             return
         }
-        if (next == lastSent) return
+        if (next == lastSent && partyId == lastSentParty) return
         val now = System.currentTimeMillis()
         if (now - lastSentAt < MIN_INTERVAL_MS || !PolyConnection.isConnected) return
         if (PolyConnection.sendPacket(ServerboundPacket.SetPartyState(next)).isSuccess) {
             lastSent = next
+            lastSentParty = partyId
             lastSentAt = now
         }
     }
