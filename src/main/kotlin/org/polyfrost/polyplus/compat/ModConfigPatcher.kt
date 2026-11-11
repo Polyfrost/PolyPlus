@@ -29,11 +29,19 @@ internal object ModConfigPatcher {
      * Settings for one mod config. [configId] is the file name inside the OneConfig profile (`polysprint.json`).
      * Keys in [values] may be dot paths into nested objects (`droppedItem.glintColor`).
      */
-    data class Patch(val source: String, val modId: String, val configId: String, val values: Map<String, JsonElement>)
+    data class Patch(
+        val source: String,
+        val modId: String,
+        val configId: String,
+        val values: Map<String, JsonElement>,
+        /** Skip the patch when the config file is missing, e.g. when its name differs between game versions. */
+        val onlyIfExists: Boolean = false,
+    )
 
     /** Whether [patch] would change anything here; used for onboarding previews. */
     fun wouldApply(patch: Patch): Boolean =
-        patch.values.isNotEmpty() && FabricLoader.getInstance().isModLoaded(patch.modId)
+        patch.values.isNotEmpty() && FabricLoader.getInstance().isModLoaded(patch.modId) &&
+            (!patch.onlyIfExists || Files.isRegularFile(ConfigManager.active().folder.resolve(patch.configId)))
 
     fun apply(patches: List<Patch>): Int {
         val folder = ConfigManager.active().folder

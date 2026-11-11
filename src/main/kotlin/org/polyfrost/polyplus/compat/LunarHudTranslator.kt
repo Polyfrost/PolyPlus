@@ -138,6 +138,14 @@ internal object LunarHudTranslator {
         }
     }
 
+    /** Lunar's `mods.json` for the selected profile, if it is among [sources]. */
+    internal fun readMods(sources: List<Path>): JsonObject? {
+        val source = sources.firstOrNull(::isLunarModsFile) ?: return null
+        return runCatching { json.parseToJsonElement(Files.readString(source)).jsonObject }
+            .onFailure { logger.debug("Could not read Lunar modules from {}", source, it) }
+            .getOrNull()
+    }
+
     private fun isLunarModsFile(path: Path): Boolean =
         path.fileName?.toString() == "mods.json" && path.parent?.parent?.fileName?.toString() == "game"
 

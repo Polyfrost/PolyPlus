@@ -109,6 +109,14 @@ internal object FeatherHudTranslator {
     private fun inferredSection(x: Double, y: Double): String =
         (if (y < 0) "Bottom" else "Top") + (if (x < 0) "Right" else "Left")
 
+    /** The selected Feather profile among [sources], parsed. */
+    internal fun readProfile(sources: List<Path>): JsonObject? {
+        val profile = selectedProfile(sources) ?: return null
+        return runCatching { json.parseToJsonElement(Files.readString(profile)).jsonObject }
+            .onFailure { logger.debug("Could not read Feather profile {}", profile, it) }
+            .getOrNull()
+    }
+
     /** Uses the profile named in `current.profile`, falling back to the newest one found. */
     private fun selectedProfile(sources: List<Path>): Path? {
         val profiles = sources.filter(::isFeatherProfile)

@@ -90,13 +90,16 @@ internal object NoRiskHudTranslator {
             .map { it.source.removePrefix("NoRisk ") }
     }
 
-    private fun requests(sources: List<Path>): List<Request>? {
-        // Pick the newest NoRisk profile that actually holds HUD modules.
-        val modules = sources.asSequence().filter(::isNoRiskProfile).firstNotNullOfOrNull { source ->
+    /** The `modules` of the newest NoRisk profile among [sources] that actually holds any. */
+    internal fun readModules(sources: List<Path>): JsonArray? =
+        sources.asSequence().filter(::isNoRiskProfile).firstNotNullOfOrNull { source ->
             runCatching { json.parseToJsonElement(Files.readString(source)).jsonObject["modules"] as? JsonArray }
                 .onFailure { logger.debug("Could not read NoRisk HUD profile {}", source, it) }
                 .getOrNull()
-        } ?: return null
+        }
+
+    private fun requests(sources: List<Path>): List<Request>? {
+        val modules = readModules(sources) ?: return null
         val (refW, refH) = OneConfigHudInstances.screen()
         return requests(modules, refW, refH)
     }

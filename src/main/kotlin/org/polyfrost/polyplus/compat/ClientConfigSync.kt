@@ -214,18 +214,21 @@ object ClientConfigSync {
             LunarHudTranslator.import(sources, importedHudFiles) +
             FeatherHudTranslator.import(sources, importedHudFiles) +
             BadlionHudTranslator.import(sources, importedHudFiles)
+        val importedFeatures = ModConfigPatcher.apply(ClientFeatureTranslator.patches(sources))
         val refreshedHudConfigs = reloadOneConfigProfileHudConfigs(sources)
         if (importedHudFiles.isNotEmpty() || translatedHudLayouts > 0) OneConfigHudInstances.reloadFromDisk()
         Files.writeString(
             marker,
             "Imported $importedOptions Minecraft settings, $importedConfigs shared mod config(s), " +
-                "$importedHudConfigs OneConfig HUD config(s), and $translatedHudLayouts translated HUD layout(s).\n",
+                "$importedFeatures mod feature config(s), $importedHudConfigs OneConfig HUD config(s), " +
+                "and $translatedHudLayouts translated HUD layout(s).\n",
         )
         logger.info(
-            "Imported {} Minecraft settings, {} shared mod config(s), {} OneConfig HUD config(s), " +
-                "{} translated HUD layout(s), and refreshed {} live HUD config(s)",
+            "Imported {} Minecraft settings, {} shared mod config(s), {} mod feature config(s), " +
+                "{} OneConfig HUD config(s), {} translated HUD layout(s), and refreshed {} live HUD config(s)",
             importedOptions,
             importedConfigs,
+            importedFeatures,
             importedHudConfigs,
             translatedHudLayouts,
             refreshedHudConfigs,
@@ -301,6 +304,7 @@ object ClientConfigSync {
                     OnboardingPreference.SKIN_LAYERS -> add("3D skin layers ${if (enabled) "on" else "off"}")
                 }
             }
+            addAll(ClientFeatureTranslator.preview(paths))
         }.distinct()
         if (modSettings.isNotEmpty()) add("Mod settings · ${modSettings.joinToString(", ")}")
 
