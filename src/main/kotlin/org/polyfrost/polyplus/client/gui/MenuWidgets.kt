@@ -138,7 +138,7 @@ internal fun menuPreviewSpec(): MenuPreviewSpec {
     val hasHeadCosmetic = CosmeticCatalog
         .localEquipped().equipped
         .containsKey(BodySlot.Hat)
-    return if (hasHeadCosmetic) MenuPreviewSpec(270.dp, 0.82f, 0.784f) else MenuPreviewSpec(210.dp, 1.05f, 0.72243f)
+    return if (hasHeadCosmetic) MenuPreviewSpec(270.dp, 0.82f, 0.784f) else MenuPreviewSpec(210.dp, 0.96f, 0.74622f)
 }
 
 internal const val MENU_PREVIEW_YAW = 180f + 22.9f
