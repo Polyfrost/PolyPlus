@@ -49,7 +49,10 @@ object FriendsRepository {
                     notifyFriendRequest(packet.requestId, packet.sender)
                 }
                 is ClientboundPacket.FriendRequestUpdated -> {
-                    PolyPlusClient.SCOPE.launch { refreshRequests() }
+                    PolyPlusClient.SCOPE.launch {
+                        refreshRequests()
+                        refreshFriends()
+                    }
                 }
                 is ClientboundPacket.FriendRemoved -> {
                     PolyPlusClient.SCOPE.launch { refreshFriends() }
