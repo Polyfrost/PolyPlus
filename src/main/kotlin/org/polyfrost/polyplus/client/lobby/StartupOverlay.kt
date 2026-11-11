@@ -105,6 +105,8 @@ object StartupOverlay {
     @JvmStatic
     fun abandon() {
         if (active) finished(Minecraft.getInstance())
+        //? if > 1.8.9
+        StartupSounds.abandon()
     }
 
     @JvmStatic

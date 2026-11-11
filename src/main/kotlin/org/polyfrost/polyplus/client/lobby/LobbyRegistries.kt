@@ -45,16 +45,16 @@ class LobbyRegistries private constructor(
         fun load(): LobbyRegistries {
             if (!vanillaOnly) {
                 try {
-                    return load(trustedPacks())
+                    return load(trustedPacks(), true)
                 } catch (error: Throwable) {
                     vanillaOnly = true
                     LOBBY_LOGGER.warn("Lobby registries failed to load with mod data, retrying with vanilla data only", error)
                 }
             }
             //? if >= 26.3 {
-            return load(listOf(ServerPacksSource.createVanillaPackSource().fullResources()))
+            return load(listOf(ServerPacksSource.createVanillaPackSource().fullResources()), false)
             //?} else {
-            /*return load(listOf<PackResources>(ServerPacksSource.createVanillaPackSource()))
+            /*return load(listOf<PackResources>(ServerPacksSource.createVanillaPackSource()), false)
             *///?}
         }
 
@@ -65,7 +65,7 @@ class LobbyRegistries private constructor(
             return packs.openAllSelected()
         }
 
-        private fun load(sources: List<PackResources>): LobbyRegistries {
+        private fun load(sources: List<PackResources>, shareTags: Boolean): LobbyRegistries {
             return MultiPackResourceManager(PackType.SERVER_DATA, sources).use { resources ->
                 val layers = RegistryLayer.createRegistryAccess()
                 //? if < 1.21.4 {
@@ -73,7 +73,8 @@ class LobbyRegistries private constructor(
                 val dimensions = RegistryDataLoader.load(resources, layers.getAccessForLoading(RegistryLayer.DIMENSIONS), RegistryDataLoader.DIMENSION_REGISTRIES)
                 val merged = layers.replaceFrom(RegistryLayer.WORLDGEN, world).replaceFrom(RegistryLayer.DIMENSIONS, dimensions)
                 val access = merged.compositeAccess()
-                LobbyRegistries(access, access.registries().map { binder(resources, it) }.toList())
+                val shared = if (shareTags) emptySet() else layers.getLayer(RegistryLayer.STATIC).registries().map { it.key() }.toList().toSet()
+                LobbyRegistries(access, access.registries().filter { it.key() !in shared }.map { binder(resources, it) }.toList())
                 *///?} else {
                 val staticTags = TagLoader.loadTagsForExistingRegistries(resources, layers.getLayer(RegistryLayer.STATIC))
                 //? if >= 26.3 {
@@ -97,7 +98,7 @@ class LobbyRegistries private constructor(
                 val dimensions = RegistryDataLoader.load(resources, dimensionContext, RegistryDataLoader.DIMENSION_REGISTRIES)
                 *///?}
                 val merged = layers.replaceFrom(worldLayer, world, dimensions)
-                LobbyRegistries(merged.compositeAccess(), staticTags)
+                LobbyRegistries(merged.compositeAccess(), if (shareTags) staticTags else emptyList())
                 //?}
             }
         }

@@ -24,6 +24,9 @@ object StartupSounds {
     @Volatile
     private var loaded = false
 
+    @Volatile
+    private var vanilla = false
+
     fun prepare() {
         if (!StartupOverlay.enabled()) return
         runCatching { Files.createDirectories(Paths.get("oneconfig", "sounds", "assets", "oneconfig", "sounds")) }
@@ -41,9 +44,16 @@ object StartupSounds {
     //? if > 1.8.9 {
     @JvmStatic
     fun reload(mc: Minecraft): CompletableFuture<Void> {
-        if (!StartupOverlay.enabled()) return mc.reloadResourcePacks()
+        if (!StartupOverlay.enabled() || vanilla) return mc.reloadResourcePacks()
         if (loaded) reloadSounds(mc) else waiting = true
         return CompletableFuture.completedFuture(null)
+    }
+
+    fun abandon() {
+        vanilla = true
+        if (!waiting) return
+        waiting = false
+        Minecraft.getInstance().reloadResourcePacks()
     }
 
     private fun reloadSounds(mc: Minecraft) {
