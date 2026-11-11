@@ -7,6 +7,7 @@ import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.util.function.BooleanSupplier
 import com.mojang.authlib.GameProfile
 import kotlinx.coroutines.launch
 //? if > 1.8.9
@@ -1473,10 +1474,21 @@ object LobbyScene {
         LobbyCompat.removeEntity(scene.level, avatar)
     }
 
+    @Volatile
+    private var reloadDone: BooleanSupplier? = null
+
+    @JvmStatic
+    fun noteReload(done: BooleanSupplier) {
+        reloadDone = done
+    }
+
+    private fun reloading(): Boolean = reloadDone?.asBoolean == false
+
     private fun shown(): Live? {
         val scene = live ?: return null
         val mc = Minecraft.getInstance()
         if (swappedIn) return scene
+        if (reloading()) return null
         val owner = session
         if (owner != null && !owner.visible) return null
         if (owner?.embedded == true) return scene

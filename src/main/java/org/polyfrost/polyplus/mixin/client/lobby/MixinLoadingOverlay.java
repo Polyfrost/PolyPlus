@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.mixin.client.lobby;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.server.packs.resources.ReloadInstance;
+import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.client.lobby.StartupOverlay;
 import org.polyfrost.polyplus.compat.RrlsOverlay;
 import org.spongepowered.asm.mixin.Final;
@@ -53,6 +54,7 @@ public class MixinLoadingOverlay {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void polyplus$claimInitialLoad(CallbackInfo ci) {
+        LobbyScene.noteReload(reload::isDone);
         polyplus$branded = StartupOverlay.begin(fadeIn, minecraft.isGameLoadFinished());
     }
 
