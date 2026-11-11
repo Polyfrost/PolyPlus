@@ -305,6 +305,7 @@
     "compat.oneconfig.MixinExternalSounds",
     "compat.oneconfig.MixinUiSounds",
     "compat.oneconfig.MixinGlHost",
+    "compat.polyhitbox.MixinPolyHitboxRenderer",
     //? if > 1.8.9
     "compat.polytone.MixinPolytoneFabric",
     //? if >= 26.2 {
