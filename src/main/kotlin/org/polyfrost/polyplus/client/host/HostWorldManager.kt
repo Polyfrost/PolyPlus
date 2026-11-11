@@ -182,7 +182,12 @@ object HostWorldManager {
         privateRelay: Boolean = true,
         autoShareResourcePack: Boolean = false,
         onHosted: (String) -> Unit = {},
+        proceed: () -> Boolean = { true },
     ): Result<Unit> = beginP2PSession(privateRelay, autoShareResourcePack) { mc, session ->
+        if (!proceed()) {
+            abandonP2PHost()
+            return@beginP2PSession
+        }
         pending = PendingHost(gameMode, allowCheats, onPublished = { onHosted(session.id) })
         //? if = 1.8.9 {
         /*openWorld(entry.id)

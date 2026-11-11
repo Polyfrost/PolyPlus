@@ -62,6 +62,7 @@ object PlayTogether {
         internal var check: ServerCheck? = null
         internal var checkAt = 0L
         internal var session: Job? = null
+        internal var hosting: Job? = null
         internal var retry: SessionRefresh.ConnectionAttempt? = null
         internal var retryAt = 0L
         internal var retries = 0
@@ -153,6 +154,8 @@ object PlayTogether {
     fun cancel() {
         val current = active ?: return
         if (current.leading) {
+            current.hosting?.cancel()
+            current.hosting = null
             PolyConnection.sendPacket(ServerboundPacket.CancelPlayTogether(current.id))
             finish(current, "Play together cancelled")
         } else {
@@ -378,6 +381,8 @@ object PlayTogether {
         val party = PartyRepository.party.value
         if (party == null || (current.partyId != null && current.partyId != party.id)) {
             current.check?.close()
+            current.hosting?.cancel()
+            current.hosting = null
             active = null
             return
         }
@@ -436,13 +441,15 @@ object PlayTogether {
         current.stage = Stage.CONNECTING
         current.connectAt = System.currentTimeMillis()
         val screen = ClientPlatform.currentScreen()
-        PolyPlusClient.SCOPE.launch {
+        val hosting = { current.hosting != null && active === current && current.stage == Stage.CONNECTING }
+        current.hosting = PolyPlusClient.SCOPE.launch {
             val entry = HostWorldManager.loadWorlds().firstOrNull { it.id == id }
             if (entry == null || screen == null) {
-                ClientPlatform.runOnMain { failed(current, "That world is gone") }
+                ClientPlatform.runOnMain { if (hosting()) failed(current, "That world is gone") }
                 return@launch
             }
-            HostWorldManager.hostViaP2P(screen, entry, entry.gameMode, false, PolyPlusConfig.voiceHideIp) { sessionId ->
+            HostWorldManager.hostViaP2P(screen, entry, entry.gameMode, false, PolyPlusConfig.voiceHideIp, proceed = hosting, onHosted = hosted@{ sessionId ->
+                if (current.hosting == null) return@hosted
                 current.sessionId = sessionId
                 PolyPlusClient.SCOPE.launch {
                     PartyApi.inviteSession(sessionId)
@@ -452,8 +459,8 @@ object PlayTogether {
                             SocialErrors.emit(PartyErrors.message(error, "Couldn't invite your party"))
                         }
                 }
-            }.onFailure { error ->
-                ClientPlatform.runOnMain { failed(current, PartyErrors.message(error, "Couldn't host the world")) }
+            }).onFailure { error ->
+                ClientPlatform.runOnMain { if (hosting()) failed(current, PartyErrors.message(error, "Couldn't host the world")) }
             }
         }
     }
