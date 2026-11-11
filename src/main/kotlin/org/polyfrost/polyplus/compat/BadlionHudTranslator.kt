@@ -86,9 +86,13 @@ internal object BadlionHudTranslator {
     private fun requests(sources: List<Path>): List<Request>? {
         val profile = sources.firstOrNull(::isBadlionProfile) ?: return null
         val root = readProfile(profile) ?: return null
-        val boxes = root["boxes"] as? JsonArray ?: return null
         val (refW, refH) = OneConfigHudInstances.screen()
+        return requests(root, refW, refH)
+    }
 
+    /** Pure translation of a Badlion profile's `data.json`; [refW]/[refH] are OneConfig's HUD screen size. */
+    internal fun requests(root: JsonObject, refW: Double, refH: Double): List<Request> {
+        val boxes = root["boxes"] as? JsonArray ?: return emptyList()
         return boxes.mapNotNull { element ->
             runCatching {
                 val box = element as? JsonObject ?: return@runCatching null

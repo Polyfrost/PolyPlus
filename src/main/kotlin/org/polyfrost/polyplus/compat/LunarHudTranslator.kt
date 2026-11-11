@@ -90,7 +90,12 @@ internal object LunarHudTranslator {
             .onFailure { logger.debug("Could not read Lunar HUD modules from {}", source, it) }
             .getOrNull() ?: return null
         val (factorX, factorY) = if (scaled) OneConfigHudInstances.guiPixelFactors(sources, "Lunar") else 1.0 to 1.0
-        return root.mapNotNull { (rawName, value) ->
+        return requests(root, factorX, factorY)
+    }
+
+    /** Pure translation of a Lunar `mods.json`; [factorX]/[factorY] turn Lunar GUI pixels into HUD units. */
+    internal fun requests(root: JsonObject, factorX: Double, factorY: Double): List<Request> =
+        root.mapNotNull { (rawName, value) ->
             val module = value as? JsonObject ?: return@mapNotNull null
             val name = rawName.uppercase()
             val target = targets[name] ?: return@mapNotNull null
@@ -118,7 +123,6 @@ internal object LunarHudTranslator {
                 style = module.style(name),
             )
         }
-    }
 
     private fun JsonObject.hasPlacement() = containsKey("position") || containsKey("x") || containsKey("y")
 

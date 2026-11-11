@@ -1,0 +1,27 @@
+{
+  "lastDisplayWidth": 0,
+  "lastDisplayHeight": 0,
+  "showFPS": {
+    "enabled": true,
+    "graphicModeSettings": {
+      "backgroundColor": { "set": true, "enabled": false, "color": { "red": 0, "green": 0, "blue": 0, "alpha": -128 } },
+      "textColor": { "set": true, "enabled": true, "color": { "red": -1, "green": 0, "blue": 0, "alpha": -1 } },
+      "textShadow": { "set": false, "value": true }
+    }
+  },
+  "reachDisplay": {
+    "enabled": true,
+    "graphicModeSettings": {
+      "textColor": { "set": false, "enabled": true, "color": { "red": 0, "green": -1, "blue": 0, "alpha": -1 } },
+      "textShadow": { "set": true, "value": false }
+    }
+  },
+  "itemCounter": { "enabled": false },
+  "boxes": [
+    { "identifier": "fps", "quadrant": "TOP_RIGHT", "xPosition": 0.9953125, "yPosition": 0.46944445, "width": 130.0, "height": 30.0, "screenWidth": 1920, "screenHeight": 1080, "type": "box" },
+    { "identifier": "reach display", "quadrant": "MIDDLE_RIGHT", "xPosition": 0.9953125, "yPosition": 0.013888889, "width": 130.0, "height": 30.0, "screenWidth": 1920, "screenHeight": 1080, "type": "box" },
+    { "identifier": "item counter", "quadrant": "BOTTOM_CENTER", "xPosition": 0.909375, "yPosition": 0.99444443, "width": 126.0, "height": 67.0, "screenWidth": 1920, "screenHeight": 1080, "type": "grouped" },
+    { "identifier": "minimap", "quadrant": "TOP_LEFT", "xPosition": 0.0, "yPosition": 0.0, "width": 200.0, "height": 270.0, "screenWidth": 1920, "screenHeight": 1080, "type": "box" },
+    { "identifier": "trophyfishexchange", "quadrant": "MIDDLE_LEFT", "xPosition": 0.1, "yPosition": 0.5, "type": "computed" }
+  ]
+}

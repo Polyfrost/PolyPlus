@@ -98,8 +98,12 @@ internal object NoRiskHudTranslator {
                 .getOrNull()
         } ?: return null
         val (refW, refH) = OneConfigHudInstances.screen()
+        return requests(modules, refW, refH)
+    }
 
-        return modules.mapNotNull { element ->
+    /** Pure translation of a NoRisk profile's `modules`; [refW]/[refH] are OneConfig's HUD screen size. */
+    internal fun requests(modules: JsonArray, refW: Double, refH: Double): List<Request> =
+        modules.mapNotNull { element ->
             runCatching {
                 val module = element.jsonObject
                 val displayName = module["name"]?.jsonPrimitive?.content?.trim() ?: return@runCatching null
@@ -123,14 +127,13 @@ internal object NoRiskHudTranslator {
                     target = target,
                     enabled = (setting("isEnabled") as? JsonPrimitive)?.booleanOrNull,
                     section = section.takeIf { placed },
-                    x = if (placed) (x!! - base.first) * refW else null,
-                    y = if (placed) (y!! - base.second) * refH else null,
+                    x = x?.takeIf { placed }?.let { (it - base.first) * refW },
+                    y = y?.takeIf { placed }?.let { (it - base.second) * refH },
                     scale = (setting("hudScale") as? JsonPrimitive)?.content?.toDoubleOrNull(),
                     style = style(setting("background") as? JsonObject, setting("multiColor") as? JsonObject),
                 )
             }.onFailure { logger.debug("Could not read a NoRisk HUD element", it) }.getOrNull()
         }
-    }
 
     private fun style(background: JsonObject?, text: JsonObject?): Map<String, JsonElement> = buildMap {
         background?.let {
