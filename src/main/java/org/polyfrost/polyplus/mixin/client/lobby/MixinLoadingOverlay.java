@@ -63,6 +63,16 @@ public class MixinLoadingOverlay {
     private void polyplus$drawStartup(GuiGraphics graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
     *///?}
         if (!polyplus$branded) return;
+        //? if >= 26.1 {
+        boolean polyplus$visible = graphics.getClass() == GuiGraphicsExtractor.class;
+        //?} else {
+        /*boolean polyplus$visible = graphics.getClass() == GuiGraphics.class;
+        *///?}
+        if (!polyplus$visible) {
+            polyplus$branded = false;
+            StartupOverlay.abandon();
+            return;
+        }
         ci.cancel();
         //? if < 1.21.10 {
         /*if (fadeOutStart == -1L && reload.isDone()) {

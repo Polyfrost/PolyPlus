@@ -103,6 +103,11 @@ object StartupOverlay {
     fun holdsOverlay(): Boolean = active
 
     @JvmStatic
+    fun abandon() {
+        if (active) finished(Minecraft.getInstance())
+    }
+
+    @JvmStatic
     fun onFrame() {
         if (!active) return
         val mc = Minecraft.getInstance()
