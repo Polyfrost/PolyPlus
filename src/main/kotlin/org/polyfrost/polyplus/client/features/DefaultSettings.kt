@@ -19,6 +19,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.render.InputConstants
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.Mods
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -527,7 +528,7 @@ object DefaultSettings {
         logger.info("Set {}#{} to {}", className.substringAfterLast('.'), fieldName, value)
     }
 
-    private fun modLoaded(id: String): Boolean = FabricLoader.getInstance().isModLoaded(id)
+    private fun modLoaded(id: String): Boolean = Mods.loaded(id)
 
     private fun findClass(name: String): Class<*>? {
         if (name in classCache) return classCache[name]

@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.compat
 
-import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import java.lang.reflect.Method
@@ -9,7 +8,6 @@ internal object ChattingButtonRow {
 
     const val SIZE = 9
 
-    private const val MOD_ID = "chatting"
     private const val STEP = SIZE + 2
     private const val RIGHT_MARGIN = 12
     private const val ROW_BOTTOM_MARGIN = 26
@@ -20,7 +18,7 @@ internal object ChattingButtonRow {
     private val logger = LogManager.getLogger("PolyPlus/ChattingButtonRow")
 
     private var api: Api? =
-        if (FabricLoader.getInstance().isModLoaded(MOD_ID)) runCatching { Api() }.getOrNull() else null
+        if (Mods.chatting) runCatching { Api() }.getOrNull() else null
 
     data class Slot(val x: Int, val y: Int)
 

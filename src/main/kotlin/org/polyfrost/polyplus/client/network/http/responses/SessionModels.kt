@@ -31,4 +31,6 @@ data class SessionInvite(
     @SerialName("eos_session_id") val eosSessionId: String? = null,
     @SerialName("created_at") val createdAt: String,
     val status: String = "pending",
+    @SerialName("minecraft_version") val minecraftVersion: String? = null,
+    val loader: String? = null,
 )

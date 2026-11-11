@@ -10,5 +10,11 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface CameraAccessor {
     @Accessor("position")
     void polyplus$setPosition(Vec3 position);
+
+    @Accessor("eyeHeight")
+    void polyplus$setEyeHeight(float eyeHeight);
+
+    @Accessor("eyeHeightOld")
+    void polyplus$setEyeHeightOld(float eyeHeightOld);
 }
 //?}

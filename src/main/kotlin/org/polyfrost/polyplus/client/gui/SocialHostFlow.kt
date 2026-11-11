@@ -10,6 +10,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,14 +27,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
@@ -50,7 +50,17 @@ import org.polyfrost.polyplus.client.social.setScreen
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalPanel
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.ToggleRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -58,7 +68,6 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
-import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
 import org.polyfrost.polyplus.client.social.toUserMessage
 import kotlinx.coroutines.launch
@@ -70,8 +79,9 @@ internal enum class HostMode {
     LAN,
 }
 
-private class HostFlowState(val hostingCurrent: Boolean) {
-    var step by mutableStateOf(if (hostingCurrent) HostFlowStep.Configure else HostFlowStep.SelectWorld)
+internal class HostFlowState(val hostingCurrent: Boolean, preselected: Boolean, val inline: Boolean = false) {
+    val skipsSelection = hostingCurrent || preselected
+    var step by mutableStateOf(if (skipsSelection) HostFlowStep.Configure else HostFlowStep.SelectWorld)
     var hostMode by mutableStateOf(HostMode.FRIENDS)
     var port by mutableStateOf("")
     var worlds by mutableStateOf<List<HostWorldManager.HostWorldEntry>?>(null)
@@ -83,6 +93,23 @@ private class HostFlowState(val hostingCurrent: Boolean) {
     var invitees by mutableStateOf<Set<String>>(emptySet())
     var hostError by mutableStateOf<String?>(null)
     var hosting by mutableStateOf(false)
+    var forFriends by mutableStateOf(false)
+
+    val title: String
+        get() = when (step) {
+            HostFlowStep.SelectWorld -> "Select world to host"
+            HostFlowStep.Configure -> "Configure world settings"
+            HostFlowStep.InviteFriends -> "Invite friends to world"
+        }
+
+    fun reset() {
+        step = if (skipsSelection) HostFlowStep.Configure else HostFlowStep.SelectWorld
+        hostMode = HostMode.FRIENDS
+        invitees = emptySet()
+        hostError = null
+        hosting = false
+        forFriends = false
+    }
 }
 
 @Composable
@@ -92,62 +119,112 @@ internal fun HostWorldFlow(
     groups: List<GroupSummary>,
     selfId: String,
     hostingCurrent: Boolean = false,
+    worldId: String? = null,
     onDismiss: () -> Unit,
 ) {
-    val state = remember { HostFlowState(hostingCurrent) }
+    val state = remember { HostFlowState(hostingCurrent, worldId != null) }
 
     LaunchedEffect(Unit) {
         P2PSessionManager.retryLoginNow()
         if (state.hostingCurrent) return@LaunchedEffect
         val loaded = HostWorldManager.loadWorlds()
         state.worlds = loaded
-        state.selected = loaded.firstOrNull()
+        state.selected = if (worldId == null) loaded.firstOrNull() else loaded.firstOrNull { it.id == worldId }
+        if (worldId != null && state.selected == null) {
+            onDismiss()
+            return@LaunchedEffect
+        }
         state.selected?.let { state.gameMode = it.gameMode }
     }
 
     SocialModalScrim(onDismiss) {
-        when (state.step) {
-            HostFlowStep.SelectWorld -> WorldSelectionModal(
-                state = state,
-                onCancel = onDismiss,
-                onNext = { state.step = HostFlowStep.Configure },
-            )
-            HostFlowStep.Configure -> WorldConfigurationModal(
-                state = state,
-                screen = screen,
-                onBack = { if (state.hostingCurrent) onDismiss() else state.step = HostFlowStep.SelectWorld },
-                onNext = { state.step = HostFlowStep.InviteFriends },
-                onHosted = onDismiss,
-            )
-            HostFlowStep.InviteFriends -> InviteFriendsModal(
-                state = state,
-                friends = friends,
-                groups = groups,
-                selfId = selfId,
-                screen = screen,
-                onBack = { state.step = HostFlowStep.Configure },
-                onHosted = onDismiss,
-            )
-        }
+        HostFlowSteps(state, screen, friends, groups, selfId, onDismiss, onDismiss)
     }
+}
+
+@Composable
+internal fun HostFlowSteps(
+    state: HostFlowState,
+    screen: Screen,
+    friends: List<Friend>,
+    groups: List<GroupSummary>,
+    selfId: String,
+    onDismiss: () -> Unit,
+    onHosted: () -> Unit,
+) {
+    when (state.step) {
+        HostFlowStep.SelectWorld -> WorldSelectionModal(
+            state = state,
+            onCancel = onDismiss,
+            onNext = { state.step = HostFlowStep.Configure },
+        )
+        HostFlowStep.Configure -> WorldConfigurationModal(
+            state = state,
+            screen = screen,
+            onBack = { if (state.skipsSelection) onDismiss() else state.step = HostFlowStep.SelectWorld },
+            onNext = { state.step = HostFlowStep.InviteFriends },
+            onHosted = onHosted,
+        )
+        HostFlowStep.InviteFriends -> InviteFriendsModal(
+            state = state,
+            friends = friends,
+            groups = groups,
+            selfId = selfId,
+            screen = screen,
+            onBack = { state.step = HostFlowStep.Configure },
+            onHosted = onHosted,
+        )
+    }
+}
+
+@Composable
+private fun HostStepFrame(state: HostFlowState, height: Dp, content: @Composable ColumnScope.() -> Unit) {
+    if (state.inline) {
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        return
+    }
+    ModalPanel(560.dp, height, PaddingValues(24.dp), 14.dp, Modifier) {
+        DialogTitle(state.title)
+        content()
+    }
+}
+
+@Composable
+internal fun inviteableGroups(groups: List<GroupSummary>): List<GroupSummary> {
+    val specialChatGroupId = SpecialChatRepository.status.collectAsState().value?.groupId
+    return groups.filter { it.kind == GroupKind.Group && it.members.size > 1 && it.id != specialChatGroupId }
 }
 
 @Composable
 private fun WorldSelectionModal(state: HostFlowState, onCancel: () -> Unit, onNext: () -> Unit) {
     var query by remember { mutableStateOf("") }
 
-    ModalPanel(width = 560.dp, height = 620.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
-        SocialText("Select world to host", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        SocialTextField(
+    HostStepFrame(state, 620.dp) {
+        TextField(
             value = query,
             onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().height(38.dp),
             placeholder = "Search worlds...",
-            leadingIcon = SOCIAL_ASSETS + "search-lg.svg",
+            leadingIcon = themedIcon(SOCIAL_ASSETS + "search-lg.svg"),
+            maxLength = 64,
+            invalid = false,
+            enabled = true,
+            singleLine = true,
+            framed = true,
+            fontSize = 14.sp,
+            label = null,
+            masked = false,
+            focusRequester = null,
+            interactionSource = null,
+            trailing = null,
+            onSubmit = null,
         )
-        SocialButton(
-            "Create New World",
-            icon = SOCIAL_ASSETS + "user-plus-01.svg",
-            modifier = Modifier.fillMaxWidth(),
+        TextButton(
+            label = "Create New World",
+            icon = themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"),
+            modifier = Modifier.fillMaxWidth().height(38.dp),
+            style = ButtonStyle.Secondary,
+            enabled = true,
             onClick = {
                 onCancel()
                 openSelectWorldScreen()
@@ -175,12 +252,12 @@ private fun WorldSelectionModal(state: HostFlowState, onCancel: () -> Unit, onNe
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SocialButton("Cancel", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.weight(1f), onClick = onCancel)
-            SocialButton(
-                "Next",
-                icon = SOCIAL_ASSETS + "chevron-right.svg",
-                modifier = Modifier.weight(1f),
-                filled = true,
+            TextButton("Cancel", themedIcon(SOCIAL_ASSETS + "x-close.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onCancel)
+            TextButton(
+                label = "Next",
+                icon = themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
+                modifier = Modifier.weight(1f).height(38.dp),
+                style = ButtonStyle.Primary,
                 enabled = state.selected != null,
                 onClick = onNext,
             )
@@ -191,7 +268,7 @@ private fun WorldSelectionModal(state: HostFlowState, onCancel: () -> Unit, onNe
 @Composable
 private fun CenteredHint(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        SocialText(text, fontSize = 13.sp, color = SocialTextSecondary)
+        SocialText(text, fontSize = 14.sp, color = SocialTextSecondary)
     }
 }
 
@@ -228,7 +305,7 @@ private fun WorldCard(entry: HostWorldManager.HostWorldEntry, selected: Boolean,
             Box(Modifier.size(64.dp).clip(ppShape(6.dp)).background(SocialCardBackground))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            SocialText(entry.name, fontSize = 15.sp)
+            SocialText(entry.name, fontSize = 14.sp)
             SocialText(socialGameModeLabel(entry.gameMode) + " · " + entry.versionName, fontSize = 12.sp, color = SocialTextSecondary)
             SocialText(socialCompatLabel(entry.compat), fontSize = 11.sp, color = socialCompatColor(entry.compat))
         }
@@ -243,51 +320,65 @@ private fun WorldConfigurationModal(
     onNext: () -> Unit,
     onHosted: () -> Unit,
 ) {
-    val lan = state.hostMode == HostMode.LAN
+    val published = state.hostingCurrent && SocialHosting.lanOpen
+    val lan = state.hostMode == HostMode.LAN && !published
     val portValid = state.port.isBlank() || state.port.trim().toIntOrNull()?.let { it in 1..65535 } == true
 
-    ModalPanel(width = 560.dp, height = 520.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
-        SocialText("Configure world settings", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+    HostStepFrame(state, 520.dp) {
         SocialText(
             "Choose how ${state.selected?.name ?: "this world"} will be hosted for your friends.",
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             color = SocialTextSecondary,
         )
 
-        FormRow("Host to") {
-            SocialDropdown(
-                label = "Visibility",
-                options = listOf(HostMode.FRIENDS, HostMode.LAN),
-                selected = state.hostMode,
-                labelFor = { socialHostModeLabel(it) },
-                modifier = Modifier.width(220.dp),
-                onSelect = { state.hostMode = it },
-            )
-        }
-        FormRow("Game Mode") {
-            SocialDropdown(
-                label = "Mode",
-                options = listOf(GameType.SURVIVAL, GameType.CREATIVE, GameType.ADVENTURE, GameType.SPECTATOR),
-                selected = state.gameMode,
-                labelFor = { socialGameModeLabel(it) },
-                modifier = Modifier.width(220.dp),
-                onSelect = { state.gameMode = it },
-            )
-        }
-        FormRow("Cheats") {
-            Box(Modifier.width(220.dp)) {
-                SocialToggle("Allow Cheats", state.allowCheats) { state.allowCheats = !state.allowCheats }
+        if (!published) {
+            FormRow("Host to") {
+                SocialDropdown(
+                    label = "Visibility",
+                    options = listOf(HostMode.FRIENDS, HostMode.LAN),
+                    selected = state.hostMode,
+                    labelFor = { socialHostModeLabel(it) },
+                    modifier = Modifier.width(220.dp),
+                    onSelect = { state.hostMode = it },
+                )
+            }
+            FormRow("Game Mode") {
+                SocialDropdown(
+                    label = "Mode",
+                    options = listOf(GameType.SURVIVAL, GameType.CREATIVE, GameType.ADVENTURE, GameType.SPECTATOR),
+                    selected = state.gameMode,
+                    labelFor = { socialGameModeLabel(it) },
+                    modifier = Modifier.width(220.dp),
+                    onSelect = { state.gameMode = it },
+                )
+            }
+            FormRow("Cheats") {
+                Box(Modifier.width(220.dp)) {
+                    ToggleRow("Allow Cheats", state.allowCheats, Modifier) { state.allowCheats = !state.allowCheats }
+                }
             }
         }
         if (lan) {
             //? if > 1.8.9 {
             FormRow("Port") {
-                SocialTextField(
+                TextField(
                     value = state.port,
                     onValueChange = { value -> state.port = value.filter { it.isDigit() } },
+                    modifier = Modifier.width(220.dp).height(38.dp),
                     placeholder = "Automatic",
+                    leadingIcon = null,
                     maxLength = 5,
-                    modifier = Modifier.width(220.dp),
+                    invalid = false,
+                    enabled = true,
+                    singleLine = true,
+                    framed = true,
+                    fontSize = 14.sp,
+                    label = null,
+                    masked = false,
+                    focusRequester = null,
+                    interactionSource = null,
+                    trailing = null,
+                    onSubmit = null,
                 )
             }
             if (!portValid) {
@@ -297,12 +388,12 @@ private fun WorldConfigurationModal(
         } else {
             FormRow("Private Relay") {
                 Box(Modifier.width(220.dp)) {
-                    SocialToggle("Private Relay", state.privateRelay) { state.privateRelay = !state.privateRelay }
+                    ToggleRow("Private Relay", state.privateRelay, Modifier) { state.privateRelay = !state.privateRelay }
                 }
             }
             FormRow("Resource Pack") {
-                Box(Modifier.width(260.dp)) {
-                    SocialToggle("Share", state.autoShareResourcePack) { state.autoShareResourcePack = !state.autoShareResourcePack }
+                Box(Modifier.width(220.dp)) {
+                    ToggleRow("Share", state.autoShareResourcePack, Modifier) { state.autoShareResourcePack = !state.autoShareResourcePack }
                 }
             }
         }
@@ -310,23 +401,27 @@ private fun WorldConfigurationModal(
         Box(Modifier.weight(1f))
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SocialButton("Back", icon = SOCIAL_ASSETS + "chevron-right.svg", modifier = Modifier.weight(1f), onClick = onBack)
-            SocialButton(
-                if (lan) "Host on LAN" else "Next",
-                icon = SOCIAL_ASSETS + (if (lan) "log-in-04.svg" else "chevron-right.svg"),
-                modifier = Modifier.weight(1f),
-                filled = true,
+            if (state.skipsSelection) {
+                TextButton("Close", themedIcon(SOCIAL_ASSETS + "x-close.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onBack)
+            } else {
+                TextButton("Back", themedIcon(SOCIAL_ASSETS + "chevron-left.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onBack)
+            }
+            TextButton(
+                label = if (lan) "Host on LAN" else "Next",
+                icon = themedIcon(SOCIAL_ASSETS + (if (lan) "log-in-04.svg" else "chevron-right.svg")),
+                modifier = Modifier.weight(1f).height(38.dp),
+                style = ButtonStyle.Primary,
                 enabled = !lan || portValid,
                 onClick = {
                     if (!lan) {
                         onNext()
-                        return@SocialButton
+                        return@TextButton
                     }
                     val port = state.port.trim().toIntOrNull()
                     if (state.hostingCurrent) {
                         HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats, port)
                     } else {
-                        val entry = state.selected ?: return@SocialButton
+                        val entry = state.selected ?: return@TextButton
                         HostWorldManager.host(screen, entry, state.gameMode, state.allowCheats, port)
                     }
                     onHosted()
@@ -361,20 +456,31 @@ private fun InviteFriendsModal(
 ) {
     var query by remember { mutableStateOf("") }
     val eosStatus by P2PSessionManager.status.collectAsState()
-    val scope = rememberCoroutineScope()
+    val published = state.hostingCurrent && SocialHosting.lanOpen
     val filtered = friends.filter { PlayerNamesRepository.displayName(it.player).contains(query, ignoreCase = true) }
     val online = filtered.filter { it.online }
     val offline = filtered.filter { !it.online }
-    val specialChatGroupId = SpecialChatRepository.status.collectAsState().value?.groupId
-    val inviteableGroups = groups.filter { it.kind == GroupKind.Group && it.members.size > 1 && it.id != specialChatGroupId }
+    val inviteableGroups = inviteableGroups(groups)
 
-    ModalPanel(width = 560.dp, height = 620.dp, padding = PaddingValues(24.dp), spacing = 14.dp) {
-        SocialText("Invite friends to world", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        SocialTextField(
+    HostStepFrame(state, 620.dp) {
+        TextField(
             value = query,
             onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().height(38.dp),
             placeholder = "Search friends...",
-            leadingIcon = SOCIAL_ASSETS + "search-lg.svg",
+            leadingIcon = themedIcon(SOCIAL_ASSETS + "search-lg.svg"),
+            maxLength = 64,
+            invalid = false,
+            enabled = true,
+            singleLine = true,
+            framed = true,
+            fontSize = 14.sp,
+            label = null,
+            masked = false,
+            focusRequester = null,
+            interactionSource = null,
+            trailing = null,
+            onSubmit = null,
         )
 
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -403,12 +509,12 @@ private fun InviteFriendsModal(
         state.hostError?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SocialButton("Back", icon = SOCIAL_ASSETS + "chevron-right.svg", modifier = Modifier.weight(1f), enabled = !state.hosting, onClick = onBack)
-            SocialButton(
-                if (state.hosting) "Hosting..." else "Host World",
-                icon = SOCIAL_ASSETS + "log-in-04.svg",
-                modifier = Modifier.weight(1f),
-                filled = true,
+            TextButton("Back", themedIcon(SOCIAL_ASSETS + "chevron-left.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, !state.hosting, onBack)
+            TextButton(
+                label = if (state.hosting) "Hosting..." else "Host World",
+                icon = themedIcon(SOCIAL_ASSETS + "log-in-04.svg"),
+                modifier = Modifier.weight(1f).height(38.dp),
+                style = ButtonStyle.Primary,
                 // P2P hosting fails outright until the login finishes, so leave only the LAN option until then
                 enabled = (state.hostingCurrent || state.selected != null) && !state.hosting && eosStatus != EosStatus.Connecting,
                 onClick = {
@@ -418,13 +524,13 @@ private fun InviteFriendsModal(
                         if (state.hostingCurrent) {
                             HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats)
                         } else {
-                            HostWorldManager.host(screen, state.selected ?: return@SocialButton, state.gameMode, state.allowCheats)
+                            HostWorldManager.host(screen, state.selected ?: return@TextButton, state.gameMode, state.allowCheats)
                         }
                         onHosted()
-                        return@SocialButton
+                        return@TextButton
                     }
-                    val invite = { sessionId: String -> state.invitees.forEach { player -> SessionsRepository.invite(sessionId, player) } }
-                    scope.launch {
+                    val invite = { sessionId: String -> SocialHosting.invite(sessionId, state.invitees) }
+                    PolyPlusClient.SCOPE.launch {
                         val result = if (state.hostingCurrent) {
                             HostWorldManager.hostCurrentWorldViaP2P(state.gameMode, state.allowCheats, state.privateRelay, state.autoShareResourcePack, invite)
                         } else {
@@ -441,13 +547,13 @@ private fun InviteFriendsModal(
                 },
             )
         }
-        if (eosStatus !is EosStatus.Failed && !state.hosting) {
+        if (eosStatus !is EosStatus.Failed && !state.hosting && !published) {
             SocialText(
                 "Host on LAN instead",
                 fontSize = 11.sp,
                 color = SocialTextSecondary,
                 modifier = Modifier.clickableWithSound {
-                    val port = state.port.trim().toIntOrNull()
+                    val port = state.port.trim().toIntOrNull()?.takeIf { it in 1..65535 }
                     if (state.hostingCurrent) {
                         HostWorldManager.hostCurrentWorldLan(state.gameMode, state.allowCheats, port)
                     } else {
@@ -483,11 +589,14 @@ private fun GroupInviteRow(group: GroupSummary, selfId: String, invitees: Set<St
             SocialText(group.name ?: "Group", fontSize = 14.sp)
             SocialText("${members.size} members", fontSize = 11.sp, color = SocialTextSecondary)
         }
-        SocialIconButton(
-            icon = if (allInvited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-            tint = if (allInvited) Color.White else SocialTextPrimary,
-            background = if (allInvited) OneConfigTheme.accent.asSocialSelected else null,
+        IconButton(
+            iconName = themedIcon(if (allInvited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg"),
             tooltip = if (allInvited) "Everyone invited" else "Invite everyone in this group",
+            label = null,
+            modifier = Modifier,
+            background = if (allInvited) OneConfigTheme.accent.asSocialSelected else null,
+            tint = if (allInvited) Color.White else SocialTextPrimary,
+            placement = TooltipPlacement.BelowStart,
             onClick = { if (!allInvited) onInviteAll(members) },
         )
     }
@@ -502,11 +611,14 @@ private fun FriendInviteRow(friend: Friend, invited: Boolean, onToggle: (Boolean
     ) {
         SocialAvatar(friend.player, 32.dp)
         SocialText(PlayerNamesRepository.displayName(friend.player), fontSize = 14.sp, modifier = Modifier.weight(1f))
-        SocialIconButton(
-            icon = if (invited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg",
-            tint = if (invited) Color.White else SocialTextPrimary,
-            background = if (invited) OneConfigTheme.accent.asSocialSelected else null,
+        IconButton(
+            iconName = themedIcon(if (invited) SOCIAL_ASSETS + "check.svg" else SOCIAL_ASSETS + "user-plus-01.svg"),
             tooltip = if (invited) "Invited" else "Invite",
+            label = null,
+            modifier = Modifier,
+            background = if (invited) OneConfigTheme.accent.asSocialSelected else null,
+            tint = if (invited) Color.White else SocialTextPrimary,
+            placement = TooltipPlacement.BelowStart,
             onClick = { onToggle(!invited) },
         )
     }

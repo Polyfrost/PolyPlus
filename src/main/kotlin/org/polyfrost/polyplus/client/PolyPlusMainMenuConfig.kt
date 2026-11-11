@@ -9,7 +9,6 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.gui.MainMenuBackground
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 1.21.11 {
@@ -32,57 +31,37 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic @Include
     var migratedFromLegacyConfig = false
 
-    @JvmStatic
-    @Switch(
-        title = "Vanilla Main Menu",
-        description = "Disable the PolyPlus main menu and use the vanilla Minecraft title screen instead.",
-    )
-    var useVanillaMainMenu = false
+    @JvmStatic @Include
+    var lastSeenNewsMillis = 0L
 
     @JvmStatic
-    @Switch(
-        title = "PolyPlus Pause Menu",
-        description = "Replace the vanilla pause menu with a PolyPlus one. Menus opened from it stay vanilla.",
-        subcategory = "Pause Menu",
+    @Dropdown(
+        title = "Main Menu",
+        description = "Choose which main menu the game starts on.",
+        options = ["Lobby", "PolyPlus", "Vanilla"],
     )
-    var usePolyPlusPauseMenu = false
-
-    @JvmStatic
-    @Switch(
-        title = "Pause Menu Player Preview",
-        description = "Show your player with Social and Wardrobe buttons beside the pause menu, when there's room. With Essential's pause menu, it replaces Essential's player on the left.",
-        subcategory = "Pause Menu",
-    )
-    var pauseMenuPlayerPanel = true
-
-    @JvmStatic
-    @Switch(
-        title = "Compact Pause Menu Buttons",
-        description = "Put PolyPlus's pause menu buttons in rows under the menu's own buttons, without the player preview.",
-        subcategory = "Pause Menu",
-    )
-    var compactPauseMenuPanel = false
+    var mainMenu: MainMenuChoice = MainMenuChoice.LOBBY
 
     @JvmStatic
     @Switch(
         title = "Hide Quickplay",
-        description = "Hide the Quickplay recent servers panel on the PolyPlus main menu.",
+        description = "Hide the Quickplay recent servers panel in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuQuickplay = false
 
     @JvmStatic
     @Switch(
-        title = "Hide Player Preview",
-        description = "Hide the 3D player preview on the PolyPlus main menu.",
+        title = "Swap Quickplay and Player Preview",
+        description = "Show Quickplay on the right and your player preview on the left in the PolyPlus menu.",
         subcategory = "Elements",
     )
-    var hideMainMenuPlayerPreview = false
+    var swapMainMenuSideColumns = false
 
     @JvmStatic
     @Switch(
         title = "Hide Alt Manager",
-        description = "Hide the account/alt manager pill on the PolyPlus main menu.",
+        description = "Hide the account/alt manager in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuAltManager = false
@@ -90,7 +69,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Social Button",
-        description = "Hide the Social button on the PolyPlus main menu.",
+        description = "Hide the Social tab in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuSocial = false
@@ -98,7 +77,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Wardrobe Button",
-        description = "Hide the Wardrobe button on the PolyPlus main menu.",
+        description = "Hide the Wardrobe tab in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuCosmetics = false
@@ -106,7 +85,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Realms Button",
-        description = "Hide the Realms button on the PolyPlus main menu.",
+        description = "Hide the Realms button in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuRealms = false
@@ -114,7 +93,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Host World Button",
-        description = "Hide the Host World button on the PolyPlus main menu.",
+        description = "Hide the Host World button in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuHostWorld = false
@@ -122,7 +101,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Mod Buttons",
-        description = "Hide the row of buttons for supported mods at the bottom of the PolyPlus main menu.",
+        description = "Hide the buttons for supported mods in the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuModButtons = false
@@ -130,7 +109,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Hide Footer",
-        description = "Hide the footer row at the bottom of the PolyPlus main menu.",
+        description = "Hide the footer row at the bottom of the lobby.",
         subcategory = "Elements",
     )
     var hideMainMenuFooter = false
@@ -138,7 +117,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Dropdown(
         title = "Main Menu FPS Limit",
-        description = "Choose how the PolyPlus main menu frame cap is selected.",
+        description = "Choose how the lobby frame cap is selected.",
         options = ["Vanilla (60 FPS limit)", "Smart (monitor refresh rate + 60)", "Custom (15-260 value)"],
         subcategory = "Performance",
     )
@@ -154,15 +133,6 @@ object PolyPlusMainMenuConfig : Config(
         subcategory = "Performance",
     )
     var mainMenuFpsLimit = 260
-
-    @JvmStatic
-    @Dropdown(
-        title = "Menu Backdrop",
-        description = "Choose what appears behind the PolyPlus main menu.",
-        options = ["PolyPlus", "Minecraft Panorama"],
-        subcategory = "Background",
-    )
-    var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
 
     @JvmStatic
     @Switch(
@@ -199,6 +169,8 @@ object PolyPlusMainMenuConfig : Config(
     *///?}
 
     init {
+        PolyPlusPauseConfig.preload()
+        PolyPlusLobbyConfig.preload()
         preload()
         migrateFromLegacyConfig()
 
@@ -206,10 +178,8 @@ object PolyPlusMainMenuConfig : Config(
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
         }
 
-        addDependency("customPanorama", "Menu Backdrop") {
-            if (!customPanoramaSupported()) Display.HIDDEN
-            else if (mainMenuBackground == MainMenuBackground.PANORAMA) Display.SHOWN
-            else Display.DISABLED
+        addDependency("customPanorama", "Custom Panorama is unavailable") {
+            if (customPanoramaSupported()) Display.SHOWN else Display.HIDDEN
         }
 
         addCallback("customPanorama") {
@@ -261,4 +231,10 @@ object PolyPlusMainMenuConfig : Config(
             MainMenuFpsLimitMode.SMART -> defaultMainMenuFpsLimit()
             MainMenuFpsLimitMode.CUSTOM -> mainMenuFpsLimit
         }
+}
+
+enum class MainMenuChoice {
+    LOBBY,
+    POLYPLUS,
+    VANILLA,
 }

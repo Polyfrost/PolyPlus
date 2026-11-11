@@ -72,8 +72,8 @@ object PolyPlusCosmeticsConfig : Config(
 
     @JvmStatic
     @Dropdown(
-        title = "Hats",
-        description = "Choose whose hat cosmetics you can see.",
+        title = "Head",
+        description = "Choose whose head cosmetics you can see.",
         options = ["Everyone", "Friends Only", "Self", "No One"],
         subcategory = "Visibility",
     )
@@ -81,8 +81,8 @@ object PolyPlusCosmeticsConfig : Config(
 
     @JvmStatic
     @Dropdown(
-        title = "Boots",
-        description = "Choose whose boots cosmetics you can see.",
+        title = "Feet",
+        description = "Choose whose feet cosmetics you can see.",
         options = ["Everyone", "Friends Only", "Self", "No One"],
         subcategory = "Visibility",
     )
@@ -90,7 +90,7 @@ object PolyPlusCosmeticsConfig : Config(
 
     @JvmStatic
     @Dropdown(
-        title = "Backs",
+        title = "Back",
         description = "Choose whose back cosmetics you can see.",
         options = ["Everyone", "Friends Only", "Self", "No One"],
         subcategory = "Visibility",

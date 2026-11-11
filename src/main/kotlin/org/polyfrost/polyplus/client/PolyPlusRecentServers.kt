@@ -1,13 +1,6 @@
 package org.polyfrost.polyplus.client
 
 import net.minecraft.client.Minecraft
-//? if > 1.8.9 {
-import net.minecraft.client.multiplayer.ServerData
-import net.minecraft.client.multiplayer.ServerList
-//?} else {
-/*import net.minecraft.client.options.ServerListEntry as ServerData
-import net.minecraft.client.options.ServerList
-*///?}
 import java.io.File
 import kotlinx.serialization.Serializable
 
@@ -15,13 +8,10 @@ import kotlinx.serialization.Serializable
 data class RecentServer(val name: String, val ip: String, val lastPlayed: Long = 0L)
 
 object PolyPlusRecentServers {
-    private const val MAX = 3
+    private const val RECORDED_MAX = 32
 
     @Serializable
-    private data class State(
-        val recents: List<RecentServer> = emptyList(),
-        val lastDirect: RecentServer? = null,
-    )
+    private data class State(val recents: List<RecentServer> = emptyList())
 
     //? if > 1.8.9 {
     private val file: File by lazy { File(Minecraft.getInstance().gameDirectory, "polyplus/recent_servers.json") }
@@ -29,9 +19,7 @@ object PolyPlusRecentServers {
     /*private val file: File by lazy { File(Minecraft.getInstance().gameDir, "polyplus/recent_servers.json") }
     *///?}
     private val recents = mutableListOf<RecentServer>()
-    private var lastDirect: RecentServer? = null
     private var loaded = false
-    private var cachedDisplayServers: List<ServerData>? = null
 
     private fun ensureLoaded() {
         if (loaded) return
@@ -41,7 +29,6 @@ object PolyPlusRecentServers {
                 val state = PolyPlusClient.JSON.decodeFromString(State.serializer(), file.readText())
                 recents.clear()
                 recents.addAll(state.recents)
-                lastDirect = state.lastDirect
             }
         }
     }
@@ -49,7 +36,7 @@ object PolyPlusRecentServers {
     private fun persist() {
         runCatching {
             file.parentFile?.mkdirs()
-            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), State(recents.toList(), lastDirect)))
+            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), State(recents.toList())))
         }
     }
 
@@ -63,65 +50,14 @@ object PolyPlusRecentServers {
         val entry = RecentServer(name?.trim().takeUnless { it.isNullOrEmpty() } ?: address, address, System.currentTimeMillis())
         recents.removeAll { it.ip.equals(address, ignoreCase = true) }
         recents.add(0, entry)
-        while (recents.size > MAX) recents.removeAt(recents.lastIndex)
+        while (recents.size > RECORDED_MAX) recents.removeAt(recents.lastIndex)
 
-        if (!isSaved(address)) lastDirect = entry
-
-        cachedDisplayServers = null
         persist()
     }
 
     @Synchronized
-    fun displayServers(): List<ServerData> {
-        cachedDisplayServers?.let { return it }
-
+    fun recent(): List<RecentServer> {
         ensureLoaded()
-        val saved = runCatching { loadServerList() }.getOrNull()
-        val savedByIp = HashMap<String, ServerData>()
-        if (saved != null) {
-            for (i in 0 until saved.size()) {
-                val data = saved.get(i)
-                savedByIp.putIfAbsent(data.ip.lowercase(), data)
-            }
-        }
-
-        val out = LinkedHashMap<String, ServerData>()
-        fun add(name: String, ip: String) {
-            val key = ip.lowercase()
-            if (key in out || out.size >= MAX) return
-            //? if > 1.8.9 {
-            out[key] = savedByIp[key] ?: ServerData(name, ip, ServerData.Type.OTHER)
-            //?} else {
-            /*out[key] = savedByIp[key] ?: ServerData(name, ip, false)
-            *///?}
-        }
-
-        recents.forEach { add(it.name, it.ip) }
-        if (saved != null) {
-            var i = 0
-            while (i < saved.size() && out.size < MAX) {
-                val data = saved.get(i)
-                add(data.name, data.ip)
-                i++
-            }
-        }
-        lastDirect?.let { add(it.name, it.ip) }
-
-        return out.values.toList().also { cachedDisplayServers = it }
+        return recents.toList()
     }
-
-    @Synchronized
-    fun lastPlayed(ip: String): Long {
-        ensureLoaded()
-        return (recents.firstOrNull { it.ip.equals(ip, ignoreCase = true) } ?: lastDirect?.takeIf { it.ip.equals(ip, ignoreCase = true) })
-            ?.lastPlayed ?: 0L
-    }
-
-    private fun isSaved(ip: String): Boolean = runCatching {
-        val list = loadServerList()
-        (0 until list.size()).any { list.get(it).ip.equals(ip, ignoreCase = true) }
-    }.getOrDefault(false)
-
-    private fun loadServerList(): ServerList =
-        ServerList(Minecraft.getInstance()).apply { load() }
 }

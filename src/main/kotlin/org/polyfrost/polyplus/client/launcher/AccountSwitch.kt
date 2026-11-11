@@ -21,6 +21,8 @@ import net.minecraft.client.Session
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+//? if > 1.8.9
+import org.polyfrost.polyplus.compat.AccountSwitchCompat
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 //? if > 1.8.9
 import org.polyfrost.polyplus.mixin.client.access.UserAccessor
@@ -53,6 +55,7 @@ object AccountSwitch {
             accessor.setUserApiService(userApiService)
             userProperties?.let { accessor.setUserPropertiesFuture(CompletableFuture.completedFuture(it)) }
             accessor.setProfileKeyPairManager(keyPairManager(mc, user, userApiService, microsoft))
+            AccountSwitchCompat.notifySwitch(user.profileId, user.name, user.accessToken)
             previousId != newId
         }
         //?} else {

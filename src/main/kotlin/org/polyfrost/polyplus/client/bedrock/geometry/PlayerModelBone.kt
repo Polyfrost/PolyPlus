@@ -37,6 +37,8 @@ enum class PlayerModelBone(val serializedName: String) {
 
     fun translateAndRotateChain(model: PlayerModel, poseStack: PoseStack) {
         for (bone in attachmentChain()) {
+            //? if = 1.21.1
+            /*if (bone == ROOT) continue*/
             //? if = 1.8.9 {
             /*if (bone == ROOT) {
                 if (model.sneaking) poseStack.translate(0f, 0.2f, 0f)

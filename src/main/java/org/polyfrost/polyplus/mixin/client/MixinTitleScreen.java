@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.Mixin;
 public class MixinTitleScreen {
     @WrapMethod(method = "init")
     private void polyplus$replaceMainMenu(Operation<Void> original) {
-        if (MainMenuReplacement.enabled() && !MainMenuReplacement.alreadyOpen()) {
+        if (MainMenuReplacement.replacesTitleScreen() && !MainMenuReplacement.alreadyOpen()) {
             MainMenuReplacement.open();
             return;
         }
@@ -41,12 +41,11 @@ public class MixinTitleScreen {
     private void polyplus$replaceMainMenu(Operation<Void> original) {
         original.call();
         if (Minecraft.getInstance().screen != (Object) this) return;
-        if (MainMenuReplacement.enabled() && !MainMenuReplacement.alreadyOpen()) {
+        if (MainMenuReplacement.replacesTitleScreen() && !MainMenuReplacement.alreadyOpen()) {
             MainMenuReplacement.open();
             return;
         }
-        ButtonWidget button = VanillaMenuButton.legacyButton(((Screen) (Object) this).width);
-        if (button != null) ((ScreenAccessor) this).polyplus$buttons().add(button);
+        ((ScreenAccessor) this).polyplus$buttons().addAll(VanillaMenuButton.legacyButtons(((Screen) (Object) this).width));
     }
 
     // argentum skips clearing the default framebuffer, which the panorama blur draws into, clear it manually
@@ -57,9 +56,7 @@ public class MixinTitleScreen {
 
     @Inject(method = "buttonClicked", at = @At("HEAD"), cancellable = true)
     private void polyplus$openPolyPlusMenu(ButtonWidget button, CallbackInfo ci) {
-        if (button.id != VanillaMenuButton.LEGACY_BUTTON_ID) return;
-        VanillaMenuButton.onLegacyButton();
-        ci.cancel();
+        if (VanillaMenuButton.onLegacyButton(button.id)) ci.cancel();
     }
 }
 *///?}

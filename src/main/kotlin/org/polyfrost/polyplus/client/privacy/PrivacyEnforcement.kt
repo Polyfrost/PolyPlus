@@ -57,4 +57,10 @@ object PrivacyEnforcement {
         if (accepted) PrivacyConsent.accept() else PrivacyConsent.decline()
         apply()
     }
+
+    fun acceptDocuments(terms: Int, privacy: Int) {
+        PrivacyConsent.accept(terms, privacy)
+        syncConfig()
+        apply()
+    }
 }

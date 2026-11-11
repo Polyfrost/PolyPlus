@@ -1,7 +1,10 @@
 package org.polyfrost.polyplus.mixin.client;
 
+//? if > 1.8.9
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
+import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -46,4 +49,17 @@ public class MixinMinecraft {
         return controlDown || GameOptions.isPressed(PolyPlusEntrypoint.dropModifier);
     }
     *///?}
+
+    //? if >= 26.1 {
+    @ModifyExpressionValue(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/FramerateLimitTracker;getFramerateLimit()I"))
+    //?} elif >= 1.21.4 {
+    /*@ModifyExpressionValue(method = "runTick", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/FramerateLimitTracker;getFramerateLimit()I"))
+    *///?} elif > 1.8.9 {
+    /*@ModifyExpressionValue(method = "runTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getFramerateLimit()I"))
+    *///?} else {
+    /*@ModifyExpressionValue(method = {"runGame", "isFramerateValid"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getMaxFramerate()I"))
+    *///?}
+    private int polyplus$throttleMinimizedMenu(int limit) {
+        return ClientPlatform.INSTANCE.menuFrameLimit(limit);
+    }
 }

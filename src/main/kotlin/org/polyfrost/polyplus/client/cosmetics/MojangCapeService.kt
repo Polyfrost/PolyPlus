@@ -218,7 +218,7 @@ object MojangCapeService {
                         Files.write(file, bytes)
                     }
                 }
-                RemoteTextures.register(texturePath(hash), file)
+                RemoteTextures.register(texturePath(hash), file, keepOnReset = true)
                 textures[hash] = location(hash)
                 retryAt.remove(hash)
                 downloading.remove(hash)

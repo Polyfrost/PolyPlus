@@ -105,7 +105,9 @@ object CosmeticAssetCache {
     fun getPetDefinition(id: Int): PetDefinition? = petsById[id]
     //?}
 
-    fun reset() {
+    fun reset() = ClientPlatform.runOnMainSync(::resetOnMain)
+
+    private fun resetOnMain() {
         generation++
         val stale = capes.keys.toList().mapNotNull(capes::remove)
         if (stale.isNotEmpty()) {
@@ -124,6 +126,7 @@ object CosmeticAssetCache {
         MojangCapeService.onTexturesReleased()
         BedrockPlayerGeometryCache.reset()
         //?}
+        installs++
     }
 
     // main thread only, and never while a preview may be showing a cosmetic outside `keep`

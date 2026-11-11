@@ -1,0 +1,290 @@
+{
+  "targets": [
+    "sky",
+    {
+      "name": "bloom_a",
+      "width": 640,
+      "height": 360
+    },
+    {
+      "name": "bloom_b",
+      "width": 640,
+      "height": 360
+    },
+    {
+      "name": "soft_a",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "soft_b",
+      "width": 960,
+      "height": 540
+    },
+    {
+      "name": "frost_a",
+      "width": 320,
+      "height": 180
+    },
+    {
+      "name": "frost_b",
+      "width": 320,
+      "height": 180
+    },
+    "lobby_out"
+  ],
+  "passes": [
+    {
+      "name": "polyplus_lobby_sky",
+      "intarget": "minecraft:main",
+      "outtarget": "sky",
+      "use_linear_filter": true,
+      "auxtargets": [
+        {
+          "name": "DepthSampler",
+          "id": "minecraft:main:depth"
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "sky",
+      "outtarget": "bloom_a",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            1,
+            0
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0.72
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "bloom_a",
+      "outtarget": "bloom_b",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "bloom_b",
+      "outtarget": "bloom_a",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            2,
+            0
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "bloom_a",
+      "outtarget": "bloom_b",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            0,
+            2
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "sky",
+      "outtarget": "soft_a",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            1,
+            0
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "soft_a",
+      "outtarget": "soft_b",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "soft_b",
+      "outtarget": "frost_a",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            1,
+            0
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "frost_a",
+      "outtarget": "frost_b",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "frost_b",
+      "outtarget": "frost_a",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            1.6,
+            0
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blur",
+      "intarget": "frost_a",
+      "outtarget": "frost_b",
+      "use_linear_filter": true,
+      "uniforms": [
+        {
+          "name": "Dir",
+          "values": [
+            0,
+            1.6
+          ]
+        },
+        {
+          "name": "Threshold",
+          "values": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_final",
+      "intarget": "sky",
+      "outtarget": "lobby_out",
+      "use_linear_filter": true,
+      "auxtargets": [
+        {
+          "name": "BloomSampler",
+          "id": "bloom_b"
+        },
+        {
+          "name": "SoftSampler",
+          "id": "soft_b"
+        },
+        {
+          "name": "FrostSampler",
+          "id": "frost_b"
+        },
+        {
+          "name": "DepthSampler",
+          "id": "minecraft:main:depth"
+        }
+      ]
+    },
+    {
+      "name": "polyplus_lobby_blit",
+      "intarget": "lobby_out",
+      "outtarget": "minecraft:main",
+      "use_linear_filter": true
+    }
+  ]
+}

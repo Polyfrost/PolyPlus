@@ -15,7 +15,7 @@ object WWaypointsCompat {
         private set
 
     fun initialize() {
-        if (!FabricLoader.getInstance().isModLoaded("wwaypoints")) return
+        if (!Mods.wwaypoints) return
         eventHandler { _: TickEvent.End ->
             val onHypixel = ServerUtils.isOnHypixel()
             if (onHypixel == isOnHypixel) return@eventHandler

@@ -1,0 +1,69 @@
+package org.polyfrost.polyplus.mixin.client.ping;
+
+import org.polyfrost.polyplus.client.gui.WheelOverlay;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+
+//? if > 1.8.9 {
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyboardHandler;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+//?} else {
+/*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.WrapWithCondition;
+import net.minecraft.client.Minecraft;
+import org.polyfrost.oneconfig.internal.legacy.KeyCodes;
+import org.spongepowered.asm.mixin.Unique;
+*///?}
+
+//? if >= 1.21.9 {
+import net.minecraft.client.input.KeyEvent;
+//?}
+
+//? if > 1.8.9 {
+@Mixin(KeyboardHandler.class)
+//?} else {
+/*@Mixin(Minecraft.class)
+*///?}
+public class MixinPingWheelKeys {
+    //? if >= 1.21.9 {
+    @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
+    private void polyplus$escapeWheel(long window, int action, KeyEvent event, CallbackInfo ci) {
+        if (action == 1 && event.key() == InputConstants.KEY_ESCAPE && WheelOverlay.consumeEscape()) ci.cancel();
+    }
+    //?} elif > 1.8.9 {
+    /*@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
+    private void polyplus$escapeWheel(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
+        if (action == 1 && key == InputConstants.KEY_ESCAPE && WheelOverlay.consumeEscape()) ci.cancel();
+    }
+    *///?} else {
+    /*@Unique
+    private boolean polyplus$swallowClick;
+
+    @WrapWithCondition(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;pauseGame()V"))
+    private boolean polyplus$escapeWheel(Minecraft minecraft) {
+        return !WheelOverlay.consumeEscape();
+    }
+
+    @WrapWithCondition(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/options/KeyBinding;set(IZ)V", ordinal = 0))
+    private boolean polyplus$clickWheel(int keyCode, boolean pressed) {
+        if (!WheelOverlay.consumeButton(KeyCodes.mouseFromLegacy(keyCode + 100), pressed)) return true;
+        polyplus$swallowClick = true;
+        return false;
+    }
+
+    @WrapWithCondition(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/options/KeyBinding;click(I)V", ordinal = 0))
+    private boolean polyplus$swallowWheelClick(int keyCode) {
+        if (!polyplus$swallowClick) return true;
+        polyplus$swallowClick = false;
+        return false;
+    }
+
+    @ModifyExpressionValue(method = "tick", at = @At(value = "INVOKE", target = "Lorg/lwjgl/input/Mouse;getEventDWheel()I", remap = false))
+    private int polyplus$scrollWheel(int amount) {
+        if (amount != 0 && WheelOverlay.consumeScroll(Math.signum(amount))) return 0;
+        return amount;
+    }
+    *///?}
+}

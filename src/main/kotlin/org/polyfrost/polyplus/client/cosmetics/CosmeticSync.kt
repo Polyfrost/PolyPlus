@@ -24,6 +24,8 @@ import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
@@ -45,9 +47,11 @@ import kotlinx.coroutines.launch
 object CosmeticSync {
     private val LOGGER = LogManager.getLogger()
     private val BATCHER = Batcher(Duration.ofMillis(200)) { players ->
-        subscribePlayers(players.toList())
+        subscribeVisible(players.toList())
     }
     private val subscribedPlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val watchedFriends: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val visiblePlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private val pendingSubscriptions = ConcurrentHashMap<Long, List<String>>()
     private val nextRequestId = AtomicLong()
@@ -83,8 +87,10 @@ object CosmeticSync {
 
     fun earlyInitialize() {
         eventHandler<WorldEvent.Load> {
-            PolyPlusClient.refreshCosmetics()
-            refreshVisibleSubscriptions()
+            if (!LobbyScene.building) {
+                PolyPlusClient.refreshCosmetics()
+                refreshVisibleSubscriptions()
+            }
             Unit
         }
 
@@ -138,7 +144,7 @@ object CosmeticSync {
                 PolyPlusClient.refreshCosmetics()
             }
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
-            val configUiOpen = OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())
+            val configUiOpen = previewUiOpen()
             if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
             configUiWasOpen = configUiOpen
             if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
@@ -206,6 +212,7 @@ object CosmeticSync {
                 PetManager.despawn(uuid)
                 //?}
             }
+            visiblePlayers.removeAll(removed.toSet())
             unsubscribePlayers(removed)
             Unit
         }
@@ -266,9 +273,38 @@ object CosmeticSync {
             normalizePlayerUuid(uuid.toString())?.let(visible::add)
         }
 
-        val stale = subscribedPlayers.filter { it !in visible }
-        unsubscribePlayers(stale)
-        return subscribePlayers(visible)
+        visiblePlayers.retainAll(visible)
+        visiblePlayers.addAll(visible)
+        val friends = watchedFriends
+            .filter { it !in visible }
+            .sortedBy { it !in subscribedPlayers }
+            .take((MAX_PLAYER_SUBSCRIPTIONS - visible.size).coerceAtLeast(0))
+        val wanted = visible + friends
+        unsubscribePlayers(subscribedPlayers.filter { it !in wanted }, rewatchFriends = false)
+        return subscribePlayers(wanted)
+    }
+
+    fun subscribeFriends(players: Collection<String>): Result<Unit> = subscribePlayers(players)
+
+    fun watchFriends(players: Collection<String>): Result<Unit> {
+        val friends = players.mapNotNull(::normalizePlayerUuid).toSet()
+        val dropped = watchedFriends.filter { it !in friends }
+        watchedFriends.retainAll(friends)
+        watchedFriends.addAll(friends)
+        if (LobbyScene.hasRealPlayer() && !LobbyScene.terrainActive()) return refreshVisibleSubscriptions()
+        if (dropped.isNotEmpty()) unsubscribePlayers(dropped)
+        return subscribePlayers(friends)
+    }
+
+    private fun subscribeVisible(players: Collection<String>): Result<Unit> {
+        val normalized = players.mapNotNull(::normalizePlayerUuid)
+        visiblePlayers.addAll(normalized)
+        val incoming = normalized.filter { it !in subscribedPlayers }
+        val overflow = subscribedPlayers.size + incoming.size - MAX_PLAYER_SUBSCRIPTIONS
+        if (overflow > 0) {
+            unsubscribePlayers(subscribedPlayers.filter { it !in visiblePlayers }.take(overflow), rewatchFriends = false)
+        }
+        return subscribePlayers(incoming)
     }
 
     fun resubscribeVisiblePlayers(): Result<Unit> {
@@ -487,9 +523,11 @@ object CosmeticSync {
     //?}
 
     //? if >= 1.21.1 {
+    private fun previewUiOpen(): Boolean = ClientPlatform.currentScreen().let { OneConfigUI.isOneConfigScreen(it) || MainMenuReplacement.isMenu(it) }
+
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog - closing it calls trim again
-        if (OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return
+        if (previewUiOpen()) return
         val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
             CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
         val inUse = HashSet<Identifier>()
@@ -503,6 +541,7 @@ object CosmeticSync {
                 is PetEntity -> entity.definition?.let { inUse += it.texture }
             }
         }
+        inUse += LobbyScene.wornTextures()
         CosmeticAssetCache.trim(keep, inUse)
     }
     //?}
@@ -600,7 +639,7 @@ object CosmeticSync {
         )
     }
 
-    private fun unsubscribePlayers(players: Iterable<String>): Result<Unit> {
+    private fun unsubscribePlayers(players: Iterable<String>, rewatchFriends: Boolean = true): Result<Unit> {
         val removed = players
             .mapNotNull(::normalizePlayerUuid)
             .filter(subscribedPlayers::remove)
@@ -610,17 +649,21 @@ object CosmeticSync {
         for (uuidString in removed) {
             CosmeticCatalog.clearPolyPlusUser(UUID.fromString(uuidString))
         }
-        return PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
+        val result = PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
+        if (rewatchFriends) subscribePlayers(removed.filter(watchedFriends::contains))
+        return result
     }
 
     private fun unsubscribeAllPlayers() {
         val players = subscribedPlayers.toList()
         subscribedPlayers.clear()
+        visiblePlayers.clear()
         pendingSubscriptions.clear()
         capWarned = false
         if (players.isNotEmpty()) {
             PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(players))
         }
+        subscribePlayers(watchedFriends.toList())
     }
 
     private fun findPlayer(uuid: UUID): AbstractClientPlayer? {

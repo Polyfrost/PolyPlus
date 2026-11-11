@@ -13,7 +13,9 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -44,9 +46,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //?} elif > 1.8.9 {
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
-
-//? if < 26.3
-//import org.polyfrost.polyplus.client.PolyPlusConfig
 
 /**
  * The title screen's player preview with Social and Wardrobe buttons under it, shown beside the pause menu's
@@ -111,7 +110,7 @@ object PauseMenuPanel {
      * The compact option puts the buttons under the menu instead, see [compactLayout].
      */
     fun layout(screenWidth: Int, screenHeight: Int, menuLeft: Int, menuRight: Int, menuRowsY: List<Int>, onLeft: Boolean = false): Layout? {
-        if (!PolyPlusMainMenuConfig.pauseMenuPlayerPanel) return null
+        if (!PolyPlusPauseConfig.vanillaPausePlayerPanel) return null
         val lastRow = menuRowsY.maxOrNull() ?: return null
         val social = PrivacyConsent.allowsOnlineServices()
         // the host flow only ever opens the local world
@@ -122,12 +121,12 @@ object PauseMenuPanel {
         *///?}
         // MixinPauseScreen already turns the menu's Open to LAN button into Host World; 26.3 moved LAN into World Options
         //? if < 26.3 {
-        /*val menuHostsWorld = PolyPlusConfig.replacePauseLanButton
+        /*val menuHostsWorld = PolyPlusPauseConfig.replacePauseLanButton
         *///?} else {
         val menuHostsWorld = false
         //?}
         val hostWorld = social && singleplayer && !menuHostsWorld
-        if (PolyPlusMainMenuConfig.compactPauseMenuPanel) return compactLayout(screenHeight, menuLeft, menuRight, lastRow, social, hostWorld)
+        if (PolyPlusPauseConfig.compactPauseMenuPanel) return compactLayout(screenHeight, menuLeft, menuRight, lastRow, social, hostWorld)
         val rightRoom = screenWidth - menuRight - MENU_GAP
         val rightWidth = minOf(WIDTH, rightRoom - MIN_EDGE_MARGIN)
         val leftRoom = menuLeft - MENU_GAP
@@ -226,6 +225,11 @@ object PauseMenuPanel {
 
     private const val STATS_REQUEST_NANOS = 10_000_000_000L
 
+    fun playtimeShort(): String {
+        requestStats()
+        return playTimeTicks()?.let(::formatPlaytime).orEmpty()
+    }
+
     fun playtimeLabel(): String {
         requestStats()
         return "Playtime: " + (playTimeTicks()?.let(::formatPlaytime) ?: "-")
@@ -247,7 +251,7 @@ object PauseMenuPanel {
 
     private fun openSocial(from: Screen) = SocialOverlay.open(from)
 
-    private fun openWardrobe() = PolyPlusOneConfigIntegration.openCosmetics()
+    private fun openWardrobe(from: Screen) = PauseRouter.openWardrobe(from, asShown = true)
 
     private fun openHostWorld(from: Screen) = SocialOverlay.openHostCurrentWorld(from)
 
@@ -272,10 +276,10 @@ object PauseMenuPanel {
     }
 
     // the Compose pause menu mirrors a hidden vanilla one, which must not get these buttons too
-    private fun vanillaMenuShown(): Boolean = !PolyPlusMainMenuConfig.usePolyPlusPauseMenu
+    private fun vanillaMenuShown(): Boolean = PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA
 
     // Essential's pause menu adds proxy Buttons for the player and buttons it draws on either side of the menu
-    fun isEssentialWidget(widget: Any): Boolean = widget.javaClass.name.startsWith("gg.essential.")
+    fun drawnElsewhere(widget: Any): Boolean = widget.javaClass.name.startsWith("gg.essential.")
 
     // Essential's left side bar: its player and the Wardrobe button under it
     private val ESSENTIAL_LEFT_SIDE_BAR = setOf("player", "wardrobe_2")
@@ -321,7 +325,7 @@ object PauseMenuPanel {
             if (screen !is PauseScreen || !screen.showsPauseMenu() || !vanillaMenuShown()) return@register
             val (essentialProxies, menuButtons) = screen.children().filterIsInstance<AbstractButton>()
                 .filter { it.visible }
-                .partition(::isEssentialWidget)
+                .partition(::drawnElsewhere)
             val menuLeft = menuButtons.minOfOrNull { it.x } ?: return@register
             val menuRight = menuButtons.maxOf { it.x + it.width }
             // Essential's own bar is on the right, so the player goes in place of Essential's on the left
@@ -345,7 +349,7 @@ object PauseMenuPanel {
                 buttonIcons += buttonIcon(icon, x, y, layout.width, label, text)
             }
             layout.socialY?.let { y -> addIconButton("Social", "social", layout.x, y) { openSocial(screen) } }
-            addIconButton("Wardrobe", "wardrobe", layout.x, layout.wardrobeY) { openWardrobe() }
+            addIconButton("Wardrobe", "wardrobe", layout.x, layout.wardrobeY) { openWardrobe(screen) }
             layout.hostWorldY?.let { y ->
                 addIconButton(Component.translatable("polyplus.hostWorld").string, "host-world", layout.x, y) { openHostWorld(screen) }
             }
@@ -408,7 +412,7 @@ object PauseMenuPanel {
     fun onLegacyButton(screen: Screen, id: Int): Boolean {
         when (id) {
             LEGACY_SOCIAL_ID -> openSocial(screen)
-            LEGACY_WARDROBE_ID -> openWardrobe()
+            LEGACY_WARDROBE_ID -> openWardrobe(screen)
             LEGACY_HOST_WORLD_ID -> openHostWorld(screen)
             LEGACY_SETTINGS_ID -> openSettings()
             else -> return false

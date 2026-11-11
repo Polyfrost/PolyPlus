@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.polyfrost.polyplus.client.launcher.SessionRefresh;
 import org.polyfrost.polyplus.client.launcher.SessionRefreshPrompt;
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -46,6 +47,16 @@ public abstract class MixinDisconnectedScreen extends Screen {
         this.layout.addChild(button);
         prompt.attach(button, this);
     }
+
+    @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;allowsMultiplayer()Z"))
+    private void polyplus$addRejoinButton(CallbackInfo ci) {
+        if (!P2PSessionManager.canRejoin()) {
+            return;
+        }
+        this.layout.addChild(Button.builder(Component.literal("Rejoin world"), pressed -> {
+            P2PSessionManager.rejoin();
+        }).width(200).build());
+    }
 }
 //?} else {
 /*import net.minecraft.client.gui.screens.DisconnectedScreen;
@@ -53,6 +64,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import org.polyfrost.polyplus.client.launcher.SessionRefresh;
 import org.polyfrost.polyplus.client.launcher.SessionRefreshPrompt;
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -64,6 +76,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinDisconnectedScreen extends Screen {
     @Unique
     private static final int POLYPLUS_REFRESH_BUTTON_ID = 0x504C5553;
+
+    @Unique
+    private static final int POLYPLUS_REJOIN_BUTTON_ID = 0x504C5554;
 
     @Shadow
     private int textHeight;
@@ -88,6 +103,24 @@ public abstract class MixinDisconnectedScreen extends Screen {
         ButtonWidget button = new ButtonWidget(POLYPLUS_REFRESH_BUTTON_ID, this.width / 2 - 100, y, prompt.label().getString());
         this.buttons.add(button);
         prompt.attach(button, this);
+    }
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void polyplus$addRejoinButton(CallbackInfo ci) {
+        if (!P2PSessionManager.canRejoin()) {
+            return;
+        }
+        int rows = this.polyplus$prompt == null ? 1 : 2;
+        int y = this.height / 2 + this.textHeight / 2 + this.textRenderer.fontHeight + 24 * rows;
+        this.buttons.add(new ButtonWidget(POLYPLUS_REJOIN_BUTTON_ID, this.width / 2 - 100, y, "Rejoin world"));
+    }
+
+    @Inject(method = "buttonClicked", at = @At("HEAD"), cancellable = true)
+    private void polyplus$pressRejoinButton(ButtonWidget button, CallbackInfo ci) {
+        if (button.id == POLYPLUS_REJOIN_BUTTON_ID) {
+            P2PSessionManager.rejoin();
+            ci.cancel();
+        }
     }
 
     @Inject(method = "buttonClicked", at = @At("HEAD"), cancellable = true)

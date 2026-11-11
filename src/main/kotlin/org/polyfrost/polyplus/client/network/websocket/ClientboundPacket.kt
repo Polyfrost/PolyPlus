@@ -1,6 +1,20 @@
 package org.polyfrost.polyplus.client.network.websocket
 
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.HostedJoinResult
+import org.polyfrost.polyplus.client.network.http.responses.MemberState
+import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
+import org.polyfrost.polyplus.client.network.http.responses.PlayEndReason
+import org.polyfrost.polyplus.client.network.http.responses.PlayReason
+import org.polyfrost.polyplus.client.network.http.responses.PlayResponse
+import org.polyfrost.polyplus.client.network.http.responses.Party
+import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
+import org.polyfrost.polyplus.client.network.http.responses.PartyInviteStatus
+import org.polyfrost.polyplus.client.network.http.responses.PartyLeftReason
+import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
+import org.polyfrost.polyplus.client.ping.PingKind
+import org.polyfrost.polyplus.client.ping.PingReply
+import org.polyfrost.polyplus.client.ping.PingTarget
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -34,6 +48,7 @@ sealed interface ClientboundPacket {
     data class PlayerPresence(
         val player: String,
         val online: Boolean,
+        val status: PlayerStatus = PlayerStatus.Unknown,
     ) : ClientboundPacket
 
     @Serializable
@@ -150,5 +165,123 @@ sealed interface ClientboundPacket {
     data class SessionInviteUpdated(
         @SerialName("invite_id") val inviteId: Int,
         val status: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyUpdated")
+    data class PartyUpdated(val party: Party) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyMemberStateChanged")
+    data class PartyMemberStateChanged(
+        @SerialName("party_id") val partyId: String,
+        val player: String,
+        val state: MemberState,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyLeft")
+    data class PartyLeft(
+        @SerialName("party_id") val partyId: String,
+        val reason: PartyLeftReason,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyInviteReceived")
+    data class PartyInviteReceived(val invite: PartyInvite) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyInviteUpdated")
+    data class PartyInviteUpdated(
+        @SerialName("invite_id") val inviteId: String,
+        val status: PartyInviteStatus,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayTogetherStarted")
+    data class PlayTogetherStarted(
+        val id: String,
+        @SerialName("party_id") val partyId: String,
+        val leader: String,
+        val destination: PlayDestination,
+        @SerialName("starts_at") val startsAt: String,
+        @SerialName("session_id") val sessionId: String? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayTogetherUpdated")
+    data class PlayTogetherUpdated(
+        val id: String,
+        val player: String,
+        val response: PlayResponse,
+        val reason: PlayReason? = null,
+        @SerialName("session_id") val sessionId: String? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayTogetherEnded")
+    data class PlayTogetherEnded(
+        val id: String,
+        val reason: PlayEndReason,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinRequested")
+    data class HostedJoinRequested(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val player: String,
+        @SerialName("expires_at") val expiresAt: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinRequestSent")
+    data class HostedJoinRequestSent(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val host: String,
+        @SerialName("expires_at") val expiresAt: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("HostedJoinResolved")
+    data class HostedJoinResolved(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("session_id") val sessionId: String,
+        val result: HostedJoinResult,
+        @SerialName("invite_id") val inviteId: Int? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPing")
+    data class PartyPing(
+        val from: String,
+        @SerialName("sent_at") val sentAt: Long,
+        val id: String,
+        val server: String,
+        val dimension: String,
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val kind: PingKind,
+        val target: PingTarget? = null,
+        val label: String? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPingCleared")
+    data class PartyPingCleared(
+        val id: String,
+        val from: String,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PartyPingReply")
+    data class PartyPingReply(
+        val id: String,
+        val owner: String,
+        val from: String,
+        val reply: PingReply,
+        @SerialName("sent_at") val sentAt: Long,
     ) : ClientboundPacket
 }

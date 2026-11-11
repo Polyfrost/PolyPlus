@@ -10,6 +10,7 @@ import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,10 +31,12 @@ object FeaturedServers {
     private val logger = LogManager.getLogger("PolyPlus/FeaturedServers")
     private val lock = Any()
     private val refreshing = AtomicBoolean(false)
+    private val lastAttemptMillis = AtomicLong(0L)
     private val _state = MutableStateFlow(FeaturedServersSnapshot())
+    @Volatile
     private var loaded = false
-    private var revision = 0L
-    private var lastAttemptMillis = 0L
+    @Volatile
+    private var committed = FeaturedServersSnapshot()
     private var expiryJob: Job? = null
 
     @JvmField
@@ -54,15 +58,16 @@ object FeaturedServers {
     fun applyConsent() {
         ensureLoaded()
         if (!PrivacyConsent.allowsOnlineServices()) {
-            synchronized(lock) {
+            val snapshot = synchronized(lock) {
                 expiryJob?.cancel()
-                publishLocked(
+                commitLocked(
                     emptyList(),
                     0L,
-                    _state.value.mainMenuDismissedCampaignIds,
-                    _state.value.multiplayerDismissedCampaignIds,
+                    committed.mainMenuDismissedCampaignIds,
+                    committed.multiplayerDismissedCampaignIds,
                 )
             }
+            publish(snapshot)
             return
         }
         restoreCache()
@@ -74,9 +79,10 @@ object FeaturedServers {
         ensureLoaded()
         if (!PrivacyConsent.allowsOnlineServices()) return
         val now = System.currentTimeMillis()
-        synchronized(lock) {
-            if (!FeaturedServerCachePolicy.shouldRefresh(lastAttemptMillis, now, force)) return
-            lastAttemptMillis = now
+        while (true) {
+            val previous = lastAttemptMillis.get()
+            if (!FeaturedServerCachePolicy.shouldRefresh(previous, now, force)) return
+            if (lastAttemptMillis.compareAndSet(previous, now)) break
         }
         if (!refreshing.compareAndSet(false, true)) return
 
@@ -86,16 +92,17 @@ object FeaturedServers {
                 require(body.toByteArray(Charsets.UTF_8).size <= MAX_CATALOG_BYTES) { "catalog exceeds 1 MiB" }
                 val decoded = FeaturedServerCatalogCodec.decode(body)
                 decoded.warnings.forEach { logger.warn(it) }
-                if (!PrivacyConsent.allowsOnlineServices()) return@launch
                 val fetchedAt = System.currentTimeMillis()
-                synchronized(lock) {
-                    publishLocked(
+                val snapshot = synchronized(lock) {
+                    if (!PrivacyConsent.allowsOnlineServices()) return@launch
+                    commitLocked(
                         decoded.servers,
                         FeaturedServerCachePolicy.expiresAt(fetchedAt),
-                        _state.value.mainMenuDismissedCampaignIds,
-                        _state.value.multiplayerDismissedCampaignIds,
+                        committed.mainMenuDismissedCampaignIds,
+                        committed.multiplayerDismissedCampaignIds,
                     )
                 }
+                publish(snapshot)
                 persistCache(CacheEnvelope(fetchedAt, body))
             } catch (e: CancellationException) {
                 throw e
@@ -111,18 +118,21 @@ object FeaturedServers {
     fun dismissMainMenu(campaignId: String) {
         if (campaignId.isBlank()) return
         ensureLoaded()
-        synchronized(lock) {
-            if (campaignId in _state.value.mainMenuDismissedCampaignIds) return
-            if (!_state.value.isMainMenuDismissible(campaignId)) return
-            val mainMenuDismissed = _state.value.mainMenuDismissedCampaignIds + campaignId
-            publishLocked(
-                _state.value.servers,
-                _state.value.expiresAtMillis,
+        val snapshot = synchronized(lock) {
+            val current = committed
+            if (campaignId in current.mainMenuDismissedCampaignIds) return
+            if (!current.isMainMenuDismissible(campaignId)) return
+            val mainMenuDismissed = current.mainMenuDismissedCampaignIds + campaignId
+            val next = commitLocked(
+                current.servers,
+                current.expiresAtMillis,
                 mainMenuDismissed,
-                _state.value.multiplayerDismissedCampaignIds,
+                current.multiplayerDismissedCampaignIds,
             )
-            persistDismissals(Dismissals(mainMenuDismissed, _state.value.multiplayerDismissedCampaignIds))
+            persistDismissals(Dismissals(mainMenuDismissed, current.multiplayerDismissedCampaignIds))
+            next
         }
+        publish(snapshot)
     }
 
     @JvmStatic
@@ -130,35 +140,41 @@ object FeaturedServers {
     fun dismissMultiplayer(campaignId: String, force: Boolean = false) {
         if (campaignId.isBlank()) return
         ensureLoaded()
-        synchronized(lock) {
-            if (campaignId in _state.value.multiplayerDismissedCampaignIds) return
-            if (!force && !_state.value.isMultiplayerDismissible(campaignId)) return
-            val multiplayerDismissed = _state.value.multiplayerDismissedCampaignIds + campaignId
-            publishLocked(
-                _state.value.servers,
-                _state.value.expiresAtMillis,
-                _state.value.mainMenuDismissedCampaignIds,
+        val snapshot = synchronized(lock) {
+            val current = committed
+            if (campaignId in current.multiplayerDismissedCampaignIds) return
+            if (!force && !current.isMultiplayerDismissible(campaignId)) return
+            val multiplayerDismissed = current.multiplayerDismissedCampaignIds + campaignId
+            val next = commitLocked(
+                current.servers,
+                current.expiresAtMillis,
+                current.mainMenuDismissedCampaignIds,
                 multiplayerDismissed,
             )
-            persistDismissals(Dismissals(_state.value.mainMenuDismissedCampaignIds, multiplayerDismissed))
+            persistDismissals(Dismissals(current.mainMenuDismissedCampaignIds, multiplayerDismissed))
+            next
         }
+        publish(snapshot)
     }
 
     @JvmStatic
     fun restoreMultiplayer(campaignId: String) {
         if (campaignId.isBlank()) return
         ensureLoaded()
-        synchronized(lock) {
-            if (campaignId !in _state.value.multiplayerDismissedCampaignIds) return
-            val multiplayerDismissed = _state.value.multiplayerDismissedCampaignIds - campaignId
-            publishLocked(
-                _state.value.servers,
-                _state.value.expiresAtMillis,
-                _state.value.mainMenuDismissedCampaignIds,
+        val snapshot = synchronized(lock) {
+            val current = committed
+            if (campaignId !in current.multiplayerDismissedCampaignIds) return
+            val multiplayerDismissed = current.multiplayerDismissedCampaignIds - campaignId
+            val next = commitLocked(
+                current.servers,
+                current.expiresAtMillis,
+                current.mainMenuDismissedCampaignIds,
                 multiplayerDismissed,
             )
-            persistDismissals(Dismissals(_state.value.mainMenuDismissedCampaignIds, multiplayerDismissed))
+            persistDismissals(Dismissals(current.mainMenuDismissedCampaignIds, multiplayerDismissed))
+            next
         }
+        publish(snapshot)
     }
 
     @JvmStatic
@@ -185,28 +201,31 @@ object FeaturedServers {
     @JvmStatic
     fun snapshot(): FeaturedServersSnapshot {
         ensureLoaded()
-        return _state.value
+        return committed
     }
 
     @JvmStatic
     fun revision(): Long = snapshot().revision
 
     private fun ensureLoaded() {
-        synchronized(lock) {
+        if (loaded) return
+        val initial = synchronized(lock) {
             if (loaded) return
-            loaded = true
             val dismissals = runCatching {
                 dismissalFile.takeIf(File::isFile)?.readText()?.let {
                     PolyPlusClient.JSON.decodeFromString(Dismissals.serializer(), it)
                 }
             }.getOrNull() ?: Dismissals()
-            publishLocked(
+            val first = commitLocked(
                 emptyList(),
                 0L,
                 dismissals.mainMenuCampaignIds,
                 dismissals.multiplayerCampaignIds,
             )
+            loaded = true
+            first
         }
+        publish(initial)
         if (PrivacyConsent.allowsOnlineServices()) restoreCache()
     }
 
@@ -222,50 +241,56 @@ object FeaturedServers {
             .onFailure { logger.warn("Ignoring invalid featured-server cache", it) }
             .getOrNull() ?: return
         decoded.warnings.forEach { logger.warn(it) }
-        synchronized(lock) {
-            publishLocked(
+        val snapshot = synchronized(lock) {
+            commitLocked(
                 decoded.servers,
                 expiresAt,
-                _state.value.mainMenuDismissedCampaignIds,
-                _state.value.multiplayerDismissedCampaignIds,
+                committed.mainMenuDismissedCampaignIds,
+                committed.multiplayerDismissedCampaignIds,
             )
         }
+        publish(snapshot)
     }
 
-    private fun publishLocked(
+    private fun publish(snapshot: FeaturedServersSnapshot) {
+        _state.update { current -> if (snapshot.revision > current.revision) snapshot else current }
+    }
+
+    private fun commitLocked(
         servers: List<FeaturedServer>,
         expiresAtMillis: Long,
         mainMenuDismissed: Set<String>,
         multiplayerDismissed: Set<String>,
-    ) {
-        revision++
-        _state.value = FeaturedServersSnapshot(
+    ): FeaturedServersSnapshot {
+        val snapshot = FeaturedServersSnapshot(
             servers.toList(),
             mainMenuDismissed.toSet(),
             multiplayerDismissed.toSet(),
             expiresAtMillis,
-            revision,
+            committed.revision + 1,
         )
+        committed = snapshot
         expiryJob?.cancel()
         val delayMillis = expiresAtMillis - System.currentTimeMillis()
         if (servers.isNotEmpty() && delayMillis > 0) {
             val expectedExpiry = expiresAtMillis
             expiryJob = PolyPlusClient.SCOPE.launch {
                 delay(delayMillis)
-                synchronized(lock) {
-                    if (_state.value.expiresAtMillis == expectedExpiry) {
-                        publishLocked(
-                            emptyList(),
-                            0L,
-                            _state.value.mainMenuDismissedCampaignIds,
-                            _state.value.multiplayerDismissedCampaignIds,
-                        )
-                    }
+                val expired = synchronized(lock) {
+                    if (committed.expiresAtMillis != expectedExpiry) return@synchronized null
+                    commitLocked(
+                        emptyList(),
+                        0L,
+                        committed.mainMenuDismissedCampaignIds,
+                        committed.multiplayerDismissedCampaignIds,
+                    )
                 }
+                if (expired != null) publish(expired)
             }
         } else {
             expiryJob = null
         }
+        return snapshot
     }
 
     private fun persistCache(envelope: CacheEnvelope) = runCatching {

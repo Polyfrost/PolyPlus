@@ -35,6 +35,10 @@ object CoverImageCache {
 
     fun cached(assetId: Int): ImageBitmap? = cache[assetId]
 
+    fun put(assetId: Int, image: ImageBitmap) {
+        cache[assetId] = image
+    }
+
     suspend fun get(assetId: Int): ImageBitmap? {
         cache[assetId]?.let { return it }
         if ((retryAt[assetId] ?: 0L) > System.currentTimeMillis()) return null

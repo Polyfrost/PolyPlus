@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.rotateBy
 import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandle
@@ -27,6 +28,12 @@ import java.lang.invoke.MethodType
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
+//? if >= 1.21.8
+import org.polyfrost.polyplus.mixin.client.access.LightingInvoker
+//? if < 1.21.10
+/*import org.polyfrost.polyplus.client.lobby.LobbyPipelines*/
+//? if < 26.2 && > 1.8.9
+/*import org.joml.Vector3f*/
 //? if >= 26.3 {
 import com.mojang.renderpearl.api.GpuFormat
 import com.mojang.renderpearl.api.buffers.GpuBuffer
@@ -216,6 +223,12 @@ object PlayerPreviewRenderer {
     @JvmStatic
     fun isDirectPreview(): Boolean = directPreview
 
+    @Volatile
+    private var buildingLevel = false
+
+    @JvmStatic
+    fun isBuildingLevel(): Boolean = buildingLevel
+
     //? if >= 1.21.10 {
     @Volatile
     private var previewCape: Identifier? = null
@@ -323,10 +336,7 @@ object PlayerPreviewRenderer {
         return (if (s > 255) 255 else s).toByte()
     }
 
-    internal fun smooth(t: Float): Float {
-        val c = t.coerceIn(0f, 1f)
-        return c * c * c * (c * (c * 6f - 15f) + 10f)
-    }
+    internal fun smooth(t: Float): Float = Easing.smootherstep(t)
 
     private fun toImageBitmap(data: ByteBuffer, w: Int, h: Int, pixelSize: Int): ImageBitmap {
         val out = ByteArray(w * h * 4)
@@ -373,6 +383,8 @@ object PlayerPreviewRenderer {
     }
 
     private var target: TextureTarget? = null
+    private var poseTiltDeg = 0f
+    private var poseLights: PreviewLights? = null
     //? if >= 26.3 {
     private var passColorView: GpuTextureView? = null
     private var passDepthView: GpuTextureView? = null
@@ -395,6 +407,9 @@ object PlayerPreviewRenderer {
     //?}
     private var dummy: AbstractClientPlayer? = null
     private var dummyProfileId: UUID? = null
+
+    @JvmStatic
+    fun isPreviewEntity(entity: Any?): Boolean = entity != null && entity === dummy
     //? if < 26.1 {
     /*private val projection by lazy { CachedOrthoProjectionMatrixBuffer("polyplus_preview", -1000f, 1000f, true) }
     *///?}
@@ -433,8 +448,23 @@ object PlayerPreviewRenderer {
         readback(colorTex, w, h, key)
     }
 
-    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
+    //? if < 1.21.10 {
+    /*fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
+        LobbyPipelines.previewing = true
+        try {
+            return drawInto(fbo, source, yawDeg, pitchDeg, w, h, modelScale, verticalAnchor, cameraTiltDeg, lights)
+        } finally {
+            LobbyPipelines.previewing = false
+        }
+    }
+
+    private fun drawInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float, lights: PreviewLights?): Boolean {
+    *///?} else {
+    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, pitchDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
+    //?}
         val mc = Minecraft.getInstance()
+        poseTiltDeg = cameraTiltDeg
+        poseLights = lights
         val colorTex = fbo.colorTexture ?: return false
         val depthTex = fbo.depthTexture ?: return false
         val colorView = fbo.colorTextureView ?: return false
@@ -532,11 +562,24 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
+        if (poseTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(poseTiltDeg.toDouble()).toFloat()))
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
         return pose
     }
 
     private fun setupUiLighting(mc: Minecraft) {
+        val lights = poseLights
+        if (lights != null) {
+            //? if >= 26.2 {
+            val lighting = mc.gameRenderer.lighting()
+            (lighting as LightingInvoker).`polyplus$updateBuffer`(Lighting.Entry.LEVEL, lights.key, lights.fill)
+            //?} else {
+            /*val lighting = mc.gameRenderer.lighting
+            (lighting as LightingInvoker).`polyplus$updateBuffer`(Lighting.Entry.LEVEL, Vector3f(lights.key), Vector3f(lights.fill))
+            *///?}
+            lighting.setupFor(Lighting.Entry.LEVEL)
+            return
+        }
         //? if >= 26.2 {
         mc.gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI)
         //?} else {
@@ -940,14 +983,16 @@ object PlayerPreviewRenderer {
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let {
                 CosmeticAssetCache.getCapeResource(it)
-            } ?: MojangCapeService.localCapeTexture()
+            } ?: MojangCapeService.localCapeTexture()?.takeIf { mojangCapeChosen() }
     }
 
     private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
         is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
         PlayerPreviewSource.LocalLive ->
-            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden()
+            CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden() && mojangCapeChosen()
     }
+
+    private fun mojangCapeChosen(): Boolean = MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())
 
     //? if >= 1.21.10 {
     private fun withCape(skin: PlayerSkin, cape: Identifier): PlayerSkin =
@@ -1007,7 +1052,9 @@ object PlayerPreviewRenderer {
 
         fun level(): ClientLevel? {
             cached?.let { return it }
+            buildingLevel = true
             return runCatching { build() }
+                .also { buildingLevel = false }
                 .onFailure { LEGACY_LOG.error("[preview] standalone level build failed", it) }
                 .getOrNull()?.also { cached = it }
         }
@@ -1180,7 +1227,7 @@ object PlayerPreviewRenderer {
     }
     //?}
 
-    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float): Boolean {
+    fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
         val mc = Minecraft.getInstance()
 
         //? if >= 1.21.4 {
@@ -1251,19 +1298,22 @@ object PlayerPreviewRenderer {
         pose.translate(w / 2f, h * verticalAnchor, 0f)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
+        if (cameraTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(cameraTiltDeg.toDouble()).toFloat()))
         pose.rotateBy(Quaternionf().rotateZ(Math.PI.toFloat()))
 
         Lighting.setupForEntityInInventory()
+        lights?.let { RenderSystem.setShaderLights(Vector3f(it.key), Vector3f(it.fill)) }
         val dispatcher = mc.entityRenderDispatcher
-        dispatcher.setRenderShadow(false)
-        val bufferSource = mc.renderBuffers().bufferSource()
         //? if < 1.21.4 {
         /*val prevCamera = dispatcher.camera
         *///?}
         val realMainTarget = mc.mainRenderTarget
-        (mc as MinecraftAccessor)
-            .`polyplus$setMainRenderTarget`(fbo)
         try {
+            LobbyPipelines.previewing = true
+            dispatcher.setRenderShadow(false)
+            val bufferSource = mc.renderBuffers().bufferSource()
+            (mc as MinecraftAccessor)
+                .`polyplus$setMainRenderTarget`(fbo)
             //? if >= 1.21.4 {
             renderer.render(state, pose, bufferSource, 0xF000F0)
             //?}
@@ -1277,6 +1327,7 @@ object PlayerPreviewRenderer {
             //fbo.bindWrite(true)
             bufferSource.endBatch()
         } finally {
+            LobbyPipelines.previewing = false
             (mc as MinecraftAccessor)
                 .`polyplus$setMainRenderTarget`(realMainTarget)
             dispatcher.setRenderShadow(true)
@@ -1347,14 +1398,12 @@ object PlayerPreviewRenderer {
 /*import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import net.minecraft.client.Minecraft
-import net.minecraft.client.render.vertex.Tesselator
 import net.minecraft.client.render.model.Model
 import net.minecraft.client.render.model.entity.PlayerModel
 import net.minecraft.client.render.pipeline.RenderTarget
 import net.minecraft.client.render.platform.GLX
 import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.client.render.platform.Lighting
-import net.minecraft.client.render.vertex.DefaultVertexFormat
 import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.resources.Identifier
 import com.mojang.authlib.minecraft.MinecraftProfileTexture
@@ -1369,6 +1418,7 @@ import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
 import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.rotateBy
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
@@ -1448,10 +1498,7 @@ object PlayerPreviewRenderer {
         if (t != null) ClientPlatform.runOnMain { runCatching { t.destroyBuffers() } }
     }
 
-    internal fun smooth(t: Float): Float {
-        val c = t.coerceIn(0f, 1f)
-        return c * c * c * (c * (c * 6f - 15f) + 10f)
-    }
+    internal fun smooth(t: Float): Float = Easing.smootherstep(t)
 
     private fun fadeAlpha(tx: Float, ty: Float, fadeEdges: Boolean, bottomFade: Float): Float {
         var a = 1f
@@ -1668,10 +1715,12 @@ object PlayerPreviewRenderer {
             else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
-                ?: MojangCapeService.localCapeTexture()
-                ?: if (MojangCapeService.localCapeHidden()) null
-                else mc.player?.capeTextureLocation ?: optifineCape(mc) ?: accountCape(mc)
+                ?: if (!MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())) playerCape(mc)
+                else MojangCapeService.localCapeTexture()
+                    ?: if (MojangCapeService.localCapeHidden()) null else playerCape(mc)
     }
+
+    private fun playerCape(mc: Minecraft): Identifier? = mc.player?.capeTextureLocation ?: optifineCape(mc) ?: accountCape(mc)
 
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
         is PlayerPreviewSource.Override -> source.equipment

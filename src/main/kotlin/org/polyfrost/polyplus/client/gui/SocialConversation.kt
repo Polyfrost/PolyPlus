@@ -10,122 +10,72 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
+import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialTimeline
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
-import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
-import org.polyfrost.polyplus.client.social.SocialErrors
-import org.polyfrost.polyplus.client.social.SpecialChatRepository
+import org.polyfrost.polyplus.client.social.SocialOverlay
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+
+private const val CHAT_VISIBILITY_POLL_MILLIS = 250L
+
+private val TimelineBottomSlop = 12.dp
+
+internal val LocalComposerFocus = staticCompositionLocalOf<FocusRequester?> { null }
 
 @Composable
-internal fun ConversationView(
-    group: GroupSummary,
-    selfId: String,
-    messages: List<GroupMessage>,
-    incomingInvites: List<SessionInvite>,
-    mutedGroups: Set<Int>,
-    renameOverrides: Map<Int, String>,
-    onToggleMute: (Int) -> Unit,
-    onRename: (Int, String) -> Unit,
-    onInviteToGroup: () -> Unit,
-    onLeaveGroup: () -> Unit,
-) {
-    val title = renameOverrides[group.id] ?: conversationDisplayTitle(group, selfId)
-    val invitesShownInline = messages.mapNotNull { it.sessionInvite?.id }.toSet()
-    val relevantInvites = incomingInvites.filter {
-        it.sender in group.members && it.id !in invitesShownInline && it.status == "pending"
-    }
-    val specialStatus by SpecialChatRepository.status.collectAsState()
-    val isSpecialGroup = specialStatus?.groupId == group.id
-    val canConvertToNormal = group.special && specialStatus?.isSpecialChatTarget == true
-
-    val latestMessageId = messages.lastOrNull { !GroupsRepository.isPending(it.id) }?.id
-    LaunchedEffect(group.id, latestMessageId) {
-        if (latestMessageId != null) GroupsRepository.markRead(group.id, latestMessageId)
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        ConversationHeader(
-            group = group,
-            title = title,
-            selfId = selfId,
-            muted = group.id in mutedGroups,
-            canConvertToNormal = canConvertToNormal,
-            onToggleMute = { onToggleMute(group.id) },
-            onRename = { onRename(group.id, it) },
-            onInvite = onInviteToGroup,
-            onLeave = onLeaveGroup,
-            onInviteToSession = {
-                val sessionId = P2PSessionManager.currentSessionId
-                if (sessionId == null) {
-                    SocialErrors.emit("Host a world first to invite people to your session")
-                } else {
-                    val invited = group.members.filterNot { it == selfId }
-                    invited.forEach { member -> SessionsRepository.invite(sessionId, member) }
-                    SocialErrors.emit("Invited the group to your session")
-                }
-            },
-            onConvertToNormal = { GroupsRepository.claimSpecialChatGroup(group.id) },
-        )
-        Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-        relevantInvites.forEach { invite -> WorldInviteBanner(invite) }
-        MessageTimeline(Modifier.weight(1f), messages, selfId, group.id, incomingInvites, isGroup = group.kind == GroupKind.Group)
-
-        val cooldownRemaining = (if (isSpecialGroup) specialStatus?.cooldownUntil else null)
-            ?.let { rememberCooldownRemaining(it) } ?: 0L
-        MessageComposer(
-            placeholder = "Message ${title}...",
-            disabledReason = if (cooldownRemaining > 0) "Next Special Chat message available in ${formatCooldown(cooldownRemaining)}" else null,
-        ) { content ->
-            GroupsRepository.sendMessage(group.id, content)
-            if (isSpecialGroup) SpecialChatRepository.refreshTargets()
-        }
-    }
-}
-
-@Composable
-private fun rememberCooldownRemaining(cooldownUntil: String): Long {
+internal fun rememberCooldownRemaining(cooldownUntil: String): Long {
     var remaining by remember(cooldownUntil) { mutableStateOf(secondsUntil(cooldownUntil)) }
     LaunchedEffect(cooldownUntil) {
         while (true) {
@@ -141,7 +91,7 @@ private fun secondsUntil(instant: String): Long = runCatching {
     Duration.between(Instant.now(), Instant.parse(instant)).seconds
 }.getOrDefault(0L).coerceAtLeast(0L)
 
-private fun formatCooldown(totalSeconds: Long): String {
+internal fun formatCooldown(totalSeconds: Long): String {
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     return when {
@@ -152,7 +102,7 @@ private fun formatCooldown(totalSeconds: Long): String {
 }
 
 @Composable
-private fun WorldInviteBanner(invite: SessionInvite) {
+internal fun WorldInviteBanner(invite: SessionInvite) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -169,90 +119,16 @@ private fun WorldInviteBanner(invite: SessionInvite) {
             SocialText("${PlayerNamesRepository.displayName(invite.sender)} invited you to their world", fontSize = 13.sp)
             SocialText("Session invite", fontSize = 11.sp, color = SocialTextSecondary)
         }
-        SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(invite) })
-        SocialButton("Join", icon = SOCIAL_ASSETS + "log-in-04.svg", filled = true, modifier = Modifier.height(34.dp), onClick = { SessionsRepository.accept(invite) })
+        TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(invite) }
+        TextButton("Join", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), Modifier.height(34.dp), ButtonStyle.Primary, true) { SessionsRepository.accept(invite) }
     }
 }
 
 @Composable
-private fun ConversationHeader(
-    group: GroupSummary,
-    title: String,
-    selfId: String,
-    muted: Boolean,
-    canConvertToNormal: Boolean,
-    onToggleMute: () -> Unit,
-    onRename: (String) -> Unit,
-    onInvite: () -> Unit,
-    onLeave: () -> Unit,
-    onInviteToSession: () -> Unit,
-    onConvertToNormal: () -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    var renaming by remember { mutableStateOf(false) }
-    var renameValue by remember { mutableStateOf(title) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (group.kind == GroupKind.Group) {
-            SocialGroupAvatar(group.members.filterNot { it == selfId }, 34.dp, ringColor = SocialWindowBackground)
-        } else {
-            val other = group.members.firstOrNull { it != selfId } ?: selfId
-            SocialAvatar(other, 34.dp)
-        }
-
-        if (renaming) {
-            SocialTextField(
-                value = renameValue,
-                onValueChange = { renameValue = it },
-                modifier = Modifier.weight(1f),
-                placeholder = "Group name",
-                onSubmit = { renaming = false; if (renameValue.isNotBlank()) onRename(renameValue.trim()) },
-            )
-        } else {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                SocialText(title, fontSize = 16.sp, maxLines = 1)
-            }
-        }
-
-        if (muted) Icon(SOCIAL_ASSETS + "volume-x.svg", SocialTextSecondary, Modifier.size(16.dp))
-
-        if (group.kind == GroupKind.Group) {
-            Box {
-                SocialIconButton(SOCIAL_ASSETS + "dots-vertical.svg", tooltip = "Group options", onClick = { menuOpen = !menuOpen })
-                if (menuOpen) {
-                    Popup(
-                        alignment = Alignment.TopEnd,
-                        offset = IntOffset(0, 44),
-                        onDismissRequest = { menuOpen = false },
-                        properties = PopupProperties(focusable = true),
-                    ) {
-                        GroupOverflowMenu(
-                            onInvite = { menuOpen = false; onInvite() },
-                            onInviteToSession = { menuOpen = false; onInviteToSession() },
-                            onRename = { menuOpen = false; renameValue = title; renaming = true },
-                            onMute = { menuOpen = false; onToggleMute() },
-                            onLeave = { menuOpen = false; onLeave() },
-                            onConvertToNormal = { menuOpen = false; onConvertToNormal() },
-                            muted = muted,
-                            canConvertToNormal = canConvertToNormal,
-                            canLeave = !group.special,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GroupOverflowMenu(
+internal fun GroupOverflowMenu(
     onInvite: () -> Unit,
     onInviteToSession: () -> Unit,
-    onRename: () -> Unit,
+    onRename: (() -> Unit)?,
     onMute: () -> Unit,
     onLeave: () -> Unit,
     onConvertToNormal: () -> Unit,
@@ -260,30 +136,22 @@ private fun GroupOverflowMenu(
     canConvertToNormal: Boolean,
     canLeave: Boolean,
 ) {
-    Column(
-        modifier = Modifier
-            .width(200.dp)
-            .clip(SocialPanelShape)
-            .background(SocialPopupBackground)
-            .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        SocialMenuItem(icon = SOCIAL_ASSETS + "user-plus-01.svg", label = "Invite Friends", height = 34.dp, onClick = onInvite)
-        SocialMenuItem(icon = SOCIAL_ASSETS + "log-in-04.svg", label = "Invite Group to Session", height = 34.dp, onClick = onInviteToSession)
-        SocialMenuItem(icon = SOCIAL_ASSETS + "edit-02.svg", label = "Rename Group", height = 34.dp, onClick = onRename)
-        SocialMenuItem(icon = SOCIAL_ASSETS + "volume-x.svg", label = if (muted) "Unmute Group" else "Mute Group", height = 34.dp, onClick = onMute)
+    MenuSurface(Modifier.width(200.dp)) {
+        MenuItem("Invite Friends", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInvite)
+        MenuItem("Invite Group to Session", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInviteToSession)
+        if (onRename != null) MenuItem("Rename Group", themedIcon(SOCIAL_ASSETS + "edit-02.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onRename)
+        MenuItem(if (muted) "Unmute Group" else "Mute Group", themedIcon(SOCIAL_ASSETS + "volume-x.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onMute)
         if (canConvertToNormal) {
-            SocialMenuItem(icon = SOCIAL_ASSETS + "check.svg", label = "Convert to Normal Chat", height = 34.dp, onClick = onConvertToNormal)
+            MenuItem("Convert to Normal Chat", themedIcon(SOCIAL_ASSETS + "check.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onConvertToNormal)
         }
         if (canLeave) {
-            SocialMenuItem(icon = SOCIAL_ASSETS + "x-close.svg", label = "Leave Group", color = SocialDangerColor, height = 34.dp, onClick = onLeave)
+            MenuItem("Leave Group", themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, MenuItemSize.Regular, true, false, true, null, Modifier, null, onLeave)
         }
     }
 }
 
 @Composable
-private fun MessageTimeline(
+internal fun MessageTimeline(
     modifier: Modifier,
     messages: List<GroupMessage>,
     selfId: String,
@@ -298,16 +166,27 @@ private fun MessageTimeline(
         return
     }
     val scrollState = remember(conversationId) { ScrollState(0) }
-    var contentHeight by remember(conversationId) { mutableStateOf(0) }
-    LaunchedEffect(conversationId, contentHeight) {
-        scrollState.scrollTo(scrollState.maxValue)
+    var pinned by remember(conversationId) { mutableStateOf(true) }
+    val bottomSlop = with(LocalDensity.current) { TimelineBottomSlop.roundToPx() }
+    val maxScroll = scrollState.maxValue
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.value }.drop(1).collect { value ->
+            pinned = value >= scrollState.maxValue - bottomSlop
+        }
     }
+    LaunchedEffect(conversationId, maxScroll) {
+        if (pinned || scrollState.value >= maxScroll - bottomSlop) {
+            pinned = true
+            scrollState.scrollTo(maxScroll)
+        }
+    }
+    ConversationReadEffect(conversationId, messages, pinned)
+    val flat = LocalSocialLook.current.timeline == SocialTimeline.Rows
     Column(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .onSizeChanged { contentHeight = it.height },
+            .padding(horizontal = if (flat) 24.dp else 16.dp, vertical = if (flat) 16.dp else 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         var lastDate: String? = null
@@ -315,20 +194,49 @@ private fun MessageTimeline(
         messages.forEach { message ->
             val date = dateSeparatorFor(message.sentAt)
             if (date != lastDate) {
-                DateSeparator(date)
+                if (flat) DayLabel(message.sentAt) else DateSeparator(date)
                 lastDate = date
                 lastSender = null
             }
-            MessageBubble(
-                message,
-                outgoing = message.sender == selfId,
-                incomingInvites = incomingInvites,
-                showSenderGutter = isGroup && message.sender != selfId,
-                showSender = message.sender != lastSender,
-            )
+            if (flat) {
+                MessageRow(message, message.sender == selfId, incomingInvites, showSender = message.sender != lastSender)
+            } else {
+                MessageBubble(
+                    message,
+                    outgoing = message.sender == selfId,
+                    incomingInvites = incomingInvites,
+                    showSenderGutter = isGroup && message.sender != selfId,
+                    showSender = message.sender != lastSender,
+                )
+            }
             lastSender = message.sender
         }
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+internal fun ConversationReadEffect(groupId: Int, messages: List<GroupMessage>, atLatest: Boolean) {
+    val showing by produceState(false) {
+        while (true) {
+            value = SocialOverlay.showsChat()
+            delay(CHAT_VISIBILITY_POLL_MILLIS)
+        }
+    }
+    val groups by GroupsRepository.groups.collectAsState()
+    val seen = atLatest && showing
+    val latest = messages.lastOrNull { !GroupsRepository.isPending(it.id) }?.id
+    val unread = groups.any { it.id == groupId && it.unread }
+    DisposableEffect(groupId) {
+        GroupsRepository.conversationShown(groupId)
+        onDispose { GroupsRepository.conversationHidden(groupId) }
+    }
+    DisposableEffect(groupId, seen) {
+        if (seen) GroupsRepository.readingStarted(groupId)
+        onDispose { if (seen) GroupsRepository.readingStopped(groupId) }
+    }
+    LaunchedEffect(groupId, seen, latest, unread) {
+        if (seen && latest != null) GroupsRepository.markRead(groupId, latest)
     }
 }
 
@@ -342,6 +250,44 @@ private fun DateSeparator(date: String) {
         Box(Modifier.weight(1f).height(1.dp).background(SocialBorderColor))
         SocialText(date, fontSize = 11.sp, color = SocialTextSecondary)
         Box(Modifier.weight(1f).height(1.dp).background(SocialBorderColor))
+    }
+}
+
+@Composable
+private fun DayLabel(sentAt: String) {
+    Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+        SocialText(dayLabelFor(sentAt), fontSize = 12.sp, color = SocialTextSecondary)
+    }
+}
+
+@Composable
+private fun MessageRow(message: GroupMessage, outgoing: Boolean, incomingInvites: List<SessionInvite>, showSender: Boolean) {
+    val invite = message.sessionInvite
+    if (invite != null) {
+        InviteMessageCard(message, invite, outgoing, incomingInvites)
+        return
+    }
+    val pending = GroupsRepository.isPending(message.id)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = if (showSender) 16.dp else 0.dp)
+            .graphicsLayer { alpha = if (pending) 0.55f else 1f },
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.width(32.dp)) {
+            if (showSender) SocialAvatar(message.sender, 32.dp)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (showSender) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SocialText(PlayerNamesRepository.displayName(message.sender), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    SocialText(if (pending) "Sending..." else clockFor(message.sentAt), fontSize = 12.sp, color = SocialTextSecondary)
+                }
+            }
+            SocialEmojiText(message.content, fontSize = 16.sp, color = SocialTextPrimary)
+        }
     }
 }
 
@@ -361,7 +307,7 @@ private fun MessageBubble(
 
     val pending = GroupsRepository.isPending(message.id)
     Row(
-        modifier = Modifier.fillMaxWidth().alpha(if (pending) 0.55f else 1f),
+        modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (pending) 0.55f else 1f },
         horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
@@ -441,14 +387,14 @@ private fun InviteMessageCard(
             )
         }
         if (!outgoing && live != null) {
-            SocialButton("Decline", modifier = Modifier.height(34.dp), onClick = { SessionsRepository.decline(live) })
-            SocialButton(
+            TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(live) }
+            TextButton(
                 if (live.status == "accepted") "Re-join" else "Join",
-                icon = SOCIAL_ASSETS + "log-in-04.svg",
-                filled = true,
-                modifier = Modifier.height(34.dp),
-                onClick = { SessionsRepository.accept(live) },
-            )
+                themedIcon(SOCIAL_ASSETS + "log-in-04.svg"),
+                Modifier.height(34.dp),
+                ButtonStyle.Primary,
+                true,
+            ) { SessionsRepository.accept(live) }
         }
     }
 }
@@ -457,48 +403,113 @@ private fun InviteMessageCard(
 internal fun MessageComposer(placeholder: String, disabledReason: String? = null, onSend: (String) -> Unit) {
     var value by remember { mutableStateOf("") }
     val disabled = disabledReason != null
+    val flat = LocalSocialLook.current.timeline == SocialTimeline.Rows
+    val ready = !disabled && value.isNotBlank()
     val trySend = {
         if (!disabled && value.isNotBlank()) {
             onSend(EmojiRegistry.toShortcodes(value.trim()))
             value = ""
         }
     }
+    val emoji: @Composable () -> Unit = {
+        EmojiPickerButton { alias ->
+            if (!disabled) {
+                val insert = ":$alias:"
+                if (value.length + insert.length <= 500) value += insert
+            }
+        }
+    }
+    val focus = LocalComposerFocus.current ?: remember { FocusRequester() }
     Column(Modifier.fillMaxWidth()) {
         if (disabledReason != null) {
-            SocialText(disabledReason, fontSize = 11.sp, color = SocialTextSecondary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            SocialText(disabledReason, fontSize = 11.sp, color = SocialTextSecondary, modifier = Modifier.padding(horizontal = if (flat) 24.dp else 12.dp, vertical = 4.dp))
+        }
+        if (flat) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
+                    .clip(SocialFieldShape)
+                    .background(SocialControlBackground)
+                    .border(SocialBorderWidth, SocialBorderColor, SocialFieldShape)
+                    .padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                emoji()
+                TextField(
+                    value = value,
+                    onValueChange = { if (!disabled) value = it },
+                    modifier = Modifier.weight(1f).height(34.dp).padding(start = 6.dp, end = 12.dp),
+                    placeholder = if (disabled) "Message unavailable" else placeholder,
+                    leadingIcon = null,
+                    maxLength = 500,
+                    invalid = false,
+                    enabled = true,
+                    singleLine = true,
+                    framed = false,
+                    fontSize = 14.sp,
+                    label = null,
+                    masked = false,
+                    focusRequester = focus,
+                    interactionSource = null,
+                    trailing = null,
+                    onSubmit = trySend,
+                )
+                IconButton(
+                    themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
+                    "Send",
+                    null,
+                    Modifier,
+                    if (disabled) null else OneConfigTheme.accent,
+                    if (disabled) SocialTextSecondary else OneConfigTheme.current.accentTextColor,
+                    TooltipPlacement.BelowStart,
+                    trySend,
+                )
+            }
+            return@Column
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SocialTextField(
+            TextField(
                 value = value,
                 onValueChange = { if (!disabled) value = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(38.dp),
                 placeholder = if (disabled) "Message unavailable" else placeholder,
-                leadingIcon = SOCIAL_ASSETS + "edit-02.svg",
+                leadingIcon = themedIcon(SOCIAL_ASSETS + "edit-02.svg"),
                 maxLength = 500,
+                invalid = false,
+                enabled = true,
+                singleLine = true,
+                framed = true,
+                fontSize = 14.sp,
+                label = null,
+                masked = false,
+                focusRequester = focus,
+                interactionSource = null,
+                trailing = null,
                 onSubmit = trySend,
             )
-            EmojiPickerButton { alias ->
-                if (!disabled) {
-                    val insert = ":$alias:"
-                    if (value.length + insert.length <= 500) value += insert
-                }
-            }
-            SocialIconButton(
-                SOCIAL_ASSETS + "chevron-right.svg",
-                background = if (!disabled && value.isNotBlank()) OneConfigTheme.accent.asSocialSelected else null,
-                tint = if (!disabled && value.isNotBlank()) OneConfigTheme.accent else SocialTextSecondary,
-                tooltip = "Send",
-                onClick = trySend,
+            emoji()
+            IconButton(
+                themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
+                "Send",
+                null,
+                Modifier,
+                if (ready) OneConfigTheme.accent.asSocialSelected else null,
+                if (ready) OneConfigTheme.accent else SocialTextSecondary,
+                TooltipPlacement.BelowStart,
+                trySend,
             )
         }
     }
 }
 
 internal inline fun conversationTitle(group: GroupSummary, selfId: String, nameOf: (String) -> String): String {
+    if (group.kind == GroupKind.Party) return "Party"
     if (group.kind == GroupKind.Group) {
         val name = group.name
         if (name != null) return name
@@ -515,16 +526,25 @@ internal inline fun conversationTitle(group: GroupSummary, selfId: String, nameO
     return nameOf(other)
 }
 
-@Composable
-internal fun conversationDisplayTitle(group: GroupSummary, selfId: String): String =
-    conversationTitle(group, selfId) { PlayerNamesRepository.displayName(it) }
-
 private fun dateSeparatorFor(sentAt: String): String = runCatching {
     val instant = Instant.parse(sentAt)
     DateTimeFormatter.ofPattern("MMM d, yyyy")
         .withZone(ZoneId.systemDefault())
         .format(instant)
 }.getOrDefault(sentAt.take(10))
+
+private fun dayLabelFor(sentAt: String): String = runCatching {
+    val sent = Instant.parse(sentAt).atZone(ZoneId.systemDefault())
+    when (ChronoUnit.DAYS.between(sent.toLocalDate(), LocalDate.now(sent.zone))) {
+        0L -> "Today"
+        1L -> "Yesterday"
+        else -> DateTimeFormatter.ofPattern("MMM d, yyyy").format(sent)
+    }
+}.getOrDefault(sentAt.take(10))
+
+private fun clockFor(sentAt: String): String = runCatching {
+    DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(sentAt))
+}.getOrDefault("")
 
 internal fun timeFor(sentAt: String): String = runCatching {
     val instant = Instant.parse(sentAt)

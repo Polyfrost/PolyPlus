@@ -5,18 +5,27 @@ import kotlinx.serialization.Serializable
 
 @Serializable(with = CosmeticType.Serializer::class)
 enum class CosmeticType(val serializedName: String, val displayName: String) {
-    Cape("cape", "Cape"),
+    Hat("hat", "Head"),
+    Glasses("glasses", "Face"),
     Backpack("backpack", "Back"),
-    Glasses("glasses", "Glasses"),
+    Cape("cape", "Capes"),
     Wings("wings", "Wings"),
-    Glove("glove", "Glove"),
-    Hat("hat", "Hat"),
+    Shoulder("shoulder", "Shoulders"),
+    Glove("glove", "Gloves"),
+    Boots("boots", "Feet"),
     Aura("aura", "Aura"),
-    Boots("boots", "Boots"),
-    Shoulder("shoulder", "Shoulder"),
     Pet("pet", "Pet"),
     Emote("emote", "Emote"),
     Unknown("unknown", "Unknown");
+
+    val searchTerms: List<String>
+        get() = when (this) {
+            Hat -> listOf(displayName, "Hat")
+            Glasses -> listOf(displayName, "Glasses")
+            Backpack -> listOf(displayName, "Backpack")
+            Boots -> listOf(displayName, "Boots")
+            else -> listOf(displayName)
+        }
 
     fun defaultSlot(): BodySlot? = when (this) {
         Cape -> BodySlot.Cape

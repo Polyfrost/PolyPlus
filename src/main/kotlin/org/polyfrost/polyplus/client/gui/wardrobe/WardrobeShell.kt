@@ -34,8 +34,6 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
-import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
-import org.polyfrost.polyplus.client.emotes.EmoteWheels
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
@@ -62,6 +60,7 @@ internal fun WardrobeShell(
     onRemoveFromCart: (String) -> Unit,
     onCheckout: () -> Unit,
     polyPlusAvailable: Boolean = true,
+    onConsent: () -> Unit = {},
 ) {
     val store = remember { WardrobeStoreData() }
     var storeReloadKey by remember { mutableIntStateOf(0) }
@@ -93,12 +92,7 @@ internal fun WardrobeShell(
     val mojangState = MojangCapeService.state
 
     val emoteKeybindWarning = remember(section) {
-        when {
-            section != WardrobeSection.Emotes || !polyPlusAvailable -> null
-            !EmoteWheelKeybind.isBound() -> "The emote wheel has no keybind yet, so it can't be opened in game."
-            else -> EmoteWheelKeybind.conflictingKeybindNames().takeIf { it.isNotEmpty() }
-                ?.let { "The emote wheel keybind is also used by ${it.joinToString()}." }
-        }
+        if (section == WardrobeSection.Emotes && polyPlusAvailable) emoteKeybindWarning() else null
     }
     LaunchedEffect(section) {
         if (!polyPlusAvailable) return@LaunchedEffect
@@ -116,14 +110,7 @@ internal fun WardrobeShell(
     val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, store.featuredLoading, store.failedTypes, store.featuredFailed, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
         buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
     }
-    val coverByVariant = remember(store.byType, store.popular, store.newest) {
-        val covers = HashMap<Int, Int>()
-        for (info in store.all) {
-            val cover = info.coverAssetId ?: continue
-            for (variant in info.variantList) covers.putIfAbsent(variant.id, cover)
-        }
-        covers
-    }
+    val coverByVariant = remember(store.byType, store.popular, store.newest) { store.coversByVariant() }
     val anchors = remember(entries) {
         entries.mapIndexedNotNull { index, entry ->
             (entry as? WardrobeEntry.Divider)?.takeIf { it.anchor }?.let { it.label to index }
@@ -191,22 +178,8 @@ internal fun WardrobeShell(
         rotationResets++
     }
     val addToWheel = { item: CosmeticUiItem ->
-        val wheel = EmoteWheels.activeIndex
-        val target = wheelSlot
-        val placed = if (target != null) {
-            EmoteWheels.assign(wheel, target, item.groupId)
-            target
-        } else {
-            EmoteWheels.addToFirstEmpty(wheel, item.groupId)
-        }
+        addEmoteToWheel(item, wheelSlot, onStatus)
         wheelSlot = null
-        onStatus(
-            if (placed == null) {
-                "Wheel ${wheel + 1} is full. Pick a slot to replace."
-            } else {
-                "Added ${item.name} to wheel ${wheel + 1}."
-            },
-        )
     }
 
     Row(modifier = Modifier.fillMaxSize().padding(horizontal = 25.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -256,6 +229,7 @@ internal fun WardrobeShell(
                     storeVariantPicks = storeVariantPicks,
                     mojangBusy = MojangCapeService.busy,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
+                    onConsent = onConsent,
                     coverFor = { item -> item.variants.firstNotNullOfOrNull { coverByVariant[it.id] } },
                     onOwned = { item ->
                         if (wheelMode && item.type == CosmeticType.Emote) {
@@ -425,7 +399,7 @@ internal fun WardrobeShell(
 }
 
 @Composable
-internal fun MinecraftCapesOnlyScreen() {
+internal fun MinecraftCapesOnlyScreen(onConsent: () -> Unit = {}) {
     var status by remember { mutableStateOf<String?>(null) }
     WardrobeShell(
         items = emptyList(),
@@ -447,6 +421,7 @@ internal fun MinecraftCapesOnlyScreen() {
         onRemoveFromCart = {},
         onCheckout = {},
         polyPlusAvailable = false,
+        onConsent = onConsent,
     )
 }
 

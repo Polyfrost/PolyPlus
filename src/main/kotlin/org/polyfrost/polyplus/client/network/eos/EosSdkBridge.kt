@@ -4,6 +4,7 @@ import gg.sona.eos.Eos
 import gg.sona.eos.EosClientCredentials
 import gg.sona.eos.EosInitializeOptions
 import gg.sona.eos.EosPlatform
+import gg.sona.eos.EosRtcOptions
 import gg.sona.eos.EosPlatformFlags
 import gg.sona.eos.EosPlatformOptions
 import gg.sona.eos.EosResult
@@ -48,7 +49,11 @@ class EosSdkBridge {
     @Volatile private var tickThread: Thread? = null
     @Volatile private var running = false
     @Volatile private var abandoned = false
+    @Volatile private var keepSdk = false
     private val starting = AtomicBoolean(false)
+
+    @Volatile var mode: EosMode? = null
+        private set
 
     private class PendingCall(val run: () -> Unit, val abandon: () -> Unit)
 
@@ -66,6 +71,7 @@ class EosSdkBridge {
     private data class StateHandlerEntry(val handle: Long, val callback: (ConnectionStateEvent) -> Unit)
 
     private val requestHandlers = ConcurrentHashMap<String, (EosProductUserId) -> Unit>()
+    private val sessionRequestHandlers = ConcurrentHashMap<String, (EosP2PSocketId, EosProductUserId) -> Unit>()
     private val stateHandlers = ConcurrentHashMap<String, CopyOnWriteArrayList<StateHandlerEntry>>()
     private val nextHandle = AtomicLong(1)
 
@@ -77,6 +83,8 @@ class EosSdkBridge {
     private val logThrottle = EosLogThrottle()
 
     @Volatile private var lastTickMs = 0L
+
+    private var lastBacklogLogMs = 0L
 
     val isLoggedIn: Boolean get() = localUser != null
 
@@ -105,6 +113,10 @@ class EosSdkBridge {
 
         private const val MAX_PACKETS_PER_TICK = 4096
         private const val CONGESTION_CHECK_EVERY_TICKS = 64
+        private const val BACKLOG_LOG_BYTES = 1024L * 1024
+        private const val BACKLOG_LOG_INTERVAL_MS = 5_000L
+
+        const val SESSION_SOCKET_PREFIX_LENGTH = 28
     }
 
     fun initialize(): Boolean {
@@ -154,8 +166,9 @@ class EosSdkBridge {
         startupSettled.await(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
-    fun shutdown() {
+    fun shutdown(retireSdk: Boolean = true) {
         val worker = synchronized(pendingCalls) {
+            keepSdk = !retireSdk
             stopped = true
             running = false
             tickThread
@@ -170,7 +183,7 @@ class EosSdkBridge {
         if (worker != null && worker.isAlive) {
             logger.warn("The EOS tick thread did not stop within {}ms; leaving it to finish on its own", SHUTDOWN_TIMEOUT_MS)
         } else {
-            teardown(retireSdk = !abandoned)
+            teardown(retireSdk = !abandoned && !keepSdk)
             rejectPendingCalls()
         }
         startupSettled.countDown()
@@ -210,24 +223,46 @@ class EosSdkBridge {
         EosLogging.setCallback { msg -> logTarget?.onLog(msg.category, msg.level, msg.message) }
         EosLogging.setLogLevel(EosLogCategory.AllCategories, EosLogLevel.Info)
 
+        val mode = EosMode.current
+        this.mode = mode
+        logger.info("Using the {} EOS app", mode)
         val options = EosPlatformOptions.create(
-            productId = EosConstants.PRODUCT_ID,
-            sandboxId = EosConstants.SANDBOX_ID,
-            deploymentId = EosConstants.DEPLOYMENT_ID,
-            clientCredentials = EosClientCredentials.of(EosConstants.CLIENT_ID, EosConstants.CLIENT_SECRET),
+            productId = mode.productId,
+            sandboxId = mode.sandboxId,
+            deploymentId = mode.deploymentId,
+            clientCredentials = EosClientCredentials.of(mode.clientId, mode.clientSecret),
         ).apply {
             flags = EosPlatformFlags.DisableOverlay or EosPlatformFlags.DisableSocialOverlay
         }
 
-        val created = runCatching { Eos.createPlatform(options) }
+        val rtc: EosRtcOptions? = runCatching { EosRtcSupport.options() }.getOrNull()
+        options.rtcOptions = rtc
+        var created = runCatching { Eos.createPlatform(options) }
             .onFailure { logger.error("Could not create the EOS platform", it) }
             .getOrNull()
+        if (created == null && rtc != null) {
+            logger.warn("Could not create the EOS platform with voice rooms; retrying without them")
+            EosRtcSupport.markFailed("the EOS platform would not start with voice rooms")
+            options.rtcOptions = null
+            created = runCatching { Eos.createPlatform(options) }
+                .onFailure { logger.error("Could not create the EOS platform", it) }
+                .getOrNull()
+        }
         if (created == null) {
             running = false
             return
         }
+        rtcEnabled = options.rtcOptions != null
         platform = created
     }
+
+    @Volatile var rtcEnabled = false
+        private set
+
+    fun onTick(block: (EosPlatform) -> Unit) = post { platform?.let(block) }
+
+    suspend fun <T> callOnTick(what: String, block: (EosPlatform) -> CompletableFuture<T>): T =
+        awaitOnTick(what) { block(requireNotNull(platform) { "EOS SDK has not started yet" }) }
 
     @Volatile private var hookedUser: EosProductUserId? = null
     private var unhookP2P: (() -> Unit)? = null
@@ -243,7 +278,14 @@ class EosSdkBridge {
         p2p.setPacketQueueSize(DEFAULT_QUEUE_BYTES, DEFAULT_QUEUE_BYTES)
 
         val request = p2p.addNotifyPeerConnectionRequest(local, null) { info ->
-            requestHandlers[info.socketId.name]?.invoke(EosProductUserId(info.remoteUserId.toStringValue()))
+            val name = info.socketId.name
+            val remote = EosProductUserId(info.remoteUserId.toStringValue())
+            val exact = requestHandlers[name]
+            if (exact != null) {
+                exact(remote)
+            } else {
+                sessionRequestHandlers[name.take(SESSION_SOCKET_PREFIX_LENGTH)]?.invoke(EosP2PSocketId(name), remote)
+            }
         }
         val established = p2p.addNotifyPeerConnectionEstablished(local, null) { info ->
             dispatchState(info.socketId.name, info.remoteUserId) {
@@ -299,7 +341,10 @@ class EosSdkBridge {
 
             tick++
             if (tick % CONGESTION_CHECK_EVERY_TICKS == 0L) {
-                runCatching { checkCongestion() }.onFailure { logger.warn("EOS congestion check failed", it) }
+                runCatching {
+                    checkCongestion()
+                    logBacklog()
+                }.onFailure { logger.warn("EOS congestion check failed", it) }
             }
 
             val hadWork = runCatching { drainInboundPackets() }
@@ -311,7 +356,7 @@ class EosSdkBridge {
         }
         runCatching { pump() }.onFailure { logger.warn("The final EOS tick before shutdown failed", it) }
         rejectPendingCalls()
-        teardown(retireSdk = !abandoned)
+        teardown(retireSdk = !abandoned && !keepSdk)
     }
 
     private fun pump() {
@@ -364,6 +409,15 @@ class EosSdkBridge {
         }
     }
 
+    private fun logBacklog() {
+        val now = EosTickHealth.monotonicMs()
+        if (now - lastBacklogLogMs < BACKLOG_LOG_INTERVAL_MS) return
+        val queued = outboundQueueBytes()
+        if (queued < BACKLOG_LOG_BYTES) return
+        lastBacklogLogMs = now
+        logger.info("EOS outbound queue holds {} KiB", queued / 1024)
+    }
+
     private fun park(idleTicks: Int) {
         if (idleTicks == 0) {
             Thread.onSpinWait()
@@ -377,6 +431,7 @@ class EosSdkBridge {
         inboundHandler = null
         loginLostHandler = null
         requestHandlers.clear()
+        sessionRequestHandlers.clear()
         stateHandlers.clear()
     }
 
@@ -576,6 +631,14 @@ class EosSdkBridge {
 
     fun addConnectionRequestHandler(socket: EosP2PSocketId, handler: (remote: EosProductUserId) -> Unit) {
         requestHandlers[socket.name] = handler
+    }
+
+    fun addSessionRequestHandler(session: EosP2PSocketId, handler: (socket: EosP2PSocketId, remote: EosProductUserId) -> Unit) {
+        sessionRequestHandlers[session.name.take(SESSION_SOCKET_PREFIX_LENGTH)] = handler
+    }
+
+    fun removeSessionRequestHandler(session: EosP2PSocketId) {
+        sessionRequestHandlers.remove(session.name.take(SESSION_SOCKET_PREFIX_LENGTH))
     }
 
     fun acceptConnection(socket: EosP2PSocketId, remote: EosProductUserId) = post {

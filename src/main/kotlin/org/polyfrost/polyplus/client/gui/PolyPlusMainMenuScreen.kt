@@ -2,7 +2,9 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -11,7 +13,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -19,23 +20,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +37,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -51,110 +44,74 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.findRootCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.client.gui.screens.TitleScreen
 //? if > 1.8.9 {
 import com.mojang.realmsclient.RealmsMainScreen
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.ServerList
 import net.minecraft.client.multiplayer.ServerStatusPinger
 import net.minecraft.client.multiplayer.resolver.ServerAddress
-import net.minecraft.client.resources.DefaultPlayerSkin
 //?} else {
 /*import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerScreen as JoinMultiplayerScreen
 import net.minecraft.client.gui.screen.menu.options.OptionsScreen
 import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
 import net.minecraft.client.network.MultiplayerServerListPinger as ServerStatusPinger
 import net.minecraft.client.options.ServerListEntry as ServerData
-import net.minecraft.client.resource.skin.DefaultSkinUtils
+import net.minecraft.client.options.ServerList
 import net.minecraft.realms.RealmsBridge
 *///?}
-import org.apache.logging.log4j.LogManager
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
 import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.PolyPlusClient
-import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
-import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.RecentServer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
-import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
+import org.polyfrost.polyplus.client.gui.lobbyshell.LocalGlassRegistry
+import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.host.HostWorldManager
-import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
-import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.social.FriendsRepository
-import org.polyfrost.polyplus.client.social.GroupsRepository
-import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-import java.awt.image.BufferedImage
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.Collections
-import java.util.UUID
 import java.util.WeakHashMap
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import javax.imageio.ImageIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -162,7 +119,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //? if >= 1.21.11 {
 import net.minecraft.server.network.EventLoopGroupHolder
-import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
 //? if < 26.1 && > 1.8.9 {
@@ -170,8 +126,7 @@ import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 *///?}
 
 class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
-    private var firstFrameDrawn = false
-
+    private val openedAt = System.currentTimeMillis()
     private var menuGuiScale by mutableStateOf(mcGuiScale())
 
     private fun syncGuiScaleState() {
@@ -182,60 +137,26 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     //? if > 1.8.9 {
     override fun shouldCloseOnEsc(): Boolean = false
     //?} else {
-    /*override fun init() {
-        MenuPanorama.legacyPanorama()
-        super.init()
-    }
-
-    override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         super.render(mouseX, mouseY, tickDelta)
-        MenuBackgroundPass.renderInline(mainMenuPanoramaEnabled())
-        firstFrameDrawn = true
     }
     *///?}
 
     //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
-        if (mainMenuPanoramaEnabled()) {
-            renderPanorama(ctx, tickDelta)
-            if (firstFrameDrawn) {
-                val gameRenderer = Minecraft.getInstance().gameRenderer
-                //? if <1.21.4 {
-                gameRenderer.processBlurEffect(tickDelta)
-                //?} else {
-                /^gameRenderer.processBlurEffect()
-                ^///?}
-            }
-        }
-        MenuBackgroundPass.renderInline(ctx, mainMenuPanoramaEnabled())
         super.render(ctx, mouseX, mouseY, tickDelta)
-        firstFrameDrawn = true
+    }
+
+    override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
     *///?} elif >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
-        if (mainMenuPanoramaEnabled()) {
-            Minecraft.getInstance().gameRenderer
-                //? if >= 26.2 {
-                .panorama()
-                .extractRenderState(ctx, width, height)
-                //?} else {
-                /*.getPanorama()
-                .extractRenderState(ctx, width, height, true)
-                *///?}
-            ctx.blurBeforeThisStratum()
-        }
-        MenuBackgroundPass.renderInline(ctx, mainMenuPanoramaEnabled())
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
-    //?}
 
-    //? if <26.1 && > 1.8.9 {
-    /*override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
-    }
-    *///?} elif >= 26.1 {
     override fun extractBackground(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
     }
     //?}
@@ -247,11 +168,10 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
-            //? if >= 1.21.11
-            CustomPanorama.initialize()
             launch(Dispatchers.IO) { FeaturedServers.warmUp() }
             val serverLoad = async(Dispatchers.IO) {
-                PolyPlusRecentServers.displayServers().map { QuickplayEntry.Server(it, PolyPlusRecentServers.lastPlayed(it.ip)) }
+                val saved = runCatching { ServerList(mc).apply { load() } }.getOrNull()
+                PolyPlusRecentServers.recent().take(QUICKPLAY_MAX).map { QuickplayEntry.Server(recentServerData(it, saved), it.lastPlayed) }
             }
             val worldLoad = async {
                 HostWorldManager.loadWorlds()
@@ -337,18 +257,8 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
                         *///?}
                     },
                     mods = { PolyPlusOneConfigIntegration.openMods() },
-                    //? if >= 26.3 {
-                    // the window follows the option now
-                    fullscreen = {
-                        mc.options.fullscreen().set(!mc.options.fullscreen().get())
-                        mc.options.save()
-                    },
-                    //?} elif > 1.8.9 {
-                    /*fullscreen = { mc.window.toggleFullScreen() },
-                    *///?} else {
-                    /*fullscreen = { mc.toggleFullscreen() },
-                    *///?}
-                    quit = { mc.stop() },
+                    fullscreen = ::toggleFullscreen,
+                    quit = { if (System.currentTimeMillis() - openedAt >= QUIT_COOLDOWN_MILLIS) mc.stop() },
                     connect = { server -> connectTo(mc, server) },
                 ),
                 quickplay = quickplay,
@@ -357,6 +267,14 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             BadModsDialog()
         }
     }
+
+    private fun recentServerData(server: RecentServer, saved: ServerList?): ServerData =
+        saved?.let { list -> (0 until list.size()).map { list.get(it) }.firstOrNull { it.ip.equals(server.ip, ignoreCase = true) } } ?:
+        //? if > 1.8.9 {
+        ServerData(server.name, server.ip, ServerData.Type.OTHER)
+        //?} else {
+        /*ServerData(server.name, server.ip, false)
+        *///?}
 
     private fun connectTo(mc: Minecraft, server: ServerData) {
         //? if > 1.8.9 {
@@ -371,8 +289,6 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
 private object MainMenuServerPings {
     private const val REFRESH_AFTER_MILLIS = 5 * 60 * 1000L
     private val pinger = ServerStatusPinger()
-    // weak so instances the menu no longer shows (e.g. after quickplay is rebuilt) aren't kept alive
-    // ServerData has no equals/hashCode, so this is keyed by identity
     private val lastPinged = Collections.synchronizedMap(WeakHashMap<ServerData, Long>())
 
     fun start(scope: CoroutineScope, servers: List<ServerData>) {
@@ -404,209 +320,6 @@ private object MainMenuServerPings {
     }
 }
 
-private object MainMenuRasterAssets {
-    private val paths = listOf(
-        "avatar.png",
-        "hypixel.png",
-        "server.png",
-    ).map { ASSETS + it }
-    private val cache = ConcurrentHashMap<String, ImageBitmap>()
-
-    var ready by mutableStateOf(false)
-        private set
-
-    fun preload() {
-        paths.forEach { load(it) }
-        ready = true
-    }
-
-    fun cached(path: String): ImageBitmap? = cache[path]
-
-    private fun load(path: String): ImageBitmap? =
-        cache[path] ?: runCatching {
-            val bytes = PolyPlusMainMenuScreen::class.java.getResourceAsStream("/$path")!!.use { it.readBytes() }
-            PolyBitmap.decode(bytes)!!.asComposeImageBitmap()
-        }.getOrNull()?.also { cache[path] = it }
-}
-
-internal object MenuHeadCache {
-    private class Entry {
-        var shown by mutableStateOf<ImageBitmap?>(null)
-
-        var settled = false
-    }
-
-    private val entries = object : LinkedHashMap<UUID, Entry>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<UUID, Entry>) = size > MAX_ENTRIES
-    }
-
-    private val fetching = HashMap<UUID, Int>()
-
-    private const val MAX_ENTRIES = 256
-
-    private val loaders = Executors.newFixedThreadPool(3) { task ->
-        Thread(task, "polyplus-account-head").apply { isDaemon = true }
-    }
-
-    private fun <T> withEntry(id: UUID, block: (Entry) -> T): T? =
-        synchronized(entries) { entries[id]?.let(block) }
-
-    fun get(id: UUID): ImageBitmap? {
-        var fetch = false
-        val entry = synchronized(entries) {
-            val entry = entries.getOrPut(id) { Entry() }
-            if (!entry.settled && id !in fetching) {
-                fetching[id] = 0
-                fetch = true
-            }
-            entry
-        }
-        if (fetch) startFetch(id)
-        return entry.shown
-    }
-
-    private fun startFetch(id: UUID) {
-        loaders.execute {
-            val face = runCatching {
-                val outcome = loadFaceByUuid(id)
-                outcome.exceptionOrNull()?.let { HEAD_LOG.debug("Failed to load head for {}; will retry", id, it) }
-                if (outcome.isSuccess) outcome.getOrNull() ?: defaultSkinFace(id) else null
-            }.onFailure { HEAD_LOG.warn("Loading the head for {} failed unexpectedly; will retry", id, it) }
-                .getOrNull()
-
-            val needsFallback = face == null && withEntry(id) { it.shown == null } == true
-            val fallback = if (needsFallback) runCatching { defaultSkinFace(id) }.getOrNull() else null
-
-            val retryIn = synchronized(entries) {
-                val entry = entries[id] ?: run {
-                    fetching.remove(id)
-                    return@synchronized null
-                }
-                if (face != null) {
-                    entry.shown = face
-                    entry.settled = true
-                    fetching.remove(id)
-                    return@synchronized null
-                }
-
-                if (entry.shown == null) entry.shown = fallback
-                val attempts = (fetching[id] ?: 0) + 1
-                fetching[id] = attempts
-                if (HeadFetchPolicy.shouldRetry(attempts)) {
-                    HeadFetchPolicy.retryDelayMs(attempts)
-                } else {
-                    HEAD_LOG.debug("Giving up on the head for {} after {} attempts", id, attempts)
-                    entry.settled = true
-                    fetching.remove(id)
-                    null
-                }
-            }
-
-            if (retryIn != null) {
-                val retry = PolyPlusClient.SCOPE.launch {
-                    delay(retryIn)
-                    startFetch(id)
-                }
-                retry.invokeOnCompletion { cause ->
-                    if (cause != null) synchronized(entries) { fetching.remove(id) }
-                }
-            }
-        }
-    }
-}
-
-private const val MENU_HEAD_SIZE = 64
-private val HEAD_LOG = LogManager.getLogger("PolyPlus/Heads")
-
-private fun loadFaceByUuid(uuid: UUID): Result<ImageBitmap?> {
-    val url = mojangSkinUrl(uuid).getOrElse { return Result.failure(it) } ?: return Result.success(null)
-    val skin = runCatching { ImageIO.read(URI(url).toURL()) }
-        .getOrElse { return Result.failure(it) }
-    if (skin == null) {
-        HEAD_LOG.debug("Skin texture at {} was not decodable for {}", url, uuid)
-        return Result.success(null)
-    }
-    return Result.success(
-        runCatching { buildFace(skin) }
-            .onFailure { HEAD_LOG.debug("Skin texture at {} is not a usable skin for {}", url, uuid, it) }
-            .getOrNull(),
-    )
-}
-
-private fun defaultSkinFace(uuid: UUID): ImageBitmap? = runCatching {
-    //? if > 1.8.9 {
-    val skinAsset = DefaultPlayerSkin.get(uuid)
-    //? if >= 1.21.10 {
-    val location = skinAsset.body().texturePath()
-    //?} else {
-    /*val location = skinAsset.texture()
-    *///?}
-    val manager = Minecraft.getInstance().resourceManager
-    val resource = manager.getResource(location).orElse(null) ?: return null
-    val skin = resource.open().use { ImageIO.read(it) } ?: return null
-    //?} else {
-    /*val location = DefaultSkinUtils.getDefaultSkin(uuid)
-    val resource = Minecraft.getInstance().resourceManager.getResource(location)
-    val skin = resource.asStream().use { ImageIO.read(it) } ?: return null
-    *///?}
-    buildFace(skin)
-}.getOrNull()
-
-private fun mojangSkinUrl(uuid: UUID): Result<String?> = runCatching {
-    val id = uuid.toString().replace("-", "")
-    val body = httpGetString("https://sessionserver.mojang.com/session/minecraft/profile/$id")
-        ?: run {
-            HEAD_LOG.debug("No Mojang profile for {} (offline, or not a premium account)", uuid)
-            return Result.success(null)
-        }
-    val textures = PolyPlusClient.JSON.parseToJsonElement(body).jsonObject["properties"]?.jsonArray
-        ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "textures" }
-        ?.jsonObject?.get("value")?.jsonPrimitive?.content
-        ?: return Result.success(null)
-    PolyPlusClient.JSON.parseToJsonElement(String(Base64.getDecoder().decode(textures), StandardCharsets.UTF_8))
-        .jsonObject["textures"]?.jsonObject?.get("SKIN")?.jsonObject?.get("url")?.jsonPrimitive?.content
-}.onFailure { HEAD_LOG.debug("Failed to read Mojang profile for {}", uuid, it) }
-
-// NOTE: authlib's fetchProfile swallows connection errors and 5xx as "no profile"
-private fun httpGetString(url: String): String? {
-    val conn = URI(url).toURL().openConnection() as HttpURLConnection
-    return try {
-        conn.connectTimeout = 8000
-        conn.readTimeout = 8000
-        val code = conn.responseCode
-        when {
-            code == 200 -> conn.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
-            HeadFetchPolicy.isDefinitiveMiss(code) -> {
-                HEAD_LOG.debug("GET {} returned {}", url, code)
-                null
-            }
-            else -> throw IOException("GET $url returned $code")
-        }
-    } finally {
-        conn.disconnect()
-    }
-}
-
-private fun buildFace(skin: BufferedImage): ImageBitmap {
-    val size = MENU_HEAD_SIZE
-    val out = ByteArray(size * size * 4)
-    for (y in 0 until size) {
-        val oy = y * 8 / size
-        for (x in 0 until size) {
-            val ox = x * 8 / size
-            val base = skin.getRGB(8 + ox, 8 + oy)
-            val hat = runCatching { skin.getRGB(40 + ox, 8 + oy) }.getOrDefault(0)
-            val argb = if ((hat ushr 24) != 0) hat else base
-            val i = (y * size + x) * 4
-            out[i] = (argb ushr 16).toByte()     // R
-            out[i + 1] = (argb ushr 8).toByte()  // G
-            out[i + 2] = argb.toByte()           // B
-            out[i + 3] = 0xFF.toByte()           // A
-        }
-    }
-    return PolyBitmap(size, size, out).asComposeImageBitmap()
-}
-
 private class MenuActions(
     val singleplayer: () -> Unit,
     val openWorld: (String) -> Unit,
@@ -619,43 +332,7 @@ private class MenuActions(
     val connect: (ServerData) -> Unit,
 )
 
-internal const val ASSETS = "assets/polyplus/mainmenu/"
-private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
-
-private val PanelBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
-private val ServerIconBackground = Color(0x33FFFFFF)
-private val FeaturedCardBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.8f)
-private val CloseBackground = Color(0x80FF4444)
-
-private val PanelShape: Shape
-    @Composable
-    get() = ppShape(9.dp)
-
-private val Outfit: FontFamily by lazy {
-    runCatching {
-        val bytes = PolyPlusMainMenuScreen::class.java
-            .getResourceAsStream("/${ASSETS}font/Outfit-Bold.ttf")!!.use { it.readBytes() }
-        FontFamily(Font("Outfit-Bold", bytes, FontWeight.Bold))
-    }.getOrDefault(FontFamily.Default)
-}
-
-internal fun mainMenuPanoramaEnabled(): Boolean {
-    return PolyPlusMainMenuConfig.mainMenuBackground == MainMenuBackground.PANORAMA
-}
-
-internal const val REFERENCE_GUI_SCALE = 2f
-
 internal fun mcGuiScale(): Int = Minecraft.getInstance().window.guiScale.toInt()
-
-internal const val GUI_DENSITY_TRIM = 0.88f
-
-@Composable
-internal fun scaledDensity(scale: Float): Density {
-    val density = LocalDensity.current
-    return remember(density, scale) { Density(density.density * scale, density.fontScale) }
-}
 
 @Composable
 private fun MainMenu(
@@ -665,69 +342,76 @@ private fun MainMenu(
     quickplay: List<QuickplayEntry>?,
     pingTick: Int,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-            val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
-            val unscaled = { dp: Float -> (dp / scale).dp }
-            CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
-                var rightColumnHeightPx by remember { mutableStateOf(0) }
-                val rightColumnHeight = with(LocalDensity.current) { rightColumnHeightPx.toDp() }
-                val columnBottomPadding = ((BASE_HEIGHT.dp - rightColumnHeight) / 2).coerceAtLeast(0.dp)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
-                ) {
-                    CenterColumn(
-                        Modifier.align(Alignment.BottomCenter).padding(bottom = columnBottomPadding),
-                        actions,
-                    )
-                }
-                if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
-                    LeftColumn(
+    var accountsOpen by remember { mutableStateOf(false) }
+    val glass = remember { MenuGlass() }
+    var rootSize by remember { mutableStateOf(Size.Zero) }
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }) {
+        MenuBackdrop(Modifier.fillMaxSize(), glass)
+        CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
+                val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+                val safeScale = usableScale(scale)
+                val innerWidth = maxWidth.value / safeScale
+                val innerHeight = maxHeight.value / safeScale
+                val edgeX = { dp: Float -> minOf(dp / safeScale, dp + (innerWidth - BASE_WIDTH) / 2f).coerceAtLeast(0f).dp }
+                val edgeY = { dp: Float -> minOf(dp / safeScale, dp + (innerHeight - BASE_HEIGHT) / 2f).coerceAtLeast(0f).dp }
+                CompositionLocalProvider(LocalDensity provides scaledDensity(scale)) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
+                    ) {
+                        CenterColumn(
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = COLUMN_INSET.dp),
+                            actions,
+                        )
+                    }
+                    val sideTop = ((innerHeight - BASE_HEIGHT) / 2f + COLUMN_INSET).coerceAtLeast(0f).dp
+                    val swapped = PolyPlusMainMenuConfig.swapMainMenuSideColumns
+                    val quickplaySide = if (swapped) Alignment.TopEnd else Alignment.TopStart
+                    val previewSide = if (swapped) Alignment.TopStart else Alignment.TopEnd
+                    Column(
+                        modifier = Modifier
+                            .align(quickplaySide)
+                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        FeaturedServerCard(Modifier, pingTick, actions)
+                        if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
+                            LeftColumn(Modifier, quickplay, pingTick, actions)
+                        }
+                    }
+                    RightColumn(
                         Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = unscaled(50f)),
-                        quickplay,
-                        pingTick,
-                        actions,
-                    )
-                }
-                RightColumn(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = unscaled(50f))
-                        .onSizeChanged { rightColumnHeightPx = it.height },
-                    screen,
-                )
-                WindowControls(
-                    Modifier.align(Alignment.TopEnd).padding(unscaled(16f)),
-                    actions,
-                )
-                if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
-                    ModIntegrationBar(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = unscaled(18f)),
+                            .align(previewSide)
+                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
                         screen,
+                        onAccounts = { accountsOpen = true },
                     )
+                    WindowControls(
+                        Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f)),
+                        actions,
+                    )
+                    if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
+                        ModIntegrationBar(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = edgeY(18f)),
+                            screen,
+                        )
+                    }
+                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
                 }
-                FeaturedServerCard(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = unscaled(50f), top = unscaled(50f)),
-                    pingTick,
-                    actions,
-                )
-                if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), unscaled)
             }
+            if (accountsOpen) AccountsDialog { accountsOpen = false }
         }
     }
 }
 
 private const val BASE_WIDTH = 1240f
 private const val QUICKPLAY_MAX = 3
+private const val QUIT_COOLDOWN_MILLIS = 500L
 
 private sealed interface QuickplayEntry {
     val lastPlayed: Long
@@ -739,8 +423,9 @@ private sealed interface QuickplayEntry {
     }
 }
 private const val BASE_HEIGHT = 720f
+private const val FULL_SIDE_COLUMN_HEIGHT = 446f
+private const val COLUMN_INSET = (BASE_HEIGHT - FULL_SIDE_COLUMN_HEIGHT) / 2f
 
-// every icon on this screen goes through here so the Minecraft themes get pixel icons
 @Composable
 private fun Icon(path: String, color: Color, modifier: Modifier) =
     org.polyfrost.oneconfig.api.ui.v1.components.Icon(themedIcon(path), color, modifier)
@@ -763,7 +448,7 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
                 PillButton("Settings", ASSETS + "settings-02.svg", Modifier.weight(1f), actions.settings)
-                PillButton("Mods", ASSETS + "settings-04.svg", Modifier.weight(1f), actions.mods)
+                PillButton("Mods", "settings", Modifier.weight(1f), actions.mods)
             }
         }
     }
@@ -795,8 +480,8 @@ private fun LeftColumn(
         @Suppress("UNUSED_EXPRESSION") pingTick
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
+            enter = Motion.enter(expandVertically() + fadeIn()),
+            exit = Motion.exit(shrinkVertically() + fadeOut()),
         ) {
             Column {
                 if (entries?.isEmpty() == true) {
@@ -855,17 +540,15 @@ private fun serverStatusText(server: ServerData): String {
 }
 
 @Composable
-private fun RightColumn(modifier: Modifier, screen: Screen) {
+private fun RightColumn(modifier: Modifier, screen: Screen, onAccounts: () -> Unit) {
     Column(
         modifier = modifier.width(300.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (!PolyPlusMainMenuConfig.hideMainMenuPlayerPreview) {
-            MenuPlayerPreview(Modifier.fillMaxWidth())
-        }
+        MenuPlayerPreview(Modifier.fillMaxWidth())
         if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) {
-            AccountPill(name = playerName(), screen = screen)
+            AccountPill(name = playerName(), onClick = onAccounts)
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuHostWorld && PrivacyConsent.allowsOnlineServices()) {
             HostWorldButton(screen)
@@ -875,95 +558,6 @@ private fun RightColumn(modifier: Modifier, screen: Screen) {
         }
         if (!PolyPlusMainMenuConfig.hideMainMenuCosmetics) {
             WardrobePill(Modifier.fillMaxWidth())
-        }
-    }
-}
-
-/** Sizing of the title screen's player preview, which grows to fit a hat cosmetic. */
-internal class MenuPreviewSpec(val height: Dp, val modelScale: Float, val fadeStart: Float)
-
-internal fun menuPreviewSpec(): MenuPreviewSpec {
-    val hasHeadCosmetic = CosmeticCatalog
-        .localEquipped().equipped
-        .containsKey(BodySlot.Hat)
-    return if (hasHeadCosmetic) MenuPreviewSpec(270.dp, 0.82f, 0.784f) else MenuPreviewSpec(210.dp, 1.05f, 0.72243f)
-}
-
-internal const val MENU_PREVIEW_YAW = 180f + 22.9f
-
-@Composable
-internal fun MenuPlayerPreview(modifier: Modifier) {
-    val spec = menuPreviewSpec()
-    Box(modifier = modifier.height(spec.height)) {
-        PlayerPreview(
-            Modifier.fillMaxWidth().height(spec.height),
-            source = PlayerPreviewSource.LocalLive,
-            modelScale = spec.modelScale,
-            verticalAnchor = 1.0f,
-            initialYaw = MENU_PREVIEW_YAW,
-            live = true,
-            bottomFadeFraction = 1f - spec.fadeStart,
-        )
-    }
-}
-
-@Composable
-internal fun SocialPill(screen: Screen, modifier: Modifier) {
-    val groups by GroupsRepository.groups.collectAsState()
-    PillButton(
-        "Social",
-        ASSETS + "message-chat-circle.svg",
-        modifier,
-        onClick = { SocialOverlay.open(screen) },
-        badge = groups.any { it.unread },
-    )
-}
-
-@Composable
-internal fun WardrobePill(modifier: Modifier) {
-    PillButton(
-        "Wardrobe",
-        ASSETS + "diamond-01.svg",
-        modifier,
-        onClick = { PolyPlusOneConfigIntegration.openCosmetics() },
-    )
-}
-
-@Composable
-internal fun HostWorldButton(screen: Screen, modifier: Modifier = Modifier.fillMaxWidth()) {
-    var showFlow by remember { mutableStateOf(false) }
-    var hostingCurrentWorld by remember { mutableStateOf(false) }
-    val friends by FriendsRepository.friends.collectAsState()
-    val groups by GroupsRepository.groups.collectAsState()
-    val selfId = remember {
-        runCatching { Minecraft.getInstance().user.profileId.toString() }.getOrDefault("")
-    }
-
-    Box(modifier) {
-        PillButton(
-            label = "Host World",
-            icon = ASSETS + "log-in-04.svg",
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                //? if > 1.8.9 {
-                hostingCurrentWorld = Minecraft.getInstance().singleplayerServer != null
-                //?} else {
-                /*hostingCurrentWorld = Minecraft.getInstance().server != null
-                *///?}
-                FriendsRepository.refreshAll()
-                GroupsRepository.refreshGroups()
-                showFlow = true
-            },
-        )
-        if (showFlow) {
-            HostWorldFlow(
-                screen = screen,
-                friends = friends,
-                groups = groups,
-                selfId = selfId,
-                hostingCurrent = hostingCurrentWorld,
-                onDismiss = { showFlow = false },
-            )
         }
     }
 }
@@ -980,7 +574,7 @@ private fun ModIntegrationBar(
             IconButton(
                 icon = button.icon,
                 tooltip = button.tooltip,
-                tooltipPlacement = TooltipPlacement.ABOVE_CENTER,
+                tooltipPlacement = TooltipPlacement.AboveCenter,
                 onClick = { button.onClick(screen) },
             )
         }
@@ -990,50 +584,21 @@ private fun ModIntegrationBar(
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        VanillaMenuButton()
+        IconButton(ASSETS + "logo.svg", tooltip = "Switch to the lobby", onClick = MainMenuReplacement::switchToLobby)
+        IconButton(ASSETS + "minecraft-block.svg", tooltip = "Switch to vanilla main menu", onClick = MainMenuReplacement::switchToVanilla)
         ThemeToggleButton()
         NotificationBell()
         if (!ClientPlatform.isMac) {
-            IconButton(ASSETS + "maximize-02.svg", tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
+            IconButton("maximise", tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
         }
-        IconButton(ASSETS + "x-close.svg", background = CloseBackground, tooltip = "Quit game", onClick = actions.quit)
+        IconButton(ASSETS + "x-close.svg", danger = true, tooltip = "Quit game", onClick = actions.quit)
     }
 }
 
 @Composable
-private fun VanillaMenuButton() {
-    IconButton(
-        icon = ASSETS + "minecraft-block.svg",
-        tooltip = "Switch to vanilla main menu",
-        onClick = {
-            PolyPlusMainMenuConfig.useVanillaMainMenu = true
-            PolyPlusMainMenuConfig.save()
-            val mc = Minecraft.getInstance()
-            //? if >= 26.2 {
-            mc.gui.setScreen(TitleScreen())
-            //?} elif > 1.8.9 {
-            /*mc.setScreen(TitleScreen())
-            *///?} else {
-            /*mc.openScreen(TitleScreen())
-            *///?}
-        },
-    )
-}
-
-@Composable
 private fun ThemeToggleButton() {
-    val themeName = OneConfigTheme.current.name
-    val light = themeName == OneConfigTheme.POLY_GLASS_LIGHT.name || themeName == OneConfigTheme.MINECRAFT_LIGHT.name
-    val minecraftStyle = themeName == OneConfigTheme.MINECRAFT_DARK.name || themeName == OneConfigTheme.MINECRAFT_LIGHT.name
-    IconButton(
-        icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
-        tooltip = if (light) "Switch to dark theme" else "Switch to light theme",
-        onClick = {
-            PolyPlusConfig.onboardingLightTheme = !light
-            OnboardingFeatures.applyTheme(!light, if (minecraftStyle) 1 else 0)
-            PolyPlusConfig.save()
-        },
-    )
+    val theme = themeToggle()
+    IconButton(icon = theme.icon, tooltip = theme.label, onClick = theme.toggle)
 }
 
 @Composable
@@ -1056,9 +621,7 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
     Column(
         modifier = modifier
             .width(300.dp)
-            .clip(PanelShape)
-            .background(FeaturedCardBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
+            .menuFrost(OneConfigTheme.current.modCardShape, MenuCardRadius, OneConfigTheme.current.modCardBackground, false)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1100,7 +663,7 @@ private fun CardThumbnail(image: ImageBitmap?) {
 private fun DismissButton(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val color = if (hovered) SocialTextPrimary else SocialTextSecondary
+    val color by animateColorAsState(if (hovered) SocialTextPrimary else SocialTextSecondary, menuFade())
     Row(
         modifier = Modifier
             .clip(ppShape(4.dp))
@@ -1116,27 +679,16 @@ private fun DismissButton(onClick: () -> Unit) {
 
 @Composable
 private fun CallToActionButton(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .clip(ppShape(6.dp))
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ppShape(6.dp))
-            .clickableWithSound(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(label, fontSize = 15.sp, color = SocialTextPrimary, maxLines = 1, textAlign = TextAlign.Center)
-    }
+    TextButton(label, null, Modifier.fillMaxWidth().height(34.dp), ButtonStyle.Primary, true, onClick)
 }
 
 @Composable
-private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
+private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
     Box(modifier) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = unscaled(24f), bottom = unscaled(18f)),
+                .padding(start = edgeX(24f), bottom = edgeY(18f)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1149,91 +701,22 @@ private fun Footer(modifier: Modifier, unscaled: (Float) -> Dp) {
             color = SocialTextSecondary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = unscaled(24f), bottom = unscaled(18f)),
+                .padding(end = edgeX(24f), bottom = edgeY(18f)),
             textAlign = TextAlign.Center,
         )
     }
 }
-
-@Composable
-private fun FooterBrandText(platform: String) {
-    val bodyFont = OneConfigTheme.current.fontFamily
-    val primary = Color.White
-    val secondary = SocialTextSecondary
-
-    BasicText(
-        text = buildAnnotatedString {
-            withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold, fontFamily = Outfit)) {
-                append("ONECLIENT")
-            }
-            withStyle(SpanStyle(color = secondary, fontFamily = bodyFont)) {
-                append("   ")
-                append(platform)
-            }
-        },
-        style = TextStyle(
-            fontSize = 13.sp,
-            fontFamily = bodyFont,
-            textAlign = TextAlign.Center,
-        ),
-    )
-}
-
-@Composable
-internal fun Modifier.pillSurface(onClick: (() -> Unit)?, borderBrush: Brush = SocialPanelBorderBrush, enabled: Boolean = true): Modifier =
-    clip(PanelShape)
-        .background(PanelBackground)
-        .border(SocialPanelBorderWidth, borderBrush, PanelShape)
-        .alpha(if (enabled) 1f else 0.5f)
-        .then(if (enabled && onClick != null) Modifier.clickableWithSound(onClick) else Modifier)
-
-@Composable
-internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, borderBrush: Brush = SocialPanelBorderBrush, badge: Boolean = false) {
-    Box(modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(45.dp)
-                .pillSurface(onClick, borderBrush)
-                .padding(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-            SocialText(label, fontSize = 16.sp, textAlign = TextAlign.Center)
-        }
-        if (badge) {
-            Box(
-                Modifier.align(Alignment.CenterEnd)
-                    .padding(end = 14.dp)
-                    .size(8.dp)
-                    .clip(OneConfigTheme.current.circleShape)
-                    .background(OneConfigTheme.accent),
-            )
-        }
-    }
-}
-
 @Composable
 private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(45.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
-        Icon(leadingIcon, SocialTextPrimary, Modifier.align(Alignment.CenterStart).size(20.dp))
-        SocialText(label, fontSize = 16.sp, textAlign = TextAlign.Center)
+    val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    MenuButtonSurface(label, Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
+        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
+        Icon(leadingIcon, ink, Modifier.align(Alignment.CenterStart).padding(start = 12.dp).size(18.dp))
+        MenuButtonLabel(label, ink, Modifier.padding(horizontal = 40.dp))
         Icon(
             ASSETS + "chevron-up.svg",
-            SocialTextPrimary,
-            Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronAngle),
+            chevronTint,
+            Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(16.dp).rotate(chevronAngle),
         )
     }
 }
@@ -1246,14 +729,13 @@ private fun ServerRow(
     fallbackPng: String,
     onClick: () -> Unit = {},
 ) {
+    val (interaction, hovered) = rememberSocialHover()
+    val chevronTint by animateColorAsState(if (hovered) SocialTextPrimary else MenuMutedIcon, menuFade())
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .clip(PanelShape)
-            .background(PanelBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
+            .menuListRow(OneConfigTheme.current.buttonShape, OneConfigTheme.current.modCardBackground, "$title, $subtitle", interaction, hovered, onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -1268,633 +750,49 @@ private fun ServerRow(
             SocialText(title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(ASSETS + "chevron-right.svg", SocialTextSecondary, Modifier.size(20.dp))
+        Icon(ASSETS + "chevron-right.svg", chevronTint, Modifier.size(20.dp))
     }
 }
 
 @Composable
-private fun AccountPill(name: String, screen: Screen) {
-    val actions = rememberAccountActions()
-    var open by remember { mutableStateOf(false) }
-    var pillSize by remember { mutableStateOf(IntSize.Zero) }
-    var panelRoom by remember { mutableStateOf(0) }
-    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val accounts = remember(actions.accounts) {
-        actions.accounts?.sortedWith(compareByDescending<OneLauncherAccounts.Account> { it.active }.thenBy { it.username.lowercase() })
-    }
-    val busy = actions.busy
-
-    LaunchedEffect(open) {
-        if (open) {
-            actions.clearError()
-            actions.reload()
-        }
-    }
-
-    val activeName = accounts?.firstOrNull { it.active }?.username ?: name
-    val chevronRotation = if (open) 0f else 180f
+private fun AccountPill(name: String, onClick: () -> Unit) {
     val localId = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
-    val head = localId?.let { MenuHeadCache.get(it) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onGloballyPositioned {
-                pillSize = it.size
-                val top = it.positionInWindow().y.toInt()
-                val windowHeight = it.findRootCoordinates().size.height
-                // the panel opens on the roomier side and scrolls its list to fit, so it never covers the pill
-                panelRoom = (maxOf(top, windowHeight - top - it.size.height) - gap).coerceAtLeast(0)
-            },
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(45.dp)
-                .clip(PanelShape)
-                .background(PanelBackground)
-                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-                .clickableWithSound { open = !open }
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            val avatarModifier = Modifier.align(Alignment.CenterStart).size(28.dp).clip(ppShape(3.dp))
-            val currentHead = head
-            if (currentHead != null) {
-                Image(currentHead, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)
-            } else {
-                RasterImage(ASSETS + "avatar.png", avatarModifier, contentScale = ContentScale.Crop)
-            }
-            SocialText(activeName, fontSize = 16.sp, textAlign = TextAlign.Center)
-            Icon(
-                ASSETS + "chevron-up.svg",
-                SocialTextPrimary,
-                Modifier.align(Alignment.CenterEnd).size(16.dp).rotate(chevronRotation),
-            )
-        }
-        if (open) {
-            val positionProvider = remember(gap) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        val below = anchorBounds.bottom + gap
-                        val fitsBelow = below + popupContentSize.height <= windowSize.height
-                        val y = if (fitsBelow) below else anchorBounds.top - gap - popupContentSize.height
-                        return IntOffset(anchorBounds.right - popupContentSize.width, y)
-                    }
-                }
-            }
-            Popup(
-                popupPositionProvider = positionProvider,
-                onDismissRequest = { if (busy == null) open = false },
-                properties = PopupProperties(focusable = true, clippingEnabled = false),
-            ) {
-                AccountSwitcherPanel(
-                    panelWidth = with(LocalDensity.current) { pillSize.width.toDp() },
-                    panelMaxHeight = with(LocalDensity.current) { panelRoom.toDp() },
-                    accounts = accounts,
-                    busy = busy,
-                    error = actions.error,
-                    errorSteps = actions.errorSteps,
-                    onSwitch = actions::switchTo,
-                    onRemove = actions::remove,
-                    onRefresh = actions::refresh,
-                    screen = screen,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountSwitcherPanel(
-    panelWidth: Dp,
-    panelMaxHeight: Dp,
-    accounts: List<OneLauncherAccounts.Account>?,
-    busy: String?,
-    error: String?,
-    errorSteps: List<String>?,
-    onSwitch: (OneLauncherAccounts.Account) -> Unit,
-    onRemove: (OneLauncherAccounts.Account) -> Unit,
-    onRefresh: (OneLauncherAccounts.Account) -> Unit,
-    screen: Screen,
-) {
-    val idle = busy == null
-
-    Column(
-        modifier = Modifier
-            .width(panelWidth)
-            .heightIn(max = panelMaxHeight)
-            .clip(PanelShape)
-            .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SocialText(
-            "Accounts",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.align(Alignment.Start),
-            textAlign = TextAlign.Center,
-        )
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SocialPanelBorderBrush))
-
-        when {
-            accounts == null -> SocialText(
-                "Loading…",
-                fontSize = 13.sp,
-                color = SocialTextSecondary,
-                modifier = Modifier.align(Alignment.Start),
-                textAlign = TextAlign.Center,
-            )
-            accounts.isEmpty() -> SocialText(
-                "No accounts found in the launcher",
-                fontSize = 13.sp,
-                color = SocialTextSecondary,
-                modifier = Modifier.align(Alignment.Start),
-                textAlign = TextAlign.Center,
-            )
-            else -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .heightIn(max = 300.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                accounts.forEach { account ->
-                    AccountRow(
-                        account = account,
-                        enabled = idle,
-                        onClick = { onSwitch(account) },
-                        onRemove = { onRemove(account) },
-                        onRefresh = { onRefresh(account) },
-                    )
-                }
-            }
-        }
-
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SocialPanelBorderBrush))
-
-        AddAccountButton(
-            icon = ASSETS + "users-01.svg",
-            text = "Manage accounts",
-            enabled = idle,
-            onClick = { ClientPlatform.setScreen(AccountSwitcherScreen(screen)) },
-        )
-        AccountStatusText(busy, error, errorSteps)
-    }
-}
-
-@Composable
-internal fun ColumnScope.AccountStatusText(busy: String?, error: String?, errorSteps: List<String>?) {
-//    if (busy != null) {
-//        SocialText(busy, fontSize = 12.sp, color = SocialTextSecondary, modifier = Modifier.align(Alignment.Start), textAlign = TextAlign.Center)
-//    }
-    if (error != null) {
-        SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
-    }
-    if (!errorSteps.isNullOrEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            SocialText(
-                "What you can do:",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                textAlign = TextAlign.Center,
-            )
-            errorSteps.forEach { step ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    SocialText("•", fontSize = 12.sp, color = SocialTextSecondary,  textAlign = TextAlign.Center)
-                    SocialText(step, fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun AccountRow(
-    account: OneLauncherAccounts.Account,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
-    onRefresh: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    var confirmRemove by remember { mutableStateOf(false) }
-    val head = MenuHeadCache.get(account.id)
-    val clickable = enabled && !account.active && !confirmRemove
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(ppShape(8.dp))
-            .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
-            .hoverable(interaction)
-            .then(if (clickable) Modifier.clickableWithSound(onClick) else Modifier)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        val avatarModifier = Modifier.size(30.dp).clip(ppShape(4.dp))
-        if (head != null) {
-            Image(head, contentDescription = null, modifier = avatarModifier, contentScale = ContentScale.Crop)
+    val headShape = OneConfigTheme.current.checkBoxShape
+    MenuButtonSurface("Accounts, $name", Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
+        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
+        if (localId != null) {
+            PlayerHead(localId, 28.dp, Modifier.align(Alignment.CenterStart).padding(start = 10.dp), headShape)
         } else {
-            RasterImage(ASSETS + "avatar.png", avatarModifier, contentScale = ContentScale.Crop)
+            RasterImage(ASSETS + "avatar.png", Modifier.align(Alignment.CenterStart).padding(start = 10.dp).size(28.dp).clip(headShape), contentScale = ContentScale.Crop)
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            SocialText(
-                account.username,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Start),
-                textAlign = TextAlign.Center,
-            )
-            val subtitle = when {
-                confirmRemove -> "Remove this account?"
-                account.expired -> "Session expired"
-                account.active -> "Active"
-                account.microsoft -> "Microsoft"
-                else -> "Offline"
-            }
-            SocialText(
-                subtitle,
-                fontSize = 11.sp,
-                color = when {
-                    confirmRemove -> SocialDangerColor
-                    account.expired -> SocialWarnColor
-                    else -> SocialTextSecondary
-                },
-                modifier = Modifier.align(Alignment.Start),
-                textAlign = TextAlign.Center,
-            )
-        }
-        if (confirmRemove) {
-            AccountActionIcon(ASSETS + "check-circle.svg", SocialDangerColor, enabled) {
-                confirmRemove = false
-                onRemove()
-            }
-            AccountActionIcon(ASSETS + "x-close.svg", SocialTextSecondary, enabled) { confirmRemove = false }
-        } else {
-            if (hovered) {
-                AccountActionIcon(ASSETS + "trash-01.svg", SocialTextSecondary, enabled) { confirmRemove = true }
-            }
-            if (account.active) {
-                Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-                    Icon(ASSETS + "check-circle.svg", SocialSuccessColor, Modifier.size(18.dp))
-                }
-            }
-            if (account.expired) {
-                AccountActionIcon(ASSETS + "refresh-cw-01.svg", SocialWarnColor, enabled, onRefresh)
-            }
-        }
+        MenuButtonLabel(name, ink, Modifier.padding(horizontal = 44.dp))
+        Icon(
+            ASSETS + "chevron-up.svg",
+            chevronTint,
+            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp).size(16.dp).rotate(180f),
+        )
     }
 }
 
 @Composable
-fun AddAccountButton(
-    icon: String,
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Row(
-        modifier = Modifier
-            .clip(ppShape(8.dp))
-            .background(if (hovered && enabled) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
-            .alpha(if (enabled) 1f else 0.5f)
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(icon, SocialTextPrimary, Modifier.size(18.dp))
-        SocialText(text, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically), textAlign = TextAlign.Center)
-    }
+private fun AccountsDialog(onClose: () -> Unit) {
+    val actions = rememberAccountActions()
+    AccountSwitcherContent(actions, onClose)
 }
-
-@Composable
-internal fun MicrosoftLoginPopup(
-    code: String,
-    verificationUri: String,
-    browserAuthUrl: String,
-    status: String?,
-    onCancel: () -> Unit,
-) {
-    SocialModalScrim(onCancel) {
-        Column(
-            modifier = Modifier
-                .width(380.dp)
-                .clip(PanelShape)
-                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
-                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-                .swallowClicks()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            SocialText("Sign in to Microsoft", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
-            SocialText(
-                "We opened the Microsoft sign-in page in your browser. Finish there and you'll be brought back automatically.",
-                fontSize = 13.sp,
-                color = SocialTextSecondary,
-                textAlign = TextAlign.Center,
-            )
-            LoginModalButton(
-                label = "Open in browser again",
-                icon = ASSETS + "link-external-01.svg",
-                filled = true,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { ClientPlatform.openUri(browserAuthUrl) },
-            )
-            OrDivider()
-            SocialText(
-                "Or enter this code at the Microsoft sign-in page:",
-                fontSize = 13.sp,
-                color = SocialTextSecondary,
-                textAlign = TextAlign.Center,
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(ppShape(8.dp))
-                    .background(OneConfigTheme.current.componentBackground.copy(alpha = 0.5f))
-                    .border(SocialPanelBorderWidth, OneConfigTheme.accent, ppShape(8.dp))
-                    .padding(vertical = 20.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                SocialText(code, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontFamily = Outfit, textAlign = TextAlign.Center)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LoginModalButton(
-                    label = "Copy code",
-                    icon = ASSETS + "copy-01.svg",
-                    filled = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        runCatching {
-                            //? if > 1.8.9 {
-                            Minecraft.getInstance().keyboardHandler.setClipboard(code)
-                            //?} else {
-                            /*Screen.setClipboard(code)
-                            *///?}
-                        }
-                    },
-                )
-                LoginModalButton(
-                    label = "Open in browser",
-                    icon = ASSETS + "link-external-01.svg",
-                    filled = true,
-                    modifier = Modifier.weight(1f),
-                    onClick = { ClientPlatform.openUri(verificationUri) },
-                )
-            }
-            if (status != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    LoadingSpinner(Modifier.size(14.dp))
-                    SocialText(status, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .clip(ppShape(6.dp))
-                    .clickableWithSound(onCancel)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                SocialText("Cancel", fontSize = 14.sp, color = SocialTextPrimary, textAlign = TextAlign.Center)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun OfflineAccountPopup(
-    busy: String?,
-    error: String?,
-    onSubmit: (String) -> Unit,
-    onCancel: () -> Unit,
-) {
-    var username by remember { mutableStateOf("") }
-    val trimmed = username.trim()
-    val validChars = trimmed.all { it.isLetterOrDigit() && it.code < 128 || it == '_' }
-    val valid = trimmed.length in 3..16 && validChars
-    val idle = busy == null
-    // the error belongs to the last name tried, so hide it once the user edits
-    var submitted by remember { mutableStateOf<String?>(null) }
-    val submit = {
-        if (valid && idle) {
-            submitted = trimmed
-            onSubmit(trimmed)
-        }
-    }
-
-    SocialModalScrim({ if (idle) onCancel() }) {
-        Column(
-            modifier = Modifier
-                .width(380.dp)
-                .clip(PanelShape)
-                .background(OneConfigTheme.current.pageBackground.copy(alpha = 0.8f))
-                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-                .swallowClicks()
-                .padding(horizontal = 22.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            SocialText("Add offline account", fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Outfit, textAlign = TextAlign.Center)
-            SocialTextField(
-                value = username,
-                onValueChange = { username = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = "Username",
-                leadingIcon = ASSETS + "user-01.svg",
-                maxLength = 16,
-                onSubmit = submit,
-            )
-            val hint = when {
-                error != null && submitted == trimmed -> error
-                trimmed.isNotEmpty() && !validChars -> "Only letters, digits, and underscores"
-                trimmed.isNotEmpty() && trimmed.length < 3 -> "At least 3 characters"
-                else -> null
-            }
-            if (hint != null) {
-                SocialText(hint, fontSize = 12.sp, color = SocialDangerColor, textAlign = TextAlign.Center)
-            }
-            if (busy != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    LoadingSpinner(Modifier.size(14.dp))
-                    SocialText(busy, fontSize = 13.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LoginModalButton(
-                    label = "Cancel",
-                    icon = ASSETS + "x-close.svg",
-                    filled = false,
-                    modifier = Modifier.weight(1f).alpha(if (idle) 1f else 0.5f),
-                    onClick = { if (idle) onCancel() },
-                )
-                LoginModalButton(
-                    label = "Add account",
-                    icon = ASSETS + "plus.svg",
-                    filled = true,
-                    modifier = Modifier.weight(1f).alpha(if (valid && idle) 1f else 0.5f),
-                    onClick = submit,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LoginModalButton(
-    label: String,
-    icon: String,
-    filled: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val contentColor = if (filled) Color.White else SocialTextPrimary
-    Row(
-        modifier = modifier
-            .height(44.dp)
-            .clip(PanelShape)
-            .background(if (filled) OneConfigTheme.accent else PanelBackground)
-            .border(SocialPanelBorderWidth, if (filled) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, PanelShape)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentColor, Modifier.size(16.dp))
-        SocialText(label, fontSize = 14.sp, color = contentColor, maxLines = 1, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun OrDivider() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(Modifier.weight(1f).height(1.dp).background(SocialPanelBorderBrush))
-        SocialText("or", fontSize = 12.sp, color = SocialTextSecondary, textAlign = TextAlign.Center)
-        Box(Modifier.weight(1f).height(1.dp).background(SocialPanelBorderBrush))
-    }
-}
-
-@Composable
-private fun LoadingSpinner(modifier: Modifier) {
-    Icon(ASSETS + "loading-02.svg", OneConfigTheme.accent, modifier)
-}
-
-@Composable
-internal fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(30.dp)
-            .clip(ppShape(6.dp))
-            .alpha(if (enabled) 1f else 0.4f)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, color, Modifier.size(18.dp))
-    }
-}
-
-internal enum class TooltipPlacement { BELOW_END, ABOVE_CENTER }
 
 @Composable
 private fun IconButton(
     icon: String,
-    background: Color = PanelBackground,
     modifier: Modifier = Modifier,
+    danger: Boolean = false,
     tooltip: String? = null,
-    tooltipPlacement: TooltipPlacement = TooltipPlacement.BELOW_END,
+    tooltipPlacement: TooltipPlacement = TooltipPlacement.BelowEnd,
     onClick: () -> Unit = {},
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Box(
-        modifier = modifier
-            .size(45.dp)
-            .clip(PanelShape)
-            .background(background)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, PanelShape)
-            .hoverable(interaction)
-            .clickableWithSound(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, SocialTextPrimary, Modifier.size(20.dp))
-        if (tooltip != null && hovered) HoverTooltip(tooltip, tooltipPlacement)
-    }
-}
-
-/** A tooltip bubble placed against the composable it's called in, wrapping at [maxWidth]. */
-@Composable
-internal fun HoverTooltip(text: String, placement: TooltipPlacement, maxWidth: Dp = Dp.Unspecified) {
-    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val positionProvider = remember(gap, placement) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset = when (placement) {
-                TooltipPlacement.BELOW_END ->
-                    IntOffset(anchorBounds.right - popupContentSize.width, anchorBounds.bottom + gap)
-                TooltipPlacement.ABOVE_CENTER -> IntOffset(
-                    anchorBounds.center.x - popupContentSize.width / 2,
-                    anchorBounds.top - gap - popupContentSize.height,
-                )
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        TooltipBubble(text, maxWidth)
-    }
-}
-
-@Composable
-private fun TooltipBubble(text: String, maxWidth: Dp) {
-    Box(
-        modifier = Modifier
-            .widthIn(max = maxWidth)
-            .clip(PanelShape)
-            .background(OneConfigTheme.current.popupBackground)
-            .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, PanelShape)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(text, fontSize = 13.sp, textAlign = TextAlign.Center)
+    MenuButtonSurface(tooltip, modifier.size(45.dp), onClick) { ink, hovered ->
+        val tint by animateColorAsState(if (danger && hovered) SocialDangerText else ink, menuFade())
+        Icon(icon, tint, Modifier.size(18.dp))
+        if (tooltip != null && hovered) TooltipPopup(tooltip, tooltipPlacement, Dp.Unspecified)
     }
 }
 
@@ -1921,28 +819,6 @@ private fun NotificationBell() {
         }
     }
 }
-
-@Composable
-private fun RasterImage(
-    path: String,
-    modifier: Modifier,
-    contentScale: ContentScale = ContentScale.Fit,
-    alignment: Alignment = Alignment.Center,
-) {
-    val bitmap = rememberRaster(path)
-    if (bitmap != null) {
-        Image(bitmap, contentDescription = null, modifier = modifier, alignment = alignment, contentScale = contentScale)
-    } else {
-        Box(modifier.background(ServerIconBackground))
-    }
-}
-
-@Composable
-private fun rememberFavicon(bytes: ByteArray?): ImageBitmap? = remember(bytes) {
-    if (bytes == null || bytes.isEmpty()) null
-    else runCatching { PolyBitmap.decode(bytes)!!.asComposeImageBitmap() }.getOrNull()
-}
-
 //? if = 1.8.9 {
 /*@Composable
 private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
@@ -1950,23 +826,3 @@ private fun rememberFavicon(icon: String?): ImageBitmap? = remember(icon) {
     else runCatching { PolyBitmap.decode(Base64.getDecoder().decode(icon))!!.asComposeImageBitmap() }.getOrNull()
 }
 *///?}
-
-@Composable
-private fun rememberRaster(path: String): ImageBitmap? =
-    if (MainMenuRasterAssets.ready) MainMenuRasterAssets.cached(path) else null
-
-fun playerName(): String = runCatching {
-    Minecraft.getInstance().user.name
-}.getOrDefault("Player")
-
-private fun platformLabel(): String = runCatching {
-    //? if fabric || ornithe {
-    val loaderName = "Fabric"
-    val mcVersion = FabricLoader.getInstance()
-        .getModContainer("minecraft").map { it.metadata.version.friendlyString }.orElse("")
-    //?} else {
-    /*val loaderName = "NeoForge"
-    val mcVersion = net.minecraft.SharedConstants.getCurrentVersion().name
-    *///?}
-    if (mcVersion.isBlank()) loaderName else "$loaderName $mcVersion"
-}.getOrDefault("Fabric")

@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
 import net.minecraft.client.gui.screens.TitleScreen
+import org.polyfrost.oneconfig.api.ui.v1.ChangelogSources
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.ModCardIcons
 import org.polyfrost.oneconfig.api.ui.v1.ModsPageDecorator
@@ -14,6 +15,7 @@ import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.api.ui.v1.page.PageGroup
 import org.polyfrost.oneconfig.api.ui.v1.page.PageText
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object PolyPlusOneConfigIntegration {
@@ -49,6 +51,7 @@ object PolyPlusOneConfigIntegration {
         if (OneConfigPages.byId(wardrobePage.id) == null) OneConfigPages.register(wardrobePage)
         ModsPageDecorators.register(modOrderToggle)
         ModCardIcons.register { modId, defaultIcon -> modCardIcon(modId, defaultIcon) }
+        ChangelogSources.register(ModpackChangelog)
         OneConfigTheme.overrideLogo(BRAND_LOGO)
     }
 
@@ -56,9 +59,11 @@ object PolyPlusOneConfigIntegration {
     fun openCosmetics() = OneConfigUI.open(wardrobePage)
 
     fun openCosmeticsFromKeybind() {
-        when (ClientPlatform.currentScreen()) {
-            null, is TitleScreen, is PolyPlusMainMenuScreen -> openCosmetics()
-            else -> Unit
+        val screen = ClientPlatform.currentScreen()
+        if (screen is PolyPlusLobbyScreen) {
+            screen.showPage(LobbyPage.Wardrobe)
+        } else if (screen == null || screen is TitleScreen || MainMenuReplacement.isMenu(screen)) {
+            openCosmetics()
         }
     }
 

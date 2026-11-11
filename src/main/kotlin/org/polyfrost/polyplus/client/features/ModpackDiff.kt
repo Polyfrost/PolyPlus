@@ -30,6 +30,11 @@ object ModpackDiff {
     )
 
     private const val MAX_VERSIONS_CHECKED = 10
+    private const val MAIN_PACK = "oneclient-modpack"
+
+    @Volatile
+    var installedVersion: String? = null
+        private set
 
     @Serializable
     private data class PackVersion(val version_number: String, val dependencies: List<PackDependency>)
@@ -47,7 +52,7 @@ object ModpackDiff {
         val size: Int get() = removed.size + added.size
     }
 
-    private data class Match(val pack: String, val version: String, val diff: Diff)
+    private data class Match(val slug: String, val pack: String, val version: String, val diff: Diff)
 
     fun logAsync() {
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) {
@@ -77,7 +82,7 @@ object ModpackDiff {
 
             for (version in versions) {
                 val diff = diff(version.dependencies.mapNotNull { dep -> dep.version_id?.let(jars::get) }.toMap(), loaded)
-                if (best == null || diff.size < best.diff.size) best = Match(name, version.version_number, diff)
+                if (best == null || diff.size < best.diff.size) best = Match(slug, name, version.version_number, diff)
                 if (diff.removed.isEmpty()) break
             }
         }
@@ -86,7 +91,8 @@ object ModpackDiff {
             logger.info("No OneClient modpack found for Minecraft {}", mcVersion)
             return
         }
-        val (pack, version, diff) = best
+        val (slug, pack, version, diff) = best
+        if (slug == MAIN_PACK && diff.removed.isEmpty()) installedVersion = version
         logger.info(buildString {
             append(pack).append(' ').append(version).append(" (Minecraft ").append(mcVersion).append(")")
             if (diff.size == 0) append(": exact match")

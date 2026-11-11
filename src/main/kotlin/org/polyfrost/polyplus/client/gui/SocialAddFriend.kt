@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,8 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
+import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.polyplus.client.network.http.PlayersApi
+import org.polyfrost.polyplus.client.network.http.SocialApi
 import org.polyfrost.polyplus.client.social.FriendsRepository
+import org.polyfrost.polyplus.client.social.SocialErrors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,36 +55,52 @@ internal fun AddFriendDialog(onDismiss: () -> Unit) {
                 sending = false
                 return@launch
             }
-            FriendsRepository.sendRequest(id)
-            sending = false
-            onDismiss()
+            withContext(Dispatchers.IO) { SocialApi.sendRequest(id) }
+                .onSuccess {
+                    FriendsRepository.refreshAll()
+                    SocialNotices.emit("Friend request sent to $name")
+                    sending = false
+                    onDismiss()
+                }
+                .onFailure {
+                    SocialErrors.emit("Couldn't send friend request", it)
+                    sending = false
+                }
         }
     }
 
-    SocialModalScrim(onDismiss) {
-        ModalPanel(width = 400.dp) {
-            SocialText("Add Friend", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            SocialText("Enter a username to send a friend request", fontSize = 13.sp, color = SocialTextSecondary)
-            SocialTextField(
-                value = username,
-                onValueChange = { username = it; error = null },
-                placeholder = "Username",
-                leadingIcon = SOCIAL_ASSETS + "search-lg.svg",
-                maxLength = 16,
-                onSubmit = { submit() },
-            )
-            error?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SocialButton("Cancel", icon = SOCIAL_ASSETS + "x-close.svg", modifier = Modifier.weight(1f), onClick = onDismiss)
-                SocialButton(
-                    if (sending) "Adding..." else "Add",
-                    icon = SOCIAL_ASSETS + "user-plus-01.svg",
-                    modifier = Modifier.weight(1f),
-                    filled = true,
-                    enabled = username.isNotBlank() && !sending,
-                    onClick = { submit() },
-                )
-            }
+    ModalDialog(onDismiss, 400.dp, true) {
+        DialogTitle("Add friend")
+        SocialText("Enter a username to send a friend request", fontSize = 13.sp, color = SocialTextSecondary)
+        TextField(
+            value = username,
+            onValueChange = { username = it; error = null },
+            modifier = Modifier.height(38.dp),
+            placeholder = "Username",
+            leadingIcon = themedIcon(SOCIAL_ASSETS + "search-lg.svg"),
+            maxLength = 16,
+            invalid = false,
+            enabled = true,
+            singleLine = true,
+            framed = true,
+            fontSize = 14.sp,
+            label = null,
+            masked = false,
+            focusRequester = null,
+            interactionSource = null,
+            trailing = null,
+            onSubmit = { submit() },
+        )
+        error?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton("Cancel", themedIcon(SOCIAL_ASSETS + "x-close.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onDismiss)
+            TextButton(
+                if (sending) "Sending…" else "Send request",
+                themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"),
+                Modifier.weight(1f).height(38.dp),
+                ButtonStyle.Primary,
+                username.isNotBlank() && !sending,
+            ) { submit() }
         }
     }
 }

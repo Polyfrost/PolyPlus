@@ -1,0 +1,397 @@
+//? if = 1.8.9 {
+/*#version 120
+#define textureLod(sampler, uv, lod) texture2D(sampler, uv)
+#define fragColor gl_FragColor
+*///?} else {
+#version 330
+//?}
+//? if >= 26.3
+#extension GL_ARB_separate_shader_objects : require
+//? if < 1.21.4 {
+/*#define InSampler DiffuseSampler
+*///?}
+
+uniform sampler2D InSampler;
+uniform sampler2D BloomSampler;
+uniform sampler2D SoftSampler;
+uniform sampler2D FrostSampler;
+uniform sampler2D DepthSampler;
+
+//? if >= 1.21.8 {
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 InSize;
+    vec2 BloomSize;
+    vec2 SoftSize;
+    vec2 FrostSize;
+    vec2 DepthSize;
+};
+
+layout(std140) uniform LobbySky {
+    vec4 Forward;
+    vec4 Right;
+    vec4 Up;
+    vec4 Params;
+    vec4 Mood;
+    vec4 Lens;
+    vec4 Wave;
+    vec4 Flags;
+};
+
+layout(std140) uniform LobbyGlass {
+    vec4 Glass;
+    vec4 Panels[12];
+    vec4 Radii[3];
+};
+
+vec4 panelAt(int index) {
+    return Panels[index];
+}
+
+float radiusAt(int index) {
+    return Radii[index / 4][index % 4];
+}
+//?} else {
+/*uniform vec2 OutSize;
+uniform vec2 InSize;
+uniform vec2 BloomSize;
+uniform vec2 SoftSize;
+uniform vec2 FrostSize;
+uniform vec2 DepthSize;
+uniform vec4 Forward;
+uniform vec4 Right;
+uniform vec4 Up;
+uniform vec4 Params;
+uniform vec4 Mood;
+uniform vec4 Lens;
+uniform vec4 Wave;
+uniform vec4 Flags;
+uniform vec4 Glass;
+uniform vec4 Panel0;
+uniform vec4 Panel1;
+uniform vec4 Panel2;
+uniform vec4 Panel3;
+uniform vec4 Panel4;
+uniform vec4 Panel5;
+uniform vec4 Panel6;
+uniform vec4 Panel7;
+uniform vec4 Panel8;
+uniform vec4 Panel9;
+uniform vec4 Panel10;
+uniform vec4 Panel11;
+uniform vec4 Radius0;
+uniform vec4 Radius1;
+uniform vec4 Radius2;
+
+vec4 panelAt(int index) {
+    vec4 panels[12] = vec4[12](Panel0, Panel1, Panel2, Panel3, Panel4, Panel5, Panel6, Panel7, Panel8, Panel9, Panel10, Panel11);
+    return panels[index];
+}
+
+float radiusAt(int index) {
+    vec4 radii[3] = vec4[3](Radius0, Radius1, Radius2);
+    return radii[index / 4][index - index / 4 * 4];
+}
+*///?}
+
+//? if >= 26.3 {
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec4 fragColor;
+//?} elif > 1.8.9 {
+/*in vec2 texCoord;
+out vec4 fragColor;
+*///?} else {
+/*varying vec2 texCoord;
+*///?}
+
+const int GATHER_TAPS = 40;
+const float GOLDEN_ANGLE = 2.39996;
+const float DOF_RADIUS = 11.0;
+const float SKY_RADIUS = 18.0;
+const float REFERENCE_HEIGHT = 1080.0;
+const float COC_DEADZONE = 0.14;
+const float COC_FULL = 0.85;
+const float FAR_DEPTH = 1000000.0;
+const float SOFT_FROM = 5.0;
+const float SOFT_TO = 12.0;
+const float DITHER = 1.3 / 255.0;
+
+bool finiteColor(vec3 color) {
+    return all(lessThan(abs(color), vec3(1000000.0)));
+}
+
+bool validDepth(float depth) {
+    return depth >= 0.0 && depth <= 1.0;
+}
+
+float noise(vec2 pixel) {
+    return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+
+int flagMode() {
+    return int(Flags.w + 0.5);
+}
+
+int depthMode() {
+    return flagMode() - flagMode() / 4 * 4;
+}
+
+int ringMode() {
+    return flagMode() / 4;
+}
+
+bool depthKnown() {
+    return depthMode() != 3;
+}
+
+bool isSkyDepth(float depth) {
+    if (depthMode() == 1) {
+        return depth >= 0.999999;
+    }
+    if (depthMode() == 2) {
+        return depth <= 0.000001;
+    }
+    if (depthMode() == 3) {
+        return false;
+    }
+    //? if >= 26.2 {
+    return depth <= 0.000001;
+    //?} else {
+    /*return depth >= 0.999999;
+    *///?}
+}
+
+float linearDepth(float depth) {
+    float near = Params.z;
+    float far = Params.w;
+    //? if >= 26.2 {
+    return near * far / (depth * (far - near) + near);
+    //?} else {
+    /*return near * far / (far - depth * (far - near));
+    *///?}
+}
+
+vec3 viewRay(vec2 uv) {
+    vec2 ndc = uv * 2.0 - 1.0;
+    return Forward.xyz + Right.xyz * (ndc.x * Forward.w * Right.w) + Up.xyz * (ndc.y * Forward.w);
+}
+
+bool waveLive() {
+    return ringMode() > 0 && dot(Wave.xy, Wave.xy) > 0.5;
+}
+
+float behindFront(vec2 uv, float depth) {
+    vec3 pos = viewRay(uv) * linearDepth(depth);
+    return Wave.w - max(dot(pos.xz, Wave.xy) - Wave.z, 0.0);
+}
+
+bool masked(vec2 uv, float depth) {
+    return ringMode() == 2 && waveLive() && !isSkyDepth(depth) && behindFront(uv, depth) <= 0.0;
+}
+
+bool skyAt(vec2 uv, float depth) {
+    return isSkyDepth(depth) || masked(uv, depth);
+}
+
+float pixelScale() {
+    return max(OutSize.y, 1.0) / REFERENCE_HEIGHT;
+}
+
+float dofRadius() {
+    return DOF_RADIUS * pixelScale();
+}
+
+float skyRadius() {
+    return SKY_RADIUS * pixelScale();
+}
+
+float focusDistance() {
+    return max(Lens.x, 0.001);
+}
+
+float lensCoc(float depth) {
+    float z = linearDepth(depth);
+    float focus = focusDistance();
+    if (z < focus) {
+        return smoothstep(0.45, 1.5, (focus - z) / focus) * Lens.y;
+    }
+    return smoothstep(COC_DEADZONE, COC_FULL, (z - focus) / max(z, 0.001)) * Lens.y;
+}
+
+float panelCoverage(int index, vec2 pixel) {
+    vec4 panel = panelAt(index);
+    float radius = radiusAt(index) * OutSize.y;
+    vec2 centre = vec2(panel.x, 1.0 - panel.y) * OutSize;
+    vec2 half_size = panel.zw * OutSize;
+    vec2 corner = abs(pixel - centre) - half_size + radius;
+    float distance = length(max(corner, 0.0)) + min(max(corner.x, corner.y), 0.0) - radius;
+    return clamp(0.5 - distance, 0.0, 1.0);
+}
+
+float frostAmount() {
+    float amount = Glass.x;
+    vec2 pixel = texCoord * OutSize;
+    int count = int(Glass.z);
+    for (int index = 0; index < count; index++) {
+        amount = max(amount, panelCoverage(index, pixel));
+    }
+    return amount * Glass.y;
+}
+
+const float REVEAL_FADE = 0.22;
+const float REVEAL_FLOOR = 0.35;
+const float PULL_START = 0.15;
+const float PULL_END = 0.7;
+const float PULL_FAR = 2.0;
+const float PULL_APERTURE = 0.3;
+const float LIGHT_START = 0.04;
+const float LIGHT_END = 0.85;
+const float LIGHT_REACH = 220.0;
+const float LIGHT_SOFTNESS = 14.0;
+const float LIGHT_EDGE = 6.0;
+const float LIGHT_FLARE = 0.8;
+const vec3 LIGHT_DARK = vec3(0.22, 0.26, 0.4);
+const vec3 LIGHT_WARMTH = vec3(1.0, 0.8, 0.55);
+
+int revealMode() {
+    return int(Lens.z + 0.5);
+}
+
+float focusPullBlur(float depth) {
+    float focus = focusDistance() * mix(PULL_FAR, 1.0, smoothstep(PULL_START, PULL_END, Lens.w));
+    float aperture = mix(PULL_APERTURE, 1.0, smoothstep(PULL_END, 1.0, Lens.w));
+    return smoothstep(focus * 0.45 * aperture, focus * 1.5 * aperture, abs(linearDepth(depth) - focus)) * Lens.y;
+}
+
+float blurAmount(float depth) {
+    return clamp(revealMode() == 1 ? focusPullBlur(depth) : lensCoc(depth), 0.0, 1.0);
+}
+
+vec2 tapLens(vec2 uv) {
+    float depth = textureLod(DepthSampler, uv, 0.0).r;
+    if (!validDepth(depth)) {
+        return vec2(0.0, FAR_DEPTH);
+    }
+    if (skyAt(uv, depth)) {
+        return vec2(skyRadius(), FAR_DEPTH);
+    }
+    return vec2(blurAmount(depth) * dofRadius(), linearDepth(depth));
+}
+
+vec3 tapColor(vec2 uv, float soften) {
+    if (soften <= 0.01) {
+        return textureLod(InSampler, uv, 0.0).rgb;
+    }
+    vec3 soft = textureLod(SoftSampler, uv, 0.0).rgb;
+    if (soften >= 0.99) {
+        return soft;
+    }
+    return mix(textureLod(InSampler, uv, 0.0).rgb, soft, soften);
+}
+
+vec3 gather(vec3 center, float centerReach, float centerDepth, float search, float seed, float behindMix) {
+    float soften = smoothstep(SOFT_FROM * pixelScale(), SOFT_TO * pixelScale(), centerReach);
+    vec3 back = mix(center, tapColor(texCoord, soften), soften);
+    float backWeight = 1.0;
+    vec3 front = vec3(0.0);
+    float frontWeight = 0.0;
+    float area = search * search / float(GATHER_TAPS);
+    float ahead = max(0.15, centerDepth * 0.03);
+    float spin = seed * 6.28318 * (1.0 - soften);
+    for (int i = 0; i < GATHER_TAPS; i++) {
+        float angle = float(i) * GOLDEN_ANGLE + spin;
+        float reach = sqrt((float(i) + 0.5) / float(GATHER_TAPS)) * search;
+        vec2 uv = texCoord + vec2(cos(angle), sin(angle)) * reach / OutSize;
+        vec2 lens = tapLens(uv);
+        vec3 taken = tapColor(uv, soften);
+        if (!finiteColor(taken)) {
+            continue;
+        }
+        float frontness = smoothstep(ahead * 0.5, ahead * 1.5, centerDepth - lens.y);
+        if (frontness > 0.0) {
+            float covers = clamp(lens.x - reach + 1.0, 0.0, 1.0) * smoothstep(0.25 * search, 0.5 * search, lens.x);
+            float share = min(area / max(lens.x * lens.x, 1.0), 0.25) * covers * frontness;
+            front += taken * share;
+            frontWeight += share;
+        }
+        float weight = clamp(min(lens.x, centerReach) - reach + 1.0, 0.0, 1.0) * (1.0 - frontness);
+        back += taken * weight;
+        backWeight += weight;
+    }
+    vec3 behind = mix(center, back / backWeight, behindMix);
+    if (frontWeight <= 0.0) {
+        return behind;
+    }
+    return mix(behind, front / frontWeight, clamp(frontWeight, 0.0, 1.0));
+}
+
+vec3 firstLightGain(float depth) {
+    float progress = clamp((Lens.w - LIGHT_START) / (LIGHT_END - LIGHT_START), 0.0, 1.0);
+    float radius = LIGHT_REACH * progress * progress;
+    if (!depthKnown() || !validDepth(depth) || skyAt(texCoord, depth)) {
+        return mix(LIGHT_DARK, vec3(1.0), smoothstep(70.0, 125.0, radius));
+    }
+    vec3 ray = viewRay(texCoord);
+    float reach = length(ray * linearDepth(depth) - Forward.xyz * Lens.x);
+    float lit = 1.0 - smoothstep(radius - LIGHT_SOFTNESS, radius, reach);
+    float front = (reach - radius + LIGHT_SOFTNESS * 0.5) / LIGHT_EDGE;
+    float flare = exp(-front * front) * (1.0 - progress);
+    return mix(LIGHT_DARK, vec3(1.0), lit) * (1.0 + LIGHT_WARMTH * (LIGHT_FLARE * flare));
+}
+
+vec3 scene() {
+    vec3 color = textureLod(InSampler, texCoord, 0.0).rgb;
+    float depth = textureLod(DepthSampler, texCoord, 0.0).r;
+    float day = 1.0 - Mood.y;
+    float seed = noise(gl_FragCoord.xy);
+    float blur = 0.0;
+    bool known = depthKnown() && validDepth(depth);
+    bool sky = known && skyAt(texCoord, depth);
+    if (known && !sky) {
+        blur = blurAmount(depth);
+        float radius = blur * dofRadius();
+        float search = max(radius, dofRadius() * Lens.y);
+        if (search > 0.5) {
+            color = gather(color, radius, linearDepth(depth), search, seed, 1.0);
+        }
+    } else if (sky) {
+        float search = mix(dofRadius() * Lens.y, skyRadius(), day);
+        if (search > 0.5) {
+            color = gather(color, search, FAR_DEPTH, search, seed, day);
+        }
+    }
+    if (revealMode() == 2) {
+        color *= firstLightGain(depth);
+    }
+    return color + textureLod(BloomSampler, texCoord, 0.0).rgb * mix(0.08, 0.6, Mood.y) * (1.0 - 0.5 * blur);
+}
+
+void main() {
+    float frost = frostAmount();
+    vec3 color = frost >= 1.0 ? textureLod(FrostSampler, texCoord, 0.0).rgb : scene();
+    if (frost > 0.0 && frost < 1.0) {
+        color = mix(color, textureLod(FrostSampler, texCoord, 0.0).rgb, frost);
+    }
+    if (!finiteColor(color)) {
+        color = textureLod(InSampler, texCoord, 0.0).rgb;
+    }
+    float bright = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    float warmth = clamp((color.r - color.b) * 3.5 + bright * bright * 0.5, 0.0, 1.0);
+    vec3 graded = mix(color * vec3(0.74, 0.86, 1.14), color * vec3(1.12, 0.97, 0.76), warmth);
+    vec3 golden = color * mix(vec3(1.0), vec3(1.1, 0.98, 0.82), Mood.w);
+    color = mix(golden, graded, Mood.y);
+    color = 1.0 - exp(-color * Mood.z);
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    color = mix(vec3(luma), color, 1.16);
+    color = mix(color, color * color * (3.0 - 2.0 * color), 0.3);
+    color += vec3(0.012, 0.0, 0.036) * (1.0 - clamp(luma * 2.2, 0.0, 1.0));
+    vec2 centred = texCoord - 0.5;
+    float vignette = 1.0 - smoothstep(0.32, 0.92, length(centred * vec2(1.15, 1.0)));
+    color *= mix(mix(0.72, 0.42, Mood.y), 1.0, vignette);
+    if (revealMode() == 1) {
+        color *= mix(REVEAL_FLOOR, 1.0, smoothstep(0.0, REVEAL_FADE, Lens.w));
+    }
+    vec2 pixel = gl_FragCoord.xy;
+    color += (vec3(noise(pixel), noise(pixel + vec2(19.0, 47.0)), noise(pixel + vec2(71.0, 13.0))) + vec3(noise(pixel + vec2(37.0, 89.0))) - 1.0) * DITHER;
+    fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+}

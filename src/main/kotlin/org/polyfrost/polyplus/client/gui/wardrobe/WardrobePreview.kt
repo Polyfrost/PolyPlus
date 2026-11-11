@@ -36,9 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -53,11 +53,13 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -153,22 +155,29 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
     val textureVersion = MojangCapeService.textureVersion
     val mojangState = MojangCapeService.state
 
-    var previewId by remember(variantId) { mutableStateOf(variantId) }
+    var previewPieces by remember(variantId, slot) {
+        mutableStateOf(if (slot != null && variantId != null) mapOf(slot to variantId) else emptyMap())
+    }
     LaunchedEffect(variantId, previewsOwned) {
-        if (!previewsOwned || variantId == null) return@LaunchedEffect
-        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
-        val id = CosmeticCatalog.resolveVariantForSkin(variantId, slim)
-        previewId = id
-        if (!isPreviewAssetLoaded(id, slot == BodySlot.Cape, slot == BodySlot.Pet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
+        if (!previewsOwned || variantId == null || slot == null) return@LaunchedEffect
+        val pieces = CosmeticCatalog.getCosmeticDefinition(variantId)
+            ?.let { CosmeticService.bothSides(it).getOrNull() }
+            ?: run {
+                val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+                mapOf(slot to CosmeticCatalog.resolveVariantForSkin(variantId, slim))
+            }
+        previewPieces = pieces
+        for ((pieceSlot, id) in pieces) {
+            if (!isPreviewAssetLoaded(id, pieceSlot == BodySlot.Cape, pieceSlot == BodySlot.Pet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
+        }
     }
 
     val base = CosmeticCatalog.localEquipped().equipped
-    val look = remember(base, owned?.equippedCosmeticId, slot, previewId, previewsOwned, mojang?.id) {
+    val look = remember(base, owned?.equippedCosmeticId, previewPieces, previewsOwned, mojang?.id) {
         base.toMutableMap().apply {
-            val id = previewId
-            if (previewsOwned && slot != null && id != null) {
+            if (previewsOwned && previewPieces.isNotEmpty()) {
                 owned?.equippedCosmeticId?.let { equippedId -> values.removeAll { it == equippedId } }
-                put(slot, id)
+                putAll(previewPieces)
             }
             if (mojang != null) remove(BodySlot.Cape)
         }
@@ -283,9 +292,9 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
     val art = remember(variant.id, swatchVersion) { CosmeticSwatches.get(variant.id) }
     Row(
         modifier = Modifier.height(28.dp)
-            .alpha(if (dimmed) 0.55f else 1f)
+            .graphicsLayer { alpha = if (dimmed) 0.55f else 1f }
             .clip(ppShape(6.dp))
-            .background(if (selected) OneConfigTheme.accent else theme.componentBackground)
+            .background(if (selected) OneConfigTheme.accent else SocialOffStateBackground)
             .border(
                 1.dp,
                 when {

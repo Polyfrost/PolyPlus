@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
+import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
@@ -7,6 +8,10 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
+
+private val LOGGER = LogManager.getLogger()
+private val URL_QUERY = Regex("""\?\S*""")
 
 internal data class CartEntry(
     val key: String,
@@ -70,8 +75,17 @@ internal fun checkoutFailureMessage(error: Throwable): String =
     if (error is BillingService.AlreadyOwnedException) {
         error.message ?: "You already own this item."
     } else {
-        "Checkout failed: ${error.message}"
+        wardrobeFailure(error, "start checkout")
     }
+
+internal fun wardrobeFailure(error: Throwable, action: String): String {
+    LOGGER.warn("Couldn't {}: {}: {}", action, error.javaClass.simpleName, error.message?.replace(URL_QUERY, ""))
+    return if (error is OnlineServicesDisabledException) {
+        "Accept the Terms of Service and Privacy Policy under Privacy in the PolyPlus settings."
+    } else {
+        "Couldn't $action. Try again later."
+    }
+}
 
 internal data class CosmeticUiItem(
     val groupId: Int,

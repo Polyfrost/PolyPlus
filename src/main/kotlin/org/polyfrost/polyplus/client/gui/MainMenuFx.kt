@@ -1,15 +1,51 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
-import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.dp
+import net.minecraft.client.Minecraft
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ThemeConfig
+import org.polyfrost.polyplus.client.lobby.GlassRegistry
+import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
+import kotlin.math.sqrt
+
+//? if = 1.8.9
+//import org.lwjgl.input.Mouse
+
+private const val PARALLAX_EASE = 0.02f
+private const val BLUR_SPREAD = 2.6f
+private const val MIN_SPOT_ALPHA = 1f / 255f
+private val MenuBlur = 40.dp
 
 private val GlowA = Color(0xFF1878F1)
 private val GlowB = Color(0xFF24D3EE)
@@ -62,7 +98,76 @@ private fun DrawScope.drawSoftGlow(color: Color, center: Offset, radius: Float, 
     drawRadial(stops, center, radius, alpha)
 }
 
-fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
+internal class MenuGlass : GlassRegistry {
+    val panels = mutableStateMapOf<Any, LobbyGlass.Panel>()
+
+    override fun put(key: Any, panel: LobbyGlass.Panel) {
+        if (panels[key] != panel) panels[key] = panel
+    }
+
+    override fun putFloating(key: Any, panel: LobbyGlass.Panel) = put(key, panel)
+
+    override fun remove(key: Any) {
+        panels.remove(key)
+    }
+}
+
+@Composable
+internal fun MenuBackdrop(modifier: Modifier, glass: MenuGlass) {
+    var time by remember { mutableFloatStateOf(0f) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val eased = remember { floatArrayOf(0.5f, 0.5f) }
+    val frosted = !OneConfigTheme.current.isMinecraftStyle
+    LaunchedEffect(Unit) {
+        if (Motion.reduced) return@LaunchedEffect
+        val start = withFrameNanos { it }
+        while (true) withFrameNanos { time = (it - start) / 1_000_000_000f }
+    }
+    Canvas(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
+        val target = if (Motion.reduced) Offset(0.5f, 0.5f) else menuMouse()
+        eased[0] += (target.x - eased[0]) * PARALLAX_EASE
+        eased[1] += (target.y - eased[1]) * PARALLAX_EASE
+        val mouse = Offset(eased[0], eased[1])
+        drawMenuBackground(time, mouse)
+        if (frosted && ThemeConfig.enableBackgroundBlur) drawFrost(glass.panels.values, origin, time, mouse)
+    }
+}
+
+private fun DrawScope.drawFrost(panels: Collection<LobbyGlass.Panel>, origin: Offset, time: Float, mouse: Offset) {
+    if (panels.isEmpty()) return
+    val blur = MenuBlur.toPx()
+    val clip = Path()
+    for (panel in panels) {
+        val centerX = panel.centerX * size.width - origin.x
+        val centerY = panel.centerY * size.height - origin.y
+        val halfWidth = panel.halfWidth * size.width
+        val halfHeight = panel.halfHeight * size.height
+        if (halfWidth <= 0f || halfHeight <= 0f) continue
+        val bounds = Rect(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight)
+        val radius = (panel.radius * size.height).coerceIn(0f, minOf(halfWidth, halfHeight))
+        clip.reset()
+        clip.addRoundRect(RoundRect(bounds, CornerRadius(radius)))
+        clipPath(clip) { drawMenuBackground(time, mouse, blur, bounds) }
+    }
+}
+
+private fun menuMouse(): Offset {
+    val mc = Minecraft.getInstance()
+    //? if > 1.8.9 {
+    val screenW = mc.window.screenWidth.coerceAtLeast(1)
+    val screenH = mc.window.screenHeight.coerceAtLeast(1)
+    val x = (mc.mouseHandler.xpos() / screenW).toFloat()
+    val y = (mc.mouseHandler.ypos() / screenH).toFloat()
+    //?} else {
+    /*val w = mc.window.width.coerceAtLeast(1)
+    val h = mc.window.height.coerceAtLeast(1)
+    val x = Mouse.getX().toFloat() / w
+    val y = (h - Mouse.getY()).toFloat() / h
+    *///?}
+    return Offset(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
+}
+
+fun DrawScope.drawMenuBackground(time: Float, mouse: Offset, blur: Float = 0f, within: Rect = Rect.Zero) {
     drawRect(FxPageBackground)
     val mdx = (mouse.x - 0.5f) * size.width
     val mdy = (mouse.y - 0.5f) * size.height
@@ -71,11 +176,22 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset) {
         val cy = size.height * (b.ay + cos(time * b.sy + b.psi) * b.driftY) + mdy * b.par
         val radius = size.width * b.rF * (1f + 0.12f * sin(time * 0.6f + b.phi))
         val alpha = (b.baseAlpha * (0.75f + 0.25f * sin(time * 0.9f + b.psi))).coerceIn(0f, 1f)
-        coolGlowLayers(time * 0.05f + b.hueOffset, alpha) { color, a -> drawSoftGlow(color, Offset(cx, cy), radius, a) }
+        coolGlowLayers(time * 0.05f + b.hueOffset, alpha) { color, a -> drawSoftSpot(color, a, Offset(cx, cy), radius, blur, within) }
     }
     drawAurora(time)
-    drawParticles(time, mouse)
+    drawParticles(time, mouse, blur, within)
     drawVignette()
+}
+
+private fun DrawScope.drawSoftSpot(color: Color, alpha: Float, center: Offset, radius: Float, blur: Float, within: Rect) {
+    if (blur <= 0f) {
+        drawSoftGlow(color, center, radius, alpha)
+        return
+    }
+    val spread = sqrt(radius * radius + BLUR_SPREAD * BLUR_SPREAD * blur * blur)
+    val faded = alpha * (radius / spread) * (radius / spread)
+    if (faded < MIN_SPOT_ALPHA || !within.inflate(spread).contains(center)) return
+    drawSoftGlow(color, center, spread, faded)
 }
 
 private fun DrawScope.drawAurora(time: Float) {
@@ -106,7 +222,12 @@ private class Particle(
 
 private val Particles: List<Particle> = (0 until PARTICLE_COUNT).map { i ->
     fun h(salt: Int): Float {
-        val v = (i * 73856093) xor (salt * 19349663)
+        var v = i * 73856093 + salt * 19349663
+        v = v xor (v ushr 16)
+        v *= 0x85EBCA6B.toInt()
+        v = v xor (v ushr 13)
+        v *= 0xC2B2AE35.toInt()
+        v = v xor (v ushr 16)
         return (v and 0xFFFF) / 65535f
     }
     Particle(
@@ -119,7 +240,7 @@ private val Particles: List<Particle> = (0 until PARTICLE_COUNT).map { i ->
     )
 }
 
-private fun DrawScope.drawParticles(time: Float, mouse: Offset) {
+private fun DrawScope.drawParticles(time: Float, mouse: Offset, blur: Float, within: Rect) {
     val mdx = (mouse.x - 0.5f) * size.width
     val mdy = (mouse.y - 0.5f) * size.height
     for (p in Particles) {
@@ -129,52 +250,7 @@ private fun DrawScope.drawParticles(time: Float, mouse: Offset) {
         val alpha = 0.35f * twinkle
         val par = p.size * 0.0006f
         val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
-        val r = p.size * 3f
-        drawSoftGlow(Color.White, center, r, alpha)
-    }
-}
-
-private val PanoramaBlackFlat = Color(0xFF11171C)
-private val PanoramaBlackGradient = Color(0xFF10161B)
-private val PanoramaGlowBlue = Color(0xFF1878F1)
-
-private class GlowSpot(
-    val ax: Float,
-    val ay: Float,
-    val radiusF: Float,
-    val alpha: Float,
-)
-
-private val GlowMask = listOf(
-    GlowSpot(0.177f, -0.080f, 0.401f, 0.15f),
-    GlowSpot(-0.117f, 1.023f, 0.401f, 0.15f),
-    GlowSpot(1.024f, 0.190f, 0.322f, 0.10f),
-    GlowSpot(0.699f, 1.119f, 0.295f, 0.10f),
-)
-
-fun DrawScope.drawPanoramaOverlay() {
-    if (PolyPlusMainMenuConfig.hidePanoramaOverlay) return
-    drawPanoramaBlackBackground()
-    drawPanoramaGlowMask()
-}
-
-private fun DrawScope.drawPanoramaBlackBackground() {
-    drawRect(PanoramaBlackFlat.copy(alpha = 0.10f))
-    drawRect(
-        brush = Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.199f to Color.Transparent,
-                0.960f to PanoramaBlackGradient.copy(alpha = 0.25f),
-            ),
-        ),
-    )
-}
-
-private fun DrawScope.drawPanoramaGlowMask() {
-    for (g in GlowMask) {
-        val center = Offset(size.width * g.ax, size.height * g.ay)
-        val radius = size.width * g.radiusF
-        drawSoftGlow(PanoramaGlowBlue, center, radius, g.alpha)
+        drawSoftSpot(Color.White, alpha, center, p.size * 3f, blur, within)
     }
 }
 

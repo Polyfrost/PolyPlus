@@ -18,8 +18,9 @@ import java.nio.file.Path
 internal object RemoteTextures {
     private val logger = LoggerFactory.getLogger("polyplus/textures")
     private val registered = LinkedHashMap<Identifier, DynamicTexture>()
+    private val persistent = HashSet<Identifier>()
 
-    fun register(textureId: Identifier, pngFile: Path): Identifier {
+    fun register(textureId: Identifier, pngFile: Path, keepOnReset: Boolean = false): Identifier {
         //? if > 1.8.9 {
         val nativeImage = Files.newInputStream(pngFile).use(NativeImage::read)
         var adopted = false
@@ -35,6 +36,7 @@ internal object RemoteTextures {
                 adopted = true
                 Minecraft.getInstance().textureManager.register(textureId, dynamicTexture)
                 registered[textureId] = dynamicTexture
+                if (keepOnReset) persistent.add(textureId)
                 logger.debug("Registered remote texture {}", textureId)
                 textureId
             }
@@ -49,6 +51,7 @@ internal object RemoteTextures {
             val dynamicTexture = DynamicTexture(image)
             Minecraft.getInstance().textureManager.register(textureId, dynamicTexture)
             registered[textureId] = dynamicTexture
+            if (keepOnReset) persistent.add(textureId)
             logger.debug("Registered remote texture {}", textureId)
             textureId
         }
@@ -71,13 +74,15 @@ internal object RemoteTextures {
         ClientPlatform.runOnMainSync {
             val client = Minecraft.getInstance()
             for (id in registered.keys.toList()) {
+                if (id in persistent) continue
                 client.textureManager.release(id)
+                registered.remove(id)
             }
-            registered.clear()
         }
     }
 
     fun release(textureId: Identifier) {
+        persistent.remove(textureId)
         if (!registered.containsKey(textureId)) {
             return
         }

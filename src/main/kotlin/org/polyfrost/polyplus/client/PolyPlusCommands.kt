@@ -9,7 +9,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.gui.PolyPlusMainMenuScreen
+import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -92,21 +92,21 @@ object PolyPlusCommands {
             })
             .then(commands.literal("mainmenu").executes { _ ->
                 //? if = 1.8.9 {
-                /*Minecraft.getInstance().tell { ClientPlatform.setScreen(PolyPlusMainMenuScreen()) }
+                /*Minecraft.getInstance().tell { ClientPlatform.setScreen(PolyPlusLobbyScreen()) }
                 *///?} else {
                 val client = Minecraft.getInstance()
                 if (client.isSameThread) {
                     //? if >= 26.2 {
-                    client.gui.setScreen(PolyPlusMainMenuScreen())
+                    client.gui.setScreen(PolyPlusLobbyScreen())
                     //?} else {
-                    /*client.setScreen(PolyPlusMainMenuScreen())
+                    /*client.setScreen(PolyPlusLobbyScreen())
                     *///?}
                 } else {
                     client.execute {
                         //? if >= 26.2 {
-                        client.gui.setScreen(PolyPlusMainMenuScreen())
+                        client.gui.setScreen(PolyPlusLobbyScreen())
                         //?} else {
-                        /*client.setScreen(PolyPlusMainMenuScreen())
+                        /*client.setScreen(PolyPlusLobbyScreen())
                         *///?}
                     }
                 }

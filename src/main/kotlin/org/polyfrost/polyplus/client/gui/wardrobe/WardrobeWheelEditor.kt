@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -24,17 +23,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.emotes.EmoteWheels
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -49,6 +53,7 @@ internal fun EmoteWheelEditor(
     coverForEmote: (Int) -> Int?,
     onSelectSlot: (Int?) -> Unit,
     modifier: Modifier,
+    framed: Boolean = true,
 ) {
     val theme = OneConfigTheme.current
     val wheelIndex = EmoteWheels.activeIndex
@@ -56,7 +61,7 @@ internal fun EmoteWheelEditor(
     val slots = EmoteWheels.slots(wheelIndex)
 
     Column(
-        modifier = modifier.wardrobePanel().padding(16.dp),
+        modifier = modifier.then(if (framed) Modifier.wardrobePanel().padding(16.dp) else Modifier),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -179,6 +184,7 @@ private fun WheelSlotCell(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp)
                         .clip(ppShape(6.dp))
                         .background(theme.popupBackground)
+                        .a11y("Clear slot", A11yRole.Button)
                         .clickable(onClick = onClear),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -203,7 +209,7 @@ internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String
     val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier = Modifier.size(28.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(8.dp))
             .background(theme.chipBackground)
             .border(1.dp, theme.borderColor, ppShape(8.dp))
@@ -212,6 +218,6 @@ internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String
         contentAlignment = Alignment.Center,
     ) {
         Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
-        if (tooltip != null && hovered) TooltipPopup(tooltip)
+        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveStart)
     }
 }

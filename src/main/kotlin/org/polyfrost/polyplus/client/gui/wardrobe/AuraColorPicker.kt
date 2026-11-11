@@ -57,6 +57,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
@@ -253,6 +254,7 @@ internal fun AuraCustomPopover(
 
     Column(
         modifier = modifier.width(190.dp)
+            .sceneFrost(16.dp)
             .clip(ppShape(16.dp))
             .background(OneConfigTheme.current.popupBackground)
             .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))

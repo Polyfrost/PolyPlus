@@ -15,11 +15,11 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.BillingService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
-import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.gui.wardrobe.CartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticsLoadingScreen
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberOnlineConsent
 import org.polyfrost.polyplus.client.gui.wardrobe.MinecraftCapesOnlyScreen
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeShell
 import org.polyfrost.polyplus.client.gui.wardrobe.cartName
@@ -27,16 +27,17 @@ import org.polyfrost.polyplus.client.gui.wardrobe.checkoutFailureMessage
 import org.polyfrost.polyplus.client.gui.wardrobe.cosmeticCartKey
 import org.polyfrost.polyplus.client.gui.wardrobe.equip
 import org.polyfrost.polyplus.client.gui.wardrobe.rememberCosmeticItems
+import org.polyfrost.polyplus.client.gui.wardrobe.selectAuraColor
 import org.polyfrost.polyplus.client.gui.wardrobe.selectedVariantId
 import org.polyfrost.polyplus.client.gui.wardrobe.toCartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.unequip
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 @Composable
 internal fun PolyPlusCosmeticsScreen() {
-    if (!PrivacyConsent.allowsOnlineServices()) {
-        MinecraftCapesOnlyScreen()
+    var consent by rememberOnlineConsent()
+    if (!consent) {
+        MinecraftCapesOnlyScreen { consent = true }
         return
     }
     var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }
@@ -123,16 +124,7 @@ internal fun PolyPlusCosmeticsScreen() {
         },
         onSelectAuraColor = { color ->
             auraColor = color
-            status = if (color != null) "Updating aura color..." else "Clearing aura color..."
-            PolyPlusClient.SCOPE.launch {
-                val result = CosmeticService.setParticleColor(color)
-                ClientPlatform.runOnMain {
-                    status = result.fold(
-                        onSuccess = { if (color != null) "Aura color updated." else "Aura color cleared." },
-                        onFailure = { "Failed to set aura color: ${it.message}" },
-                    )
-                }
-            }
+            selectAuraColor(color) { status = it }
         },
         onSelectVariant = { groupId, variantId ->
             variantPicks[groupId] = variantId

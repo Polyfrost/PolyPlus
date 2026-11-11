@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -35,6 +33,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -52,7 +51,6 @@ import kotlinx.coroutines.withContext
 import net.minecraft.resources.Identifier
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.api.TinyFdApi
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
@@ -68,7 +66,9 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -317,7 +317,7 @@ private enum class SkinSource(val label: String, val icon: String) {
 }
 
 @Composable
-internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modifier: Modifier) {
+internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modifier: Modifier, framed: Boolean = true) {
     val theme = OneConfigTheme.current
     val sources = SkinSource.entries
     var source by remember { mutableStateOf(SkinSource.Username) }
@@ -401,7 +401,7 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
     }
 
     Column(
-        modifier = modifier.wardrobePanel().padding(16.dp),
+        modifier = modifier.then(if (framed) Modifier.wardrobePanel().padding(16.dp) else Modifier),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -504,7 +504,7 @@ private fun SegmentedControl(
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (icon != null) Icon(icon, color = color, modifier = Modifier.size(12.dp))
+                if (icon != null) ThemedIcon(icon, color, 12.dp)
                 SocialText(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
         }
@@ -516,14 +516,14 @@ private fun PrimaryWideButton(label: String, iconPath: String, enabled: Boolean,
     val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().height(33.dp)
-            .alpha(if (enabled) 1f else 0.6f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(8.dp))
             .background(OneConfigTheme.accent)
             .clickable(enabled = enabled, onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(iconPath, color = theme.accentTextColor, modifier = Modifier.size(14.dp))
+        ThemedIcon(iconPath, theme.accentTextColor, 14.dp)
         SocialText(label, color = theme.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }

@@ -7,6 +7,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.SessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.SessionResponse
+import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -60,10 +61,11 @@ object SessionsRepository {
         SessionsApi.close(sessionId).onFailure { LOGGER.error("Failed to close session $sessionId", it) }
     }
 
-    fun invite(sessionId: String, player: String) = PolyPlusClient.SCOPE.launch {
+    fun invite(sessionId: String, player: String, onFailure: () -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         SessionsApi.invite(sessionId, player).onFailure {
             LOGGER.error("Failed to invite $player to session $sessionId", it)
             SocialErrors.emit("Couldn't send session invite", it)
+            onFailure()
         }
     }
 
@@ -79,6 +81,22 @@ object SessionsRepository {
             }
     }
 
+    fun rejoin(sessionId: String) = PolyPlusClient.SCOPE.launch {
+        val invites = SessionsApi.incomingInvites().getOrElse {
+            LOGGER.error("Failed to look up session $sessionId to rejoin it", it)
+            Notifications.info("PolyPlus", "Couldn't reach Poly+ to rejoin that world")
+            return@launch
+        }
+        _incomingInvites.value = invites
+        val invite = invites.firstOrNull { it.sessionId == sessionId }
+        if (invite == null) {
+            P2PSessionManager.forgetRejoin()
+            Notifications.info("PolyPlus", "That world has closed")
+            return@launch
+        }
+        accept(invite)
+    }
+
     fun decline(invite: SessionInvite) = PolyPlusClient.SCOPE.launch {
         SessionsApi.declineInvite(invite.id).onSuccess { refreshIncoming() }
             .onFailure {
@@ -88,6 +106,7 @@ object SessionsRepository {
     }
 
     private fun notifyInviteReceived(inviteId: Int, sender: String) {
+        if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("session_invite:$inviteId")) return
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.nameOr(sender)

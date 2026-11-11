@@ -4,14 +4,17 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.network.http.SocialApi
 import org.polyfrost.polyplus.client.network.http.responses.BlockedPlayer
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.FriendRequest
+import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.events.WebSocketMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -46,18 +49,32 @@ object FriendsRepository {
                     notifyFriendRequest(packet.requestId, packet.sender)
                 }
                 is ClientboundPacket.FriendRequestUpdated -> {
-                    PolyPlusClient.SCOPE.launch { refreshRequests() }
+                    PolyPlusClient.SCOPE.launch {
+                        refreshRequests()
+                        refreshFriends()
+                    }
                 }
                 is ClientboundPacket.FriendRemoved -> {
                     PolyPlusClient.SCOPE.launch { refreshFriends() }
                 }
+                is ClientboundPacket.PlayerPresence -> onPresence(packet)
                 else -> {}
             }
             Unit
         }
     }
 
+    fun presence(player: String, friends: List<Friend>, party: Party?): Boolean? =
+        party?.member(player)?.online ?: friends.firstOrNull { it.player.equals(player, ignoreCase = true) }?.online
+
+    private fun onPresence(packet: ClientboundPacket.PlayerPresence) {
+        _friends.update { list ->
+            list.map { if (it.player.equals(packet.player, ignoreCase = true)) it.copy(online = packet.online, status = packet.status) else it }
+        }
+    }
+
     fun refreshAll() {
+        PlayerStatusRepository.refresh()
         PolyPlusClient.SCOPE.launch {
             refreshFriends()
             refreshRequests()
@@ -72,6 +89,7 @@ object FriendsRepository {
                 friendUuids = it.mapNotNullTo(HashSet()) { friend ->
                     runCatching { UUID.fromString(friend.player) }.getOrNull()
                 }
+                CosmeticSync.watchFriends(it.map { friend -> friend.player })
             }
             .onFailure { LOGGER.error("Failed to refresh friends list", it) }
     }
@@ -96,15 +114,6 @@ object FriendsRepository {
         SocialApi.blocked()
             .onSuccess { _blocked.value = it }
             .onFailure { LOGGER.error("Failed to refresh blocked players", it) }
-    }
-
-    fun sendRequest(player: String) = PolyPlusClient.SCOPE.launch {
-        SocialApi.sendRequest(player)
-            .onSuccess { refreshRequests(); if (it == null) refreshFriends() }
-            .onFailure {
-                LOGGER.error("Failed to send friend request to $player", it)
-                SocialErrors.emit("Couldn't send friend request", it)
-            }
     }
 
     fun acceptRequest(id: Int) = PolyPlusClient.SCOPE.launch {
@@ -158,6 +167,7 @@ object FriendsRepository {
     }
 
     private fun notifyFriendRequest(requestId: Int, sender: String) {
+        if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("friend_request:$requestId")) return
         PlayerNamesRepository.resolve(listOf(sender))
         val name = PlayerNamesRepository.nameOr(sender)

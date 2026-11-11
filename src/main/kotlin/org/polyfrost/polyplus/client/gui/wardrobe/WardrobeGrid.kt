@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -49,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +62,12 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -75,7 +81,10 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
+import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.ppShapeOf
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -111,9 +120,11 @@ internal fun WardrobeGrid(
     onSelectOutfit: (OutfitInfo) -> Unit,
     onSelectSkin: (PlayerSkinInfo) -> Unit,
     onStatus: (String) -> Unit,
+    columns: Int = 4,
+    onConsent: () -> Unit = {},
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Fixed(columns),
         state = state,
         modifier = modifier,
         contentPadding = PaddingValues(bottom = 12.dp),
@@ -128,7 +139,7 @@ internal fun WardrobeGrid(
             when (entry) {
                 is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
                 is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
-                is WardrobeEntry.Note -> CapeSectionNote(entry.text)
+                is WardrobeEntry.Note -> if (entry.id == CONSENT_NOTE_ID) ConsentNote(entry.text, onConsent) else CapeSectionNote(entry.text)
                 is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
                 is WardrobeEntry.Owned -> {
                     val item = entry.item
@@ -281,6 +292,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Outfit -> {
                     val outfit = entry.outfit
                     var renaming by remember { mutableStateOf(false) }
+                    var deleting by remember { mutableStateOf(false) }
                     WardrobeCard(
                         name = outfit.name,
                         detail = {
@@ -290,6 +302,18 @@ internal fun WardrobeGrid(
                                     current = outfit.name,
                                     onSave = { renameOutfit(outfit, it, onStatus) },
                                     onDismiss = { renaming = false },
+                                )
+                            }
+                            if (deleting) {
+                                ConfirmDialog(
+                                    title = "Delete ${outfit.name}?",
+                                    text = "This outfit will be removed from your wardrobe.",
+                                    confirmLabel = "Delete",
+                                    onConfirm = {
+                                        deleting = false
+                                        deleteOutfit(outfit, onStatus)
+                                    },
+                                    onDismiss = { deleting = false },
                                 )
                             }
                         },
@@ -304,7 +328,7 @@ internal fun WardrobeGrid(
                             CardMenuAction("Wear", enabled = !entry.active) { wearOutfit(outfit, onStatus) },
                             CardMenuAction("Rename") { renaming = true },
                             CardMenuAction(favoriteMenuLabel(outfit.favorite)) { toggleOutfitFavorite(outfit, onStatus) },
-                            CardMenuAction("Delete") { deleteOutfit(outfit, onStatus) },
+                            CardMenuAction("Delete") { deleting = true },
                         ),
                     ) { modifier ->
                         OutfitThumbnail(outfit, modifier)
@@ -313,6 +337,7 @@ internal fun WardrobeGrid(
                 is WardrobeEntry.Skin -> {
                     val skin = entry.skin
                     var renaming by remember { mutableStateOf(false) }
+                    var deleting by remember { mutableStateOf(false) }
                     WardrobeCard(
                         name = skin.name,
                         detail = {
@@ -322,6 +347,18 @@ internal fun WardrobeGrid(
                                     current = skin.name,
                                     onSave = { renameSkin(skin, it, onStatus) },
                                     onDismiss = { renaming = false },
+                                )
+                            }
+                            if (deleting) {
+                                ConfirmDialog(
+                                    title = "Delete ${skin.name}?",
+                                    text = "This skin will be removed from your wardrobe.",
+                                    confirmLabel = "Delete",
+                                    onConfirm = {
+                                        deleting = false
+                                        deleteSkin(skin, onStatus)
+                                    },
+                                    onDismiss = { deleting = false },
                                 )
                             }
                         },
@@ -339,7 +376,7 @@ internal fun WardrobeGrid(
                             CardMenuAction(
                                 if (skin.model == SkinModel.Slim) "Switch to classic arms" else "Switch to slim arms",
                             ) { switchSkinModel(skin, onStatus) },
-                            CardMenuAction("Delete") { deleteSkin(skin, onStatus) },
+                            CardMenuAction("Delete") { deleting = true },
                         ),
                     ) { modifier ->
                         SkinThumbnail(skin, modifier)
@@ -392,9 +429,6 @@ private fun cosmeticCountLabel(count: Int): String = when (count) {
 
 private val CARD_SUCCESS = Color(0xFF239A60)
 private val CARD_NEUTRAL_CHIP = Color(0xFFD9D9D9)
-private val CARD_FRAME = Color(0xFF232D32)
-private val CARD_HAIRLINE = Color(0x1AFFFFFF)
-private val CARD_STRIP = Color(0xB3232D32)
 private val CARD_HIGHLIGHT = Color(0x0DFFFFFF)
 
 @Composable
@@ -430,7 +464,7 @@ private fun WardrobeCard(
     }
     Box(
         modifier = Modifier.fillMaxWidth()
-            .alpha(if (enabled) 1f else 0.6f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(12.dp))
             .background(theme.modCardBackground)
             .drawBehind {
@@ -451,8 +485,8 @@ private fun WardrobeCard(
                 Box(
                     modifier = Modifier.fillMaxWidth().height(maxWidth)
                         .clip(ppShape(5.dp))
-                        .background(CARD_FRAME)
-                        .border(1.dp, CARD_HAIRLINE, ppShape(5.dp)),
+                        .background(OneConfigTheme.current.chipBackground)
+                        .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)),
                 ) {
                     thumbnail(Modifier.fillMaxSize())
                     if (hovered && variants.size > 1) {
@@ -550,13 +584,13 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
                 when {
                     selected -> OneConfigTheme.accent
                     hovered -> theme.textColorSecondary
-                    else -> CARD_HAIRLINE
+                    else -> OneConfigTheme.current.borderColor
                 },
                 ppShape(5.dp),
             ),
         )
         if (hovered) {
-            TooltipPopup(variant.name)
+            TooltipPopup(variant.name, TooltipPlacement.AboveStart)
         }
     }
 }
@@ -584,7 +618,7 @@ private fun CardMenuButton(
 }
 
 @Composable
-private fun rememberDropdownPosition(): PopupPositionProvider {
+internal fun rememberDropdownPosition(): PopupPositionProvider {
     val gap = with(LocalDensity.current) { 4.dp.roundToPx() }
     return remember(gap) {
         object : PopupPositionProvider {
@@ -611,6 +645,7 @@ private fun rememberDropdownPosition(): PopupPositionProvider {
 @Composable
 private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
     val theme = OneConfigTheme.current
+    EscapeCloses(onDismiss)
     Popup(
         popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
@@ -618,6 +653,7 @@ private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDis
     ) {
         Column(
             modifier = Modifier.widthIn(min = 160.dp).width(IntrinsicSize.Max)
+                .sceneFrost(16.dp)
                 .clip(ppShape(16.dp))
                 .background(theme.popupBackground)
                 .border(1.dp, theme.borderColor, ppShape(16.dp))
@@ -640,7 +676,7 @@ private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
     val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier = Modifier.fillMaxWidth().height(32.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .clip(ppShape(8.dp))
             .background(if (hovered && enabled) theme.chipBackground else Color.Transparent)
             .hoverable(interaction)
@@ -664,6 +700,7 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
             if (name != current) onSave(name)
         }
     }
+    EscapeCloses(onDismiss)
     Popup(
         popupPositionProvider = rememberDropdownPosition(),
         onDismissRequest = onDismiss,
@@ -671,6 +708,7 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
     ) {
         Column(
             modifier = Modifier.width(240.dp)
+                .sceneFrost(16.dp)
                 .clip(ppShape(16.dp))
                 .background(theme.popupBackground)
                 .border(1.dp, theme.borderColor, ppShape(16.dp))
@@ -707,7 +745,7 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
     Box(Modifier.fillMaxWidth().height(36.dp)) {
         Row(
             modifier = Modifier.fillMaxSize()
-                .background(if (active) OneConfigTheme.accent else CARD_STRIP)
+                .background(if (active) OneConfigTheme.accent else OneConfigTheme.current.chipBackground)
                 .hoverable(interaction)
                 .clickable(enabled = enabled, onClick = onAction),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -719,7 +757,7 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
         if (!active) {
             Box(
                 Modifier.fillMaxWidth().height(1.dp)
-                    .background(if (hovered && enabled) theme.textColorSecondary else CARD_HAIRLINE),
+                    .background(if (hovered && enabled) theme.textColorSecondary else theme.borderColor),
             )
         }
     }
@@ -758,7 +796,7 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
 }
 
 @Composable
-private fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
+internal fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
     val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().wardrobePanel().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -782,5 +820,28 @@ private fun LibraryIntro(note: String, action: String?, onAction: () -> Unit) {
         if (action != null) {
             SmallButton(action, iconPath = "plus", primary = false, onClick = onAction)
         }
+    }
+}
+
+@Composable
+private fun ConsentNote(text: String, onConsent: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    if (open) {
+        ConsentStep("PolyPlus capes and cosmetics need online services.", Modifier.fillMaxWidth(), { open = false }) {
+            open = false
+            onConsent()
+        }
+        return
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().height(57.dp)
+            .clip(ppShape(16.dp))
+            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SocialText(text, 12.sp, Modifier.weight(1f), color = OneConfigTheme.current.textColorSecondary)
+        TextButton("Turn on online services", Modifier.height(38.dp), ButtonStyle.Primary) { open = true }
     }
 }

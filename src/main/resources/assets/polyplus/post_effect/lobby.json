@@ -1,0 +1,560 @@
+{
+  "targets": {
+    "sky": {},
+    "bloom_a": {
+      "width": 640,
+      "height": 360
+    },
+    "bloom_b": {
+      "width": 640,
+      "height": 360
+    },
+    "soft_a": {
+      "width": 960,
+      "height": 540
+    },
+    "soft_b": {
+      "width": 960,
+      "height": 540
+    },
+    "frost_a": {
+      "width": 320,
+      "height": 180
+    },
+    "frost_b": {
+      "width": 320,
+      "height": 180
+    },
+    "lobby_out": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_sky",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "sky",
+      "uniforms": {
+        "LobbySky": [
+          {
+            "name": "Forward",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              1,
+              0.4
+            ]
+          },
+          {
+            "name": "Right",
+            "type": "vec4",
+            "value": [
+              1,
+              0,
+              0,
+              1.78
+            ]
+          },
+          {
+            "name": "Up",
+            "type": "vec4",
+            "value": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Params",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0.05,
+              1024
+            ]
+          },
+          {
+            "name": "Mood",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Lens",
+            "type": "vec4",
+            "value": [
+              12,
+              0.9,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Wave",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Flags",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sky",
+          "bilinear": true
+        }
+      ],
+      "output": "bloom_a",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0.72
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "bloom_a",
+          "bilinear": true
+        }
+      ],
+      "output": "bloom_b",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "bloom_b",
+          "bilinear": true
+        }
+      ],
+      "output": "bloom_a",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              2,
+              0
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "bloom_a",
+          "bilinear": true
+        }
+      ],
+      "output": "bloom_b",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              0,
+              2
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sky",
+          "bilinear": true
+        }
+      ],
+      "output": "soft_a",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "soft_a",
+          "bilinear": true
+        }
+      ],
+      "output": "soft_b",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "soft_b",
+          "bilinear": true
+        }
+      ],
+      "output": "frost_a",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "frost_a",
+          "bilinear": true
+        }
+      ],
+      "output": "frost_b",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "frost_b",
+          "bilinear": true
+        }
+      ],
+      "output": "frost_a",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              1.6,
+              0
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "frost_a",
+          "bilinear": true
+        }
+      ],
+      "output": "frost_b",
+      "uniforms": {
+        "LobbyBlur": [
+          {
+            "name": "Dir",
+            "type": "vec2",
+            "value": [
+              0,
+              1.6
+            ]
+          },
+          {
+            "name": "Threshold",
+            "type": "float",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sky"
+        },
+        {
+          "sampler_name": "Bloom",
+          "target": "bloom_b",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Soft",
+          "target": "soft_b",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Frost",
+          "target": "frost_b",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "lobby_out",
+      "uniforms": {
+        "LobbySky": [
+          {
+            "name": "Forward",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              1,
+              0.4
+            ]
+          },
+          {
+            "name": "Right",
+            "type": "vec4",
+            "value": [
+              1,
+              0,
+              0,
+              1.78
+            ]
+          },
+          {
+            "name": "Up",
+            "type": "vec4",
+            "value": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Params",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0.05,
+              1024
+            ]
+          },
+          {
+            "name": "Mood",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Lens",
+            "type": "vec4",
+            "value": [
+              12,
+              0.9,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Wave",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Flags",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "LobbyGlass": [
+          {
+            "name": "Glass",
+            "type": "vec4",
+            "value": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "polyplus:post/lobby_quad",
+      "fragment_shader": "polyplus:post/lobby_blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "lobby_out"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}
