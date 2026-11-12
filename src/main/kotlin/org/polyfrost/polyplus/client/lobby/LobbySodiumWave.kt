@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.lobby
 
 import java.lang.reflect.Method
+import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
 object LobbySodiumWave {
@@ -50,7 +51,7 @@ object LobbySodiumWave {
 
     private fun vitrailPackInUse(): Boolean {
         val query = vitrailSession ?: return false
-        return runCatching { (query.invoke(null) as java.util.Optional<*>).isPresent }.getOrDefault(false)
+        return runCatching { (query.invoke(null) as Optional<*>).isPresent }.getOrDefault(false)
     }
 
     @JvmStatic
