@@ -973,7 +973,7 @@ object LobbyScene {
             //?}
         )
         //?}
-        val listener = ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie)
+        val listener = LobbyCompat.quietly { ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie) }
         val realm = loaded.entry.realm
         val dimensionKey = when (realm) {
             LobbyRealm.NETHER -> BuiltinDimensionTypes.NETHER
