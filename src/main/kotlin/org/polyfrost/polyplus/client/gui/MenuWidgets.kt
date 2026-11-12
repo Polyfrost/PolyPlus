@@ -75,6 +75,9 @@ import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.ConcurrentHashMap
 
+//? if > 1.8.9
+import net.minecraft.client.gui.screens.CreditsAndAttributionScreen
+
 internal object MainMenuRasterAssets {
     private val paths = listOf(
         "avatar.png",
@@ -278,7 +281,7 @@ internal fun CopyrightText(
     val link = Modifier
         .hoverable(interaction)
         .a11y(COPYRIGHT_TEXT, A11yRole.Link, null, null, null, true)
-        .clickableTextWithSound { ClientPlatform.setScreen(net.minecraft.client.gui.screens.CreditsAndAttributionScreen(screen)) }
+        .clickableTextWithSound { ClientPlatform.setScreen(CreditsAndAttributionScreen(screen)) }
         .pointerHoverIcon(PointerIcon.Hand)
     val underline = if (hovered) TextDecoration.Underline else null
     //?} else {

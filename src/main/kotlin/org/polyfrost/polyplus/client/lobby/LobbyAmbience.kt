@@ -21,6 +21,7 @@ import org.polyfrost.polyplus.mixin.client.access.SoundManagerAccessor
 /*import net.minecraft.client.sound.SoundCategory
 import net.minecraft.client.sound.instance.AbstractTickableSoundInstance
 import net.minecraft.client.sound.instance.SoundInstance
+import org.lwjgl.opengl.Display
 *///?}
 
 private const val SILENT_FLOOR = 1.0e-4f
@@ -402,7 +403,7 @@ object LobbyAmbience {
             //? if > 1.8.9 {
             !mc.isWindowActive
             //?} else {
-            /*!org.lwjgl.opengl.Display.isActive()
+            /*!Display.isActive()
             *///?}
 
     private fun audible(mc: Minecraft): Boolean =
