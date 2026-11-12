@@ -126,7 +126,10 @@ object ClientConfigSync {
                     val relative = root.path.relativize(path)
                     val relativeName = relative.fileName?.toString().orEmpty()
                     val relativeTopLevel = relative.getName(0).toString()
-                    val profile = if (
+                    val profile = if (root.name == "NoRisk Client") {
+                        // NoRisk nests its game folders (`noriskclient/legacy`, `noriskclient/new`); each is a profile.
+                        instanceFolder(root.path, path)?.fileName?.toString() ?: relativeTopLevel
+                    } else if (
                         root.sharedGameDirectory && relative.nameCount >= 5 && relativeTopLevel == "OneConfig" &&
                         relative.getName(1).toString() == "profiles"
                     ) {
@@ -144,7 +147,20 @@ object ClientConfigSync {
                 }
             }
 
-        val results = mergeDawnSyncGroups(grouped).map { (key, paths) ->
+        val merged = mergeDawnSyncGroups(grouped)
+        //? if = 1.8.9 {
+        /*val running = Generation.LEGACY
+        *///?} else {
+        val running = Generation.MODERN
+        //?}
+        val hidden = otherGenerationProfiles(merged.mapValues { generationOf(it.value) }, running)
+        if (hidden.isNotEmpty()) {
+            logger.info(
+                "Hiding profile(s) for the other game generation: {}",
+                hidden.joinToString { "${it.first}/${it.second}" },
+            )
+        }
+        val results = merged.filterKeys { it !in hidden }.map { (key, paths) ->
             val (client, profile) = key
             val orderedPaths = paths.sortedBy { it.toString() }
             val shortProfile = Regex("(?i)^([0-9a-f]{8})-[0-9a-f-]{27}$")
@@ -167,6 +183,51 @@ object ClientConfigSync {
         )
         return results
     }
+
+    /** Whether a profile was last played on 1.8.9 or on a modern version. */
+    internal enum class Generation { LEGACY, MODERN }
+
+    /** A real options file has far more entries than the stubs some launchers leave in unused folders. */
+    private const val MIN_REAL_OPTIONS = 20
+
+    /** Modern versions save a `version` line in `options.txt`; 1.8.9 never does. Null when it is only a stub. */
+    internal fun optionsGeneration(lines: List<String>): Generation? = when {
+        lines.any { it.startsWith("version:") } -> Generation.MODERN
+        lines.count { optionEntry(it) != null } >= MIN_REAL_OPTIONS -> Generation.LEGACY
+        else -> null
+    }
+
+    /**
+     * The generation of a profile's own game folder, or null when it cannot be told or does not apply: Lunar and
+     * Badlion keep one layout for every game version, so their profiles belong to both.
+     */
+    private fun generationOf(paths: List<Path>): Generation? {
+        val sharedLayout = paths.any {
+            BadlionHudTranslator.isBadlionProfile(it) ||
+                it.fileName?.toString() == "mods.json" && it.parent?.parent?.fileName?.toString() == "game"
+        }
+        if (sharedLayout) return null
+        val generations = paths.filter { it.fileName?.toString() == "options.txt" }
+            .mapNotNull { path -> runCatching { optionsGeneration(Files.readAllLines(path)) }.getOrNull() }
+        return generations.firstOrNull { it == Generation.MODERN } ?: generations.firstOrNull()
+    }
+
+    /**
+     * Profiles to leave out because they are for the other game generation. This only applies to a client that
+     * has both a 1.8.9 and a modern profile; a client with just one kind is still offered, and its options are
+     * converted on import.
+     */
+    internal fun <K> otherGenerationProfiles(generations: Map<Pair<String, K>, Generation?>, running: Generation): Set<Pair<String, K>> =
+        generations.entries.groupBy { it.key.first }.values.flatMap { profiles ->
+            val known = profiles.mapNotNull { it.value }.toSet()
+            if (known.size < 2) emptyList() else profiles.filter { it.value != null && it.value != running }.map { it.key }
+        }.toSet()
+
+    /** The game folder [path] belongs to: its nearest parent below [root] that has an `options.txt`. */
+    private fun instanceFolder(root: Path, path: Path): Path? =
+        generateSequence(path.parent) { it.parent }
+            .takeWhile { it != root && it.startsWith(root) }
+            .firstOrNull { it.resolve("options.txt").isRegularFile() }
 
     /**
      * Dawn profiles play inside a shared synced folder (`.dawn/auto-sync/groups/<group>`), which holds the real

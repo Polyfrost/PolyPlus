@@ -142,6 +142,31 @@ class GameOptionsImportTest {
     }
 
     @Test
+    fun `options files tell a legacy profile from a modern one`() {
+        val legacy = (1..30).map { "option$it:1" }
+        assertEquals(ClientConfigSync.Generation.LEGACY, ClientConfigSync.optionsGeneration(legacy))
+        assertEquals(ClientConfigSync.Generation.MODERN, ClientConfigSync.optionsGeneration(listOf("version:4903") + legacy))
+        // A launcher's four-line stub says nothing about the game version.
+        assertNull(ClientConfigSync.optionsGeneration(listOf("lang:en_us", "guiScale:2", "fov:0.0", "gamma:0.5")))
+    }
+
+    @Test
+    fun `a client with both generations only offers the running one`() {
+        val legacy = ClientConfigSync.Generation.LEGACY
+        val modern = ClientConfigSync.Generation.MODERN
+        val profiles = mapOf(
+            ("NoRisk Client" to "legacy") to legacy,
+            ("NoRisk Client" to "new") to modern,
+            ("NoRisk Client" to "shared") to null,
+            // Only one kind, so it stays and its options are converted on import.
+            ("Modrinth" to "Fabulously Optimized") to modern,
+            ("Lunar Client" to "Default") to null,
+        )
+        assertEquals(setOf("NoRisk Client" to "new"), ClientConfigSync.otherGenerationProfiles(profiles, legacy))
+        assertEquals(setOf("NoRisk Client" to "legacy"), ClientConfigSync.otherGenerationProfiles(profiles, modern))
+    }
+
+    @Test
     fun `merging Lunar JSON converts keys without copying its data version or installation state`(@TempDir directory: Path) {
         val lunar = directory.resolve("optionsLC.txt")
         Files.writeString(lunar, """{"version": 1, "key_key.forward": 17, "renderClouds": false, "ao": 0, "mouseSensitivity": 0.4, "resourcePacks": ["missing.zip"]}""")
