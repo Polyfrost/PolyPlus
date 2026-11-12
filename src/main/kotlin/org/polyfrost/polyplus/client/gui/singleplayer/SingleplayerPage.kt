@@ -6,7 +6,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
-import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.UnderlineTabs
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -76,7 +76,7 @@ private fun WorldsHeader(state: SingleplayerState, onBack: () -> Unit) {
         "Search worlds",
         onBack,
         filters = if (showTabs) {
-            { TabRow(WorldFilter.entries.map { TabItem(it, it.label) }, state.filter, Modifier) { state.filter = it } }
+            { UnderlineTabs(WorldFilter.entries.map { TabItem(it, it.label) }, state.filter) { state.filter = it } }
         } else {
             null
         },

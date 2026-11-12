@@ -4,22 +4,32 @@ package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.ppShape
@@ -73,6 +84,44 @@ internal fun PageHeader(
     }
     filters?.invoke()
 }
+
+@Composable
+internal fun <T> UnderlineTabs(tabs: List<TabItem<T>>, selected: T, onSelect: (T) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        tabs.forEach { tab -> UnderlineTab(tab.label, tab.value == selected) { onSelect(tab.value) } }
+    }
+}
+
+@Composable
+private fun UnderlineTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    val (interaction, hovered) = rememberSocialHover()
+    val shape = ppShape(8.dp)
+    val ink by animateColorAsState(if (selected || hovered) SocialTextPrimary else MutedText)
+    val fill by animateColorAsState(if (hovered && !selected) SocialTextPrimary.copy(alpha = TAB_HOVER_ALPHA) else Color.Transparent)
+    val bar by animateColorAsState(if (selected) OneConfigTheme.accent else Color.Transparent)
+    Box(
+        Modifier
+            .widthIn(min = TAB_MIN_WIDTH)
+            .height(TAB_HEIGHT)
+            .clip(shape)
+            .background(fill)
+            .drawBehind {
+                val thickness = TAB_BAR_HEIGHT.toPx()
+                drawRect(bar, Offset(0f, size.height - thickness), Size(size.width, thickness))
+            }
+            .hoverable(interaction)
+            .clickableWithSound(label, A11yRole.Tab, selected, shape = shape, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Label(label, 15.sp, color = ink, weight = if (selected) FontWeight.Medium else FontWeight.Normal)
+    }
+}
+
+private val TAB_HEIGHT = 40.dp
+private val TAB_BAR_HEIGHT = 2.dp
+private val TAB_MIN_WIDTH = 88.dp
+private const val TAB_HOVER_ALPHA = 0.08f
 
 @Composable
 internal fun NoMatchState(noun: String, filterLabel: String?, query: String, modifier: Modifier) {
