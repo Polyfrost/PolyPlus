@@ -299,6 +299,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallbac
 import net.minecraft.client.renderer.ShaderInstance
 import net.minecraft.resources.Identifier
 import org.lwjgl.opengl.GL20
+import org.polyfrost.polyplus.compat.Mods
 
 object LobbyPipelines {
     @Volatile
@@ -317,6 +318,8 @@ object LobbyPipelines {
     fun compiled(): Boolean = solid != null && cutoutMipped != null && cutout != null && translucent != null && tripwire != null
 
     fun register() {
+        // VulkanMod can't compile these shaders, and the GL link check aborts the JVM without a GL context
+        if (Mods.vulkanMod) return
         CoreShaderRegistrationCallback.EVENT.register { context ->
             solid = null
             cutoutMipped = null

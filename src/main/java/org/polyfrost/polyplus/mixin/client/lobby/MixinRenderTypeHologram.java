@@ -16,10 +16,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
+// outranks VulkanMod's default-priority @Overwrite of draw, which otherwise rejects INVOKE injectors
 //? if >= 26.2 {
-@Mixin(PreparedRenderType.class)
+@Mixin(value = PreparedRenderType.class, priority = 1100)
 //?} else {
-/*@Mixin(RenderType.class)
+/*@Mixin(value = RenderType.class, priority = 1100)
 *///?}
 public class MixinRenderTypeHologram {
     //? if >= 26.3 {

@@ -22,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @IfModAbsent("sodium")
+@IfModAbsent("vulkanmod")
 @Mixin(LevelRenderer.class)
 public class MixinLevelRendererSections {
     //? if >= 1.21.5 {

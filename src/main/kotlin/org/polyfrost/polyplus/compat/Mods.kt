@@ -12,6 +12,7 @@ object Mods {
     val iris: Boolean by lazy { loaded("iris") }
     val notEnoughAnimations: Boolean by lazy { loaded("notenoughanimations") }
     val replayMod: Boolean by lazy { loaded("replaymod") }
+    val vulkanMod: Boolean by lazy { loaded("vulkanmod") }
     val wwaypoints: Boolean by lazy { loaded("wwaypoints") }
 
     fun loaded(id: String): Boolean = runCatching { FabricLoader.getInstance().isModLoaded(id) }.getOrDefault(false)

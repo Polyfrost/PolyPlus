@@ -368,7 +368,10 @@ object LobbySky {
     /*fun process(renderer: GameRenderer, resources: GraphicsResourceAllocator) {
         val chain = Minecraft.getInstance().shaderManager.getPostChain(POST_EFFECT, LevelTargetBundle.MAIN_TARGETS) ?: return
         //? if >= 1.21.8 {
-        chain.process(LobbyCompat.mainTarget(renderer), resources)
+        val target = LobbyCompat.mainTarget(renderer)
+        // VulkanMod on 26.1 leaves the main target without a depth view, which the chain's depth inputs require
+        if (target.depthTextureView == null) return
+        chain.process(target, resources)
         //?} elif >= 1.21.5 {
         /^glass.clear()
         LobbyGlass.write(glass)

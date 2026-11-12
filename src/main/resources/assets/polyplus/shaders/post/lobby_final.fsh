@@ -38,19 +38,25 @@ layout(std140) uniform LobbySky {
     vec4 Flags;
 };
 
+// VulkanMod's GLSL converter rejects array members in uniform blocks; std140 lays these out like vec4[12] and vec4[3]
 layout(std140) uniform LobbyGlass {
     vec4 Glass;
-    vec4 Panels[12];
-    vec4 Radii[3];
+    vec4 Panel0;
+    vec4 Panel1;
+    vec4 Panel2;
+    vec4 Panel3;
+    vec4 Panel4;
+    vec4 Panel5;
+    vec4 Panel6;
+    vec4 Panel7;
+    vec4 Panel8;
+    vec4 Panel9;
+    vec4 Panel10;
+    vec4 Panel11;
+    vec4 Radius0;
+    vec4 Radius1;
+    vec4 Radius2;
 };
-
-vec4 panelAt(int index) {
-    return Panels[index];
-}
-
-float radiusAt(int index) {
-    return Radii[index / 4][index % 4];
-}
 //?} else {
 /*uniform vec2 OutSize;
 uniform vec2 InSize;
@@ -82,6 +88,7 @@ uniform vec4 Panel11;
 uniform vec4 Radius0;
 uniform vec4 Radius1;
 uniform vec4 Radius2;
+*///?}
 
 vec4 panelAt(int index) {
     vec4 panels[12] = vec4[12](Panel0, Panel1, Panel2, Panel3, Panel4, Panel5, Panel6, Panel7, Panel8, Panel9, Panel10, Panel11);
@@ -92,7 +99,6 @@ float radiusAt(int index) {
     vec4 radii[3] = vec4[3](Radius0, Radius1, Radius2);
     return radii[index / 4][index - index / 4 * 4];
 }
-*///?}
 
 //? if >= 26.3 {
 layout(location = 0) in vec2 texCoord;

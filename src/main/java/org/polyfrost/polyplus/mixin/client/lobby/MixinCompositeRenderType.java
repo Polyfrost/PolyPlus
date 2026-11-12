@@ -7,7 +7,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-@Mixin(targets = "net.minecraft.client.renderer.RenderType$CompositeRenderType")
+// outranks VulkanMod's default-priority @Overwrite of draw, which otherwise rejects INVOKE injectors
+@Mixin(targets = "net.minecraft.client.renderer.RenderType$CompositeRenderType", priority = 1100)
 public class MixinCompositeRenderType {
     @ModifyArg(method = "draw", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderPass;setPipeline(Lcom/mojang/blaze3d/pipeline/RenderPipeline;)V"))
     private RenderPipeline polyplus$lightBothFaces(RenderPipeline original) {

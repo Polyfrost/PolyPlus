@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.lobby
 
 //? if > 1.8.9 {
 import com.mojang.blaze3d.pipeline.RenderTarget
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.concurrent.Executor
 import net.minecraft.client.Camera
@@ -131,6 +132,7 @@ object LobbyCompat {
     fun renderedSections(mc: Minecraft): Int = levelSink(mc).countRenderedSections()
 
     private const val SODIUM_HAS_LIGHT_DATA = 2
+    private const val VULKANMOD_LIGHT_READY: Byte = 2
 
     private val sodiumTracker: Pair<Method, Method>? by lazy {
         runCatching {
@@ -141,9 +143,17 @@ object LobbyCompat {
         }.getOrNull()
     }
 
+    private val vulkanModStatus: Pair<Field, Method>? by lazy {
+        runCatching {
+            val map = Class.forName("net.vulkanmod.render.chunk.ChunkStatusMap")
+            map.getField("INSTANCE") to map.getMethod("setChunkStatus", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Byte::class.javaPrimitiveType)
+        }.getOrNull()
+    }
+
+    // Sodium and VulkanMod only build sections once vanilla's light packet handler has run, which the lobby bypasses
     fun lightReady(level: ClientLevel, x: Int, z: Int) {
-        val (get, added) = sodiumTracker ?: return
-        added.invoke(get.invoke(null, level), x, z, SODIUM_HAS_LIGHT_DATA)
+        sodiumTracker?.let { (get, added) -> added.invoke(get.invoke(null, level), x, z, SODIUM_HAS_LIGHT_DATA) }
+        vulkanModStatus?.let { (instance, set) -> set.invoke(instance.get(null), x, z, VULKANMOD_LIGHT_READY) }
     }
 
     fun requeueChunks(mc: Minecraft, level: ClientLevel, centerX: Int, centerZ: Int, radius: Int) {
