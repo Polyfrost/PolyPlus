@@ -2,7 +2,6 @@ package org.polyfrost.polyplus.client.lobby
 
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
-import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.oneconfig.internal.ui.sound.UiSounds
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
@@ -393,11 +392,13 @@ object LobbyAmbience {
         return ClientPlatform.currentScreen() is PolyPlusLobbyScreen || LobbyScene.showing()
     }
 
-    private fun volume(): Float =
-        AMBIENCE_GAIN * (OneConfigConfig.uiAmbienceVolume / 100f).coerceIn(0f, 1f)
+    private fun volume(): Float {
+        PolyPlusLobbyConfig.inheritMusicVolume()
+        return AMBIENCE_GAIN * (PolyPlusLobbyConfig.lobbyMusicVolume / 100f).coerceIn(0f, 1f)
+    }
 
     private fun audible(mc: Minecraft): Boolean =
-        OneConfigConfig.enableUIAmbience && volume() > 0f &&
+        volume() > 0f &&
             //? if > 1.8.9 {
             mc.options.getSoundSourceVolume(SoundSource.MASTER) > 0f
             //?} else {

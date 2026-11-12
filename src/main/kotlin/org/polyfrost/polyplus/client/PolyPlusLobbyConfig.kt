@@ -4,7 +4,9 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
+import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
+import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyReveal
@@ -52,6 +54,19 @@ object PolyPlusLobbyConfig : Config(
     var lobbyMusic: LobbyMusic = LobbyMusic.MATCH_SCENE
 
     @JvmStatic
+    @Slider(
+        title = "Lobby Music Volume",
+        description = "How loud the lobby music plays, in percent.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+    )
+    var lobbyMusicVolume = 100f
+
+    @JvmStatic @Include
+    var lobbyMusicVolumeInherited = false
+
+    @JvmStatic
     @Switch(
         title = "Quit Without Confirmation",
         description = "Close the game as soon as you press Quit in the lobby, without asking first.",
@@ -61,6 +76,15 @@ object PolyPlusLobbyConfig : Config(
     init {
         preload()
         migrateFromSplitConfigs()
+        hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
+        inheritMusicVolume()
+    }
+
+    fun inheritMusicVolume() {
+        if (lobbyMusicVolumeInherited || OneConfigConfig.INSTANCE?.getTree() == null) return
+        lobbyMusicVolume = if (OneConfigConfig.enableUIAmbience) OneConfigConfig.uiAmbienceVolume.coerceIn(0f, 100f) else 0f
+        lobbyMusicVolumeInherited = true
+        save()
     }
 
     private fun migrateFromSplitConfigs() {
