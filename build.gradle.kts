@@ -1,17 +1,18 @@
 @file:Suppress("UnstableApiUsage")
 
-import dev.detekt.gradle.Detekt
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import dev.detekt.gradle.Detekt
 import dev.kikugie.loomx.LoomCompatDependencyExtension
 import dev.kikugie.loomx.LoomCompatProjectExtension
 import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.task.NestJarsAction
 import net.ltgt.gradle.errorprone.errorprone
 import net.ornithemc.ploceus.api.PloceusGradleExtensionApi
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.kotlin.dsl.getByName
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     java
@@ -428,6 +429,8 @@ tasks.named<Detekt>("detekt") {
     dependsOn(tasks.withType<Detekt>().matching { it.name != "detekt" && !it.name.endsWith("SourceSet") })
 }
 
+loomExt.uncompressNestedJars = true
+
 val modId = property("mod.id") as String
 loomExt.mixin {
     defaultRefmapName.set("mixins.$modId.refmap.json")
@@ -546,7 +549,7 @@ if (!isOrnithe) {
         archiveFileName = "rrls-stub.jar"
         destinationDirectory = layout.buildDirectory.dir("rrls-stub")
     }
-    loomx.modJar.configure { net.fabricmc.loom.task.NestJarsAction.addToTask(this, files(rrlsStub)) }
+    loomx.modJar.configure { NestJarsAction.addToTask(this, files(rrlsStub)) }
     dependencies { runtimeOnly(files(rrlsStub)) }
 }
 
