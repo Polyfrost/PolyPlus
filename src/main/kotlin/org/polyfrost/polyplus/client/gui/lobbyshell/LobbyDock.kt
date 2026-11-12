@@ -50,6 +50,7 @@ import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.SparkCompat
+import org.polyfrost.polyplus.compat.SparkLink
 import org.polyfrost.polyplus.compat.SparkProfile
 import kotlin.math.roundToInt
 
@@ -101,7 +102,7 @@ private fun DockTile(
     }
 }
 
-private class SparkView(val fps: Int, val profile: SparkProfile, val available: Boolean, val busy: Boolean) {
+private class SparkView(val fps: Int, val profile: SparkProfile, val available: Boolean, val busy: Boolean, val ready: SparkLink?) {
     val profiling: Boolean get() = profile is SparkProfile.Running || profile == SparkProfile.Uploading || busy
 }
 
@@ -110,6 +111,7 @@ private fun readSpark(): SparkView = SparkView(
     SparkCompat.profile,
     runCatching { SparkCompat.available }.getOrDefault(false),
     runCatching { SparkCompat.busy() }.getOrDefault(false),
+    SparkCompat.ready,
 )
 
 @Composable
@@ -124,8 +126,22 @@ private fun SparkTile(first: Boolean, last: Boolean) {
     var menu by remember { mutableStateOf(false) }
     val anchor = rememberRiseAnchor()
     Box {
-        DockTile("spark tools", SPARK_TILE, first, last, active = menu, onClick = { menu = !menu }) {
-            when (val profile = view.profile) {
+        val ready = view.ready.takeIf { !view.profiling }
+        val onClick = {
+            if (ready != null) {
+                SparkCompat.openReady()
+                view = readSpark()
+            } else {
+                menu = !menu
+            }
+        }
+        DockTile(if (ready != null) "Open ${ready.label.lowercase()}" else "spark tools", SPARK_TILE, first, last, active = menu, onClick = onClick) {
+            val profile = view.profile
+            if (ready != null) {
+                SparkLines("${ready.label} ready", "Click to open", true)
+                return@DockTile
+            }
+            when (profile) {
                 is SparkProfile.Running -> {
                     val seconds = ((System.currentTimeMillis() - profile.startedAt) / 1000L).coerceIn(0L, profile.seconds.toLong())
                     SparkLines("Profiling", clock(seconds), true)

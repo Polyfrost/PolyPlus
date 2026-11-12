@@ -39,6 +39,8 @@ internal sealed interface SparkProfile {
     data class Done(val url: String) : SparkProfile
 }
 
+internal data class SparkLink(val label: String, val url: String)
+
 internal object SparkCompat {
     const val SHORT_PROFILE_SECONDS = 30
     const val LONG_PROFILE_SECONDS = 120
@@ -62,6 +64,7 @@ internal object SparkCompat {
     private const val HEALTH_ACTIVITY = "Health report"
     private const val SENDER = "me.lucko.spark.common.command.sender.CommandSender"
     private const val SENDER_NAME = "PolyPlus"
+    private val SPARK_LINK = Regex("""https://spark\.lucko\.me/[A-Za-z0-9]+""")
 
     private val methods = ConcurrentHashMap<String, Method>()
     private val windows = ConcurrentHashMap<String, Any>()
@@ -85,6 +88,16 @@ internal object SparkCompat {
     @Volatile
     var healthRunning: Boolean = false
         private set
+
+    @Volatile
+    var ready: SparkLink? = null
+        private set
+
+    fun openReady() {
+        val link = ready ?: return
+        ready = null
+        ClientPlatform.openUri(link.url)
+    }
 
     @Volatile
     private var watcher: Job? = null
@@ -190,6 +203,10 @@ internal object SparkCompat {
                     "isPlayer" -> false
                     "hasPermission" -> true
                     "toData" -> data
+                    "sendMessage" -> {
+                        args?.firstOrNull()?.toString()?.let { SPARK_LINK.find(it)?.value }?.let(::senderLink)
+                        null
+                    }
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === args?.firstOrNull()
                     else -> null
@@ -227,25 +244,44 @@ internal object SparkCompat {
 
     private fun watchHealth(platform: Any, since: Long) {
         PolyPlusClient.SCOPE.launch {
-            try {
-                while (System.currentTimeMillis() - since < HEALTH_LIMIT_MILLIS) {
-                    delay(WATCH_MILLIS)
-                    val result = result(platform, since, HEALTH_ACTIVITY) as? Result.Url ?: continue
-                    lastHealthUrl = result.value
-                    copy(result.value)
-                    notify("Health report link copied", result.value)
-                    return@launch
-                }
-                ClientPlatform.runOnMain { runCatching { SocialErrors.emit("The health report couldn't be uploaded.") } }
-            } finally {
+            while (healthRunning && System.currentTimeMillis() - since < HEALTH_LIMIT_MILLIS) {
+                delay(WATCH_MILLIS)
+                val result = result(platform, since, HEALTH_ACTIVITY) as? Result.Url ?: continue
+                healthFinished(result.value)
+            }
+            if (healthRunning) {
                 healthRunning = false
+                ClientPlatform.runOnMain { runCatching { SocialErrors.emit("The health report couldn't be uploaded.") } }
             }
         }
     }
 
+    private fun senderLink(url: String) {
+        when {
+            profile is SparkProfile.Running || profile == SparkProfile.Uploading -> {
+                watcher?.cancel()
+                finished(url)
+            }
+            healthRunning -> healthFinished(url)
+        }
+    }
+
+    @Synchronized
+    private fun healthFinished(url: String) {
+        if (!healthRunning) return
+        healthRunning = false
+        lastHealthUrl = url
+        ready = SparkLink("Health report", url)
+        copy(url)
+        notify("Health report link copied", url)
+    }
+
+    @Synchronized
     private fun finished(url: String) {
+        if (profile == SparkProfile.Done(url)) return
         lastProfileUrl = url
         profile = SparkProfile.Done(url)
+        ready = SparkLink("Profile", url)
         copy(url)
         notify("Profile link copied", url)
     }
