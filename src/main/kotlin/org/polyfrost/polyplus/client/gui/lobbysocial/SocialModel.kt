@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
+import org.polyfrost.polyplus.client.party.PartyRepository
 import java.util.UUID
 
 internal data class SocialPerson(
@@ -61,6 +62,12 @@ internal data class SocialSnapshot(
         get() = requests.count { it.incoming } + worlds.count { !it.accepted } + partyInvites.size
 
     fun find(id: String?): SocialPerson? = friends.firstOrNull { it.id == id }
+
+    fun isFriend(id: String): Boolean = friends.any { PartyRepository.samePlayer(it.id, id) }
+
+    fun isBlocked(id: String): Boolean = blocked.any { PartyRepository.samePlayer(it.id, id) }
+
+    fun requestWith(id: String): SocialRequest? = requests.firstOrNull { PartyRepository.samePlayer(it.person.id, id) }
 }
 
 internal sealed interface SocialDetail {
@@ -101,6 +108,10 @@ internal interface SocialSource {
     fun inviteToWorld(person: SocialPerson)
 
     fun remove(person: SocialPerson)
+
+    fun addFriend(person: SocialPerson)
+
+    fun hide(thread: SocialThread)
 
     fun block(person: SocialPerson)
 

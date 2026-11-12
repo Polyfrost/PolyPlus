@@ -54,6 +54,7 @@ import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.OnboardingSlider
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
@@ -245,8 +246,19 @@ internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Uni
     )
 }
 
+internal fun memberSocialItems(cell: PartyCell): List<MenuAction> {
+    if (cell.self) return emptyList()
+    if (FriendsRepository.blocked.value.any { PartyRepository.samePlayer(it.player, cell.id) }) return emptyList()
+    val friend = FriendsRepository.friends.value.any { PartyRepository.samePlayer(it.player, cell.id) }
+    val requested = (FriendsRepository.incomingRequests.value + FriendsRepository.outgoingRequests.value).any { PartyRepository.samePlayer(it.player, cell.id) }
+    val add = MenuAction("Add friend", PartyIcons.INVITE) {
+        FriendsRepository.sendRequest(cell.id) { SocialNotices.emit("Friend request sent to ${cell.name}") }
+    }.takeUnless { friend || requested }
+    return listOfNotNull(add, blockMenuItem(cell.name) { FriendsRepository.block(cell.id) })
+}
+
 internal fun memberMenuItems(host: SocialHost, party: Party, cell: PartyCell): List<MenuAction> =
-    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell)) + memberLeaderItems(party, cell)
+    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell)) + memberLeaderItems(party, cell) + memberSocialItems(cell)
 
 internal fun partyInviteItem(
     friendId: String,

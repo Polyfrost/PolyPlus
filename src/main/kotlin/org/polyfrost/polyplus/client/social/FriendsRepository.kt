@@ -141,6 +141,19 @@ object FriendsRepository {
             }
     }
 
+    fun sendRequest(player: String, onSent: () -> Unit = {}) = PolyPlusClient.SCOPE.launch {
+        SocialApi.sendRequest(player)
+            .onSuccess {
+                refreshRequests()
+                refreshFriends()
+                onSent()
+            }
+            .onFailure {
+                LOGGER.error("Failed to send friend request to $player", it)
+                SocialErrors.emit("Couldn't send friend request", it)
+            }
+    }
+
     fun removeFriend(player: String) = PolyPlusClient.SCOPE.launch {
         SocialApi.removeFriend(player).onSuccess { refreshFriends() }
             .onFailure {

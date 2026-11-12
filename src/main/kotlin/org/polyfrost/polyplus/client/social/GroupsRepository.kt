@@ -241,6 +241,12 @@ object GroupsRepository {
         }
     }
 
+    fun markLatestRead(groupId: Int) = PolyPlusClient.SCOPE.launch {
+        val cached = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }?.id
+        val latest = cached ?: GroupsApi.messages(groupId).getOrNull()?.filterNot { isPending(it.id) }?.maxOfOrNull { it.id }
+        if (latest != null) markRead(groupId, latest)
+    }
+
     private fun clearMessageToasts(groupId: Int) {
         messageToasts.remove(groupId)?.forEach { notification ->
             Notifications.dismiss(notification)

@@ -140,6 +140,7 @@ internal class InboxItem(
     val dismissLabel: String,
     val dismiss: () -> Unit,
     val brief: String = detail,
+    val more: () -> List<MenuAction> = { emptyList() },
 ) {
     val verb: String?
         get() = acceptLabel?.substringBefore(' ')
@@ -191,6 +192,7 @@ internal fun requestItems(snapshot: SocialSnapshot, source: SocialSource): List<
             { source.accept(request) },
             if (request.incoming) "Decline" else "Cancel request",
             { source.dismiss(request) },
+            more = { listOf(blockMenuItem(source, request.person)) },
         )
     }
 
@@ -270,7 +272,16 @@ private fun hostJoinItems(): List<InboxItem> = HostJoinRequests.pending.map { re
 internal fun InboxItem.menuItems(): List<MenuAction> = listOfNotNull(
     acceptLabel?.let { MenuAction(it, onClick = accept) },
     MenuAction(dismissLabel, onClick = dismiss),
-)
+) + more()
+
+internal fun blockMenuItem(name: String, onBlock: () -> Unit): MenuAction = MenuAction("Block", danger = true) {
+    ConfirmPrompt.ask("Block $name?", "You won't see their messages or requests. You can unblock them later.", "Block", SOCIAL_ASSETS + "x-close.svg", onBlock)
+}
+
+internal fun blockMenuItem(source: SocialSource, person: SocialPerson, onBlocked: () -> Unit = {}): MenuAction = blockMenuItem(person.name) {
+    onBlocked()
+    source.block(person)
+}
 
 internal fun friendMenuItems(state: SocialPageState, person: SocialPerson): List<MenuAction> = listOf(
     MenuAction("Remove friend") {
@@ -279,13 +290,26 @@ internal fun friendMenuItems(state: SocialPageState, person: SocialPerson): List
             state.source.remove(person)
         }
     },
-    MenuAction("Block", danger = true) {
-        ConfirmPrompt.ask("Block ${person.name}?", "You won't see their messages or requests. You can unblock them later.", "Block", SOCIAL_ASSETS + "x-close.svg") {
-            state.selected = null
-            state.source.block(person)
-        }
-    },
+    blockMenuItem(state.source, person) { state.selected = null },
 )
+
+internal fun friendshipMenuItem(state: SocialPageState, snapshot: SocialSnapshot, person: SocialPerson): MenuAction {
+    val request = snapshot.requestWith(person.id)
+    return when {
+        request == null -> MenuAction("Add friend", SOCIAL_ASSETS + "user-plus-01.svg") { state.source.addFriend(person) }
+        request.incoming -> MenuAction("Accept friend request", SOCIAL_ASSETS + "user-plus-01.svg") { state.source.accept(request) }
+        else -> MenuAction("Friend request sent", SOCIAL_ASSETS + "user-plus-01.svg", enabled = false) {}
+    }
+}
+
+internal fun personMenuItems(state: SocialPageState, snapshot: SocialSnapshot, person: SocialPerson): List<MenuAction> = when {
+    snapshot.isBlocked(person.id) -> blockedMenuItems(state, person)
+    snapshot.isFriend(person.id) -> listOfNotNull(
+        partyInviteItem(person.id).takeIf { person.online },
+        worldInviteItem(state, person),
+    ) + friendMenuItems(state, person)
+    else -> listOf(friendshipMenuItem(state, snapshot, person), blockMenuItem(state.source, person))
+}
 
 internal fun worldInviteItem(state: SocialPageState, person: SocialPerson, hosting: Boolean = P2PSessionManager.currentSessionId != null): MenuAction? {
     if (!hosting) return null
