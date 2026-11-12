@@ -225,7 +225,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
         ServerFilter.All -> servers.featured + servers.saved + servers.lan + servers.sponsored
         ServerFilter.Recent -> servers.recent
     }
-    val shown = base.filter { query.isBlank() || it.data.name.contains(query.trim(), true) || (!hideAddress && it.data.ip.contains(query.trim(), true)) }
+    val shown = base.filter { query.isBlank() || it.data.shownName.contains(query.trim(), true) || (!hideAddress && it.data.ip.contains(query.trim(), true)) }
     val canReorder = filter == ServerFilter.All && query.isBlank()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(PageGrid.Gap)) {
         PageHeader(
@@ -348,7 +348,7 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
             .cardFrame(selected, hovered)
             .contextMenu { serverMenuItems(lobby, entry, canReorder, onDelete = onDelete) }
             .hoverable(interaction)
-            .clickableWithSound(data.name, selected = selected.takeIf { it }, shape = ppShape(16.dp), onClick = onClick),
+            .clickableWithSound(data.shownName, selected = selected.takeIf { it }, shape = ppShape(16.dp), onClick = onClick),
     ) {
         Row(
             Modifier.fillMaxWidth().serverWash(data, SERVER_CARD_WASH).padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
@@ -403,7 +403,7 @@ private fun ServerText(entry: ServerEntry, revision: Int) {
     ServerRevisions.of(entry.data)
     val data = entry.data
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Label(data.name, 15.sp, weight = FontWeight.Medium)
+        Label(data.shownName, 15.sp, weight = FontWeight.Medium)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (data.state() == ServerData.State.INCOMPATIBLE) Tag("Incompatible", TagTone.Danger)
             Label(serverMeta(data), 12.sp, color = if (LobbyServers.failed(data)) SocialDangerText else MutedText)
@@ -561,7 +561,7 @@ private fun DirectConnectDialog(lobby: LobbyShell, onDismiss: () -> Unit) {
 @Composable
 private fun DeleteServerDialog(entry: ServerEntry, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     ConfirmDialog(
-        title = "Delete ${entry.data.name}?",
+        title = "Delete ${entry.data.shownName}?",
         text = "It will be removed from your server list.",
         confirmLabel = "Delete",
         dismissLabel = "Cancel",

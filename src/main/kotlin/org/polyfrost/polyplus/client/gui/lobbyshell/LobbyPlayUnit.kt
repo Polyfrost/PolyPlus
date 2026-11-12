@@ -384,7 +384,7 @@ private fun ServerHero(lobby: LobbyShell, data: ServerData) {
     val revision = servers.revision
     LaunchedEffect(data) { servers.ping(data) }
     HeroLayout({ ServerIcon(data, revision, HeroIconSize) }) {
-        HeroName(data.name)
+        HeroName(data.shownName)
         ServerStatus(data, revision)
     }
 }
@@ -604,7 +604,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
             }
             rows.forEach { entry ->
                 LaunchedEffect(entry.data) { servers.ping(entry.data) }
-                RecentTile(entry.data.name, lobby.isSelected(entry.data), { lobby.select(entry.data) }, { serverMenuItems(lobby, entry) }) { ServerIcon(entry.data, servers.revision, TileSize) }
+                RecentTile(entry.data.shownName, lobby.isSelected(entry.data), { lobby.select(entry.data) }, { serverMenuItems(lobby, entry) }) { ServerIcon(entry.data, servers.revision, TileSize) }
             }
             replays.forEach { entry ->
                 RecentTile(entry.name, lobby.isSelected(entry), { lobby.select(entry) }, { replayMenuItems(entry, lobby::watch) }) { ReplayThumb(entry, TileSize, TileSize) }

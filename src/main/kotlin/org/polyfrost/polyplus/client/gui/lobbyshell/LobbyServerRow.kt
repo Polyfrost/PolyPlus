@@ -104,7 +104,7 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
             .height(RowHeight)
             .contextMenu { serverMenuItems(lobby, entry, canReorder, vertical = true, onDelete = onDelete) }
             .hoverable(interaction)
-            .clickableWithSound("${data.name}, ${serverPlayers(data)}", selected = selected.takeIf { it }, shape = ppShape(16.dp)) {
+            .clickableWithSound("${data.shownName}, ${serverPlayers(data)}", selected = selected.takeIf { it }, shape = ppShape(16.dp)) {
                 doubleClick()
                 lobby.select(data)
             }
@@ -118,7 +118,7 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
         ServerIcon(data, revision, RowIcon)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Label(data.name, 14.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
+                Label(data.shownName, 14.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
                 if (data.state() == ServerData.State.INCOMPATIBLE) Tag("Incompatible", TagTone.Danger)
             }
             MotdText(entry, revision)

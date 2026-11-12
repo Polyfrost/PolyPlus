@@ -498,7 +498,7 @@ private fun LeftColumn(
                     Spacer(Modifier.height(12.dp))
                     when (entry) {
                         is QuickplayEntry.Server -> ServerRow(
-                            title = entry.data.name,
+                            title = PolyPlusRecentServers.listLabel(entry.data.name, entry.data.ip),
                             subtitle = serverStatusText(entry.data),
                             //? if > 1.8.9 {
                             favicon = rememberFavicon(entry.data.iconBytes),
