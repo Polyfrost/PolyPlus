@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Pseudo
-@Mixin(targets = "dev.tr7zw.entityculling.NMSCullingHelper", remap = false)
+@Mixin(targets = {"dev.tr7zw.entityculling.NMSCullingHelper", "dev.tr7zw.entityculling.util.NMSCullingHelper"}, remap = false)
 public class MixinNMSCullingHelper {
     @Inject(method = "ignoresCulling", at = @At("HEAD"), cancellable = true, remap = false, require = 0, expect = 0)
     private static void polyplus$keepLobbyEntities(CallbackInfoReturnable<Boolean> cir) {
