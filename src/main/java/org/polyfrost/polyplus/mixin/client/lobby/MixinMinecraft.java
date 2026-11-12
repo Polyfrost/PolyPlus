@@ -96,6 +96,8 @@ public class MixinMinecraft {
 //?} else {
 /*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.render.platform.GLX;
+import net.minecraft.client.render.platform.GlStateManager;
 import net.minecraft.client.world.ClientWorld;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.lobby.LobbyCapture;
@@ -105,6 +107,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 
 @Mixin(Minecraft.class)
 public class MixinMinecraft {
@@ -145,6 +149,18 @@ public class MixinMinecraft {
     @Inject(method = "pauseGame", at = @At("HEAD"), cancellable = true)
     private void polyplus$noLobbyPause(CallbackInfo ci) {
         if (LobbyScene.terrainActive()) ci.cancel();
+    }
+
+    @Inject(method = "runGame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/pipeline/RenderTarget;draw(II)V"))
+    private void polyplus$disableExtraTextureUnitsBeforeBlit(CallbackInfo ci) {
+        for (int unit = 1; unit <= 3; unit++) {
+            GlStateManager.activeTexture(GLX.GL_TEXTURE0 + unit);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + unit);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            GlStateManager.disableTexture();
+        }
+        GlStateManager.activeTexture(GLX.GL_TEXTURE0);
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
     }
 }
 *///?}
