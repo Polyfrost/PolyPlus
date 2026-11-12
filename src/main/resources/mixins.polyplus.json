@@ -286,6 +286,8 @@
     "compat.distanthorizons.MixinDhSharedApi",
     "compat.distanthorizons.MixinDhVanillaFog",
     //?}
+    //? if >= 1.21.10
+    "compat.betterf3.MixinBetterF3Bossbar",
     //? if > 1.8.9
     "compat.confirmdisconnect.MixinConfirmDisconnectPauseScreen",
     //? if < 1.21.8 && > 1.8.9
