@@ -122,6 +122,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.SparkCompat
 import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -2136,6 +2137,7 @@ object LobbyScene {
 
     @JvmStatic
     fun onClientTick() {
+        SparkCompat.warm()
         LobbyAmbience.tick()
         val scene = shown() ?: return
         guarded("tick") { tickScene(scene) }

@@ -100,6 +100,10 @@ internal object SparkCompat {
 
     val available: Boolean get() = installed && platform() != null
 
+    fun warm() {
+        if (installed && clientPlatform == null) platform()
+    }
+
     fun stats(singleplayer: Boolean): SparkStats? {
         if (!installed) return null
         val platform = platform() ?: return null
