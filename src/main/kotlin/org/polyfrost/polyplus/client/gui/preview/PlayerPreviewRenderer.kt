@@ -210,6 +210,10 @@ import java.util.stream.Stream
 
 object PlayerPreviewRenderer {
     private val equipmentByEntityId = ConcurrentHashMap<Int, CosmeticEquipment>()
+    private val clockStart = System.nanoTime()
+    private const val NANOS_PER_TICK = 50_000_000.0
+
+    private fun previewTicks(): Float = ((System.nanoTime() - clockStart) / NANOS_PER_TICK).toFloat()
     private val tintByEntityId = ConcurrentHashMap<Int, PreviewTint>()
 
     @JvmStatic
@@ -638,7 +642,7 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
-        state.ageInTicks = (System.nanoTime() / 50_000_000L).toFloat()
+        state.ageInTicks = previewTicks()
         // the dummy's skin customisation data is never synced, which hides every outer layer; match directState
         state.showHat = true
         state.showJacket = true
@@ -903,7 +907,7 @@ object PlayerPreviewRenderer {
         lightCoords = 0xF000F0
         yRot = 0f
         xRot = 0f
-        ageInTicks = (System.nanoTime() / 50_000_000L).toFloat()
+        ageInTicks = previewTicks()
     }
     //?} else {
     /*private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
@@ -920,7 +924,7 @@ object PlayerPreviewRenderer {
         showCape = true
         yRot = 0f
         xRot = 0f
-        ageInTicks = (System.nanoTime() / 50_000_000L).toFloat()
+        ageInTicks = previewTicks()
     }
     *///?}
 
@@ -1276,7 +1280,7 @@ object PlayerPreviewRenderer {
         scale = 1f
         boundingBoxWidth = 0.6f
         boundingBoxHeight = 1.8f
-        ageInTicks = (System.nanoTime() / 50_000_000L).toFloat()
+        ageInTicks = previewTicks()
     }
     //?}
 
