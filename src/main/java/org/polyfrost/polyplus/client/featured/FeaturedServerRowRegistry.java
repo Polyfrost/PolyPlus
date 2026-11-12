@@ -121,6 +121,7 @@ import net.minecraft.client.gui.screen.menu.multiplayer.MultiplayerServerListWid
 import net.minecraft.client.gui.widget.EntryListWidget;
 import net.minecraft.client.gui.widget.ServerListEntryWidget;
 import net.minecraft.client.options.ServerListEntry;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -151,7 +152,7 @@ public final class FeaturedServerRowRegistry {
     public static synchronized void release(MultiplayerServerListWidget list) {
         var entries = new ArrayList<ServerListEntryWidget>();
         for (var item : ROWS.entrySet()) {
-            if (item.getValue().list == list) entries.add(item.getKey());
+            if (item.getValue().list() == list) entries.add(item.getKey());
         }
         for (var entry : entries) ROWS.remove(entry);
     }
@@ -177,9 +178,9 @@ public final class FeaturedServerRowRegistry {
     }
 
     public static final class Row {
-        private final MultiplayerServerListWidget list;
-        private final ServerListEntryWidget entry;
-        private final MultiplayerScreen screen;
+        private final WeakReference<MultiplayerServerListWidget> list;
+        private final WeakReference<ServerListEntryWidget> entry;
+        private final WeakReference<MultiplayerScreen> screen;
         private final ServerListEntry data;
         private final FeaturedServer server;
         private final boolean promoted;
@@ -199,24 +200,24 @@ public final class FeaturedServerRowRegistry {
             FeaturedServer server,
             boolean promoted
         ) {
-            this.list = list;
-            this.entry = entry;
-            this.screen = screen;
+            this.list = new WeakReference<>(list);
+            this.entry = new WeakReference<>(entry);
+            this.screen = new WeakReference<>(screen);
             this.data = data;
             this.server = server;
             this.promoted = promoted;
         }
 
         public MultiplayerServerListWidget list() {
-            return list;
+            return list.get();
         }
 
         public ServerListEntryWidget entry() {
-            return entry;
+            return entry.get();
         }
 
         public MultiplayerScreen screen() {
-            return screen;
+            return screen.get();
         }
 
         public ServerListEntry data() {
