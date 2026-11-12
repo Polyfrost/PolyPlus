@@ -29,7 +29,7 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Style",
         description = "Picks how the pause screen looks.",
-        options = ["Spotlight", "Full", "Compact", "Vanilla"],
+        options = ["Full", "Spotlight", "Compact", "Vanilla"],
         subcategory = "Style",
     )
     var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK_FLAT
