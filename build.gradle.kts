@@ -543,6 +543,12 @@ tasks.withType<ProcessResources>().configureEach {
     }
 }
 
+tasks.named<Jar>("sourcesJar") {
+    exclude("**/*.png")
+    exclude("assets/**")
+    exclude("natives/**")
+}
+
 if (!isOrnithe) {
     val rrlsStub = tasks.register<Jar>("rrlsStubJar") {
         from(rootProject.file("src/rrls-stub"))
