@@ -50,7 +50,7 @@ internal object PlaySessions {
 
     private class Place(val key: String, val name: String, val server: Boolean, val unresolvedHost: String? = null)
 
-    private class Session(val player: UUID, var place: Place) {
+    private class Session(val player: UUID, var place: Place, val baseMillis: Long) {
         var lastNanos = System.nanoTime()
         var elapsed = 0L
         var pending = 0L
@@ -83,6 +83,8 @@ internal object PlaySessions {
 
     fun log(player: UUID): PlayLog = synchronized(lock) { loaded().players[player.toString()] ?: PlayLog() }
 
+    fun currentPlaceMillis(): Long? = session?.let { it.baseMillis + it.elapsed }
+
     private fun tick() {
         val mc = Minecraft.getInstance()
         val place = currentPlace(mc)
@@ -92,7 +94,10 @@ internal object PlaySessions {
             flush(open)
             session = null
         }
-        if (place != null && session == null) session = Session(ClientPlatform.localPlayerUuid(), place)
+        if (place != null && session == null) {
+            val player = ClientPlatform.localPlayerUuid()
+            session = Session(player, place, log(player).spots[place.key]?.millis ?: 0L)
+        }
         session?.let {
             if (place != null) it.place = place
             advance(it, mc)

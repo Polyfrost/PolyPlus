@@ -24,6 +24,9 @@ import org.polyfrost.polyplus.mixin.client.access.TitleScreenInvoker
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.renderer.Panorama
+import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
 //? if < 26.1 && > 1.8.9 {
@@ -111,6 +114,15 @@ object MenuPanorama {
         if (drew) drawnThisPass = true
         return drew
     }
+
+    private val CUBE_MAP_ID: Identifier = Identifier.withDefaultNamespace("textures/gui/title/background/panorama")
+
+    @JvmStatic
+    fun panoramaReady(): Boolean = textureLoaded(CustomPanorama.cubeMapTexture(CUBE_MAP_ID)) &&
+        textureLoaded(CustomPanorama.overlayTexture(Panorama.PANORAMA_OVERLAY))
+
+    private fun textureLoaded(id: Identifier): Boolean =
+        runCatching { Minecraft.getInstance().textureManager.getTexture(id).getTextureView() }.isSuccess
     //?} elif > 1.8.9 {
     /*@JvmStatic
     fun drawBackdrop(ctx: GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
