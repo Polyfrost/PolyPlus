@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -289,9 +288,9 @@ private fun AccountStatusBadge() {
     val hidden = status == PlayerStatus.Offline
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OneConfigTheme.current.circleShape)
             .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, OneConfigTheme.current.borderColor, RoundedCornerShape(50))
+            .border(1.dp, OneConfigTheme.current.borderColor, OneConfigTheme.current.circleShape)
             .clickableWithSound(selfStatusLabel(status)) { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -306,9 +305,9 @@ private fun AccountStatusBadge() {
 private fun AccountBadge(icon: String, text: String, color: Color) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OneConfigTheme.current.circleShape)
             .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, color, RoundedCornerShape(50))
+            .border(1.dp, color, OneConfigTheme.current.circleShape)
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

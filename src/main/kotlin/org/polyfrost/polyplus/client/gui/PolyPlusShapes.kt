@@ -17,6 +17,8 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
+import org.polyfrost.oneconfig.internal.ui.themes.UITheme
+import org.polyfrost.oneconfig.internal.ui.themes.cornerRadiusOrNull
 
 private const val LIGHT_SUFFIX = " Light"
 private const val DARK_SUFFIX = " Dark"
@@ -25,7 +27,7 @@ internal val OneConfigUITheme.isLightTheme: Boolean
     get() = pageBackground.luminance() > LIGHT_TEXT_LIMIT && textColor.luminance() < LIGHT_TEXT_LIMIT
 
 internal val OneConfigUITheme.isMinecraftStyle: Boolean
-    get() = name == OneConfigTheme.MINECRAFT_DARK.name || name == OneConfigTheme.MINECRAFT_LIGHT.name
+    get() = (this as? UITheme)?.isMinecraftStyle == true || name == OneConfigTheme.MINECRAFT_DARK.name || name == OneConfigTheme.MINECRAFT_LIGHT.name
 
 internal fun OneConfigUITheme.familyVariant(light: Boolean): OneConfigUITheme? {
     val target = name.removeSuffix(LIGHT_SUFFIX).removeSuffix(DARK_SUFFIX) + if (light) LIGHT_SUFFIX else DARK_SUFFIX
@@ -105,8 +107,18 @@ private fun crispPixelSize(size: Dp): Dp = with(LocalDensity.current) {
 }
 
 @Composable
-internal fun ppShape(radius: Dp): Shape =
-    if (isMinecraftTheme) RectangleShape else RoundedCornerShape(radius)
+private fun cornerScale(): Float {
+    val radius = OneConfigTheme.current.popupShape.cornerRadiusOrNull() ?: return 1f
+    val reference = OneConfigTheme.POLYFROSTED_DARK.popupShape.cornerRadiusOrNull() ?: return 1f
+    if (reference <= 0.dp) return 1f
+    return (radius / reference).coerceIn(0f, 1f)
+}
+
+@Composable
+internal fun ppShape(radius: Dp): Shape {
+    val scale = cornerScale()
+    return if (scale <= 0f) RectangleShape else RoundedCornerShape(radius * scale)
+}
 
 @Composable
 internal fun ppShapeOf(
@@ -114,6 +126,8 @@ internal fun ppShapeOf(
     topEnd: Dp = 0.dp,
     bottomEnd: Dp = 0.dp,
     bottomStart: Dp = 0.dp,
-): Shape =
-    if (isMinecraftTheme) RectangleShape
-    else RoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
+): Shape {
+    val scale = cornerScale()
+    return if (scale <= 0f) RectangleShape
+    else RoundedCornerShape(topStart * scale, topEnd * scale, bottomEnd * scale, bottomStart * scale)
+}
