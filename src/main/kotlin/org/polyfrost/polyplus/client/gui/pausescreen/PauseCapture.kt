@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import net.minecraft.client.Minecraft
-import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
 //? if > 1.8.9
 import org.polyfrost.polyplus.client.gui.WidgetPress
@@ -167,7 +166,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         val handler = (widget as? Button)?.let { (it as ButtonAccessor).`polyplus$onPress`() }
         val mod = if (slotted.group == GROUP_OTHER) PauseModSource.of(widget.javaClass, handler?.javaClass) else null
         val group = if (slotted.group == GROUP_OTHER && widget.message.contents is TranslatableContents) GROUP_GAME else slotted.group
-        val text = Platform.i18n().getUnformattedText(widget.message).ifBlank { tooltip.orEmpty() }.ifBlank { UNNAMED }
+        val text = PauseText.of(widget.message).ifBlank { tooltip.orEmpty() }.ifBlank { UNNAMED }
         return PauseEntry(
             System.identityHashCode(widget),
             slotted.slot,
