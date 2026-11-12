@@ -140,12 +140,13 @@ internal class LiveSocialSource : SocialSource {
             val byId = friends.associateBy { it.player }
             val inviters = invites.filter { it.status == INVITE_PENDING }.map { it.sender } + partyInvites.map { it.sender }
             val person = { id: String -> personOf(id, byId[id], party, names, inviters) }
+            val (concealed, shown) = groups.partition { HiddenConversations.isHidden(it, hidden) }
             SocialSnapshot(
                 friends = friends.map { person(it.player) }.sortedWith(compareByDescending<SocialPerson> { it.online }.thenBy { it.name.lowercase() }),
                 requests = incoming.map { SocialRequest(it.id, person(it.player), incoming = true) } +
                     outgoing.map { SocialRequest(it.id, person(it.player), incoming = false) },
                 blocked = blocked.map { person(it.player) }.sortedBy { it.name.lowercase() },
-                threads = threadsOf(groups.filterNot { HiddenConversations.isHidden(it, hidden) }, person, names, responded),
+                threads = threadsOf(shown, person, names, responded),
                 worlds = invites.filter { it.status == INVITE_PENDING || it.status == INVITE_ACCEPTED }
                     .sortedBy { it.status == INVITE_ACCEPTED }
                     .map { SocialWorld(it.id, person(it.sender), null, it.status == INVITE_ACCEPTED, buildLabel(it)) },
@@ -155,6 +156,7 @@ internal class LiveSocialSource : SocialSource {
                 specialTarget = special?.isSpecialChatTarget == true,
                 scanningReplies = scanning,
                 partyInvites = partyInvites.map { SocialPartyInvite(it, person(it.sender)) },
+                hiddenThreads = threadsOf(concealed, person, names, responded),
             )
         }
     }

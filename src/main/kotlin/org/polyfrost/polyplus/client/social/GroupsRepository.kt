@@ -204,16 +204,25 @@ object GroupsRepository {
 
     fun readingStopped(groupId: Int) = readingConversations.remove(groupId)
 
-    fun markRead(groupId: Int, messageId: Long) {
-        if (isPending(messageId)) return
+    fun newestMessage(groupId: Int): GroupMessage? = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }
+
+    fun markRead(groupId: Int, messageId: Long, onResult: (Boolean) -> Unit = {}) {
+        if (isPending(messageId)) {
+            onResult(false)
+            return
+        }
         clearMessageToasts(groupId)
         if (System.currentTimeMillis() < (markReadRetryAt[groupId] ?: 0L)) {
             markReadPending.merge(groupId, messageId) { a, b -> maxOf(a, b) }
+            onResult(false)
             return
         }
         val reported = readThrough[groupId]
         val unread = _groups.value.any { it.id == groupId && it.unread }
-        if (!unread && reported != null && reported >= messageId) return
+        if (!unread && reported != null && reported >= messageId) {
+            onResult(true)
+            return
+        }
         val target = maxOf(messageId, reported ?: messageId)
         readThrough[groupId] = target
         readFence[groupId] = Long.MAX_VALUE
@@ -221,6 +230,7 @@ object GroupsRepository {
         PolyPlusClient.SCOPE.launch {
             val result = GroupsApi.markRead(groupId, target)
             readFence.replace(groupId, Long.MAX_VALUE, if (result.isSuccess) refreshTicket.get() else 0L)
+            onResult(result.isSuccess)
             result.onSuccess {
                 markReadFailures.remove(groupId)
                 markReadRetryAt.remove(groupId)
@@ -241,10 +251,17 @@ object GroupsRepository {
         }
     }
 
-    fun markLatestRead(groupId: Int) = PolyPlusClient.SCOPE.launch {
-        val cached = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }?.id
-        val latest = cached ?: GroupsApi.messages(groupId).getOrNull()?.filterNot { isPending(it.id) }?.maxOfOrNull { it.id }
-        if (latest != null) markRead(groupId, latest)
+    fun acknowledge(groupId: Int, messageId: Long?, notAfter: Instant, onResult: (Long?) -> Unit) {
+        if (messageId != null) {
+            markRead(groupId, messageId) { ok -> onResult(if (ok) messageId else null) }
+            return
+        }
+        PolyPlusClient.SCOPE.launch {
+            val newest = GroupsApi.messages(groupId).getOrNull()
+                ?.filter { !isPending(it.id) && runCatching { !Instant.parse(it.sentAt).isAfter(notAfter) }.getOrDefault(false) }
+                ?.maxByOrNull { it.id }
+            if (newest == null) onResult(null) else markRead(groupId, newest.id) { ok -> onResult(if (ok) newest.id else null) }
+        }
     }
 
     private fun clearMessageToasts(groupId: Int) {
@@ -292,6 +309,7 @@ object GroupsRepository {
         if (isPending(message.id)) return
         val newest = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }
         if (newest != null && newest.id != message.id) return
+        HiddenConversations.messageArrived(groupId, message.id)
         val existing = _groups.value.firstOrNull { it.id == groupId }
         if (existing == null) {
             refreshGroups()

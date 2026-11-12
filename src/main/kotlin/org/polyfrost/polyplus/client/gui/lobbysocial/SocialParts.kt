@@ -346,7 +346,7 @@ internal fun WorldAction(state: SocialPageState, snapshot: SocialSnapshot, perso
 
 @Composable
 internal fun FriendDetailPanel(state: SocialPageState, snapshot: SocialSnapshot, person: SocialPerson, modifier: Modifier) {
-    val groups = snapshot.threads.filter { thread -> thread.group && thread.people.any { it.id == person.id } }
+    val groups = snapshot.allThreads.filter { thread -> thread.group && thread.people.any { it.id == person.id } }
     Column(modifier.socialSurface().padding(LocalSocialLook.current.paneEdge), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             PersonHead(person, 64.dp)

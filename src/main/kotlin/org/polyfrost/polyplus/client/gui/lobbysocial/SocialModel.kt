@@ -57,7 +57,11 @@ internal data class SocialSnapshot(
     val specialTarget: Boolean,
     val scanningReplies: Boolean,
     val partyInvites: List<SocialPartyInvite> = emptyList(),
+    val hiddenThreads: List<SocialThread> = emptyList(),
 ) {
+    val allThreads: List<SocialThread>
+        get() = threads + hiddenThreads
+
     val waiting: Int
         get() = requests.count { it.incoming } + worlds.count { !it.accepted } + partyInvites.size
 
@@ -141,7 +145,7 @@ internal class SocialPageState(val source: SocialSource) {
 
     fun conversation(snapshot: SocialSnapshot): SocialDetail.Conversation? {
         val chat = SocialChatLink.active ?: return null
-        val thread = snapshot.threads.firstOrNull { it.id == chat.id } ?: return null
+        val thread = snapshot.allThreads.firstOrNull { it.id == chat.id } ?: return null
         return SocialDetail.Conversation(chat, thread)
     }
 
