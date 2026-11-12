@@ -767,7 +767,11 @@ private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolea
 @Composable
 private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
     val theme = OneConfigTheme.current
-    val color = if (badge.style == CardBadgeStyle.New) theme.textColor else theme.accentTextColor
+    val color = when (badge.style) {
+        CardBadgeStyle.New -> Color.White
+        CardBadgeStyle.Sale -> Color(0xFF101114)
+        CardBadgeStyle.Accent -> theme.accentTextColor
+    }
     Row(
         modifier = modifier.widthIn(min = if (badge.label.isEmpty()) 40.dp else 81.dp).height(21.dp)
             .clip(ppShapeOf(bottomStart = 7.dp, bottomEnd = 7.dp))

@@ -66,6 +66,7 @@ object StartupOverlay {
     var active = false
 
     private var shownProgress = 0f
+    private var overlayDrawn = false
     private var holdNanos = 0L
     private var startNanos = 0L
     private var fallbackNanos = 0L
@@ -95,20 +96,23 @@ object StartupOverlay {
         val initial = !fadeIn && !loadFinished && enabled()
         if (initial) {
             cardGrow = 0f
+            overlayDrawn = false
             active = true
         }
         return initial
     }
 
     @JvmStatic
-    fun holdsOverlay(): Boolean = active
+    fun holdsOverlay(): Boolean = active && overlayDrawn
 
     @JvmStatic
     fun onFrame() {
         if (!active) return
         val mc = Minecraft.getInstance()
-        if (!overlayOpen(mc) && loadFinished(mc) && ClientPlatform.currentScreen() !is PolyPlusLobbyScreen) finished(mc)
+        if (!overlayHeld(mc) && loadFinished(mc) && ClientPlatform.currentScreen() !is PolyPlusLobbyScreen) finished(mc)
     }
+
+    private fun overlayHeld(mc: Minecraft): Boolean = overlayDrawn && overlayOpen(mc)
 
     private fun overlayOpen(mc: Minecraft): Boolean =
         //? if >= 26.2 {
@@ -136,7 +140,7 @@ object StartupOverlay {
     }
 
     fun screenFrame(mc: Minecraft, g: StartupGraphics) {
-        if (!active || overlayOpen(mc)) return
+        if (!active || overlayHeld(mc)) return
         StartupTextures.load(mc)
         enterHold(true)
         val canvas = StartupCanvas(mc, g)
@@ -149,6 +153,7 @@ object StartupOverlay {
 
     @JvmStatic
     fun frame(mc: Minecraft, g: StartupGraphics, partial: Float, reload: Float, holding: Boolean) {
+        overlayDrawn = true
         StartupTextures.load(mc)
         enterHold(holding)
         val canvas = StartupCanvas(mc, g)

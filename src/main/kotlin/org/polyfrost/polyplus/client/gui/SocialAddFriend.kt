@@ -91,7 +91,7 @@ internal fun AddFriendDialog(onDismiss: () -> Unit) {
             trailing = null,
             onSubmit = { submit() },
         )
-        error?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }
+        error?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerText) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton("Cancel", themedIcon(SOCIAL_ASSETS + "x-close.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, true, onDismiss)
             TextButton(

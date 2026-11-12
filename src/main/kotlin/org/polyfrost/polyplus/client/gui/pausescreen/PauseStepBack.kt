@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,14 +127,15 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         val panels = widgets.view.panels.take(slots.count)
         val panelArea = panelSlots(narrow, 1, maxWidth, maxHeight, rowWidth).count > 0
         val panelled = remember(panels) { panels.mapTo(HashSet()) { it.id } }
-        if (screen.staged) AvatarTag(place.title) else FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
+        if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
             Column(
                 Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp)
-                    .width(if (narrow) 340.dp else 400.dp),
+                    .width(if (narrow) 340.dp else 400.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 Eyebrow(place.eyebrow)
                 Spacer(Modifier.height(6.dp))
@@ -168,12 +172,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin + LobbyLayout.BarHeight + LobbyLayout.Gap),
         )
     }
-    if (screen.moreOpen) {
-        MoreDismiss(screen)
-        LobbyDarkChrome {
-            MorePanel(screen, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 376.dp else 488.dp, top = 68.dp))
-        }
-    }
+    if (screen.moreOpen) MoreDismiss(screen)
     if (screen.customizeOpen) {
         CustomizeDismiss(screen)
         LobbyDarkChrome {
@@ -193,7 +192,15 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     rememberModMenu()?.let { (modMenu, logo) ->
         MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
-    MenuRow(asset("dots-vertical"), "More", height = rowHeight) { screen.moreOpen = !screen.moreOpen }
+    LinkedModRow(screen, rowHeight)
+    val moreShown = screen.moreOpen && !screen.moreLinked
+    Box(Modifier.focusRequester(rememberMoreTrigger(moreShown))) {
+        MenuRow(asset("dots-vertical"), "More", height = rowHeight) {
+            screen.moreLinked = false
+            screen.moreOpen = !moreShown
+        }
+        if (moreShown) MorePopup(screen, rememberToolAnchor(true))
+    }
     Spacer(Modifier.height(6.dp))
     Hairline()
     Spacer(Modifier.height(6.dp))

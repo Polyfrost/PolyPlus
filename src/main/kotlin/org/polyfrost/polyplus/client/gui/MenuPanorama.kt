@@ -24,6 +24,9 @@ import org.polyfrost.polyplus.mixin.client.access.TitleScreenInvoker
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.renderer.Panorama
+import net.minecraft.resources.Identifier
+import org.polyfrost.polyplus.client.gui.panorama.CustomPanorama
 //?}
 
 //? if < 26.1 && > 1.8.9 {
@@ -85,6 +88,11 @@ object MenuPanorama {
         MainMenuReplacement.replacesTitleScreen() && !MainMenuReplacement.enabled()
 
     @JvmStatic
+    fun panoramaBackdrop(): Boolean = PolyPlusMainMenuConfig.mainMenuBackground == MainMenuBackground.PANORAMA
+
+    private fun classicBackdropActive(): Boolean = classicMenuActive() && !panoramaBackdrop()
+
+    @JvmStatic
     fun beginPass() {
         drawnThisPass = false
     }
@@ -104,13 +112,40 @@ object MenuPanorama {
 
     @JvmStatic
     fun drawComposeBackdrop(ctx: GuiGraphicsExtractor, screen: Screen): Boolean {
-        if (!classicMenuActive() || screen !is ComposeScreen) return false
+        if (!classicBackdropActive() || screen !is ComposeScreen) return false
         if (!backdropWanted(screen, true)) return false
         if (drawnThisPass) return true
         val drew = MenuFxPass.renderInline(ctx)
         if (drew) drawnThisPass = true
         return drew
     }
+
+    @JvmStatic
+    fun drawMenuPanorama(ctx: GuiGraphicsExtractor, width: Int, height: Int): Boolean {
+        if (!panoramaBackdrop()) return false
+        if (panoramaReady()) {
+            Minecraft.getInstance().gameRenderer
+                //? if >= 26.2 {
+                .panorama()
+                .extractRenderState(ctx, width, height)
+                //?} else {
+                /*.getPanorama()
+                .extractRenderState(ctx, width, height, true)
+                *///?}
+        }
+        ctx.blurBeforeThisStratum()
+        MenuBackgroundPass.renderInline(ctx)
+        return true
+    }
+
+    private val CUBE_MAP_ID: Identifier = Identifier.withDefaultNamespace("textures/gui/title/background/panorama")
+
+    @JvmStatic
+    fun panoramaReady(): Boolean = textureLoaded(CustomPanorama.cubeMapTexture(CUBE_MAP_ID)) &&
+        textureLoaded(CustomPanorama.overlayTexture(Panorama.PANORAMA_OVERLAY))
+
+    private fun textureLoaded(id: Identifier): Boolean =
+        runCatching { Minecraft.getInstance().textureManager.getTexture(id).getTextureView() }.isSuccess
     //?} elif > 1.8.9 {
     /*@JvmStatic
     fun drawBackdrop(ctx: GuiGraphics, screen: Screen, onPanoramaPass: Boolean): Boolean {
@@ -123,7 +158,7 @@ object MenuPanorama {
 
     @JvmStatic
     fun drawComposeBackdrop(ctx: GuiGraphics, screen: Screen): Boolean {
-        if (!classicMenuActive() || screen !is ComposeScreen) return false
+        if (!classicBackdropActive() || screen !is ComposeScreen) return false
         if (!backdropWanted(screen, true)) return false
         if (drawnThisPass) return true
         val drew = MenuFxPass.renderInline(ctx)
@@ -145,7 +180,7 @@ object MenuPanorama {
 
     @JvmStatic
     fun drawComposeBackdrop(screen: Screen): Boolean {
-        if (!classicMenuActive()) return drawBackdrop(screen, false)
+        if (!classicBackdropActive()) return drawBackdrop(screen, false)
         if (!backdropWanted(screen, false)) return false
         if (drawnThisPass) return true
         val drew = MenuFxPass.renderInline()

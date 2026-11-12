@@ -122,6 +122,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.SparkCompat
 import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -973,7 +974,7 @@ object LobbyScene {
             //?}
         )
         //?}
-        val listener = ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie)
+        val listener = LobbyCompat.quietly { ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie) }
         val realm = loaded.entry.realm
         val dimensionKey = when (realm) {
             LobbyRealm.NETHER -> BuiltinDimensionTypes.NETHER
@@ -1028,7 +1029,7 @@ object LobbyScene {
     }
     //?}
 
-    private fun finishBuild(mc: Minecraft, loaded: Loaded, listener: ClientPacketListener, level: ClientLevel, gameMode: MultiPlayerGameMode, rig: LocalPlayer, anchor: BlockPos): Live {
+    private fun finishBuild(mc: Minecraft, loaded: Loaded, listener: ClientPacketListener, level: ClientLevel, gameMode: MultiPlayerGameMode, rig: LocalPlayer, anchor: BlockPos): Live = standingIn(mc, rig) {
         sample(mc)
         val root = loaded.root
         val stage = root.optCompound("stage")?.let { LobbyStage.restore(level, it) }
@@ -1045,7 +1046,17 @@ object LobbyScene {
         //? if > 1.8.9
         built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
         runCatching { LobbyHerobrine.onSceneShown(level, stage) }
-        return built
+        built
+    }
+
+    private inline fun <T> standingIn(mc: Minecraft, rig: LocalPlayer, block: () -> T): T {
+        if (mc.player != null) return block()
+        mc.player = rig
+        try {
+            return block()
+        } finally {
+            if (mc.player === rig) mc.player = null
+        }
     }
 
     private fun sceneClock(captured: Long): Long = driven?.clock ?: LobbyAntics.clock(LobbyTime.clock(captured))
@@ -2126,6 +2137,7 @@ object LobbyScene {
 
     @JvmStatic
     fun onClientTick() {
+        SparkCompat.warm()
         LobbyAmbience.tick()
         val scene = shown() ?: return
         guarded("tick") { tickScene(scene) }

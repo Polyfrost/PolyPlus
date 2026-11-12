@@ -5,6 +5,7 @@ package org.polyfrost.polyplus.client.gui
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -17,6 +18,15 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
+import org.polyfrost.oneconfig.internal.ui.themes.CatppuccinFrappe
+import org.polyfrost.oneconfig.internal.ui.themes.CatppuccinLatte
+import org.polyfrost.oneconfig.internal.ui.themes.CatppuccinMacchiato
+import org.polyfrost.oneconfig.internal.ui.themes.CatppuccinMocha
+import org.polyfrost.oneconfig.internal.ui.themes.NordDark
+import org.polyfrost.oneconfig.internal.ui.themes.NordLight
+import org.polyfrost.oneconfig.internal.ui.themes.UITheme
+import org.polyfrost.oneconfig.internal.ui.themes.cornerRadiusOrNull
+import org.polyfrost.oneconfig.internal.ui.themes.palette
 
 private const val LIGHT_SUFFIX = " Light"
 private const val DARK_SUFFIX = " Dark"
@@ -25,12 +35,25 @@ internal val OneConfigUITheme.isLightTheme: Boolean
     get() = pageBackground.luminance() > LIGHT_TEXT_LIMIT && textColor.luminance() < LIGHT_TEXT_LIMIT
 
 internal val OneConfigUITheme.isMinecraftStyle: Boolean
-    get() = name == OneConfigTheme.MINECRAFT_DARK.name || name == OneConfigTheme.MINECRAFT_LIGHT.name
+    get() = (this as? UITheme)?.isMinecraftStyle == true || name == OneConfigTheme.MINECRAFT_DARK.name || name == OneConfigTheme.MINECRAFT_LIGHT.name
+
+internal val OneConfigUITheme.isGlassStyle: Boolean
+    get() = (this as? UITheme)?.liquidGlass ?: (name == OneConfigTheme.GLASS_DARK.name || name == OneConfigTheme.GLASS_LIGHT.name)
+
+private val OneConfigUITheme.family: String
+    get() = (this as? UITheme)?.palette?.group ?: name.removeSuffix(LIGHT_SUFFIX).removeSuffix(DARK_SUFFIX)
+
+private val familyThemes: List<OneConfigUITheme> by lazy {
+    OneConfigTheme.builtIn() + listOf(CatppuccinLatte, CatppuccinMocha, CatppuccinMacchiato, CatppuccinFrappe, NordDark, NordLight)
+}
 
 internal fun OneConfigUITheme.familyVariant(light: Boolean): OneConfigUITheme? {
-    val target = name.removeSuffix(LIGHT_SUFFIX).removeSuffix(DARK_SUFFIX) + if (light) LIGHT_SUFFIX else DARK_SUFFIX
-    return OneConfigTheme.builtIn().firstOrNull { it.name == target }
+    if (isLightTheme == light) return this
+    val family = family
+    return familyThemes.firstOrNull { it.family == family && it.isLightTheme == light }
 }
+
+internal val LocalShapeTheme = compositionLocalOf<OneConfigUITheme?> { null }
 
 internal val isMinecraftTheme: Boolean
     @Composable
@@ -105,8 +128,18 @@ private fun crispPixelSize(size: Dp): Dp = with(LocalDensity.current) {
 }
 
 @Composable
-internal fun ppShape(radius: Dp): Shape =
-    if (isMinecraftTheme) RectangleShape else RoundedCornerShape(radius)
+private fun cornerScale(): Float {
+    val radius = (LocalShapeTheme.current ?: OneConfigTheme.current).popupShape.cornerRadiusOrNull() ?: return 1f
+    val reference = OneConfigTheme.POLYFROSTED_DARK.popupShape.cornerRadiusOrNull() ?: return 1f
+    if (reference <= 0.dp) return 1f
+    return (radius / reference).coerceIn(0f, 1f)
+}
+
+@Composable
+internal fun ppShape(radius: Dp): Shape {
+    val scale = cornerScale()
+    return if (scale <= 0f) RectangleShape else RoundedCornerShape(radius * scale)
+}
 
 @Composable
 internal fun ppShapeOf(
@@ -114,6 +147,8 @@ internal fun ppShapeOf(
     topEnd: Dp = 0.dp,
     bottomEnd: Dp = 0.dp,
     bottomStart: Dp = 0.dp,
-): Shape =
-    if (isMinecraftTheme) RectangleShape
-    else RoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
+): Shape {
+    val scale = cornerScale()
+    return if (scale <= 0f) RectangleShape
+    else RoundedCornerShape(topStart * scale, topEnd * scale, bottomEnd * scale, bottomStart * scale)
+}

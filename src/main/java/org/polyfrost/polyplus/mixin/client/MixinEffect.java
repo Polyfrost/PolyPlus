@@ -21,8 +21,8 @@ public abstract class MixinEffect {
     @Inject(method = "clear", at = @At("TAIL"))
     private void polyplus$disableExtraSamplerUnits(CallbackInfo ci) {
         int count = samplerNames.size();
-        if (count <= 2) return;
-        for (int unit = 2; unit < count; unit++) {
+        if (count <= 1) return;
+        for (int unit = 1; unit < count; unit++) {
             GlStateManager.activeTexture(GLX.GL_TEXTURE0 + unit);
             GlStateManager.disableTexture();
         }

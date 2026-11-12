@@ -227,6 +227,8 @@
     "compat.renderscale.MixinRenderScaleLobby",
     //? if > 1.8.9
     "compat.spatialgui.MixinSpatialGUIClient",
+    //? if > 1.8.9
+    "compat.fabric.MixinClientPlayNetworkAddon",
     //? if >= 26.3
     "compat.polytime.MixinPolyTimeClockInstance",
     //? if >= 26.1 && < 26.3
@@ -299,6 +301,7 @@
     "compat.entityculling.MixinNMSCullingHelper",
     //? if > 1.8.9
     "compat.euphoria.MixinSodiumConsole",
+    "compat.evergreenhud.MixinEvergreenMediaHud",
     //? if iris {
     "compat.iris.MixinIrisCommonUniforms",
     "compat.iris.MixinIrisDHCompat",

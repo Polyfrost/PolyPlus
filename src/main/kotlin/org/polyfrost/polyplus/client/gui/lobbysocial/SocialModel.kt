@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
+import org.polyfrost.polyplus.client.party.PartyRepository
 import java.util.UUID
 
 internal data class SocialPerson(
@@ -56,11 +57,21 @@ internal data class SocialSnapshot(
     val specialTarget: Boolean,
     val scanningReplies: Boolean,
     val partyInvites: List<SocialPartyInvite> = emptyList(),
+    val hiddenThreads: List<SocialThread> = emptyList(),
 ) {
+    val allThreads: List<SocialThread>
+        get() = threads + hiddenThreads
+
     val waiting: Int
         get() = requests.count { it.incoming } + worlds.count { !it.accepted } + partyInvites.size
 
     fun find(id: String?): SocialPerson? = friends.firstOrNull { it.id == id }
+
+    fun isFriend(id: String): Boolean = friends.any { PartyRepository.samePlayer(it.id, id) }
+
+    fun isBlocked(id: String): Boolean = blocked.any { PartyRepository.samePlayer(it.id, id) }
+
+    fun requestWith(id: String): SocialRequest? = requests.firstOrNull { PartyRepository.samePlayer(it.person.id, id) }
 }
 
 internal sealed interface SocialDetail {
@@ -102,6 +113,10 @@ internal interface SocialSource {
 
     fun remove(person: SocialPerson)
 
+    fun addFriend(person: SocialPerson)
+
+    fun hide(thread: SocialThread)
+
     fun block(person: SocialPerson)
 
     fun unblock(person: SocialPerson)
@@ -130,7 +145,7 @@ internal class SocialPageState(val source: SocialSource) {
 
     fun conversation(snapshot: SocialSnapshot): SocialDetail.Conversation? {
         val chat = SocialChatLink.active ?: return null
-        val thread = snapshot.threads.firstOrNull { it.id == chat.id } ?: return null
+        val thread = snapshot.allThreads.firstOrNull { it.id == chat.id } ?: return null
         return SocialDetail.Conversation(chat, thread)
     }
 

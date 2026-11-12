@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -382,7 +381,7 @@ private fun WorldConfigurationModal(
                 )
             }
             if (!portValid) {
-                SocialText("Port must be between 1 and 65535.", fontSize = 12.sp, color = SocialDangerColor)
+                SocialText("Port must be between 1 and 65535.", fontSize = 12.sp, color = SocialDangerText)
             }
             //?}
         } else {
@@ -503,10 +502,10 @@ private fun InviteFriendsModal(
 
         when (val status = eosStatus) {
             EosStatus.Connecting -> SocialText("Connecting to Poly+ multiplayer services...", fontSize = 12.sp, color = SocialTextSecondary)
-            is EosStatus.Failed -> SocialText(status.reason + " You can still host on LAN.", fontSize = 12.sp, color = SocialWarnColor)
+            is EosStatus.Failed -> SocialText(status.reason + " You can still host on LAN.", fontSize = 12.sp, color = SocialWarnText)
             EosStatus.Ready -> {}
         }
-        state.hostError?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerColor) }
+        state.hostError?.let { SocialText(it, fontSize = 12.sp, color = SocialDangerText) }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton("Back", themedIcon(SOCIAL_ASSETS + "chevron-left.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, !state.hosting, onBack)
@@ -595,7 +594,7 @@ private fun GroupInviteRow(group: GroupSummary, selfId: String, invitees: Set<St
             label = null,
             modifier = Modifier,
             background = if (allInvited) OneConfigTheme.accent.asSocialSelected else null,
-            tint = if (allInvited) Color.White else SocialTextPrimary,
+            tint = SocialTextPrimary,
             placement = TooltipPlacement.BelowStart,
             onClick = { if (!allInvited) onInviteAll(members) },
         )
@@ -617,7 +616,7 @@ private fun FriendInviteRow(friend: Friend, invited: Boolean, onToggle: (Boolean
             label = null,
             modifier = Modifier,
             background = if (invited) OneConfigTheme.accent.asSocialSelected else null,
-            tint = if (invited) Color.White else SocialTextPrimary,
+            tint = SocialTextPrimary,
             placement = TooltipPlacement.BelowStart,
             onClick = { onToggle(!invited) },
         )
@@ -649,7 +648,7 @@ private fun socialCompatLabel(compat: HostWorldManager.Compat): String = when (c
 @Composable
 private fun socialCompatColor(compat: HostWorldManager.Compat) = when (compat) {
     HostWorldManager.Compat.CURRENT -> SocialTextSecondary
-    HostWorldManager.Compat.OLDER -> SocialWarnColor
-    HostWorldManager.Compat.NEWER -> SocialDangerColor
-    HostWorldManager.Compat.INCOMPATIBLE -> SocialDangerColor
+    HostWorldManager.Compat.OLDER -> SocialWarnText
+    HostWorldManager.Compat.NEWER -> SocialDangerText
+    HostWorldManager.Compat.INCOMPATIBLE -> SocialDangerText
 }

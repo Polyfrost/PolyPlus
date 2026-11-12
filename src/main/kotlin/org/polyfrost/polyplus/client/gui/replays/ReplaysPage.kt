@@ -6,7 +6,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
-import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.UnderlineTabs
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -91,7 +91,7 @@ private fun ReplaysHeader(view: ReplaysView, onBack: () -> Unit) {
         "Search replays",
         onBack,
         filters = if (providers.size > 1) {
-            { TabRow(listOf(TabItem<String?>(null, "All")) + providers.map { TabItem<String?>(it.id, it.name) }, view.providerId, Modifier) { view.providerId = it } }
+            { UnderlineTabs(listOf(TabItem<String?>(null, "All")) + providers.map { TabItem<String?>(it.id, it.name) }, view.providerId) { view.providerId = it } }
         } else {
             null
         },

@@ -99,7 +99,7 @@ internal fun ThreadList(state: SocialPageState, list: SocialListState, snapshot:
     }
     ScrollFade(modifier, 2.dp) {
         threads.forEach { thread ->
-            ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, thread) }) { state.source.open(thread) }
+            ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, snapshot, thread) }) { state.source.open(thread) }
         }
     }
 }
@@ -209,7 +209,7 @@ internal fun RequestList(state: SocialPageState, snapshot: SocialSnapshot, modif
     ScrollFade(modifier.padding(12.dp), 0.dp) {
         requests.forEach { request ->
             Row(
-                Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { requestMenuItems(state, request) }.padding(horizontal = 10.dp),
+                Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { requestMenuItems(state, request) + blockMenuItem(state.source, request.person) }.padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

@@ -80,7 +80,7 @@ internal class LobbyTour(online: Boolean) {
             add(TourStop(TourAnchor.Wardrobe, "Wardrobe", text))
         }
         if (online && !LobbyPage.Social.hidden) {
-            add(TourStop(TourAnchor.Social, "Social", "Friends and messages live here. Press Enter to open it from the lobby."))
+            add(TourStop(TourAnchor.Social, "Social", "Friends and messages live here. Click it or press Enter to open it from the lobby."))
         }
         add(TourStop(TourAnchor.Tools, "Mods and settings", "Mod settings, Minecraft settings and the theme are up here. You can change anything you picked during setup."))
     }

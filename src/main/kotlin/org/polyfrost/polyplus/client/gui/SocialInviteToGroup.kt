@@ -18,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +65,7 @@ internal fun InviteToGroupDialog(friends: List<Friend>, onInvite: (String) -> Un
                             null,
                             Modifier,
                             null,
-                            if (done) Color.White else SocialTextPrimary,
+                            SocialTextPrimary,
                             TooltipPlacement.BelowStart,
                         ) {
                             if (!done) {

@@ -56,7 +56,7 @@ internal class SocialListState(private val hideParty: Boolean = false) {
     fun unread(snapshot: SocialSnapshot): Int = snapshot.threads.count { it.unread && !(hideParty && it.party) }
 
     fun matching(snapshot: SocialSnapshot, activeId: Int? = null, filtered: Boolean = true): List<SocialThread> =
-        snapshot.threads.filter {
+        (if (query.isBlank()) snapshot.threads else snapshot.allThreads).filter {
             val inReplies = !filtered || !it.special || replies == SpecialChatResponses.Filter.All || it.responded == (replies == SpecialChatResponses.Filter.Responded)
             val inUnread = !filtered || !unreadOnly || it.unread || it.id == activeId
             !(hideParty && it.party) && inReplies && inUnread && it.title.contains(query.trim(), ignoreCase = true)
@@ -64,7 +64,7 @@ internal class SocialListState(private val hideParty: Boolean = false) {
 
     fun threads(snapshot: SocialSnapshot, activeId: Int?): List<SocialThread> {
         val filter = filter(snapshot)
-        return snapshot.threads.filter {
+        return (if (query.isBlank()) snapshot.threads else snapshot.allThreads).filter {
             if (hideParty && it.party) return@filter false
             val apart = snapshot.specialTarget && it.special
             val inTab = when (filter) {

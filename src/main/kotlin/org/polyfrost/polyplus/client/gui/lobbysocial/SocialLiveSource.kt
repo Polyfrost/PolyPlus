@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.client.gui.AddFriendDialog
 import org.polyfrost.polyplus.client.gui.ConversationReadEffect
 import org.polyfrost.polyplus.client.gui.CreateGroupDialog
 import org.polyfrost.polyplus.client.gui.InviteToGroupDialog
+import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.conversationTitle
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -21,6 +22,7 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.ChatIdentity
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.polyplus.client.social.HiddenConversations
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialRefresh
@@ -126,22 +128,25 @@ internal class LiveSocialSource : SocialSource {
         val scanning by SpecialChatResponses.scanning.collectAsState()
         val partyInvites by PartyRepository.incomingInvites.collectAsState()
         val party by PartyRepository.party.collectAsState()
+        val hidden by HiddenConversations.hidden.collectAsState()
         LaunchedEffect(friends, incoming, outgoing, blocked, groups, invites) {
             PlayerNamesRepository.resolve(
                 friends.map { it.player } + incoming.map { it.player } + outgoing.map { it.player } + blocked.map { it.player } +
                     groups.flatMap { it.members } + invites.map { it.sender },
             )
         }
-        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, partyInvites, party) {
+        LaunchedEffect(groups, hidden) { HiddenConversations.reveal(groups) }
+        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, partyInvites, party, hidden) {
             val byId = friends.associateBy { it.player }
             val inviters = invites.filter { it.status == INVITE_PENDING }.map { it.sender } + partyInvites.map { it.sender }
             val person = { id: String -> personOf(id, byId[id], party, names, inviters) }
+            val (concealed, shown) = groups.partition { HiddenConversations.isHidden(it, hidden) }
             SocialSnapshot(
                 friends = friends.map { person(it.player) }.sortedWith(compareByDescending<SocialPerson> { it.online }.thenBy { it.name.lowercase() }),
                 requests = incoming.map { SocialRequest(it.id, person(it.player), incoming = true) } +
                     outgoing.map { SocialRequest(it.id, person(it.player), incoming = false) },
                 blocked = blocked.map { person(it.player) }.sortedBy { it.name.lowercase() },
-                threads = threadsOf(groups, person, names, responded),
+                threads = threadsOf(shown, person, names, responded),
                 worlds = invites.filter { it.status == INVITE_PENDING || it.status == INVITE_ACCEPTED }
                     .sortedBy { it.status == INVITE_ACCEPTED }
                     .map { SocialWorld(it.id, person(it.sender), null, it.status == INVITE_ACCEPTED, buildLabel(it)) },
@@ -151,6 +156,7 @@ internal class LiveSocialSource : SocialSource {
                 specialTarget = special?.isSpecialChatTarget == true,
                 scanningReplies = scanning,
                 partyInvites = partyInvites.map { SocialPartyInvite(it, person(it.sender)) },
+                hiddenThreads = threadsOf(concealed, person, names, responded),
             )
         }
     }
@@ -246,6 +252,7 @@ internal class LiveSocialSource : SocialSource {
     }
 
     private fun openChat(id: Int, title: String) {
+        HiddenConversations.show(id)
         GroupsRepository.loadMessages(id)
         SocialChatLink.open(LiveConversation(id, title))
     }
@@ -277,6 +284,16 @@ internal class LiveSocialSource : SocialSource {
 
     override fun remove(person: SocialPerson) {
         FriendsRepository.removeFriend(person.id)
+    }
+
+    override fun addFriend(person: SocialPerson) {
+        FriendsRepository.sendRequest(person.id) { SocialNotices.emit("Friend request sent to ${person.name}") }
+    }
+
+    override fun hide(thread: SocialThread) {
+        val group = GroupsRepository.groups.value.firstOrNull { it.id == thread.id } ?: return
+        if (SocialChatLink.active?.id == thread.id) SocialChatLink.close()
+        HiddenConversations.hide(group)
     }
 
     override fun block(person: SocialPerson) {

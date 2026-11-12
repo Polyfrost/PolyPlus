@@ -98,6 +98,7 @@ import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.MainMenuRasterAssets
+import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.Outfit
@@ -108,7 +109,10 @@ import org.polyfrost.polyplus.client.gui.SocialDangerColor
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialPopupBackground
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.CopyrightText
+import org.polyfrost.polyplus.client.gui.SocialHoverBorder
+import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
@@ -209,7 +213,7 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         StartupOverlay.rootWidth = widthPx
         val fullscreen = MacSafeArea.fullscreen()
         val notchPx = remember(widthPx, heightPx, fullscreen) { MacSafeArea.topShare() * heightPx }
-        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT)
+        val scale = MenuScale.scale(minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT))
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         val notch = with(density) { notchPx.toDp() }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
@@ -253,7 +257,11 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .layout { measurable, constraints ->
+                        val height = 150.dp.roundToPx() + notch
+                        val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                        layout(placeable.width, placeable.height - notch) { placeable.place(0, -notch) }
+                    }
                     .background(Brush.verticalGradient(0f to sceneScrim.copy(alpha = 0.92f), 0.42f to sceneScrim.copy(alpha = 0.74f), 1f to Color.Transparent)),
             )
             Box(
@@ -301,7 +309,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         ) {
             Column(Modifier.widthIn(max = chatWidth), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
                 if (lobby.page == LobbyPage.Home) LinkedModButton(Modifier)
-                if (chatShown) ChatPanel(open = lobby.page == LobbyPage.Home)
+                if (chatShown || chatWidth > 0.dp) ChatDock(lobby, chatWidth)
             }
             Spacer(Modifier.width(chatWidth.coerceAtMost(LobbyLayout.Gap)))
             key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false).onGloballyPositioned { barStart = it.positionInRoot().x }) }
@@ -319,7 +327,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 .tourAnchor(lobby.anchors, TourAnchor.Play)
                 .a11yRegion(A11yRegion.Play),
         )
-        if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer() }
+        if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer(screen) }
         if (lobby.page != LobbyPage.Social) {
             SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top))
         }
@@ -339,7 +347,33 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
 }
 
 @Composable
-private fun BoxScope.Footer() {
+private fun ChatDock(lobby: LobbyShell, width: Dp) {
+    val open = lobby.page == LobbyPage.Home
+    val party by PartyRepository.party.collectAsState()
+    val prompt = !open || (SocialChatLink.active == null && party?.chatGroupId == null)
+    val (interaction, hovered) = rememberSocialHover()
+    val shape = ppShape(20.dp)
+    val action = if (prompt) {
+        Modifier
+            .border(1.dp, if (hovered) SocialHoverBorder else Color.Transparent, shape)
+            .hoverable(interaction)
+            .clickableWithSound("Open Social", shape = shape) { lobby.openSocial() }
+    } else {
+        Modifier
+    }
+    Box(Modifier.clip(shape).revealWidth(width).then(action)) {
+        ChatPanel(open)
+    }
+}
+
+private fun Modifier.revealWidth(width: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = LobbyLayout.ChatWidth.roundToPx()))
+    val shown = minOf(placeable.width, width.roundToPx()).coerceIn(constraints.minWidth, constraints.maxWidth)
+    layout(shown, placeable.height) { placeable.place(0, 0) }
+}
+
+@Composable
+private fun BoxScope.Footer(screen: Screen) {
     Row(
         Modifier
             .align(Alignment.BottomStart)
@@ -352,7 +386,7 @@ private fun BoxScope.Footer() {
         LobbyIcon("footer-logo", size = 14.dp)
         FooterBrandText(platformLabel(), 11.sp, SocialTextPrimary)
         Spacer(Modifier.weight(1f))
-        SocialText("Copyright Mojang AB. Do not distribute!", 11.sp, color = SocialTextSecondary, maxLines = 1)
+        CopyrightText(screen, 11.sp, SocialTextSecondary, maxLines = 1)
     }
 }
 
@@ -535,7 +569,7 @@ private fun QuitPortrait(player: UUID) {
                 .background(SocialDangerColor),
             contentAlignment = Alignment.Center,
         ) {
-            LobbyIcon("x-close", OneConfigTheme.current.accentTextColor, 14.dp)
+            LobbyIcon("x-close", Color.White, 14.dp)
         }
     }
 }
@@ -569,7 +603,7 @@ private fun MoreButton(lobby: LobbyShell, screen: Screen) {
 private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     val theme = themeToggle()
     MenuSurface(Modifier.width(MORE_MENU_WIDTH.dp)) {
-        MenuItem(theme.label, themedIcon(theme.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, theme.toggle)
+        if (theme != null) MenuItem(theme.label, themedIcon(theme.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, theme.toggle)
         MenuItem("Switch to PolyPlus main menu", themedIcon(SOCIAL_ASSETS + "logo.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
             MainMenuReplacement.switchToPolyPlusMenu()

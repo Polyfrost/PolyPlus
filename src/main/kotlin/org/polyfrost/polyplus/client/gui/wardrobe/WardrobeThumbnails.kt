@@ -152,7 +152,7 @@ internal fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier
             .background(if (owned) Color(0xFF239A60) else OneConfigTheme.accent)
             .padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
-        SocialText(label, color = OneConfigTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        SocialText(label, color = if (owned) Color.White else OneConfigTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
     }
 }
 

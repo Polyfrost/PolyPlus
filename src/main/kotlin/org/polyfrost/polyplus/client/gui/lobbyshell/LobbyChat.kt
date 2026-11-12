@@ -52,11 +52,10 @@ import org.polyfrost.polyplus.client.gui.EmojiPickerButton
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
 import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialEmojiText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.lobbysocial.ChatLine
+import org.polyfrost.polyplus.client.gui.lobbysocial.ChatLines
 import org.polyfrost.polyplus.client.gui.lobbysocial.ConversationChip
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.cooldownReason
@@ -72,7 +71,6 @@ private val BarPadding = 12.dp
 private val BarGap = 12.dp
 private val BarEntryWidth = 124.dp
 private val BarHeadSize = 30.dp
-private val ChatNameWidth = 120.dp
 private val DockCloseSize = 28.dp
 
 @Composable
@@ -144,10 +142,7 @@ internal fun ChatPanel(open: Boolean) {
                 DockCloseButton()
             }
         }
-        Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Bottom)) {
-            if (lines.isEmpty()) Label("No messages yet", 12.sp, color = MutedText)
-            lines.forEach { ChatRow(it) }
-        }
+        ChatLines(lines, Modifier.weight(1f).fillMaxWidth())
         val cooldown = cooldownReason(conversation.id)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextField(
@@ -222,15 +217,4 @@ private fun DockCloseButton() {
         TooltipPlacement.BelowStart,
         SocialChatLink::close,
     )
-}
-
-@Composable
-private fun ChatRow(line: ChatLine) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Label(line.name, 14.sp, Modifier.widthIn(max = ChatNameWidth), weight = FontWeight.Medium)
-            Label(":", 14.sp, color = MutedText, weight = FontWeight.Medium)
-        }
-        SocialEmojiText(line.text, 14.sp, Modifier.weight(1f), maxLines = 1)
-    }
 }

@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.BillingService
+import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialSuccessText
+import org.polyfrost.polyplus.client.gui.SocialWarnText
 import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.network.http.responses.TransactionInfo
@@ -100,10 +104,11 @@ private fun TransactionRow(tx: TransactionInfo) {
     }
 }
 
+@Composable
 private fun statusColor(status: TransactionStatus): Color = when (status) {
-    TransactionStatus.Completed -> Color(0xFF239A60)
-    TransactionStatus.Pending -> Color(0xFFE0A030)
-    TransactionStatus.Failed -> Color(0xFFFF4444)
-    TransactionStatus.Refunded, TransactionStatus.PartiallyRefunded, TransactionStatus.Chargeback -> Color(0xFF8A9296)
-    TransactionStatus.Unknown -> Color(0xFF8A9296)
+    TransactionStatus.Completed -> SocialSuccessText
+    TransactionStatus.Pending -> SocialWarnText
+    TransactionStatus.Failed -> SocialDangerText
+    TransactionStatus.Refunded, TransactionStatus.PartiallyRefunded, TransactionStatus.Chargeback -> MutedText
+    TransactionStatus.Unknown -> MutedText
 }

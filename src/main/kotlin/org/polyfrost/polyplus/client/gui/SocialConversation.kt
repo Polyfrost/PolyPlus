@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -343,7 +342,7 @@ private fun MessageBubble(
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                SocialEmojiText(message.content, fontSize = 14.sp, color = if (outgoing) Color.White else SocialTextPrimary)
+                SocialEmojiText(message.content, fontSize = 14.sp, color = if (outgoing) OneConfigTheme.current.accentTextColor else SocialTextPrimary)
             }
         }
     }

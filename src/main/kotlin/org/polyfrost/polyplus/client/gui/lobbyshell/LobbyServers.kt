@@ -42,6 +42,8 @@ internal class ServerEntry(
     val key: String get() = "$kind:${System.identityHashCode(data)}:${data.ip}"
 }
 
+internal val ServerData.shownName: String get() = PolyPlusRecentServers.listLabel(name, ip)
+
 internal object ServerRevisions {
     private val states = WeakHashMap<ServerData, MutableIntState>()
 

@@ -141,11 +141,14 @@ internal fun groupMenuItems(
     )
 }
 
-internal fun threadMenuItems(state: SocialPageState, thread: SocialThread): List<MenuAction> {
+internal fun threadMenuItems(state: SocialPageState, snapshot: SocialSnapshot, thread: SocialThread): List<MenuAction> {
     val open = MenuAction("Open chat", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.open(thread) }
+    if (thread.party) return listOf(open)
+    val hide = MenuAction("Hide conversation") { state.source.hide(thread) }
     val group = GroupsRepository.groups.value.firstOrNull { it.id == thread.id }
-    if (thread.group && !thread.party && group != null) return listOf(open) + groupMenuItems(state, group)
-    return listOf(open)
+    if (thread.group) return listOf(open, hide) + group?.let { groupMenuItems(state, it) }.orEmpty()
+    val person = thread.people.firstOrNull() ?: return listOf(open, hide)
+    return listOf(open, hide) + personMenuItems(state, snapshot, person)
 }
 
 @Composable

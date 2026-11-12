@@ -3,7 +3,10 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
@@ -98,14 +101,16 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
     *///?} else if > 1.8.9 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
-            Minecraft.getInstance().gameRenderer
-                //? if >= 26.2 {
-                .panorama()
-                .extractRenderState(ctx, width, height)
-                //?} else {
-                /*.getPanorama()
-                .extractRenderState(ctx, width, height, true)
-                *///?}
+            if (MenuPanorama.panoramaReady()) {
+                Minecraft.getInstance().gameRenderer
+                    //? if >= 26.2 {
+                    .panorama()
+                    .extractRenderState(ctx, width, height)
+                    //?} else {
+                    /*.getPanorama()
+                    .extractRenderState(ctx, width, height, true)
+                    *///?}
+            }
             ctx.blurBeforeThisStratum()
             MenuBackgroundPass.renderInline(ctx)
         }
@@ -139,6 +144,8 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
 
     @Composable
     override fun compose() {
-        ProvideOneConfigTheme { content(::dismiss) }
+        ProvideOneConfigTheme {
+            Box(Modifier.fillMaxSize().wrapTabFocus(), propagateMinConstraints = true) { content(::dismiss) }
+        }
     }
 }

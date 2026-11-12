@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -251,13 +250,13 @@ fun AccountButton(
                 )
                 if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
                 if (account.active && account.microsoft && PrivacyConsent.allowsOnlineServices()) AccountStatusBadge()
-                if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
+                if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerText)
             }
             SocialText(
                 if (confirmRemove) "Remove this account?"
                 else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
                 fontSize = 13.sp,
-                color = if (confirmRemove) SocialDangerColor else OneConfigTheme.current.textColorSecondary,
+                color = if (confirmRemove) SocialDangerText else OneConfigTheme.current.textColorSecondary,
                 textAlign = TextAlign.Right,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -272,7 +271,7 @@ fun AccountButton(
         } else {
             if (account.refreshable) {
                 RefreshAccountButton(
-                    color = if (account.expired) SocialDangerColor else SocialTextSecondary,
+                    color = if (account.expired) SocialDangerText else SocialTextSecondary,
                     enabled = enabled,
                     spinning = refreshing,
                     onClick = onRefresh,
@@ -289,9 +288,9 @@ private fun AccountStatusBadge() {
     val hidden = status == PlayerStatus.Offline
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OneConfigTheme.current.circleShape)
             .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, OneConfigTheme.current.borderColor, RoundedCornerShape(50))
+            .border(1.dp, OneConfigTheme.current.borderColor, OneConfigTheme.current.circleShape)
             .clickableWithSound(selfStatusLabel(status)) { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -306,9 +305,9 @@ private fun AccountStatusBadge() {
 private fun AccountBadge(icon: String, text: String, color: Color) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(OneConfigTheme.current.circleShape)
             .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, color, RoundedCornerShape(50))
+            .border(1.dp, color, OneConfigTheme.current.circleShape)
             .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

@@ -6,11 +6,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import net.minecraft.client.Minecraft
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
+//? if > 1.8.9
+import org.polyfrost.polyplus.client.gui.WidgetPress
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 
 //? if > 1.8.9 {
-import net.minecraft.client.gui.components.AbstractButton
 import net.minecraft.client.gui.components.AbstractSliderButton
 import net.minecraft.client.gui.components.AbstractStringWidget
 import net.minecraft.client.gui.components.AbstractWidget
@@ -34,13 +35,6 @@ import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.resource.language.I18n
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 *///?}
-
-//? if >= 1.21.9 {
-import com.mojang.blaze3d.platform.InputConstants
-import net.minecraft.client.input.KeyEvent
-import net.minecraft.client.input.MouseButtonEvent
-import net.minecraft.client.input.MouseButtonInfo
-//?}
 
 internal enum class PauseSlot { RESUME, OPTIONS, WORLD, ADVANCEMENTS, STATS, QUIT, MORE }
 
@@ -168,7 +162,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
     }
 
     private fun entryFor(widget: AbstractWidget, slotted: Slotted): PauseEntry {
-        val tooltip = tooltip(widget)
+        val tooltip = WidgetPress.tooltip(widget)
         val handler = (widget as? Button)?.let { (it as ButtonAccessor).`polyplus$onPress`() }
         val mod = if (slotted.group == GROUP_OTHER) PauseModSource.of(widget.javaClass, handler?.javaClass) else null
         val group = if (slotted.group == GROUP_OTHER && widget.message.contents is TranslatableContents) GROUP_GAME else slotted.group
@@ -184,41 +178,12 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
             slotted.glyph,
             slotted.slot == PauseSlot.MORE && isModMenu(widget, handler),
             slotted.slot == PauseSlot.QUIT && (widget.message.contents as? TranslatableContents)?.key !in VANILLA_QUIT_KEYS,
-        ) { press(widget) }
+        ) { WidgetPress.press(widget) }
     }
 
     private fun isModMenu(widget: AbstractWidget, handler: Any?): Boolean {
         if ((widget.message.contents as? TranslatableContents)?.key == MOD_MENU_KEY) return true
         return listOfNotNull(widget.javaClass, handler?.javaClass).any { it.name.startsWith(MOD_MENU_PACKAGE) }
-    }
-
-    private fun press(widget: AbstractWidget) {
-        ClientPlatform.runOnMain {
-            if (!widget.isActive) return@runOnMain
-            if (widget is AbstractButton) {
-                //? if >= 1.21.9 {
-                widget.onPress(KeyEvent(InputConstants.KEY_RETURN, 0, 0))
-                //?} else {
-                /*widget.onPress()
-                *///?}
-                return@runOnMain
-            }
-            val x = (widget.x + widget.width / 2).toDouble()
-            val y = (widget.y + widget.height / 2).toDouble()
-            //? if >= 1.21.9 {
-            val event = MouseButtonEvent(x, y, MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0))
-            widget.mouseClicked(event, false)
-            widget.mouseReleased(event)
-            //?} else {
-            /*widget.mouseClicked(x, y, 0)
-            widget.mouseReleased(x, y, 0)
-            *///?}
-        }
-    }
-
-    private fun tooltip(widget: AbstractWidget): String? {
-        val tooltip = (widget as AbstractWidgetAccessor).`polyplus$tooltip`().get() ?: return null
-        return PauseText.of((tooltip as TooltipAccessor).`polyplus$message`())
     }
 
     private fun spriteOf(widget: AbstractWidget): ImageBitmap? {

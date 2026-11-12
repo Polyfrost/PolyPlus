@@ -41,7 +41,6 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.gui.HudComposeHost
-import org.polyfrost.polyplus.client.gui.isLightTheme
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -139,7 +138,7 @@ private class MarkerRenderer(
     private val cardSurface = theme.popupBackground.copy(alpha = CARD_SURFACE_ALPHA)
     private val textPrimary = theme.textColor
     private val textSecondary = theme.textColorSecondary
-    private val iconTint = if (theme.isLightTheme) theme.textColor else Color.White
+    private val iconTint = theme.textColor
     private val kindColors = PingKind.values().map { Color(0xFF000000.toInt() or it.color) }
     private val replyColors = PingReply.values().map { Color(0xFF000000.toInt() or it.color) }
 

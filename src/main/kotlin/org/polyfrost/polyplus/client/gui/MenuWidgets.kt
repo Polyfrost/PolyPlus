@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
@@ -104,7 +105,8 @@ private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 internal val PanelBackground: Color
     @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
-private val ServerIconBackground = Color(0x33FFFFFF)
+private val ServerIconBackground: Color
+    @Composable get() = SocialTextPrimary.copy(alpha = 0.2f)
 
 internal val PanelShape: Shape
     @Composable
@@ -224,24 +226,23 @@ internal fun toggleFullscreen() {
 internal class ThemeToggle(val icon: String, val label: String, val toggle: () -> Unit)
 
 @Composable
-internal fun themeToggle(): ThemeToggle {
-    val light = OneConfigTheme.current.isLightTheme
-    val style = OnboardingFeatures.uiStyleOf(OneConfigTheme.current)
+internal fun themeToggle(): ThemeToggle? {
+    val light = (OneConfigTheme.active ?: OneConfigTheme.current).isLightTheme
+    val target = OnboardingFeatures.themeVariant(!light) ?: return null
     return ThemeToggle(
         icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
         label = if (light) "Switch to dark theme" else "Switch to light theme",
         toggle = {
             PolyPlusConfig.onboardingLightTheme = !light
-            OnboardingFeatures.applyTheme(!light, style)
+            OneConfigTheme.activate(target)
             PolyPlusConfig.save()
         },
     )
 }
 
 @Composable
-internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = Color.White) {
+internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = Color.White, secondary: Color = SocialTextSecondary) {
     val bodyFont = OneConfigTheme.current.fontFamily
-    val secondary = SocialTextSecondary
 
     BasicText(
         text = buildAnnotatedString {
@@ -259,6 +260,32 @@ internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, prima
             textAlign = TextAlign.Center,
         ),
     )
+}
+
+private const val COPYRIGHT_TEXT = "Copyright Mojang AB. Do not distribute!"
+
+@Composable
+internal fun CopyrightText(
+    screen: Screen,
+    fontSize: TextUnit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Start,
+    maxLines: Int = Int.MAX_VALUE,
+) {
+    //? if > 1.8.9 {
+    val (interaction, hovered) = rememberSocialHover()
+    val link = Modifier
+        .hoverable(interaction)
+        .a11y(COPYRIGHT_TEXT, A11yRole.Link, null, null, null, true)
+        .clickableTextWithSound { ClientPlatform.setScreen(net.minecraft.client.gui.screens.CreditsAndAttributionScreen(screen)) }
+        .pointerHoverIcon(PointerIcon.Hand)
+    val underline = if (hovered) TextDecoration.Underline else null
+    //?} else {
+    /*val link: Modifier = Modifier
+    val underline: TextDecoration? = null
+    *///?}
+    SocialText(COPYRIGHT_TEXT, fontSize, modifier.then(link), color = color, textAlign = textAlign, textDecoration = underline, maxLines = maxLines)
 }
 
 internal val MenuMutedIcon: Color

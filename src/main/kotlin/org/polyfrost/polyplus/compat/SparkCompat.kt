@@ -14,6 +14,8 @@ import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Stream
 
@@ -58,6 +60,8 @@ internal object SparkCompat {
     private const val HEALTH_LIMIT_MILLIS = 60_000L
     private const val PROFILER_ACTIVITY = "Profiler"
     private const val HEALTH_ACTIVITY = "Health report"
+    private const val SENDER = "me.lucko.spark.common.command.sender.CommandSender"
+    private const val SENDER_NAME = "PolyPlus"
 
     private val methods = ConcurrentHashMap<String, Method>()
     private val windows = ConcurrentHashMap<String, Any>()
@@ -95,6 +99,10 @@ internal object SparkCompat {
     private var lastLookup = 0L
 
     val available: Boolean get() = installed && platform() != null
+
+    fun warm() {
+        if (installed && clientPlatform == null) platform()
+    }
 
     fun stats(singleplayer: Boolean): SparkStats? {
         if (!installed) return null
@@ -169,7 +177,30 @@ internal object SparkCompat {
 
     private fun sender(platform: Any): Any? {
         val plugin = call(platform, "getPlugin") ?: return null
-        return (call(plugin, "getCommandSenders") as? Stream<*>)?.findFirst()?.orElse(null)
+        return (call(plugin, "getCommandSenders") as? Stream<*>)?.findFirst()?.orElse(null) ?: menuSender
+    }
+
+    private val menuSender: Any? by lazy {
+        runCatching {
+            val type = Class.forName(SENDER)
+            val data = Class.forName("$SENDER\$Data").getConstructor(String::class.java, UUID::class.java).newInstance(SENDER_NAME, null)
+            Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { proxy, method, args ->
+                when (method.name) {
+                    "getName", "toString" -> SENDER_NAME
+                    "isPlayer" -> false
+                    "hasPermission" -> true
+                    "toData" -> data
+                    "hashCode" -> System.identityHashCode(proxy)
+                    "equals" -> proxy === args?.firstOrNull()
+                    else -> null
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun providerPlatform(): Any? {
+        val api = Class.forName(PROVIDER).getMethod("get").invoke(null) ?: return null
+        return field(api, "platform")
     }
 
     private fun watch(platform: Any, startedAt: Long, seconds: Int) {
@@ -271,7 +302,7 @@ internal object SparkCompat {
         val now = System.currentTimeMillis()
         if (now - lastLookup < LOOKUP_RETRY_MILLIS) return null
         lastLookup = now
-        val found = runCatching { ornithePlatform() }.getOrNull() ?: runCatching { fabricPlatform() }.getOrNull()
+        val found = runCatching { ornithePlatform() }.getOrNull() ?: runCatching { fabricPlatform() }.getOrNull() ?: runCatching { providerPlatform() }.getOrNull()
         if (found != null && platformType(found) == "CLIENT") clientPlatform = found
         return clientPlatform
     }

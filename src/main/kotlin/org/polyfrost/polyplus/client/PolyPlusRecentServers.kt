@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.resources.language.I18n
 import java.io.File
 import kotlinx.serialization.Serializable
 
@@ -59,5 +60,35 @@ object PolyPlusRecentServers {
     fun recent(): List<RecentServer> {
         ensureLoaded()
         return recents.toList()
+    }
+
+    private const val DEFAULT_NAME_KEY = "selectServer.defaultName"
+    private const val DEFAULT_NAME = "Minecraft Server"
+
+    @JvmStatic
+    fun isDefaultName(name: String?): Boolean {
+        val trimmed = name?.trim().orEmpty()
+        if (trimmed.isEmpty() || trimmed.equals(DEFAULT_NAME, ignoreCase = true)) return true
+        val translated = runCatching { I18n.get(DEFAULT_NAME_KEY).trim() }.getOrNull()
+        return translated != null && translated != DEFAULT_NAME_KEY && trimmed.equals(translated, ignoreCase = true)
+    }
+
+    private const val GENERIC_NAME = "Multiplayer server"
+    private val IPV4 = Regex("""^\d{1,3}(\.\d{1,3}){3}(:\d+)?$""")
+    private val IPV6 = Regex("""^\[?[0-9a-fA-F:.]*:[0-9a-fA-F:.]*:[0-9a-fA-F:.]*(%[0-9a-zA-Z]+)?(]:\d+|])?$""")
+
+    @JvmStatic
+    fun isRawIp(address: String): Boolean {
+        val host = address.trim()
+        return IPV4.matches(host) || IPV6.matches(host)
+    }
+
+    @JvmStatic
+    fun listLabel(name: String?, ip: String?): String {
+        if (name != null && !isDefaultName(name) && !isRawIp(name)) return name.trim()
+        val address = ip?.trim().orEmpty()
+        val hide = runCatching { Minecraft.getInstance().options.hideServerAddress }.getOrDefault(false)
+        if (address.isNotEmpty() && !hide && !isRawIp(address)) return address
+        return GENERIC_NAME
     }
 }

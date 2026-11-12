@@ -41,7 +41,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.ServerBanner
 import org.polyfrost.polyplus.client.gui.lobbyshell.ServerIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
 import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
-import org.polyfrost.polyplus.client.gui.lobbyshell.motdText
+import org.polyfrost.polyplus.client.gui.lobbyshell.MotdLines
 
 private val BannerHeight = 108.dp
 private val IconSize = 56.dp
@@ -109,8 +109,7 @@ private fun MetaLine(data: ServerData, status: PreviewStatus) {
 
 @Composable
 private fun MotdLines(data: ServerData) {
-    val muted = MutedText
-    PreviewText(motdText(data.motd, muted), muted, maxLines = 2)
+    MotdLines(data.motd)
 }
 
 @Composable

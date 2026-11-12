@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
@@ -46,6 +45,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.OnboardingSlider
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialText
@@ -75,13 +76,13 @@ private const val SUNSET_START = 11500L
 private const val NIGHT_START = 13500L
 private const val NIGHT_END = 22500L
 private const val KILOBYTE = 1024L
+private const val VOLUME_MAX = 100f
+private const val VOLUME_STEP = 5f
+private const val VOLUME_SLIDER_WIDTH = 150f
 
 @Composable
 internal fun SceneButton(lobby: LobbyShell) {
-    if (lobby.page != LobbyPage.Home) return
-    Box(Modifier.size(LobbyLayout.BarHeight).panel(), contentAlignment = Alignment.Center) {
-        IconButton(themedIcon(SOCIAL_ASSETS + "image-01.svg"), "Change scene", Modifier) { lobby.sceneOpen = !lobby.sceneOpen }
-    }
+    LobbyDock(lobby)
 }
 
 @Composable
@@ -253,6 +254,35 @@ private fun MusicPicker() {
         PolyPlusLobbyConfig.save()
     }
     musicDetail(music)?.let { Note(it) }
+    if (music != LobbyMusic.OFF && music != LobbyMusic.MINECRAFT) {
+        MusicVolume()
+        MuteUnfocusedRow()
+    }
+}
+
+@Composable
+private fun MuteUnfocusedRow() {
+    var muted by remember { mutableStateOf(PolyPlusLobbyConfig.muteLobbyMusicUnfocused) }
+    SwitchRow("Mute when unfocused", "Fades out while the game is in the background", muted, true) {
+        muted = !muted
+        PolyPlusLobbyConfig.muteLobbyMusicUnfocused = muted
+        PolyPlusLobbyConfig.save()
+    }
+}
+
+@Composable
+private fun MusicVolume() {
+    var percent by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyMusicVolume) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Label("Volume", 12.sp, color = MutedText)
+        Box(Modifier.weight(1f)) {
+            OnboardingSlider(percent / VOLUME_MAX, VOLUME_SLIDER_WIDTH, thumbSize = 15.dp, trackHeight = 5.dp, label = "Lobby music volume", value = "${percent.roundToInt()}%", onRelease = PolyPlusLobbyConfig::save) { progress ->
+                percent = (progress * VOLUME_MAX / VOLUME_STEP).roundToInt() * VOLUME_STEP
+                PolyPlusLobbyConfig.lobbyMusicVolume = percent
+            }
+        }
+        Label("${percent.roundToInt()}%", 12.sp)
+    }
 }
 
 private fun musicDetail(music: LobbyMusic): String? = when (music) {

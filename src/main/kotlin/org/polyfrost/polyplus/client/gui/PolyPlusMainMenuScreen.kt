@@ -140,13 +140,29 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         super.render(mouseX, mouseY, tickDelta)
+        if (MenuPanorama.panoramaBackdrop()) MenuBackgroundPass.renderInline()
     }
     *///?}
 
     //? if <26.1 && > 1.8.9 {
-    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*private var firstFrameDrawn = false
+
+    override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
+        if (MenuPanorama.panoramaBackdrop()) {
+            renderPanorama(ctx, tickDelta)
+            if (firstFrameDrawn) {
+                val gameRenderer = Minecraft.getInstance().gameRenderer
+                //? if <1.21.4 {
+                gameRenderer.processBlurEffect(tickDelta)
+                //?} else {
+                /^gameRenderer.processBlurEffect()
+                ^///?}
+            }
+            MenuBackgroundPass.renderInline(ctx)
+        }
         super.render(ctx, mouseX, mouseY, tickDelta)
+        firstFrameDrawn = true
     }
 
     override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
@@ -154,6 +170,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     *///?} elif >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
+        MenuPanorama.drawMenuPanorama(ctx, width, height)
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
@@ -345,12 +362,12 @@ private fun MainMenu(
     var accountsOpen by remember { mutableStateOf(false) }
     val glass = remember { MenuGlass() }
     var rootSize by remember { mutableStateOf(Size.Zero) }
-    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }.trackScreenFocus()) {
-        MenuBackdrop(Modifier.fillMaxSize(), glass)
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }.trackScreenFocus().wrapTabFocus()) {
+        if (!MenuPanorama.panoramaBackdrop()) MenuBackdrop(Modifier.fillMaxSize(), glass)
         CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-                val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+                val scale = MenuScale.scale(containFit, guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM)
                 val safeScale = usableScale(scale)
                 val innerWidth = maxWidth.value / safeScale
                 val innerHeight = maxHeight.value / safeScale
@@ -401,7 +418,7 @@ private fun MainMenu(
                             screen,
                         )
                     }
-                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
+                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), screen, edgeX, edgeY)
                 }
             }
             if (accountsOpen) AccountsDialog { accountsOpen = false }
@@ -498,7 +515,7 @@ private fun LeftColumn(
                     Spacer(Modifier.height(12.dp))
                     when (entry) {
                         is QuickplayEntry.Server -> ServerRow(
-                            title = entry.data.name,
+                            title = PolyPlusRecentServers.listLabel(entry.data.name, entry.data.ip),
                             subtitle = serverStatusText(entry.data),
                             //? if > 1.8.9 {
                             favicon = rememberFavicon(entry.data.iconBytes),
@@ -597,7 +614,7 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions) {
 
 @Composable
 private fun ThemeToggleButton() {
-    val theme = themeToggle()
+    val theme = themeToggle() ?: return
     IconButton(icon = theme.icon, tooltip = theme.label, onClick = theme.toggle)
 }
 
@@ -683,7 +700,7 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
+private fun Footer(modifier: Modifier, screen: Screen, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
     Box(modifier) {
         Row(
             modifier = Modifier
@@ -693,12 +710,12 @@ private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> D
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp))
-            FooterBrandText(platformLabel())
+            FooterBrandText(platformLabel(), secondary = Color.White.copy(alpha = 0.7f))
         }
-        SocialText(
-            "Copyright Mojang AB. Do not distribute!",
+        CopyrightText(
+            screen,
             fontSize = 13.sp,
-            color = SocialTextSecondary,
+            color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = edgeX(24f), bottom = edgeY(18f)),
