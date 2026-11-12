@@ -326,6 +326,8 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         editing = ServerEdit(null)
     }
 
+    fun serverListModButtons(): List<ServerListModButton> = ServerListModButtons.capture(screen)
+
     fun editServer(entry: ServerEntry) {
         editing = ServerEdit(entry.data, entry.savedIndex)
     }
