@@ -91,6 +91,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.AccountSwitcherContent
@@ -384,7 +385,7 @@ private fun BoxScope.Footer(screen: Screen) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LobbyIcon("footer-logo", size = 14.dp)
-        FooterBrandText(platformLabel(), 11.sp, SocialTextPrimary)
+        FooterBrandText("${platformLabel()}   PolyPlus ${PolyPlusConstants.VERSION}", 11.sp, SocialTextPrimary)
         Spacer(Modifier.weight(1f))
         CopyrightText(screen, 11.sp, SocialTextSecondary, maxLines = 1)
     }
