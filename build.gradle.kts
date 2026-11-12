@@ -521,6 +521,8 @@ tasks.withType<ProcessResources>().configureEach {
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
             line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"").replace("\"java\": \">=21\"", "\"java\": \">=25\"")
+                .replace("\"compose-multiplatform\": \">=1.0.6\",", "\"compose-multiplatform\": \">=1.0.6\"")
+                .takeUnless { "\"rrls\"" in it }
         }
         expand(
             mapOf(
@@ -536,6 +538,16 @@ tasks.withType<ProcessResources>().configureEach {
     filesMatching("mixins.*.json") {
         expand("id" to modId)
     }
+}
+
+if (!isOrnithe) {
+    val rrlsStub = tasks.register<Jar>("rrlsStubJar") {
+        from(rootProject.file("src/rrls-stub"))
+        archiveFileName = "rrls-stub.jar"
+        destinationDirectory = layout.buildDirectory.dir("rrls-stub")
+    }
+    loomx.modJar.configure { net.fabricmc.loom.task.NestJarsAction.addToTask(this, files(rrlsStub)) }
+    dependencies { runtimeOnly(files(rrlsStub)) }
 }
 
 tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach {

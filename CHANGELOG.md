@@ -1,2 +1,2 @@
 ## Unreleased changes
-- Marked as conflicting with Remove Reloading Screen (RRLS)
+- Remove Reloading Screen (RRLS) is now disabled automatically instead of blocking launch
