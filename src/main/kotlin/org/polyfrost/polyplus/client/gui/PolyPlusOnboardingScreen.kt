@@ -1777,7 +1777,7 @@ private fun MotionBlurModeCard(
                 "Recommended",
                 11.sp,
                 Modifier.align(Alignment.BottomCenter).padding(14.dp),
-                OneConfigTheme.accent,
+                OneConfigTheme.accent.takeIf { meetsTextContrast(it, OneConfigTheme.current.popupBackground) } ?: SocialTextPrimary,
                 FontWeight.Medium,
                 textAlign = TextAlign.Center,
             )
@@ -1794,7 +1794,7 @@ private fun FpsHud(fps: Int, color: Color, modifier: Modifier = Modifier) {
             .padding(HUD_PADDING.dp),
     ) {
         val style = TextStyle(fontSize = HUD_TEXT_SIZE.sp, fontFamily = MinecraftFontFamily)
-        BasicText("FPS: ", style = style.copy(color = SocialTextPrimary))
+        BasicText("FPS: ", style = style.copy(color = Color.White))
         BasicText(fps.toString(), style = style.copy(color = color))
     }
 }
@@ -1973,7 +1973,7 @@ private fun ChoiceButton(
     blocked: String? = null,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (primary) Color.White else SocialTextPrimary
+    val contentColor = if (primary) OneConfigTheme.current.accentTextColor else SocialTextPrimary
     val shape = ButtonShape
     val role = if (option) A11yRole.Option else A11yRole.Button
     Row(
@@ -2176,8 +2176,8 @@ private fun BottomNavigation(
             Box(
                 Modifier.size(if (index == page) 12.dp else 10.dp)
                     .clip(ppShape(8.dp))
-                    .background(if (index == page) Color(0x80EBF2FF) else Color(0x73232D32))
-                    .border(1.dp, if (index == page) Color(0xCCFFFFFF) else Color(0x66FFFFFF), ppShape(8.dp)),
+                    .background(if (index == page) SocialTextPrimary.copy(alpha = 0.5f) else Color(0x73232D32))
+                    .border(1.dp, SocialTextPrimary.copy(alpha = if (index == page) 0.8f else 0.4f), ppShape(8.dp)),
             )
         }
     }
@@ -2541,7 +2541,7 @@ private fun CheckBox(checked: Boolean) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) Icon("tick", theme.textColor, Modifier.size(26.dp))
+        if (checked) Icon("tick", theme.accentTextColor, Modifier.size(26.dp))
     }
 }
 

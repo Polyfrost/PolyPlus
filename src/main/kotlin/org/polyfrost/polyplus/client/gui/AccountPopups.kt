@@ -49,7 +49,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 @Composable
 internal fun ColumnScope.AccountStatusText(busy: String?, error: String?, errorSteps: List<String>?) {
     if (error != null) {
-        SocialText(error, fontSize = 12.sp, color = SocialDangerColor, modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
+        SocialText(error, fontSize = 12.sp, color = SocialDangerText, modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
     }
     if (!errorSteps.isNullOrEmpty()) {
         Column(
@@ -274,7 +274,7 @@ internal fun OfflineAccountPopup(
                 else -> null
             }
             if (hint != null) {
-                SocialText(hint, fontSize = 12.sp, color = SocialDangerColor, textAlign = TextAlign.Center)
+                SocialText(hint, fontSize = 12.sp, color = SocialDangerText, textAlign = TextAlign.Center)
             }
             if (busy != null) {
                 Row(
@@ -313,7 +313,7 @@ private fun LoginModalButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (filled) Color.White else SocialTextPrimary
+    val contentColor = if (filled) OneConfigTheme.current.accentTextColor else SocialTextPrimary
     Row(
         modifier = modifier
             .height(44.dp)

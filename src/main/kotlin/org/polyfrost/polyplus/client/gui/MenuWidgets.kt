@@ -104,7 +104,8 @@ private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 internal val PanelBackground: Color
     @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
-private val ServerIconBackground = Color(0x33FFFFFF)
+private val ServerIconBackground: Color
+    @Composable get() = SocialTextPrimary.copy(alpha = 0.2f)
 
 internal val PanelShape: Shape
     @Composable
@@ -239,9 +240,8 @@ internal fun themeToggle(): ThemeToggle? {
 }
 
 @Composable
-internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = Color.White) {
+internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = Color.White, secondary: Color = SocialTextSecondary) {
     val bodyFont = OneConfigTheme.current.fontFamily
-    val secondary = SocialTextSecondary
 
     BasicText(
         text = buildAnnotatedString {

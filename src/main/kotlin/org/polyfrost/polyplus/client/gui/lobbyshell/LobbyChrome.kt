@@ -539,7 +539,7 @@ private fun QuitPortrait(player: UUID) {
                 .background(SocialDangerColor),
             contentAlignment = Alignment.Center,
         ) {
-            LobbyIcon("x-close", OneConfigTheme.current.accentTextColor, 14.dp)
+            LobbyIcon("x-close", Color.White, 14.dp)
         }
     }
 }

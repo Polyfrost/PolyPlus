@@ -110,7 +110,7 @@ private fun MetaLine(data: ServerData, status: PreviewStatus) {
 @Composable
 private fun MotdLines(data: ServerData) {
     val muted = MutedText
-    PreviewText(motdText(data.motd, muted), muted, maxLines = 2)
+    PreviewText(motdText(data.motd, muted, OneConfigTheme.current.textColor, OneConfigTheme.current.popupBackground), muted, maxLines = 2)
 }
 
 @Composable

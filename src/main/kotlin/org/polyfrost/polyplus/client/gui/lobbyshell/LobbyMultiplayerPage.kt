@@ -86,6 +86,7 @@ import org.polyfrost.polyplus.client.gui.RasterImage
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.legibleOn
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.clickableWithSound
@@ -469,7 +470,7 @@ internal fun MotdText(entry: ServerEntry, revision: Int, maxLines: Int = 2) {
     val muted = MutedText
     val text = when {
         entry.kind == ServerKind.LAN || LobbyServers.failed(data) || data.state() == ServerData.State.PINGING -> AnnotatedString("")
-        else -> motdText(data.motd, muted)
+        else -> motdText(data.motd, muted, OneConfigTheme.current.textColor, OneConfigTheme.current.popupBackground)
     }
     BasicText(
         text,
@@ -479,14 +480,14 @@ internal fun MotdText(entry: ServerEntry, revision: Int, maxLines: Int = 2) {
     )
 }
 
-internal fun motdText(component: Component?, fallback: Color): AnnotatedString {
+internal fun motdText(component: Component?, fallback: Color, ink: Color, surface: Color): AnnotatedString {
     component ?: return AnnotatedString("")
     return buildAnnotatedString {
         val run = StringBuilder()
         var runColor = fallback
         fun flush() {
             if (run.isEmpty()) return
-            withStyle(SpanStyle(color = runColor)) { append(run.toString()) }
+            withStyle(SpanStyle(color = legibleOn(runColor, ink, surface))) { append(run.toString()) }
             run.clear()
         }
         //? if > 1.8.9 {

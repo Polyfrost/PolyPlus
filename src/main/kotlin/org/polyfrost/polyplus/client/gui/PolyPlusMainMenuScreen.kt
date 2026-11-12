@@ -693,12 +693,12 @@ private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> D
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp))
-            FooterBrandText(platformLabel())
+            FooterBrandText(platformLabel(), secondary = Color.White.copy(alpha = 0.7f))
         }
         SocialText(
             "Copyright Mojang AB. Do not distribute!",
             fontSize = 13.sp,
-            color = SocialTextSecondary,
+            color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = edgeX(24f), bottom = edgeY(18f)),

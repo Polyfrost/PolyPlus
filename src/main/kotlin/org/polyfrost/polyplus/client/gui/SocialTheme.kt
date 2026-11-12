@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -52,11 +53,15 @@ internal fun textContrast(text: Color, surface: Color): Float =
 
 internal fun meetsTextContrast(text: Color, surface: Color): Boolean = textContrast(text, surface) >= MIN_TEXT_CONTRAST
 
+internal fun legibleOn(color: Color, ink: Color, surface: Color): Color {
+    val step = (0..READABLE_STEPS).firstOrNull { meetsTextContrast(lerp(color, ink, it / READABLE_STEPS.toFloat()), surface) } ?: READABLE_STEPS
+    return lerp(color, ink, step / READABLE_STEPS.toFloat())
+}
+
 @Composable
 private fun readableText(color: Color): Color {
     val theme = OneConfigTheme.current
-    val step = (0..READABLE_STEPS).firstOrNull { meetsTextContrast(lerp(color, theme.textColor, it / READABLE_STEPS.toFloat()), theme.popupBackground) } ?: READABLE_STEPS
-    return lerp(color, theme.textColor, step / READABLE_STEPS.toFloat())
+    return legibleOn(color, theme.textColor, theme.popupBackground)
 }
 
 internal val SocialDangerText: Color
@@ -64,6 +69,9 @@ internal val SocialDangerText: Color
 
 internal val SocialSuccessText: Color
     @Composable get() = readableText(SocialSuccessColor)
+
+internal val SocialWarnText: Color
+    @Composable get() = readableText(SocialWarnColor)
 
 internal const val DISABLED_ALPHA = 0.4f
 
@@ -73,7 +81,13 @@ internal val SocialPanelBorderWidth = 1.5.dp
 
 private const val PANEL_BORDER_ANGLE_DEG = 20.0
 
-internal val SocialPanelBorderBrush: Brush = object : ShaderBrush() {
+internal val SocialPanelBorderBrush: Brush
+    @Composable get() {
+        val ink = OneConfigTheme.current.textColor
+        return remember(ink) { panelBorderBrush(ink) }
+    }
+
+private fun panelBorderBrush(ink: Color): Brush = object : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val radians = Math.toRadians(PANEL_BORDER_ANGLE_DEG)
         val ux = cos(radians).toFloat()
@@ -83,9 +97,9 @@ internal val SocialPanelBorderBrush: Brush = object : ShaderBrush() {
             from = Offset.Zero,
             to = Offset(ux * len, uy * len),
             colors = listOf(
-                Color.White.copy(alpha = 0.5f),
-                Color.White.copy(alpha = 0.15f),
-                Color.White.copy(alpha = 0.5f),
+                ink.copy(alpha = 0.5f),
+                ink.copy(alpha = 0.15f),
+                ink.copy(alpha = 0.5f),
             ),
             colorStops = listOf(0f, 0.5f, 1f),
         )

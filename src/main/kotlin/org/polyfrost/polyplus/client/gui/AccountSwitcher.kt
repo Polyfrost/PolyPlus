@@ -250,13 +250,13 @@ fun AccountButton(
                 )
                 if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
                 if (account.active && account.microsoft && PrivacyConsent.allowsOnlineServices()) AccountStatusBadge()
-                if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerColor)
+                if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerText)
             }
             SocialText(
                 if (confirmRemove) "Remove this account?"
                 else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
                 fontSize = 13.sp,
-                color = if (confirmRemove) SocialDangerColor else OneConfigTheme.current.textColorSecondary,
+                color = if (confirmRemove) SocialDangerText else OneConfigTheme.current.textColorSecondary,
                 textAlign = TextAlign.Right,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -271,7 +271,7 @@ fun AccountButton(
         } else {
             if (account.refreshable) {
                 RefreshAccountButton(
-                    color = if (account.expired) SocialDangerColor else SocialTextSecondary,
+                    color = if (account.expired) SocialDangerText else SocialTextSecondary,
                     enabled = enabled,
                     spinning = refreshing,
                     onClick = onRefresh,

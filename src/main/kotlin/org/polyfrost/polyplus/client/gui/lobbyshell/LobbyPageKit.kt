@@ -103,7 +103,11 @@ internal fun Tag(text: String, tone: TagTone = TagTone.Dark, modifier: Modifier 
     } else {
         Modifier.background(Color.Black.copy(alpha = TAG_FILL_ALPHA), shape).border(1.dp, theme.textColorSecondary.copy(alpha = TAG_HAIRLINE_ALPHA), shape)
     }
-    val ink = if (tone == TagTone.Danger) SocialDangerColor else theme.accentTextColor
+    val ink = when (tone) {
+        TagTone.Danger -> SocialDangerColor
+        TagTone.Accent -> theme.accentTextColor
+        else -> Color.White
+    }
     Box(modifier.height(18.dp).clip(shape).then(surface).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
         Label(text.uppercase(), 10.sp, color = ink, weight = FontWeight.Medium)
     }
