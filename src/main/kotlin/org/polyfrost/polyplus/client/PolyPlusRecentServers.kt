@@ -75,12 +75,12 @@ object PolyPlusRecentServers {
 
     private const val GENERIC_NAME = "Multiplayer server"
     private val IPV4 = Regex("""^\d{1,3}(\.\d{1,3}){3}(:\d+)?$""")
+    private val IPV6 = Regex("""^\[?[0-9a-fA-F:.]*:[0-9a-fA-F:.]*:[0-9a-fA-F:.]*(%[0-9a-zA-Z]+)?(]:\d+|])?$""")
 
     @JvmStatic
     fun isRawIp(address: String): Boolean {
         val host = address.trim()
-        if (host.startsWith("[") || host.count { it == ':' } > 1) return true
-        return IPV4.matches(host)
+        return IPV4.matches(host) || IPV6.matches(host)
     }
 
     @JvmStatic
