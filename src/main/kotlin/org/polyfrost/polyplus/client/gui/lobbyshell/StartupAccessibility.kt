@@ -222,8 +222,14 @@ internal object StartupAccessibility {
 
     private fun toggleReducedMotion() {
         reducedMotion = !reducedMotion
-        ThemeConfig.reducedMotion = reducedMotion
-        ThemeConfig.INSTANCE?.save()
+        val config = ThemeConfig.INSTANCE
+        val property = config?.getTree()?.getProp("reducedMotion")
+        if (config != null && property != null) {
+            property.setAs(reducedMotion)
+            config.save()
+        } else {
+            ThemeConfig.reducedMotion = reducedMotion
+        }
         announce(buttonNarration(label(Control.ReducedMotion)))
     }
 
