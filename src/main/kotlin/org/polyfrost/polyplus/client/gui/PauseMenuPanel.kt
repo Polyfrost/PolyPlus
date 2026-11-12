@@ -20,6 +20,7 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.client.stats.PlaySessions
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -33,13 +34,9 @@ import net.minecraft.client.gui.components.AbstractButton
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.PauseScreen
 import net.minecraft.network.chat.Component
-import net.minecraft.network.protocol.game.ServerboundClientCommandPacket
-import net.minecraft.stats.Stats
 //?} else {
 /*import net.minecraft.client.gui.widget.ButtonWidget
 import net.minecraft.client.resource.language.I18n
-import net.minecraft.network.packet.c2s.play.ClientStatusC2SPacket
-import net.minecraft.stat.Stats
 import org.lwjgl.input.Mouse
 *///?}
 
@@ -210,42 +207,12 @@ object PauseMenuPanel {
         )
     }
 
-    private var statsRequestedAt: Long? = null
+    fun playtimeShort(): String = PlaySessions.currentPlaceMillis()?.let(::formatPlaytime).orEmpty()
 
-    // the client's stat counter only updates when asked, as vanilla's Statistics screen does. asked again every so
-    // often while the label is shown, since playtime keeps counting in multiplayer and unpaused LAN worlds
-    private fun requestStats() {
-        val now = System.nanoTime()
-        statsRequestedAt?.let { if (now - it < STATS_REQUEST_NANOS) return }
-        statsRequestedAt = now
-        //? if > 1.8.9 {
-        Minecraft.getInstance().connection?.send(ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.REQUEST_STATS))
-        //?} else {
-        /*Minecraft.getInstance().networkHandler?.sendPacket(ClientStatusC2SPacket(ClientStatusC2SPacket.Status.REQUEST_STATS))
-        *///?}
-    }
+    fun playtimeLabel(): String = "Playtime: " + (PlaySessions.currentPlaceMillis()?.let(::formatPlaytime) ?: "-")
 
-    private const val STATS_REQUEST_NANOS = 10_000_000_000L
-
-    fun playtimeShort(): String {
-        requestStats()
-        return playTimeTicks()?.let(::formatPlaytime).orEmpty()
-    }
-
-    fun playtimeLabel(): String {
-        requestStats()
-        return "Playtime: " + (playTimeTicks()?.let(::formatPlaytime) ?: "-")
-    }
-
-    private fun playTimeTicks(): Int? =
-        //? if > 1.8.9 {
-        Minecraft.getInstance().player?.stats?.getValue(Stats.CUSTOM, Stats.PLAY_TIME)
-        //?} else {
-        /*Minecraft.getInstance().player?.stats?.get(Stats.MINUTES_PLAYED) // counts ticks, despite the name
-        *///?}
-
-    internal fun formatPlaytime(ticks: Int): String {
-        val minutes = ticks / 20 / 60
+    internal fun formatPlaytime(millis: Long): String {
+        val minutes = millis / 60_000
         return if (minutes < 60) "${minutes}m" else "${minutes / 60}h ${minutes % 60}m"
     }
 
@@ -444,7 +411,6 @@ object PauseMenuPanel {
     fun render(ctx: GuiGraphicsExtractor, screen: Screen) {
         val layout = layouts[screen] ?: return
         if (layout.onLeft) hideEssentialFlags(screen)
-        // stats arrive a moment after the request, and keep counting while the menu is open
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
         updateDrag(screen, layout)
         inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }

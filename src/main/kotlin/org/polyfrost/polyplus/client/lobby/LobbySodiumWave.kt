@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.lobby
 
 import java.lang.reflect.Method
+import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
 object LobbySodiumWave {
@@ -19,6 +20,7 @@ object LobbySodiumWave {
     private const val LOCATED_VERTEX = "layout(location = 0) out vec4 v_Color;"
     private const val LOCATED_FRAGMENT = "layout(location = 0) in vec4 v_Color;"
     private const val IRIS_API = "net.irisshaders.iris.api.v0.IrisApi"
+    private const val VITRAIL_PACKS = "dev.vitrail.render.PackChoice"
 
     private val snippets = ConcurrentHashMap<String, String>()
     private val reported = ConcurrentHashMap.newKeySet<String>()
@@ -33,13 +35,23 @@ object LobbySodiumWave {
         }.getOrNull()
     }
 
-    @JvmStatic
-    fun active(): Boolean = LobbyWaveState.active() && !broken && !irisPackInUse()
+    private val vitrailSession: Method? by lazy {
+        runCatching { Class.forName(VITRAIL_PACKS).getMethod("session") }.getOrNull()
+    }
 
     @JvmStatic
-    fun irisPackInUse(): Boolean {
+    fun active(): Boolean = LobbyWaveState.active() && !broken && !packInUse()
+
+    private fun packInUse(): Boolean = irisPackInUse() || vitrailPackInUse()
+
+    private fun irisPackInUse(): Boolean {
         val (api, query) = irisPack ?: return false
         return runCatching { query.invoke(api) == true }.getOrDefault(false)
+    }
+
+    private fun vitrailPackInUse(): Boolean {
+        val query = vitrailSession ?: return false
+        return runCatching { (query.invoke(null) as Optional<*>).isPresent }.getOrDefault(false)
     }
 
     @JvmStatic

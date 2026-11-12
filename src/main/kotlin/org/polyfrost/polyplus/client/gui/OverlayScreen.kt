@@ -98,14 +98,16 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
     *///?} else if > 1.8.9 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         if (!inGame()) {
-            Minecraft.getInstance().gameRenderer
-                //? if >= 26.2 {
-                .panorama()
-                .extractRenderState(ctx, width, height)
-                //?} else {
-                /*.getPanorama()
-                .extractRenderState(ctx, width, height, true)
-                *///?}
+            if (MenuPanorama.panoramaReady()) {
+                Minecraft.getInstance().gameRenderer
+                    //? if >= 26.2 {
+                    .panorama()
+                    .extractRenderState(ctx, width, height)
+                    //?} else {
+                    /*.getPanorama()
+                    .extractRenderState(ctx, width, height, true)
+                    *///?}
+            }
             ctx.blurBeforeThisStratum()
             MenuBackgroundPass.renderInline(ctx)
         }

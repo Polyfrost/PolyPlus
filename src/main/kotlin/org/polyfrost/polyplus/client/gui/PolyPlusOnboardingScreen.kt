@@ -193,14 +193,16 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) = Unit
     *///?} else {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
-        Minecraft.getInstance().gameRenderer
-            //? if >= 26.2 {
-            .panorama()
-            .extractRenderState(ctx, width, height)
-            //?} else {
-            /*.getPanorama()
-            .extractRenderState(ctx, width, height, true)
-            *///?}
+        if (MenuPanorama.panoramaReady()) {
+            Minecraft.getInstance().gameRenderer
+                //? if >= 26.2 {
+                .panorama()
+                .extractRenderState(ctx, width, height)
+                //?} else {
+                /*.getPanorama()
+                .extractRenderState(ctx, width, height, true)
+                *///?}
+        }
         ctx.blurBeforeThisStratum()
         MenuBackgroundPass.renderInline(ctx)
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
