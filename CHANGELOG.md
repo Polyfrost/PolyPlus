@@ -1,7 +1,26 @@
-## 2.0.6
-- Add a Player preview switch to the Full pause screen
-- Rename the pause screen styles to Spotlight and Full
-- Show your linked mod's menus on the pause screen
-- Fix the macOS notch leaving a bright strip at the top of the lobby
-- Fix render distance staying low after joining a world with Smooth Join
-- Fix the lobby not loading with mods like Simple Discord Rich Presence
+## 2.0.7
+- Redesign the Servers page with compact server cards and a simpler top bar
+- Show other mods' multiplayer screen buttons in the Servers menu
+- Fit server MOTDs the same way the vanilla server list does
+- Turn the lobby's scene button into a small dock with spark profiling and health reports
+- Add a separate lobby music volume, also in the scene picker
+- Add an option to mute the lobby music while the game is in the background
+- Bring back the main menu panorama option
+- Scale the lobby and main menu with OneConfig's UI scale
+- Hide conversations and block players from any social menu
+- Click the copyright text to open the credits
+- Click the lobby's social prompt to open Social
+- Open the pause screen's More menu next to its button
+- Wrap Tab focus around in the menus and let keyboards reach the pause More menu
+- Apply the onboarding's reduced motion setting to OneConfig right away
+- Stop showing the server's address on the pause screen
+- Show direct joins by their hostname instead of "Minecraft Server", and never show raw IPs
+- Keep custom and palette themes when switching between light and dark
+- List Full first in the pause screen styles
+- Fix the 1.8.9 lobby sometimes flickering purple
+- Fix menus ignoring custom theme corners
+- Fix unreadable text on light themes and light accents
+- Fix the pause media widget taking a while to show the current song
+- Fix EvergreenHUD's hidden media buttons reacting to clicks in the main menu
+- Fix long messages getting cut off in the lobby chat popup
+- Fix compatibility with FireClient
