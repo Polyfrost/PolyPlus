@@ -261,7 +261,7 @@ internal fun canPlayTogether(): Boolean {
 
 internal fun startPlayTogether(target: Any?) {
     when (target) {
-        is ServerData -> PlayTogether.start(PlayTogether.serverDestination(target.ip, target.shownName))
+        is ServerData -> PlayTogether.start(PlayTogether.serverDestination(target.ip, target.name))
         is LobbyWorld -> if (target.playable) PlayTogether.start(PlayTogether.worldDestination(target.name), target.id)
     }
 }
