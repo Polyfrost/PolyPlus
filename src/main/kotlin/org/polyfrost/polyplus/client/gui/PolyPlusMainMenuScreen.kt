@@ -362,7 +362,7 @@ private fun MainMenu(
     var accountsOpen by remember { mutableStateOf(false) }
     val glass = remember { MenuGlass() }
     var rootSize by remember { mutableStateOf(Size.Zero) }
-    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }.trackScreenFocus()) {
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }.trackScreenFocus().wrapTabFocus()) {
         if (!MenuPanorama.panoramaBackdrop()) MenuBackdrop(Modifier.fillMaxSize(), glass)
         CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
             BoxWithConstraints(Modifier.fillMaxSize()) {

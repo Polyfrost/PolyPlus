@@ -10,12 +10,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -33,6 +36,10 @@ internal object LobbyA11y {
     private var rootFocused = false
 
     private val regions = HashMap<A11yRegion, FocusRequester>()
+
+    private var regionEntries = 0
+
+    internal fun regionEntries(): Int = regionEntries
 
     fun keyboardFocused(): Boolean = A11y.keyboardMode && rootFocused
 
@@ -59,13 +66,30 @@ internal object LobbyA11y {
             val region = order[index.mod(order.size)]
             if (region == after) continue
             val requester = regions[region] ?: continue
-            if (requester.requestFocus(direction)) return true
+            if (requester.requestFocus(direction)) {
+                regionEntries++
+                return true
+            }
         }
         return false
     }
 }
 
 private fun FocusDirection.isTab(): Boolean = this == FocusDirection.Next || this == FocusDirection.Previous
+
+private fun KeyEvent.isTabDown(): Boolean = type == KeyEventType.KeyDown && key == Key.Tab
+
+internal fun FocusManager.moveTabFocus(backward: Boolean, movedElsewhere: () -> Boolean = { false }): Boolean {
+    val direction = if (backward) FocusDirection.Previous else FocusDirection.Next
+    if (moveFocus(direction) || movedElsewhere()) return true
+    clearFocus()
+    return moveFocus(direction)
+}
+
+internal fun Modifier.wrapTabFocus(): Modifier = composed {
+    val focus = LocalFocusManager.current
+    onKeyEvent { event -> event.isTabDown() && focus.moveTabFocus(event.isShiftPressed) }
+}
 
 internal fun Modifier.a11yRegion(region: A11yRegion): Modifier = composed {
     val requester = remember { FocusRequester() }
@@ -93,6 +117,10 @@ internal fun Modifier.a11yRoot(): Modifier = composed {
         .onFocusChanged { LobbyA11y.rootFocusChanged(it.hasFocus) }
         .trackScreenFocus()
         .onKeyEvent { event ->
+            if (event.isTabDown()) {
+                val entries = LobbyA11y.regionEntries()
+                return@onKeyEvent focus.moveTabFocus(event.isShiftPressed) { LobbyA11y.regionEntries() != entries }
+            }
             if (event.type != KeyEventType.KeyDown || !A11y.keyboardMode) return@onKeyEvent false
             val direction = when (event.key) {
                 Key.DirectionLeft -> FocusDirection.Left

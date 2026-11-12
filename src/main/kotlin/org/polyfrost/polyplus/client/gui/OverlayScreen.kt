@@ -3,7 +3,10 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
@@ -141,6 +144,8 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
 
     @Composable
     override fun compose() {
-        ProvideOneConfigTheme { content(::dismiss) }
+        ProvideOneConfigTheme {
+            Box(Modifier.fillMaxSize().wrapTabFocus(), propagateMinConstraints = true) { content(::dismiss) }
+        }
     }
 }
