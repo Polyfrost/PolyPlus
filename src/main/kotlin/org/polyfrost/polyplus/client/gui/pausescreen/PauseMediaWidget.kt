@@ -218,7 +218,9 @@ internal fun prettyPlayer(raw: String): String {
 
 internal object PauseMediaWidgets {
     fun register() {
-        if (Mods.evergreenHud) PauseWidgets.register(MediaWidget)
+        if (!Mods.evergreenHud) return
+        PauseWidgets.register(MediaWidget)
+        PauseEvergreenMedia.keepWarmInWorld(MediaWidget.id)
     }
 }
 
