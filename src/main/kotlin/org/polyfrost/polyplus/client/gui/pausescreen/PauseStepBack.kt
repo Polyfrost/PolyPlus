@@ -124,7 +124,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         val panels = widgets.view.panels.take(slots.count)
         val panelArea = panelSlots(narrow, 1, maxWidth, maxHeight, rowWidth).count > 0
         val panelled = remember(panels) { panels.mapTo(HashSet()) { it.id } }
-        if (screen.staged) AvatarTag(place.title) else FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
+        if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
             Column(

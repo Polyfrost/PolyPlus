@@ -83,6 +83,7 @@ private val ROW_PADDING = 10.dp
 private val NESTED_INDENT = 14.dp
 private const val DISABLED_ALPHA = 0.5f
 private const val STYLE_OPTION = "pauseScreenStyle"
+private const val PREVIEW_OPTION = "flatPausePlayerPreview"
 private const val UNAVAILABLE = "Not available right now."
 //? if >= 26.3 {
 private val PANEL_EXCLUDED = setOf("replacePauseLanButton")
@@ -145,6 +146,7 @@ internal fun PauseCustomizePanel(screen: OneClientPauseScreen, modifier: Modifie
         runCatching { PolyPlusPauseConfig.save() }
         when {
             prop.getID() == STYLE_OPTION -> if (value is PauseScreenStyle) pickedStyle = value
+            prop.getID() == PREVIEW_OPTION -> screen.playerPreview = value == true
             PauseWidgetRegistry.builtInToggledBy(prop.getID()) != null -> PauseWidgetRegistry.invalidate()
             else -> menuChanges++
         }
