@@ -43,8 +43,6 @@ import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.polyplus.client.gui.themedIcon
@@ -68,6 +66,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.ReplyFilterButton
 import org.polyfrost.polyplus.client.gui.lobbysocial.RosterRow
 import org.polyfrost.polyplus.client.gui.lobbysocial.RosterSections
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
+import org.polyfrost.polyplus.client.gui.lobbysocial.ChatAsPicker
 import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialDialog
@@ -191,35 +190,12 @@ internal fun SelfHeader(
             if (reconnecting) {
                 Label("Reconnecting", 12.sp, color = MutedText)
             } else {
-                CompactStatusPicker { close -> ChatAsItems(state, snapshot, close) }
+                CompactStatusPicker()
             }
+            if (snapshot.delegations.isNotEmpty()) ChatAsPicker(state, snapshot)
         }
         InvitesBell(invites)
         IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier, onClose)
-    }
-}
-
-@Composable
-private fun ChatAsItems(state: SocialPageState, snapshot: SocialSnapshot, close: () -> Unit) {
-    if (snapshot.delegations.isEmpty()) return
-    SectionHeading("Chat as", Modifier.padding(start = Inset, top = Inset))
-    (listOf<SocialPerson?>(null) + snapshot.delegations).forEach { person ->
-        val selected = person?.id == snapshot.actAs
-        MenuItem(
-            person?.name ?: ClientPlatform.localPlayerName(),
-            null,
-            null,
-            MenuItemSize.Compact,
-            false,
-            selected,
-            true,
-            null,
-            Modifier,
-            null,
-        ) {
-            close()
-            state.source.chatAs(person?.id)
-        }
     }
 }
 

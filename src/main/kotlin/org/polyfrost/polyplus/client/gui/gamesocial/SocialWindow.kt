@@ -234,7 +234,10 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
             PartyJoin.cancel()
         }
     }
-    LaunchedEffect(Unit) { PartyRepository.refresh() }
+    LaunchedEffect(Unit) {
+        PartyRepository.refresh()
+        ChatIdentity.refreshDelegations()
+    }
     LaunchedEffect(window) {
         while (true) {
             window.lanOpen = SocialHosting.lanOpen
