@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -131,7 +133,8 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp)
-                    .width(if (narrow) 340.dp else 400.dp),
+                    .width(if (narrow) 340.dp else 400.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 Eyebrow(place.eyebrow)
                 Spacer(Modifier.height(6.dp))
@@ -193,7 +196,12 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     rememberModMenu()?.let { (modMenu, logo) ->
         MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
-    MenuRow(asset("dots-vertical"), "More", height = rowHeight) { screen.moreOpen = !screen.moreOpen }
+    LinkedModRow(screen, rowHeight)
+    MenuRow(asset("dots-vertical"), "More", height = rowHeight) {
+        val showing = screen.moreOpen && !screen.moreLinked
+        screen.moreLinked = false
+        screen.moreOpen = !showing
+    }
     Spacer(Modifier.height(6.dp))
     Hairline()
     Spacer(Modifier.height(6.dp))

@@ -77,7 +77,12 @@ import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
+import org.polyfrost.polyplus.client.gui.lobbyshell.LINKED_MOD_CAPTION
 import org.polyfrost.polyplus.client.gui.lobbyshell.ModLogo
+import org.polyfrost.polyplus.client.gui.lobbyshell.decodeModLogo
+import org.polyfrost.polyplus.client.gui.lobbyshell.icon
+import org.polyfrost.polyplus.client.gui.lobbyshell.label
+import org.polyfrost.polyplus.compat.LinkedModMenus
 import org.polyfrost.polyplus.client.gui.lobbyshell.MoreMenuPanel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModMenu
 import androidx.compose.ui.graphics.ImageBitmap
@@ -301,11 +306,41 @@ private fun MoreEntry(entry: PauseEntry, onDone: () -> Unit) {
     }
 }
 
+private fun pauseLinkedEntries(): List<LinkedModMenus.Entry> =
+    LinkedModMenus.entries.filter { it != LinkedModMenus.Entry.Accounts && it != LinkedModMenus.Entry.FriendsWorlds }
+
+@Composable
+private fun LinkedEntry(entry: LinkedModMenus.Entry, onDone: () -> Unit) {
+    MenuItem(entry.label, themedIcon(entry.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
+        onDone()
+        LinkedModMenus.open(entry)
+    }
+}
+
+@Composable
+internal fun LinkedModRow(screen: OneClientPauseScreen, height: Dp) {
+    val linked = remember { pauseLinkedEntries() }
+    if (linked.isEmpty()) return
+    val logo = remember { decodeModLogo(LinkedModMenus.logo) }
+    MenuRow(asset("link-external-01"), LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, height = height, logo = logo) {
+        val showing = screen.moreOpen && screen.moreLinked
+        screen.moreLinked = true
+        screen.moreOpen = !showing
+    }
+}
+
 @Composable
 internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier, routes: Boolean = false) {
+    val linked = remember { pauseLinkedEntries() }
+    val close = { screen.moreOpen = false }
+    if (screen.moreLinked && linked.isNotEmpty()) {
+        MoreMenuPanel(Modifier.heightIn(max = 560.dp).pauseGlass().verticalScroll(rememberScrollState()), modifier) {
+            linked.forEach { LinkedEntry(it, close) }
+        }
+        return
+    }
     val modMenu = rememberModMenu()
     val entries = screen.capture.more.filterNot { modMenu != null && it.modMenu }
-    val close = { screen.moreOpen = false }
     val game = if (routes) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
     val mods = modMenu.takeIf { routes }
     MoreMenuPanel(Modifier.heightIn(max = 560.dp).pauseGlass().verticalScroll(rememberScrollState()), modifier) {
@@ -316,7 +351,13 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
                 button.onClick(screen)
             }
         }
-        if ((game.isNotEmpty() || mods != null) && entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
+        val routed = linked.takeIf { routes }.orEmpty()
+        if (routed.isNotEmpty()) {
+            if (game.isNotEmpty() || mods != null) Hairline(Modifier.padding(vertical = 4.dp))
+            Label(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, 11.sp, Modifier.padding(start = 10.dp, top = 6.dp, bottom = 2.dp), color = MutedText, weight = FontWeight.Medium)
+            routed.forEach { LinkedEntry(it, close) }
+        }
+        if ((game.isNotEmpty() || mods != null || routed.isNotEmpty()) && entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
         entries.groupBy { it.section }.forEach { (section, rows) ->
             Label(section, 11.sp, Modifier.padding(start = 10.dp, top = 6.dp, bottom = 2.dp), color = MutedText, weight = FontWeight.Medium)
             rows.forEach { MoreEntry(it, close) }
