@@ -78,6 +78,9 @@ internal class SocialListState(private val hideParty: Boolean = false) {
         }
     }
 
+    fun paging(source: SocialSource, snapshot: SocialSnapshot): ListPaging? =
+        if (query.isNotBlank()) null else listPaging(source, snapshot, !unreadOnly && replies == SpecialChatResponses.Filter.All, SocialList.Threads)
+
     fun emptyTitle(snapshot: SocialSnapshot): String {
         val filter = filter(snapshot)
         return when {
@@ -101,6 +104,9 @@ internal fun rememberSocialListState(source: SocialSource, snapshot: SocialSnaps
 
 internal fun visibleFriends(state: SocialPageState, snapshot: SocialSnapshot, filter: FriendFilter): List<SocialPerson> =
     snapshot.friends.filter { state.matches(it) && (filter != FriendFilter.Online || it.online) }
+
+internal fun SocialPageState.paging(snapshot: SocialSnapshot, fill: Boolean, vararg lists: SocialList): ListPaging? =
+    if (query.isNotBlank()) null else listPaging(source, snapshot, fill, *lists)
 
 internal fun rosterSections(people: List<SocialPerson>): List<Pair<String, List<SocialPerson>>> = listOf(
     "Playing" to people.filter { it.online && it.activity != null },

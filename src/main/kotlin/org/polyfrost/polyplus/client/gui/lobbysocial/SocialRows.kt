@@ -89,7 +89,9 @@ internal fun ChatAsPicker(state: SocialPageState, snapshot: SocialSnapshot) {
 internal fun ThreadList(state: SocialPageState, list: SocialListState, snapshot: SocialSnapshot, modifier: Modifier) {
     val activeId = SocialChatLink.active?.id
     val threads = list.threads(snapshot, activeId)
+    val paging = list.paging(state.source, snapshot)
     if (threads.isEmpty()) {
+        FillWhenEmpty(paging)
         if (LocalSocialLook.current.narrowLists) {
             Box(modifier, contentAlignment = Alignment.Center) { Label(list.emptyTitle(snapshot), 14.sp, color = MutedText) }
         } else {
@@ -97,7 +99,7 @@ internal fun ThreadList(state: SocialPageState, list: SocialListState, snapshot:
         }
         return
     }
-    ScrollFade(modifier, 2.dp) {
+    ScrollFade(modifier, 2.dp, paging = paging) {
         threads.forEach { thread ->
             ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, snapshot, thread) }) { state.source.open(thread) }
         }
@@ -145,12 +147,13 @@ internal fun ThreadRow(thread: SocialThread, selected: Boolean, menu: () -> List
 }
 
 @Composable
-internal fun Roster(state: SocialPageState, people: List<SocialPerson>, modifier: Modifier) {
+internal fun Roster(state: SocialPageState, people: List<SocialPerson>, modifier: Modifier, paging: ListPaging? = null) {
     if (people.isEmpty()) {
+        FillWhenEmpty(paging)
         EmptyState("No friends match that filter", modifier)
         return
     }
-    ScrollFade(modifier.padding(horizontal = 12.dp), 0.dp) { RosterSections(state, people) }
+    ScrollFade(modifier.padding(horizontal = 12.dp), 0.dp, paging = paging) { RosterSections(state, people) }
 }
 
 @Composable
@@ -202,11 +205,13 @@ private fun RowActions(state: SocialPageState, person: SocialPerson, ink: Color)
 @Composable
 internal fun RequestList(state: SocialPageState, snapshot: SocialSnapshot, modifier: Modifier) {
     val requests = snapshot.requests.filter { state.matches(it.person) }.sortedByDescending { it.incoming }
+    val paging = state.paging(snapshot, true, SocialList.Incoming, SocialList.Outgoing)
     if (requests.isEmpty()) {
+        FillWhenEmpty(paging)
         EmptyState(if (state.query.isBlank()) "No friend requests" else "No requests match that search", modifier)
         return
     }
-    ScrollFade(modifier.padding(12.dp), 0.dp) {
+    ScrollFade(modifier.padding(12.dp), 0.dp, paging = paging) {
         requests.forEach { request ->
             Row(
                 Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { requestMenuItems(state, request) + blockMenuItem(state.source, request.person) }.padding(horizontal = 10.dp),
@@ -241,11 +246,13 @@ private fun RowScope.RequestActions(state: SocialPageState, request: SocialReque
 @Composable
 internal fun BlockedList(state: SocialPageState, snapshot: SocialSnapshot, modifier: Modifier) {
     val blocked = snapshot.blocked.filter(state::matches)
+    val paging = state.paging(snapshot, true, SocialList.Blocked)
     if (blocked.isEmpty()) {
+        FillWhenEmpty(paging)
         EmptyState(if (state.query.isBlank()) "You haven't blocked anyone" else "No blocked players match that search", modifier)
         return
     }
-    ScrollFade(modifier.padding(12.dp), 0.dp) {
+    ScrollFade(modifier.padding(12.dp), 0.dp, paging = paging) {
         blocked.forEach { person ->
             Row(
                 Modifier.fillMaxWidth().height(RowHeight + 8.dp).contextMenu { blockedMenuItems(state, person) }.padding(horizontal = 10.dp),

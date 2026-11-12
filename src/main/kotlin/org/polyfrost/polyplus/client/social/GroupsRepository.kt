@@ -6,6 +6,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notification
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.oneconfig.api.notifications.v1.NotificationsManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.network.http.CursorPage
 import org.polyfrost.polyplus.client.network.http.GroupsApi
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
 import org.polyfrost.polyplus.client.network.http.responses.GroupLastMessage
@@ -13,16 +14,16 @@ import org.polyfrost.polyplus.client.network.http.responses.GroupMessage
 import org.polyfrost.polyplus.client.network.http.responses.GroupMessageSessionInvite
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
+import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.events.WebSocketMessage
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private class ViewCounts {
@@ -42,8 +43,8 @@ private class ViewCounts {
 object GroupsRepository {
     private val LOGGER = LogManager.getLogger()
 
-    private val _groups = MutableStateFlow<List<GroupSummary>>(emptyList())
-    val groups = _groups.asStateFlow()
+    val groupsPaging = PagedList<GroupSummary, Int>("chats", { it.id }, ::fetchGroups)
+    val groups = groupsPaging.items
 
     private val messagesByGroup = ConcurrentHashMap<Int, MutableStateFlow<List<GroupMessage>>>()
     private const val MAX_CACHED_MESSAGES = 200
@@ -67,9 +68,6 @@ object GroupsRepository {
     private val markReadRetryAt = ConcurrentHashMap<Int, Long>()
     private val markReadPending = ConcurrentHashMap<Int, Long>()
 
-    @Volatile
-    private var appliedTicket = 0L
-
     fun isPending(messageId: Long): Boolean = messageId >= PENDING_ID_BASE
 
     fun earlyInitialize() {
@@ -89,18 +87,18 @@ object GroupsRepository {
         // recomposition, briefly dropping the subscription appendOrReplace uses to detect an open conversation
         messagesByGroup.getOrPut(groupId) { MutableStateFlow(emptyList()) }
 
-    fun refreshGroups() = PolyPlusClient.SCOPE.launch {
+    fun refreshGroups(): Job = groupsPaging.refresh()
+
+    fun syncGroups(): Job = groupsPaging.syncHead()
+
+    private suspend fun fetchGroups(cursor: String?): Result<CursorPage<GroupSummary>> {
         // conversations cached after the request started may be missing from its (then stale) response, so they're kept
         val cached = messagesByGroup.keys.toSet()
         val ticket = refreshTicket.incrementAndGet()
-        GroupsApi.list()
-            .onSuccess { summaries ->
-                if (ticket < appliedTicket) return@onSuccess
-                appliedTicket = ticket
-                _groups.value = summaries.map { if (it.unread && ticket <= (readFence[it.id] ?: 0L)) it.copy(unread = false) else it }
-                messagesByGroup.keys.removeAll(cached - summaries.mapTo(HashSet()) { it.id })
-            }
-            .onFailure { LOGGER.error("Failed to refresh groups", it) }
+        return GroupsApi.listPage(cursor).map { page ->
+            if (cursor == null && page.cursor == null) messagesByGroup.keys.removeAll(cached - page.items.mapTo(HashSet()) { it.id })
+            page.copy(items = page.items.map { if (it.unread && ticket <= (readFence[it.id] ?: 0L)) it.copy(unread = false) else it })
+        }
     }
 
     fun reset() {
@@ -111,7 +109,7 @@ object GroupsRepository {
         markReadRetryAt.clear()
         markReadPending.clear()
         messageToasts.keys.toList().forEach(::clearMessageToasts)
-        _groups.value = emptyList()
+        groupsPaging.clear()
         refreshGroups()
     }
 
@@ -136,7 +134,11 @@ object GroupsRepository {
     }
 
     fun addMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
-        GroupsApi.addMember(groupId, player).onSuccess { refreshGroups() }
+        GroupsApi.addMember(groupId, player).onSuccess {
+            groupsPaging.update { list ->
+                list.map { if (it.id == groupId && it.members.none { member -> PartyRepository.samePlayer(member, player) }) it.copy(members = it.members + player) else it }
+            }
+        }
             .onFailure {
                 LOGGER.error("Failed to add $player to group $groupId", it)
                 SocialErrors.emit("Couldn't add member", it)
@@ -144,7 +146,15 @@ object GroupsRepository {
     }
 
     fun removeMember(groupId: Int, player: String) = PolyPlusClient.SCOPE.launch {
-        GroupsApi.removeMember(groupId, player).onSuccess { refreshGroups() }
+        GroupsApi.removeMember(groupId, player).onSuccess {
+            if (PartyRepository.samePlayer(player, ChatIdentity.selfId())) {
+                groupsPaging.removeIf { it.id == groupId }
+            } else {
+                groupsPaging.update { list ->
+                    list.map { if (it.id == groupId) it.copy(members = it.members.filterNot { member -> PartyRepository.samePlayer(member, player) }) else it }
+                }
+            }
+        }
             .onFailure {
                 LOGGER.error("Failed to remove $player from group $groupId", it)
                 SocialErrors.emit("Couldn't remove member", it)
@@ -218,7 +228,7 @@ object GroupsRepository {
             return
         }
         val reported = readThrough[groupId]
-        val unread = _groups.value.any { it.id == groupId && it.unread }
+        val unread = groups.value.any { it.id == groupId && it.unread }
         if (!unread && reported != null && reported >= messageId) {
             onResult(true)
             return
@@ -226,7 +236,7 @@ object GroupsRepository {
         val target = maxOf(messageId, reported ?: messageId)
         readThrough[groupId] = target
         readFence[groupId] = Long.MAX_VALUE
-        _groups.update { list -> list.map { if (it.id == groupId && it.unread) it.copy(unread = false) else it } }
+        groupsPaging.update { list -> list.map { if (it.id == groupId && it.unread) it.copy(unread = false) else it } }
         PolyPlusClient.SCOPE.launch {
             val result = GroupsApi.markRead(groupId, target)
             readFence.replace(groupId, Long.MAX_VALUE, if (result.isSuccess) refreshTicket.get() else 0L)
@@ -241,7 +251,7 @@ object GroupsRepository {
                 val backoff = minOf(MARK_READ_BASE_BACKOFF_MS shl (failures - 1).coerceAtMost(5), MARK_READ_MAX_BACKOFF_MS)
                 markReadRetryAt[groupId] = System.currentTimeMillis() + backoff
                 readThrough.remove(groupId)
-                refreshGroups()
+                syncGroups()
                 delay(backoff)
                 val pending = markReadPending.remove(groupId)
                 val latest = if (groupId in readingConversations) messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }?.id ?: target else null
@@ -284,7 +294,7 @@ object GroupsRepository {
     }
 
     private fun upsertGroup(summary: GroupSummary) {
-        _groups.value = _groups.value.filterNot { it.id == summary.id } + summary
+        groupsPaging.putFirst(summary)
     }
 
     private fun appendOrReplace(groupId: Int, message: GroupMessage) {
@@ -310,17 +320,18 @@ object GroupsRepository {
         val newest = messagesByGroup[groupId]?.value?.lastOrNull { !isPending(it.id) }
         if (newest != null && newest.id != message.id) return
         HiddenConversations.messageArrived(groupId, message.id)
-        val existing = _groups.value.firstOrNull { it.id == groupId }
+        val existing = groups.value.firstOrNull { it.id == groupId }
         if (existing == null) {
-            refreshGroups()
+            syncGroups()
             return
         }
         val selfId = ChatIdentity.selfId()
         val last = GroupLastMessage(content = message.content, sender = message.sender, sentAt = message.sentAt)
         val unread = message.sender != selfId && groupId !in readingConversations
         if (unread) readFence.remove(groupId)
-        _groups.value = _groups.value.map {
-            if (it.id == groupId) it.copy(lastMessage = last, unread = it.unread || unread) else it
+        groupsPaging.update { list ->
+            val (touched, rest) = list.partition { it.id == groupId }
+            touched.map { it.copy(lastMessage = last, unread = it.unread || unread) } + rest
         }
     }
 

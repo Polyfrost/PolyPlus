@@ -45,6 +45,10 @@ internal data class SocialWorld(val id: Int, val host: SocialPerson, val name: S
 
 internal data class SocialPartyInvite(val invite: PartyInvite, val host: SocialPerson)
 
+internal enum class SocialList { Friends, Incoming, Outgoing, Blocked, Threads }
+
+internal data class SocialPaging(val more: Set<SocialList> = emptySet(), val loading: Set<SocialList> = emptySet())
+
 internal data class SocialSnapshot(
     val friends: List<SocialPerson>,
     val requests: List<SocialRequest>,
@@ -58,9 +62,21 @@ internal data class SocialSnapshot(
     val scanningReplies: Boolean,
     val partyInvites: List<SocialPartyInvite> = emptyList(),
     val hiddenThreads: List<SocialThread> = emptyList(),
+    val paging: SocialPaging = SocialPaging(),
 ) {
     val allThreads: List<SocialThread>
         get() = threads + hiddenThreads
+
+    fun loaded(list: SocialList): Int = when (list) {
+        SocialList.Friends -> friends.size
+        SocialList.Incoming -> requests.count { it.incoming }
+        SocialList.Outgoing -> requests.count { !it.incoming }
+        SocialList.Blocked -> blocked.size
+        SocialList.Threads -> threads.size + hiddenThreads.size
+    }
+
+    fun countLabel(count: Int, vararg lists: SocialList): String =
+        if (lists.any { it in paging.more }) "$count+" else count.toString()
 
     val waiting: Int
         get() = requests.count { it.incoming } + worlds.count { !it.accepted } + partyInvites.size
@@ -96,6 +112,8 @@ internal interface SocialSource {
     fun Dialog(dialog: SocialDialog, onDismiss: () -> Unit)
 
     fun refresh()
+
+    fun loadMore(list: SocialList)
 
     fun accept(request: SocialRequest)
 

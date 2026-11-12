@@ -11,52 +11,55 @@ import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.FriendRequest
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
+import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.events.WebSocketMessage
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.util.UUID
 
 object FriendsRepository {
     private val LOGGER = LogManager.getLogger()
+    private const val ACCEPTED = "accepted"
 
-    private val _friends = MutableStateFlow<List<Friend>>(emptyList())
-    val friends = _friends.asStateFlow()
+    @Volatile
+    private var fetchedIncomingOnce = false
+
+    val friendsPaging = PagedList<Friend, String>("friends list", { it.player }, SocialApi::friendsPage)
+    val friends = friendsPaging.items
 
     @Volatile
     private var friendUuids: Set<UUID> = emptySet()
 
     fun isFriend(uuid: UUID): Boolean = uuid in friendUuids
 
-    private val _incomingRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
-    val incomingRequests = _incomingRequests.asStateFlow()
+    val incomingPaging = PagedList<FriendRequest, Int>("incoming friend requests", { it.id }) { cursor ->
+        SocialApi.incomingRequestsPage(cursor).onSuccess { page -> if (cursor == null) notifyNewRequests(page.items) }
+    }
+    val incomingRequests = incomingPaging.items
 
-    private val _outgoingRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
-    val outgoingRequests = _outgoingRequests.asStateFlow()
+    val outgoingPaging = PagedList<FriendRequest, Int>("outgoing friend requests", { it.id }, SocialApi::outgoingRequestsPage)
+    val outgoingRequests = outgoingPaging.items
 
-    private val _blocked = MutableStateFlow<List<BlockedPlayer>>(emptyList())
-    val blocked = _blocked.asStateFlow()
-
-    @Volatile
-    private var fetchedIncomingOnce = false
+    val blockedPaging = PagedList<BlockedPlayer, String>("blocked players", { it.player }, SocialApi::blockedPage)
+    val blocked = blockedPaging.items
 
     fun earlyInitialize() {
+        PolyPlusClient.SCOPE.launch {
+            friends.map { list -> list.map { it.player } }.distinctUntilChanged().collect { players ->
+                friendUuids = players.mapNotNullTo(HashSet()) { runCatching { UUID.fromString(it) }.getOrNull() }
+                CosmeticSync.watchFriends(players)
+            }
+        }
         eventHandler<WebSocketMessage> { event ->
             when (val packet = event.packet) {
                 is ClientboundPacket.FriendRequestReceived -> {
-                    PolyPlusClient.SCOPE.launch { refreshRequests() }
+                    incomingPaging.putFirst(FriendRequest(packet.requestId, packet.sender, Instant.now().toString()))
                     notifyFriendRequest(packet.requestId, packet.sender)
                 }
-                is ClientboundPacket.FriendRequestUpdated -> {
-                    PolyPlusClient.SCOPE.launch {
-                        refreshRequests()
-                        refreshFriends()
-                    }
-                }
-                is ClientboundPacket.FriendRemoved -> {
-                    PolyPlusClient.SCOPE.launch { refreshFriends() }
-                }
+                is ClientboundPacket.FriendRequestUpdated -> onRequestUpdated(packet)
+                is ClientboundPacket.FriendRemoved -> friendsPaging.removeIf { PartyRepository.samePlayer(it.player, packet.player) }
                 is ClientboundPacket.PlayerPresence -> onPresence(packet)
                 else -> {}
             }
@@ -68,57 +71,43 @@ object FriendsRepository {
         party?.member(player)?.online ?: friends.firstOrNull { it.player.equals(player, ignoreCase = true) }?.online
 
     private fun onPresence(packet: ClientboundPacket.PlayerPresence) {
-        _friends.update { list ->
+        friendsPaging.update { list ->
             list.map { if (it.player.equals(packet.player, ignoreCase = true)) it.copy(online = packet.online, status = packet.status) else it }
         }
+    }
+
+    private fun onRequestUpdated(packet: ClientboundPacket.FriendRequestUpdated) {
+        incomingPaging.removeIf { it.id == packet.requestId }
+        outgoingPaging.removeIf { it.id == packet.requestId }
+        if (packet.status == ACCEPTED) friendsPaging.syncHead()
     }
 
     fun refreshAll() {
         PlayerStatusRepository.refresh()
         PolyPlusClient.SCOPE.launch {
-            refreshFriends()
-            refreshRequests()
-            refreshBlocked()
+            friendsPaging.refresh().join()
+            incomingPaging.refresh().join()
+            outgoingPaging.refresh().join()
+            blockedPaging.refresh().join()
         }
     }
 
-    private suspend fun refreshFriends() {
-        SocialApi.friends()
-            .onSuccess {
-                _friends.value = it
-                friendUuids = it.mapNotNullTo(HashSet()) { friend ->
-                    runCatching { UUID.fromString(friend.player) }.getOrNull()
-                }
-                CosmeticSync.watchFriends(it.map { friend -> friend.player })
-            }
-            .onFailure { LOGGER.error("Failed to refresh friends list", it) }
+    private fun notifyNewRequests(fresh: List<FriendRequest>) {
+        val known = incomingRequests.value.mapTo(HashSet()) { it.id }
+        if (fetchedIncomingOnce) {
+            fresh.filter { it.id !in known }.forEach { notifyFriendRequest(it.id, it.player) }
+        }
+        fetchedIncomingOnce = true
     }
 
-    private suspend fun refreshRequests() {
-        SocialApi.incomingRequests()
-            .onSuccess { fresh ->
-                val known = _incomingRequests.value.mapTo(HashSet()) { it.id }
-                _incomingRequests.value = fresh
-                if (fetchedIncomingOnce) {
-                    fresh.filter { it.id !in known }.forEach { notifyFriendRequest(it.id, it.player) }
-                }
-                fetchedIncomingOnce = true
-            }
-            .onFailure { LOGGER.error("Failed to refresh incoming friend requests", it) }
-        SocialApi.outgoingRequests()
-            .onSuccess { _outgoingRequests.value = it }
-            .onFailure { LOGGER.error("Failed to refresh outgoing friend requests", it) }
-    }
-
-    private suspend fun refreshBlocked() {
-        SocialApi.blocked()
-            .onSuccess { _blocked.value = it }
-            .onFailure { LOGGER.error("Failed to refresh blocked players", it) }
-    }
+    private fun samePlayer(player: String): (String) -> Boolean = { PartyRepository.samePlayer(it, player) }
 
     fun acceptRequest(id: Int) = PolyPlusClient.SCOPE.launch {
         SocialApi.acceptRequest(id)
-            .onSuccess { refreshRequests(); refreshFriends() }
+            .onSuccess {
+                incomingPaging.removeIf { it.id == id }
+                friendsPaging.syncHead()
+            }
             .onFailure {
                 LOGGER.error("Failed to accept friend request $id", it)
                 SocialErrors.emit("Couldn't accept friend request", it)
@@ -126,7 +115,7 @@ object FriendsRepository {
     }
 
     fun declineRequest(id: Int) = PolyPlusClient.SCOPE.launch {
-        SocialApi.declineRequest(id).onSuccess { refreshRequests() }
+        SocialApi.declineRequest(id).onSuccess { incomingPaging.removeIf { it.id == id } }
             .onFailure {
                 LOGGER.error("Failed to decline friend request $id", it)
                 SocialErrors.emit("Couldn't decline friend request", it)
@@ -134,7 +123,7 @@ object FriendsRepository {
     }
 
     fun cancelRequest(id: Int) = PolyPlusClient.SCOPE.launch {
-        SocialApi.cancelRequest(id).onSuccess { refreshRequests() }
+        SocialApi.cancelRequest(id).onSuccess { outgoingPaging.removeIf { it.id == id } }
             .onFailure {
                 LOGGER.error("Failed to cancel friend request $id", it)
                 SocialErrors.emit("Couldn't cancel friend request", it)
@@ -143,9 +132,14 @@ object FriendsRepository {
 
     fun sendRequest(player: String, onSent: () -> Unit = {}) = PolyPlusClient.SCOPE.launch {
         SocialApi.sendRequest(player)
-            .onSuccess {
-                refreshRequests()
-                refreshFriends()
+            .onSuccess { request ->
+                if (request != null) {
+                    outgoingPaging.putFirst(request)
+                } else {
+                    val same = samePlayer(player)
+                    incomingPaging.removeIf { same(it.player) }
+                    friendsPaging.syncHead()
+                }
                 onSent()
             }
             .onFailure {
@@ -155,7 +149,8 @@ object FriendsRepository {
     }
 
     fun removeFriend(player: String) = PolyPlusClient.SCOPE.launch {
-        SocialApi.removeFriend(player).onSuccess { refreshFriends() }
+        val same = samePlayer(player)
+        SocialApi.removeFriend(player).onSuccess { friendsPaging.removeIf { same(it.player) } }
             .onFailure {
                 LOGGER.error("Failed to remove friend $player", it)
                 SocialErrors.emit("Couldn't remove friend", it)
@@ -163,8 +158,14 @@ object FriendsRepository {
     }
 
     fun block(player: String) = PolyPlusClient.SCOPE.launch {
+        val same = samePlayer(player)
         SocialApi.block(player)
-            .onSuccess { refreshBlocked(); refreshFriends(); refreshRequests() }
+            .onSuccess {
+                friendsPaging.removeIf { same(it.player) }
+                incomingPaging.removeIf { same(it.player) }
+                outgoingPaging.removeIf { same(it.player) }
+                blockedPaging.syncHead()
+            }
             .onFailure {
                 LOGGER.error("Failed to block $player", it)
                 SocialErrors.emit("Couldn't block player", it)
@@ -172,7 +173,8 @@ object FriendsRepository {
     }
 
     fun unblock(player: String) = PolyPlusClient.SCOPE.launch {
-        SocialApi.unblock(player).onSuccess { refreshBlocked() }
+        val same = samePlayer(player)
+        SocialApi.unblock(player).onSuccess { blockedPaging.removeIf { same(it.player) } }
             .onFailure {
                 LOGGER.error("Failed to unblock $player", it)
                 SocialErrors.emit("Couldn't unblock player", it)

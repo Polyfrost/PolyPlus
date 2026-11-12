@@ -72,6 +72,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialDialog
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialList
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialListState
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPageState
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPerson
@@ -81,6 +82,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.ThreadList
 import org.polyfrost.polyplus.client.gui.lobbysocial.ThreadRow
 import org.polyfrost.polyplus.client.gui.lobbysocial.threadMenuItems
 import org.polyfrost.polyplus.client.gui.lobbysocial.ToggleIconButton
+import org.polyfrost.polyplus.client.gui.lobbysocial.paging
 import org.polyfrost.polyplus.client.gui.lobbysocial.partyCells
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberSocialListState
 import org.polyfrost.polyplus.client.gui.lobbysocial.requestItems
@@ -426,13 +428,13 @@ private fun FriendsBody(window: SocialWindowState, state: SocialPageState, snaps
         NoFriendsMessage(state, modifier)
         return
     }
-    ScrollFade(modifier, 0.dp) {
+    ScrollFade(modifier, 0.dp, paging = state.paging(snapshot, true, SocialList.Incoming, SocialList.Outgoing, SocialList.Friends)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = Inset), horizontalArrangement = Arrangement.spacedBy(Inset)) {
             AddFriendButton(state, Modifier.weight(1f))
-            if (snapshot.blocked.isNotEmpty()) TextButton("Blocked ${snapshot.blocked.size}", Modifier.height(38.dp), window::showBlocked)
+            if (snapshot.blocked.isNotEmpty()) TextButton("Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}", Modifier.height(38.dp), window::showBlocked)
         }
         if (requests.isNotEmpty()) {
-            SectionHeading("Requests ${requests.size}", Modifier.padding(start = Inset, top = 12.dp, bottom = 6.dp))
+            SectionHeading("Requests ${snapshot.countLabel(requests.size, SocialList.Incoming, SocialList.Outgoing)}", Modifier.padding(start = Inset, top = 12.dp, bottom = 6.dp))
             requests.forEach { Box(Modifier.padding(horizontal = Inset)) { InboxLine(it) } }
         }
         RosterSections(state, visibleFriends(state, snapshot, FriendFilter.All))

@@ -15,8 +15,8 @@ import org.polyfrost.polyplus.client.social.ChatIdentity.applyActAs
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object GroupsApi {
-    suspend fun list(): Result<List<GroupSummary>> =
-        PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/groups") { applyActAs() }
+    suspend fun listPage(cursor: String?): Result<CursorPage<GroupSummary>> =
+        PolyPlusClient.HTTP.pageAuthorized("${PolyPlusConfig.apiUrl}/v1/groups", cursor) { applyActAs() }
 
     suspend fun delegations(): Result<List<String>> =
         PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/groups/delegations")

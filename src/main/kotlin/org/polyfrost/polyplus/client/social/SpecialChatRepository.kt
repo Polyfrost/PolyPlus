@@ -18,7 +18,7 @@ object SpecialChatRepository {
         SpecialChatApi.status()
             .onSuccess { result ->
                 _status.value = result
-                GroupsRepository.refreshGroups()
+                GroupsRepository.syncGroups()
             }
             .onFailure { LOGGER.error("Failed to refresh Special Chat status", it) }
     }

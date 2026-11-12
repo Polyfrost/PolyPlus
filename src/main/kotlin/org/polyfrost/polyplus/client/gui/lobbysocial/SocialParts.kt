@@ -20,15 +20,21 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -65,6 +71,7 @@ import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 
 private const val GROUP_FACE_SCALE = 0.68f
 private const val FADE_HEIGHT = 32
+private val NEAR_END = 160.dp
 
 @Composable
 internal fun ScrollFade(
@@ -72,6 +79,7 @@ internal fun ScrollFade(
     spacing: Dp = 6.dp,
     maxHeight: Dp = Dp.Unspecified,
     ink: Color = if (LocalSocialLook.current.surface == SocialSurface.None) PanelSurface else OneConfigTheme.current.pageBackground,
+    paging: ListPaging? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scroll = rememberScrollState()
@@ -79,8 +87,65 @@ internal fun ScrollFade(
     Column(
         bounds.fadingEdges(scroll, ink, FADE_HEIGHT.dp).verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(spacing),
-        content = content,
-    )
+    ) {
+        content()
+        if (paging?.loading == true) PageLoadingRow()
+    }
+    if (paging != null) PageOnScroll(scroll, paging)
+}
+
+internal class ListPaging(val more: Boolean, val loading: Boolean, val loaded: Int, val fill: Boolean, val load: () -> Unit) {
+    val ready: Boolean
+        get() = more && !loading
+}
+
+private enum class ScrollReach { Away, Short, End }
+
+@Composable
+private fun PageOnScroll(scroll: ScrollState, paging: ListPaging) {
+    val reach = with(LocalDensity.current) { NEAR_END.toPx() }
+    val current by rememberUpdatedState(paging)
+    val position by remember(scroll, reach) {
+        derivedStateOf {
+            val max = scroll.maxValue
+            when {
+                max == Int.MAX_VALUE -> ScrollReach.Away
+                max == 0 -> ScrollReach.Short
+                max - scroll.value <= reach -> ScrollReach.End
+                else -> ScrollReach.Away
+            }
+        }
+    }
+    LaunchedEffect(position, paging.more, paging.loading, paging.loaded, paging.fill) {
+        val wanted = position == ScrollReach.End || (position == ScrollReach.Short && current.fill)
+        if (wanted && current.ready) current.load()
+    }
+}
+
+@Composable
+internal fun FillWhenEmpty(paging: ListPaging?) {
+    if (paging == null) return
+    val current by rememberUpdatedState(paging)
+    LaunchedEffect(paging.more, paging.loading, paging.loaded, paging.fill) {
+        if (current.fill && current.ready) current.load()
+    }
+}
+
+@Composable
+internal fun PageLoadingRow() {
+    Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.Center) {
+        Label("Loading more...", 12.sp, color = MutedText)
+    }
+}
+
+internal fun listPaging(source: SocialSource, snapshot: SocialSnapshot, fill: Boolean, vararg lists: SocialList): ListPaging {
+    val next = lists.firstOrNull { it in snapshot.paging.more }
+    return ListPaging(
+        more = next != null,
+        loading = lists.any { it in snapshot.paging.loading },
+        loaded = lists.sumOf { snapshot.loaded(it) },
+        fill = fill,
+    ) { next?.let(source::loadMore) }
 }
 
 @Composable

@@ -120,7 +120,7 @@ private fun RosterPane(state: SocialPageState, snapshot: SocialSnapshot, onBack:
             filter == FriendFilter.Requests -> RequestList(state, snapshot, body)
             filter == FriendFilter.Blocked -> BlockedList(state, snapshot, body)
             snapshot.friends.isEmpty() -> NoFriendsMessage(state, body)
-            else -> Roster(state, visibleFriends(state, snapshot, filter), body)
+            else -> Roster(state, visibleFriends(state, snapshot, filter), body, state.paging(snapshot, filter == FriendFilter.All, SocialList.Friends))
         }
     }
 }
@@ -138,8 +138,8 @@ private fun RosterHeader(state: SocialPageState, snapshot: SocialSnapshot, filte
         TextField(state.query, { state.query = it }, Modifier.weight(1f).height(38.dp), "Search friends", themedIcon(LobbyIcons.SEARCH), 64, false)
         FriendFilter.entries.forEach { entry ->
             val label = when {
-                entry == FriendFilter.Requests && requests > 0 -> "Requests $requests"
-                entry == FriendFilter.Blocked && snapshot.blocked.isNotEmpty() -> "Blocked ${snapshot.blocked.size}"
+                entry == FriendFilter.Requests && requests > 0 -> "Requests ${snapshot.countLabel(requests, SocialList.Incoming)}"
+                entry == FriendFilter.Blocked && snapshot.blocked.isNotEmpty() -> "Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}"
                 else -> entry.name
             }
             Box(Modifier) { Chip(label, selected = entry == filter) { onFilter(entry) } }
@@ -154,13 +154,15 @@ private fun InboxList(state: SocialPageState, snapshot: SocialSnapshot, modifier
     Column(modifier.panel().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PanelTitle("Waiting on you")
-            if (snapshot.waiting > 0) Label(snapshot.waiting.toString(), 14.sp, color = MutedText)
+            if (snapshot.waiting > 0) Label(snapshot.countLabel(snapshot.waiting, SocialList.Incoming), 14.sp, color = MutedText)
         }
+        val paging = listPaging(state.source, snapshot, true, SocialList.Incoming, SocialList.Outgoing)
         if (items.isEmpty()) {
+            FillWhenEmpty(paging)
             EmptyState("Nothing waiting", Modifier.weight(1f).fillMaxWidth(), "Invites and friend requests show up here.")
             return@Column
         }
-        ScrollFade(Modifier.weight(1f).fillMaxWidth(), 0.dp) {
+        ScrollFade(Modifier.weight(1f).fillMaxWidth(), 0.dp, paging = paging) {
             items.groupBy { it.section }.forEach { (section, entries) ->
                 SectionHeading(section, Modifier.padding(top = 6.dp, bottom = 6.dp))
                 entries.forEach { InboxLine(it) }

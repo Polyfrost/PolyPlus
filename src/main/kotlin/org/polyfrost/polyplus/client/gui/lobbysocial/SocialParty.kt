@@ -341,6 +341,8 @@ internal fun DeviceVolume(input: Boolean, modifier: Modifier = Modifier.padding(
 @Composable
 internal fun InvitePicker(party: Party?) {
     val friends by FriendsRepository.friends.collectAsState()
+    val more by FriendsRepository.friendsPaging.hasMore.collectAsState()
+    val loading by FriendsRepository.friendsPaging.loading.collectAsState()
     val outgoing by PartyRepository.outgoingInvites.collectAsState()
     val names by PlayerNamesRepository.names.collectAsState()
     val members = party?.members.orEmpty()
@@ -355,7 +357,8 @@ internal fun InvitePicker(party: Party?) {
         if (candidates.isEmpty()) {
             Label("No friends to invite yet", 12.sp, color = MutedText)
         }
-        ScrollFade(Modifier, 6.dp, maxHeight = 280.dp, ink = OneConfigTheme.current.pageBackground) {
+        val paging = ListPaging(more, loading, friends.size, true, FriendsRepository.friendsPaging::loadMore)
+        ScrollFade(Modifier, 6.dp, maxHeight = 280.dp, ink = OneConfigTheme.current.pageBackground, paging = paging) {
             candidates.forEach { friend ->
                 val invite = outgoing.firstOrNull { PartyRepository.samePlayer(it.recipient, friend.player) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

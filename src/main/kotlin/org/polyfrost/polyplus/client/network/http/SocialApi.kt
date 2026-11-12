@@ -8,19 +8,19 @@ import org.polyfrost.polyplus.client.network.http.responses.FriendRequest
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 
 object SocialApi {
-    suspend fun friends(): Result<List<Friend>> =
-        PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/social/friends")
+    suspend fun friendsPage(cursor: String?): Result<CursorPage<Friend>> =
+        PolyPlusClient.HTTP.pageAuthorized("${PolyPlusConfig.apiUrl}/v1/social/friends", cursor)
 
     suspend fun removeFriend(player: String): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.deleteAuthorized("${PolyPlusConfig.apiUrl}/social/friends/$player")
         Unit
     }
 
-    suspend fun incomingRequests(): Result<List<FriendRequest>> =
-        PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/social/requests/incoming")
+    suspend fun incomingRequestsPage(cursor: String?): Result<CursorPage<FriendRequest>> =
+        PolyPlusClient.HTTP.pageAuthorized("${PolyPlusConfig.apiUrl}/v1/social/requests/incoming", cursor)
 
-    suspend fun outgoingRequests(): Result<List<FriendRequest>> =
-        PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/social/requests/outgoing")
+    suspend fun outgoingRequestsPage(cursor: String?): Result<CursorPage<FriendRequest>> =
+        PolyPlusClient.HTTP.pageAuthorized("${PolyPlusConfig.apiUrl}/v1/social/requests/outgoing", cursor)
 
     suspend fun sendRequest(player: String): Result<FriendRequest?> =
         PolyPlusClient.HTTP.postBodyAuthorized("${PolyPlusConfig.apiUrl}/social/requests/$player")
@@ -40,8 +40,8 @@ object SocialApi {
         Unit
     }
 
-    suspend fun blocked(): Result<List<BlockedPlayer>> =
-        PolyPlusClient.HTTP.getBodyAuthorized("${PolyPlusConfig.apiUrl}/social/blocked")
+    suspend fun blockedPage(cursor: String?): Result<CursorPage<BlockedPlayer>> =
+        PolyPlusClient.HTTP.pageAuthorized("${PolyPlusConfig.apiUrl}/v1/social/blocked", cursor)
 
     suspend fun block(player: String): Result<Unit> = runSuspendCatching {
         PolyPlusClient.HTTP.postAuthorized("${PolyPlusConfig.apiUrl}/social/blocked/$player")

@@ -23,6 +23,7 @@ import org.polyfrost.polyplus.client.social.ChatIdentity
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.HiddenConversations
+import org.polyfrost.polyplus.client.social.PagedList
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SocialRefresh
@@ -109,6 +110,28 @@ internal fun rememberPartyConversation(groupId: Int): ChatConversation {
     return remember(groupId) { LiveConversation(groupId, "Party") }
 }
 
+private fun pagedOf(list: SocialList): PagedList<*, *> = when (list) {
+    SocialList.Friends -> FriendsRepository.friendsPaging
+    SocialList.Incoming -> FriendsRepository.incomingPaging
+    SocialList.Outgoing -> FriendsRepository.outgoingPaging
+    SocialList.Blocked -> FriendsRepository.blockedPaging
+    SocialList.Threads -> GroupsRepository.groupsPaging
+}
+
+@Composable
+private fun rememberPaging(): SocialPaging {
+    val states = SocialList.entries.map { list ->
+        val paged = pagedOf(list)
+        Triple(list, paged.hasMore.collectAsState().value, paged.loading.collectAsState().value)
+    }
+    return remember(states) {
+        SocialPaging(
+            more = states.filter { it.second }.mapTo(HashSet()) { it.first },
+            loading = states.filter { it.third }.mapTo(HashSet()) { it.first },
+        )
+    }
+}
+
 internal class LiveSocialSource : SocialSource {
     @Composable
     override fun snapshot(): SocialSnapshot {
@@ -129,6 +152,7 @@ internal class LiveSocialSource : SocialSource {
         val partyInvites by PartyRepository.incomingInvites.collectAsState()
         val party by PartyRepository.party.collectAsState()
         val hidden by HiddenConversations.hidden.collectAsState()
+        val paging = rememberPaging()
         LaunchedEffect(friends, incoming, outgoing, blocked, groups, invites) {
             PlayerNamesRepository.resolve(
                 friends.map { it.player } + incoming.map { it.player } + outgoing.map { it.player } + blocked.map { it.player } +
@@ -136,7 +160,7 @@ internal class LiveSocialSource : SocialSource {
             )
         }
         LaunchedEffect(groups, hidden) { HiddenConversations.reveal(groups) }
-        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, partyInvites, party, hidden) {
+        return remember(friends, incoming, outgoing, blocked, groups, invites, names, hosted, worldInvited, actAs, delegations, special, responded, scanning, partyInvites, party, hidden, paging) {
             val byId = friends.associateBy { it.player }
             val inviters = invites.filter { it.status == INVITE_PENDING }.map { it.sender } + partyInvites.map { it.sender }
             val person = { id: String -> personOf(id, byId[id], party, names, inviters) }
@@ -157,6 +181,7 @@ internal class LiveSocialSource : SocialSource {
                 scanningReplies = scanning,
                 partyInvites = partyInvites.map { SocialPartyInvite(it, person(it.sender)) },
                 hiddenThreads = threadsOf(concealed, person, names, responded),
+                paging = paging,
             )
         }
     }
@@ -241,6 +266,10 @@ internal class LiveSocialSource : SocialSource {
     override fun refresh() {
         SocialRefresh.refreshAll()
         ChatIdentity.refreshDelegations()
+    }
+
+    override fun loadMore(list: SocialList) {
+        pagedOf(list).loadMore()
     }
 
     override fun accept(request: SocialRequest) {

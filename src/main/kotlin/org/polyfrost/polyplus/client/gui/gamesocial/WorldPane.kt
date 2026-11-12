@@ -48,6 +48,8 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
 import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialDialog
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialList
+import org.polyfrost.polyplus.client.gui.lobbysocial.listPaging
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPageState
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPerson
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialSnapshot
@@ -134,11 +136,12 @@ private fun InviteFriends(state: SocialPageState, snapshot: SocialSnapshot, modi
     Column(modifier.padding(start = Edge, end = Edge, top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextField(query, { query = it }, Modifier.fillMaxWidth().height(38.dp), "Search friends", themedIcon(LobbyIcons.SEARCH), 64, false)
         val list = Modifier.fillMaxWidth().weight(1f)
+        val paging = if (query.isBlank()) listPaging(state.source, snapshot, true, SocialList.Friends) else null
         if (found.isEmpty() && invitable.isEmpty()) {
             NoInvitees(state, query.isBlank(), list)
             return@Column
         }
-        ScrollFade(list, 2.dp) {
+        ScrollFade(list, 2.dp, paging = paging) {
             PeopleSection("Online ${online.size}", online, state, snapshot)
             if (invitable.isNotEmpty()) {
                 SectionHeading("Groups", Modifier.padding(top = 10.dp, bottom = 6.dp))
