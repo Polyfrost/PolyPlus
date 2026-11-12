@@ -254,7 +254,20 @@ private fun MusicPicker() {
         PolyPlusLobbyConfig.save()
     }
     musicDetail(music)?.let { Note(it) }
-    if (music != LobbyMusic.OFF && music != LobbyMusic.MINECRAFT) MusicVolume()
+    if (music != LobbyMusic.OFF && music != LobbyMusic.MINECRAFT) {
+        MusicVolume()
+        MuteUnfocusedRow()
+    }
+}
+
+@Composable
+private fun MuteUnfocusedRow() {
+    var muted by remember { mutableStateOf(PolyPlusLobbyConfig.muteLobbyMusicUnfocused) }
+    SwitchRow("Mute when unfocused", "Fades out while the game is in the background", muted, true) {
+        muted = !muted
+        PolyPlusLobbyConfig.muteLobbyMusicUnfocused = muted
+        PolyPlusLobbyConfig.save()
+    }
 }
 
 @Composable

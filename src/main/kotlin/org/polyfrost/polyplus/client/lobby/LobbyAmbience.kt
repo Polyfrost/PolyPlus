@@ -216,7 +216,7 @@ object LobbyAmbience {
         }
         silenced = quiet
         if (departing && !playing() && !lobbyUp(mc)) departing = false
-        val wanted = lobbyUp(mc) && audible(mc) && !departing && !(StartupOverlay.active && !introClaimed)
+        val wanted = lobbyUp(mc) && audible(mc) && !mutedUnfocused(mc) && !departing && !(StartupOverlay.active && !introClaimed)
         if (!playing()) {
             if (!wanted || !loops() || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
             if (!begin(mc, false)) retry = RETRY_TICKS
@@ -396,6 +396,14 @@ object LobbyAmbience {
         PolyPlusLobbyConfig.inheritMusicVolume()
         return AMBIENCE_GAIN * (PolyPlusLobbyConfig.lobbyMusicVolume / 100f).coerceIn(0f, 1f)
     }
+
+    private fun mutedUnfocused(mc: Minecraft): Boolean =
+        PolyPlusLobbyConfig.muteLobbyMusicUnfocused &&
+            //? if > 1.8.9 {
+            !mc.isWindowActive
+            //?} else {
+            /*!org.lwjgl.opengl.Display.isActive()
+            *///?}
 
     private fun audible(mc: Minecraft): Boolean =
         volume() > 0f &&

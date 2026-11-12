@@ -68,6 +68,13 @@ object PolyPlusLobbyConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Mute When Unfocused",
+        description = "Fade out the lobby music while the game window isn't focused.",
+    )
+    var muteLobbyMusicUnfocused = false
+
+    @JvmStatic
+    @Switch(
         title = "Quit Without Confirmation",
         description = "Close the game as soon as you press Quit in the lobby, without asking first.",
     )
@@ -77,6 +84,7 @@ object PolyPlusLobbyConfig : Config(
         preload()
         migrateFromSplitConfigs()
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
+        hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         inheritMusicVolume()
     }
 
