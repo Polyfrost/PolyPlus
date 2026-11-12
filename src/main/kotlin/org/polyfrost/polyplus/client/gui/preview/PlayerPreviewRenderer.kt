@@ -422,7 +422,7 @@ object PlayerPreviewRenderer {
     private val projection by lazy { ProjectionMatrixBuffer("polyplus_preview") }
 
     private fun orthoMatrix(w: Int, h: Int): Matrix4f =
-        Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f)
+        Matrix4f().setOrtho(0f, w.toFloat(), h.toFloat(), 0f, -1000f, 1000f, RenderSystem.getDevice().isZZeroToOne())
     //?}
     //? if >= 26.2 {
     private fun orthoProjection(w: Int, h: Int): Projection =
