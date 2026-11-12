@@ -140,13 +140,29 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         super.render(mouseX, mouseY, tickDelta)
+        if (MenuPanorama.panoramaBackdrop()) MenuBackgroundPass.renderInline()
     }
     *///?}
 
     //? if <26.1 && > 1.8.9 {
-    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+    /*private var firstFrameDrawn = false
+
+    override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
+        if (MenuPanorama.panoramaBackdrop()) {
+            renderPanorama(ctx, tickDelta)
+            if (firstFrameDrawn) {
+                val gameRenderer = Minecraft.getInstance().gameRenderer
+                //? if <1.21.4 {
+                gameRenderer.processBlurEffect(tickDelta)
+                //?} else {
+                /^gameRenderer.processBlurEffect()
+                ^///?}
+            }
+            MenuBackgroundPass.renderInline(ctx)
+        }
         super.render(ctx, mouseX, mouseY, tickDelta)
+        firstFrameDrawn = true
     }
 
     override fun renderBackground(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
@@ -154,6 +170,7 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     *///?} elif >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
+        MenuPanorama.drawMenuPanorama(ctx, width, height)
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
     }
 
@@ -346,7 +363,7 @@ private fun MainMenu(
     val glass = remember { MenuGlass() }
     var rootSize by remember { mutableStateOf(Size.Zero) }
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { rootSize = Size(it.width.toFloat(), it.height.toFloat()) }.trackScreenFocus()) {
-        MenuBackdrop(Modifier.fillMaxSize(), glass)
+        if (!MenuPanorama.panoramaBackdrop()) MenuBackdrop(Modifier.fillMaxSize(), glass)
         CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)

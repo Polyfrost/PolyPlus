@@ -9,6 +9,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.gui.MainMenuBackground
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 1.21.11 {
@@ -135,6 +136,15 @@ object PolyPlusMainMenuConfig : Config(
     var mainMenuFpsLimit = 260
 
     @JvmStatic
+    @Dropdown(
+        title = "Menu Backdrop",
+        description = "Choose what appears behind the PolyPlus menu.",
+        options = ["PolyPlus", "Minecraft Panorama"],
+        subcategory = "Background",
+    )
+    var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
+
+    @JvmStatic
     @Switch(
         title = "Custom Panorama",
         description = "Use the PolyPlus panorama instead of the vanilla Minecraft one.",
@@ -176,6 +186,10 @@ object PolyPlusMainMenuConfig : Config(
 
         addDependency("mainMenuFpsLimit", "Main Menu FPS Limit") {
             if (mainMenuFpsLimitMode == MainMenuFpsLimitMode.CUSTOM) Display.SHOWN else Display.DISABLED
+        }
+
+        addDependency("mainMenuBackground", "Main Menu") {
+            if (mainMenu == MainMenuChoice.POLYPLUS) Display.SHOWN else Display.DISABLED
         }
 
         addDependency("customPanorama", "Custom Panorama is unavailable") {
