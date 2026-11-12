@@ -51,7 +51,8 @@ internal object OneConfigHudInstances {
     val RESOURCE_PACK = Target("evergreenhud", "$EVERGREEN.ResourcePackHud", "resourcepack")
     val CLOCK = Target("evergreenhud", "$EVERGREEN.clock.ClockHud", "clock")
     val ITEM_COUNTER = Target("evergreenhud", "$EVERGREEN.ItemCounterHud", "itemcounter")
-    val INVENTORY = Target("evergreenhud", "$EVERGREEN.InventoryHud", "inventory")
+    val ITEM_TRACKER = Target("evergreenhud", "$EVERGREEN.ItemTrackerHud", "itemtracker")
+    val INVENTORY =Target("evergreenhud", "$EVERGREEN.InventoryHud", "inventory")
     val PLAYTIME = Target("evergreenhud", "$EVERGREEN.PlayTimeHud", "playtime")
     val MEDIA = Target("evergreenhud", "$EVERGREEN.media.MediaHud", "media")
     val HEIGHT_LIMIT = Target("hybedwars", "tomeko.hybedwars.location.HeightLimitHud", "heightlimit")
@@ -83,24 +84,42 @@ internal object OneConfigHudInstances {
         val hasChanges get() = enabled != null || hasPlacement || scale != null || style.isNotEmpty()
     }
 
-    /** OneConfig's HUD screen size; offsets are stored relative to it and rescaled when the window changes. */
-    fun screen(): Pair<Double, Double> {
+    /**
+     * The HUD screen size OneConfig will use once the import is applied, in its HUD units: Minecraft's scaled GUI
+     * pixels. It is worked out from the window and the GUI scale being imported, because OneConfig's own value is
+     * a 960x540 placeholder until the first HUD frame, and OneConfig does not rescale saved offsets later.
+     */
+    fun screen(sources: List<Path>): Pair<Double, Double> {
+        runCatching {
+            val window = Minecraft.getInstance().window
+            val width = window.width
+            val height = window.height
+            if (width > 0 && height > 0) {
+                val imported = importedGuiScale(sources)
+                return if (imported != null) {
+                    val scale = guiScale(width, height, imported)
+                    width.toDouble() / scale to height.toDouble() / scale
+                } else {
+                    window.guiScaledWidth.toDouble() to window.guiScaledHeight.toDouble()
+                }
+            }
+        }.onFailure { logger.warn("Could not read the window size for HUD placement", it) }
         val width = HudManager.guiScreenWidth.toDouble()
         val height = HudManager.guiScreenHeight.toDouble()
         return if (width > 0 && height > 0) width to height else 1280.0 to 720.0
     }
 
     /**
-     * Factors that turn another client's offsets in Minecraft scaled-GUI pixels (at the GUI scale from its
-     * imported options) into OneConfig HUD units for the current window, so HUDs keep the same visual spacing.
+     * Factors that turn another client's offsets in Minecraft scaled-GUI pixels (at [sourceGuiScale], or the
+     * imported options' GUI scale) into OneConfig HUD units, so HUDs keep the same visual spacing.
      */
-    fun guiPixelFactors(sources: List<Path>, client: String, guiScaleSetting: Int? = null): Pair<Double, Double> = runCatching {
-        val (refW, refH) = screen()
+    fun guiPixelFactors(sources: List<Path>, client: String, sourceGuiScale: Int? = null): Pair<Double, Double> = runCatching {
+        val (refW, refH) = screen(sources)
         val window = Minecraft.getInstance().window
         val width = window.width
         val height = window.height
         if (width <= 0 || height <= 0) return@runCatching 1.0 to 1.0
-        val scale = guiScale(width, height, guiScaleSetting ?: importedGuiScale(sources))
+        val scale = guiScale(width, height, sourceGuiScale ?: importedGuiScale(sources) ?: 0)
         logger.info(
             "Scaling {} HUD offsets for a {}x{} window at GUI scale {} into {}x{} HUD units",
             client, width, height, scale, refW, refH,
@@ -108,6 +127,24 @@ internal object OneConfigHudInstances {
         refW / (width.toDouble() / scale) to refH / (height.toDouble() / scale)
     }.onFailure { logger.warn("Could not read the window size; {} HUD offsets are left unscaled", client, it) }
         .getOrDefault(1.0 to 1.0)
+
+    /**
+     * Converts a screen-direction offset from [section]'s anchor (negative = left or up) into OneConfig's form,
+     * which measures inward from the anchored edge: right-edge offsets grow leftwards and bottom-edge offsets
+     * grow upwards. The result is clamped so a HUD can never be placed outside the screen.
+     */
+    internal fun oneConfigOffset(section: String, x: Double, y: Double, width: Double, height: Double): Pair<Double, Double> {
+        val horizontalEdge = section.endsWith("Left") || section.endsWith("Right")
+        val verticalEdge = section.startsWith("Top") || section.startsWith("Bottom")
+        val inwardX = if (section.endsWith("Right")) -x else x
+        val inwardY = if (section.startsWith("Bottom")) -y else y
+        val clampedX = if (horizontalEdge) inwardX.coerceIn(0.0, width * EDGE_LIMIT) else inwardX.coerceIn(-width / 2, width / 2)
+        val clampedY = if (verticalEdge) inwardY.coerceIn(0.0, height * EDGE_LIMIT) else inwardY.coerceIn(-height / 2, height / 2)
+        return clampedX to clampedY
+    }
+
+    /** How far from its anchored edge a HUD may start, as a share of the screen, so some of it stays visible. */
+    private const val EDGE_LIMIT = 0.9
 
     /** Minecraft's own GUI scale selection; 0 (auto) picks the largest scale that still fits 320x240. */
     private fun guiScale(width: Int, height: Int, setting: Int): Int {
@@ -118,8 +155,8 @@ internal object OneConfigHudInstances {
         return scale
     }
 
-    /** The other client's GUI scale from its imported options (Lunar's JSON options first). */
-    private fun importedGuiScale(sources: List<Path>): Int {
+    /** The other client's GUI scale from its imported options (Lunar's JSON options first), if it has one. */
+    private fun importedGuiScale(sources: List<Path>): Int? {
         sources.firstOrNull { it.fileName?.toString() == "optionsLC.txt" }?.let { path ->
             runCatching {
                 json.parseToJsonElement(Files.readString(path)).jsonObject["guiScale"]?.jsonPrimitive?.content?.toIntOrNull()
@@ -130,12 +167,13 @@ internal object OneConfigHudInstances {
                 Files.readAllLines(path).firstOrNull { it.startsWith("guiScale:") }?.substringAfter(':')?.trim()?.toIntOrNull()
             }.getOrNull()?.let { return it }
         }
-        return 0
+        return null
     }
 
-    fun apply(requests: List<Request>, alreadyImported: Set<String>): Int {
+    /** Writes [requests] as HUD instances; [screen] is the HUD screen size from [screen]. */
+    fun apply(requests: List<Request>, alreadyImported: Set<String>, screen: Pair<Double, Double>): Int {
         val hudDir = hudDirectory()
-        val (refW, refH) = screen()
+        val (refW, refH) = screen
         var applied = 0
         var unplaced = 0
         val handled = mutableSetOf<String>()
@@ -156,7 +194,7 @@ internal object OneConfigHudInstances {
                 }
 
                 // Only create HUDs the other client actually shows; a disabled one needs no instance.
-                if (request.enabled != true) return@runCatching
+                if (!wouldCreate(request)) return@runCatching
                 Files.createDirectories(hudDir)
                 val path = hudDir.resolve(target.fileName ?: "${(1000..9999).random()}-${target.name}.json")
                 // The client left this HUD at its default spot, so stack these down the left edge instead of overlapping.
@@ -172,7 +210,15 @@ internal object OneConfigHudInstances {
     /** Whether [request] would change anything on import; used for onboarding previews. */
     fun wouldApply(request: Request): Boolean =
         isAvailable(request.target) && request.enabled != false &&
-            (request.enabled == true || findInstance(hudDirectory(), request.target) != null && request.hasChanges)
+            (wouldCreate(request) || findInstance(hudDirectory(), request.target) != null && request.hasChanges)
+
+    /**
+     * Whether a HUD with no instance yet gets one. Single-instance HUDs (scoreboard, tab list, ...) are the game's
+     * own and already show at their usual spot, so one with no saved placement is left alone instead of being
+     * stacked in the top-left corner.
+     */
+    internal fun wouldCreate(request: Request): Boolean =
+        request.enabled == true && (request.hasPlacement || request.target.fileName == null)
 
     private fun write(path: Path, root: JsonObject, request: Request, refW: Double, refH: Double, fallbackY: Double?) {
         val values = root.toMutableMap()
@@ -189,8 +235,9 @@ internal object OneConfigHudInstances {
         val x = request.x ?: if (fallbackY != null) 4.0 else null
         val y = request.y ?: fallbackY
         if (section != null || x != null || y != null) {
-            values["relativeX"] = JsonPrimitive(x ?: 0.0)
-            values["relativeY"] = JsonPrimitive(y ?: 0.0)
+            val (relativeX, relativeY) = oneConfigOffset(section ?: "TopLeft", x ?: 0.0, y ?: 0.0, refW, refH)
+            values["relativeX"] = JsonPrimitive(relativeX)
+            values["relativeY"] = JsonPrimitive(relativeY)
             values["layoutRefW"] = JsonPrimitive(refW)
             values["layoutRefH"] = JsonPrimitive(refH)
         }

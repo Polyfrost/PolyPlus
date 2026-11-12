@@ -977,6 +977,11 @@ private fun CardDropdown(
     selected: Int,
     onSelect: (Int) -> Unit,
     placeholder: String? = null,
+    /**
+     * Keep room above the row for the menu, so it opens upward without moving anything. With false the dropdown
+     * takes only its row, and the menu opens below it, pushing later content down while it is open.
+     */
+    reserveMenuSpace: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val shape = ppShape(6.dp)
@@ -998,30 +1003,59 @@ private fun CardDropdown(
         options.size * CARD_MENU_ITEM_HEIGHT + CARD_MENU_PADDING * 2f,
         CARD_MENU_ITEM_HEIGHT * 4 + CARD_MENU_PADDING * 2f,
     )
-    Box(Modifier.width(CARD_CONTENT_WIDTH.dp).height((menuHeight + CARD_MENU_GAP + CARD_ROW_HEIGHT).dp)) {
-        if (expanded) {
-            Column(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(CARD_DROPDOWN_WIDTH.dp, menuHeight.dp)
-                    .shadow(10.dp, shape, ambientColor = ShadowColor, spotColor = ShadowColor)
-                    .clip(shape)
-                    .background(MenuBackground)
-                    .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape)
-                    .padding(vertical = CARD_MENU_PADDING.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                options.forEachIndexed { index, option ->
-                    CardMenuItem(option, index == selected, if (index == selected) chosen else null) {
-                        if (index != selected) onSelect(index)
-                        expanded = false
-                        if (A11y.keyboardMode) trigger.requestFocus()
-                    }
+    val menu: @Composable (Modifier) -> Unit = { modifier ->
+        Column(
+            modifier
+                .size(CARD_DROPDOWN_WIDTH.dp, menuHeight.dp)
+                .shadow(10.dp, shape, ambientColor = ShadowColor, spotColor = ShadowColor)
+                .clip(shape)
+                .background(MenuBackground)
+                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape)
+                .padding(vertical = CARD_MENU_PADDING.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            options.forEachIndexed { index, option ->
+                CardMenuItem(option, index == selected, if (index == selected) chosen else null) {
+                    if (index != selected) onSelect(index)
+                    expanded = false
+                    if (A11y.keyboardMode) trigger.requestFocus()
                 }
             }
         }
+    }
+    if (!reserveMenuSpace) {
+        Column(Modifier.width(CARD_CONTENT_WIDTH.dp), horizontalAlignment = Alignment.End) {
+            CardDropdownRow(label, spoken, options, selected, placeholder, expanded, shape, trigger) { expanded = !expanded }
+            if (expanded) {
+                Spacer(Modifier.height(CARD_MENU_GAP.dp))
+                menu(Modifier)
+            }
+        }
+        return
+    }
+    Box(Modifier.width(CARD_CONTENT_WIDTH.dp).height((menuHeight + CARD_MENU_GAP + CARD_ROW_HEIGHT).dp)) {
+        if (expanded) menu(Modifier.align(Alignment.TopEnd))
+        Box(Modifier.align(Alignment.BottomStart)) {
+            CardDropdownRow(label, spoken, options, selected, placeholder, expanded, shape, trigger) { expanded = !expanded }
+        }
+    }
+}
+
+@Composable
+private fun CardDropdownRow(
+    label: String,
+    spoken: String,
+    options: List<String>,
+    selected: Int,
+    placeholder: String?,
+    expanded: Boolean,
+    shape: Shape,
+    trigger: FocusRequester,
+    onToggle: () -> Unit,
+) {
+    run {
         Row(
-            Modifier.align(Alignment.BottomStart).height(CARD_ROW_HEIGHT.dp),
+            Modifier.height(CARD_ROW_HEIGHT.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CardLabel(label)
@@ -1036,7 +1070,8 @@ private fun CardDropdown(
                     .clickableWithSound(
                         "$spoken: ${options.getOrElse(selected) { placeholder ?: options.first() }}, " + if (expanded) "expanded" else "collapsed",
                         shape = shape,
-                    ) { expanded = !expanded }
+                        onClick = onToggle,
+                    )
                     .padding(horizontal = CARD_MENU_INSET.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1106,6 +1141,80 @@ private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit)
     }
 }
 
+/** Lists everything the selected profile would change, so nothing about the import is a surprise. */
+@Composable
+private fun ImportSummaryBox(source: ClientConfigSync.ImportSource) {
+    val summary = source.summary
+    Column(
+        Modifier
+            .width(IMPORT_SUMMARY_WIDTH.dp)
+            .clip(ButtonShape)
+            .background(ChoiceBackground)
+            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ButtonShape)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SocialText("What will be imported", 13.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium)
+        SocialText(
+            "From ${source.client} · ${source.profile}",
+            11.sp,
+            color = SocialTextSecondary,
+            fontWeight = FontWeight.Light,
+        )
+        Column(
+            Modifier.heightIn(max = IMPORT_SUMMARY_MAX_HEIGHT.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (summary.gameSettings > 0) {
+                ImportSummaryRow("Game settings", "${summary.gameSettings} options, including video settings and keybinds")
+            }
+            if (summary.modSettings.isNotEmpty()) {
+                ImportSummaryRow("Mod settings", summary.modSettings.joinToString(", "))
+            }
+            when {
+                summary.huds.isNotEmpty() ->
+                    ImportSummaryRow("HUDs (${summary.huds.size})", summary.huds.joinToString(", "))
+                summary.hasUnmatchedHuds ->
+                    ImportSummaryRow("HUDs", "None of this client's HUDs have a match in this game yet")
+            }
+            if (summary.isEmpty() && !summary.hasUnmatchedHuds) {
+                ImportSummaryRow("Nothing", "This profile has no settings that match this game yet")
+            }
+        }
+        SocialText(
+            "Your current settings are backed up before anything is replaced.",
+            10.sp,
+            color = SocialTextSecondary,
+            fontWeight = FontWeight.Light,
+        )
+    }
+}
+
+@Composable
+private fun ImportSummaryRow(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        SocialText(
+            label,
+            11.sp,
+            Modifier.width(IMPORT_SUMMARY_LABEL_WIDTH.dp),
+            SocialTextPrimary,
+            FontWeight.Normal,
+        )
+        SocialText(
+            value,
+            11.sp,
+            Modifier.width((IMPORT_SUMMARY_WIDTH - IMPORT_SUMMARY_LABEL_WIDTH - 44).dp),
+            SocialTextSecondary,
+            FontWeight.Light,
+        )
+    }
+}
+
+private const val IMPORT_SUMMARY_WIDTH = 500
+private const val IMPORT_SUMMARY_LABEL_WIDTH = 96
+// What fits under the question, buttons and both dropdowns in the panel's content area.
+private const val IMPORT_SUMMARY_MAX_HEIGHT = 92
+
 @Composable
 private fun ImportConfigsPage(
     importConfigs: Boolean?,
@@ -1120,7 +1229,8 @@ private fun ImportConfigsPage(
     Column(
         Modifier.fillMaxSize().padding(top = CONTENT_TOP.dp, bottom = (PANEL_HEIGHT - CONTENT_BOTTOM).dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        // Once importing, flow from the top so opening a dropdown pushes only what is below it.
+        verticalArrangement = if (importConfigs == true) Arrangement.Top else Arrangement.Center,
     ) {
         SocialText(
             "We found compatible settings from another launcher. Would you like to import them into this game?",
@@ -1146,13 +1256,14 @@ private fun ImportConfigsPage(
             ) { onImportConfigs(false) }
         }
         if (importConfigs == true) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             SocialText(
                 "Choose a client, then choose a profile to preview:",
                 13.sp,
                 color = SocialTextPrimary,
                 fontWeight = FontWeight.Normal,
             )
+            Spacer(Modifier.height(10.dp))
             val clients = sources.map { it.client }.distinct()
             val selectedClientIndex = clients.indexOf(selectedClient)
             CardDropdown(
@@ -1161,41 +1272,26 @@ private fun ImportConfigsPage(
                 selected = selectedClientIndex,
                 onSelect = { index -> clients.getOrNull(index)?.let(onClientSelected) },
                 placeholder = "Select a client",
+                reserveMenuSpace = false,
             )
             val profiles = sources.filter { it.client == selectedClient }
             val selectedProfileIndex = profiles.indexOfFirst { it.id == selectedSourceId }
                 .takeIf { it >= 0 } ?: if (profiles.size == 1) 0 else -1
             if (selectedClient != null) {
+                Spacer(Modifier.height(8.dp))
                 CardDropdown(
                     label = "Profile",
                     options = profiles.map { it.profile },
                     selected = selectedProfileIndex,
                     onSelect = { index -> profiles.getOrNull(index)?.let { onSourceSelected(it.id) } },
                     placeholder = "Select a profile",
+                    reserveMenuSpace = false,
                 )
             }
             val source = profiles.getOrNull(selectedProfileIndex)
             if (source != null) {
-                Spacer(Modifier.height(16.dp))
-                Column(
-                    Modifier
-                        .width(500.dp)
-                        .clip(ButtonShape)
-                        .background(ChoiceBackground)
-                        .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ButtonShape)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    SocialText(
-                        "${source.client} · ${source.profile}",
-                        13.sp,
-                        color = SocialTextPrimary,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    source.preview.take(5).forEach { line ->
-                        SocialText(line, 11.sp, color = SocialTextSecondary, fontWeight = FontWeight.Light)
-                    }
-                }
+                Spacer(Modifier.height(14.dp))
+                ImportSummaryBox(source)
             }
         }
     }

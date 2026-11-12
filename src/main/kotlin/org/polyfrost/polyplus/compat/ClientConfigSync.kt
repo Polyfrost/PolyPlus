@@ -8,8 +8,12 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import org.apache.logging.log4j.LogManager
+//? if = 1.8.9 {
+/*import org.lwjgl.opengl.Display
+*///?}
 import org.polyfrost.polyplus.privacy.LauncherEnvironment
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,10 +27,22 @@ object ClientConfigSync {
     private const val MARKER = ".polyplus-client-config-sync-v5"
     private val previousMarkers = (1..4).map { ".polyplus-client-config-sync-v$it" }
 
+    /** What importing a source would change here, for the onboarding summary box. */
+    data class ImportSummary(
+        val gameSettings: Int,
+        val modSettings: List<String>,
+        val huds: List<String>,
+        /** The client has a HUD layout, but none of its HUDs exist in this instance. */
+        val hasUnmatchedHuds: Boolean,
+    ) {
+        fun isEmpty(): Boolean = gameSettings == 0 && modSettings.isEmpty() && huds.isEmpty()
+    }
+
     data class ImportSource(
         val id: String,
         val client: String,
         val profile: String,
+        val summary: ImportSummary,
         val preview: List<String>,
         val onboardingPreferences: Map<OnboardingPreference, Boolean>,
         internal val paths: List<Path>,
@@ -66,6 +82,7 @@ object ClientConfigSync {
 
     // These entries describe session or installation state, rather than reusable preferences.
     private val excludedOptions = setOf(
+        "version",
         "lastServer",
         "resourcePacks",
         "incompatibleResourcePacks",
@@ -75,6 +92,7 @@ object ClientConfigSync {
         "onboarded",
         "tutorialStep",
         "lastLaunchedVersion",
+        "startedCleanly",
     )
     private val optionFileNames = setOf("options.txt", "optionsLC.txt")
     private val oneConfigHudProfileMods = setOf("evergreenhud", "vanillahud", "vanilla-hud", "chatting")
@@ -131,11 +149,13 @@ object ClientConfigSync {
             val orderedPaths = paths.sortedBy { it.toString() }
             val shortProfile = Regex("(?i)^([0-9a-f]{8})-[0-9a-f-]{27}$")
                 .matchEntire(profile)?.groupValues?.get(1) ?: profile
+            val summary = summarize(orderedPaths)
             ImportSource(
                 id = orderedPaths.joinToString("|") { it.toAbsolutePath().normalize().toString() },
                 client = client,
                 profile = shortProfile,
-                preview = preview(orderedPaths),
+                summary = summary,
+                preview = summary.previewLines(),
                 onboardingPreferences = readOnboardingPreferences(orderedPaths),
                 paths = orderedPaths,
             )
@@ -206,6 +226,7 @@ object ClientConfigSync {
         val optionSources = sources.filter { it.fileName.toString() in optionFileNames }
             .sortedBy { if (it.fileName.toString() == "optionsLC.txt") 0 else 1 }
         val importedOptions = if (optionSources.isEmpty()) 0 else mergeOptions(optionSources, target)
+        if (importedOptions > 0) reloadGameOptions()
         val importedConfigs = importSharedModConfigs(sources)
         val importedHudFiles = importOneConfigHudConfigs(sources)
         val importedProfileHudFiles = importOneConfigProfileHudConfigs(sources)
@@ -284,14 +305,27 @@ object ClientConfigSync {
         }
     }
 
-    private fun preview(paths: List<Path>): List<String> = buildList {
+    /** Short preview lines for a source card; onboarding shows only a few, so one line per category. */
+    private fun ImportSummary.previewLines(): List<String> = buildList {
+        if (gameSettings > 0) add("Game settings · $gameSettings options")
+        if (modSettings.isNotEmpty()) add("Mod settings · ${modSettings.joinToString(", ")}")
+        when {
+            huds.isNotEmpty() -> {
+                val shown = huds.take(PREVIEW_HUD_NAMES)
+                val more = huds.size - shown.size
+                add("HUDs · ${huds.size}: ${shown.joinToString(", ")}${if (more > 0) ", +$more more" else ""}")
+            }
+            hasUnmatchedHuds -> add("HUDs · none of this client's HUDs have a match here")
+        }
+        if (isEmpty()) add("Compatible settings found")
+    }
+
+    private fun summarize(paths: List<Path>): ImportSummary {
         val options = paths.filter { it.fileName?.toString() in optionFileNames }
             .sortedBy { if (it.fileName?.toString() == "optionsLC.txt") 0 else 1 }
             .flatMap { path -> runCatching { readOptionEntries(path) }.getOrDefault(emptyList()) }
-            .filter { it.first !in excludedOptions }
+            .filter { it.first !in excludedOptions && isOptionKey(it.first) }
             .distinctBy { it.first }
-        // Onboarding shows only a few lines per source, so keep to one line per category.
-        if (options.isNotEmpty()) add("Game settings · ${options.size} options")
 
         val modSettings = buildList {
             paths.forEach { path ->
@@ -306,7 +340,6 @@ object ClientConfigSync {
             }
             addAll(ClientFeatureTranslator.preview(paths))
         }.distinct()
-        if (modSettings.isNotEmpty()) add("Mod settings · ${modSettings.joinToString(", ")}")
 
         val huds = buildList {
             importableHudFiles(paths).values.forEach { add(it.substringAfterLast('.').removeSuffix("Hud")) }
@@ -322,15 +355,12 @@ object ClientConfigSync {
                 it.fileName?.toString() == "mods.json" ||
                 it.parent?.fileName?.toString() == "profiles" && it.fileName?.toString()?.endsWith(".json") == true
         }
-        when {
-            huds.isNotEmpty() -> {
-                val shown = huds.take(PREVIEW_HUD_NAMES)
-                val more = huds.size - shown.size
-                add("HUDs · ${huds.size}: ${shown.joinToString(", ")}${if (more > 0) ", +$more more" else ""}")
-            }
-            hasHudLayout -> add("HUDs · none of this client's HUDs have a match here")
-        }
-        if (isEmpty()) add("Compatible settings found")
+        return ImportSummary(
+            gameSettings = options.size,
+            modSettings = modSettings,
+            huds = huds,
+            hasUnmatchedHuds = huds.isEmpty() && hasHudLayout,
+        )
     }
 
     private const val PREVIEW_HUD_NAMES = 5
@@ -536,18 +566,31 @@ object ClientConfigSync {
         return imported
     }
 
-    private fun mergeOptions(sources: List<Path>, target: Path): Int {
+    internal fun mergeOptions(sources: List<Path>, target: Path): Int {
         val currentLines = if (Files.isRegularFile(target)) Files.readAllLines(target) else emptyList()
         val values = linkedMapOf<String, String>()
+        //? if = 1.8.9 {
+        /*val legacyOptions = true
+        *///?} else {
+        val legacyOptions = false
+        //?}
+        //? if >= 26.3 {
+        val sdlKeys = true
+        //?} else {
+        /*val sdlKeys = false
+        *///?}
         sources.forEach { source ->
-            Files.readAllLines(source).mapNotNull(::optionEntry)
+            // Lunar's optionsLC.txt is JSON, so read it as such rather than as `key:value` lines.
+            // The translator reads the source's `version` to tell its format, so exclusions come after it.
+            GameOptionsTranslator.translate(readOptionEntries(source).filter { isOptionKey(it.first) }, legacyOptions, sdlKeys)
                 .filter { (key, _) -> key !in excludedOptions }
                 .forEach { (key, value) -> values.putIfAbsent(key, value) }
         }
         if (values.isEmpty()) return 0
 
         val seen = mutableSetOf<String>()
-        val merged = currentLines.map { line ->
+        // Drop the JSON line an earlier build pasted in from optionsLC.txt.
+        val merged = currentLines.filter { line -> optionEntry(line)?.first?.let(::isOptionKey) != false }.map { line ->
             val entry = optionEntry(line) ?: return@map line
             val importedValue = values[entry.first] ?: return@map line
             seen += entry.first
@@ -568,6 +611,36 @@ object ClientConfigSync {
         return values.size
     }
 
+    /**
+     * Makes the running game read the merged `options.txt`. It only reads the file at startup, so without this the
+     * imported options would not apply this session and its next options save would write the old ones back.
+     */
+    private fun reloadGameOptions() {
+        val mc = Minecraft.getInstance()
+        val reload = Runnable {
+            runCatching {
+                mc.options.load()
+                // Loading only stores the values; screens opened from here on use the imported GUI scale.
+                //? if >= 26.1 {
+                mc.resizeGui()
+                //?} elif > 1.8.9 {
+                /*mc.resizeDisplay()
+                *///?} else {
+                /*Display.setVSyncEnabled(mc.options.vsync)
+                *///?}
+                logger.info("Reloaded the game options after the import")
+            }.onFailure { logger.warn("Could not reload the game options; the import applies after a restart", it) }
+        }
+        //? if > 1.8.9 {
+        if (mc.isSameThread) reload.run() else mc.execute(reload)
+        //?} else {
+        /*if (mc.isOnSameThread) reload.run() else mc.executeTask(reload)
+        *///?}
+    }
+
+    /** Real option keys are plain names such as `guiScale` or `key_key.attack`, never JSON. */
+    private fun isOptionKey(key: String): Boolean = key.none { it == '{' || it == '"' || it == '}' }
+
     private fun optionEntry(line: String): Pair<String, String>? {
         if (line.isBlank() || line.startsWith("#")) return null
         val separator = line.indexOf(':')
@@ -582,7 +655,7 @@ object ClientConfigSync {
             runCatching {
                 Json.parseToJsonElement(Files.readString(path)).jsonObject.mapNotNull { (key, element) ->
                     val value = element as? JsonPrimitive ?: return@mapNotNull null
-                    if (value == JsonNull || key in excludedOptions) return@mapNotNull null
+                    if (value == JsonNull) return@mapNotNull null
                     key to value.content
                 }
             }.onFailure { logger.debug("Could not read Lunar options from {}", path, it) }
@@ -601,7 +674,11 @@ object ClientConfigSync {
     private fun readOnboardingPreferences(paths: List<Path>): Map<OnboardingPreference, Boolean> = buildMap {
         val lunarMods = paths.firstOrNull {
             it.fileName?.toString() == "mods.json" && it.parent?.parent?.fileName?.toString() == "game"
-        } ?: return@buildMap
+        }
+        if (lunarMods == null) {
+            NoRiskHudTranslator.skinLayersEnabled(paths)?.let { put(OnboardingPreference.SKIN_LAYERS, it) }
+            return@buildMap
+        }
         val skinLayersEnabled = runCatching {
             Json.parseToJsonElement(Files.readString(lunarMods))
                 .jsonObject["3D_SKINS"]

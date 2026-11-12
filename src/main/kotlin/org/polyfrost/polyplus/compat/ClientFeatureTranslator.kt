@@ -206,6 +206,7 @@ internal object ClientFeatureTranslator {
                 options?.get("flyBoostAmount")?.jsonPrimitive?.content?.toDoubleOrNull()?.takeIf { it in 1.0..10.0 }
                     ?.let { put("flyBoostAmount", JsonPrimitive(it)) }
             }
+            if (feature == Feature.HITBOXES) putAll(HitboxSettingsTranslator.fromLunar(options))
         }
         feature to extra
     }.flatMap { (feature, extra) -> patchesFor("Lunar", feature, extra) }
@@ -219,19 +220,27 @@ internal object ClientFeatureTranslator {
 
     internal fun fromBadlion(root: JsonObject): List<Patch> = root.mapNotNull { (key, value) ->
         val feature = badlion[key] ?: return@mapNotNull null
-        val enabled = (value as? JsonObject)?.get("enabled")?.jsonPrimitive?.booleanOrNull
-        feature.takeIf { enabled == true }
-    }.flatMap { patchesFor("Badlion", it) }
+        val settings = value as? JsonObject
+        if (settings?.get("enabled")?.jsonPrimitive?.booleanOrNull != true) return@mapNotNull null
+        val extra = if (feature == Feature.HITBOXES) HitboxSettingsTranslator.fromBadlion(settings) else emptyMap()
+        feature to extra
+    }.flatMap { (feature, extra) -> patchesFor("Badlion", feature, extra) }
 
     internal fun fromNoRisk(modules: JsonArray): List<Patch> = modules.mapNotNull { element ->
         val module = element as? JsonObject ?: return@mapNotNull null
         val name = module["name"]?.jsonPrimitive?.content?.trim()?.lowercase()?.replace('_', ' ') ?: return@mapNotNull null
         val feature = noRisk[name] ?: return@mapNotNull null
-        val enabled = (module["values"] as? JsonArray)?.firstNotNullOfOrNull { item ->
-            (item as? JsonObject)?.takeIf { it["name"]?.jsonPrimitive?.content == "isEnabled" }?.get("value")
-        }?.jsonPrimitive?.booleanOrNull
-        feature.takeIf { enabled == true }
-    }.flatMap { patchesFor("NoRisk", it) }
+        fun setting(key: String): JsonElement? = (module["values"] as? JsonArray)?.firstNotNullOfOrNull { item ->
+            (item as? JsonObject)?.takeIf { it["name"]?.jsonPrimitive?.content == key }?.get("value")
+        }
+        if ((setting("isEnabled") as? JsonPrimitive)?.booleanOrNull != true) return@mapNotNull null
+        val extra = if (feature == Feature.HITBOXES) {
+            HitboxSettingsTranslator.fromNoRisk(setting("settings") as? JsonObject)
+        } else {
+            emptyMap()
+        }
+        feature to extra
+    }.flatMap { (feature, extra) -> patchesFor("NoRisk", feature, extra) }
 
     private fun patchesFor(client: String, feature: Feature, extra: Map<String, JsonElement> = emptyMap()): List<Patch> {
         val change = changes[feature] ?: return emptyList()

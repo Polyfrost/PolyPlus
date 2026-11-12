@@ -46,9 +46,24 @@ internal object BadlionHudTranslator {
             "memory" to Module("memoryDisplay", MEMORY),
             "pack display" to Module("resourcePackDisplay", RESOURCE_PACK),
             "item counter" to Module("itemCounter", ITEM_COUNTER),
+            "item tracker" to Module("itemTracker", ITEM_TRACKER),
             "speedometer" to Module("speedometer", SPEED),
             "saturation" to Module("saturation", SATURATION),
             "boss bar" to Module("bossBar", BOSS_BAR),
+        )
+    }
+
+    /**
+     * Mods that have no entry in `boxes` in the inspected profiles, so only their on/off state and styling
+     * carry over: mod settings key -> (name, target).
+     */
+    private val unplacedModules = with(OneConfigHudInstances) {
+        mapOf(
+            "scoreboard" to ("scoreboard" to SCOREBOARD),
+            "serverAddress" to ("server address" to SERVER),
+            "showTps" to ("tps" to TPS),
+            "uptime" to ("uptime" to PLAYTIME),
+            "playerList" to ("tab list" to TAB_LIST),
         )
     }
 
@@ -67,7 +82,7 @@ internal object BadlionHudTranslator {
 
     fun import(sources: List<Path>, alreadyImported: Set<String>): Int {
         val requests = requests(sources) ?: return 0
-        return OneConfigHudInstances.apply(requests, alreadyImported)
+        return OneConfigHudInstances.apply(requests, alreadyImported, OneConfigHudInstances.screen(sources))
     }
 
     fun preview(sources: List<Path>): List<String> {
@@ -86,13 +101,22 @@ internal object BadlionHudTranslator {
     private fun requests(sources: List<Path>): List<Request>? {
         val profile = sources.firstOrNull(::isBadlionProfile) ?: return null
         val root = readProfile(profile) ?: return null
-        val (refW, refH) = OneConfigHudInstances.screen()
+        val (refW, refH) = OneConfigHudInstances.screen(sources)
         return requests(root, refW, refH)
     }
 
     /** Pure translation of a Badlion profile's `data.json`; [refW]/[refH] are OneConfig's HUD screen size. */
     internal fun requests(root: JsonObject, refW: Double, refH: Double): List<Request> {
-        val boxes = root["boxes"] as? JsonArray ?: return emptyList()
+        val unplaced = unplacedModules.mapNotNull { (modKey, named) ->
+            val settings = root[modKey] as? JsonObject ?: return@mapNotNull null
+            Request(
+                source = "Badlion ${named.first}",
+                target = named.second,
+                enabled = settings["enabled"]?.jsonPrimitive?.booleanOrNull,
+                style = settings.style(),
+            )
+        }
+        val boxes = root["boxes"] as? JsonArray ?: return unplaced
         return boxes.mapNotNull { element ->
             runCatching {
                 val box = element as? JsonObject ?: return@runCatching null
@@ -114,7 +138,7 @@ internal object BadlionHudTranslator {
                     style = settings?.style().orEmpty(),
                 )
             }.onFailure { logger.debug("Could not read a Badlion HUD box", it) }.getOrNull()
-        }
+        } + unplaced
     }
 
     /**
