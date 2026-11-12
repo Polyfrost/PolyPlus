@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -192,13 +193,13 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
         MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
     LinkedModRow(screen, rowHeight)
-    Box {
+    val moreShown = screen.moreOpen && !screen.moreLinked
+    Box(Modifier.focusRequester(rememberMoreTrigger(moreShown))) {
         MenuRow(asset("dots-vertical"), "More", height = rowHeight) {
-            val showing = screen.moreOpen && !screen.moreLinked
             screen.moreLinked = false
-            screen.moreOpen = !showing
+            screen.moreOpen = !moreShown
         }
-        if (screen.moreOpen && !screen.moreLinked) MorePopup(screen, rememberToolAnchor(true))
+        if (moreShown) MorePopup(screen, rememberToolAnchor(true))
     }
     Spacer(Modifier.height(6.dp))
     Hairline()

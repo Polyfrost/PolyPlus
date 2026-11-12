@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -152,7 +153,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             screen.capture.entry(PauseSlot.OPTIONS)?.let { DockItem(it.glyph, "Options", enabled = it.enabled, onClick = it.press) }
             screen.capture.entry(PauseSlot.WORLD)?.let { DockItem(it.glyph, "World", enabled = it.enabled, onClick = it.press) }
             if (screen.canHost) DockItem(asset("log-in-04"), "Host", onClick = screen::openHost)
-            Box {
+            Box(Modifier.focusRequester(rememberMoreTrigger(screen.moreOpen))) {
                 DockItem(asset("dots-vertical"), "More", active = screen.moreOpen) { screen.moreLinked = false; screen.moreOpen = !screen.moreOpen }
                 if (screen.moreOpen) MorePopup(screen, rememberRiseAnchor(centered = true), routes = true)
             }

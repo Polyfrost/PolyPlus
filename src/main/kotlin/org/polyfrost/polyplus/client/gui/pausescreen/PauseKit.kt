@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -65,6 +68,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
@@ -72,6 +76,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.trackScreenFocus
+import org.polyfrost.polyplus.client.gui.wrapTabFocus
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.liquidGlassTheme
 import org.polyfrost.oneconfig.internal.ui.components.liquidGlass
@@ -324,20 +329,56 @@ internal fun LinkedModRow(screen: OneClientPauseScreen, height: Dp) {
     val linked = remember { pauseLinkedEntries() }
     if (linked.isEmpty()) return
     val logo = remember { decodeModLogo(LinkedModMenus.logo) }
-    Box {
+    val open = screen.moreOpen && screen.moreLinked
+    Box(Modifier.focusRequester(rememberMoreTrigger(open))) {
         MenuRow(asset("link-external-01"), LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, height = height, logo = logo) {
-            val showing = screen.moreOpen && screen.moreLinked
             screen.moreLinked = true
-            screen.moreOpen = !showing
+            screen.moreOpen = !open
         }
-        if (screen.moreOpen && screen.moreLinked) MorePopup(screen, rememberToolAnchor(true))
+        if (open) MorePopup(screen, rememberToolAnchor(true))
     }
 }
 
 @Composable
+internal fun rememberMoreTrigger(open: Boolean): FocusRequester {
+    val trigger = remember { FocusRequester() }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (open) {
+            shown = true
+            return@LaunchedEffect
+        }
+        if (!shown) return@LaunchedEffect
+        shown = false
+        if (!A11y.keyboardMode) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { trigger.requestFocus() }
+    }
+    return trigger
+}
+
+@Composable
 internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvider, routes: Boolean = false) {
-    Popup(popupPositionProvider = anchor, properties = PopupProperties(focusable = false)) {
-        MorePanel(screen, Modifier.heightIn(max = popupMaxHeight(POPUP_EDGE)).blockPointer(), routes)
+    val first = remember { FocusRequester() }
+    val keyboard = remember { A11y.keyboardMode }
+    Popup(popupPositionProvider = anchor, onDismissRequest = { screen.moreOpen = false }, properties = PopupProperties(focusable = true)) {
+        MorePanel(
+            screen,
+            Modifier
+                .heightIn(max = popupMaxHeight(POPUP_EDGE))
+                .blockPointer()
+                .trackScreenFocus()
+                .wrapTabFocus()
+                .focusRequester(first)
+                .focusGroup(),
+            routes,
+        )
+        if (keyboard) {
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                runCatching { first.requestFocus() }
+            }
+        }
     }
 }
 
