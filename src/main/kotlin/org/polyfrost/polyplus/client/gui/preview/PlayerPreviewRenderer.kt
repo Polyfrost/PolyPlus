@@ -638,6 +638,7 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
+        state.ageInTicks = (System.nanoTime() / 50_000_000L).toFloat()
         // the dummy's skin customisation data is never synced, which hides every outer layer; match directState
         state.showHat = true
         state.showJacket = true
