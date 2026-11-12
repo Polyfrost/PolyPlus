@@ -109,6 +109,9 @@ import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialPopupBackground
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.SocialHoverBorder
+import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialTextSecondary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
@@ -305,7 +308,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         ) {
             Column(Modifier.widthIn(max = chatWidth), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
                 if (lobby.page == LobbyPage.Home) LinkedModButton(Modifier)
-                if (chatShown) ChatPanel(open = lobby.page == LobbyPage.Home)
+                if (chatShown || chatWidth > 0.dp) ChatDock(lobby, chatWidth)
             }
             Spacer(Modifier.width(chatWidth.coerceAtMost(LobbyLayout.Gap)))
             key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false).onGloballyPositioned { barStart = it.positionInRoot().x }) }
@@ -340,6 +343,32 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             )
         }
     } }
+}
+
+@Composable
+private fun ChatDock(lobby: LobbyShell, width: Dp) {
+    val open = lobby.page == LobbyPage.Home
+    val party by PartyRepository.party.collectAsState()
+    val prompt = !open || (SocialChatLink.active == null && party?.chatGroupId == null)
+    val (interaction, hovered) = rememberSocialHover()
+    val shape = ppShape(20.dp)
+    val action = if (prompt) {
+        Modifier
+            .border(1.dp, if (hovered) SocialHoverBorder else Color.Transparent, shape)
+            .hoverable(interaction)
+            .clickableWithSound("Open Social", shape = shape) { lobby.openSocial() }
+    } else {
+        Modifier
+    }
+    Box(Modifier.clip(shape).revealWidth(width).then(action)) {
+        ChatPanel(open)
+    }
+}
+
+private fun Modifier.revealWidth(width: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = LobbyLayout.ChatWidth.roundToPx()))
+    val shown = minOf(placeable.width, width.roundToPx()).coerceIn(constraints.minWidth, constraints.maxWidth)
+    layout(shown, placeable.height) { placeable.place(0, 0) }
 }
 
 @Composable
