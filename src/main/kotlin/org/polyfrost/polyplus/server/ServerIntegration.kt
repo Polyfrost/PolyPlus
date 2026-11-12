@@ -7,6 +7,7 @@ import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.server.apollo.ApolloBridge
 import org.polyfrost.polyplus.server.bindings.CodeBindings
+import org.polyfrost.polyplus.server.bindings.SwitchBindings
 import java.util.concurrent.CopyOnWriteArrayList
 
 //? if > 1.8.9 {
@@ -43,7 +44,10 @@ object ServerIntegration {
         SelfTest.initialize()
     }
 
-    fun capabilities(): Set<String> = OptionRegistry.keys() + NOTIFICATION
+    fun capabilities(): Set<String> {
+        SwitchBindings.scan()
+        return OptionRegistry.keys() + NOTIFICATION
+    }
 
     fun dispatch(command: ServerCommand) {
         runCatching {

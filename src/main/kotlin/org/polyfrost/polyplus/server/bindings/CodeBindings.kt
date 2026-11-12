@@ -44,12 +44,15 @@ class CodeBinding(
     private val read: () -> JsonElement,
     private val write: (OptionValue) -> Boolean,
     private val reset: (JsonElement) -> Unit,
+    private val lock: (Boolean) -> Unit = {},
 ) : Binding {
     override fun snapshot(): JsonElement? = guarded(null, read)
 
     override fun apply(value: OptionValue): Boolean = guarded(false) { write(value) }
 
     override fun restore(snapshot: JsonElement) = reset(snapshot)
+
+    override fun setLocked(locked: Boolean) = lock(locked)
 
     private inline fun <T> guarded(fallback: T, block: () -> T): T = try {
         block()
@@ -94,6 +97,7 @@ object CodeBindings {
         zoomify()
         //? if jade
         jade()
+        SwitchBindings.scan()
     }
 
     private fun resolve(mod: String, vararg keys: Pair<String, (String) -> List<Binding>>) {
