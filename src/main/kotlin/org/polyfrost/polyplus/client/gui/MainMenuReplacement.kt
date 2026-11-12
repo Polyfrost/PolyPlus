@@ -18,6 +18,7 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 object MainMenuReplacement {
     private var playing = false
     private var lobbyFailed = false
+    private var vanillaServerList = false
 
     private fun choice(): MainMenuChoice {
         val chosen = PolyPlusMainMenuConfig.mainMenu
@@ -88,6 +89,18 @@ object MainMenuReplacement {
         )
     }
 
+    fun openVanillaServerList(screen: JoinMultiplayerScreen) {
+        vanillaServerList = true
+        try {
+            ClientPlatform.setScreen(screen)
+        } finally {
+            vanillaServerList = false
+        }
+    }
+
+    private fun keepsVanillaServerList(): Boolean =
+        vanillaServerList || ClientPlatform.currentScreen() is JoinMultiplayerScreen
+
     @JvmStatic
     fun replaceLists(screen: Screen?): Screen? {
         val inWorld = ClientPlatform.inWorld() && !LobbyScene.terrainActive()
@@ -108,6 +121,7 @@ object MainMenuReplacement {
         if (inWorld) return screen
         when (screen?.javaClass) {
             JoinMultiplayerScreen::class.java -> {
+                if (!left && keepsVanillaServerList()) return screen
                 if (!left) return lobbyPage(LobbyPage.Multiplayer)
                 playing = false
                 return lobbyPage(LobbyPage.Home)
