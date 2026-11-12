@@ -263,7 +263,7 @@ private fun MusicVolume() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Label("Volume", 12.sp, color = MutedText)
         Box(Modifier.weight(1f)) {
-            OnboardingSlider(percent / VOLUME_MAX, VOLUME_SLIDER_WIDTH, thumbSize = 15.dp, trackHeight = 5.dp, onRelease = PolyPlusLobbyConfig::save) { progress ->
+            OnboardingSlider(percent / VOLUME_MAX, VOLUME_SLIDER_WIDTH, thumbSize = 15.dp, trackHeight = 5.dp, label = "Lobby music volume", value = "${percent.roundToInt()}%", onRelease = PolyPlusLobbyConfig::save) { progress ->
                 percent = (progress * VOLUME_MAX / VOLUME_STEP).roundToInt() * VOLUME_STEP
                 PolyPlusLobbyConfig.lobbyMusicVolume = percent
             }
