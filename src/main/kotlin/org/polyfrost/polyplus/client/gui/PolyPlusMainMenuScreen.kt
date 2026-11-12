@@ -367,7 +367,7 @@ private fun MainMenu(
         CompositionLocalProvider(LocalGlassRegistry provides glass, LocalRootSize provides rootSize) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val containFit = minOf(maxWidth.value / BASE_WIDTH, maxHeight.value / BASE_HEIGHT)
-                val scale = minOf(guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM, containFit)
+                val scale = MenuScale.scale(containFit, guiScale / REFERENCE_GUI_SCALE * GUI_DENSITY_TRIM)
                 val safeScale = usableScale(scale)
                 val innerWidth = maxWidth.value / safeScale
                 val innerHeight = maxHeight.value / safeScale

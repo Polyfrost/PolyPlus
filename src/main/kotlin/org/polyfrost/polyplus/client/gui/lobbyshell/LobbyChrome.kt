@@ -98,6 +98,7 @@ import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.MainMenuRasterAssets
+import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.Outfit
@@ -212,7 +213,7 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
         StartupOverlay.rootWidth = widthPx
         val fullscreen = MacSafeArea.fullscreen()
         val notchPx = remember(widthPx, heightPx, fullscreen) { MacSafeArea.topShare() * heightPx }
-        val scale = minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT)
+        val scale = MenuScale.scale(minOf(widthPx / LobbyLayout.DESIGN_WIDTH, (heightPx - notchPx) / LobbyLayout.DESIGN_HEIGHT))
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         val notch = with(density) { notchPx.toDp() }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
