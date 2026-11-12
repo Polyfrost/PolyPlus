@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
@@ -259,6 +260,32 @@ internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, prima
             textAlign = TextAlign.Center,
         ),
     )
+}
+
+private const val COPYRIGHT_TEXT = "Copyright Mojang AB. Do not distribute!"
+
+@Composable
+internal fun CopyrightText(
+    screen: Screen,
+    fontSize: TextUnit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Start,
+    maxLines: Int = Int.MAX_VALUE,
+) {
+    //? if > 1.8.9 {
+    val (interaction, hovered) = rememberSocialHover()
+    val link = Modifier
+        .hoverable(interaction)
+        .a11y(COPYRIGHT_TEXT, A11yRole.Link, null, null, null, true)
+        .clickableTextWithSound { ClientPlatform.setScreen(net.minecraft.client.gui.screens.CreditsAndAttributionScreen(screen)) }
+        .pointerHoverIcon(PointerIcon.Hand)
+    val underline = if (hovered) TextDecoration.Underline else null
+    //?} else {
+    /*val link: Modifier = Modifier
+    val underline: TextDecoration? = null
+    *///?}
+    SocialText(COPYRIGHT_TEXT, fontSize, modifier.then(link), color = color, textAlign = textAlign, textDecoration = underline, maxLines = maxLines)
 }
 
 internal val MenuMutedIcon: Color

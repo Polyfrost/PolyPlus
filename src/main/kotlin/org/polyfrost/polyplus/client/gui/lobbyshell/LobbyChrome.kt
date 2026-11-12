@@ -108,7 +108,7 @@ import org.polyfrost.polyplus.client.gui.SocialDangerColor
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.SocialPopupBackground
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.CopyrightText
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
@@ -326,7 +326,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 .tourAnchor(lobby.anchors, TourAnchor.Play)
                 .a11yRegion(A11yRegion.Play),
         )
-        if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer() }
+        if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer(screen) }
         if (lobby.page != LobbyPage.Social) {
             SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top))
         }
@@ -372,7 +372,7 @@ private fun Modifier.revealWidth(width: Dp): Modifier = layout { measurable, con
 }
 
 @Composable
-private fun BoxScope.Footer() {
+private fun BoxScope.Footer(screen: Screen) {
     Row(
         Modifier
             .align(Alignment.BottomStart)
@@ -385,7 +385,7 @@ private fun BoxScope.Footer() {
         LobbyIcon("footer-logo", size = 14.dp)
         FooterBrandText(platformLabel(), 11.sp, SocialTextPrimary)
         Spacer(Modifier.weight(1f))
-        SocialText("Copyright Mojang AB. Do not distribute!", 11.sp, color = SocialTextSecondary, maxLines = 1)
+        CopyrightText(screen, 11.sp, SocialTextSecondary, maxLines = 1)
     }
 }
 

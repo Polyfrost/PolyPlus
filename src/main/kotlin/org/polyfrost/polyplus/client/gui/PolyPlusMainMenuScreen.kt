@@ -401,7 +401,7 @@ private fun MainMenu(
                             screen,
                         )
                     }
-                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), edgeX, edgeY)
+                    if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), screen, edgeX, edgeY)
                 }
             }
             if (accountsOpen) AccountsDialog { accountsOpen = false }
@@ -683,7 +683,7 @@ private fun CallToActionButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
+private fun Footer(modifier: Modifier, screen: Screen, edgeX: (Float) -> Dp, edgeY: (Float) -> Dp) {
     Box(modifier) {
         Row(
             modifier = Modifier
@@ -695,8 +695,8 @@ private fun Footer(modifier: Modifier, edgeX: (Float) -> Dp, edgeY: (Float) -> D
             Icon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp))
             FooterBrandText(platformLabel(), secondary = Color.White.copy(alpha = 0.7f))
         }
-        SocialText(
-            "Copyright Mojang AB. Do not distribute!",
+        CopyrightText(
+            screen,
             fontSize = 13.sp,
             color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier
