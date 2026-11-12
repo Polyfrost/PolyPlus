@@ -89,6 +89,21 @@ val LevelHeightAccessor.maxSectionY: Int get() = maxSection - 1
 *///?}
 
 object LobbyCompat {
+    @Volatile
+    private var quiet = false
+
+    @JvmStatic
+    fun quietConnection(): Boolean = quiet
+
+    fun <T> quietly(block: () -> T): T {
+        quiet = true
+        try {
+            return block()
+        } finally {
+            quiet = false
+        }
+    }
+
     fun offlineConnection(): Connection {
         val connection = Connection(PacketFlow.CLIENTBOUND)
         (connection as ConnectionAccessor).`polyplus$setAddress`(InetSocketAddress(InetAddress.getLoopbackAddress(), 0))

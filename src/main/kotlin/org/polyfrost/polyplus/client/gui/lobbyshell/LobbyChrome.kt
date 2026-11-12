@@ -253,7 +253,11 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .layout { measurable, constraints ->
+                        val height = 150.dp.roundToPx() + notch
+                        val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                        layout(placeable.width, placeable.height - notch) { placeable.place(0, -notch) }
+                    }
                     .background(Brush.verticalGradient(0f to sceneScrim.copy(alpha = 0.92f), 0.42f to sceneScrim.copy(alpha = 0.74f), 1f to Color.Transparent)),
             )
             Box(

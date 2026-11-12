@@ -973,7 +973,7 @@ object LobbyScene {
             //?}
         )
         //?}
-        val listener = ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie)
+        val listener = LobbyCompat.quietly { ClientPacketListener(mc, LobbyCompat.offlineConnection(), cookie) }
         val realm = loaded.entry.realm
         val dimensionKey = when (realm) {
             LobbyRealm.NETHER -> BuiltinDimensionTypes.NETHER
@@ -1028,7 +1028,7 @@ object LobbyScene {
     }
     //?}
 
-    private fun finishBuild(mc: Minecraft, loaded: Loaded, listener: ClientPacketListener, level: ClientLevel, gameMode: MultiPlayerGameMode, rig: LocalPlayer, anchor: BlockPos): Live {
+    private fun finishBuild(mc: Minecraft, loaded: Loaded, listener: ClientPacketListener, level: ClientLevel, gameMode: MultiPlayerGameMode, rig: LocalPlayer, anchor: BlockPos): Live = standingIn(mc, rig) {
         sample(mc)
         val root = loaded.root
         val stage = root.optCompound("stage")?.let { LobbyStage.restore(level, it) }
@@ -1045,7 +1045,17 @@ object LobbyScene {
         //? if > 1.8.9
         built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
         runCatching { LobbyHerobrine.onSceneShown(level, stage) }
-        return built
+        built
+    }
+
+    private inline fun <T> standingIn(mc: Minecraft, rig: LocalPlayer, block: () -> T): T {
+        if (mc.player != null) return block()
+        mc.player = rig
+        try {
+            return block()
+        } finally {
+            if (mc.player === rig) mc.player = null
+        }
     }
 
     private fun sceneClock(captured: Long): Long = driven?.clock ?: LobbyAntics.clock(LobbyTime.clock(captured))

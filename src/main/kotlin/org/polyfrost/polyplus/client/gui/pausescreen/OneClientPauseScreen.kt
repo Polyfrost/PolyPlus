@@ -54,7 +54,9 @@ class OneClientPauseScreen(
     internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)
+    internal var moreLinked by mutableStateOf(false)
     internal var customizeOpen by mutableStateOf(customizing)
+    internal var playerPreview by mutableStateOf(style != PauseScreenStyle.STEP_BACK_FLAT || PolyPlusPauseConfig.flatPausePlayerPreview)
     private var decided = false
     private var openedAt = 0L
     internal var resumeBounds = Rect.Zero

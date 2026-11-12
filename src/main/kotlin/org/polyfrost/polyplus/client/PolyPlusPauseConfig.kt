@@ -29,10 +29,18 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Style",
         description = "Picks how the pause screen looks.",
-        options = ["Step Back", "Step Back (Flat)", "Compact", "Vanilla"],
+        options = ["Spotlight", "Full", "Compact", "Vanilla"],
         subcategory = "Style",
     )
     var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK_FLAT
+
+    @JvmStatic
+    @Switch(
+        title = "Player preview",
+        description = "Shows your player beside the menu.",
+        subcategory = "Style",
+    )
+    var flatPausePlayerPreview = true
 
     @JvmStatic
     @Switch(
@@ -85,6 +93,7 @@ object PolyPlusPauseConfig : Config(
     init {
         preload()
         migrateFromSplitConfigs()
+        hideIf("flatPausePlayerPreview") { pauseScreenStyle != PauseScreenStyle.STEP_BACK_FLAT }
         hideIf("vanillaPausePlayerPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         hideIf("compactPauseMenuPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         addDependency("compactPauseMenuPanel", "vanillaPausePlayerPanel", true)

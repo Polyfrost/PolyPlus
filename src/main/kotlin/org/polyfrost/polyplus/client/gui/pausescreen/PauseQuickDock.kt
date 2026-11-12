@@ -153,7 +153,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             screen.capture.entry(PauseSlot.OPTIONS)?.let { DockItem(it.glyph, "Options", enabled = it.enabled, onClick = it.press) }
             screen.capture.entry(PauseSlot.WORLD)?.let { DockItem(it.glyph, "World", enabled = it.enabled, onClick = it.press) }
             if (screen.canHost) DockItem(asset("log-in-04"), "Host", onClick = screen::openHost)
-            DockItem(asset("dots-vertical"), "More", active = screen.moreOpen) { screen.moreOpen = !screen.moreOpen }
+            DockItem(asset("dots-vertical"), "More", active = screen.moreOpen) { screen.moreLinked = false; screen.moreOpen = !screen.moreOpen }
             DockRule()
             screen.capture.entry(PauseSlot.QUIT)?.let { DockItem(it.glyph, if (it.relabelled) it.label else if (PauseWorldAccess.singleplayer) "Quit" else "Leave", danger = true, enabled = it.enabled, onClick = it.press) }
         }
