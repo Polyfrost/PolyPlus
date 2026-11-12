@@ -3,7 +3,7 @@ package org.polyfrost.polyplus.client.gui
 //? if > 1.8.9 {
 import net.minecraft.client.gui.components.AbstractButton
 import net.minecraft.client.gui.components.AbstractWidget
-import org.polyfrost.oneconfig.api.platform.v1.Platform
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseText
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.AbstractWidgetAccessor
 import org.polyfrost.polyplus.mixin.client.access.TooltipAccessor
@@ -44,7 +44,7 @@ internal object WidgetPress {
 
     fun tooltip(widget: AbstractWidget): String? {
         val tooltip = (widget as AbstractWidgetAccessor).`polyplus$tooltip`().get() ?: return null
-        return Platform.i18n().getUnformattedText((tooltip as TooltipAccessor).`polyplus$message`())
+        return PauseText.of((tooltip as TooltipAccessor).`polyplus$message`())
     }
 }
 //?}
