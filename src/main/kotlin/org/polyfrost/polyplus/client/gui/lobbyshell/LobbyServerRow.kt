@@ -46,7 +46,7 @@ import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.themedIcon
 
-private val RowHeight = 56.dp
+private val RowHeight = 64.dp
 private val RowGap = 6.dp
 private val RowIcon = 36.dp
 private val PlayersWidth = 104.dp
@@ -121,7 +121,7 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
                 Label(data.name, 14.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
                 if (data.state() == ServerData.State.INCOMPATIBLE) Tag("Incompatible", TagTone.Danger)
             }
-            MotdText(entry, revision, maxLines = 1)
+            MotdText(entry, revision)
         }
         Label(serverPlayers(data), 12.sp, Modifier.width(PlayersWidth), color = if (failed) SocialDangerText else MutedText)
         Label(serverPing(data), 12.sp, Modifier.width(PingWidth), color = MutedText)

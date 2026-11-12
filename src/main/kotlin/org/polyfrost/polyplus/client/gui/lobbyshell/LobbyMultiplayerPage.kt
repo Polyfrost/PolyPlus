@@ -47,8 +47,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -60,8 +63,6 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.lobby.LobbyMotd*/
 import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.Style
-import net.minecraft.util.StringDecomposer
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
 import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
@@ -463,56 +464,94 @@ internal fun serverMeta(data: ServerData): String {
 }
 
 @Composable
-internal fun MotdText(entry: ServerEntry, revision: Int, maxLines: Int = 2) {
+internal fun MotdText(entry: ServerEntry, revision: Int, modifier: Modifier = Modifier, reserve: Boolean = false) {
     @Suppress("UNUSED_EXPRESSION") revision
     ServerRevisions.of(entry.data)
     val data = entry.data
-    val muted = MutedText
-    val text = when {
-        entry.kind == ServerKind.LAN || LobbyServers.failed(data) || data.state() == ServerData.State.PINGING -> AnnotatedString("")
-        else -> motdText(data.motd, muted, OneConfigTheme.current.textColor, OneConfigTheme.current.popupBackground)
-    }
-    BasicText(
-        text,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-        style = TextStyle(color = muted, fontSize = 12.sp, fontFamily = OneConfigTheme.current.fontFamily),
-    )
+    val hidden = entry.kind == ServerKind.LAN || LobbyServers.failed(data) || data.state() == ServerData.State.PINGING
+    MotdLines(if (hidden) null else data.motd, modifier, reserve)
 }
 
-internal fun motdText(component: Component?, fallback: Color, ink: Color, surface: Color): AnnotatedString {
-    component ?: return AnnotatedString("")
-    return buildAnnotatedString {
-        val run = StringBuilder()
-        var runColor = fallback
-        fun flush() {
-            if (run.isEmpty()) return
-            withStyle(SpanStyle(color = legibleOn(runColor, ink, surface))) { append(run.toString()) }
-            run.clear()
+@Composable
+internal fun MotdLines(motd: Component?, modifier: Modifier = Modifier, reserve: Boolean = false) {
+    val theme = OneConfigTheme.current
+    val muted = MutedText
+    val parsed = remember(motd, muted, theme.textColor, theme.popupBackground) { motdLines(motd, muted, theme.textColor, theme.popupBackground) }
+    val lines = if (reserve) parsed + List(VANILLA_MOTD_LINES - parsed.size) { AnnotatedString("") } else parsed
+    if (lines.isEmpty()) return
+    val style = TextStyle(
+        color = muted,
+        fontSize = MOTD_SIZE,
+        fontFamily = theme.fontFamily,
+        lineHeight = MOTD_LINE_HEIGHT,
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+    )
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val widest = remember(lines, style) { lines.maxOf { measurer.measure(it, style, softWrap = false, maxLines = 1).size.width } }
+        val available = constraints.maxWidth
+        val fitted = if (widest <= available) style else style.copy(fontSize = style.fontSize * (available.toFloat() / widest))
+        Column {
+            lines.forEach { BasicText(it, style = fitted, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip) }
         }
-        //? if > 1.8.9 {
-        StringDecomposer.iterateFormatted(component, Style.EMPTY) { _, style, codepoint ->
-            val color = style.color?.let { Color(0xFF000000 or it.value.toLong()) } ?: fallback
-            if (color != runColor) {
-                flush()
-                runColor = color
-            }
-            run.appendCodePoint(if (codepoint == '\n'.code) ' '.code else codepoint)
-            true
-        }
-        //?} else {
-        /*LobbyMotd.forEach(component.string) { value, codepoint ->
-            val color = value?.let { Color(0xFF000000 or it.toLong()) } ?: fallback
-            if (color != runColor) {
-                flush()
-                runColor = color
-            }
-            run.appendCodePoint(if (codepoint == '\n'.code) ' '.code else codepoint)
-        }
-        *///?}
-        flush()
     }
 }
+
+private class MotdLineBuilder(private val fallback: Color, private val ink: Color, private val surface: Color) {
+    private val builder = AnnotatedString.Builder()
+    private val run = StringBuilder()
+    private var runStyle: SpanStyle? = null
+
+    fun add(color: Int?, bold: Boolean, italic: Boolean, underlined: Boolean, struck: Boolean, codepoint: Int) {
+        val decorations = listOfNotNull(TextDecoration.Underline.takeIf { underlined }, TextDecoration.LineThrough.takeIf { struck })
+        val next = SpanStyle(
+            color = legibleOn(color?.let { Color(0xFF000000 or it.toLong()) } ?: fallback, ink, surface),
+            fontWeight = if (bold) FontWeight.Bold else null,
+            fontStyle = if (italic) FontStyle.Italic else null,
+            textDecoration = if (decorations.isEmpty()) null else TextDecoration.combine(decorations),
+        )
+        if (next != runStyle) flush()
+        runStyle = next
+        run.appendCodePoint(codepoint)
+    }
+
+    private fun flush() {
+        val style = runStyle ?: return
+        if (run.isEmpty()) return
+        builder.withStyle(style) { append(run.toString()) }
+        run.clear()
+    }
+
+    fun build(): AnnotatedString {
+        flush()
+        return builder.toAnnotatedString()
+    }
+}
+
+internal fun motdLines(component: Component?, fallback: Color, ink: Color, surface: Color): List<AnnotatedString> {
+    component ?: return emptyList()
+    //? if > 1.8.9 {
+    return Minecraft.getInstance().font.split(component, VANILLA_MOTD_WIDTH).take(VANILLA_MOTD_LINES).map { line ->
+        val builder = MotdLineBuilder(fallback, ink, surface)
+        line.accept { _, style, codepoint ->
+            builder.add(style.color?.value, style.isBold, style.isItalic, style.isUnderlined, style.isStrikethrough, codepoint)
+            true
+        }
+        builder.build()
+    }
+    //?} else {
+    /*return Minecraft.getInstance().textRenderer.split(component.string, VANILLA_MOTD_WIDTH).take(VANILLA_MOTD_LINES).map { line ->
+        val builder = MotdLineBuilder(fallback, ink, surface)
+        LobbyMotd.forEach(line) { value, codepoint -> builder.add(value, false, false, false, false, codepoint) }
+        builder.build()
+    }
+    *///?}
+}
+
+private const val VANILLA_MOTD_WIDTH = 271
+private const val VANILLA_MOTD_LINES = 2
+private val MOTD_SIZE = 12.sp
+private val MOTD_LINE_HEIGHT = 17.sp
 
 @Composable
 private fun ServerLastPlayedStrip(lobby: LobbyShell, friends: List<OnlineFriend>) {
