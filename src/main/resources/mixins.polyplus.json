@@ -22,6 +22,8 @@
     "client.MixinClientHandshakePacketListenerImpl",
     //? if > 1.8.9
     "client.MixinClientLanguage",
+    //? if > 1.8.9
+    "client.MixinClientLanguageServerPacks",
     "client.MixinClientPacketListener",
     "client.MixinConnectScreen",
     //? if = 1.8.9

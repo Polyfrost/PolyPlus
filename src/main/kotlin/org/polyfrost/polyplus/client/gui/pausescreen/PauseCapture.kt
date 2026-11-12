@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import net.minecraft.client.Minecraft
-import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
@@ -173,7 +172,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         val handler = (widget as? Button)?.let { (it as ButtonAccessor).`polyplus$onPress`() }
         val mod = if (slotted.group == GROUP_OTHER) PauseModSource.of(widget.javaClass, handler?.javaClass) else null
         val group = if (slotted.group == GROUP_OTHER && widget.message.contents is TranslatableContents) GROUP_GAME else slotted.group
-        val text = Platform.i18n().getUnformattedText(widget.message).ifBlank { tooltip.orEmpty() }.ifBlank { UNNAMED }
+        val text = PauseText.of(widget.message).ifBlank { tooltip.orEmpty() }.ifBlank { UNNAMED }
         return PauseEntry(
             System.identityHashCode(widget),
             slotted.slot,
@@ -219,7 +218,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
 
     private fun tooltip(widget: AbstractWidget): String? {
         val tooltip = (widget as AbstractWidgetAccessor).`polyplus$tooltip`().get() ?: return null
-        return Platform.i18n().getUnformattedText((tooltip as TooltipAccessor).`polyplus$message`())
+        return PauseText.of((tooltip as TooltipAccessor).`polyplus$message`())
     }
 
     private fun spriteOf(widget: AbstractWidget): ImageBitmap? {
