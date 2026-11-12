@@ -171,12 +171,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin + LobbyLayout.BarHeight + LobbyLayout.Gap),
         )
     }
-    if (screen.moreOpen) {
-        MoreDismiss(screen)
-        LobbyDarkChrome {
-            MorePanel(screen, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 376.dp else 488.dp, top = 68.dp))
-        }
-    }
+    if (screen.moreOpen) MoreDismiss(screen)
     if (screen.customizeOpen) {
         CustomizeDismiss(screen)
         LobbyDarkChrome {
@@ -197,10 +192,13 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
         MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
     }
     LinkedModRow(screen, rowHeight)
-    MenuRow(asset("dots-vertical"), "More", height = rowHeight) {
-        val showing = screen.moreOpen && !screen.moreLinked
-        screen.moreLinked = false
-        screen.moreOpen = !showing
+    Box {
+        MenuRow(asset("dots-vertical"), "More", height = rowHeight) {
+            val showing = screen.moreOpen && !screen.moreLinked
+            screen.moreLinked = false
+            screen.moreOpen = !showing
+        }
+        if (screen.moreOpen && !screen.moreLinked) MorePopup(screen, rememberToolAnchor(true))
     }
     Spacer(Modifier.height(6.dp))
     Hairline()

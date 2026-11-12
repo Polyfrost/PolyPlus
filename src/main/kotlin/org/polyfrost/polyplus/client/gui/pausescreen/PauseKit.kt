@@ -60,7 +60,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
@@ -322,10 +324,20 @@ internal fun LinkedModRow(screen: OneClientPauseScreen, height: Dp) {
     val linked = remember { pauseLinkedEntries() }
     if (linked.isEmpty()) return
     val logo = remember { decodeModLogo(LinkedModMenus.logo) }
-    MenuRow(asset("link-external-01"), LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, height = height, logo = logo) {
-        val showing = screen.moreOpen && screen.moreLinked
-        screen.moreLinked = true
-        screen.moreOpen = !showing
+    Box {
+        MenuRow(asset("link-external-01"), LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, height = height, logo = logo) {
+            val showing = screen.moreOpen && screen.moreLinked
+            screen.moreLinked = true
+            screen.moreOpen = !showing
+        }
+        if (screen.moreOpen && screen.moreLinked) MorePopup(screen, rememberToolAnchor(true))
+    }
+}
+
+@Composable
+internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvider, routes: Boolean = false) {
+    Popup(popupPositionProvider = anchor, properties = PopupProperties(focusable = false)) {
+        MorePanel(screen, Modifier.heightIn(max = popupMaxHeight(POPUP_EDGE)).blockPointer(), routes)
     }
 }
 
