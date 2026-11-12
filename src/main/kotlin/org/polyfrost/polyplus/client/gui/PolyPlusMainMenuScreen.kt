@@ -597,7 +597,7 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions) {
 
 @Composable
 private fun ThemeToggleButton() {
-    val theme = themeToggle()
+    val theme = themeToggle() ?: return
     IconButton(icon = theme.icon, tooltip = theme.label, onClick = theme.toggle)
 }
 

@@ -573,7 +573,7 @@ private fun MoreButton(lobby: LobbyShell, screen: Screen) {
 private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     val theme = themeToggle()
     MenuSurface(Modifier.width(MORE_MENU_WIDTH.dp)) {
-        MenuItem(theme.label, themedIcon(theme.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, theme.toggle)
+        if (theme != null) MenuItem(theme.label, themedIcon(theme.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, theme.toggle)
         MenuItem("Switch to PolyPlus main menu", themedIcon(SOCIAL_ASSETS + "logo.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
             onClose()
             MainMenuReplacement.switchToPolyPlusMenu()

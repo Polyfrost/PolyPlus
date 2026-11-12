@@ -19,6 +19,9 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.familyVariant
+import org.polyfrost.polyplus.client.gui.isGlassStyle
+import org.polyfrost.polyplus.client.gui.isLightTheme
+import org.polyfrost.polyplus.client.gui.isMinecraftStyle
 import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
@@ -376,9 +379,10 @@ object OnboardingFeatures {
         *///?}
     }.getOrDefault(4).coerceAtLeast(1)
 
-    fun uiStyleOf(theme: OneConfigUITheme?): Int = when (theme?.name) {
-        OneConfigTheme.MINECRAFT_DARK.name, OneConfigTheme.MINECRAFT_LIGHT.name -> UI_STYLE_MINECRAFT
-        OneConfigTheme.GLASS_DARK.name, OneConfigTheme.GLASS_LIGHT.name -> UI_STYLE_POLYGLASS
+    fun uiStyleOf(theme: OneConfigUITheme?): Int = when {
+        theme == null -> UI_STYLE_POLYFROSTED
+        theme.isMinecraftStyle -> UI_STYLE_MINECRAFT
+        theme.isGlassStyle -> UI_STYLE_POLYGLASS
         else -> UI_STYLE_POLYFROSTED
     }
 
@@ -389,8 +393,15 @@ object OnboardingFeatures {
     }
 
     fun applyTheme(light: Boolean, style: Int) {
-        val sameFamily = OneConfigTheme.active?.takeIf { uiStyleOf(it) == style }?.familyVariant(light)
+        val active = OneConfigTheme.active
+        if (active != null && uiStyleOf(active) == style && active.isLightTheme == light) return
+        val sameFamily = active?.takeIf { uiStyleOf(it) == style }?.familyVariant(light)
         OneConfigTheme.activate(sameFamily ?: uiStyleTheme(style, light))
+    }
+
+    fun themeVariant(light: Boolean): OneConfigUITheme? {
+        val active = OneConfigTheme.active ?: return uiStyleTheme(UI_STYLE_POLYFROSTED, light)
+        return active.familyVariant(light)
     }
 
     private fun applyToggleSprint(enabled: Boolean) {

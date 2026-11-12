@@ -224,15 +224,15 @@ internal fun toggleFullscreen() {
 internal class ThemeToggle(val icon: String, val label: String, val toggle: () -> Unit)
 
 @Composable
-internal fun themeToggle(): ThemeToggle {
-    val light = OneConfigTheme.current.isLightTheme
-    val style = OnboardingFeatures.uiStyleOf(OneConfigTheme.current)
+internal fun themeToggle(): ThemeToggle? {
+    val light = (OneConfigTheme.active ?: OneConfigTheme.current).isLightTheme
+    val target = OnboardingFeatures.themeVariant(!light) ?: return null
     return ThemeToggle(
         icon = if (light) ONBOARDING_ASSETS + "sun.svg" else ASSETS + "moon-star.svg",
         label = if (light) "Switch to dark theme" else "Switch to light theme",
         toggle = {
             PolyPlusConfig.onboardingLightTheme = !light
-            OnboardingFeatures.applyTheme(!light, style)
+            OneConfigTheme.activate(target)
             PolyPlusConfig.save()
         },
     )
