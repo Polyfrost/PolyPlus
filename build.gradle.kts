@@ -520,8 +520,8 @@ tasks.withType<ProcessResources>().configureEach {
     inputs.property("oneconfigVersion", oneconfigVersion)
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
-            line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"").replace("\"java\": \">=21\"", "\"java\": \">=25\"")
-                .replace("\"compose-multiplatform\": \">=1.0.6\",", "\"compose-multiplatform\": \">=1.0.6\"")
+            line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"")
+                .replace("\"java\": \">=21\"", "\"java\": \">=25\"")
                 .takeUnless { "\"rrls\"" in it }
         }
         expand(
