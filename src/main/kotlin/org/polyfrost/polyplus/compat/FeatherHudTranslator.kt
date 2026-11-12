@@ -55,7 +55,7 @@ internal object FeatherHudTranslator {
 
     fun import(sources: List<Path>, alreadyImported: Set<String>): Int {
         val requests = requests(sources, scaled = true) ?: return 0
-        return OneConfigHudInstances.apply(requests, alreadyImported)
+        return OneConfigHudInstances.apply(requests, alreadyImported, OneConfigHudInstances.screen(sources))
     }
 
     fun preview(sources: List<Path>): List<String> {

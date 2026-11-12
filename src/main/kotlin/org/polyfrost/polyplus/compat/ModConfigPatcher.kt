@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.compat
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -8,9 +9,11 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import net.fabricmc.loader.api.FabricLoader
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.compose.render.PolyColor
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import java.nio.file.Files
 
@@ -92,9 +95,16 @@ internal object ModConfigPatcher {
         return JsonObject(this + (key to replacement))
     }
 
-    /** Sets [values] on the loaded config, converting each to its property's type. Returns how many were set. */
+    /**
+     * Sets [values] on the config if OneConfig already has it loaded, converting each to its property's type.
+     * Returns how many were set.
+     *
+     * Only looks configs up. `ConfigManager.get` would load and register any file, and OneConfig then re-saves it
+     * in its own format, which breaks mods with their own config system (Item Physic's loader needs its key order).
+     */
     private fun updateLive(configId: String, values: Map<String, JsonElement>): Int {
-        val tree = runCatching { ConfigManager.active().get(configId) }.getOrNull() ?: return 0
+        val tree = runCatching { ConfigManager.active().trees().firstOrNull { it.id == configId } }.getOrNull()
+            ?: return 0
         return values.count { (key, value) ->
             runCatching {
                 val property = tree.getProp(*key.split('.').toTypedArray()) ?: return@runCatching false
@@ -106,6 +116,13 @@ internal object ModConfigPatcher {
 
     /** Converts a JSON value to the same type as the property's [current] value, or null when it cannot. */
     private fun convert(value: JsonElement, current: Any?): Any? {
+        // Colors are written as OneConfig's [r, g, b, a] arrays.
+        if (current is PolyColor) {
+            val channels = (value as? JsonArray)?.mapNotNull { it.jsonPrimitive.intOrNull }?.takeIf { it.size == 4 }
+                ?: return null
+            val (r, g, b, a) = channels.map { it.coerceIn(0, 255) }
+            return PolyColor((a shl 24) or (r shl 16) or (g shl 8) or b)
+        }
         val primitive = value as? JsonPrimitive ?: return null
         return when (current) {
             is Boolean -> primitive.booleanOrNull

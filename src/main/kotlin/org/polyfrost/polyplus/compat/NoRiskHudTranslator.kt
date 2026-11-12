@@ -47,6 +47,8 @@ internal object NoRiskHudTranslator {
             "item tooltip" to ITEM_TOOLTIP,
             "itemtooltip" to ITEM_TOOLTIP,
             "keystrokes" to KEYSTROKES,
+            "mousetracker" to MOUSE_STROKES,
+            "mouse tracker" to MOUSE_STROKES,
             "ping" to PING,
             "potion effects" to POTIONS,
             "potion status" to POTIONS,
@@ -80,7 +82,7 @@ internal object NoRiskHudTranslator {
 
     fun import(sources: List<Path>, alreadyImported: Set<String>): Int {
         val requests = requests(sources) ?: return 0
-        return OneConfigHudInstances.apply(requests, alreadyImported)
+        return OneConfigHudInstances.apply(requests, alreadyImported, OneConfigHudInstances.screen(sources))
     }
 
     fun preview(sources: List<Path>): List<String> {
@@ -98,9 +100,22 @@ internal object NoRiskHudTranslator {
                 .getOrNull()
         }
 
+    /** Whether NoRisk's "3D Skin" module is on, if the profile among [sources] has one. */
+    internal fun skinLayersEnabled(sources: List<Path>): Boolean? = readModules(sources)?.let(::skinLayersEnabled)
+
+    internal fun skinLayersEnabled(modules: JsonArray): Boolean? {
+        val module = modules.firstOrNull {
+            (it as? JsonObject)?.get("name")?.jsonPrimitive?.content?.trim().equals("3D Skin", ignoreCase = true)
+        } as? JsonObject ?: return null
+        return (module["values"] as? JsonArray)?.firstNotNullOfOrNull { value ->
+            (value as? JsonObject)?.takeIf { it["name"]?.jsonPrimitive?.content == "isEnabled" }
+                ?.get("value")?.let { it as? JsonPrimitive }?.booleanOrNull
+        }
+    }
+
     private fun requests(sources: List<Path>): List<Request>? {
         val modules = readModules(sources) ?: return null
-        val (refW, refH) = OneConfigHudInstances.screen()
+        val (refW, refH) = OneConfigHudInstances.screen(sources)
         return requests(modules, refW, refH)
     }
 

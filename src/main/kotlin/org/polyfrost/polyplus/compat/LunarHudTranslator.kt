@@ -41,6 +41,18 @@ internal object LunarHudTranslator {
             "TITLES" to TITLES,
             "BOSSBAR" to BOSS_BAR,
             "HEIGHT_LIMIT" to HEIGHT_LIMIT,
+            "ITEM_TRACKER" to ITEM_TRACKER,
+            "SATURATION" to SATURATION,
+            "PLAYTIME" to PLAYTIME,
+            "TAB" to TAB_LIST,
+        )
+    }
+
+    /** HUDs Lunar keeps as a child of another module: module -> child key -> (name, target). */
+    private val childTargets = with(OneConfigHudInstances) {
+        mapOf(
+            "HYPIXEL_MOD" to mapOf("HYPIXEL_TPS" to ("TPS" to TPS)),
+            "HYPIXEL_BEDWARS" to mapOf("HYPIXEL_BEDWARS_HEIGHT_LIMIT_CHILD" to ("HEIGHT_LIMIT" to HEIGHT_LIMIT)),
         )
     }
 
@@ -66,7 +78,7 @@ internal object LunarHudTranslator {
 
     fun import(sources: List<Path>, alreadyImported: Set<String>): Int {
         val requests = requests(sources, scaled = true) ?: return 0
-        return OneConfigHudInstances.apply(requests, alreadyImported)
+        return OneConfigHudInstances.apply(requests, alreadyImported, OneConfigHudInstances.screen(sources))
     }
 
     fun preview(sources: List<Path>): List<String> {
@@ -95,35 +107,46 @@ internal object LunarHudTranslator {
     }
 
     /** Pure translation of a Lunar `mods.json`; [factorX]/[factorY] turn Lunar GUI pixels into HUD units. */
-    internal fun requests(root: JsonObject, factorX: Double, factorY: Double): List<Request> =
-        root.mapNotNull { (rawName, value) ->
-            val module = value as? JsonObject ?: return@mapNotNull null
-            val name = rawName.uppercase()
-            val target = targets[name] ?: return@mapNotNull null
+    internal fun requests(root: JsonObject, factorX: Double, factorY: Double): List<Request> {
+        val modules = root.mapNotNull { (rawName, value) -> (value as? JsonObject)?.let { rawName.uppercase() to it } }
 
+        fun request(name: String, target: OneConfigHudInstances.Target, module: JsonObject, placed: JsonObject, enabled: Boolean?) =
+            Request(
+                source = "Lunar $name",
+                target = target,
+                enabled = enabled,
+                section = placed["position"]?.jsonPrimitive?.content?.let { anchors[it.normalizedAnchor()] },
+                x = placed.number("x")?.times(factorX),
+                y = placed.number("y")?.times(factorY),
+                scale = module.number("scale") ?: placed.number("scale"),
+                style = placed.style(name) + module.style(name),
+            )
+
+        val topLevel = modules.mapNotNull { (name, module) ->
+            val target = targets[name] ?: return@mapNotNull null
             // Some modules (e.g. PING) keep their placement on a child element instead of the module itself.
             val placed = module.takeIf { it.hasPlacement() }
                 ?: module.entries.firstNotNullOfOrNull { (key, child) ->
                     (child as? JsonObject)?.takeIf { key.startsWith(name) && it.hasPlacement() }
                 }
                 ?: module
-            val section = placed["position"]?.jsonPrimitive?.content?.let { anchors[it.normalizedAnchor()] }
-            val x = placed.number("x")
-            val y = placed.number("y")
             // If Lunar saved a HUD placement but omitted its default-on flag, import it as visible.
-            val enabled = module["enabled"]?.jsonPrimitive?.booleanOrNull
-                ?: (section != null || x != null || y != null).takeIf { it }
-            Request(
-                source = "Lunar $name",
-                target = target,
-                enabled = enabled,
-                section = section,
-                x = x?.times(factorX),
-                y = y?.times(factorY),
-                scale = module.number("scale") ?: placed.number("scale"),
-                style = module.style(name),
-            )
+            val enabled = module["enabled"]?.jsonPrimitive?.booleanOrNull ?: placed.hasPlacement().takeIf { it }
+            request(name, target, module, placed, enabled)
         }
+        // After the top-level modules, so a module of its own wins over a child that maps to the same HUD.
+        val nested = modules.flatMap { (parentName, module) ->
+            childTargets[parentName].orEmpty().mapNotNull { (childKey, named) ->
+                val child = module[childKey] as? JsonObject ?: return@mapNotNull null
+                val parentEnabled = module["enabled"]?.jsonPrimitive?.booleanOrNull
+                // A child cannot show while its module is off; otherwise its own flag decides.
+                val enabled = if (parentEnabled == false) false
+                else child["enabled"]?.jsonPrimitive?.booleanOrNull ?: parentEnabled
+                request(named.first, named.second, child, child, enabled)
+            }
+        }
+        return topLevel + nested
+    }
 
     private fun JsonObject.hasPlacement() = containsKey("position") || containsKey("x") || containsKey("y")
 
