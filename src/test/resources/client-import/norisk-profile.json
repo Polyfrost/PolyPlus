@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "name": "FPS",
+      "values": [
+        { "name": "isEnabled", "value": true },
+        {
+          "name": "anchorPosition",
+          "value": { "type": "gg.norisk.ui.api.serializable.AnchorPointPosition", "anchor": "TOP_RIGHT", "relativX": 0.9, "relativY": 0.1 }
+        },
+        { "name": "hudScale", "value": 1.25 },
+        {
+          "name": "background",
+          "value": { "backgroundType": "BLANK", "color": { "color": { "red": 0.0, "green": 0.0, "blue": 0.0, "alpha": 1.0 }, "isRainbow": false } }
+        },
+        { "name": "multiColor", "value": { "color": { "red": 1.0, "green": 0.0, "blue": 0.0, "alpha": 1.0 }, "isRainbow": true } }
+      ]
+    },
+    {
+      "name": "Potion Status",
+      "values": [
+        { "name": "isEnabled", "value": true },
+        { "name": "anchorPosition", "value": { "anchor": "MIDDLE_LEFT", "relativX": 0.0, "relativY": 0.5 } }
+      ]
+    },
+    {
+      "name": "Clock",
+      "values": [ { "name": "isEnabled", "value": false } ]
+    },
+    {
+      "name": "Speedometer",
+      "values": [
+        { "name": "isEnabled", "value": true },
+        { "name": "anchorPosition", "value": { "anchor": "TOP_LEFT", "relativX": 5.0, "relativY": 0.0 } }
+      ]
+    },
+    { "name": "Not A Hud", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "FullBright", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "TNT_Timer", "values": [ { "name": "isEnabled", "value": true } ] },
+    { "name": "MotionBlur", "values": [ { "name": "isEnabled", "value": false } ] }
+  ]
+}
