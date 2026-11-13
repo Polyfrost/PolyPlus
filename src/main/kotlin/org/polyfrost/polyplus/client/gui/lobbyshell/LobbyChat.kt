@@ -77,7 +77,7 @@ private val DockCloseSize = 28.dp
 internal fun PlayerBar(lobby: LobbyShell, modifier: Modifier) {
     val party by PartyRepository.party.collectAsState()
     Row(
-        modifier.height(LobbyLayout.BarHeight).panel().padding(horizontal = BarPadding),
+        modifier.height(LobbyLayout.BarHeight).panel().padding(start = (LobbyLayout.BarHeight - BarHeadSize) / 2, end = BarPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(BarGap),
     ) {
@@ -91,13 +91,13 @@ internal fun PlayerBar(lobby: LobbyShell, modifier: Modifier) {
 
 @Composable
 private fun SoloRoster() {
-    BarEntry(ClientPlatform.localPlayerName(), "You") { PlayerHead(ClientPlatform.localPlayerUuid(), BarHeadSize, Modifier, headShape(BarHeadSize)) }
+    BarEntry(ClientPlatform.localPlayerName(), "You") { PlayerHead(ClientPlatform.localPlayerUuid(), BarHeadSize, Modifier.centerVerticallyExact(), headShape(BarHeadSize)) }
 }
 
 @Composable
 private fun BarEntry(name: String, detail: String, head: @Composable () -> Unit) {
     Row(
-        Modifier.widthIn(max = BarEntryWidth),
+        Modifier.widthIn(max = BarEntryWidth).fillMaxHeight(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

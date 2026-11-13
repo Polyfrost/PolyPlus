@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -105,7 +106,7 @@ internal fun PartyRoster(host: SocialHost, party: Party, width: Dp) {
     val tier = RosterTier.entries.firstOrNull { it.span(cells.size) <= width } ?: RosterTier.Heads
     val slot = tier.width + tier.gap
     val shown = if (tier.span(cells.size) <= width) cells else cells.take(((width - OverflowWidth + tier.gap) / slot).toInt().coerceAtLeast(1))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(tier.gap)) {
+    Row(Modifier.centerVerticallyExact(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(tier.gap)) {
         shown.forEach { cell -> key(cell.id) { PartyEntry(host, party, cell, tier) } }
         if (shown.size < cells.size) Label("+${cells.size - shown.size}", 12.sp, color = MutedText, weight = FontWeight.Medium)
     }
@@ -170,6 +171,7 @@ private fun PartyEntry(host: SocialHost, party: Party, cell: PartyCell, tier: Ro
     Box {
         Row(
             modifier
+                .height(IntrinsicSize.Max)
                 .rowFrame(false, hovered, ppShape(8.dp))
                 .contextMenu { memberMenuItems(host, party, cell) }
                 .hoverable(interaction)
@@ -178,7 +180,7 @@ private fun PartyEntry(host: SocialHost, party: Party, cell: PartyCell, tier: Ro
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
         ) {
-            EntryHead(cell)
+            EntryHead(cell, Modifier.centerVerticallyExact())
             if (tier != RosterTier.Heads) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Label(cell.name, if (compact) 12.sp else 14.sp, color = if (cell.speaking) SocialSuccessText else SocialTextPrimary, weight = FontWeight.Medium)
@@ -194,8 +196,8 @@ private fun PartyEntry(host: SocialHost, party: Party, cell: PartyCell, tier: Ro
 }
 
 @Composable
-private fun EntryHead(cell: PartyCell) {
-    Box {
+private fun EntryHead(cell: PartyCell, modifier: Modifier) {
+    Box(modifier) {
         PlayerHead(seedOf(cell.id), EntryHead, Modifier.then(if (cell.speaking) Modifier.border(1.dp, SocialSuccessColor, headShape(EntryHead)) else Modifier), headShape(EntryHead))
         if (cell.muted) {
             Box(
@@ -222,7 +224,7 @@ private fun EntryHead(cell: PartyCell) {
 
 @Composable
 internal fun PartyControls(host: SocialHost, party: Party?) {
-    PartyActions(party)
+    Box(Modifier.centerVerticallyExact()) { PartyActions(party) }
     PartyInviteCards(host)
 }
 

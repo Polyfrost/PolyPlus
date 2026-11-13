@@ -42,6 +42,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.constrainWidth
+import kotlin.math.floor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -110,6 +113,16 @@ private fun Modifier.glassBounds(root: Size, radiusPx: Float, register: (LobbyGl
                 radiusPx / root.height,
             ),
         )
+    }
+}
+
+internal fun Modifier.centerVerticallyExact(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0))
+    val height = if (constraints.hasBoundedHeight) constraints.maxHeight else placeable.height
+    val offset = (height - placeable.height) / 2f
+    val top = floor(offset).toInt()
+    layout(constraints.constrainWidth(placeable.width), height) {
+        placeable.placeWithLayer(0, top) { translationY = offset - top }
     }
 }
 
