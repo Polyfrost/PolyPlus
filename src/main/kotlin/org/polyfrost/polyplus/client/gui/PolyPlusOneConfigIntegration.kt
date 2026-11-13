@@ -24,10 +24,11 @@ object PolyPlusOneConfigIntegration {
     private const val MOD_ICONS = "assets/polyplus/modicons/"
 
     private val modIcons = setOf(
-        "betterhurtcam", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "crosshairtweaks",
-        "custom-block-highlight", "droppeditemtweaks", "fastquit", "fovchanger", "freelook", "gammautils", "mountopacity",
-        "numericalenchantments", "overlaytweaks", "rendertweaks", "sciophobia", "scrolltweaks", "shaketweaks",
-        "simplenickhider", "smoothskies", "tooltipscroll", "waveycapes", "zoomify",
+        "betterhurtcam", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "countdown", "crosshairtweaks",
+        "custom-block-highlight", "droppeditemtweaks", "fastquit", "fovchanger", "freelook", "gammautils", "itemphysiclite",
+        "lambdynlights", "mountopacity", "numericalenchantments", "overlaytweaks", "polydium", "rendertweaks", "sciophobia",
+        "scrolltweaks", "shaketweaks", "shieldstatus", "simplenickhider", "smoothskies", "tipper", "tooltipscroll",
+        "waveycapes", "zoomify",
     )
 
     private val wardrobePage = object : OneConfigPage(
@@ -77,6 +78,9 @@ object PolyPlusOneConfigIntegration {
         val id = when (val base = modId.replaceFirst(Regex("(v\\d+)?\\.(json|toml)$"), "")) {
             "fullbright", "polyfullbright" -> "gammautils"
             "legacy_waveycapes" -> "waveycapes"
+            "tntcountdown" -> "countdown"
+            "itemphysicliteconfig.mixins", "oitemphysic" -> "itemphysiclite"
+            "hypixelautotip" -> "tipper"
             "legacy_skin_layers", "legacy-skin-layers", "skinlayers3d" -> return null
             else -> base
         }

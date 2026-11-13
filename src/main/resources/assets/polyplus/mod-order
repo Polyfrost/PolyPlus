@@ -20,6 +20,7 @@ wwaypoints
 polyhitbox.json
 overflowparticles.json
 fovchanger.json
+shieldstatus
 polyblur.json
 nametag.json
 polytime.json
@@ -44,6 +45,7 @@ controlify
 flashback
 itemphysicliteconfig.mixins.json
 itemphysiclite
+oitemphysic.json
 status-effect-bars
 effecttimerplus
 appleskin
