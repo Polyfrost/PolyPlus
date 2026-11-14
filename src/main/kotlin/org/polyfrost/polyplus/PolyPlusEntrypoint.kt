@@ -45,7 +45,7 @@ class PolyPlusEntrypoint
 
         @JvmStatic
         fun remap(binding: KeyBinding, vanillaKey: Int): Int =
-            binding.keyCode.takeIf { it != Keyboard.KEY_NONE } ?: vanillaKey
+            binding.keyCode.takeIf { it > Keyboard.KEY_NONE && it < Keyboard.KEYBOARD_SIZE } ?: vanillaKey
     }
     *///?}
 
