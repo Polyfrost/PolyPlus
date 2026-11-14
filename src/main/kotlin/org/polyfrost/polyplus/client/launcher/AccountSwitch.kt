@@ -20,6 +20,7 @@ import net.minecraft.client.Session
 *///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if > 1.8.9
 import org.polyfrost.polyplus.compat.AccountSwitchCompat
@@ -74,7 +75,10 @@ object AccountSwitch {
             previousId != newId
         }
         *///?}
-        if (switched) PolyPlusClient.refresh()
+        if (switched) {
+            MojangSkinService.clearLocalOverride()
+            PolyPlusClient.refresh()
+        }
         true
     }.getOrElse {
         LOGGER.error("Failed to switch account in-session", it)

@@ -90,6 +90,7 @@ object CosmeticSync {
             if (!LobbyScene.building) {
                 PolyPlusClient.refreshCosmetics()
                 refreshVisibleSubscriptions()
+                MojangSkinService.refreshLocalOverride()
             }
             Unit
         }

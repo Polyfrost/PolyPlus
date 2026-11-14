@@ -18,8 +18,10 @@ import org.polyfrost.polyplus.libs.ktor.http.HttpHeaders
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import org.polyfrost.polyplus.libs.ktor.http.isSuccess
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -54,19 +56,22 @@ object MojangSkinService {
     private const val UNREACHABLE_MESSAGE = "Couldn't reach Minecraft's servers."
     private const val READBACK_ATTEMPTS = 5
     private const val READBACK_DELAY_MS = 1_000L
+    private const val UPLOAD_GRACE_MS = 60_000L
+    private const val TEXTURE_WAIT_MS = 30_000L
+    private const val TEXTURE_POLL_MS = 250L
     private const val MAX_LOGGED_BODY = 500
     private val TEXTURE_HASH = Regex("^[0-9a-f]{32,64}$")
 
     private val requestLock = Mutex()
 
-    @Volatile
-    private var knownTexture: String? = null
+    private class SkinOverride(val owner: UUID, val skin: MojangSkin, val uploadedAt: Long = System.currentTimeMillis())
+
+    // Writes to override and overrideChecks happen under overrideLock; bumping overrideChecks drops in-flight join checks.
+    private val overrideLock = Any()
 
     @Volatile
-    private var changedSkin: MojangSkin? = null
-
-    @Volatile
-    private var changedFor: UUID? = null
+    private var override: SkinOverride? = null
+    private var overrideChecks = 0
 
     var changedSkinVersion by mutableIntStateOf(0)
         private set
@@ -142,19 +147,16 @@ object MojangSkinService {
             tokenFor(owner)
             val file = png()
             val token = tokenFor(owner)
-            val previous = knownTexture ?: runSuspendCatching { readProfile(token) }.getOrNull()?.textureHash
+            val previous = runSuspendCatching { readProfile(token) }.getOrNull()?.textureHash
             val response = post(token, file, model)
             ensureSkinChanged(response)
             val reported = runSuspendCatching { response.body<ServicesProfile>() }.getOrNull()?.let(::activeSkin)
-            val skin = if (reported != null) {
-                knownTexture = reported.textureHash
-                reported
-            } else {
-                readBack(token, previous)
-            }
+            val skin = reported ?: readBack(token, previous)
             if (skin != null) {
-                changedSkin = skin
-                changedFor = owner
+                synchronized(overrideLock) {
+                    override = SkinOverride(owner, skin)
+                    overrideChecks++
+                }
                 changedSkinVersion++
             }
             skin
@@ -183,11 +185,53 @@ object MojangSkinService {
 
     @JvmStatic
     fun localPreviewSkin(playerId: UUID): PreviewSkin? {
-        val skin = changedSkin ?: return null
-        if (playerId != changedFor || playerId != ClientPlatform.localPlayerUuid()) return null
+        val current = override ?: return null
+        if (playerId != current.owner || playerId != ClientPlatform.localPlayerUuid()) return null
+        val skin = current.skin
         val hash = skin.textureHash ?: return null
         val texture = SkinLibrary.texture(hash, skin.url) ?: return null
         return PreviewSkin(texture, skin.model == SkinModel.Slim)
+    }
+
+    fun refreshLocalOverride() {
+        val owner = ClientPlatform.localPlayerUuid()
+        val (current, check) = synchronized(overrideLock) {
+            val current = override ?: return
+            if (current.owner != owner) {
+                clearLocalOverride()
+                return
+            }
+            if (System.currentTimeMillis() - current.uploadedAt < UPLOAD_GRACE_MS) return
+            current to ++overrideChecks
+        }
+        val token = accessToken() ?: return
+        PolyPlusClient.SCOPE.launch {
+            val active = runSuspendCatching { readProfile(token) }.getOrNull() ?: return@launch
+            if (active.textureHash == current.skin.textureHash && active.model == current.skin.model) return@launch
+            if (!textureLoaded(active)) return@launch
+            synchronized(overrideLock) {
+                if (check != overrideChecks || owner != ClientPlatform.localPlayerUuid()) return@launch
+                override = SkinOverride(owner, active, uploadedAt = 0L)
+            }
+            changedSkinVersion++
+        }
+    }
+
+    fun clearLocalOverride() {
+        synchronized(overrideLock) {
+            if (override == null) return
+            override = null
+            overrideChecks++
+        }
+        changedSkinVersion++
+    }
+
+    private suspend fun textureLoaded(skin: MojangSkin): Boolean {
+        val hash = skin.textureHash ?: return false
+        return withTimeoutOrNull(TEXTURE_WAIT_MS) {
+            while (ClientPlatform.runOnMainSync { SkinLibrary.texture(hash, skin.url) } == null) delay(TEXTURE_POLL_MS)
+            true
+        } ?: false
     }
 
     private suspend fun readBack(token: String, previous: String?): MojangSkin? {
@@ -206,7 +250,7 @@ object MojangSkinService {
             return null
         }
         if (!status.isSuccess()) throw MojangSkinException(UNREACHABLE_MESSAGE)
-        return activeSkin(response.body<ServicesProfile>()).also { knownTexture = it?.textureHash }
+        return activeSkin(response.body<ServicesProfile>())
     }
 
     private fun activeSkin(profile: ServicesProfile): MojangSkin? {
