@@ -133,6 +133,10 @@ float noise(vec2 pixel) {
     return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
 }
 
+bool reducedEffects() {
+    return Params.y > 0.5;
+}
+
 int flagMode() {
     return int(Flags.w + 0.5);
 }
@@ -378,7 +382,7 @@ vec3 scene() {
     vec3 color = textureLod(InSampler, texCoord, 0.0).rgb;
     float depth = textureLod(DepthSampler, texCoord, 0.0).r;
     float blur = 0.0;
-    if (depthKnown() && validDepth(depth)) {
+    if (!reducedEffects() && depthKnown() && validDepth(depth)) {
         float z = linearDepth(depth);
         bool sky = skyAt(texCoord, depth, z);
         if (!sky) {

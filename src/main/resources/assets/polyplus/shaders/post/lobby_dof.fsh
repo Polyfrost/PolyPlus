@@ -56,7 +56,7 @@ out vec4 fragColor;
 /*varying vec2 texCoord;
 *///?}
 
-const int GATHER_TAPS = 24;
+const int GATHER_TAPS = 12;
 const int PROBE_TAPS = 8;
 const float GOLDEN_ANGLE = 2.39996;
 const float DOF_RADIUS = 11.0;
@@ -83,6 +83,10 @@ bool validDepth(float depth) {
 
 float noise(vec2 pixel) {
     return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+
+bool reducedEffects() {
+    return Params.y > 0.5;
 }
 
 int flagMode() {
@@ -308,7 +312,7 @@ vec4 gather(vec3 center, float centerReach, float centerDepth, float search, flo
 void main() {
     vec4 result = vec4(0.0);
     float depth = textureLod(DepthSampler, texCoord, 0.0).r;
-    if (depthKnown() && validDepth(depth)) {
+    if (!reducedEffects() && depthKnown() && validDepth(depth)) {
         vec3 center = textureLod(InSampler, texCoord, 0.0).rgb;
         float seed = noise(gl_FragCoord.xy);
         float z = linearDepth(depth);

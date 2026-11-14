@@ -114,6 +114,27 @@ object LobbySky {
     private val glass = MemoryUtil.memAlloc(LobbyGlass.BLOCK_BYTES)
     private val fogSeen = Vector3f(1f, 1f, 1f)
 
+    private val WEAK_GPUS = listOf("llvmpipe", "softpipe", "software", "mesa x11", "swiftshader", "microsoft basic render", "gl4es", "mali", "adreno", "powervr", "tegra", "v3d")
+
+    private val STRONG_INTEL = listOf("arc", "(dg2", "(bmg", "(lnl")
+
+    private val reducedEffects: Boolean by lazy {
+        val gpu = runCatching { gpuName() }.getOrNull().orEmpty().lowercase()
+        val weak = ("intel" in gpu && STRONG_INTEL.none { it in gpu }) || WEAK_GPUS.any { it in gpu }
+        if (weak) LOBBY_LOGGER.info("Using reduced lobby effects on {}", gpu)
+        weak
+    }
+
+    //? if >= 26.2 {
+    private fun gpuName(): String = RenderSystem.getDevice().deviceInfo.name()
+    //?} elif >= 1.21.5 {
+    /*private fun gpuName(): String = RenderSystem.getDevice().renderer
+    *///?} elif > 1.8.9 {
+    /*private fun gpuName(): String = com.mojang.blaze3d.platform.GlUtil.getRenderer()
+    *///?} else {
+    /*private fun gpuName(): String = GL11.glGetString(GL11.GL_RENDERER).orEmpty()
+    *///?}
+
     private val untinted: Boolean get() = mood.interior || mood.realm != LobbyRealm.OVERWORLD
 
     private fun skyLight(color: Vector3f): Vector3f = if (untinted) color else color.lerp(NIGHT_LIGHT, 0.34f * mood.night)
@@ -202,10 +223,11 @@ object LobbySky {
         val bridge = LobbyShaderBridges.current
         val pack = bridge.packActive()
         val model = if (pack) bridge.depthModel() else NATIVE_DEPTH
+        val quality = if (reducedEffects) 1f else 0f
         if (model == NATIVE_DEPTH || model == DepthModel.UNKNOWN) {
-            data.putFloat(1f).putFloat(0f).putFloat(NEAR).putFloat(depthFar)
+            data.putFloat(1f).putFloat(quality).putFloat(NEAR).putFloat(depthFar)
         } else {
-            data.putFloat(1f).putFloat(0f).putFloat(depthFar).putFloat(NEAR)
+            data.putFloat(1f).putFloat(quality).putFloat(depthFar).putFloat(NEAR)
         }
         data.putFloat(mood.aurora).putFloat(mood.night).putFloat(mood.exposure).putFloat(mood.golden)
         val lens = if (pack && bridge.packDepthOfField()) DEPTH_OF_FIELD * PACK_DEPTH_OF_FIELD else DEPTH_OF_FIELD

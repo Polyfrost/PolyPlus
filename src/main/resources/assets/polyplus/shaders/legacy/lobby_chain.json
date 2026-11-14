@@ -35,8 +35,7 @@
       "name": "dof",
       "width": 960,
       "height": 540
-    },
-    "lobby_out"
+    }
   ],
   "passes": [
     {
@@ -270,7 +269,7 @@
     {
       "name": "polyplus_lobby_final",
       "intarget": "sky",
-      "outtarget": "lobby_out",
+      "outtarget": "minecraft:main",
       "use_linear_filter": true,
       "auxtargets": [
         {
@@ -286,12 +285,6 @@
           "id": "frost_b"
         }
       ]
-    },
-    {
-      "name": "polyplus_lobby_blit",
-      "intarget": "lobby_out",
-      "outtarget": "minecraft:main",
-      "use_linear_filter": true
     }
   ]
 }

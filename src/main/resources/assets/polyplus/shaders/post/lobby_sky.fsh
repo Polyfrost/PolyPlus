@@ -60,6 +60,7 @@ const float AURORA_SATURATION = 0.72;
 const float RING_GAIN = 0.6;
 const float RING_WIDTH = 7.0;
 const float RING_RAMP = 28.0;
+const float REDUCED_AURORA_STEPS = 10.0;
 
 int flagMode() {
     return int(Flags.w + 0.5);
@@ -149,8 +150,12 @@ float auroraBand(vec3 dir, float t) {
 vec3 aurora(vec3 dir, float t, float jitter, float coverage) {
     vec3 total = vec3(0.0);
     const int STEPS = 26;
+    float steps = Params.y > 0.5 ? REDUCED_AURORA_STEPS : float(STEPS);
     for (int i = 0; i < STEPS; i++) {
-        float f = (float(i) + jitter) / float(STEPS);
+        if (float(i) >= steps) {
+            break;
+        }
+        float f = (float(i) + jitter) / steps;
         float height = 0.9 + f * f * 2.1;
         vec2 p = dir.xz / (dir.y + 0.16) * height * 0.95;
         float band = ribbon(p, t);
@@ -158,7 +163,7 @@ vec3 aurora(vec3 dir, float t, float jitter, float coverage) {
         tint = mix(tint, vec3(0.92, 0.16, 0.86), smoothstep(0.5, 1.0, f));
         total += band * tint * pow(1.0 - f, 1.6);
     }
-    return total * 0.3 * coverage;
+    return total * 0.3 * coverage * (float(STEPS) / steps);
 }
 
 vec3 ringGlow(float front) {
