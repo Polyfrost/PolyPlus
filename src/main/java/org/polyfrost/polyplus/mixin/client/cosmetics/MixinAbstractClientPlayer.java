@@ -5,9 +5,8 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
-import org.polyfrost.polyplus.client.cosmetics.CapeResolver;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
-import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride;
+import org.polyfrost.polyplus.client.cosmetics.PlayerSkinCache;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
@@ -39,6 +38,9 @@ public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, P
 
     @Unique
     private CosmeticEquipment polyplus$cosmeticEquipment;
+
+    @Unique
+    private final PlayerSkinCache polyplus$skinCache = new PlayerSkinCache();
 
     @Override
     public EmoteController polyplus$emoteController() {
@@ -76,7 +78,7 @@ public abstract class MixinAbstractClientPlayer implements PlayerEmotesAccess, P
         GameProfile profile = this.playerInfo.getProfile();
         //~ if >= 1.21.10 'getId' -> 'id'
         UUID player = profile.id();
-        return LocalSkinOverride.apply(player, CapeResolver.applyCape(player, profile, original));
+        return polyplus$skinCache.apply(player, profile, original);
     }
 }
 //?} else {
