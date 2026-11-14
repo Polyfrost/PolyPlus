@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client.lobby
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import net.minecraft.client.Minecraft
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -40,9 +41,9 @@ object StartupSounds {
 
     //? if > 1.8.9 {
     @JvmStatic
-    fun reload(mc: Minecraft): CompletableFuture<Void> {
-        if (!StartupOverlay.enabled()) return mc.reloadResourcePacks()
-        if (loaded) reloadSounds(mc) else waiting = true
+    fun reload(original: Operation<CompletableFuture<Void>>): CompletableFuture<Void> {
+        if (!StartupOverlay.enabled()) return original.call()
+        if (loaded) reloadSounds(Minecraft.getInstance()) else waiting = true
         return CompletableFuture.completedFuture(null)
     }
 
@@ -59,8 +60,8 @@ object StartupSounds {
     }
     //?} else {
     /*@JvmStatic
-    fun reload(mc: Minecraft) {
-        if (StartupOverlay.enabled()) reloadSounds(mc) else mc.reloadResources()
+    fun reload(original: Operation<Void>) {
+        if (StartupOverlay.enabled()) reloadSounds(Minecraft.getInstance()) else original.call()
     }
 
     private fun reloadSounds(mc: Minecraft) {
