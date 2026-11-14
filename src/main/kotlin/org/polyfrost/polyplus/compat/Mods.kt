@@ -13,6 +13,7 @@ object Mods {
     val guiSlider: Boolean by lazy { loaded("gui_slider") }
     val iris: Boolean by lazy { loaded("iris") }
     val notEnoughAnimations: Boolean by lazy { loaded("notenoughanimations") }
+    val overflowAnimations: Boolean by lazy { loaded("overflowanimations") }
     val replayMod: Boolean by lazy { loaded("replaymod") }
     val vulkanMod: Boolean by lazy { loaded("vulkanmod") }
     val wwaypoints: Boolean by lazy { loaded("wwaypoints") }
