@@ -65,7 +65,7 @@ Type a shortcode like `:sob:` and it turns into an emoji. You get suggestions wh
 - A first launch setup screen for toggle sprint, motion blur, GUI scale and other OneClient mods
 - A branded loading screen
 - A warning when your memory allocation is hurting performance
-- A Windows sensitivity converter in the controls screen (1.8.9)
+- A raw input switch in the controls screen (1.8.9)
 
 ## Terms of Service
 
