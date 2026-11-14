@@ -43,9 +43,11 @@ class PolyPlusEntrypoint
         lateinit var customDebug: KeyBinding
         lateinit var clearShaders: KeyBinding
 
+        // The result replaces F1/F3/F4 constants that tick passes to Keyboard.isKeyDown, so a mouse
+        // binding (negative code) or any out-of-range code would throw there on every key press
         @JvmStatic
         fun remap(binding: KeyBinding, vanillaKey: Int): Int =
-            binding.keyCode.takeIf { it != Keyboard.KEY_NONE } ?: vanillaKey
+            binding.keyCode.takeIf { it > Keyboard.KEY_NONE && it < Keyboard.KEYBOARD_SIZE } ?: vanillaKey
     }
     *///?}
 
