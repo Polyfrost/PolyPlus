@@ -22,9 +22,11 @@ import kotlin.math.tan
 
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.DeathScreen
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.entity.LivingEntity
 //?} else {
 /*import net.minecraft.client.gui.screen.game.DeathScreen
+import net.minecraft.client.gui.screen.game.inventory.InventoryMenuScreen
 import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.entity.living.LivingEntity
 *///?}
@@ -327,14 +329,20 @@ object PauseStage {
         PauseAvatar.end()
     }
 
+    // The stage only starts from the pause menu, so every screen opened while staged is one of its menus,
+    // except deaths and server-opened containers. Leaving the world finishes through the player check.
     @JvmStatic
     fun onScreen(screen: Screen?) {
         if (PausePlatform.player() == null) finish()
-        else if (screen == null || screen is DeathScreen || unpausedBy(screen)) release()
+        else if (screen == null || screen is DeathScreen || isContainer(screen)) release()
     }
 
-    private fun unpausedBy(screen: Screen): Boolean =
-        screen !is OneClientPauseScreen && PausePlatform.pausesWorld() && !PausePlatform.gamePaused()
+    private fun isContainer(screen: Screen): Boolean =
+        //? if > 1.8.9 {
+        screen is AbstractContainerScreen<*>
+        //?} else {
+        /*screen is InventoryMenuScreen
+        *///?}
 
     @JvmStatic
     fun frame() {
