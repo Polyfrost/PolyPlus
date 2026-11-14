@@ -86,7 +86,7 @@ public class MixinGameRenderer {
         if (!LobbyScene.terrainActive()) return;
         LobbyScene.drawHolograms(renderer);
         //? if < 26.1
-        /^LobbyScene.onLevelDrawn(renderer);^/
+        /^LobbyScene.onLevelDrawn(renderer, true);^/
         //? if >= 1.21.4 {
         /^LobbySky.INSTANCE.process(renderer, ((GameRendererAccessor) renderer).polyplus$resourcePool());
         ^///?} else {
@@ -159,8 +159,13 @@ public class MixinGameRenderer {
     private void polyplus$processLobbyPost(float tickDelta, long startTime, CallbackInfo ci) {
         GameRenderer renderer = (GameRenderer) (Object) this;
         if (!LobbyScene.terrainActive()) return;
-        LobbyScene.onLevelDrawn(renderer);
+        LobbyScene.onLevelDrawn(renderer, false);
         LobbySky.INSTANCE.process(renderer);
+    }
+
+    @Inject(method = "render(IFJ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/world/WorldRenderer;render(Lnet/minecraft/client/render/block/BlockLayer;DILnet/minecraft/entity/Entity;)I", ordinal = 0, shift = At.Shift.AFTER))
+    private void polyplus$lobbyTerrainDrawn(int anaglyphRenderPass, float tickDelta, long renderTimeLimit, CallbackInfo ci) {
+        LobbyScene.onTerrainDrawn();
     }
 
     @Inject(method = "render(FJ)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;render(IIF)V"))
