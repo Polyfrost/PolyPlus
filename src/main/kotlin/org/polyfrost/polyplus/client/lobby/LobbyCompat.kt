@@ -132,6 +132,7 @@ object LobbyCompat {
     fun renderedSections(mc: Minecraft): Int = levelSink(mc).countRenderedSections()
 
     private const val SODIUM_HAS_LIGHT_DATA = 2
+    private const val MAX_LIGHT_PASSES = 64
     private const val VULKANMOD_LIGHT_READY: Byte = 2
 
     private val sodiumTracker: Pair<Method, Method>? by lazy {
@@ -154,6 +155,14 @@ object LobbyCompat {
     fun lightReady(level: ClientLevel, x: Int, z: Int) {
         sodiumTracker?.let { (get, added) -> added.invoke(get.invoke(null, level), x, z, SODIUM_HAS_LIGHT_DATA) }
         vulkanModStatus?.let { (instance, set) -> set.invoke(instance.get(null), x, z, VULKANMOD_LIGHT_READY) }
+    }
+
+    // capped because a mod can turn runLightUpdates into a no-op while work stays queued
+    // (Optimized Fullbright does with ScalableLux), and an unbounded loop then hangs startup
+    fun drainLight(level: ClientLevel) {
+        val lightEngine = level.lightEngine
+        var passes = 0
+        while (lightEngine.hasLightWork() && passes++ < MAX_LIGHT_PASSES) lightEngine.runLightUpdates()
     }
 
     fun requeueChunks(mc: Minecraft, level: ClientLevel, centerX: Int, centerZ: Int, radius: Int) {

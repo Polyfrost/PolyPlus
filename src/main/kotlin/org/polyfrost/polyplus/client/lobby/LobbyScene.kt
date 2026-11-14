@@ -199,6 +199,9 @@ object LobbyScene {
         var startNanos = 0L
         val builtNanos = Util.getNanos()
         var frames = 0L
+        var published = false
+        var drawn = false
+        var unstartedTicks = 0
         var frameTime = 0.0
         var frameLook: Vec3 = Vec3(0.0, 0.0, 0.0)
         val worn = HashMap<UUID, List<AttachedCosmetic>>()
@@ -265,6 +268,7 @@ object LobbyScene {
     const val INTRO_SECONDS = 2.5
     private const val CRANE_SECONDS = 5.0
     private const val START_WAIT_NANOS = 4_000_000_000L
+    private const val STALL_TICKS = 400
     private const val LABEL_HEAD_SHARE = 0.9
     private const val LABEL_BODY_SHARE = 0.5
     private const val LABEL_SIGHT_SLACK = 0.5
@@ -393,6 +397,7 @@ object LobbyScene {
     private var leftTag: String? = null
     private var leftAt = 0.0
     private var abandoning = false
+    private var loadingTicks = 0
 
     @JvmStatic
     fun showing(): Boolean = shown() != null
@@ -772,6 +777,7 @@ object LobbyScene {
     }
 
     private fun tryNext() {
+        loadingTicks = 0
         val entry = attempts.removeFirstOrNull()
         if (entry == null) {
             if (switching) {
@@ -1112,8 +1118,7 @@ object LobbyScene {
 
     private fun relight(level: ClientLevel) {
         //? if > 1.8.9 {
-        val lightEngine = level.lightEngine
-        while (lightEngine.hasLightWork()) lightEngine.runLightUpdates()
+        LobbyCompat.drainLight(level)
         //?}
     }
 
@@ -1204,7 +1209,7 @@ object LobbyScene {
                 }
             }
         }
-        while (lightEngine.hasLightWork()) lightEngine.runLightUpdates()
+        LobbyCompat.drainLight(level)
     }
 
     private fun load(level: ClientLevel, pos: ChunkPos, sections: Array<LevelChunkSection>): LevelChunk? {
@@ -1858,14 +1863,21 @@ object LobbyScene {
             mc.gameRenderer.setRenderBlockOutline(false)
             scene.frameTime = elapsed()
             scene.frameLook = poseRig(scene, scene.frameTime)
+            scene.published = false
             scene.extracted = true
         }
     }
 
     @JvmStatic
-    fun onLevelDrawn(renderer: GameRenderer) {
+    fun onLevelDrawn(renderer: GameRenderer, drawn: Boolean) {
         val scene = live ?: return
-        if (scene.extracted && swappedIn) guarded("publish") { publishFrame(Minecraft.getInstance(), renderer, scene, scene.frameTime, scene.frameLook) }
+        if (scene.extracted && swappedIn) guarded("publish") { publishFrame(Minecraft.getInstance(), renderer, scene, scene.frameTime, scene.frameLook, drawn) }
+    }
+
+    @JvmStatic
+    fun onTerrainDrawn() {
+        val scene = live ?: return
+        if (scene.extracted && swappedIn) scene.drawn = true
     }
 
     *///?}
@@ -2007,7 +2019,7 @@ object LobbyScene {
 
     private fun sectionsSettled(mc: Minecraft): Boolean = LobbyCompat.sectionsDone(mc)
 
-    private fun publishFrame(mc: Minecraft, renderer: GameRenderer, scene: Live, time: Double, look: Vec3) {
+    private fun publishFrame(mc: Minecraft, renderer: GameRenderer, scene: Live, time: Double, look: Vec3, drawn: Boolean = true) {
         val yawRad = Math.toRadians(scene.rig.yRot.toDouble())
         val right = Vec3(-cos(yawRad), 0.0, -sin(yawRad))
         //? if = 1.8.9
@@ -2035,6 +2047,8 @@ object LobbyScene {
         if (published != labels) labels = published
         overlayAlpha = (((time - overlayDelay) / OVERLAY_FADE_SECONDS).toFloat()).coerceIn(0f, 1f) * (1f - departProgress * 4f).coerceIn(0f, 1f)
         scene.extracted = true
+        scene.published = true
+        if (drawn) scene.drawn = true
         scene.frames++
         if (!scene.started && ((scene.frames > 30 && sectionsSettled(mc)) || (scene.frames > 2 && Util.getNanos() - scene.builtNanos > START_WAIT_NANOS))) {
             scene.started = true
@@ -2128,8 +2142,12 @@ object LobbyScene {
     fun onLevelRendered() {
         val scene = live ?: return
         if (scene.extracted && swappedIn) {
-            //? if < 26.1
-            /*Minecraft.getInstance().gameRenderer.setRenderBlockOutline(true)*/
+            //? if < 26.1 {
+            /*val mc = Minecraft.getInstance()
+            mc.gameRenderer.setRenderBlockOutline(true)
+            // Another mod can skip or cancel GameRenderer.renderLevel, so the reveal must not depend on the in-level hook.
+            if (!scene.published) guarded("publish") { publishFrame(mc, mc.gameRenderer, scene, scene.frameTime, scene.frameLook, drawn = false) }
+            *///?}
             end()
             scene.extracted = false
         }
@@ -2139,8 +2157,23 @@ object LobbyScene {
     fun onClientTick() {
         SparkCompat.warm()
         LobbyAmbience.tick()
+        watchLoading()
         val scene = shown() ?: return
         guarded("tick") { tickScene(scene) }
+        watchStart(scene)
+    }
+
+    private fun watchLoading() {
+        if ((phase != Phase.LOADING && !switching) || embedded || ++loadingTicks < STALL_TICKS) return
+        LOBBY_LOGGER.error("Lobby scene did not load within {} ticks, trying the next one", STALL_TICKS)
+        loadGeneration++
+        tryNext()
+    }
+
+    private fun watchStart(scene: Live) {
+        if (live !== scene || (scene.started && scene.drawn) || embedded) return
+        if (++scene.unstartedTicks < STALL_TICKS) return
+        abandon("start", IllegalStateException("Scene never started: ${scene.frames} frames published, drawn=${scene.drawn}, extracted=${scene.extracted}"))
     }
 
     private fun tickScene(scene: Live) {
