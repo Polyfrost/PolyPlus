@@ -1,0 +1,14 @@
+{
+  "**SelectedPresets**": { "background": { "id": "rounded", "version": 1, "fallback": false } },
+  "fps": { "**ArbitraryData**": {}, "hudRelativeY": "140.0", "hudRelativeX": "203.0" },
+  "keystrokes": { "**ArbitraryData**": {}, "hudRelativeY": "-1.0", "enabled": "true", "hudRelativeX": "202.0" },
+  "ping": { "**ArbitraryData**": {}, "hudRelativeY": "72.0", "hudRelativeX": "-249.0" },
+  "armorStatus": { "**ArbitraryData**": {}, "hudRelativeY": "-65.0", "hudRelativeX": "-108.0" },
+  "comboDisplay": { "**ArbitraryData**": {}, "hudRelativeY": "52.0", "enabled": "true", "hudRelativeX": "65.0" },
+  "packdisplay": { "**ArbitraryData**": {}, "hudRelativeY": "129.0", "enabled": "true", "hudRelativeX": "-60.0" },
+  "coordinates": { "**ArbitraryData**": {}, "enabled": "true" },
+  "toggleSprint": { "**ArbitraryData**": {}, "enabled": "false" },
+  "motionBlur": { "**ArbitraryData**": {}, "enabled": "true" },
+  "itemPhysic": { "**ArbitraryData**": {}, "enabled": "true" },
+  "glint": { "**ArbitraryData**": {} }
+}

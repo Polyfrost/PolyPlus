@@ -1,0 +1,180 @@
+package org.polyfrost.polyplus.compat
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.apache.logging.log4j.LogManager
+import org.polyfrost.polyplus.compat.OneConfigHudInstances.Request
+import java.nio.file.Files
+import java.nio.file.Path
+
+/** Translates Lunar's HUD modules (placement, scale, colors) into OneConfig HUD instances. */
+internal object LunarHudTranslator {
+    private val logger = LogManager.getLogger("PolyPlus/ClientConfigSync/Hud")
+    private val json = Json
+
+    private val targets = with(OneConfigHudInstances) {
+        mapOf(
+            "FPS" to FPS,
+            "COORDINATES" to COORDINATES,
+            "DIRECTION_HUD" to DIRECTION,
+            "DAY_COUNTER" to DAY,
+            "ARMORSTATUS" to ARMOR,
+            "POTION_EFFECTS" to POTIONS,
+            "KEYSTROKES" to KEYSTROKES,
+            "CPS" to CPS,
+            "PING" to PING,
+            "MEMORY" to MEMORY,
+            "COMBO" to COMBO,
+            "REACH_DISPLAY" to REACH,
+            "SERVER_ADDRESS" to SERVER,
+            "PACK_DISPLAY" to RESOURCE_PACK,
+            "CLOCK" to CLOCK,
+            "ITEM_COUNTER" to ITEM_COUNTER,
+            "MEDIA_PLAYER" to MEDIA,
+            "SCOREBOARD" to SCOREBOARD,
+            "ACTION_BAR" to ACTION_BAR,
+            "TITLES" to TITLES,
+            "BOSSBAR" to BOSS_BAR,
+            "HEIGHT_LIMIT" to HEIGHT_LIMIT,
+            "ITEM_TRACKER" to ITEM_TRACKER,
+            "SATURATION" to SATURATION,
+            "PLAYTIME" to PLAYTIME,
+            "TAB" to TAB_LIST,
+        )
+    }
+
+    /** HUDs Lunar keeps as a child of another module: module -> child key -> (name, target). */
+    private val childTargets = with(OneConfigHudInstances) {
+        mapOf(
+            "HYPIXEL_MOD" to mapOf("HYPIXEL_TPS" to ("TPS" to TPS)),
+            "HYPIXEL_BEDWARS" to mapOf("HYPIXEL_BEDWARS_HEIGHT_LIMIT_CHILD" to ("HEIGHT_LIMIT" to HEIGHT_LIMIT)),
+        )
+    }
+
+    private val anchors = mapOf(
+        "topleft" to "TopLeft",
+        "topcenter" to "TopCenter",
+        "topright" to "TopRight",
+        "middleleft" to "CenterLeft",
+        "middlecenter" to "Center",
+        "center" to "Center",
+        "middleright" to "CenterRight",
+        "bottomleft" to "BottomLeft",
+        "bottomcenter" to "BottomCenter",
+        "bottomright" to "BottomRight",
+    )
+
+    // Lunar option -> OneConfig HUD property. Lunar only saves options the user changed.
+    private val sharedBooleans = mapOf("background" to "showBackground", "textShadow" to "showShadow", "brackets" to "brackets")
+    private val sharedColors = mapOf("backgroundColor" to ("bgColor" to "bgChroma"), "textColor" to ("textColor" to "textChroma"))
+    private val moduleBooleans = mapOf(
+        "COORDINATES" to mapOf("showDirection" to "showDirection", "showAxisLabels" to "showAxis"),
+    )
+
+    fun import(sources: List<Path>, alreadyImported: Set<String>): Int {
+        val requests = requests(sources, scaled = true) ?: return 0
+        return OneConfigHudInstances.apply(requests, alreadyImported, OneConfigHudInstances.screen(sources))
+    }
+
+    fun preview(sources: List<Path>): List<String> {
+        val source = sources.firstOrNull(::isLunarModsFile) ?: return emptyList()
+        val requests = requests(sources, scaled = false) ?: return emptyList()
+        val result = requests.filter { request ->
+            OneConfigHudInstances.wouldApply(request).also {
+                logger.info(
+                    "Lunar HUD mapping {} -> {} (enabled={}, placement={}, style={}, importable={})",
+                    request.source, request.target.hudClass, request.enabled,
+                    request.section ?: "none", request.style.keys, it,
+                )
+            }
+        }.map { it.source.removePrefix("Lunar ") }.distinct()
+        logger.info("Lunar HUD elements eligible for import from {}: {}", source, result.joinToString().ifEmpty { "none" })
+        return result
+    }
+
+    private fun requests(sources: List<Path>, scaled: Boolean): List<Request>? {
+        val source = sources.firstOrNull(::isLunarModsFile) ?: return null
+        val root = runCatching { json.parseToJsonElement(Files.readString(source)).jsonObject }
+            .onFailure { logger.debug("Could not read Lunar HUD modules from {}", source, it) }
+            .getOrNull() ?: return null
+        val (factorX, factorY) = if (scaled) OneConfigHudInstances.guiPixelFactors(sources, "Lunar") else 1.0 to 1.0
+        return requests(root, factorX, factorY)
+    }
+
+    /** Pure translation of a Lunar `mods.json`; [factorX]/[factorY] turn Lunar GUI pixels into HUD units. */
+    internal fun requests(root: JsonObject, factorX: Double, factorY: Double): List<Request> {
+        val modules = root.mapNotNull { (rawName, value) -> (value as? JsonObject)?.let { rawName.uppercase() to it } }
+
+        fun request(name: String, target: OneConfigHudInstances.Target, module: JsonObject, placed: JsonObject, enabled: Boolean?) =
+            Request(
+                source = "Lunar $name",
+                target = target,
+                enabled = enabled,
+                section = placed["position"]?.jsonPrimitive?.content?.let { anchors[it.normalizedAnchor()] },
+                x = placed.number("x")?.times(factorX),
+                y = placed.number("y")?.times(factorY),
+                scale = module.number("scale") ?: placed.number("scale"),
+                style = placed.style(name) + module.style(name),
+            )
+
+        val topLevel = modules.mapNotNull { (name, module) ->
+            val target = targets[name] ?: return@mapNotNull null
+            // Some modules (e.g. PING) keep their placement on a child element instead of the module itself.
+            val placed = module.takeIf { it.hasPlacement() }
+                ?: module.entries.firstNotNullOfOrNull { (key, child) ->
+                    (child as? JsonObject)?.takeIf { key.startsWith(name) && it.hasPlacement() }
+                }
+                ?: module
+            // If Lunar saved a HUD placement but omitted its default-on flag, import it as visible.
+            val enabled = module["enabled"]?.jsonPrimitive?.booleanOrNull ?: placed.hasPlacement().takeIf { it }
+            request(name, target, module, placed, enabled)
+        }
+        // After the top-level modules, so a module of its own wins over a child that maps to the same HUD.
+        val nested = modules.flatMap { (parentName, module) ->
+            childTargets[parentName].orEmpty().mapNotNull { (childKey, named) ->
+                val child = module[childKey] as? JsonObject ?: return@mapNotNull null
+                val parentEnabled = module["enabled"]?.jsonPrimitive?.booleanOrNull
+                // A child cannot show while its module is off; otherwise its own flag decides.
+                val enabled = if (parentEnabled == false) false
+                else child["enabled"]?.jsonPrimitive?.booleanOrNull ?: parentEnabled
+                request(named.first, named.second, child, child, enabled)
+            }
+        }
+        return topLevel + nested
+    }
+
+    private fun JsonObject.hasPlacement() = containsKey("position") || containsKey("x") || containsKey("y")
+
+    private fun JsonObject.style(name: String): Map<String, JsonElement> = buildMap {
+        val options = this@style["options"] as? JsonObject ?: return@buildMap
+        (sharedBooleans + moduleBooleans[name].orEmpty()).forEach { (lunarKey, hudKey) ->
+            options[lunarKey]?.jsonPrimitive?.booleanOrNull?.let { put(hudKey, JsonPrimitive(it)) }
+        }
+        sharedColors.forEach { (lunarKey, keys) ->
+            val color = options[lunarKey] as? JsonObject ?: return@forEach
+            color["value"]?.jsonPrimitive?.content?.toIntOrNull()?.let { put(keys.first, JsonPrimitive(it)) }
+            color["chroma"]?.jsonPrimitive?.booleanOrNull?.let { put(keys.second, JsonPrimitive(it)) }
+        }
+    }
+
+    /** Lunar's `mods.json` for the selected profile, if it is among [sources]. */
+    internal fun readMods(sources: List<Path>): JsonObject? {
+        val source = sources.firstOrNull(::isLunarModsFile) ?: return null
+        return runCatching { json.parseToJsonElement(Files.readString(source)).jsonObject }
+            .onFailure { logger.debug("Could not read Lunar modules from {}", source, it) }
+            .getOrNull()
+    }
+
+    private fun isLunarModsFile(path: Path): Boolean =
+        path.fileName?.toString() == "mods.json" && path.parent?.parent?.fileName?.toString() == "game"
+
+    private fun JsonObject.number(key: String): Double? =
+        this[key]?.jsonPrimitive?.content?.toDoubleOrNull()?.takeIf { it.isFinite() }
+
+    private fun String.normalizedAnchor(): String = lowercase().filter(Char::isLetter)
+}
