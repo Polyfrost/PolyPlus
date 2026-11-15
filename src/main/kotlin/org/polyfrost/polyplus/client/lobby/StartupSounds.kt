@@ -41,9 +41,9 @@ object StartupSounds {
 
     //? if > 1.8.9 {
     @JvmStatic
-    fun reload(original: Operation<CompletableFuture<Void>>): CompletableFuture<Void> {
-        if (!StartupOverlay.enabled()) return original.call()
-        if (loaded) reloadSounds(Minecraft.getInstance()) else waiting = true
+    fun reload(mc: Minecraft, original: Operation<CompletableFuture<Void>>): CompletableFuture<Void> {
+        if (!StartupOverlay.enabled()) return original.call(mc)
+        if (loaded) reloadSounds(mc) else waiting = true
         return CompletableFuture.completedFuture(null)
     }
 
@@ -60,8 +60,8 @@ object StartupSounds {
     }
     //?} else {
     /*@JvmStatic
-    fun reload(original: Operation<Void>) {
-        if (StartupOverlay.enabled()) reloadSounds(Minecraft.getInstance()) else original.call()
+    fun reload(mc: Minecraft, original: Operation<Void>) {
+        if (StartupOverlay.enabled()) reloadSounds(mc) else original.call(mc)
     }
 
     private fun reloadSounds(mc: Minecraft) {

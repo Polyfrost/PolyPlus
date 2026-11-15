@@ -22,8 +22,8 @@ public class MixinExternalSounds {
             require = 0,
             expect = 0
     )
-    private static CompletableFuture<Void> polyplus$reloadOnlySounds(Operation<CompletableFuture<Void>> original) {
-        return StartupSounds.reload(original);
+    private static CompletableFuture<Void> polyplus$reloadOnlySounds(Minecraft minecraft, Operation<CompletableFuture<Void>> original) {
+        return StartupSounds.reload(minecraft, original);
     }
     //?} else {
     /*@WrapOperation(
@@ -33,8 +33,8 @@ public class MixinExternalSounds {
             require = 0,
             expect = 0
     )
-    private static void polyplus$reloadOnlySounds(Operation<Void> original) {
-        StartupSounds.reload(original);
+    private static void polyplus$reloadOnlySounds(Minecraft minecraft, Operation<Void> original) {
+        StartupSounds.reload(minecraft, original);
     }
     *///?}
 }
