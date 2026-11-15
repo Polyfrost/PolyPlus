@@ -3,16 +3,18 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -51,36 +53,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlIndication
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
-import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
-import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.wardrobe.AuraCustomPopover
+import org.polyfrost.polyplus.client.gui.wardrobe.AuraColorPopup
 import org.polyfrost.polyplus.client.gui.wardrobe.AuraSwatchRow
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticUiItem
 import org.polyfrost.polyplus.client.gui.wardrobe.ForceCapesToggle
-import org.polyfrost.polyplus.client.gui.wardrobe.rememberDropdownPosition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
-private const val OC_ICONS = "/assets/oneconfig/ico/"
 private val CarouselHeaderHeight = 38.dp
 private val CarouselPadding = 10.dp
 private val CarouselRowGap = 8.dp
@@ -93,6 +91,7 @@ private val CarouselWheelStep = 108.dp
 private val VariantWheelStep = 40.dp
 private const val WheelNotchDp = 150f
 private val NoteTileWidth = 260.dp
+internal val OutlineOnHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)
 internal val CarouselHeight = CarouselPadding * 2 + CarouselHeaderHeight + CarouselRowGap + CarouselTileHeight
 
 internal class PickerEntry(val key: String, val name: String, val equipped: Boolean, val item: CosmeticUiItem?, val cape: MojangCape?)
@@ -133,27 +132,24 @@ private fun TryOnWhileHovered(entry: PickerEntry, hovered: Boolean, model: Picke
 }
 
 @Composable
-internal fun Modifier.listRow(selected: Boolean, hovered: Boolean): Modifier {
-    val shape = OneConfigTheme.current.sideBarNavigationEntryShape
-    val background by animateColorAsState(if (selected) OneConfigTheme.accent else Color.Transparent)
-    val border by animateColorAsState(if (selected || hovered) SocialBorderColor else Color.Transparent)
-    return clip(shape).background(background).border(1.dp, border, shape)
-}
-
-@Composable
-internal fun rowText(selected: Boolean, hovered: Boolean): Color {
-    val theme = OneConfigTheme.current
-    return when {
-        selected -> theme.accentTextColor
-        hovered -> theme.textColor
-        else -> theme.textColor.copy(alpha = 0.8f)
-    }
-}
-
-@Composable
 internal fun OutlineIconButton(icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val description = when (icon) {
+        "left-arrow" -> "Back"
+        "close" -> "Close"
+        else -> icon.replace('-', ' ')
+    }
     val text = OneConfigTheme.current.textColor
-    IconButton(themedIcon(OC_ICONS + icon), modifier.size(26.dp), text.copy(alpha = 0.7f), text, true, true, onClick)
+    IconButton(
+        icon = icon,
+        contentDescription = description,
+        onClick = onClick,
+        modifier = modifier,
+        style = IconButtonStyle.Hairline,
+        tooltip = null,
+        restTint = text.copy(alpha = text.alpha * 0.7f),
+        frameSize = 26.dp,
+        iconSize = 18.dp,
+    )
 }
 
 @Composable
@@ -164,15 +160,15 @@ internal fun CarouselPicker(model: PickerModel, modifier: Modifier) {
             verticalArrangement = Arrangement.spacedBy(CarouselRowGap),
         ) {
             Row(Modifier.fillMaxWidth().height(CarouselHeaderHeight), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Label(model.type.displayName, 16.sp, Modifier.padding(start = 2.dp), weight = FontWeight.Medium)
+                Text(model.type.displayName, Modifier.padding(start = 2.dp), style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 Box(Modifier.weight(1f)) { CarouselVariants(model) }
                 model.aura?.let { AuraControl(it) }
                 if (model.forceToggle) ForceCapesToggle()
                 model.target?.let { target ->
-                    Label(target.name, 12.sp, Modifier.widthIn(max = 130.dp), color = OneConfigTheme.current.textColorSecondary)
-                    TextButton(if (model.unequips) "Unequip" else "Equip", Modifier.height(38.dp), if (model.unequips) ButtonStyle.Secondary else ButtonStyle.Primary, model.onApply)
+                    Text(target.name, Modifier.widthIn(max = 130.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    TextButton(text = if (model.unequips) "Unequip" else "Equip", onClick = model.onApply, modifier = Modifier, style = if (model.unequips) ControlStyle.Secondary else ControlStyle.Primary, size = ControlSize.Large)
                 }
-                OutlineIconButton("close.svg", Modifier, model.onClose)
+                OutlineIconButton("close", Modifier, model.onClose)
             }
             CarouselStrip(model)
         }
@@ -185,14 +181,7 @@ private fun AuraControl(aura: AuraChoice) {
     Box {
         AuraSwatchRow(aura.color, customOpen, { customOpen = !customOpen }, aura.onCommit)
         if (customOpen) {
-            EscapeCloses { customOpen = false }
-            Popup(
-                popupPositionProvider = rememberDropdownPosition(),
-                onDismissRequest = { customOpen = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                AuraCustomPopover(aura.color, aura.onPreview, aura.onCommit)
-            }
+            AuraColorPopup(aura.color, aura.onPreview, aura.onCommit, onDismiss = { customOpen = false })
         }
     }
 }
@@ -203,15 +192,18 @@ private fun CarouselVariants(model: PickerModel) {
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val wheelStep = with(LocalDensity.current) { VariantWheelStep.toPx() }
-    Row(
-        Modifier
-            .wheelSteps(scroll, scope, wheelStep)
-            .horizontalScroll(scroll),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ScrollContainer(
+        scroll,
+        Modifier.wheelSteps(scroll, scope, wheelStep),
+        orientation = Orientation.Horizontal,
+        scrollbar = false,
+        smoothWheel = false,
     ) {
-        for (variant in item.variants) {
-            Box(Modifier) {
-                Chip(variant.name, selected = variant.id == model.variantOf(item)) { model.onPickVariant(item, variant.id) }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (variant in item.variants) {
+                Box(Modifier) {
+                    Chip(label = variant.name, selected = variant.id == model.variantOf(item), onClick = { model.onPickVariant(item, variant.id) })
+                }
             }
         }
     }
@@ -219,6 +211,7 @@ private fun CarouselVariants(model: PickerModel) {
 
 private fun Modifier.wheelSteps(scroll: ScrollState, scope: CoroutineScope, step: Float): Modifier =
     pointerInput(scroll, step) {
+        var target = Float.NaN
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -226,7 +219,13 @@ private fun Modifier.wheelSteps(scroll: ScrollState, scope: CoroutineScope, step
                 val change = event.changes.firstOrNull() ?: continue
                 val delta = change.scrollDelta
                 val notches = (if (abs(delta.x) > abs(delta.y)) delta.x else delta.y) / WheelNotchDp
-                scope.launch { scroll.animateScrollBy(notches * step) }
+                val from = if (target.isNaN() || !scroll.isScrollInProgress) scroll.value.toFloat() else target
+                val next = (from + notches * step).coerceIn(0f, scroll.maxValue.toFloat())
+                target = next
+                scope.launch {
+                    scroll.animateScrollTo(next.roundToInt(), Motion.spec(spring()))
+                    if (target == next) target = Float.NaN
+                }
                 change.consume()
             }
         }
@@ -238,8 +237,8 @@ private fun CarouselStrip(model: PickerModel) {
     val scope = rememberCoroutineScope()
     val wheelStep = with(LocalDensity.current) { CarouselWheelStep.toPx() }
     val edge = OneConfigTheme.current.pageBackground
-    val startAlpha by animateFloatAsState(if (scroll.canScrollBackward) 1f else 0f)
-    val endAlpha by animateFloatAsState(if (scroll.canScrollForward) 1f else 0f)
+    val startAlpha by Motion.animateFloatAsState(if (scroll.canScrollBackward) 1f else 0f)
+    val endAlpha by Motion.animateFloatAsState(if (scroll.canScrollForward) 1f else 0f)
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
@@ -261,49 +260,40 @@ private fun CarouselStrip(model: PickerModel) {
                 )
             },
     ) {
-        Row(
-            Modifier.fillMaxHeight().horizontalScroll(scroll).widthIn(min = maxWidth),
-            horizontalArrangement = Arrangement.spacedBy(CarouselTileGap, Alignment.CenterHorizontally),
+        ScrollContainer(
+            scroll,
+            Modifier.fillMaxHeight(),
+            orientation = Orientation.Horizontal,
+            scrollbar = false,
+            smoothWheel = false,
         ) {
-            model.note?.let { NoteTile(it) }
-            for (entry in model.entries) CarouselTile(entry, model)
-            model.onMarketplace?.let { MarketplaceTile(it) }
+            Row(
+                Modifier.fillMaxHeight().widthIn(min = maxWidth),
+                horizontalArrangement = Arrangement.spacedBy(CarouselTileGap, Alignment.CenterHorizontally),
+            ) {
+                model.note?.let { NoteTile(it) }
+                for (entry in model.entries) CarouselTile(entry, model)
+                model.onMarketplace?.let { MarketplaceTile(it) }
+            }
         }
     }
 }
 
 @Composable
 private fun CarouselTile(entry: PickerEntry, model: PickerModel) {
-    val (interaction, hovered) = rememberSocialHover()
-    TryOnWhileHovered(entry, hovered, model)
+    val hover = rememberHoverState()
+    TryOnWhileHovered(entry, hover.hovered, model)
     val selected = entry.key == model.selected?.key
     val theme = OneConfigTheme.current
-    val accent = OneConfigTheme.accent
-    val shape = ppShape(12.dp)
-    val thumbShape = ppShape(5.dp)
-    val background by animateColorAsState(
-        when {
-            selected -> accent
-            hovered -> theme.chipBackground
-            else -> theme.modCardBackground
-        },
-    )
-    val border by animateColorAsState(
-        when {
-            selected || entry.equipped -> accent
-            hovered -> theme.textColorSecondary
-            else -> theme.borderColor
-        },
-    )
+    val shape = OneConfigTheme.shape(12.dp)
     Column(
         Modifier
             .width(CarouselTileWidth)
             .fillMaxHeight()
-            .clip(shape)
-            .background(background)
-            .border(1.dp, border, shape)
-            .hoverable(interaction)
-            .clickableWithSound { model.onPick(entry) }
+            .themedSurface(SurfaceKind.Card, shape, glass = false)
+            .then(if (entry.equipped && !selected) Modifier.border(1.dp, OneConfigTheme.accent, shape) else Modifier)
+            .hoverable(hover.interactionSource)
+            .selectableRow(selected, { model.onPick(entry) }, entry.name, shape, interactionSource = hover.interactionSource)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -312,45 +302,43 @@ private fun CarouselTile(entry: PickerEntry, model: PickerModel) {
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .clip(thumbShape)
-                .background(theme.chipBackground)
-                .border(1.dp, theme.borderColor, thumbShape),
+                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(5.dp), glass = false),
         ) {
             EntryArt(entry, model, Modifier.fillMaxSize().padding(6.dp))
-            if (entry.equipped) Box(Modifier.align(Alignment.TopStart).padding(2.dp)) { Tag("Equipped", TagTone.Accent) }
+            if (entry.equipped) Box(Modifier.align(Alignment.TopStart).padding(2.dp)) { Badge("Equipped", tone = BadgeTone.Accent, style = BadgeStyle.Solid) }
         }
-        Label(entry.name, 12.sp, color = if (selected) theme.accentTextColor else SocialTextPrimary, weight = FontWeight.Medium)
+        Text(entry.name, color = SelectionDefaults.itemContentColor(selected), style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
 private fun NoteTile(text: String) {
     Box(Modifier.width(NoteTileWidth).fillMaxHeight().padding(6.dp), contentAlignment = Alignment.Center) {
-        SocialText(text, 12.sp, color = MutedText, textAlign = TextAlign.Center)
+        Text(text, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 private fun MarketplaceTile(onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val color = rowText(selected = false, hovered = hovered)
+    val theme = OneConfigTheme.current
+    val color = theme.textColor
+    val shape = theme.sideBarNavigationEntryShape
     Column(
         Modifier
             .width(CarouselTileWidth)
             .fillMaxHeight()
-            .listRow(selected = false, hovered = hovered)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .clip(shape)
+            .oneConfigClickable("Get more in Marketplace", onClick, shape = shape, recipe = OutlineOnHover)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
     ) {
-        ThemedIcon(OC_ICONS + "plus.svg", color, 14.dp)
-        SocialText("Get more in Marketplace", 12.sp, color = color, textAlign = TextAlign.Center)
+        ThemedIcon("plus", color, 14.dp)
+        Text("Get more in Marketplace", color = color, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 internal fun SlotPlaceholder() {
-    ThemedIcon(OC_ICONS + "plus.svg", OneConfigTheme.current.textColorSecondary, 14.dp)
+    ThemedIcon("plus", OneConfigTheme.current.textColorSecondary, 14.dp)
 }

@@ -83,6 +83,7 @@ object PingMarkers {
     private const val NETWORK_MATCH = 24.0
 
     private val lastPositions = HashMap<String, DoubleArray>()
+    private val lostTargets = HashSet<String>()
     private val requestedNames = HashSet<String>()
     private val headings = HashMap<String, Heading>()
     private val expansion = HashMap<String, Float>()
@@ -96,6 +97,7 @@ object PingMarkers {
         val pings = visiblePings()
         if (pings.isEmpty()) {
             if (lastPositions.isNotEmpty()) lastPositions.clear()
+            if (lostTargets.isNotEmpty()) lostTargets.clear()
             if (headings.isNotEmpty()) headings.clear()
             if (expansion.isNotEmpty()) expansion.clear()
             hoveredId = null
@@ -104,16 +106,21 @@ object PingMarkers {
         }
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {
-        if (mc.gui.hud.isHidden) return
+        val hidden = mc.gui.hud.isHidden
         //?} else {
-        /*if (mc.options.hideGui) return
+        /*val hidden = mc.options.hideGui
         *///?}
+        if (hidden) {
+            hoveredId = null
+            return
+        }
         val canvas = PingCanvas(graphics)
         val entities = trackedEntities(pings)
         val now = System.currentTimeMillis()
         val viewer = viewerPosition(partialTicks) ?: return
         val ids = pings.mapTo(HashSet()) { it.id }
         lastPositions.keys.retainAll(ids)
+        lostTargets.retainAll(ids)
         headings.keys.retainAll(ids)
         expansion.keys.retainAll(ids)
         val frames = ArrayList<Frame>(pings.size)
@@ -133,6 +140,11 @@ object PingMarkers {
         val ordered = frames.sortedBy { if (it === hovered) 2f else expansion[it.ping.id] ?: 0f }
         if (OneConfigTheme.active?.isMinecraftStyle != true && PingMarkersCompose.draw(canvas, graphics, ordered, now)) return
         for (frame in ordered) drawMarker(canvas, frame, now)
+    }
+
+    internal fun hoveredPing(): Ping? {
+        val id = hoveredId ?: return null
+        return visiblePings().firstOrNull { it.id == id }
     }
 
     internal fun visiblePings(): List<Ping> {
@@ -222,7 +234,12 @@ object PingMarkers {
         }
         for (ping in pings) {
             val target = ping.target ?: continue
+            if (ping.id in lostTargets) continue
             val entity = target.entity?.let { byUuid[it] } ?: target.entityId?.let { networkEntity(ping, it) } ?: continue
+            if (entity.isInvisible) {
+                lostTargets.add(ping.id)
+                continue
+            }
             found[ping.id] = entity
         }
         return found

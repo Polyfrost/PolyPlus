@@ -3,23 +3,18 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,61 +24,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
-import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.OnboardingSlider
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialHoverBorder
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.SocialSwitch
-import org.polyfrost.polyplus.client.gui.SocialDropdown
-import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
-import org.polyfrost.polyplus.client.lobby.LobbyMusic
-import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
-import org.polyfrost.polyplus.client.gui.SocialTextSecondary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbyPacks
-import org.polyfrost.polyplus.client.lobby.LobbyRealm
-import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbySceneEntry
-import org.polyfrost.polyplus.client.lobby.LobbySceneScore
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
-import java.util.Locale
 import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
-private const val SUNSET_START = 11500L
-private const val NIGHT_START = 13500L
-private const val NIGHT_END = 22500L
-private const val KILOBYTE = 1024L
-private const val VOLUME_MAX = 100f
-private const val VOLUME_STEP = 5f
-private const val VOLUME_SLIDER_WIDTH = 150f
-
-@Composable
-internal fun SceneButton(lobby: LobbyShell) {
-    LobbyDock(lobby)
-}
+private const val QUICK_RECENT = 4
+private val RowHeight = 46.dp
+private val RowGap = 6.dp
+private val PickerChrome = 16.dp * 2 + 32.dp + 10.dp
+private val PartyGap = 10.dp
+private val PartySeedHeight = 44.dp * 2 + PartyGap
+private val FallbackListHeight = 420.dp
 
 @Composable
 internal fun BoxScope.SceneControl(lobby: LobbyShell, barStart: () -> Float) {
@@ -103,257 +74,98 @@ internal fun BoxScope.SceneControl(lobby: LobbyShell, barStart: () -> Float) {
     }
 }
 
-private val PickerHeight = 320.dp
-private val FadeHeight = 24.dp
-
-private fun Modifier.scrollMask(scroll: ScrollState, edge: Dp): Modifier = this
-    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-    .drawWithContent {
-        drawContent()
-        val top = scroll.canScrollBackward
-        val bottom = scroll.canScrollForward
-        if (!top && !bottom || size.height <= 0f) return@drawWithContent
-        val stop = (edge.toPx() / size.height).coerceIn(0f, 0.5f)
-        drawRect(
-            Brush.verticalGradient(
-                0f to if (top) Color.Transparent else Color.Black,
-                stop to Color.Black,
-                1f - stop to Color.Black,
-                1f to if (bottom) Color.Transparent else Color.Black,
-            ),
-            blendMode = BlendMode.DstIn,
-        )
-    }
-
 @Composable
 private fun ScenePicker(onClose: () -> Unit) {
     val party by PartyRepository.party.collectAsState()
     val member = PartyScene.isMember(party)
-    val keepOwn = PartyScene.keepOwnBackdrop
-    val following = member && !keepOwn
+    val following = member && !PartyScene.keepOwnBackdrop
     val pinned = LobbySceneStore.pinned
+    var managing by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    var partyHeight by remember(member) { mutableStateOf(with(density) { PartySeedHeight.roundToPx() }) }
+    if (managing) SceneManagerDialog { managing = false }
     Column(Modifier.fillMaxWidth().panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Label("Lobby scene", 16.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, "Close", Modifier, null, SocialTextPrimary, TooltipPlacement.BelowStart, onClose)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Lobby scene", Modifier.weight(1f), style = OneConfigTheme.current.typography.heading, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            IconButton(
+                icon = SOCIAL_ASSETS + "settings-02.svg",
+                contentDescription = "Scenes and settings",
+                onClick = { managing = true },
+                size = ControlSize.Regular,
+                tooltipPlacement = TooltipPlacement.BelowStart,
+            )
+            IconButton(
+                icon = SOCIAL_ASSETS + "x-close.svg",
+                contentDescription = "Close",
+                onClick = onClose,
+                size = ControlSize.Regular,
+                tooltip = null,
+                tooltipPlacement = TooltipPlacement.BelowStart,
+            )
         }
         if (member) {
-            if (following) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Label("Following your party leader", 14.sp, weight = FontWeight.Medium)
-                    Label(
-                        PartyScene.followedLabel()?.let { "$it. Only the leader chooses it." } ?: "Waiting for the leader's scene.",
-                        12.sp,
-                        color = SocialTextSecondary,
-                    )
-                }
-            }
-            SwitchRow("Keep my own backdrop", "Use your own scene and time in parties.", keepOwn, true) {
-                PartyScene.setKeepOwnBackdrop(!keepOwn)
-            }
+            Column(Modifier.onSizeChanged { partyHeight = it.height }, verticalArrangement = Arrangement.spacedBy(PartyGap)) { PartyBackdrop(following) }
         }
         val scroll = rememberScrollState()
-        Column(
-            Modifier.heightIn(max = PickerHeight).scrollMask(scroll, FadeHeight).verticalScroll(scroll),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SceneRow("Automatic", "Best recent scene", !following && pinned == null, { pick(null) }, enabled = !following)
-            Heading("Your captures")
-            key(LobbyPacks.revision) {
-                val captures = LobbySceneStore.usableScenes
-                val locked = LobbySceneStore.lockedScenes
-                if (captures.isEmpty() && locked.isEmpty()) Note("No captures yet. Good spots appear here after you play your worlds.")
-                captures.forEach { CaptureRow(it, following, pinned) }
-                locked.forEach { (entry, reason) -> CaptureRow(entry, following, pinned, reason) }
+        ScrollContainer(scroll, Modifier.heightIn(max = listRoom(if (member) partyHeight else null)), scrollbar = false, fadingEdges = true) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RowGap)) {
+                QuickRow("Automatic", "Best recent scene", !following && pinned == null, !following, false) { pickScene(null) }
+                key(LobbyPacks.revision) {
+                    if (LobbySceneStore.captures.isEmpty()) SceneNote("No captures yet. Good spots appear here after you play your worlds.")
+                    quickScenes(pinned).forEach { entry ->
+                        QuickRow(entry.label, sceneLine(entry), !following && pinned == entry.id, !following, entry.favourite) { pickScene(entry.id) }
+                    }
+                }
+                SectionHeader("Polyfrost scenes")
+                LobbySceneStore.bundledScenes.forEach { entry ->
+                    QuickRow(entry.label, sceneLine(entry), !following && pinned == entry.id, !following, false) { pickScene(entry.id) }
+                }
             }
-            Heading("Polyfrost scenes")
-            LobbySceneStore.bundledScenes.forEach { entry ->
-                SceneRow(entry.label, describe(entry), !following && pinned == entry.id, { pick(entry.id) }, enabled = !following)
-            }
-            Heading("Music")
-            MusicPicker()
-            Heading("Capture")
-            CaptureSwitchRow()
         }
     }
 }
 
 @Composable
-private fun CaptureRow(entry: LobbySceneEntry, following: Boolean, pinned: String?, locked: String? = null) {
-    var deleting by remember { mutableStateOf(false) }
-    var renaming by remember { mutableStateOf(false) }
-    SceneRow(entry.label, locked ?: describe(entry), !following && pinned == entry.id, { pick(entry.id) }, enabled = locked == null && !following) {
-        if (LobbySceneStore.canRename(entry)) IconButton(themedIcon(SOCIAL_ASSETS + "edit-02.svg"), "Rename capture", Modifier) { renaming = true }
-        IconButton(themedIcon(SOCIAL_ASSETS + "trash-01.svg"), "Delete capture", Modifier) { deleting = true }
-    }
-    if (renaming) RenameSceneDialog(entry) { renaming = false }
-    if (deleting) {
-        ConfirmDialog(
-            title = "Delete ${entry.label}?",
-            text = "This capture will be deleted from your computer.",
-            confirmLabel = "Delete",
-            dismissLabel = "Cancel",
-            icon = themedIcon(LobbyIcons.TRASH),
-            danger = true,
-            confirmEnabled = true,
-            onConfirm = {
-                deleting = false
-                val showing = LobbyScene.currentId == entry.id
-                LobbySceneStore.delete(entry)
-                if (showing) LobbyScene.reload()
-            },
-            onDismiss = { deleting = false },
-        )
-    }
+private fun listRoom(partyPx: Int?): Dp {
+    val root = LocalRootSize.current
+    if (root.height <= 0f) return FallbackListHeight
+    val density = LocalDensity.current
+    val height = with(density) { root.height.toDp() }
+    val party = if (partyPx == null) 0.dp else with(density) { partyPx.toDp() } + PartyGap
+    val fixed = LobbyLayout.Top + LobbyLayout.PageBottom + PickerChrome + party
+    return (height - fixed).coerceAtLeast(RowHeight)
+}
+
+private fun quickScenes(pinned: String?): List<LobbySceneEntry> {
+    val usable = LobbySceneStore.usableScenes
+    val rest = usable.filterNot { it.favourite }
+    return usable.filter { it.favourite } + rest.take(QUICK_RECENT) + rest.drop(QUICK_RECENT).filter { it.id == pinned }
 }
 
 @Composable
-private fun SceneRow(
+private fun QuickRow(
     title: String,
     detail: String,
     selected: Boolean,
+    enabled: Boolean,
+    favourite: Boolean,
     onClick: () -> Unit,
-    enabled: Boolean = true,
-    trailing: @Composable () -> Unit = {},
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    val shape = ppShape(8.dp)
+    val theme = OneConfigTheme.current
     Row(
         Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .card(8.dp, selected)
-            .border(1.dp, if (hovered && !selected && enabled) SocialHoverBorder else Color.Transparent, shape)
-            .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound("$title, $detail", selected = selected.takeIf { it }, shape = shape, onClick = onClick) else Modifier)
-            .padding(start = 12.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(Modifier.weight(1f).graphicsLayer { alpha = if (enabled) 1f else 0.5f }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Label(title, 14.sp, weight = FontWeight.Medium)
-            Label(detail, 12.sp, color = SocialTextSecondary)
-        }
-        trailing()
-    }
-}
-
-@Composable
-private fun CaptureSwitchRow() {
-    SwitchRow("Capture scenes", "Saves good spots while you play", LobbySceneStore.captureEnabled, true) {
-        LobbySceneStore.captureEnabled = !LobbySceneStore.captureEnabled
-    }
-}
-
-@Composable
-private fun MusicPicker() {
-    var music by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyMusic) }
-    SocialDropdown("Play", LobbyMusic.entries, music, LobbyMusic::toString, Modifier.fillMaxWidth()) {
-        music = it
-        PolyPlusLobbyConfig.lobbyMusic = it
-        PolyPlusLobbyConfig.save()
-    }
-    musicDetail(music)?.let { Note(it) }
-    if (music != LobbyMusic.OFF && music != LobbyMusic.MINECRAFT) {
-        MusicVolume()
-        MuteUnfocusedRow()
-    }
-}
-
-@Composable
-private fun MuteUnfocusedRow() {
-    var muted by remember { mutableStateOf(PolyPlusLobbyConfig.muteLobbyMusicUnfocused) }
-    SwitchRow("Mute when unfocused", "Fades out while the game is in the background", muted, true) {
-        muted = !muted
-        PolyPlusLobbyConfig.muteLobbyMusicUnfocused = muted
-        PolyPlusLobbyConfig.save()
-    }
-}
-
-@Composable
-private fun MusicVolume() {
-    var percent by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyMusicVolume) }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Label("Volume", 12.sp, color = MutedText)
-        Box(Modifier.weight(1f)) {
-            OnboardingSlider(percent / VOLUME_MAX, VOLUME_SLIDER_WIDTH, thumbSize = 15.dp, trackHeight = 5.dp, label = "Lobby music volume", value = "${percent.roundToInt()}%", onRelease = PolyPlusLobbyConfig::save) { progress ->
-                percent = (progress * VOLUME_MAX / VOLUME_STEP).roundToInt() * VOLUME_STEP
-                PolyPlusLobbyConfig.lobbyMusicVolume = percent
-            }
-        }
-        Label("${percent.roundToInt()}%", 12.sp)
-    }
-}
-
-private fun musicDetail(music: LobbyMusic): String? = when (music) {
-    LobbyMusic.MATCH_SCENE -> "Follows the scene and time of day"
-    LobbyMusic.MINECRAFT -> "The game's own menu music"
-    LobbyMusic.OFF -> "No music in the lobby"
-    else -> null
-}
-
-@Composable
-private fun SwitchRow(title: String, detail: String, checked: Boolean, enabled: Boolean, onToggle: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
-            .rowFrame(false, hovered && enabled)
-            .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound("$title, $detail", A11yRole.Switch, checked = checked, onClick = onToggle) else Modifier)
-            .padding(horizontal = 8.dp),
+            .height(RowHeight)
+            .card(8.dp)
+            .selectableCard(selected, onClick, "$title, $detail", OneConfigTheme.shape(8.dp), enabled, role = A11yRole.Button)
+            .padding(start = 12.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Label(title, 14.sp)
-            Label(detail, 12.sp, color = SocialTextSecondary)
+            Text(title, color = theme.textColor, style = theme.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(detail, color = theme.textColorSecondary, style = theme.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        Label(if (checked) "On" else "Off", 12.sp, color = SocialTextSecondary)
-        SocialSwitch(checked, 42.dp, 21.dp, SocialOffStateBackground)
+        if (favourite) FavouriteStar()
     }
-}
-
-@Composable
-private fun Heading(text: String) {
-    Column {
-        Spacer(Modifier.height(6.dp))
-        Label(text, 12.sp, color = SocialTextPrimary, weight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun Note(text: String) {
-    SocialText(text, 12.sp, color = SocialTextSecondary)
-}
-
-private fun pick(id: String?) {
-    if (LobbySceneStore.pinned == id) return
-    LobbySceneStore.pinned = id
-    if (id == null || LobbyScene.currentId != id) LobbyScene.reload()
-}
-
-private fun describe(entry: LobbySceneEntry): String {
-    val biome = entry.biome.substringAfter(':').replace('_', ' ').replaceFirstChar { it.titlecase(Locale.ROOT) }
-    val time = when (entry.clock % 24000L) {
-        in SUNSET_START until NIGHT_START -> "Sunset"
-        in NIGHT_START until NIGHT_END -> "Night"
-        else -> "Day"
-    }
-    val points = entry.points?.let { "$it pts" }
-    val size = if (entry.bytes > 0L) "${entry.bytes / KILOBYTE} KB" else null
-    return when (entry.setting) {
-        LobbySceneScore.Profile.CAVE -> listOfNotNull(if (entry.realm == LobbyRealm.NETHER) biome else caveName(entry.biome), points, size)
-        LobbySceneScore.Profile.INDOOR -> listOfNotNull(biome, "Indoors", points, size)
-        LobbySceneScore.Profile.OUTDOOR -> listOfNotNull(biome, time.takeIf { entry.realm == LobbyRealm.OVERWORLD }, points, size)
-    }.joinToString(", ")
-}
-
-private fun caveName(biome: String): String = when (biome) {
-    "minecraft:lush_caves" -> "Lush cave"
-    "minecraft:dripstone_caves" -> "Dripstone cave"
-    "minecraft:deep_dark" -> "Deep dark"
-    else -> "Cave"
 }

@@ -7,14 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.ThemeConfig
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
-import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -25,56 +22,22 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?}
 
 //? if = 1.8.9 {
-/*import net.minecraft.client.gui.screens.TitleScreen
-import org.polyfrost.polyplus.client.social.execute
-import org.lwjgl.input.Keyboard
+/*import org.polyfrost.polyplus.client.social.execute
 *///?}
 
 /** Fullscreen Compose overlay on top of [previousScreen], which it returns to when dismissed. */
 // holding the previous screen here instead of in an overlay singleton lets it go once the overlay is replaced by any screen
-abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScreen(RenderMode.CONTINUOUS) {
+abstract class OverlayScreen(previousScreen: Screen?) :
+    OneConfigComposeScreen(previous = previousScreen, renderMode = OneConfigComposeScreen.RenderMode.Continuous) {
     private var firstFrameDrawn = false
-    private val openedAt = System.currentTimeMillis()
+
+    override val dimBackground: Boolean get() = false
 
     //? if > 1.8.9 {
-    override fun shouldCloseOnEsc(): Boolean = true
-
     private fun inGame(): Boolean = Minecraft.getInstance().level != null
     //?} else {
     /*private fun inGame(): Boolean = Minecraft.getInstance().world != null
-
-    private var escaping = false
-
-    override fun handleKeyboard() {
-        escaping = Keyboard.getEventKeyState() && Keyboard.getEventKey() == Keyboard.KEY_ESCAPE
-        try {
-            super.handleKeyboard()
-        } finally {
-            escaping = false
-        }
-    }
-
-    override fun removed() {
-        super.removed()
-        if (escaping) Minecraft.getInstance().tell { restoreAfterEscape() }
-    }
-
-    private fun restoreAfterEscape() {
-        val current = ClientPlatform.currentScreen()
-        if (current == null || current is TitleScreen) ClientPlatform.setScreen(previousScreen)
-    }
     *///?}
-
-    /** Mirrors OneConfig's own fullscreen blur fade-in (see OneConfigUIScreen). */
-    override fun blurAlpha(): Float {
-        if (!inGame() || !ThemeConfig.enableBackgroundBlur) return 0f
-        val progress = (System.currentTimeMillis() - openedAt).toFloat() / OPEN_ANIMATION_MS
-        return progress.coerceIn(0f, 1f)
-    }
-
-    private companion object {
-        private const val OPEN_ANIMATION_MS = 250L
-    }
 
     //? if <26.1 && > 1.8.9 {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
@@ -123,29 +86,17 @@ abstract class OverlayScreen(private val previousScreen: Screen?) : ComposeScree
     }
     //?}
 
-    /** Whether Escape and [dismiss] may close the overlay right now. */
-    protected open fun canDismiss(): Boolean = true
-
-    override fun handleKeyPressed(key: Int, modifiers: Int): Boolean =
-        key == InputConstants.KEY_ESCAPE && !canDismiss()
-
-    fun dismiss() {
-        Minecraft.getInstance().execute {
-            if (canDismiss() && ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(previousScreen)
-        }
-    }
-
-    //? if > 1.8.9 {
-    override fun onClose() = dismiss()
-    //?}
-
     @Composable
     protected abstract fun content(onClose: () -> Unit)
 
     @Composable
-    override fun compose() {
-        ProvideOneConfigTheme {
-            Box(Modifier.fillMaxSize().wrapTabFocus(), propagateMinConstraints = true) { content(::dismiss) }
+    final override fun Content() {
+        ProvidePopupSounds(false) {
+            Box(Modifier.fillMaxSize().wrapTabFocus(), propagateMinConstraints = true) { content(::dismissLater) }
         }
+    }
+
+    private fun dismissLater() {
+        Minecraft.getInstance().execute { dismiss() }
     }
 }

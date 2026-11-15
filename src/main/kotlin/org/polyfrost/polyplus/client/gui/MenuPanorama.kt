@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.platform.isOneConfigComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 
@@ -70,10 +73,10 @@ object MenuPanorama {
     }
 
     @JvmStatic
-    fun active(screen: Screen): Boolean = menusActive(screen) && screen !is ComposeScreen
+    fun active(screen: Screen): Boolean = menusActive(screen) && !isOneConfigComposeScreen(screen)
 
     @JvmStatic
-    fun panoramaPassNeedsBackdrop(screen: Screen): Boolean = screen is ComposeScreen
+    fun panoramaPassNeedsBackdrop(screen: Screen): Boolean = isOneConfigComposeScreen(screen)
 
     private fun backdropWanted(screen: Screen, onPanoramaPass: Boolean): Boolean {
         if (!PolyPlusMainMenuConfig.panoramaInAllMenus) return false
@@ -112,7 +115,7 @@ object MenuPanorama {
 
     @JvmStatic
     fun drawComposeBackdrop(ctx: GuiGraphicsExtractor, screen: Screen): Boolean {
-        if (!classicBackdropActive() || screen !is ComposeScreen) return false
+        if (!classicBackdropActive() || !isOneConfigComposeScreen(screen)) return false
         if (!backdropWanted(screen, true)) return false
         if (drawnThisPass) return true
         val drew = MenuFxPass.renderInline(ctx)
@@ -158,7 +161,7 @@ object MenuPanorama {
 
     @JvmStatic
     fun drawComposeBackdrop(ctx: GuiGraphics, screen: Screen): Boolean {
-        if (!classicBackdropActive() || screen !is ComposeScreen) return false
+        if (!classicBackdropActive() || !isOneConfigComposeScreen(screen)) return false
         if (!backdropWanted(screen, true)) return false
         if (drawnThisPass) return true
         val drew = MenuFxPass.renderInline(ctx)
@@ -203,7 +206,7 @@ object MenuPanorama {
     private const val SHADE_TOP = 0x00000000
     private const val SHADE_BOTTOM = 0x80000000.toInt()
 
-    private val panoramaGlState = StoredGLState(330)
+    private val panoramaGlState = StoredGLState()
     private var lastPanoramaTick = 0L
 
     @JvmStatic

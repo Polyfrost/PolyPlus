@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,11 +36,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
@@ -102,50 +104,32 @@ internal fun formatCooldown(totalSeconds: Long): String {
 
 @Composable
 internal fun WorldInviteBanner(invite: SessionInvite) {
+    val warning = OneConfigTheme.current.warning
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(SocialPanelShape)
-            .background(SocialWarnColor.copy(alpha = 0.12f))
-            .border(SocialBorderWidth, SocialWarnColor, SocialPanelShape)
+            .background(warning.copy(alpha = 0.12f))
+            .border(SocialBorderWidth, warning, SocialPanelShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         SocialAvatar(invite.sender, 32.dp)
         Column(Modifier.weight(1f)) {
-            SocialText("${PlayerNamesRepository.displayName(invite.sender)} invited you to their world", fontSize = 13.sp)
-            SocialText("Session invite", fontSize = 11.sp, color = SocialTextSecondary)
+            Text("${PlayerNamesRepository.displayName(invite.sender)} invited you to their world", style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal))
+            Text("Session invite", color = SocialTextSecondary, style = OneConfigTheme.current.typography.caption)
         }
-        TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(invite) }
-        TextButton("Join", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), Modifier.height(34.dp), ButtonStyle.Primary, true) { SessionsRepository.accept(invite) }
-    }
-}
-
-@Composable
-internal fun GroupOverflowMenu(
-    onInvite: () -> Unit,
-    onInviteToSession: () -> Unit,
-    onRename: (() -> Unit)?,
-    onMute: () -> Unit,
-    onLeave: () -> Unit,
-    onConvertToNormal: () -> Unit,
-    muted: Boolean,
-    canConvertToNormal: Boolean,
-    canLeave: Boolean,
-) {
-    MenuSurface(Modifier.width(200.dp)) {
-        MenuItem("Invite Friends", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInvite)
-        MenuItem("Invite Group to Session", themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onInviteToSession)
-        if (onRename != null) MenuItem("Rename Group", themedIcon(SOCIAL_ASSETS + "edit-02.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onRename)
-        MenuItem(if (muted) "Unmute Group" else "Mute Group", themedIcon(SOCIAL_ASSETS + "volume-x.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onMute)
-        if (canConvertToNormal) {
-            MenuItem("Convert to Normal Chat", themedIcon(SOCIAL_ASSETS + "check.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null, onConvertToNormal)
-        }
-        if (canLeave) {
-            MenuItem("Leave Group", themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, MenuItemSize.Regular, true, false, true, null, Modifier, null, onLeave)
-        }
+        TextButton(text = "Decline", onClick = { SessionsRepository.decline(invite) }, modifier = Modifier.height(34.dp))
+        TextButton(
+            text = "Join",
+            icon = SOCIAL_ASSETS + "log-in-04.svg",
+            onClick = { SessionsRepository.accept(invite) },
+            modifier = Modifier.height(34.dp),
+            style = ControlStyle.Primary,
+            enabled = true,
+        )
     }
 }
 
@@ -160,7 +144,7 @@ internal fun MessageTimeline(
 ) {
     if (messages.isEmpty()) {
         Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            SocialText("No messages yet. Say hello!", fontSize = 13.sp, color = SocialTextSecondary)
+            Text("No messages yet. Say hello!", color = SocialTextSecondary, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal))
         }
         return
     }
@@ -181,36 +165,32 @@ internal fun MessageTimeline(
     }
     ConversationReadEffect(conversationId, messages, pinned)
     val flat = LocalSocialLook.current.timeline == SocialTimeline.Rows
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState)
-            .padding(horizontal = if (flat) 24.dp else 16.dp, vertical = if (flat) 16.dp else 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        var lastDate: String? = null
-        var lastSender: String? = null
-        messages.forEach { message ->
-            val date = dateSeparatorFor(message.sentAt)
-            if (date != lastDate) {
-                if (flat) DayLabel(message.sentAt) else DateSeparator(date)
-                lastDate = date
-                lastSender = null
+    ScrollContainer(scrollState, modifier.fillMaxWidth(), scrollbar = false) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = if (flat) 24.dp else 16.dp, vertical = if (flat) 16.dp else 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            var lastDate: String? = null
+            var lastSender: String? = null
+            messages.forEach { message ->
+                val date = dateSeparatorFor(message.sentAt)
+                if (date != lastDate) {
+                    if (flat) DayLabel(message.sentAt) else DateSeparator(date)
+                    lastDate = date
+                    lastSender = null
+                }
+                if (flat) {
+                    MessageRow(message, message.sender == selfId, incomingInvites, showSender = message.sender != lastSender)
+                } else {
+                    MessageBubble(
+                        message,
+                        outgoing = message.sender == selfId,
+                        incomingInvites = incomingInvites,
+                        showSenderGutter = isGroup && message.sender != selfId,
+                        showSender = message.sender != lastSender,
+                    )
+                }
+                lastSender = message.sender
             }
-            if (flat) {
-                MessageRow(message, message.sender == selfId, incomingInvites, showSender = message.sender != lastSender)
-            } else {
-                MessageBubble(
-                    message,
-                    outgoing = message.sender == selfId,
-                    incomingInvites = incomingInvites,
-                    showSenderGutter = isGroup && message.sender != selfId,
-                    showSender = message.sender != lastSender,
-                )
-            }
-            lastSender = message.sender
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(4.dp))
     }
 }
 
@@ -246,16 +226,16 @@ private fun DateSeparator(date: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(Modifier.weight(1f).height(1.dp).background(SocialBorderColor))
-        SocialText(date, fontSize = 11.sp, color = SocialTextSecondary)
-        Box(Modifier.weight(1f).height(1.dp).background(SocialBorderColor))
+        Divider(Modifier.weight(1f))
+        Text(date, color = SocialTextSecondary, style = OneConfigTheme.current.typography.caption)
+        Divider(Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun DayLabel(sentAt: String) {
     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-        SocialText(dayLabelFor(sentAt), fontSize = 12.sp, color = SocialTextSecondary)
+        Text(dayLabelFor(sentAt), color = SocialTextSecondary, style = OneConfigTheme.current.typography.small)
     }
 }
 
@@ -267,11 +247,12 @@ private fun MessageRow(message: GroupMessage, outgoing: Boolean, incomingInvites
         return
     }
     val pending = GroupsRepository.isPending(message.id)
+    val pendingAlpha = OneConfigTheme.current.disabledAlpha
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = if (showSender) 16.dp else 0.dp)
-            .graphicsLayer { alpha = if (pending) 0.55f else 1f },
+            .graphicsLayer { alpha = if (pending) pendingAlpha else 1f },
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -281,8 +262,8 @@ private fun MessageRow(message: GroupMessage, outgoing: Boolean, incomingInvites
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (showSender) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SocialText(PlayerNamesRepository.displayName(message.sender), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                    SocialText(if (pending) "Sending..." else clockFor(message.sentAt), fontSize = 12.sp, color = SocialTextSecondary)
+                    Text(PlayerNamesRepository.displayName(message.sender), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, softWrap = false)
+                    Text(if (pending) "Sending..." else clockFor(message.sentAt), color = SocialTextSecondary, style = OneConfigTheme.current.typography.small)
                 }
             }
             SocialEmojiText(message.content, fontSize = 16.sp, color = SocialTextPrimary)
@@ -305,8 +286,9 @@ private fun MessageBubble(
     }
 
     val pending = GroupsRepository.isPending(message.id)
+    val pendingAlpha = OneConfigTheme.current.disabledAlpha
     Row(
-        modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (pending) 0.55f else 1f },
+        modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (pending) pendingAlpha else 1f },
         horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
@@ -322,14 +304,14 @@ private fun MessageBubble(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (showSenderGutter && showSender) {
-                    SocialText(
+                    Text(
                         PlayerNamesRepository.displayName(message.sender),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
+                        softWrap = false,
                     )
                 }
-                SocialText(if (pending) "Sending..." else timeFor(message.sentAt), fontSize = 10.sp, color = SocialTextSecondary)
+                Text(if (pending) "Sending..." else timeFor(message.sentAt), color = SocialTextSecondary, style = OneConfigTheme.current.typography.body.copy(fontSize = 10.sp))
             }
             Box(
                 modifier = Modifier
@@ -356,44 +338,46 @@ private fun InviteMessageCard(
     incomingInvites: List<SessionInvite>,
 ) {
     val live = incomingInvites.firstOrNull { it.id == invite.id }
+    val warning = OneConfigTheme.current.warning
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
             .clip(SocialPanelShape)
-            .background(SocialWarnColor.copy(alpha = 0.12f))
-            .border(SocialBorderWidth, SocialWarnColor, SocialPanelShape)
+            .background(warning.copy(alpha = 0.12f))
+            .border(SocialBorderWidth, warning, SocialPanelShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         SocialAvatar(message.sender, 32.dp)
         Column(Modifier.weight(1f)) {
-            SocialText(
+            Text(
                 if (outgoing) "You invited them to your world" else "${PlayerNamesRepository.displayName(message.sender)} invited you to their world",
-                fontSize = 13.sp,
+                style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal),
             )
-            SocialText(
+            Text(
                 when (invite.status) {
                     "accepted" -> "Accepted"
                     "declined" -> "Declined"
                     "expired" -> "Expired"
                     else -> "Session invite"
                 },
-                fontSize = 11.sp,
                 color = SocialTextSecondary,
+                style = OneConfigTheme.current.typography.caption,
             )
         }
         if (!outgoing && live != null) {
-            TextButton("Decline", Modifier.height(34.dp)) { SessionsRepository.decline(live) }
+            TextButton(text = "Decline", onClick = { SessionsRepository.decline(live) }, modifier = Modifier.height(34.dp))
             TextButton(
-                if (live.status == "accepted") "Re-join" else "Join",
-                themedIcon(SOCIAL_ASSETS + "log-in-04.svg"),
-                Modifier.height(34.dp),
-                ButtonStyle.Primary,
-                true,
-            ) { SessionsRepository.accept(live) }
+                text = if (live.status == "accepted") "Re-join" else "Join",
+                icon = SOCIAL_ASSETS + "log-in-04.svg",
+                onClick = { SessionsRepository.accept(live) },
+                modifier = Modifier.height(34.dp),
+                style = ControlStyle.Primary,
+                enabled = true,
+            )
         }
     }
 }
@@ -419,9 +403,10 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
         }
     }
     val focus = LocalComposerFocus.current ?: remember { FocusRequester() }
+    val fieldPlaceholder = if (disabled) "Message unavailable" else placeholder
     Column(Modifier.fillMaxWidth()) {
         if (disabledReason != null) {
-            SocialText(disabledReason, fontSize = 11.sp, color = SocialTextSecondary, modifier = Modifier.padding(horizontal = if (flat) 24.dp else 12.dp, vertical = 4.dp))
+            Text(disabledReason, modifier = Modifier.padding(horizontal = if (flat) 24.dp else 12.dp, vertical = 4.dp), color = SocialTextSecondary, style = OneConfigTheme.current.typography.caption)
         }
         if (flat) {
             Row(
@@ -440,30 +425,21 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
                     value = value,
                     onValueChange = { if (!disabled) value = it },
                     modifier = Modifier.weight(1f).height(34.dp).padding(start = 6.dp, end = 12.dp),
-                    placeholder = if (disabled) "Message unavailable" else placeholder,
-                    leadingIcon = null,
+                    placeholder = fieldPlaceholder,
                     maxLength = 500,
-                    invalid = false,
-                    enabled = true,
-                    singleLine = true,
                     framed = false,
                     fontSize = 14.sp,
-                    label = null,
-                    masked = false,
                     focusRequester = focus,
-                    interactionSource = null,
-                    trailing = null,
                     onSubmit = trySend,
                 )
                 IconButton(
-                    themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
-                    "Send",
-                    null,
-                    Modifier,
-                    if (disabled) null else OneConfigTheme.accent,
-                    if (disabled) SocialTextSecondary else OneConfigTheme.current.accentTextColor,
-                    TooltipPlacement.BelowStart,
-                    trySend,
+                    icon = SOCIAL_ASSETS + "chevron-right.svg",
+                    contentDescription = "Send",
+                    onClick = trySend,
+                    style = if (disabled) IconButtonStyle.Ghost else IconButtonStyle.Filled,
+                    tooltipPlacement = TooltipPlacement.BelowStart,
+                    restTint = SocialTextSecondary,
+                    frameSize = 34.dp,
                 )
             }
             return@Column
@@ -476,32 +452,26 @@ internal fun MessageComposer(placeholder: String, disabledReason: String? = null
             TextField(
                 value = value,
                 onValueChange = { if (!disabled) value = it },
-                modifier = Modifier.weight(1f).height(38.dp),
-                placeholder = if (disabled) "Message unavailable" else placeholder,
-                leadingIcon = themedIcon(SOCIAL_ASSETS + "edit-02.svg"),
+                modifier = Modifier.weight(1f),
+                size = ControlSize.Large,
+                placeholder = fieldPlaceholder,
+                leadingIcon = SOCIAL_ASSETS + "edit-02.svg",
                 maxLength = 500,
-                invalid = false,
-                enabled = true,
-                singleLine = true,
-                framed = true,
                 fontSize = 14.sp,
-                label = null,
-                masked = false,
                 focusRequester = focus,
-                interactionSource = null,
-                trailing = null,
                 onSubmit = trySend,
             )
             emoji()
+            val sendShape = IconButtonDefaults.shape(IconButtonStyle.Ghost)
             IconButton(
-                themedIcon(SOCIAL_ASSETS + "chevron-right.svg"),
-                "Send",
-                null,
-                Modifier,
-                if (ready) OneConfigTheme.accent.asSocialSelected else null,
-                if (ready) OneConfigTheme.accent else SocialTextSecondary,
-                TooltipPlacement.BelowStart,
-                trySend,
+                icon = SOCIAL_ASSETS + "chevron-right.svg",
+                contentDescription = "Send",
+                onClick = trySend,
+                modifier = if (ready) Modifier.clip(sendShape).background(OneConfigTheme.accent.asSocialSelected) else Modifier,
+                tooltipPlacement = TooltipPlacement.BelowStart,
+                tint = if (ready) OneConfigTheme.accent else SocialTextSecondary,
+                shape = sendShape,
+                frameSize = 34.dp,
             )
         }
     }

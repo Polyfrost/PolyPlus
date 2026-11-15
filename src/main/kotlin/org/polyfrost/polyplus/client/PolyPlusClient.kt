@@ -72,6 +72,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.registerPolyPlusPixelIcons
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseMediaWidgets
 
 //? if wwaypoints
@@ -178,6 +179,7 @@ object PolyPlusClient {
         }
         step("rich text privacy") { RichTextPrivacy.warmUp() }
         step("default settings") { DefaultSettings.initialize() }
+        step("pixel icons") { registerPolyPlusPixelIcons() }
         step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
         step("pause media widget") { PauseMediaWidgets.register() }
         step("default mod order") { DefaultModOrder.initialize() }

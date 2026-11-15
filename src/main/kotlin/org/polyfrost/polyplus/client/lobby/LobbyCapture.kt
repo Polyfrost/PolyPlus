@@ -39,6 +39,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus
 import net.minecraft.world.level.levelgen.Heightmap
 //? if > 1.8.9
 import net.minecraft.world.level.storage.LevelResource
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
@@ -178,6 +179,8 @@ object LobbyCapture {
     private const val STAGE_SCORE_WEIGHT = 0.2
     private const val BIOME_NAME_FALLBACK = "minecraft:plains"
     private const val COPY_SHARE = 0.9f
+    private const val CALM_WAIT_TICKS = 40
+    private const val MAX_STALL_TICKS = 600
     private const val FAILED = "Something went wrong. Try again in a moment."
     private const val SERVER_BLOCKS = "This server blocks scene capture"
     private const val SERVER_TURNED_OFF = "You turned off scene capture for this server"
@@ -194,6 +197,9 @@ object LobbyCapture {
     private var wait = FIRST_DELAY_TICKS
     private var lastSpot: BlockPos? = null
     private var settled = 0
+    private var savePending = false
+    private var rest = Int.MAX_VALUE
+    private var stalled = 0
     private var policy = ServerApiProtocol.ScenePolicy.UNSET
     private val landed = ConcurrentLinkedQueue<Runnable>()
     private var inFlight: Source? = null
@@ -230,8 +236,11 @@ object LobbyCapture {
             surveying = null
             copying = null
             lastSpot = null
-            wait = FIRST_DELAY_TICKS
+            wait = frequency().ticks(FIRST_DELAY_TICKS)
             settled = 0
+            savePending = false
+            stalled = 0
+            LobbyCaptureGate.reset()
             policy = ServerApiProtocol.ScenePolicy.UNSET
             recent = null
             queued = null
@@ -246,6 +255,8 @@ object LobbyCapture {
             return
         }
         settled++
+        if (rest < Int.MAX_VALUE) rest++
+        LobbyCaptureGate.tick(player)
         if (OneClientServerApi.isConnected) policy = OneClientServerApi.scenePolicy
         rememberPolicy(mc)
         val screen = ClientPlatform.currentScreen()
@@ -256,12 +267,16 @@ object LobbyCapture {
             earlyScreen = null
             if (handover != null) dropHandover()
         }
+        if (frequency() == LobbyCaptureFrequency.OFF) {
+            if (copying?.source?.action == null) copying = null
+            if (surveying?.source?.action == null) surveying = null
+        }
         copying?.let {
-            guarded { stepCopy(level, it) }
+            if (paced(it.source)) guarded { stepCopy(level, it) }
             return
         }
         surveying?.let {
-            guarded { stepSurvey(level, it) }
+            if (paced(it.source)) guarded { stepSurvey(level, it) }
             return
         }
         if (busy) return
@@ -270,17 +285,55 @@ object LobbyCapture {
             startManual(mc, level, player, it)
             return
         }
-        if (local(mc)) {
-            if (justSaved && settled >= SETTLED_TICKS) start(mc, level, player, pausing)
+        automatic(mc, level, player, screen, pausing, justSaved)
+    }
+
+    private fun automatic(mc: Minecraft, level: ClientLevel, player: LocalPlayer, screen: Any?, pausing: Boolean, justSaved: Boolean) {
+        val frequency = frequency()
+        if (frequency == LobbyCaptureFrequency.OFF) {
+            savePending = false
             return
         }
-        if (pausing && screen !== earlyScreen) {
+        if (local(mc)) {
+            if (justSaved && settled >= SETTLED_TICKS) savePending = true
+            val timed = frequency == LobbyCaptureFrequency.OFTEN && --wait <= 0
+            if ((savePending || timed) && ready(frequency)) {
+                savePending = false
+                start(mc, level, player, pausing)
+            }
+            return
+        }
+        if (pausing && screen !== earlyScreen && ready(frequency)) {
             earlyScreen = screen
             start(mc, level, player, true)
             return
         }
         if (--wait > 0) return
+        if (!ready(frequency)) {
+            wait = CALM_WAIT_TICKS
+            return
+        }
         start(mc, level, player, false)
+    }
+
+    private fun frequency(): LobbyCaptureFrequency = PolyPlusLobbyConfig.lobbyCaptureFrequency
+
+    private fun rested(frequency: LobbyCaptureFrequency): Boolean = frequency != LobbyCaptureFrequency.OFF && rest >= frequency.restTicks
+
+    private fun ready(frequency: LobbyCaptureFrequency): Boolean = rested(frequency) && LobbyCaptureGate.calm
+
+    private fun paced(source: Source): Boolean {
+        if (source.action == null && !LobbyCaptureGate.calm) {
+            if (++stalled > MAX_STALL_TICKS) {
+                lastSpot?.let { report(source, it, "abandoned while the game was busy") }
+                surveying = null
+                copying = null
+                stalled = 0
+                wait = frequency().ticks(RETRY_TICKS)
+            }
+            return false
+        }
+        return LobbyCaptureGate.spread()
     }
 
     @JvmStatic
@@ -388,7 +441,7 @@ object LobbyCapture {
             it.handOver = true
             it.left = level
         }
-        if (copying == null && surveying == null && !busy) {
+        if (copying == null && surveying == null && !busy && rested(frequency())) {
             begin(mc, level, player.blockPosition(), player.onGround(), player.isVehicle || player.isPassenger)
         }
         val survey = surveying
@@ -489,7 +542,7 @@ object LobbyCapture {
     }
 
     private fun begin(mc: Minecraft, level: ClientLevel, feet: BlockPos, grounded: Boolean, riding: Boolean) {
-        wait = RETRY_TICKS
+        wait = frequency().ticks(RETRY_TICKS)
         val source = source(mc) ?: return
         val moved = lastSpot?.let { hypot((it.x - feet.x).toDouble(), (it.z - feet.z).toDouble()) } ?: Double.MAX_VALUE
         if (moved < MOVED_BLOCKS || !grounded || riding) return
@@ -499,6 +552,7 @@ object LobbyCapture {
             return
         }
         surveying = surveyAt(level, source, feet)
+        stalled = 0
         report(source, feet, "started")
     }
 
@@ -602,6 +656,7 @@ object LobbyCapture {
             return
         }
         surveying = surveyAt(level, source, feet)
+        stalled = 0
         spot = LobbySpotState.Surveying(action, 0f)
         report(source, feet, "started by hand")
     }
@@ -883,14 +938,15 @@ object LobbyCapture {
         state.`is`(Blocks.LANTERN) ||
         state.`is`(Blocks.TORCH)
 
-    private fun finishSurvey(job: Surveying, verdict: LobbySceneScore.Verdict, surveyed: ClientLevel) {
+    private fun finishSurvey(job: Surveying, judged: LobbySceneScore.Verdict, surveyed: ClientLevel) {
         busy = false
         val mc = Minecraft.getInstance()
         val left = job.source.left
         val level = left ?: mc.level
+        val action = job.source.action
+        val verdict = if (judged.rejection != null || action == LobbySpotAction.CHECK) judged else pickView(job.source, judged)
         val anchor = verdict.anchor
         val rejection = verdict.rejection
-        val action = job.source.action
         if (level == null || level !== surveyed || (left == null && level !== trackedLevel)) {
             if (action != null) spot = LobbySpotState.Idle
             return
@@ -949,6 +1005,14 @@ object LobbyCapture {
             leaving = Leaving(left, null, copy)
         } else {
             copying = copy
+        }
+    }
+
+    private fun pickView(source: Source, verdict: LobbySceneScore.Verdict): LobbySceneScore.Verdict {
+        val manual = source.action != null
+        return LobbySceneScore.choose(verdict, PolyPlusLobbyConfig.lobbyCaptureView) { option ->
+            val spot = option.anchor ?: return@choose false
+            manual || LobbySceneStore.wouldKeep(source.world, spot.x, spot.z, option.score, source.stack, option.realm)
         }
     }
 
@@ -1105,6 +1169,8 @@ object LobbyCapture {
                 //?} else {
                 /*val root = LobbySnapshot.encode(job.chunks, meta)
                 *///?}
+                val chunkCount = job.chunks.size
+                job.chunks.clear()
                 val score = job.verdict.score + stage.quality * STAGE_SCORE_WEIGHT
                 val outcome = Outcome(root, score, biome, clock, anchor, solveMillis, packs, job.verdict.breakdown?.total, job.verdict.profile, dimension)
                 val encoded = Util.getNanos()
@@ -1122,7 +1188,7 @@ object LobbyCapture {
                 val data = LobbySnapshot.compress(root)
                 val compressMillis = (Util.getNanos() - compressStart) / 1_000_000L
                 val encodeMillis = (encoded - encodeStart) / 1_000_000L
-                landed.add(Runnable { store(job, outcome, data, encodeMillis, compressMillis) })
+                landed.add(Runnable { store(job, outcome, data, chunkCount, encodeMillis, compressMillis) })
             } catch (error: Throwable) {
                 LOBBY_LOGGER.warn("Capture copy failed", error)
                 landed.add(
@@ -1167,7 +1233,7 @@ object LobbyCapture {
         report(source, BlockPos(entry.x, 0, entry.z), "handed over in memory as ${entry.id} (copy ${copyMillis}ms)")
     }
 
-    private fun store(job: Copying, outcome: Outcome, data: ByteArray, encodeMillis: Long, compressMillis: Long) {
+    private fun store(job: Copying, outcome: Outcome, data: ByteArray, chunkCount: Int, encodeMillis: Long, compressMillis: Long) {
         busy = false
         val source = job.source
         blocked(source)?.let {
@@ -1175,14 +1241,19 @@ object LobbyCapture {
             fail(source, it)
             return
         }
-        val entry = entry(source, outcome, data.size.toLong())
         val action = source.action
+        if (action == null && frequency() == LobbyCaptureFrequency.OFF) {
+            report(source, outcome.anchor, "dropped (automatic capture is off)")
+            return
+        }
+        val entry = entry(source, outcome, data.size.toLong())
         val report = LobbySceneScore.report(job.verdict.breakdown, null, true, job.weaker, false, realm = job.verdict.realm)
         val kept = LobbySceneStore.admit(entry, data) { saved ->
             action?.let { spot = LobbySpotState.Done(it, report, saved, if (saved) "Saved to your lobby scenes" else "Could not save this scene") }
         }
         if (kept) {
-            wait = CAPTURED_TICKS
+            wait = frequency().ticks(CAPTURED_TICKS)
+            if (action == null) rest = 0
             val stored = LobbySceneStore.named(entry)
             recent = stored
             if (source.connection != null && source.connection === session.get()) sessionScenes += stored
@@ -1197,7 +1268,7 @@ object LobbyCapture {
                 outcome.score,
                 outcome.biome,
                 data.size / 1024,
-                job.chunks.size,
+                chunkCount,
                 job.entities.size,
                 job.surveyTiming.describe(),
                 job.timing.describe(),

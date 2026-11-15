@@ -3,7 +3,9 @@
 package org.polyfrost.polyplus.client.gui
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigPrefs
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +32,6 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.polyplus.client.lobby.GlassRegistry
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import kotlin.math.PI
@@ -150,23 +151,21 @@ internal fun MenuBackdrop(modifier: Modifier, glass: MenuGlass) {
     Canvas(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
         val mouse = easedMenuMouse()
         drawMenuBackground(time, mouse)
-        if (frosted && ThemeConfig.enableBackgroundBlur) drawFrost(glass.panels.values, origin, time, mouse)
+        if (frosted && OneConfigPrefs.backgroundBlur) drawFrost(glass.panels.values, origin, time, mouse)
     }
 }
 
 internal object MenuFxPass {
     private val drawScope = CanvasDrawScope()
-    private val inline = InlineCanvas("menu_fx")
-
     //? if >= 26.1 {
     @JvmStatic
-    fun renderInline(ctx: GuiGraphicsExtractor): Boolean = inline.draw(ctx) { render(it) }
+    fun renderInline(ctx: GuiGraphicsExtractor): Boolean = InlinePolyCanvas.draw(ctx) { render(it) }
     //?} elif > 1.8.9 {
     /*@JvmStatic
-    fun renderInline(ctx: GuiGraphics): Boolean = inline.draw(ctx) { render(it) }
+    fun renderInline(ctx: GuiGraphics): Boolean = InlinePolyCanvas.draw(ctx) { render(it) }
     *///?} else {
     /*@JvmStatic
-    fun renderInline(): Boolean = inline.draw { render(it) }
+    fun renderInline(): Boolean = InlinePolyCanvas.draw { render(it) }
     *///?}
 
     private fun render(canvas: ComposeCanvas) {

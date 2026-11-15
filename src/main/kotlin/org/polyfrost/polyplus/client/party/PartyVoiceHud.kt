@@ -241,12 +241,13 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
                 if (textUnderline) append("§n")
             }
             PolyMcText(
-                text = if (style.isEmpty()) cased else "$style$cased§r",
+                text = if (style.isEmpty()) cased else "$style${cased.replace("§", "")}§r",
                 outlineColor = if (showShadow && fullShadow) PolyColor(shadowColor, shadowChroma, shadowChromaSpeed) else null,
                 color = color,
                 shadow = showShadow && !fullShadow,
                 scale = scale,
                 modifier = modifier,
+                literal = style.isEmpty(),
             )
         } else {
             PolyText(

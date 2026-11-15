@@ -3,12 +3,16 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import org.polyfrost.polyplus.client.gui.SocialSuccessColor
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.layout.PaddingValues
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeColors
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,22 +22,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.transparencyCheckerboard
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.rememberCoverImage
@@ -146,14 +149,17 @@ internal fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier
         isNewItem(createdAt) -> "NEW"
         else -> return
     }
-    Box(
-        modifier = modifier.align(Alignment.TopStart)
-            .clip(ppShape(5.dp))
-            .background(if (owned) Color(0xFF239A60) else OneConfigTheme.accent)
-            .padding(horizontal = 7.dp, vertical = 2.dp),
-    ) {
-        SocialText(label, color = if (owned) Color.White else OneConfigTheme.current.accentTextColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-    }
+    val theme = OneConfigTheme.current
+    Badge(
+        label,
+        modifier.align(Alignment.TopStart),
+        tone = if (owned) BadgeTone.Success else BadgeTone.Accent,
+        style = BadgeStyle.Solid,
+        colors = if (owned) BadgeColors(container = SocialSuccessColor, content = Color.White) else BadgeColors(container = OneConfigTheme.accent, content = theme.accentTextColor),
+        shape = OneConfigTheme.shape(5.dp),
+        labelStyle = TextStyle(fontSize = 10.sp),
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+    )
 }
 
 internal fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
@@ -181,7 +187,7 @@ internal fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
                 contentDescription = null,
                 filterQuality = FilterQuality.None,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().clip(ppShape(5.dp)),
+                modifier = Modifier.fillMaxSize().clip(OneConfigTheme.shape(5.dp)),
             )
         }
     }
@@ -189,9 +195,10 @@ internal fun CoverThumbnail(coverAssetId: Int?, modifier: Modifier) {
 
 @Composable
 private fun CheckerThumbnail(modifier: Modifier) {
-    Checkerboard(
-        modifier = modifier.clip(ppShape(5.dp))
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)),
-        cell = 9.dp,
+    val shape = OneConfigTheme.shape(5.dp)
+    Box(
+        modifier.clip(shape)
+            .border(1.dp, OneConfigTheme.current.borderColor, shape)
+            .transparencyCheckerboard(9.dp),
     )
 }

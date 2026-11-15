@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
+import androidx.compose.ui.text.style.TextOverflow
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,29 +23,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.PanelHeader
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SelfStatusPicker
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.leftColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
-import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
-import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
+import org.polyfrost.polyplus.client.gui.lobbyshell.pageTitleStyle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.centerColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rightColumn
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.ChipDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+
+internal const val SEARCH_MAX_LENGTH = 64
 
 @Composable
 internal fun BoxScope.SocialDirectory(state: SocialPageState, snapshot: SocialSnapshot, onBack: () -> Unit) {
@@ -75,19 +82,30 @@ private fun ThreadsColumn(state: SocialPageState, snapshot: SocialSnapshot, modi
                 list::toggleUnread,
             )
             ToggleIconButton(LobbyIcons.SEARCH, list.searching, if (list.searching) "Close search" else "Search conversations", list::toggleSearch)
-            IconButton(themedIcon(LobbyIcons.PLUS), "New group", Modifier) {
-                state.dialog = SocialDialog.NewGroup
-            }
+            IconButton(
+                icon = LobbyIcons.PLUS,
+                contentDescription = "New group",
+                onClick = { state.dialog = SocialDialog.NewGroup },
+                modifier = Modifier.size(34.dp),
+                tint = OneConfigTheme.current.textColor,
+                tooltipPlacement = TooltipPlacement.BelowStart,
+            )
         }
         if (list.searching) {
-            TextField(list.query, { list.query = it }, Modifier.fillMaxWidth().height(38.dp), "Search conversations", themedIcon(LobbyIcons.SEARCH), 64, false)
+            SearchField(
+                query = list.query,
+                onQueryChange = { list.query = it.take(SEARCH_MAX_LENGTH) },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = "Search conversations",
+                clearable = false,
+            )
         }
         SelfStatusPicker(Modifier.fillMaxWidth())
         if (snapshot.delegations.isNotEmpty()) ChatAsPicker(state, snapshot)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             list.tabs(snapshot).forEach { entry ->
                 Box {
-                    Chip(entry.name, selected = entry == filter) { list.chosen = entry }
+                    Chip(label = entry.name, selected = entry == filter, onClick = { list.chosen = entry })
                     if (list.badged(entry, snapshot)) Box(Modifier.align(Alignment.TopEnd).size(6.dp).clip(OneConfigTheme.current.circleShape).background(OneConfigTheme.accent))
                 }
             }
@@ -99,14 +117,13 @@ private fun ThreadsColumn(state: SocialPageState, snapshot: SocialSnapshot, modi
 @Composable
 internal fun ToggleIconButton(icon: String, active: Boolean, tooltip: String, onClick: () -> Unit) {
     IconButton(
-        themedIcon(icon),
-        tooltip,
-        null,
-        Modifier,
-        if (active) OneConfigTheme.accent else null,
-        if (active) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
-        TooltipPlacement.BelowStart,
-        onClick,
+        icon = icon,
+        contentDescription = tooltip,
+        onClick = onClick,
+        modifier = Modifier.size(34.dp),
+        selected = active,
+        tint = if (active) OneConfigTheme.current.accentTextColor else SocialTextPrimary,
+        tooltipPlacement = TooltipPlacement.BelowStart,
     )
 }
 
@@ -128,24 +145,41 @@ private fun RosterPane(state: SocialPageState, snapshot: SocialSnapshot, onBack:
 @Composable
 private fun RosterHeader(state: SocialPageState, snapshot: SocialSnapshot, filter: FriendFilter, onBack: () -> Unit, onFilter: (FriendFilter) -> Unit) {
     val requests = snapshot.requests.count { it.incoming }
-    Row(
-        Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        BackButton(onBack)
-        PageTitle("Friends", Modifier.padding(end = 2.dp))
-        TextField(state.query, { state.query = it }, Modifier.weight(1f).height(38.dp), "Search friends", themedIcon(LobbyIcons.SEARCH), 64, false)
-        FriendFilter.entries.forEach { entry ->
-            val label = when {
-                entry == FriendFilter.Requests && requests > 0 -> "Requests ${snapshot.countLabel(requests, SocialList.Incoming)}"
-                entry == FriendFilter.Blocked && snapshot.blocked.isNotEmpty() -> "Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}"
-                else -> entry.name
+    PanelHeader(
+        "Friends",
+        Modifier.height(58.dp).padding(horizontal = 12.dp),
+        titleStyle = pageTitleStyle(),
+        leading = { BackButton(onBack) },
+        titleWeight = false,
+        spacing = 8.dp,
+        actions = {
+            SearchField(
+                query = state.query,
+                onQueryChange = { state.query = it.take(SEARCH_MAX_LENGTH) },
+                modifier = Modifier.weight(1f).padding(start = 2.dp),
+                placeholder = "Search friends",
+                clearable = false,
+            )
+            val tabs = FriendFilter.entries.map { entry ->
+                val label = when {
+                    entry == FriendFilter.Requests && requests > 0 -> "Requests ${snapshot.countLabel(requests, SocialList.Incoming)}"
+                    entry == FriendFilter.Blocked && snapshot.blocked.isNotEmpty() -> "Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}"
+                    else -> entry.name
+                }
+                TabItem(entry, label)
             }
-            Box(Modifier) { Chip(label, selected = entry == filter) { onFilter(entry) } }
-        }
-        TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), Modifier.height(38.dp), ButtonStyle.Secondary, true) { state.dialog = SocialDialog.AddFriend }
-    }
+            TabRow(tabs, filter, onFilter, style = TabStyle.Chips, size = ChipDefaults.size, fill = false)
+            TextButton(
+                text = "Add friend",
+                icon = SOCIAL_ASSETS + "user-plus-01.svg",
+                onClick = { state.dialog = SocialDialog.AddFriend },
+                modifier = Modifier,
+                style = ControlStyle.Secondary,
+                enabled = true,
+                size = ControlSize.Large,
+            )
+        },
+    )
 }
 
 @Composable
@@ -154,17 +188,17 @@ private fun InboxList(state: SocialPageState, snapshot: SocialSnapshot, modifier
     Column(modifier.panel().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PanelTitle("Waiting on you")
-            if (snapshot.waiting > 0) Label(snapshot.countLabel(snapshot.waiting, SocialList.Incoming), 14.sp, color = MutedText)
+            if (snapshot.waiting > 0) Text(snapshot.countLabel(snapshot.waiting, SocialList.Incoming), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         val paging = listPaging(state.source, snapshot, true, SocialList.Incoming, SocialList.Outgoing)
         if (items.isEmpty()) {
             FillWhenEmpty(paging)
-            EmptyState("Nothing waiting", Modifier.weight(1f).fillMaxWidth(), "Invites and friend requests show up here.")
+            EmptyState("Nothing waiting", Modifier.weight(1f).fillMaxWidth(), text = "Invites and friend requests show up here.")
             return@Column
         }
         ScrollFade(Modifier.weight(1f).fillMaxWidth(), 0.dp, paging = paging) {
             items.groupBy { it.section }.forEach { (section, entries) ->
-                SectionHeading(section, Modifier.padding(top = 6.dp, bottom = 6.dp))
+                SectionHeader(section, Modifier.padding(top = 6.dp, bottom = 6.dp))
                 entries.forEach { InboxLine(it) }
             }
         }

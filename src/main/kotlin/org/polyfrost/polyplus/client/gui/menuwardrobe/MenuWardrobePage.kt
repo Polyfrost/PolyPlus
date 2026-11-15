@@ -3,6 +3,8 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -327,7 +329,7 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
         if (rotation.userRotated) return@LaunchedEffect
         val start = rotation.yaw
         val delta = ((target - start) % 360f + 540f) % 360f - 180f
-        animate(0f, 1f, animationSpec = tween(300)) { progress, _ ->
+        animate(0f, 1f, animationSpec = Motion.spec(tween(300))) { progress, _ ->
             if (!rotation.userRotated) rotation.yaw = start + delta * progress
         }
     }
@@ -473,7 +475,7 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
                     .fillMaxSize(),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                StatusChip(it)
+                Badge(it, overImage = true)
             }
         }
     }

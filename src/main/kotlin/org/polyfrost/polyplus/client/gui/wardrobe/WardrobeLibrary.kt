@@ -3,12 +3,6 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,14 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -51,6 +42,18 @@ import kotlinx.coroutines.withContext
 import net.minecraft.resources.Identifier
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.api.TinyFdApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
@@ -66,10 +69,6 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
@@ -287,12 +286,10 @@ internal fun OutfitSwitcher(onStatus: (String) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        WheelIconButton("left-arrow", enabled = canCycle) { cycle(-1) }
+        IconButton("left-arrow", "Previous outfit", { cycle(-1) }, enabled = canCycle, style = IconButtonStyle.Framed, size = ControlSize.Compact, tooltip = null, sound = null)
         Box(
             modifier = Modifier.weight(1f).fillMaxHeight()
-                .clip(ppShape(8.dp))
-                .background(theme.chipBackground)
-                .border(1.dp, theme.borderColor, ppShape(8.dp))
+                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(8.dp), glass = false)
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -303,10 +300,16 @@ internal fun OutfitSwitcher(onStatus: (String) -> Unit) {
                 fontWeight = FontWeight.Medium,
             )
         }
-        WheelIconButton("right-arrow", enabled = canCycle) { cycle(1) }
-        WheelIconButton("plus", enabled = !busy && loaded, tooltip = "New outfit from current look") {
-            createOutfitFromCurrent(onStatus)
-        }
+        IconButton("right-arrow", "Next outfit", { cycle(1) }, enabled = canCycle, style = IconButtonStyle.Framed, size = ControlSize.Compact, tooltip = null, sound = null)
+        IconButton(
+            "plus",
+            "New outfit from current look",
+            { createOutfitFromCurrent(onStatus) },
+            enabled = !busy && loaded,
+            style = IconButtonStyle.Framed,
+            size = ControlSize.Compact,
+            sound = null,
+        )
     }
 }
 
@@ -401,47 +404,53 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
     }
 
     Column(
-        modifier = modifier.then(if (framed) Modifier.wardrobePanel().padding(16.dp) else Modifier),
+        modifier = modifier.then(if (framed) Modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp)).padding(16.dp) else Modifier),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SocialText("Add skin", color = theme.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            WheelIconButton("close", enabled = true, tooltip = "Close", onClick = onClose)
+            Text("Add skin", Modifier.weight(1f), theme.textColor, theme.typography.heading)
+            IconButton("close", "Close", onClose, style = IconButtonStyle.Framed, size = ControlSize.Compact, sound = null)
         }
-        SegmentedControl(
-            options = sources.map { it.label to it.icon },
-            selectedIndex = sources.indexOf(source),
-            onSelect = { index ->
-                source = sources[index]
+        TabRow(
+            tabs = sources.map { TabItem(it, it.label, it.icon) },
+            selected = source,
+            onSelect = {
+                source = it
                 message = null
             },
+            style = TabStyle.Segmented,
+            sound = null,
         )
         when (source) {
             SkinSource.Username -> FieldGroup("Minecraft username") {
-                WardrobeTextField(
+                TextField(
                     value = username,
                     onValueChange = { username = it },
-                    placeholder = "Username",
                     modifier = Modifier.fillMaxWidth(),
+                    placeholder = "Username",
+                    size = ControlSize.Compact,
+                    label = "Minecraft username",
                     maxLength = MAX_USERNAME_LENGTH,
                     onSubmit = { submit() },
                 )
-                SocialText("Saves this player's current skin to your library without changing yours.", color = theme.textColorSecondary, fontSize = 12.sp)
+                Text("Saves this player's current skin to your library without changing yours.", color = theme.textColorSecondary, style = OneConfigTheme.current.typography.small)
             }
             SkinSource.Url -> FieldGroup("Image URL") {
-                WardrobeTextField(
+                TextField(
                     value = url,
                     onValueChange = { url = it },
-                    placeholder = "https://",
                     modifier = Modifier.fillMaxWidth(),
+                    placeholder = "https://",
+                    size = ControlSize.Compact,
+                    label = "Image URL",
                     maxLength = MAX_URL_LENGTH,
                     onSubmit = { submit() },
                 )
-                SocialText("Link to a 64×64 or 64×32 PNG skin. Adding it also puts it on.", color = theme.textColorSecondary, fontSize = 12.sp)
+                Text("Link to a 64×64 or 64×32 PNG skin. Adding it also puts it on.", color = theme.textColorSecondary, style = OneConfigTheme.current.typography.small)
             }
             SkinSource.File -> FieldGroup("Skin file") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallButton(if (picking) "Choosing..." else "Choose file", iconPath = "folder", primary = false, onClick = { chooseFile() })
+                    TextButton(if (picking) "Choosing..." else "Choose file", "folder", { chooseFile() }, sound = null)
                     CardLabel(
                         file?.fileName?.toString() ?: "No file chosen",
                         color = if (file != null) theme.textColor else theme.textColorSecondary,
@@ -449,89 +458,48 @@ internal fun AddSkinPanel(onClose: () -> Unit, onStatus: (String) -> Unit, modif
                         modifier = Modifier.weight(1f),
                     )
                 }
-                SocialText("A 64×64 or 64×32 PNG skin. Adding it also puts it on.", color = theme.textColorSecondary, fontSize = 12.sp)
+                Text("A 64×64 or 64×32 PNG skin. Adding it also puts it on.", color = theme.textColorSecondary, style = OneConfigTheme.current.typography.small)
             }
         }
         if (source != SkinSource.Username) {
             FieldGroup("Name") {
-                WardrobeTextField(
+                TextField(
                     value = name,
                     onValueChange = { name = it },
-                    placeholder = "Optional",
                     modifier = Modifier.fillMaxWidth(),
+                    placeholder = "Optional",
+                    size = ControlSize.Compact,
+                    label = "Name",
                     maxLength = MAX_LIBRARY_NAME_LENGTH,
                 )
             }
             FieldGroup("Arms") {
-                SegmentedControl(
-                    options = SkinModel.entries.map { it.label to null },
-                    selectedIndex = SkinModel.entries.indexOf(model),
-                    onSelect = { model = SkinModel.entries[it] },
+                TabRow(
+                    tabs = SkinModel.entries.map { TabItem(it, it.label) },
+                    selected = model,
+                    onSelect = { model = it },
+                    style = TabStyle.Segmented,
+                    sound = null,
                 )
             }
         }
-        message?.let { SocialText(it, color = theme.textColorSecondary, fontSize = 12.sp) }
-        PrimaryWideButton(if (working) "Adding..." else "Add skin", iconPath = "plus", enabled = !working, onClick = { submit() })
-    }
-}
-
-@Composable
-private fun SegmentedControl(
-    options: List<Pair<String, String?>>,
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit,
-) {
-    val theme = OneConfigTheme.current
-    Row(
-        modifier = Modifier.fillMaxWidth().height(33.dp)
-            .clip(ppShape(8.dp))
-            .background(theme.chipBackground)
-            .border(1.dp, theme.borderColor, ppShape(8.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        options.forEachIndexed { index, (label, icon) ->
-            val selected = index == selectedIndex
-            val interaction = remember { MutableInteractionSource() }
-            val hovered by interaction.collectIsHoveredAsState()
-            val color = if (selected) theme.accentTextColor else if (hovered) theme.textColor else theme.textColorSecondary
-            Row(
-                modifier = Modifier.weight(1f).fillMaxHeight()
-                    .clip(ppShape(6.dp))
-                    .background(if (selected) OneConfigTheme.accent else Color.Transparent)
-                    .hoverable(interaction)
-                    .clickable { onSelect(index) },
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (icon != null) ThemedIcon(icon, color, 12.dp)
-                SocialText(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrimaryWideButton(label: String, iconPath: String, enabled: Boolean, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
-    Row(
-        modifier = Modifier.fillMaxWidth().height(33.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(ppShape(8.dp))
-            .background(OneConfigTheme.accent)
-            .clickable(enabled = enabled, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ThemedIcon(iconPath, theme.accentTextColor, 14.dp)
-        SocialText(label, color = theme.accentTextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        message?.let { Text(it, color = theme.textColorSecondary, style = OneConfigTheme.current.typography.small) }
+        TextButton(
+            if (working) "Adding..." else "Add skin",
+            "plus",
+            { submit() },
+            style = ControlStyle.Primary,
+            enabled = !working,
+            fillWidth = true,
+            sound = null,
+        )
     }
 }
 
 @Composable
 private fun FieldGroup(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SocialText(label, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        Text(label, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small)
         content()
     }
 }

@@ -3,11 +3,11 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.polyplus.client.gui.KitDangerColor
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,14 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
@@ -47,12 +45,11 @@ import org.polyfrost.oneconfig.api.ui.v1.components.rememberReorderState
 import org.polyfrost.oneconfig.api.ui.v1.components.reorderItem
 import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
 import org.polyfrost.polyplus.api.pause.PauseWidget
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private val BAR_RULE = 24.dp
 private val CARD_GAP = 2.dp
@@ -129,10 +126,10 @@ private fun widgetMenu(
     current.movedBy(widget.id, 1)?.let { ids ->
         add(MenuAction(if (vertical) "Move down" else "Move right", if (vertical) null else asset("chevron-right")) { reorder(ids) })
     }
-    add(MenuAction("Remove widget", asset("trash-01"), danger = true) {
+    add(MenuAction("Remove widget", {
         PauseWidgetRegistry.remove(widget.id)
         refresh()
-    })
+    }, icon = asset("trash-01"), danger = true, dangerColor = KitDangerColor))
 }
 
 @Composable
@@ -169,7 +166,7 @@ private fun AddWidget(
 
 @Composable
 private fun BarRule() {
-    Box(Modifier.width(1.dp).height(BAR_RULE).background(SocialBorderColor))
+    Divider(Modifier.height(BAR_RULE), vertical = true)
 }
 
 @Composable
@@ -186,37 +183,35 @@ internal fun PauseWidgetBar(
     val added = drag.shown
     val panelModes = view.panels.mapTo(HashSet()) { it.id }
     Box {
-        ContextMenuHost {
-            Row(
-                Modifier.height(LobbyLayout.BarHeight).pauseGlass(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                view.builtIns.forEachIndexed { index, widget ->
-                    key(widget.id) {
-                        if (index > 0) BarRule()
-                        widget.Bar(context)
+        Row(
+            Modifier.height(LobbyLayout.BarHeight).pauseGlass(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            view.builtIns.forEachIndexed { index, widget ->
+                key(widget.id) {
+                    if (index > 0) BarRule()
+                    widget.Bar(context)
+                }
+            }
+            added.forEachIndexed { index, widget ->
+                key(widget.id) {
+                    Row(
+                        Modifier
+                            .widgetGuard(widget.id)
+                            .reorderable(drag, widget.id, index)
+                            .contextMenu { widgetMenu(widget, added, false, widgets.refresh, asPanel = barPanelToggle(widget, panelModes, panelArea)) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (index > 0 || view.builtIns.isNotEmpty()) BarRule()
+                        WidgetGuard(widget.id) { widget.Bar(context) }
                     }
                 }
-                added.forEachIndexed { index, widget ->
-                    key(widget.id) {
-                        Row(
-                            Modifier
-                                .widgetGuard(widget.id)
-                                .reorderable(drag, widget.id, index)
-                                .contextMenu { widgetMenu(widget, added, false, widgets.refresh, asPanel = barPanelToggle(widget, panelModes, panelArea)) },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (index > 0 || view.builtIns.isNotEmpty()) BarRule()
-                            WidgetGuard(widget.id) { widget.Bar(context) }
-                        }
-                    }
-                }
-                if (view.addable.isNotEmpty()) {
-                    if (view.builtIns.isNotEmpty() || added.isNotEmpty()) BarRule()
-                    AddWidget(view.addable, side = false, refresh = widgets.refresh) { press, open ->
-                        BarTile(tooltip = if (open) null else "Add widget", active = open, onClick = press, glass = false) { hovered ->
-                            PauseGlyph(asset("plus"), if (hovered || open) SocialTextPrimary else MutedText, 20.dp)
-                        }
+            }
+            if (view.addable.isNotEmpty()) {
+                if (view.builtIns.isNotEmpty() || added.isNotEmpty()) BarRule()
+                AddWidget(view.addable, side = false, refresh = widgets.refresh) { press, open ->
+                    BarTile(tooltip = if (open) null else "Add widget", label = "Add widget", active = open, onClick = press, glass = false) { hovered ->
+                        PauseGlyph(asset("plus"), if (hovered || open) SocialTextPrimary else OneConfigTheme.current.mutedText, 20.dp)
                     }
                 }
             }
@@ -233,35 +228,33 @@ internal fun PauseWidgetCard(screen: OneClientPauseScreen, modifier: Modifier, w
     val drag = rememberWidgetDrag(Orientation.Vertical, view.added, widgets.refresh)
     val added = drag.shown
     Box(modifier) {
-        ContextMenuHost {
-            Column(
-                Modifier.width(width).pauseGlass(16.dp).padding(6.dp),
-                verticalArrangement = Arrangement.spacedBy(CARD_GAP),
-            ) {
-                view.builtIns.forEach { widget ->
-                    key(widget.id) { widget.Card(context) }
-                }
-                added.forEachIndexed { index, widget ->
-                    key(widget.id) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .widgetGuard(widget.id)
-                                .reorderable(drag, widget.id, index)
-                                .contextMenu { widgetMenu(widget, added, true, widgets.refresh) },
-                        ) {
-                            WidgetGuard(widget.id) { widget.Card(context) }
-                        }
+        Column(
+            Modifier.width(width).pauseGlass(16.dp).padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(CARD_GAP),
+        ) {
+            view.builtIns.forEach { widget ->
+                key(widget.id) { widget.Card(context) }
+            }
+            added.forEachIndexed { index, widget ->
+                key(widget.id) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .widgetGuard(widget.id)
+                            .reorderable(drag, widget.id, index)
+                            .contextMenu { widgetMenu(widget, added, true, widgets.refresh) },
+                    ) {
+                        WidgetGuard(widget.id) { widget.Card(context) }
                     }
                 }
-                if (view.addable.isNotEmpty()) {
-                    AddWidget(view.addable, side = true, refresh = widgets.refresh) { press, open ->
-                        CardRow(active = open, onClick = press) { lit ->
-                            Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) {
-                                PauseGlyph(asset("plus"), if (lit) SocialTextPrimary else MutedText, CARD_GLYPH)
-                            }
-                            Label("Add widget", 13.sp, color = if (lit) SocialTextPrimary else MutedText, weight = FontWeight.Medium)
+            }
+            if (view.addable.isNotEmpty()) {
+                AddWidget(view.addable, side = true, refresh = widgets.refresh) { press, open ->
+                    CardRow(label = "Add widget", active = open, onClick = press) { lit ->
+                        Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) {
+                            PauseGlyph(asset("plus"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, CARD_GLYPH)
                         }
+                        Text("Add widget", color = if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                 }
             }
@@ -294,28 +287,26 @@ internal fun PauseWidgetPanels(
     val drag = rememberWidgetDrag(Orientation.Vertical, panels, widgets.refresh, PauseWidgetRegistry::reorderPanels)
     val shown = drag.shown
     Box(modifier) {
-        ContextMenuHost {
-            Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
-                shown.forEachIndexed { index, widget ->
-                    key(widget.id) {
-                        val enter = rememberPanelEnter()
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = maxHeight)
-                                .widgetGuard(widget.id)
-                                .reorderable(drag, widget.id, index)
-                                .contextMenu { widgetMenu(widget, shown, true, widgets.refresh, PauseWidgetRegistry::reorderPanels, asPanel = false) }
-                                .graphicsLayer {
-                                    alpha = enter.value
-                                    translationY = (1f - enter.value) * PANEL_RISE.toPx()
-                                }
-                                .clip(ppShape(PANEL_RADIUS))
-                                .pauseGlass(PANEL_RADIUS)
-                                .then(if (widget.fullBleed()) Modifier else Modifier.padding(PANEL_PADDING)),
-                        ) {
-                            WidgetGuard(widget.id) { widget.Panel(context) }
-                        }
+        Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(LobbyLayout.Gap)) {
+            shown.forEachIndexed { index, widget ->
+                key(widget.id) {
+                    val enter = rememberPanelEnter()
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = maxHeight)
+                            .widgetGuard(widget.id)
+                            .reorderable(drag, widget.id, index)
+                            .contextMenu { widgetMenu(widget, shown, true, widgets.refresh, PauseWidgetRegistry::reorderPanels, asPanel = false) }
+                            .graphicsLayer {
+                                alpha = enter.value
+                                translationY = (1f - enter.value) * PANEL_RISE.toPx()
+                            }
+                            .clip(OneConfigTheme.shape(PANEL_RADIUS))
+                            .pauseGlass(PANEL_RADIUS)
+                            .then(if (widget.fullBleed()) Modifier else Modifier.padding(PANEL_PADDING)),
+                    ) {
+                        WidgetGuard(widget.id) { widget.Panel(context) }
                     }
                 }
             }

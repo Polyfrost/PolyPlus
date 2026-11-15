@@ -2,8 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.wardrobe
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -31,15 +28,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
@@ -49,15 +50,16 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 
 @Composable
 internal fun PriceLabel(basePrice: Float?, finalPrice: Float?, discounted: Boolean) {
+    val theme = OneConfigTheme.current
     when {
-        finalPrice == null -> SocialText("—", color = OneConfigTheme.current.textColorSecondary, fontSize = 14.sp)
-        finalPrice <= 0f -> SocialText("FREE", color = SocialSuccessText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        finalPrice == null -> Text("—", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.body)
+        finalPrice <= 0f -> Text("FREE", color = SocialSuccessText, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium))
         discounted && basePrice != null -> {
-            SocialText(money(basePrice), color = SocialDangerText, fontSize = 10.sp, textDecoration = TextDecoration.LineThrough)
+            Text(money(basePrice), color = SocialDangerText, style = OneConfigTheme.current.typography.body.copy(fontSize = 10.sp, textDecoration = TextDecoration.LineThrough))
             Spacer(Modifier.width(4.dp))
-            SocialText(money(finalPrice), color = SocialSuccessText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(money(finalPrice), color = SocialSuccessText, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium))
         }
-        else -> SocialText(money(finalPrice), color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        else -> Text(money(finalPrice), color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium))
     }
 }
 
@@ -77,15 +79,19 @@ private fun CartPanel(
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (items.isEmpty()) {
-            CenteredNote("Your cart is empty.")
+            EmptyState("Your cart is empty.", Modifier.fillMaxSize())
             return@Column
         }
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(items, key = { it.key }) { item ->
-                CartRow(item = item, onRemove = { onRemove(item.key) })
+        val list = rememberLazyListState()
+        ScrollContainer(list, Modifier.weight(1f), scrollbar = false) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = list,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(items, key = { it.key }) { item ->
+                    CartRow(item = item, onRemove = { onRemove(item.key) })
+                }
             }
         }
 
@@ -100,15 +106,15 @@ private fun CartPanel(
             RowTotals("Total", if (total <= 0f) "FREE" else money(total), OneConfigTheme.current.textColor, large = true)
         }
         if (status != null) {
-            SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(status, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         TextButton(
-            "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
-            themedIcon("assets/polyplus/ico/shopping-cart/0.svg"),
-            Modifier.fillMaxWidth().height(38.dp),
-            ButtonStyle.Primary,
-            true,
-            onCheckout,
+            text = "Checkout ${items.size} item${if (items.size == 1) "" else "s"}",
+            icon = "assets/polyplus/ico/shopping-cart/0.svg",
+            onClick = onCheckout,
+            modifier = Modifier.fillMaxWidth(),
+            style = ControlStyle.Primary,
+            size = ControlSize.Large,
         )
     }
 }
@@ -117,9 +123,7 @@ private fun CartPanel(
 private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxWidth().height(81.dp)
-            .clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+            .themedSurface(SurfaceKind.Card, OneConfigTheme.shape(12.dp), glass = false),
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 42.dp),
@@ -128,25 +132,25 @@ private fun CartRow(item: CartEntry, onRemove: () -> Unit) {
         ) {
             CoverThumbnail(item.coverAssetId, Modifier.size(58.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SocialText(item.name, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.name, color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 item.description?.takeIf { it.isNotBlank() }?.let {
-                    SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(it, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     PriceLabel(item)
-                    if (item.discounted) SocialText("SAVE ${item.discountRate}%", color = SocialSuccessText, fontSize = 12.sp, maxLines = 1)
+                    if (item.discounted) Text("SAVE ${item.discountRate}%", color = SocialSuccessText, style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
                 }
             }
         }
-        IconButton(themedIcon("trash"), "Remove", Modifier.align(Alignment.BottomEnd).padding(2.dp), onClick = onRemove)
+        IconButton(icon = "trash", contentDescription = "Remove", onClick = onRemove, modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp))
     }
 }
 
 @Composable
 private fun RowTotals(label: String, value: String, color: Color, large: Boolean = false) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        SocialText(label, color = OneConfigTheme.current.textColor, fontSize = if (large) 16.sp else 12.sp, fontWeight = if (large) FontWeight.Medium else FontWeight.Normal, modifier = Modifier.weight(1f))
-        SocialText(value, color = color, fontSize = if (large) 18.sp else 12.sp, fontWeight = if (large) FontWeight.Medium else FontWeight.Normal)
+        Text(label, modifier = Modifier.weight(1f), color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontSize = if (large) 16.sp else 12.sp, fontWeight = if (large) FontWeight.Medium else FontWeight.Normal))
+        Text(value, color = color, style = OneConfigTheme.current.typography.body.copy(fontSize = if (large) 18.sp else 12.sp, fontWeight = if (large) FontWeight.Medium else FontWeight.Normal))
     }
 }
 
@@ -167,12 +171,10 @@ internal fun StoreDetailPanel(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
             modifier = Modifier.fillMaxWidth().height(330.dp)
-                .clip(ppShape(12.dp))
-                .background(cardBrush())
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+                .themedSurface(SurfaceKind.Card, OneConfigTheme.shape(12.dp), glass = false),
         ) {
             if (info == null || variant == null) {
-                CenteredNote("Select a cosmetic to preview it.")
+                EmptyState("Select a cosmetic to preview it.", Modifier.fillMaxSize())
             } else {
                 val (source, _) = rememberCosmeticPreviewSource(variant.id, info.type)
                 val fades = info.type != CosmeticType.Boots
@@ -198,70 +200,62 @@ internal fun StoreDetailPanel(
 
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth()
-                .clip(ppShape(12.dp))
-                .background(cardBrush())
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp)),
+                .themedSurface(SurfaceKind.Card, OneConfigTheme.shape(12.dp), glass = false),
         ) {
             if (info == null || variant == null) {
-                CenteredNote("Browse the store to buy individual cosmetics.")
+                EmptyState("Browse the store to buy individual cosmetics.", Modifier.fillMaxSize())
             } else {
                 val variants = info.uiVariants()
                 Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(
-                        modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        SocialText(info.type.displayName, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
-                        SocialText(info.name, color = OneConfigTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                        Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
-                        if (variants.size > 1) {
-                            VariantPicker(
-                                variants = variants,
-                                selectedVariantId = variant.id,
-                                onSelect = onSelectVariant,
-                                ownedVariantIds = ownedIds,
-                            )
-                        }
-                        if (info.tags.all.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                for (tag in info.tags.all.take(4)) {
-                                    Box(
-                                        modifier = Modifier.clip(ppShape(5.dp))
-                                            .background(OneConfigTheme.current.chipBackground)
-                                            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                                    ) {
-                                        SocialText(tag.replaceFirstChar { it.uppercase() }, color = OneConfigTheme.current.textColor, fontSize = 11.sp)
+                    val scroll = rememberScrollState()
+                    ScrollContainer(scroll, Modifier.weight(1f, fill = false), scrollbar = false) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(info.type.displayName, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+                            Text(info.name, color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium))
+                            Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
+                            if (variants.size > 1) {
+                                VariantPicker(
+                                    variants = variants,
+                                    selectedVariantId = variant.id,
+                                    onSelect = onSelectVariant,
+                                    ownedVariantIds = ownedIds,
+                                )
+                            }
+                            if (info.tags.all.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    for (tag in info.tags.all.take(4)) {
+                                        Badge(tag.replaceFirstChar { it.uppercase() })
                                     }
                                 }
                             }
-                        }
-                        info.description?.takeIf { it.isNotBlank() }?.let {
-                            SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                            info.description?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+                            }
                         }
                     }
                     if (status != null) {
-                        SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                        Text(status, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
                     }
                     if (variant.id in ownedIds) {
-                        SocialText(
+                        Text(
                             "You already own this cosmetic.",
                             color = OneConfigTheme.current.textColorSecondary,
-                            fontSize = 12.sp,
+                            style = OneConfigTheme.current.typography.small,
                         )
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallButton(
-                                label = if (inCart) "In cart" else "Add to cart",
-                                iconPath = "assets/polyplus/ico/shopping-cart/0.svg",
-                                primary = false,
-                                onClick = { if (!inCart) onAddToCart(info, variant) },
+                            TextButton(
+                                if (inCart) "In cart" else "Add to cart",
+                                "assets/polyplus/ico/shopping-cart/0.svg",
+                                { if (!inCart) onAddToCart(info, variant) },
+                                sound = null,
                             )
-                            SmallButton(
-                                label = "Buy now",
-                                iconPath = "assets/polyplus/ico/shopping-bag.svg",
-                                primary = true,
-                                onClick = { onBuyNow(info, variant) },
+                            TextButton(
+                                "Buy now",
+                                "assets/polyplus/ico/shopping-bag.svg",
+                                { onBuyNow(info, variant) },
+                                style = ControlStyle.Primary,
+                                sound = null,
                             )
                         }
                     }
@@ -286,12 +280,12 @@ internal fun WardrobeCartPane(
     framed: Boolean = true,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().then(if (framed) Modifier.wardrobePanel() else Modifier).padding(12.dp),
+        modifier = Modifier.fillMaxSize().then(if (framed) Modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp)) else Modifier).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SocialText("Cart", color = OneConfigTheme.current.textColor, fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            IconButton(themedIcon("close"), "Close", Modifier, onClose)
+            Text("Cart", Modifier.weight(1f), OneConfigTheme.current.textColor, OneConfigTheme.current.typography.title)
+            IconButton(icon = "close", contentDescription = "Close", onClick = onClose)
         }
         CartPanel(items = cart, status = status, modifier = Modifier.weight(1f).fillMaxWidth(), onRemove = onRemove, onCheckout = onCheckout)
     }
@@ -300,20 +294,20 @@ internal fun WardrobeCartPane(
 @Composable
 internal fun BundleDetailPanel(bundle: BundleInfo, status: String?, onBuy: () -> Unit, modifier: Modifier) {
     Column(
-        modifier = modifier.wardrobePanel().padding(16.dp),
+        modifier = modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         CoverThumbnail(bundle.assetId, Modifier.fillMaxWidth().height(200.dp))
-        SocialText("Bundle", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
-        SocialText(bundle.name, color = OneConfigTheme.current.textColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text("Bundle", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+        Text(bundle.name, color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium))
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted) }
         bundle.description?.takeIf { it.isNotBlank() }?.let {
-            SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+            Text(it, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
         }
         Spacer(Modifier.weight(1f))
         if (status != null) {
-            SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+            Text(status, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
         }
-        SmallButton("Buy now", iconPath = "assets/polyplus/ico/shopping-bag.svg", primary = true, onClick = onBuy)
+        TextButton("Buy now", "assets/polyplus/ico/shopping-bag.svg", onBuy, style = ControlStyle.Primary, sound = null)
     }
 }

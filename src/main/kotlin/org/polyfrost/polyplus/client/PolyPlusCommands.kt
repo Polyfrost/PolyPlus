@@ -5,14 +5,12 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.ChatFormatting
-import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.resourcepack.HostSharedPack
-import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.PrivacyConsent
 
 //? if = 1.8.9 {
 /*import com.mojang.brigadier.arguments.ArgumentType
@@ -60,6 +58,13 @@ object PolyPlusCommands {
         <FabricClientCommandSource> {
         var root = commands.literal(PolyPlusConstants.ID)
             .then(commands.literal("refresh").executes { ctx ->
+                if (!PrivacyConsent.allowsOnlineServices()) {
+                    ctx.source.sendFeedback(
+                        Component.literal("Online features are off, so there's nothing to refresh.")
+                            .withStyle(ChatFormatting.RED),
+                    )
+                    return@executes Command.SINGLE_SUCCESS
+                }
                 PolyPlusClient.refresh()
                 LOGGER.info("PolyPlus Client refresh triggered via command.")
                 ctx.source.sendFeedback(
@@ -88,29 +93,6 @@ object PolyPlusCommands {
                             .withStyle(ChatFormatting.GREEN),
                     )
                 }
-                Command.SINGLE_SUCCESS
-            })
-            .then(commands.literal("mainmenu").executes { _ ->
-                //? if = 1.8.9 {
-                /*Minecraft.getInstance().tell { ClientPlatform.setScreen(PolyPlusLobbyScreen()) }
-                *///?} else {
-                val client = Minecraft.getInstance()
-                if (client.isSameThread) {
-                    //? if >= 26.2 {
-                    client.gui.setScreen(PolyPlusLobbyScreen())
-                    //?} else {
-                    /*client.setScreen(PolyPlusLobbyScreen())
-                    *///?}
-                } else {
-                    client.execute {
-                        //? if >= 26.2 {
-                        client.gui.setScreen(PolyPlusLobbyScreen())
-                        //?} else {
-                        /*client.setScreen(PolyPlusLobbyScreen())
-                        *///?}
-                    }
-                }
-                //?}
                 Command.SINGLE_SUCCESS
             })
 

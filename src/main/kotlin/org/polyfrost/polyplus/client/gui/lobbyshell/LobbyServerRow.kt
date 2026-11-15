@@ -2,8 +2,12 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,38 +19,33 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
-import org.polyfrost.oneconfig.api.ui.v1.components.rememberReorderState
-import org.polyfrost.oneconfig.api.ui.v1.components.reorderItem
-import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
-import org.polyfrost.polyplus.client.gui.themedIcon
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderAutoScroll
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderOverlay
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderableItem
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import androidx.compose.ui.text.style.TextOverflow
 
 private val RowHeight = 64.dp
+private val MORE_MENU_GAP = 6.dp
 private val RowGap = 6.dp
 private val RowIcon = 36.dp
 private val PlayersWidth = 104.dp
@@ -55,34 +54,16 @@ private val PingWidth = 56.dp
 @Composable
 internal fun ServerList(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
-    val saved = shown.filter { it.kind == ServerKind.SAVED }
-    var dragged by remember { mutableStateOf<List<ServerEntry>?>(null) }
-    val draggedKey = remember { arrayOfNulls<String>(1) }
-    val order = dragged?.takeIf { canReorder && it.size == saved.size } ?: saved
-    val entries = if (order === saved) shown else order.iterator().let { moved -> shown.map { if (it.kind == ServerKind.SAVED) moved.next() else it } }
-    val currentOrder by rememberUpdatedState(order)
-    val reorder = rememberReorderState(
-        Orientation.Vertical,
-        { from, to ->
-            if (draggedKey[0] == null) draggedKey[0] = currentOrder.getOrNull(from)?.key
-            currentOrder.withItemMoved(from, to)?.let { dragged = it }
-        },
-        {
-            val moved = dragged
-            val key = draggedKey[0]
-            dragged = null
-            draggedKey[0] = null
-            val target = moved?.indexOfFirst { it.key == key } ?: -1
-            if (moved != null && target >= 0) lobby.servers.moveTo(moved[target], target)
-        },
-    )
-    Box(modifier.fillMaxSize().reorderAutoScroll(reorder, listState)) {
-        LazyColumn(Modifier.fillMaxSize(), listState, verticalArrangement = Arrangement.spacedBy(RowGap)) {
-            items(entries, key = { it.key }) { entry ->
-                val index = order.indexOf(entry)
-                val drag = if (index >= 0) Modifier.reorderItem(reorder, entry.key, index, canReorder) else Modifier
-                ServerRow(lobby, entry, canReorder, onDelete, Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()), drag)
+    val reorder = rememberServerReorder(lobby, shown, canReorder, listState)
+    ScrollContainer(listState, modifier.fillMaxSize(), scrollbar = false) {
+        Box(Modifier.fillMaxSize().reorderContainer(reorder.state).reorderAutoScroll(reorder.state)) {
+            LazyColumn(Modifier.fillMaxSize(), listState, verticalArrangement = Arrangement.spacedBy(RowGap)) {
+                itemsIndexed(reorder.entries, key = { _, entry -> entry.key }) { index, entry ->
+                    val drag = Modifier.reorderableItem(reorder.state, entry.key, index, canReorder && entry.kind == ServerKind.SAVED)
+                    ServerRow(lobby, entry, canReorder, onDelete, Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()), drag)
+                }
             }
+            reorder.overlayEntry?.let { entry -> ServerRow(lobby, entry, canReorder, onDelete, Modifier.reorderOverlay(reorder.state)) }
         }
     }
 }
@@ -93,23 +74,28 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     val data = entry.data
     val revision = servers.revision
     ServerRevisions.of(data)
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     val selected = lobby.isSelected(data)
     val doubleClick = rememberDoubleClick { lobby.join(data) }
     LaunchedEffect(data) { servers.ping(data) }
     val failed = LobbyServers.failed(data)
-    LobbyHighlight(ppShape(16.dp)) { Row(
+    Row(
         modifier
             .fillMaxWidth()
             .height(RowHeight)
             .contextMenu { serverMenuItems(lobby, entry, canReorder, vertical = true, onDelete = onDelete) }
-            .hoverable(interaction)
-            .clickableWithSound("${data.shownName}, ${serverPlayers(data)}", selected = selected.takeIf { it }, shape = ppShape(16.dp)) {
-                doubleClick()
-                lobby.select(data)
-            }
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(
+                "${data.shownName}, ${serverPlayers(data)}",
+                {
+                    doubleClick()
+                    lobby.select(data)
+                },
+                selected = selected.takeIf { it },
+                shape = OneConfigTheme.shape(16.dp),
+            )
             .then(drag)
-            .cardFrame(selected, hovered)
+            .cardFrame(selected, hover.hovered)
             .serverWash(data, 0.22f)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -118,21 +104,21 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
         ServerIcon(data, revision, RowIcon)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Label(data.shownName, 14.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
-                if (data.state() == ServerData.State.INCOMPATIBLE) Tag("Incompatible", TagTone.Danger)
+                Text(data.shownName, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                if (data.state() == ServerData.State.INCOMPATIBLE) DangerTag("Incompatible".uppercase())
             }
             MotdText(entry, revision)
         }
-        Label(serverPlayers(data), 12.sp, Modifier.width(PlayersWidth), color = if (failed) SocialDangerText else MutedText)
-        Label(serverPing(data), 12.sp, Modifier.width(PingWidth), color = MutedText)
-        TextButton("Join", Modifier.height(38.dp), ButtonStyle.Primary) { lobby.join(data) }
+        Text(serverPlayers(data), Modifier.width(PlayersWidth), color = if (failed) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(serverPing(data), Modifier.width(PingWidth), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        TextButton(text = "Join", onClick = { lobby.join(data) }, size = ControlSize.Large, style = ControlStyle.Primary)
         ServerMoreMenu(lobby, entry, canReorder, onDelete)
-    } }
+    }
 }
 
 @Composable
 internal fun ServerMoreMenu(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, vertical: Boolean = true) {
-    AnchoredPopupButton(themedIcon(LobbyIcons.MORE), "More") { close ->
+    NavPopupButton(LobbyIcons.MORE, "More", gap = MORE_MENU_GAP) { close ->
         LobbyUserTheme { MenuList(serverMenuItems(lobby, entry, canReorder, vertical = vertical, onDelete = onDelete), close) }
     }
 }

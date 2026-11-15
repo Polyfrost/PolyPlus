@@ -4,7 +4,6 @@ package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -50,15 +48,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import java.awt.Color as AwtColor
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
-import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
 internal fun AuraSwatchRow(
@@ -71,12 +74,14 @@ internal fun AuraSwatchRow(
         AuraDot(
             color = Color(DEFAULT_AURA_ARGB),
             isSelected = selectedColor == null,
+            label = "Default aura colour",
             onClick = { onCommit(null) },
         )
         for (color in AURA_PRESETS) {
             AuraDot(
                 color = Color(color),
                 isSelected = selectedColor == color,
+                label = "Aura colour ${auraHex(color)}",
                 onClick = { onCommit(color) },
             )
         }
@@ -84,10 +89,11 @@ internal fun AuraSwatchRow(
         AuraDot(
             color = if (isCustom) Color(selectedColor!!) else OneConfigTheme.current.componentBackground,
             isSelected = isCustom || customOpen,
+            label = "Custom aura colour",
             onClick = onToggleCustom,
         ) {
             if (!isCustom) {
-                SocialText("+", color = OneConfigTheme.current.textColorSecondary, fontSize = 11.sp)
+                Text("+", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp))
             }
         }
     }
@@ -97,13 +103,15 @@ internal fun AuraSwatchRow(
 private fun AuraDot(
     color: Color,
     isSelected: Boolean,
+    label: String,
     onClick: () -> Unit,
     content: @Composable () -> Unit = {},
 ) {
+    val shape = OneConfigTheme.shape(6.dp)
     Box(
         modifier = Modifier.size(18.dp)
-            .clip(ppShape(6.dp))
-            .clickable(onClick = onClick),
+            .clip(shape)
+            .oneConfigClickable(label, onClick, selected = isSelected, shape = shape, indication = false, sound = null),
         contentAlignment = Alignment.Center,
     ) {
         Checkerboard(Modifier.fillMaxSize())
@@ -112,7 +120,7 @@ private fun AuraDot(
             Modifier.fillMaxSize().border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = if (isSelected) OneConfigTheme.accent else OneConfigTheme.current.borderColor,
-                shape = ppShape(6.dp),
+                shape = shape,
             ),
         )
         content()
@@ -138,7 +146,9 @@ private const val DEFAULT_AURA_ARGB: Int = -1
 
 private val AURA_PRESETS: List<Int> = AURA_COLORS.filter { it != DEFAULT_AURA_ARGB }
 
-/** Converts an ARGB int to a HSB float array (hue in degrees, saturation and brightness as a float between 0 and 1). */
+private fun auraHex(argb: Int): String =
+    "#%02X%02X%02X".format((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+
 private fun argbToHsb(argb: Int): FloatArray =
     AwtColor.RGBtoHSB((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF, null)
         .also { it[0] *= 360f }
@@ -189,7 +199,7 @@ private class AuraPickerState(argb: Int) {
 }
 
 @Composable
-internal fun Checkerboard(modifier: Modifier, cell: Dp = 4.dp) {
+private fun Checkerboard(modifier: Modifier, cell: Dp = 4.dp) {
     Box(
         modifier = modifier.drawBehind {
             val step = cell.toPx()
@@ -209,7 +219,25 @@ internal fun Checkerboard(modifier: Modifier, cell: Dp = 4.dp) {
 }
 
 @Composable
-internal fun AuraCustomPopover(
+internal fun AuraColorPopup(
+    selectedColor: Int?,
+    onPreview: (Int) -> Unit,
+    onCommit: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+    gap: Dp = 4.dp,
+) {
+    EscapeCloses(onDismiss)
+    Popup(
+        popupPositionProvider = rememberAnchoredPosition(Placement.BelowEnd, gap),
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        AuraCustomPopover(selectedColor, onPreview, onCommit)
+    }
+}
+
+@Composable
+private fun AuraCustomPopover(
     selectedColor: Int?,
     onPreview: (Int) -> Unit,
     onCommit: (Int?) -> Unit,
@@ -251,22 +279,26 @@ internal fun AuraCustomPopover(
     val brightness = state.brightness
     val alpha = state.alpha
     val current = hsbToColor(hue, saturation, brightness)
+    val theme = OneConfigTheme.current
+    val paneShape = OneConfigTheme.shape(16.dp)
+    val barShape = OneConfigTheme.shape(6.dp)
+    val handleShape = OneConfigTheme.shape(5.dp)
 
     Column(
         modifier = modifier.width(190.dp)
             .sceneFrost(16.dp)
-            .clip(ppShape(16.dp))
-            .background(OneConfigTheme.current.popupBackground)
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .clip(paneShape)
+            .background(theme.popupBackground)
+            .border(1.dp, theme.borderColor, paneShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SocialText("Aura Color", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        Text("Aura Color", color = theme.textColorSecondary, style = theme.typography.body.copy(fontSize = 12.sp))
 
         var paneSize by remember { mutableStateOf(Size.Zero) }
         Box(
             modifier = Modifier.fillMaxWidth().height(120.dp)
-                .clip(ppShape(6.dp))
+                .clip(barShape)
                 .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .drawWithCache {
                     val hueColor = hsbToColor(hue, 1f, 1f)
@@ -305,15 +337,15 @@ internal fun AuraCustomPopover(
                 modifier = Modifier
                     .offset { IntOffset((selX - 7.dp.toPx()).roundToInt(), (selY - 7.dp.toPx()).roundToInt()) }
                     .size(14.dp)
-                    .clip(ppShape(6.dp))
+                    .clip(barShape)
                     .background(current)
-                    .border(2.dp, Color.White, ppShape(6.dp)),
+                    .border(2.dp, Color.White, barShape),
             )
         }
 
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
-                .clip(ppShape(6.dp))
+                .clip(barShape)
                 .drawWithCache {
                     val gradient = Brush.horizontalGradient(
                         listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
@@ -347,15 +379,15 @@ internal fun AuraCustomPopover(
                 modifier = Modifier.align(Alignment.CenterStart)
                     .offset { IntOffset(((hue / 360f) * barWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
                     .size(10.dp)
-                    .clip(ppShape(5.dp))
+                    .clip(handleShape)
                     .background(Color.White)
-                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
+                    .border(1.dp, Color.White.copy(0.5f), handleShape),
             )
         }
 
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
-                .clip(ppShape(6.dp))
+                .clip(barShape)
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -391,17 +423,17 @@ internal fun AuraCustomPopover(
                 modifier = Modifier.align(Alignment.CenterStart)
                     .offset { IntOffset((alpha * alphaBarWidth - 5.dp.toPx()).roundToInt().coerceAtLeast(0), 0) }
                     .size(10.dp)
-                    .clip(ppShape(5.dp))
+                    .clip(handleShape)
                     .background(Color.White)
-                    .border(1.dp, Color.White.copy(0.5f), ppShape(5.dp)),
+                    .border(1.dp, Color.White.copy(0.5f), handleShape),
             )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.size(28.dp).clip(ppShape(5.dp))) {
+            Box(modifier = Modifier.size(28.dp).clip(handleShape)) {
                 Checkerboard(Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
-                Box(Modifier.fillMaxSize().border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)))
+                Box(Modifier.fillMaxSize().border(1.dp, theme.borderColor, handleShape))
             }
             BasicTextField(
                 value = hexText,
@@ -419,26 +451,25 @@ internal fun AuraCustomPopover(
                 keyboardActions = KeyboardActions(onDone = { commitHex() }),
                 singleLine = true,
                 textStyle = TextStyle(
-                    color = OneConfigTheme.current.textColor,
+                    color = theme.textColor,
                     fontSize = 12.sp,
-                    fontFamily = OneConfigTheme.current.fontFamily,
+                    fontFamily = theme.fontFamily,
                 ),
-                cursorBrush = SolidColor(OneConfigTheme.current.textColor),
+                cursorBrush = SolidColor(theme.textColor),
                 modifier = Modifier.weight(1f)
-                    .clip(ppShape(5.dp))
-                    .background(OneConfigTheme.current.chipBackground)
-                    .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp))
+                    .clip(handleShape)
+                    .background(theme.chipBackground)
+                    .border(1.dp, theme.borderColor, handleShape)
                     .padding(horizontal = 8.dp, vertical = 6.dp)
                     .onFocusChanged { if (!it.isFocused) commitHex() }
                     .trackTextInputFocus(),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SocialText("#", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                        Text("#", color = theme.textColorSecondary, style = theme.typography.body.copy(fontSize = 12.sp))
                         inner()
                     }
                 },
             )
         }
-
     }
 }

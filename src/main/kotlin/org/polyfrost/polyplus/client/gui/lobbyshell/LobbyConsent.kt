@@ -2,9 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
-import androidx.compose.foundation.layout.height
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.ToggleRow
 import androidx.compose.foundation.layout.Arrangement
@@ -22,10 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbysocial.socialSurface
 import org.polyfrost.polyplus.client.legal.LegalDocument
 import org.polyfrost.polyplus.client.legal.LegalDocuments
@@ -40,6 +39,7 @@ internal fun rememberOnlineConsent(): MutableState<Boolean> = remember { mutable
 
 @Composable
 internal fun ConsentStep(reason: String, modifier: Modifier, onDismiss: () -> Unit, onAccepted: () -> Unit) {
+    val theme = OneConfigTheme.current
     var document by remember { mutableStateOf<LegalDocument?>(null) }
     var agreed by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
@@ -50,33 +50,43 @@ internal fun ConsentStep(reason: String, modifier: Modifier, onDismiss: () -> Un
     }
     Column(modifier.socialSurface().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PanelTitle("Turn on online services")
-        SocialText(reason, 14.sp, color = MutedText)
-        SocialText("Declining keeps crash reporting and all online features off.", 12.sp, color = MutedText)
+        Text(reason, Modifier, theme.mutedText, theme.typography.body)
+        Text("Declining keeps crash reporting and all online features off.", Modifier, theme.mutedText, theme.typography.small)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton("Terms of Service", Modifier.weight(1f).height(38.dp)) {
-                ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL)
-            }
-            TextButton("Privacy Policy", Modifier.weight(1f).height(38.dp)) {
-                ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL)
-            }
+            TextButton(
+                text = "Terms of Service",
+                onClick = { ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL) },
+                modifier = Modifier.weight(1f), size = ControlSize.Large,
+            )
+            TextButton(
+                text = "Privacy Policy",
+                onClick = { ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL) },
+                modifier = Modifier.weight(1f), size = ControlSize.Large,
+            )
         }
-        ToggleRow("I agree to both", agreed, Modifier) { agreed = !agreed }
+        ToggleRow(label = "I agree to both", checked = agreed, onCheckedChange = { agreed = it }, modifier = Modifier)
         val loaded = document
         when {
             loaded != null -> Unit
-            failed -> SocialText("Couldn't load the current terms. Check your connection and try again.", 12.sp, color = SocialDangerText)
-            else -> SocialText("Loading the current terms...", 12.sp, color = MutedText)
+            failed -> Text("Couldn't load the current terms. Check your connection and try again.", Modifier, SocialDangerText, theme.typography.small)
+            else -> Text("Loading the current terms...", Modifier, theme.mutedText, theme.typography.small)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton("Not now", Modifier.weight(1f).height(38.dp), onDismiss)
+            TextButton(text = "Not now", onClick = onDismiss, modifier = Modifier.weight(1f), size = ControlSize.Large)
             if (loaded == null && failed) {
-                TextButton("Retry", Modifier.weight(1f).height(38.dp), ButtonStyle.Primary) { attempt++ }
+                TextButton(text = "Retry", onClick = { attempt++ }, modifier = Modifier.weight(1f), size = ControlSize.Large, style = ControlStyle.Primary)
             } else {
-                TextButton(if (loaded == null) "Loading..." else "Agree", null, Modifier.weight(1f).height(38.dp), ButtonStyle.Primary, agreed && loaded != null) {
-                    val accepted = document ?: return@TextButton
-                    PrivacyEnforcement.acceptDocuments(accepted.version, accepted.resolvedPrivacyVersion)
-                    onAccepted()
-                }
+                TextButton(
+                    text = if (loaded == null) "Loading..." else "Agree",
+                    onClick = {
+                        val accepted = document ?: return@TextButton
+                        PrivacyEnforcement.acceptDocuments(accepted.version, accepted.resolvedPrivacyVersion)
+                        onAccepted()
+                    },
+                    modifier = Modifier.weight(1f), size = ControlSize.Large,
+                    style = ControlStyle.Primary,
+                    enabled = agreed && loaded != null,
+                )
             }
         }
     }

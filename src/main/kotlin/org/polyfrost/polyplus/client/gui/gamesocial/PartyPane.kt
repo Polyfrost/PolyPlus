@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,17 +22,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.polyplus.client.gui.themedIcon
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LeaveVoiceButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
@@ -54,6 +56,7 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PlayTogether
 import org.polyfrost.polyplus.client.social.GroupsRepository
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 
 private const val SEAT_COLUMNS = 4
 private const val NARROW_SEAT_COLUMNS = 2
@@ -77,13 +80,13 @@ internal fun PartyPane(
         val narrow = maxWidth < NarrowPane
         Column(Modifier.fillMaxSize()) {
             RoomHeader(window, party, narrow)
-            PaneRule()
+            Divider()
             PlayTogetherBanner(Modifier.padding(start = Edge, end = Edge, top = 16.dp))
             Box(Modifier.padding(start = Edge, end = Edge, top = 16.dp)) {
                 PartySeats(host, party, if (narrow) NARROW_SEAT_COLUMNS else SEAT_COLUMNS, inviteSeat = true)
             }
             RoomVoice(window, party)
-            PaneRule()
+            Divider()
             RoomChat(thread?.id, snapshot, reconnecting)
         }
     }
@@ -114,12 +117,12 @@ private fun RoomHeader(window: SocialWindowState, party: Party, narrow: Boolean)
         SocialGroupAvatar(party.members.map { it.player }, 34.dp, ringColor = Color.Transparent, grid = true)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             PanelTitle("Party")
-            Label("${party.members.size} of ${PartyRepository.MAX_MEMBERS} · ${party.members.count { it.online }} online", 12.sp, color = MutedText)
+            Text("${party.members.size} of ${PartyRepository.MAX_MEMBERS} · ${party.members.count { it.online }} online", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         BringPartyButton(party)
-        if (!narrow) TextButton("Leave", Modifier.height(38.dp)) { PartyRepository.leave() }
+        if (!narrow) TextButton(text = "Leave", onClick = { PartyRepository.leave() }, modifier = Modifier, size = ControlSize.Large)
         PartyButtons(party, window::showVoice)
-        if (!back) IconButton(themedIcon(LobbyIcons.CLOSE), "Close party", Modifier, window::closeParty)
+        if (!back) IconButton(icon = LobbyIcons.CLOSE, contentDescription = "Close party", onClick = window::closeParty, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
     }
 }
 
@@ -131,7 +134,14 @@ private fun BringPartyButton(party: Party) {
     val play = PlayTogether.active
     val running = play != null && play.stage != PlayTogether.Stage.DONE
     if (!away && !running) return
-    TextButton(if (running) "Bringing party" else "Bring party here", null, Modifier.height(38.dp), ButtonStyle.Primary, !running, PlayTogether::bringHere)
+    TextButton(
+        text = if (running) "Bringing party" else "Bring party here",
+        onClick = PlayTogether::bringHere,
+        modifier = Modifier,
+        style = ControlStyle.Primary,
+        enabled = !running,
+        size = ControlSize.Large,
+    )
 }
 
 @Composable
@@ -142,11 +152,11 @@ private fun RoomVoice(window: SocialWindowState, party: Party) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Label("Voice", 14.sp, weight = FontWeight.Medium)
+        Text("Voice", style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         VoiceModeChips(party)
         Spacer(Modifier.weight(1f))
         if (!voice.inVoice || window.singlePane) VoiceButtons(party, leave = false)
-        IconButton(themedIcon(PartyIcons.SETTINGS), "Voice and devices", Modifier, window::showVoice)
+        IconButton(icon = PartyIcons.SETTINGS, contentDescription = "Voice and devices", onClick = window::showVoice, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
         if (voice.inVoice && window.singlePane) LeaveVoiceButton()
     }
 }

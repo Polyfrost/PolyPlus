@@ -3,10 +3,8 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -19,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -30,30 +27,28 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.compat.replay.ReplayProvider
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import kotlin.math.cos
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private const val TICK_MILLIS = 250L
 private const val DISCARD_ARM_MILLIS = 3000L
 private const val PULSE_NANOS = 1_600_000_000.0
 private val BAR_CONTROL = 32.dp
-private val BAR_CONTROL_ICON = 16.dp
 private val CARD_CONTROL = 24.dp
-private val CARD_CONTROL_ICON = 13.dp
 private val CARD_GLYPH = 16.dp
 
 private sealed interface RecordingView
@@ -116,8 +111,8 @@ internal fun RecordingBarTool(screen: OneClientPauseScreen, glass: Boolean = tru
     val recording = rememberRecording()
     when (val view = recording.view ?: return) {
         is IdleView -> StartTool(screen, view.starters) { press, choosing ->
-            BarTile(tooltip = if (choosing) null else "Start recording", active = choosing, onClick = press, glass = glass) { hovered ->
-                PauseGlyph(asset("video-recorder"), if (hovered || choosing) SocialTextPrimary else MutedText, 20.dp)
+            BarTile(tooltip = if (choosing) null else "Start recording", label = "Start recording", active = choosing, onClick = press, glass = glass) { hovered ->
+                PauseGlyph(asset("video-recorder"), if (hovered || choosing) SocialTextPrimary else OneConfigTheme.current.mutedText, 20.dp)
             }
         }
         is LiveView -> BarTile(glass = glass) {
@@ -128,7 +123,7 @@ internal fun RecordingBarTool(screen: OneClientPauseScreen, glass: Boolean = tru
             ) {
                 RecordingDot(view.paused)
                 RecordingTime(view, 14.sp)
-                LiveControls(screen, view, recording.refresh, BAR_CONTROL, BAR_CONTROL_ICON)
+                LiveControls(screen, view, recording.refresh, BAR_CONTROL)
             }
         }
     }
@@ -139,19 +134,19 @@ internal fun RecordingCardTool(screen: OneClientPauseScreen) {
     val recording = rememberRecording()
     when (val view = recording.view ?: return) {
         is IdleView -> StartTool(screen, view.starters, side = true) { press, choosing ->
-            CardRow(active = choosing, onClick = press) { lit ->
+            CardRow(label = "Start recording", active = choosing, onClick = press) { lit ->
                 Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) {
-                    PauseGlyph(asset("video-recorder"), if (lit) SocialTextPrimary else MutedText, CARD_GLYPH)
+                    PauseGlyph(asset("video-recorder"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, CARD_GLYPH)
                 }
-                Label("Record", 13.sp, color = SocialTextPrimary, weight = FontWeight.Medium)
+                Text("Record", style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
         is LiveView -> CardRow {
             Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) { RecordingDot(view.paused) }
-            Label(if (view.paused) "Paused" else "Rec", 13.sp, color = if (view.paused) MutedText else SocialTextPrimary, weight = FontWeight.Medium)
-            view.elapsedSeconds?.let { TabularLabel(elapsedText(it), 13.sp, if (view.paused) MutedText else SocialTextPrimary) }
+            Text(if (view.paused) "Paused" else "Rec", color = if (view.paused) OneConfigTheme.current.mutedText else SocialTextPrimary, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            view.elapsedSeconds?.let { TabularLabel(elapsedText(it), 13.sp, if (view.paused) OneConfigTheme.current.mutedText else SocialTextPrimary) }
             Spacer(Modifier.weight(1f))
-            LiveControls(screen, view, recording.refresh, CARD_CONTROL, CARD_CONTROL_ICON)
+            LiveControls(screen, view, recording.refresh, CARD_CONTROL)
         }
     }
 }
@@ -177,6 +172,7 @@ private fun StartTool(
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
+                EscapeCloses(close)
                 MenuList(starters.map { provider -> MenuAction("Record with ${provider.name}", asset("video-recorder")) { start(provider) } }, close)
             }
         }
@@ -185,18 +181,18 @@ private fun StartTool(
 
 @Composable
 private fun RecordingTime(live: LiveView, size: TextUnit) {
-    val ink = if (live.paused) MutedText else SocialTextPrimary
+    val ink = if (live.paused) OneConfigTheme.current.mutedText else SocialTextPrimary
     val seconds = live.elapsedSeconds
     if (seconds != null) {
         TabularLabel(elapsedText(seconds), size, ink)
-        if (live.paused) Label("Paused", size, color = MutedText)
+        if (live.paused) Text("Paused", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = size), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     } else {
-        Label(if (live.paused) "Paused" else "Recording", size, color = ink, weight = FontWeight.Medium)
+        Text(if (live.paused) "Paused" else "Recording", color = ink, style = OneConfigTheme.current.typography.body.copy(fontSize = size, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
-private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: () -> Unit, size: Dp, icon: Dp) {
+private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: () -> Unit, size: Dp) {
     val provider = live.provider
     var armed by remember(provider) { mutableStateOf(false) }
     LaunchedEffect(armed) {
@@ -211,18 +207,17 @@ private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: 
                 asset(if (live.paused) "play-circle" else "pause-circle"),
                 if (live.paused) "Resume recording" else "Pause recording",
                 size,
-                icon,
             ) {
                 runCatching { provider.setPaused(!live.paused) }
                 refresh()
             }
         }
-        ChipButton(asset("check-circle"), provider.finishLabel, size, icon) {
+        ChipButton(asset("check-circle"), provider.finishLabel, size) {
             runCatching { provider.finish() }
             screen.closeIfCurrent()
         }
         if (live.canDiscard) {
-            ChipButton(asset("trash-01"), if (armed) "Click again to discard" else "Discard recording", size, icon, danger = armed) {
+            ChipButton(asset("trash-01"), if (armed) "Click again to discard" else "Discard recording", size, danger = armed) {
                 if (armed) {
                     armed = false
                     runCatching { provider.discard() }
@@ -239,33 +234,28 @@ private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: 
 private fun RecordingDot(paused: Boolean) {
     val frame by rememberFrame()
     val dot = SocialDangerText
+    val reduced = Motion.reduced
     Box(
         Modifier
             .size(8.dp)
-            .graphicsLayer { alpha = if (paused) 0.5f else (0.7f + 0.3f * cos(frame / PULSE_NANOS * 2.0 * Math.PI)).toFloat() }
+            .graphicsLayer { alpha = if (paused) 0.5f else if (reduced) 1f else (0.7f + 0.3f * cos(frame / PULSE_NANOS * 2.0 * Math.PI)).toFloat() }
             .background(dot, OneConfigTheme.current.circleShape),
     )
 }
 
 @Composable
-private fun ChipButton(icon: String, tooltip: String, size: Dp, iconSize: Dp, danger: Boolean = false, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val ink = when {
-        danger -> SocialDangerText
-        hovered -> SocialTextPrimary
-        else -> MutedText
-    }
-    val shape = ppShape(if (size > 24.dp) 10.dp else 6.dp)
-    Box(
-        Modifier
-            .size(size)
-            .rowFrame(false, hovered || danger, shape)
-            .background(if (danger) SocialDangerText.copy(alpha = 0.12f) else Color.Transparent, shape)
-            .hoverable(interaction)
-            .quietClick(interaction, onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        PauseGlyph(icon, ink, iconSize)
-        if (hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
+private fun ChipButton(icon: String, tooltip: String, size: Dp, danger: Boolean = false, onClick: () -> Unit) {
+    val controlSize = if (size > 24.dp) ControlSize.Regular else ControlSize.Compact
+    IconButton(
+        contentDescription = tooltip,
+        onClick = onClick,
+        size = controlSize,
+        danger = danger,
+        dangerColor = SocialDangerText,
+        tooltipPlacement = TooltipPlacement.AboveCenter,
+        active = danger,
+        frameSize = size,
+    ) { tint ->
+        PauseGlyph(icon, tint, IconButtonDefaults.iconSize(controlSize))
     }
 }

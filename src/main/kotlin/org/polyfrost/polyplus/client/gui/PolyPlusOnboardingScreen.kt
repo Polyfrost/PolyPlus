@@ -5,22 +5,13 @@ package org.polyfrost.polyplus.client.gui
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -32,7 +23,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -41,7 +31,6 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -62,28 +51,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -94,8 +71,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mojang.blaze3d.platform.InputConstants
@@ -112,13 +87,11 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
-import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
-import org.polyfrost.oneconfig.api.ui.v1.a11y.focusRing
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.oneconfig.internal.ui.screens.ModCard as OneConfigModCard
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
@@ -141,7 +114,33 @@ import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.privacy.LauncherEnvironment
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.oneconfig.api.ui.v1.components.ChipDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.LinkText
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.Select
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
+import org.polyfrost.oneconfig.api.ui.v1.components.Slider
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
+import org.polyfrost.oneconfig.api.ui.v1.components.cardSelection
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
+import org.polyfrost.oneconfig.api.ui.v1.theme.contrastAgainst
+import androidx.compose.ui.graphics.lerp
 import java.util.Locale
 import kotlin.io.path.exists
 import kotlin.math.roundToInt
@@ -155,7 +154,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
-class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
+class PolyPlusOnboardingScreen :
+    OneConfigComposeScreen(previous = null, renderMode = OneConfigComposeScreen.RenderMode.Continuous) {
     private var firstFrameDrawn = false
 
     // consuming Escape here rather than via shouldCloseOnEsc, since OneConfig hands unhandled keys straight to Screen on 1.8.9
@@ -213,10 +213,8 @@ class PolyPlusOnboardingScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     //?}
 
     @Composable
-    override fun compose() {
-        ProvideOneConfigTheme {
-            OnboardingFlow(OnboardingHost.Screen) { ClientPlatform.setScreen(TitleScreen()) }
-        }
+    override fun Content() {
+        ProvidePopupSounds(false) { OnboardingFlow(OnboardingHost.Screen) { ClientPlatform.setScreen(TitleScreen()) } }
     }
 }
 
@@ -244,6 +242,7 @@ internal fun OnboardingFlow(
         OnboardingFeatures.newModCards(PolyPlusConfig.onboardingModSettingsVersion, modReads.cards)
     }
     val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
+    val watermarkStep = remember { LauncherEnvironment.isOneClient && !PolyPlusConfig.watermarkAsked }
     var guides by remember { mutableStateOf(owedGuides) }
     val pages = remember(guides) {
         buildList {
@@ -258,6 +257,7 @@ internal fun OnboardingFlow(
                     .forEach { add(OnboardingStep.Mods(it)) }
                 if (ModCard.BLOCK_HIGHLIGHT in offeredCards) add(OnboardingStep.BlockHighlight)
             }
+            if (watermarkStep) add(OnboardingStep.Watermark)
             if (needsBlurChoice) add(OnboardingStep.MotionBlur)
             guides.sortedBy { it.ordinal }.forEach { add(OnboardingStep.Guide(it)) }
             if (!lobbyHost && (needsSettings || needsModSettings)) add(OnboardingStep.Done)
@@ -270,7 +270,8 @@ internal fun OnboardingFlow(
         mutableIntStateOf(OneConfigTheme.active?.let(OnboardingFeatures::uiStyleOf) ?: PolyPlusConfig.onboardingUiStyle)
     }
     var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
-    var alphabeticalMods by remember { mutableStateOf(PolyPlusConfig.alphabeticalModOrder) }
+    var watermark by remember { mutableStateOf(PolyPlusConfig.watermarkEnabled) }
+    var alphabeticalMods by remember { mutableStateOf(DefaultModOrder.alphabetical()) }
     var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
     var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
     var fireOpacity by remember {
@@ -345,10 +346,7 @@ internal fun OnboardingFlow(
             PolyPlusConfig.onboardingUiStyle = uiStyle
             PolyPlusConfig.onboardingGuiScale = chosenGuiScale
             PolyPlusConfig.onboardingToggleSprint = toggleSprint
-            if (alphabeticalMods != PolyPlusConfig.alphabeticalModOrder) {
-                PolyPlusConfig.alphabeticalModOrder = alphabeticalMods
-                DefaultModOrder.apply()
-            }
+            if (alphabeticalMods != DefaultModOrder.alphabetical()) DefaultModOrder.select(alphabeticalMods)
         }
         if (showsModSettings) {
             val startedAtVersion = PolyPlusConfig.onboardingModSettingsVersion
@@ -415,6 +413,10 @@ internal fun OnboardingFlow(
             PolyPlusConfig.onboardingMotionBlur = motionBlur
             PolyPlusConfig.onboardingPolyBlurApplied = false
             PolyPlusConfig.adaptiveBlurApplied = true
+        }
+        if (watermarkStep) {
+            PolyPlusConfig.watermarkEnabled = watermark
+            PolyPlusConfig.watermarkAsked = true
         }
         OnboardingFeatures.markGuidesShown(guides.map { it.card })
         PolyPlusConfig.onboardingCompleted = true
@@ -569,6 +571,7 @@ internal fun OnboardingFlow(
                     }
                 }
             }
+            OnboardingStep.Watermark -> WatermarkPage(watermark) { watermark = it }
             OnboardingStep.MotionBlur ->
                 if (waitingForOptimization) {
                     OptimizingPage(blurSampleTimedOut) { blurPickedManually = true }
@@ -701,21 +704,7 @@ internal fun OnboardingFlow(
                     Modifier
                         .offset(((DESIGN_WIDTH - panelWidth) / 2f).dp, ((DESIGN_HEIGHT - panelHeight) / 2f).dp)
                         .size(panelWidth.dp, panelHeight.dp)
-                        .then(
-                            if (OneConfigTheme.current.shadowEnabled) {
-                                Modifier.shadow(
-                                    elevation = 29.dp,
-                                    shape = ButtonShape,
-                                    ambientColor = ShadowColor,
-                                    spotColor = ShadowColor,
-                                )
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .clip(ButtonShape)
-                        .background(PageBackground.copy(alpha = 0.9f))
-                        .border(SocialPanelBorderWidth, OneConfigTheme.current.borderColor, ButtonShape),
+                        .themedSurface(SurfaceKind.Panel),
                 ) {
                     content()
                 }
@@ -740,13 +729,13 @@ private fun LookAndFeelPage(
     val scaleHeight = LABEL_HEIGHT + 32f
     val total = colorsHeight + SECTION_GAP + styleHeight + SECTION_GAP + scaleHeight
     var y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - total) / 2f
-    SectionLabel("UI Colors", y)
+    SectionHeader("UI Colors", Modifier.offset(232.dp, y.dp).width(198.dp), eyebrow = false)
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         ChoiceButton("Dark", MAIN_MENU_ASSETS + "moon-star.svg", !lightTheme, 198f, option = true) { onLightTheme(false) }
         ChoiceButton("Light", ONBOARDING_ASSETS + "sun.svg", lightTheme, 198f, option = true) { onLightTheme(true) }
     }
     y += colorsHeight + SECTION_GAP
-    SectionLabel("UI Style", y)
+    SectionHeader("UI Style", Modifier.offset(232.dp, y.dp).width(198.dp), eyebrow = false)
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(STYLE_CARD_GAP.dp)) {
         UiStyleOptions.forEach { option ->
             StyleCard(option, OnboardingFeatures.uiStyleTheme(option.style, lightTheme), uiStyle == option.style) { onUiStyle(option.style) }
@@ -758,7 +747,7 @@ private fun LookAndFeelPage(
 
 @Composable
 private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: (Int) -> Unit) {
-    SectionLabel("GUI Scale", y)
+    SectionHeader("GUI Scale", Modifier.offset(232.dp, y.dp).width(198.dp), eyebrow = false)
     val steps = maxScale.coerceAtLeast(1)
     fun valueToProgress(v: Int): Float = if (v <= 0) 1f else ((v - 1).toFloat() / steps).coerceIn(0f, 1f)
     fun indexToValue(index: Int): Int = if (index >= steps) 0 else index + 1
@@ -768,10 +757,8 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
         OnboardingSlider(
             progress = valueToProgress(guiScale),
             width = 332f,
-            thumbSize = WIDE_SLIDER_THUMB,
-            trackHeight = WIDE_SLIDER_TRACK,
             label = "GUI Scale",
-            value = shown,
+            valueText = { p -> indexToValue((p * steps).roundToInt()).let { if (it <= 0) "Auto" else it.toString() } },
             keyStep = 1f / steps,
             onRelease = { OnboardingFeatures.applyGuiScale(pending, persist = false) },
         ) { p ->
@@ -779,16 +766,17 @@ private fun GuiScaleSection(y: Float, guiScale: Int, maxScale: Int, onGuiScale: 
             onGuiScale(pending)
         }
         Spacer(Modifier.width(18.dp))
-        SliderValueBox(
-            shown,
-            width = 64.dp,
-            height = 26.dp,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal,
-            alignment = Alignment.CenterStart,
-            textPadding = 8.dp,
-        )
+        ValueBadge(shown, 64.dp, 26.dp, Alignment.CenterStart)
     }
+}
+
+@Composable
+private fun ValueBadge(value: String, width: Dp, height: Dp, alignment: Alignment = Alignment.Center, dimmed: Boolean = false) {
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    Box(
+        Modifier.width(width).height(height).graphicsLayer { alpha = if (dimmed) disabledAlpha else 1f },
+        contentAlignment = alignment,
+    ) { Badge(value) }
 }
 
 @Composable
@@ -812,28 +800,25 @@ private fun ModCardFrame(
     Box(
         Modifier
             .size(CARD_WIDTH.dp, CARD_HEIGHT.dp)
-            .clip(ButtonShape)
-            .background(ChoiceBackground)
-            .border(SocialPanelBorderWidth, SocialPanelBorderBrush, ButtonShape),
+            .themedSurface(SurfaceKind.Card),
     ) {
         CompositionLocalProvider(LocalCardTitle provides title) { Column(Modifier.fillMaxSize().padding(CARD_PADDING.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, SocialTextPrimary, Modifier.size(22.dp))
-                SocialText(title, 17.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                Icon(name = icon, contentDescription = null, tint = SocialTextPrimary, modifier = Modifier.size(22.dp))
+                Text(title, style = OneConfigTheme.current.typography.body.copy(fontSize = 17.sp, fontWeight = FontWeight.Medium), textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(CARD_TITLE_GAP.dp))
             preview()
             Spacer(Modifier.height(CARD_DESC_GAP.dp))
-            SocialText(
+            Text(
                 description,
-                12.sp,
-                Modifier.width(CARD_CONTENT_WIDTH.dp),
-                SocialTextSecondary,
-                FontWeight.Light,
-                TextAlign.Start,
+                modifier = Modifier.width(CARD_CONTENT_WIDTH.dp),
+                color = SocialTextSecondary,
+                style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Light),
+                textAlign = TextAlign.Start,
             )
             Spacer(Modifier.weight(1f))
             Column(
@@ -849,157 +834,73 @@ private fun ModCardFrame(
 private fun cardSpeech(label: String): String = LocalCardTitle.current.let { if (it.isEmpty()) label else "$it, $label" }
 
 @Composable
-private fun CardLabel(label: String) {
-    SocialText(
+private fun CardLabel(label: String, dimmed: Boolean = false) {
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    Text(
         label,
-        12.sp,
-        Modifier.width(CARD_LABEL_WIDTH.dp),
-        SocialTextSecondary,
-        FontWeight.Light,
-        TextAlign.Start,
+        modifier = Modifier.width(CARD_LABEL_WIDTH.dp).graphicsLayer { alpha = if (dimmed) disabledAlpha else 1f },
+        color = SocialTextSecondary,
+        style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Light),
+        textAlign = TextAlign.Start,
     )
 }
 
 @Composable
-private fun CardSlider(label: String, progress: Float, value: String, interactive: Boolean = true, onProgress: (Float) -> Unit) {
+private fun CardSlider(label: String, progress: Float, valueText: (Float) -> String, interactive: Boolean = true, onProgress: (Float) -> Unit) {
     Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
-        CardLabel(label)
+        CardLabel(label, dimmed = !interactive)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        OnboardingSlider(progress, CARD_SLIDER_WIDTH, enabled = interactive, label = cardSpeech(label), value = value, onProgress = onProgress)
+        OnboardingSlider(progress, CARD_SLIDER_WIDTH, enabled = interactive, label = cardSpeech(label), valueText = valueText, onProgress = onProgress)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        SliderValueBox(value, CARD_VALUE_WIDTH.dp, CARD_ROW_HEIGHT.dp, 12.sp)
-    }
-}
-
-@Composable
-private fun CardChip(label: String, spoken: String, selected: Boolean, interactive: Boolean = true, onClick: () -> Unit) {
-    val shape = ppShape(6.dp)
-    Box(
-        Modifier
-            .size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp)
-            .clip(shape)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
-            .then(if (interactive) Modifier.clickableWithSound(spoken, A11yRole.Option, selected, shape = shape) { if (!selected) onClick() } else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(label, 12.sp, color = SocialTextPrimary, fontWeight = if (selected) FontWeight.Medium else FontWeight.Light, textAlign = TextAlign.Center)
+        ValueBadge(valueText(progress), CARD_VALUE_WIDTH.dp, CARD_ROW_HEIGHT.dp, dimmed = !interactive)
     }
 }
 
 @Composable
 private fun CardToggle(label: String, enabled: Boolean, interactive: Boolean = true, onEnabled: (Boolean) -> Unit) {
     Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
-        CardLabel(label)
+        CardLabel(label, dimmed = !interactive)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
         val spoken = cardSpeech(label)
-        CardChip("On", "$spoken: On", enabled, interactive) { onEnabled(true) }
+        Chip(
+            "On",
+            enabled,
+            { if (!enabled) onEnabled(true) },
+            Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp),
+            enabled = interactive,
+            size = ControlSize.Compact,
+            role = A11yRole.Option,
+            contentDescription = "$spoken: On",
+        )
         Spacer(Modifier.width(CARD_CHIP_GAP.dp))
-        CardChip("Off", "$spoken: Off", !enabled, interactive) { onEnabled(false) }
+        Chip(
+            "Off",
+            !enabled,
+            { if (enabled) onEnabled(false) },
+            Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp),
+            enabled = interactive,
+            size = ControlSize.Compact,
+            role = A11yRole.Option,
+            contentDescription = "$spoken: Off",
+        )
     }
 }
 
-/**
- * A dropdown for modes that are a list rather than a yes/no. Controls sit at the foot of the card,
- * so the menu opens upward. It reserves the open menu's height up front and pins the closed row to
- * the bottom of that box: the row never moves, and the menu stays inside its parent's bounds, which
- * a negative offset would not — Compose does not hit-test children drawn outside their parent.
- */
 @Composable
 private fun CardDropdown(label: String, options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val shape = ppShape(6.dp)
-    val menuHeight = options.size * CARD_MENU_ITEM_HEIGHT + CARD_MENU_PADDING * 2f
-    val trigger = remember { FocusRequester() }
-    val chosen = remember { FocusRequester() }
-    val spoken = cardSpeech(label)
-    DisposableEffect(expanded) {
-        val close: () -> Unit = {
-            expanded = false
-            trigger.requestFocus()
-        }
-        if (expanded) OnboardingKeys.dismiss = close
-        onDispose { if (OnboardingKeys.dismiss === close) OnboardingKeys.dismiss = null }
-    }
-    LaunchedEffect(expanded) {
-        if (expanded && A11y.keyboardMode) chosen.requestFocus()
-    }
-    Box(Modifier.width(CARD_CONTENT_WIDTH.dp).height((menuHeight + CARD_MENU_GAP + CARD_ROW_HEIGHT).dp)) {
-        if (expanded) {
-            Column(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(CARD_DROPDOWN_WIDTH.dp, menuHeight.dp)
-                    .shadow(10.dp, shape, ambientColor = ShadowColor, spotColor = ShadowColor)
-                    .clip(shape)
-                    .background(MenuBackground)
-                    .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape)
-                    .padding(vertical = CARD_MENU_PADDING.dp),
-            ) {
-                options.forEachIndexed { index, option ->
-                    CardMenuItem(option, index == selected, if (index == selected) chosen else null) {
-                        if (index != selected) onSelect(index)
-                        expanded = false
-                        if (A11y.keyboardMode) trigger.requestFocus()
-                    }
-                }
-            }
-        }
-        Row(
-            Modifier.align(Alignment.BottomStart).height(CARD_ROW_HEIGHT.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CardLabel(label)
-            Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-            Row(
-                Modifier
-                    .size(CARD_DROPDOWN_WIDTH.dp, CARD_ROW_HEIGHT.dp)
-                    .clip(shape)
-                    .background(if (expanded) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-                    .border(SocialPanelBorderWidth, if (expanded) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
-                    .focusRequester(trigger)
-                    .clickableWithSound(
-                        "$spoken: ${options.getOrElse(selected) { options.first() }}, " + if (expanded) "expanded" else "collapsed",
-                        shape = shape,
-                    ) { expanded = !expanded }
-                    .padding(horizontal = CARD_MENU_INSET.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SocialText(
-                    options.getOrElse(selected) { options.first() },
-                    12.sp,
-                    Modifier.weight(1f),
-                    SocialTextPrimary,
-                    FontWeight.Medium,
-                    TextAlign.Start,
-                )
-                Icon(ONBOARDING_ASSETS + "chevron-selector.svg", SocialTextSecondary, Modifier.size(13.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun CardMenuItem(label: String, selected: Boolean, requester: FocusRequester?, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(CARD_MENU_ITEM_HEIGHT.dp)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else Color.Transparent)
-            .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
-            .clickableWithSound(label, A11yRole.Option, selected, shape = RoundedCornerShape(0.dp), onClick = onClick)
-            .padding(horizontal = CARD_MENU_INSET.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SocialText(
-            label,
-            12.sp,
-            Modifier.weight(1f),
-            SocialTextPrimary,
-            if (selected) FontWeight.Medium else FontWeight.Light,
-            TextAlign.Start,
+    Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
+        CardLabel(label)
+        Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
+        Select(
+            selected = selected,
+            options = options.indices.toList(),
+            onSelect = onSelect,
+            modifier = Modifier.width(CARD_DROPDOWN_WIDTH.dp),
+            label = { options.getOrElse(it) { options.first() } },
+            size = ControlSize.Compact,
+            contentDescription = cardSpeech(label),
+            placement = Placement.AboveStart,
         )
-        if (selected) Icon(MAIN_MENU_ASSETS + "check.svg", OneConfigTheme.accent, Modifier.size(12.dp))
     }
 }
 
@@ -1011,18 +912,60 @@ private fun SprintPage(toggleSprint: Boolean, onToggleSprint: (Boolean) -> Unit)
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        SocialText(
+        Text(
             SPRINT_TEXT,
-            13.sp,
-            Modifier.width(460.dp),
-            SocialTextSecondary,
-            FontWeight.Light,
+            modifier = Modifier.width(460.dp),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             ChoiceButton("Enabled", ONBOARDING_ASSETS + "zap.svg", toggleSprint, 198f, option = true) { onToggleSprint(true) }
             ChoiceButton("Disabled", ONBOARDING_ASSETS + "flash-off.svg", !toggleSprint, 198f, option = true) { onToggleSprint(false) }
+        }
+    }
+}
+
+@Composable
+private fun WatermarkPage(watermark: Boolean, onWatermark: (Boolean) -> Unit) {
+    Header("Continuing with", "Watermark")
+    Column(
+        Modifier.fillMaxSize().padding(top = CONTENT_TOP.dp, bottom = (PANEL_HEIGHT - CONTENT_BOTTOM).dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            WATERMARK_TEXT,
+            modifier = Modifier.width(460.dp),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        val hudBackground = OneConfigTheme.current.onMediaShadow.copy(alpha = HUD_BACKGROUND_ALPHA)
+        val disabledAlpha = OneConfigTheme.current.disabledAlpha
+        Row(
+            Modifier
+                .size(WATERMARK_PREVIEW_WIDTH.dp, WATERMARK_PREVIEW_HEIGHT.dp)
+                .clip(OneConfigTheme.shape(HUD_RADIUS.dp))
+                .background(hudBackground)
+                .graphicsLayer { alpha = if (watermark) 1f else disabledAlpha },
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(name = MAIN_MENU_ASSETS + "logo.svg", contentDescription = null, tint = OneConfigTheme.accent, modifier = Modifier.size(WATERMARK_LOGO_SIZE.dp))
+            Icon(
+                name = BRAND_ASSETS + "oneclient.svg",
+                contentDescription = null,
+                tint = OneConfigTheme.accent,
+                modifier = Modifier.size(WATERMARK_WORDMARK_WIDTH.dp, WATERMARK_WORDMARK_HEIGHT.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            ChoiceButton("Show", MAIN_MENU_ASSETS + "logo.svg", watermark, 198f, option = true) { onWatermark(true) }
+            ChoiceButton("Hide", MAIN_MENU_ASSETS + "x-close.svg", !watermark, 198f, option = true) { onWatermark(false) }
         }
     }
 }
@@ -1035,12 +978,11 @@ private fun ModOrderPage(alphabetical: Boolean, onAlphabetical: (Boolean) -> Uni
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        SocialText(
+        Text(
             MOD_ORDER_TEXT,
-            13.sp,
-            Modifier.width(460.dp),
-            SocialTextSecondary,
-            FontWeight.Light,
+            modifier = Modifier.width(460.dp),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
@@ -1056,11 +998,7 @@ private fun ModOrderCard(label: String, alphabetical: Boolean, selected: Boolean
     val mods = remember(alphabetical) {
         DefaultModOrder.preview(alphabetical).take(MOD_ORDER_PREVIEW_COLUMNS * MOD_ORDER_PREVIEW_ROWS)
     }
-    Box(
-        Modifier.width(MOD_ORDER_CARD_WIDTH.dp).clip(ButtonShape)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape),
-    ) {
+    Box(Modifier.width(MOD_ORDER_CARD_WIDTH.dp).themedSurface(SurfaceKind.Card).cardSelection(selected)) {
         Column(
             Modifier.padding(MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, MOD_ORDER_CARD_PADDING.dp, 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1093,9 +1031,9 @@ private fun ModOrderCard(label: String, alphabetical: Boolean, selected: Boolean
                 }
             }
             Spacer(Modifier.height(10.dp))
-            SocialText(label, 14.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+            Text(label, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), textAlign = TextAlign.Center)
         }
-        Box(Modifier.matchParentSize().clickableWithSound("$label order", A11yRole.Option, selected, shape = ButtonShape, onClick = onClick))
+        Box(Modifier.matchParentSize().selectableCard(selected, onClick, "$label order", style = SelectionDefaults.Card.copy(ringWidth = 0.dp, fillAlpha = 0f)))
     }
 }
 
@@ -1132,14 +1070,14 @@ private fun FireOverlayCard(
         CardSlider(
             "Height",
             ((height - OnboardingFeatures.FIRE_OVERLAY_MIN) / span).toFloat(),
-            fireHeightLabel(height.toFloat()),
+            { fireHeightLabel((OnboardingFeatures.FIRE_OVERLAY_MIN + it * span).toFloat()) },
         ) { onHeight(OnboardingFeatures.FIRE_OVERLAY_MIN + it * span) }
         if (OnboardingFeatures.fireOverlayOpacityAvailable) {
             val opacitySpan = OnboardingFeatures.FIRE_OPACITY_MAX - OnboardingFeatures.FIRE_OPACITY_MIN
             CardSlider(
                 "Fade",
                 (opacity - OnboardingFeatures.FIRE_OPACITY_MIN) / opacitySpan,
-                if (opacity.roundToInt() == OnboardingFeatures.FIRE_OPACITY_VANILLA.toInt()) "Vanilla" else "%.0f%%".fmt(opacity),
+                { fireOpacityLabel(OnboardingFeatures.FIRE_OPACITY_MIN + it * opacitySpan) },
             ) { onOpacity(OnboardingFeatures.FIRE_OPACITY_MIN + it * opacitySpan) }
         }
     }
@@ -1157,7 +1095,7 @@ private fun ShieldHeightCard(height: Float, onHeight: (Float) -> Unit) {
         CardSlider(
             "Height",
             (height - OnboardingFeatures.SHIELD_HEIGHT_MIN) / span,
-            fireHeightLabel(height),
+            { fireHeightLabel(OnboardingFeatures.SHIELD_HEIGHT_MIN + it * span) },
         ) { onHeight(OnboardingFeatures.SHIELD_HEIGHT_MIN + it * span) }
     }
 }
@@ -1174,7 +1112,7 @@ private fun MountOpacityCard(opacity: Float, onOpacity: (Float) -> Unit) {
         CardSlider(
             "Mounts",
             (opacity - OnboardingFeatures.HORSE_OPACITY_MIN) / span,
-            "%.0f%%".fmt(opacity),
+            { "%.0f%%".fmt(OnboardingFeatures.HORSE_OPACITY_MIN + it * span) },
         ) { onOpacity(OnboardingFeatures.HORSE_OPACITY_MIN + it * span) }
     }
 }
@@ -1231,10 +1169,10 @@ private fun FullbrightCard(
         { GammaPreview(gamma) },
     ) {
         val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
-        CardSlider("Brightness", (gamma - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(gamma)) {
+        CardSlider("Brightness", (gamma - OnboardingFeatures.GAMMA_MIN) / span, { "%.0f%%".fmt(OnboardingFeatures.GAMMA_MIN + it * span) }) {
             onGamma(OnboardingFeatures.GAMMA_MIN + it * span)
         }
-        CardSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, "%.0f%%".fmt(toggled)) {
+        CardSlider("Toggles to", (toggled - OnboardingFeatures.GAMMA_MIN) / span, { "%.0f%%".fmt(OnboardingFeatures.GAMMA_MIN + it * span) }) {
             onToggled(OnboardingFeatures.GAMMA_MIN + it * span)
         }
         CardToggle("Smooth", smooth, onEnabled = onSmooth)
@@ -1279,25 +1217,22 @@ private fun BlockHighlightPage(
                 "Outline", draft.outlineStart, draft.outlineEnd, !draft.outlineRainbow,
                 { change { outlineStart = it } }, { change { outlineEnd = it } },
             )
-            CardSlider("Opacity", draft.outlineOpacity, "%.0f%%".fmt(draft.outlineOpacity * 100f)) {
+            CardSlider("Opacity", draft.outlineOpacity, { "%.0f%%".fmt(it * 100f) }) {
                 change { outlineOpacity = it }
             }
             val widthSpan = CBH_WIDTH_MAX - CBH_WIDTH_MIN
-            CardSlider("Width", (draft.outlineWidth - CBH_WIDTH_MIN) / widthSpan, "%.1f".fmt(draft.outlineWidth)) {
+            CardSlider("Width", (draft.outlineWidth - CBH_WIDTH_MIN) / widthSpan, { "%.1f".fmt(((CBH_WIDTH_MIN + it * widthSpan) * 2f).roundToInt() / 2f) }) {
                 change { outlineWidth = ((CBH_WIDTH_MIN + it * widthSpan) * 2f).roundToInt() / 2f }
             }
             CardToggle("Rainbow", draft.outlineRainbow) { change { outlineRainbow = it } }
             CardToggle("See-through", draft.seeThrough) { change { seeThrough = it } }
             CardToggle("Fill", draft.fill) { change { fill = it } }
-            Column(
-                Modifier.graphicsLayer { alpha = if (draft.fill) 1f else DISABLED_ALPHA },
-                verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp)) {
                 SwatchRow(
                     "Fill colour", draft.fillStart, draft.fillEnd, !draft.fillRainbow,
                     { change { fillStart = it } }, { change { fillEnd = it } }, draft.fill,
                 )
-                CardSlider("Fill opacity", draft.fillOpacity, "%.0f%%".fmt(draft.fillOpacity * 100f), draft.fill) {
+                CardSlider("Fill opacity", draft.fillOpacity, { "%.0f%%".fmt(it * 100f) }, draft.fill) {
                     change { fillOpacity = it }
                 }
                 CardToggle("Fill rainbow", draft.fillRainbow, draft.fill) { change { fillRainbow = it } }
@@ -1309,7 +1244,6 @@ private fun BlockHighlightPage(
 
 @Composable
 private fun CardStepper(label: String, text: String, onPrevious: () -> Unit, onNext: () -> Unit) {
-    val shape = ppShape(6.dp)
     var spoken by remember { mutableStateOf(text) }
     LaunchedEffect(text) {
         if (text != spoken) A11y.say("$label: $text", true)
@@ -1321,29 +1255,13 @@ private fun CardStepper(label: String, text: String, onPrevious: () -> Unit, onN
         Row(
             Modifier
                 .size(CARD_DROPDOWN_WIDTH.dp, CARD_ROW_HEIGHT.dp)
-                .clip(shape)
-                .background(ChoiceBackground)
-                .border(SocialPanelBorderWidth, SocialPanelBorderBrush, shape),
+                .themedSurface(SurfaceKind.Field),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepperArrow("$label: $text, previous", back = true, onPrevious)
-            SocialText(text, 12.sp, Modifier.weight(1f), SocialTextPrimary, FontWeight.Medium, TextAlign.Center)
-            StepperArrow("$label: $text, next", back = false, onNext)
+            IconButton(MAIN_MENU_ASSETS + "chevron-left.svg", "$label: $text, previous", onPrevious, style = IconButtonStyle.Ghost, size = ControlSize.Compact, tooltip = null)
+            Text(text, modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), textAlign = TextAlign.Center)
+            IconButton(MAIN_MENU_ASSETS + "chevron-right.svg", "$label: $text, next", onNext, style = IconButtonStyle.Ghost, size = ControlSize.Compact, tooltip = null)
         }
-    }
-}
-
-@Composable
-private fun StepperArrow(label: String, back: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.size(CARD_ROW_HEIGHT.dp).clickableWithSound(label, shape = ppShape(6.dp), onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            MAIN_MENU_ASSETS + "chevron-right.svg",
-            SocialTextSecondary,
-            Modifier.size(13.dp).then(if (back) Modifier.rotate(180f) else Modifier),
-        )
     }
 }
 
@@ -1359,8 +1277,9 @@ private fun SwatchRow(
 ) {
     val clickable = enabled && interactive
     var editingEnd by remember { mutableStateOf(false) }
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
     Row(
-        Modifier.height(CARD_ROW_HEIGHT.dp).graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA },
+        Modifier.height(CARD_ROW_HEIGHT.dp).graphicsLayer { alpha = if (clickable) 1f else disabledAlpha },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CardLabel(label)
@@ -1380,7 +1299,7 @@ private fun SwatchRow(
 
 @Composable
 private fun Swatch(rgb: Int, label: String, selected: Boolean?, enabled: Boolean, onClick: () -> Unit) {
-    val shape = ppShape(4.dp)
+    val shape = OneConfigTheme.shape(4.dp)
     val marked = selected == true
     Box(
         Modifier
@@ -1390,7 +1309,7 @@ private fun Swatch(rgb: Int, label: String, selected: Boolean?, enabled: Boolean
             .border(if (marked) 2.dp else SocialPanelBorderWidth, if (marked) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
             .then(
                 if (enabled) {
-                    Modifier.clickableWithSound(label, if (selected == null) A11yRole.Button else A11yRole.Option, selected, shape = shape, onClick = onClick)
+                    Modifier.oneConfigClickable(label, onClick, if (selected == null) A11yRole.Button else A11yRole.Option, selected = selected, shape = shape, indication = false)
                 } else {
                     Modifier
                 },
@@ -1417,16 +1336,11 @@ private fun ToggleKeyButton() {
     DisposableEffect(Unit) {
         onDispose { OnboardingKeyCapture.pending = null }
     }
-    val shape = ppShape(6.dp)
-    Box(
-        Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp).clip(shape)
-            .background(if (capturing) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (capturing) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
-            .clickableWithSound(
-                cardSpeech("Toggle key") + ": " + if (capturing) "press a key, or Escape to cancel" else label,
-                shape = shape,
-            ) {
-                if (capturing) return@clickableWithSound
+    Chip(
+        if (capturing) "Press a key" else label,
+        capturing,
+        {
+            if (!capturing) {
                 capturing = true
                 A11y.say("Press a key to bind, or Escape to cancel", true)
                 OnboardingKeyCapture.pending = { key ->
@@ -1437,17 +1351,12 @@ private fun ToggleKeyButton() {
                     }
                     A11y.say("Toggle key: $label", true)
                 }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        SocialText(
-            if (capturing) "Press a key" else label,
-            12.sp,
-            color = SocialTextPrimary,
-            fontWeight = if (capturing) FontWeight.Medium else FontWeight.Light,
-            textAlign = TextAlign.Center,
-        )
-    }
+            }
+        },
+        Modifier.size(CARD_CHIP_WIDTH.dp, CARD_ROW_HEIGHT.dp),
+        size = ControlSize.Compact,
+        contentDescription = cardSpeech("Toggle key") + ": " + if (capturing) "press a key, or Escape to cancel" else label,
+    )
 }
 
 private fun String.fmt(vararg args: Any?): String = String.format(Locale.ROOT, this, *args)
@@ -1458,141 +1367,32 @@ private fun Float.clampGamma(): Float =
 private fun fireHeightLabel(height: Float): String =
     if (height >= -0.001f) "Vanilla" else "%.2f".fmt(height)
 
+private fun fireOpacityLabel(opacity: Float): String =
+    if (opacity.roundToInt() == OnboardingFeatures.FIRE_OPACITY_VANILLA.toInt()) "Vanilla" else "%.0f%%".fmt(opacity)
+
 @Composable
 internal fun OnboardingSlider(
     progress: Float,
     width: Float,
-    thumbSize: Dp = 11.dp,
-    trackHeight: Dp = 6.dp,
     enabled: Boolean = true,
     label: String? = null,
-    value: String? = null,
+    valueText: ((Float) -> String)? = null,
     keyStep: Float = SLIDER_KEY_STEP,
     onRelease: () -> Unit = {},
     onProgress: (Float) -> Unit,
 ) {
-    var trackWidthPx by remember { mutableStateOf(0f) }
-    val currentOnProgress by rememberUpdatedState(onProgress)
-    val currentOnRelease by rememberUpdatedState(onRelease)
-    val currentProgress by rememberUpdatedState(progress)
-    val spokenValue by rememberUpdatedState(value)
-    val animated by animateFloatAsState(progress.coerceIn(0f, 1f), animationSpec = spring())
-    val trackShape = ppShape(trackHeight / 2)
-    var focused by remember { mutableStateOf(false) }
-    LaunchedEffect(value) {
-        if (focused && A11y.keyboardMode) value?.let { A11y.say(it, true) }
-    }
-    Box(
-        Modifier
-            .width(width.dp)
-            .height(thumbSize)
-            .onSizeChanged { trackWidthPx = it.width.toFloat() }
-            .then(
-                if (!enabled || label == null) {
-                    Modifier
-                } else {
-                    Modifier
-                        .onFocusChanged {
-                            if (it.isFocused == focused) return@onFocusChanged
-                            focused = it.isFocused
-                            if (focused && A11y.keyboardMode) {
-                                A11y.say(listOfNotNull(label, spokenValue, "slider").joinToString(", "), true)
-                            }
-                        }
-                        .focusRing(ppShape(thumbSize / 2))
-                        .onKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                            val target = when (event.key) {
-                                Key.DirectionLeft -> currentProgress - keyStep
-                                Key.DirectionRight -> currentProgress + keyStep
-                                Key.MoveHome -> 0f
-                                Key.MoveEnd -> 1f
-                                else -> return@onKeyEvent false
-                            }
-                            currentOnProgress(target.coerceIn(0f, 1f))
-                            currentOnRelease()
-                            true
-                        }
-                        .focusable()
-                },
-            )
-            .then(
-                if (!enabled) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(Unit) {
-                        val thumbPx = thumbSize.toPx()
-                        awaitEachGesture {
-                            val down = awaitFirstDown()
-                            fun update(x: Float) {
-                                val usable = (trackWidthPx - thumbPx).coerceAtLeast(1f)
-                                currentOnProgress(((x - thumbPx / 2f) / usable).coerceIn(0f, 1f))
-                            }
-                            update(down.position.x)
-                            down.consume()
-                            do {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull() ?: break
-                                update(change.position.x)
-                                change.consume()
-                            } while (change.pressed)
-                            currentOnRelease()
-                        }
-                    }
-                },
-            ),
-    ) {
-        Box(
-            Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .height(trackHeight)
-                .clip(trackShape)
-                .background(ChoiceBackground)
-                .border(1.dp, SocialPanelBorderBrush, trackShape),
-        ) {
-            Box(Modifier.fillMaxWidth(animated).height(trackHeight).background(OneConfigTheme.accent))
-        }
-        Box(
-            Modifier
-                .align(Alignment.CenterStart)
-                .offset {
-                    IntOffset(
-                        (animated * (trackWidthPx - thumbSize.toPx())).roundToInt(),
-                        0,
-                    )
-                }
-                .size(thumbSize)
-                .clip(ppShape(thumbSize / 2))
-                .background(SocialTextPrimary),
-        )
-    }
-}
-
-@Composable
-private fun SliderValueBox(
-    value: String,
-    width: Dp,
-    height: Dp = 24.dp,
-    fontSize: TextUnit = 11.sp,
-    fontWeight: FontWeight = FontWeight.Light,
-    alignment: Alignment = Alignment.Center,
-    textPadding: Dp = 0.dp,
-) {
-    Box(
-        Modifier.width(width).height(height).clip(ppShape(6.dp)).background(ChoiceBackground)
-            .border(1.dp, SocialPanelBorderBrush, ppShape(6.dp)),
-        contentAlignment = alignment,
-    ) {
-        SocialText(
-            value,
-            fontSize,
-            Modifier.padding(start = textPadding),
-            color = SocialTextPrimary,
-            fontWeight = fontWeight,
-            textAlign = TextAlign.Center,
-        )
-    }
+    Slider(
+        value = progress,
+        onValueChange = onProgress,
+        modifier = Modifier.width(width.dp),
+        enabled = enabled,
+        onValueChangeFinished = onRelease,
+        size = ControlSize.Compact,
+        keyStep = keyStep,
+        contentDescription = label,
+        valueDescription = valueText,
+        sound = null,
+    )
 }
 
 @Composable
@@ -1603,23 +1403,16 @@ private fun OptimizingPage(showPickManually: Boolean, onPickManually: () -> Unit
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        val transition = rememberInfiniteTransition(label = "optimizing")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
-            label = "spin",
-        )
-        Icon(MAIN_MENU_ASSETS + "loading-02.svg", OneConfigTheme.accent, Modifier.size(40.dp).rotate(angle))
+        val angle by Motion.animateInfiniteFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), "spin")
+        Icon(name = MAIN_MENU_ASSETS + "loading-02.svg", contentDescription = null, tint = OneConfigTheme.accent, modifier = Modifier.size(40.dp).rotate(angle))
         Spacer(Modifier.height(18.dp))
-        SocialText("Checking your frame rate… (about 6 seconds)", 16.sp, Modifier.width(PANEL_WIDTH.dp), SocialTextPrimary, FontWeight.Medium, textAlign = TextAlign.Center)
+        Text("Checking your frame rate… (about 6 seconds)", modifier = Modifier.width(PANEL_WIDTH.dp), style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))
-        SocialText(
+        Text(
             "Measuring your frame rate to pick the best motion blur settings.",
-            13.sp,
-            Modifier.width(460.dp),
-            SocialTextSecondary,
-            FontWeight.Light,
+            modifier = Modifier.width(460.dp),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
             textAlign = TextAlign.Center,
         )
         if (showPickManually) {
@@ -1658,7 +1451,7 @@ private fun MotionBlurPage(
             "Disabled",
             MAIN_MENU_ASSETS + "x-close.svg",
             "No motion blur at all. You get the most performance with this option.",
-            ImpactGood,
+            OneConfigTheme.current.success,
             300,
             blurMode == OnboardingFeatures.MOTION_BLUR_DISABLED,
             recommended == OnboardingFeatures.MOTION_BLUR_DISABLED,
@@ -1667,7 +1460,7 @@ private fun MotionBlurPage(
             "Performance",
             ONBOARDING_ASSETS + "zap.svg",
             "Motion blur with no hand blur option and less samples per frame for the motion blur.",
-            ImpactWarn,
+            OneConfigTheme.current.warning,
             225,
             blurMode == OnboardingFeatures.MOTION_BLUR_PERFORMANCE,
             recommended == OnboardingFeatures.MOTION_BLUR_PERFORMANCE,
@@ -1676,7 +1469,7 @@ private fun MotionBlurPage(
             "Quality",
             "assets/polyplus/ico/stars.svg",
             "Best for 200+ FPS. Heaviest on performance.",
-            ImpactHeavy,
+            OneConfigTheme.current.error,
             200,
             blurMode == OnboardingFeatures.MOTION_BLUR_QUALITY,
             recommended == OnboardingFeatures.MOTION_BLUR_QUALITY,
@@ -1685,12 +1478,13 @@ private fun MotionBlurPage(
 
     val blurOff = blurMode != OnboardingFeatures.MOTION_BLUR_PERFORMANCE &&
         blurMode != OnboardingFeatures.MOTION_BLUR_QUALITY
-    SectionLabel("Blur Strength", BLUR_STRENGTH_LABEL_Y)
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    SectionHeader("Blur Strength", Modifier.offset(232.dp, BLUR_STRENGTH_LABEL_Y.dp).width(198.dp), eyebrow = false)
     BlurStrengthSlider(motionBlur, blurOff, onMotionBlur)
     MotionBlurPreview(
         if (blurOff) 0 else motionBlur,
         Modifier.offset(233.5.dp, BLUR_PREVIEW_Y.dp).size(413.dp, BLUR_PREVIEW_HEIGHT.dp)
-            .graphicsLayer { alpha = if (blurOff) 0.4f else 1f },
+            .graphicsLayer { alpha = if (blurOff) disabledAlpha else 1f },
     )
 }
 
@@ -1698,29 +1492,19 @@ private fun MotionBlurPage(
 private fun BlurStrengthSlider(motionBlur: Int, disabled: Boolean, onMotionBlur: (Int) -> Unit) {
     val steps = MOTION_BLUR_MAX - MOTION_BLUR_MIN
     Row(
-        Modifier.offset(232.dp, BLUR_SLIDER_Y.dp).graphicsLayer { alpha = if (disabled) 0.4f else 1f },
+        Modifier.offset(232.dp, BLUR_SLIDER_Y.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OnboardingSlider(
             progress = ((motionBlur - MOTION_BLUR_MIN).toFloat() / steps).coerceIn(0f, 1f),
             width = 332f,
-            thumbSize = WIDE_SLIDER_THUMB,
-            trackHeight = WIDE_SLIDER_TRACK,
             enabled = !disabled,
             label = "Blur Strength",
-            value = motionBlur.toString(),
+            valueText = { fraction -> (MOTION_BLUR_MIN + (fraction * steps).roundToInt()).toString() },
             keyStep = 1f / steps,
         ) { fraction -> onMotionBlur(MOTION_BLUR_MIN + (fraction * steps).roundToInt()) }
         Spacer(Modifier.width(18.dp))
-        SliderValueBox(
-            if (disabled) "Off" else motionBlur.toString(),
-            width = 64.dp,
-            height = 26.dp,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal,
-            alignment = Alignment.CenterStart,
-            textPadding = 8.dp,
-        )
+        ValueBadge(if (disabled) "Off" else motionBlur.toString(), 64.dp, 26.dp, Alignment.CenterStart, dimmed = disabled)
     }
 }
 
@@ -1738,16 +1522,8 @@ private fun MotionBlurModeCard(
     Box(
         Modifier
             .size(MODE_CARD_WIDTH.dp, MODE_CARD_HEIGHT.dp)
-            .clip(ButtonShape)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
-            .clickableWithSound(
-                "$title${if (recommended) ", recommended" else ""}. $description",
-                A11yRole.Option,
-                selected,
-                shape = ButtonShape,
-                onClick = onClick,
-            ),
+            .themedSurface(SurfaceKind.Card)
+            .selectableCard(selected, onClick, "$title${if (recommended) ", recommended" else ""}. $description"),
     ) {
         Column(
             Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = MODE_CARD_FOOTER.dp),
@@ -1756,29 +1532,27 @@ private fun MotionBlurModeCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, if (selected) OneConfigTheme.accent else SocialTextPrimary, Modifier.size(18.dp))
-                SocialText(title, 15.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                Icon(name = icon, contentDescription = null, tint = if (selected) OneConfigTheme.accent else SocialTextPrimary, modifier = Modifier.size(18.dp))
+                Text(title, style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(9.dp))
-            SocialText(
+            Text(
                 description,
-                12.sp,
-                Modifier.width((MODE_CARD_WIDTH - 32f).dp).heightIn(min = MODE_CARD_DESC_HEIGHT.dp),
-                SocialTextSecondary,
-                FontWeight.Light,
-                TextAlign.Start,
+                modifier = Modifier.width((MODE_CARD_WIDTH - 32f).dp).heightIn(min = MODE_CARD_DESC_HEIGHT.dp),
+                color = SocialTextSecondary,
+                style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Light),
+                textAlign = TextAlign.Start,
             )
             Spacer(Modifier.weight(1f))
             FpsHud(exampleFps, impactColor, Modifier.align(Alignment.CenterHorizontally))
             Spacer(Modifier.weight(1f))
         }
         if (recommended) {
-            SocialText(
+            Text(
                 "Recommended",
-                11.sp,
-                Modifier.align(Alignment.BottomCenter).padding(14.dp),
-                OneConfigTheme.accent.takeIf { meetsTextContrast(it, OneConfigTheme.current.popupBackground) } ?: SocialTextPrimary,
-                FontWeight.Medium,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp),
+                color = OneConfigTheme.accent.takeIf { it.contrastAgainst(OneConfigTheme.current.popupBackground) >= MIN_TEXT_CONTRAST } ?: SocialTextPrimary,
+                style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium),
                 textAlign = TextAlign.Center,
             )
         }
@@ -1789,12 +1563,12 @@ private fun MotionBlurModeCard(
 private fun FpsHud(fps: Int, color: Color, modifier: Modifier = Modifier) {
     Row(
         modifier
-            .clip(ppShape(HUD_RADIUS.dp))
-            .background(HudBackground)
+            .clip(OneConfigTheme.shape(HUD_RADIUS.dp))
+            .background(OneConfigTheme.current.onMediaShadow.copy(alpha = HUD_BACKGROUND_ALPHA))
             .padding(HUD_PADDING.dp),
     ) {
         val style = TextStyle(fontSize = HUD_TEXT_SIZE.sp, fontFamily = MinecraftFontFamily)
-        BasicText("FPS: ", style = style.copy(color = Color.White))
+        BasicText("FPS: ", style = style.copy(color = OneConfigTheme.current.onMedia))
         BasicText(fps.toString(), style = style.copy(color = color))
     }
 }
@@ -1803,14 +1577,12 @@ private val MinecraftFontFamily = FontFamily(Font("assets/oneconfig/fonts/minecr
 
 @Composable
 private fun DonePage() {
-    Icon(ONBOARDING_ASSETS + "check-verified.svg", SocialTextPrimary, Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
-    SocialText("All Done!", 32.sp, Modifier.offset(0.dp, 311.dp).width(PANEL_WIDTH.dp), textAlign = TextAlign.Center)
-    SocialText(
+    Icon(name = ONBOARDING_ASSETS + "check-verified.svg", contentDescription = null, tint = SocialTextPrimary, modifier = Modifier.offset(374.75.dp, 157.dp).size(130.5.dp))
+    Text("All Done!", modifier = Modifier.offset(0.dp, 311.dp).width(PANEL_WIDTH.dp), style = OneConfigTheme.current.typography.body.copy(fontSize = 32.sp), textAlign = TextAlign.Center)
+    Text(
         DONE_TEXT,
-        15.sp,
-        Modifier.offset(225.dp, 382.dp).width(430.dp),
-        SocialTextPrimary,
-        FontWeight.Light,
+        modifier = Modifier.offset(225.dp, 382.dp).width(430.dp),
+        style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Light),
         textAlign = TextAlign.Center,
     )
 }
@@ -1818,8 +1590,8 @@ private fun DonePage() {
 @Composable
 private fun GuidePage(guide: ModGuide) {
     Header("Where to change this later", guide.feature)
-    SocialText(guide.route, 15.sp, Modifier.offset(GUIDE_MARGIN.dp, GUIDE_TEXT_Y.dp).width(GUIDE_WIDTH.dp), SocialTextPrimary, FontWeight.Light)
-    SocialText(guide.options, 13.sp, Modifier.offset(GUIDE_MARGIN.dp, (GUIDE_TEXT_Y + 24f).dp).width(GUIDE_WIDTH.dp), SocialTextSecondary, FontWeight.Light)
+    Text(guide.route, modifier = Modifier.offset(GUIDE_MARGIN.dp, GUIDE_TEXT_Y.dp).width(GUIDE_WIDTH.dp), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Light))
+    Text(guide.options, modifier = Modifier.offset(GUIDE_MARGIN.dp, (GUIDE_TEXT_Y + 24f).dp).width(GUIDE_WIDTH.dp), color = SocialTextSecondary, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light))
     GuideShot(guide.path)
 }
 
@@ -1827,7 +1599,7 @@ private fun GuidePage(guide: ModGuide) {
 private fun GuideShot(path: String) {
     val shot = remember(path) { loadOnboardingImage(path) } ?: return
     val fit = minOf(GUIDE_WIDTH / shot.width, GUIDE_HEIGHT / shot.height)
-    val shape = ppShape(6.dp)
+    val shape = OneConfigTheme.shape(6.dp)
     Box(
         Modifier.offset(0.dp, GUIDE_SHOT_Y.dp).width(PANEL_WIDTH.dp).height(GUIDE_HEIGHT.dp),
         contentAlignment = Alignment.TopCenter,
@@ -1848,8 +1620,8 @@ private fun GuideShot(path: String) {
 @Composable
 private fun Header(kicker: String, title: String) {
     val width = LocalPanelWidth.current
-    SocialText(kicker, 15.sp, Modifier.offset(0.dp, 35.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
-    SocialText(title, 32.sp, Modifier.offset(0.dp, 66.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
+    Text(kicker, modifier = Modifier.offset(0.dp, 35.dp).width(width.dp), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Normal), textAlign = TextAlign.Center)
+    Text(title, modifier = Modifier.offset(0.dp, 66.dp).width(width.dp), style = OneConfigTheme.current.typography.body.copy(fontSize = 32.sp), textAlign = TextAlign.Center)
 }
 
 @Composable
@@ -1857,7 +1629,7 @@ private fun LockupHeader() {
     val width = LocalPanelWidth.current
     val ink = SocialTextPrimary.toArgb()
     SideEffect { StartupOverlay.cardInk = ink }
-    SocialText("Welcome to", 15.sp, Modifier.offset(0.dp, 28.dp).width(width.dp), SocialTextPrimary, FontWeight.Normal, textAlign = TextAlign.Center)
+    Text("Welcome to", modifier = Modifier.offset(0.dp, 28.dp).width(width.dp), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Normal), textAlign = TextAlign.Center)
     Row(
         Modifier.offset(0.dp, 56.dp).width(width.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
@@ -1865,7 +1637,7 @@ private fun LockupHeader() {
     ) {
         Box(Modifier.onGloballyPositioned { StartupOverlay.cardMark = StartupOverlay.place(it) }) { LobbyIcon("logo", size = 36.dp) }
         Box(Modifier.onGloballyPositioned { StartupOverlay.cardWord = StartupOverlay.place(it) }) {
-            SocialText("ONECLIENT", 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.2.sp, fontFamily = Outfit, maxLines = 1)
+            Text("ONECLIENT", style = OneConfigTheme.current.typography.body.copy(fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.2.sp, fontFamily = Outfit), maxLines = 1, softWrap = false)
         }
     }
 }
@@ -1886,12 +1658,11 @@ private fun AccessibilityPage(onLeave: () -> Unit) {
     val rowWidth = panelWidth - ACCESSIBILITY_MARGIN * 2f
     LockupHeader()
     if (prompt.isNotEmpty()) {
-        SocialText(
+        Text(
             prompt,
-            14.sp,
-            Modifier.offset(ACCESSIBILITY_MARGIN.dp, ACCESSIBILITY_TEXT_Y.dp).width(rowWidth.dp),
-            SocialTextSecondary,
-            FontWeight.Normal,
+            modifier = Modifier.offset(ACCESSIBILITY_MARGIN.dp, ACCESSIBILITY_TEXT_Y.dp).width(rowWidth.dp),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.body,
             textAlign = TextAlign.Center,
         )
     }
@@ -1906,6 +1677,7 @@ private fun AccessibilityPage(onLeave: () -> Unit) {
                         (rowWidth - ACCESSIBILITY_GAP * (row.size - 1)) / row.size,
                         enabled = control != StartupAccessibility.Control.Narrator || StartupAccessibility.narratorAvailable(),
                         focused = StartupAccessibility.focused(control),
+                        chip = true,
                     ) { StartupAccessibility.activate(control) }
                 }
             }
@@ -1936,27 +1708,18 @@ private fun accessibilityIcon(control: StartupAccessibility.Control): String = M
 
 @Composable
 private fun StandardStartupLink(modifier: Modifier) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
     val focused = StartupAccessibility.focused(StartupAccessibility.Control.Standard)
     Box(modifier.width(LocalPanelWidth.current.dp), contentAlignment = Alignment.Center) {
-        BasicText(
+        LinkText(
             StartupAccessibility.label(StartupAccessibility.Control.Standard),
-            Modifier.hoverable(interactionSource).clickableTextWithSound { StartupAccessibility.activate(StartupAccessibility.Control.Standard) },
-            TextStyle(
-                color = if (hovered || focused) SocialTextPrimary else SocialTextSecondary,
+            { StartupAccessibility.activate(StartupAccessibility.Control.Standard) },
+            style = OneConfigTheme.current.typography.body.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Light,
-                fontFamily = OneConfigTheme.current.fontFamily,
                 textDecoration = if (focused) TextDecoration.Underline else TextDecoration.None,
             ),
         )
     }
-}
-
-@Composable
-private fun SectionLabel(label: String, y: Float) {
-    SocialText(label, 15.sp, Modifier.offset(232.dp, y.dp).width(198.dp), SocialTextPrimary, FontWeight.Normal, TextAlign.Start)
 }
 
 @Composable
@@ -1970,55 +1733,48 @@ private fun ChoiceButton(
     enabled: Boolean = true,
     focused: Boolean = false,
     option: Boolean = false,
+    chip: Boolean = false,
     blocked: String? = null,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (primary) OneConfigTheme.current.accentTextColor else SocialTextPrimary
-    val shape = ButtonShape
-    val role = if (option) A11yRole.Option else A11yRole.Button
-    Row(
-        modifier
-            .width(width.dp)
-            .height(32.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(ButtonShape)
-            .background(
-                when {
-                    primary -> OneConfigTheme.accent
-                    selected -> OneConfigTheme.accent.asSocialSelected
-                    else -> ChoiceBackground
-                },
-            )
-            .border(
-                if (focused) FOCUS_BORDER_WIDTH.dp else SocialPanelBorderWidth,
-                when {
-                    focused -> SolidColor(SocialTextPrimary)
-                    selected || primary -> SolidColor(OneConfigTheme.accent)
-                    else -> SocialPanelBorderBrush
-                },
-                ButtonShape,
-            )
-            .then(
-                when {
-                    enabled -> Modifier.clickableWithSound(label, role, selected.takeIf { option }, shape = shape, onClick = onClick)
-                    blocked != null -> Modifier.a11y("$label, unavailable. $blocked", A11yRole.Button, null, null, shape, true).clickable { A11y.say(blocked, true) }
-                    else -> Modifier
-                },
-            ),
-        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentColor, Modifier.size(17.dp))
-        SocialText(label, 14.sp, color = contentColor, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+    val theme = OneConfigTheme.current
+    val chipped = option || chip
+    val frame = modifier
+        .width(width.dp)
+        .height(32.dp)
+        .then(if (focused) Modifier.border(FOCUS_BORDER_WIDTH.dp, theme.textColor, if (chipped) ChipDefaults.shape else ButtonDefaults.shape) else Modifier)
+    if (chipped) {
+        Chip(
+            label,
+            selected,
+            onClick,
+            frame,
+            icon = icon,
+            enabled = enabled,
+            role = if (option) A11yRole.Option else A11yRole.Button,
+        )
+        return
     }
+    val style = if (primary) ControlStyle.Primary else ControlStyle.Secondary
+    val message = blocked.takeIf { !enabled }
+    TextButton(
+        label,
+        if (message != null) ({ A11y.say(message, true) }) else onClick,
+        if (message != null) frame.graphicsLayer { alpha = theme.disabledAlpha } else frame,
+        style = style,
+        enabled = enabled || message != null,
+        leading = { Icon(name = icon, contentDescription = null, tint = ButtonDefaults.contentColor(style), modifier = Modifier.size(17.dp)) },
+        contentDescription = message?.let { "$label, unavailable. $it" },
+        sound = if (message != null) null else UiSound.Click,
+    )
 }
 
-private class UiStyleOption(val style: Int, val label: String, val caption: String, val rounded: Boolean, val glass: Boolean)
+private class UiStyleOption(val style: Int, val label: String, val caption: String, val glass: Boolean)
 
 private val UiStyleOptions = listOf(
-    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYFROSTED, "Polyfrosted", "Frosted panels, the OneConfig look", rounded = true, glass = false),
-    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYGLASS, "PolyGlass", "See-through glass over your game", rounded = true, glass = true),
-    UiStyleOption(OnboardingFeatures.UI_STYLE_MINECRAFT, "Minecraft", "Blocky, like the vanilla menus", rounded = false, glass = false),
+    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYFROSTED, "Polyfrosted", "Frosted panels, the OneConfig look", glass = false),
+    UiStyleOption(OnboardingFeatures.UI_STYLE_POLYGLASS, "PolyGlass", "See-through glass over your game", glass = true),
+    UiStyleOption(OnboardingFeatures.UI_STYLE_MINECRAFT, "Minecraft", "Blocky, like the vanilla menus", glass = false),
 )
 
 private val StylePreviewBackdrop = Brush.verticalGradient(
@@ -2033,26 +1789,25 @@ private val StylePreviewSheen = Brush.verticalGradient(listOf(Color.White.copy(a
 @Composable
 private fun StyleCard(option: UiStyleOption, theme: OneConfigUITheme, selected: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.size(STYLE_CARD_WIDTH.dp, 155.dp).clip(ButtonShape)
-            .background(if (selected) OneConfigTheme.accent.asSocialSelected else ChoiceBackground)
-            .border(SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, ButtonShape)
-            .clickableWithSound("${option.label} style. ${option.caption}", A11yRole.Option, selected, shape = ButtonShape, onClick = onClick)
+        Modifier.size(STYLE_CARD_WIDTH.dp, 155.dp)
+            .themedSurface(SurfaceKind.Card)
+            .selectableCard(selected, onClick, "${option.label} style. ${option.caption}")
             .padding(9.dp),
     ) {
         UiPreview(option, theme)
         Spacer(Modifier.height(7.dp))
-        SocialText(option.label, 14.sp, color = SocialTextPrimary, fontWeight = FontWeight.Medium, fontFamily = theme.fontFamily, maxLines = 1)
+        Text(option.label, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium, fontFamily = theme.fontFamily), maxLines = 1, softWrap = false)
         Spacer(Modifier.height(2.dp))
-        SocialText(option.caption, 11.sp, color = SocialTextSecondary, maxLines = 2)
+        Text(option.caption, color = SocialTextSecondary, style = OneConfigTheme.current.typography.caption, maxLines = 2)
     }
 }
 
 @Composable
 private fun UiPreview(option: UiStyleOption, theme: OneConfigUITheme) {
     val accent = OneConfigTheme.accent
-    val window = RoundedCornerShape(if (option.rounded) 7.dp else 0.dp)
-    val small = RoundedCornerShape(if (option.rounded) 3.dp else 0.dp)
-    Box(Modifier.size(STYLE_PREVIEW_WIDTH.dp, STYLE_PREVIEW_HEIGHT.dp).clip(RoundedCornerShape(4.dp)).background(StylePreviewBackdrop)) {
+    val window = theme.shapes.medium
+    val small = theme.shapes.small
+    Box(Modifier.size(STYLE_PREVIEW_WIDTH.dp, STYLE_PREVIEW_HEIGHT.dp).clip(OneConfigTheme.shape(4.dp)).background(StylePreviewBackdrop)) {
         val windowModifier = Modifier.fillMaxSize().padding(8.dp, 7.dp).clip(window)
         Row(windowModifier.background(theme.pageBackground).border(1.dp, theme.borderColor, window)) {
             Column(
@@ -2080,20 +1835,6 @@ private fun UiPreview(option: UiStyleOption, theme: OneConfigUITheme) {
         }
         if (option.glass) Box(windowModifier.background(StylePreviewSheen))
     }
-}
-
-@Composable
-private fun TextAction(label: String, textAlign: TextAlign, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    SocialText(
-        label,
-        13.sp,
-        Modifier.hoverable(interactionSource).a11y(label, A11yRole.Button).clickableTextWithSound(onClick),
-        color = if (hovered) SocialTextPrimary else SocialTextSecondary,
-        fontWeight = FontWeight.Light,
-        textAlign = textAlign,
-    )
 }
 
 @Composable
@@ -2129,7 +1870,13 @@ private fun BottomNavigation(
                     .size(SECONDARY_ACTION_WIDTH.dp, 32.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                TextAction("Skip setup", TextAlign.Start, onSkip)
+                TextButton(
+                    "Skip setup",
+                    onSkip,
+                    Modifier.offset(x = -ButtonDefaults.horizontalPadding(ControlSize.Compact)),
+                    style = ControlStyle.Ghost,
+                    size = ControlSize.Compact,
+                )
             }
         }
     }
@@ -2149,7 +1896,7 @@ private fun BottomNavigation(
                 .size(HINT_WIDTH.dp, 32.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
-            SocialText(hint, 13.sp, color = SocialTextSecondary, fontWeight = FontWeight.Light, textAlign = TextAlign.End)
+            Text(hint, color = SocialTextSecondary, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light), textAlign = TextAlign.End)
         }
     }
     ChoiceButton(
@@ -2175,9 +1922,9 @@ private fun BottomNavigation(
         repeat(pageCount) { index ->
             Box(
                 Modifier.size(if (index == page) 12.dp else 10.dp)
-                    .clip(ppShape(8.dp))
-                    .background(if (index == page) SocialTextPrimary.copy(alpha = 0.5f) else Color(0x73232D32))
-                    .border(1.dp, SocialTextPrimary.copy(alpha = if (index == page) 0.8f else 0.4f), ppShape(8.dp)),
+                    .clip(OneConfigTheme.shape(8.dp))
+                    .background(if (index == page) SocialTextPrimary.copy(alpha = 0.5f) else OneConfigTheme.current.componentBackground)
+                    .border(1.dp, SocialTextPrimary.copy(alpha = if (index == page) 0.8f else 0.4f), OneConfigTheme.shape(8.dp)),
             )
         }
     }
@@ -2187,7 +1934,7 @@ private fun BottomNavigation(
 private fun MotionBlurPreview(strength: Int, modifier: Modifier = Modifier) {
     val image = remember { loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png") }
     val motion = UnityMotionBlur.maxSmear(strength)
-    val shape = ppShape(6.dp)
+    val shape = OneConfigTheme.shape(6.dp)
 
     Box(
         modifier
@@ -2231,7 +1978,7 @@ private fun PreviewFrame(
     height: Float = CARD_PREVIEW_HEIGHT,
     draw: DrawScope.() -> Unit,
 ) {
-    val shape = ppShape(6.dp)
+    val shape = OneConfigTheme.shape(6.dp)
     Box(
         Modifier
             .size(width.dp, height.dp)
@@ -2250,12 +1997,11 @@ private fun CapePreview(enabled: Boolean) {
     }
     val still = remember { loadOnboardingImage(WAVEY_ASSETS + "off.png") }
     val shot = if (enabled) {
-        val transition = rememberInfiniteTransition(label = "cape")
-        val position by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = CAPE_WAVE_FRAMES.toFloat(),
-            animationSpec = infiniteRepeatable(tween(CAPE_WAVE_LOOP_MS, easing = LinearEasing)),
-            label = "wave",
+        val position by Motion.animateInfiniteFloat(
+            0f,
+            CAPE_WAVE_FRAMES.toFloat(),
+            infiniteRepeatable(tween(CAPE_WAVE_LOOP_MS, easing = LinearEasing)),
+            "wave",
         )
         frames.getOrNull(position.toInt().coerceIn(0, CAPE_WAVE_FRAMES - 1))
     } else {
@@ -2296,31 +2042,32 @@ private fun DynamicLightsPreview(mode: Int) {
 }
 
 @Composable
-private fun BoxScope.FpsBadge(tier: Pair<Int, Color>) {
-    val (fps, color) = tier
-    SocialText(
+private fun BoxScope.FpsBadge(tier: Pair<Int, Int>) {
+    val (fps, level) = tier
+    val theme = OneConfigTheme.current
+    val color = when (level) {
+        0 -> theme.success
+        1 -> lerp(theme.success, theme.warning, FPS_MIDDLE_BLEND)
+        2 -> theme.warning
+        else -> theme.error
+    }
+    Text(
         "$fps FPS",
-        12.sp,
-        Modifier
+        modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(8.dp)
-            .clip(ppShape(4.dp))
-            .background(Color.Black.copy(alpha = 0.6f))
+            .clip(OneConfigTheme.shape(4.dp))
+            .background(theme.onMediaShadow)
             .padding(horizontal = 6.dp, vertical = 2.dp),
-        color,
-        FontWeight.Medium,
-        TextAlign.Center,
+        color = color,
+        style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium),
+        textAlign = TextAlign.Center,
     )
 }
 
-private val PREVIEW_FPS = listOf(
-    400 to Color(0xFF4ADE80),
-    300 to Color(0xFFA3E635),
-    200 to Color(0xFFFBBF24),
-    100 to Color(0xFFF87171),
-)
+private val PREVIEW_FPS = listOf(400 to 0, 300 to 1, 200 to 2, 100 to 3)
 
-private val TOGGLE_ON_FPS = 200 to Color(0xFFF87171)
+private val TOGGLE_ON_FPS = 200 to 3
 
 @Composable
 private fun GammaPreview(gamma: Float) {
@@ -2328,7 +2075,7 @@ private fun GammaPreview(gamma: Float) {
     val dark = remember { loadOnboardingImage(darkPath) }
     val bright = remember { loadOnboardingImage(brightPath) }
     val span = OnboardingFeatures.GAMMA_MAX - OnboardingFeatures.GAMMA_MIN
-    val fade by animateFloatAsState((gamma - OnboardingFeatures.GAMMA_MIN) / span, animationSpec = spring())
+    val fade by Motion.animateFloatAsState((gamma - OnboardingFeatures.GAMMA_MIN) / span)
     PreviewFrame {
         dark?.let { drawCover(it, size.width, size.height) }
         bright?.let { drawCover(it, size.width, size.height, fade) }
@@ -2359,8 +2106,8 @@ private fun BetterGrassPreview(mode: Int) {
 private fun FireOverlayPreview(height: Double, opacity: Float) {
     val fire = remember { VanillaTextures.load(VanillaTextures.FIRE) }
     val scene = remember { loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png") }
-    val shift by animateFloatAsState((-height).toFloat(), animationSpec = spring())
-    val fade by animateFloatAsState(opacity / OnboardingFeatures.FIRE_OPACITY_MAX, animationSpec = spring())
+    val shift by Motion.animateFloatAsState((-height).toFloat())
+    val fade by Motion.animateFloatAsState(opacity / OnboardingFeatures.FIRE_OPACITY_MAX)
     PreviewFrame {
         scene?.let { drawCover(it, size.width, size.height) }
         drawRect(SceneShade)
@@ -2403,10 +2150,7 @@ private fun HorsePreview(opacity: Float) {
         loadOnboardingImage(MOUNT_ASSETS + MOUNT_SCENE) ?: loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png")
     }
     val horse = remember { loadOnboardingImage(MOUNT_ASSETS + MOUNT_FULL) }
-    val fade by animateFloatAsState(
-        opacity / OnboardingFeatures.HORSE_OPACITY_MAX,
-        animationSpec = spring(),
-    )
+    val fade by Motion.animateFloatAsState(opacity / OnboardingFeatures.HORSE_OPACITY_MAX)
     PreviewFrame {
         scene?.let { drawCover(it, size.width, size.height) }
         horse?.let { drawCover(it, size.width, size.height, fade) }
@@ -2419,7 +2163,7 @@ private fun ShieldPreview(height: Float) {
         loadOnboardingImage(SHIELD_ASSETS + SHIELD_SCENE) ?: loadOnboardingImage(ONBOARDING_ASSETS + "motion-test.png")
     }
     val shield = remember { loadOnboardingImage(SHIELD_ASSETS + SHIELD_LAYER) }
-    val drop by animateFloatAsState(-height, animationSpec = spring())
+    val drop by Motion.animateFloatAsState(-height)
     PreviewFrame {
         scene?.let { drawCover(it, size.width, size.height) }
         val plate = shield ?: return@PreviewFrame
@@ -2496,67 +2240,33 @@ private fun TermsPage(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SocialText("Agree to the", 15.sp, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center)
+                Text("Agree to the", style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Normal), textAlign = TextAlign.Center)
                 TermsLink("Terms of Service") {
                     ClientPlatform.openUri(document?.resolvedTermsUrl ?: LegalDocuments.TERMS_URL)
                 }
-                SocialText("and", 15.sp, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center)
+                Text("and", style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Normal), textAlign = TextAlign.Center)
                 TermsLink("Privacy Policy") {
                     ClientPlatform.openUri(document?.resolvedPrivacyUrl ?: LegalDocuments.PRIVACY_URL)
                 }
-                SocialText("to use online features.", 15.sp, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center)
+                Text("to use online features.", style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Normal), textAlign = TextAlign.Center)
             }
-            SocialText(
+            Text(
                 TERMS_NOTE,
-                12.sp,
-                Modifier.width((panelWidth - 80f).dp),
-                SocialTextSecondary,
-                FontWeight.Light,
+                modifier = Modifier.width((panelWidth - 80f).dp),
+                color = SocialTextSecondary,
+                style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Light),
                 textAlign = TextAlign.Center,
             )
         }
     }
 }
 
-// Mirrors OneConfig's CheckboxIndicator so the onboarding checkbox matches the rest of the UI
-@Composable
-private fun CheckBox(checked: Boolean) {
-    val theme = OneConfigTheme.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-    Box(
-        Modifier
-            .size(24.dp)
-            .hoverable(interactionSource)
-            .clip(theme.checkBoxShape)
-            .background(if (checked) OneConfigTheme.accent else SocialOffStateBackground)
-            .border(
-                1.5.dp,
-                when {
-                    checked -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> theme.borderColor
-                },
-                theme.checkBoxShape,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (checked) Icon("tick", theme.accentTextColor, Modifier.size(26.dp))
-    }
-}
-
 @Composable
 private fun TermsLink(label: String, onClick: () -> Unit) {
-    BasicText(
+    LinkText(
         label,
-        Modifier.a11y(label, A11yRole.Link).clickableTextWithSound(onClick),
-        TextStyle(
-            color = OneConfigTheme.accent,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = OneConfigTheme.current.fontFamily,
-            textDecoration = TextDecoration.Underline,
-        ),
+        onClick,
+        style = OneConfigTheme.current.typography.body.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium, textDecoration = TextDecoration.Underline),
     )
 }
 
@@ -2589,7 +2299,6 @@ internal object OnboardingKeys {
     private var next: (() -> Unit)? = null
     private var back: (() -> Unit)? = null
     private var blocked: String? = null
-    var dismiss: (() -> Unit)? = null
 
     fun update(page: Int, next: (() -> Unit)?, back: (() -> Unit)?, blocked: String?) {
         if (page != this.page) {
@@ -2606,13 +2315,12 @@ internal object OnboardingKeys {
         next = null
         back = null
         blocked = null
-        dismiss = null
     }
 
     fun handle(key: Int): Boolean {
         if (OnboardingKeyCapture.pending != null) return false
         when (key) {
-            InputConstants.KEY_ESCAPE -> (dismiss ?: back ?: return false)()
+            InputConstants.KEY_ESCAPE -> if (!EscapeStack.dispatch()) (back ?: return false)()
             InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
                 if (LobbyA11y.keyboardFocused()) return false
                 if (System.currentTimeMillis() - pageAt < PAGE_SETTLE_MS) return true
@@ -2650,6 +2358,7 @@ private fun pageSpeech(step: OnboardingStep, page: Int, waiting: Boolean): Strin
         OnboardingStep.ModOrder -> "Mod Sorting. $MOD_ORDER_TEXT"
         OnboardingStep.Sprint -> "Toggle Sprint. $SPRINT_TEXT"
         is OnboardingStep.Mods -> "Mods: " + step.cards.joinToString(" and ") { modCardTitle(it) } + "."
+        OnboardingStep.Watermark -> "Watermark. $WATERMARK_TEXT"
         OnboardingStep.BlockHighlight -> "Block Highlight. Pick a preset to start from, then adjust the outline and fill."
         OnboardingStep.MotionBlur ->
             if (waiting) {
@@ -2725,6 +2434,8 @@ private sealed interface OnboardingStep {
     data class Mods(val cards: List<ModCard>) : OnboardingStep
 
     data object BlockHighlight : OnboardingStep
+
+    data object Watermark : OnboardingStep
 
     data object MotionBlur : OnboardingStep
 
@@ -2820,8 +2531,6 @@ private const val UI_SCALE = DESIGN_WIDTH / 1240f
 private const val PANEL_WIDTH = 880f
 private const val PANEL_HEIGHT = 660f
 private const val MOTION_BLUR_MIN = 1
-private val WIDE_SLIDER_THUMB = 13.dp
-private val WIDE_SLIDER_TRACK = 7.dp
 private const val MOTION_BLUR_MAX = 10
 
 private const val CONTENT_TOP = 140f
@@ -2880,6 +2589,7 @@ private const val BLOCK_SPIN_PER_MS = 0.0004f
 private const val CBH_WIDTH_MIN = 1f
 private const val CBH_WIDTH_MAX = 10f
 private const val SWATCH_SIZE = 20f
+private const val SLIDER_KEY_STEP = 0.05f
 private const val SWATCH_GAP = 3f
 private const val SWATCH_GROUP_GAP = 12f
 private val SWATCH_PALETTE = listOf(
@@ -2928,11 +2638,20 @@ private const val NAV_BOTTOM_INSET = 56f
 private const val SECONDARY_ACTION_WIDTH = 120f
 private const val HINT_WIDTH = 200f
 private const val BLUR_SAMPLE_TIMEOUT_MILLIS = 10_000L
-private const val SLIDER_KEY_STEP = 0.05f
+private const val MIN_TEXT_CONTRAST = 4.5f
+private const val FPS_MIDDLE_BLEND = 0.5f
+private const val HUD_BACKGROUND_ALPHA = 0.5f
 private const val TERMS_NOTE =
     "Declining turns off crash reports, friends, parties, world hosting, featured servers, cosmetics and the Marketplace. You can change this later in Settings."
 private const val MOD_ORDER_TEXT = "Choose how the mods list is sorted. Recommended puts the mods you are most likely to tweak first."
 private const val SPRINT_TEXT = "Turn sprinting into a toggle so you keep running after you let go of the key."
+private const val WATERMARK_TEXT =
+    "Show the OneClient logo in inventories and options screens. You can move, resize or recolor it later in settings."
+private const val WATERMARK_PREVIEW_WIDTH = 232f
+private const val WATERMARK_PREVIEW_HEIGHT = 56f
+private const val WATERMARK_LOGO_SIZE = 28f
+private const val WATERMARK_WORDMARK_HEIGHT = 18f
+private const val WATERMARK_WORDMARK_WIDTH = WATERMARK_WORDMARK_HEIGHT * (159f / 19f)
 private const val DONE_TEXT = "That’s all for now, thank you for choosing OneClient! We hope you have a nice experience using it."
 
 private val LocalCardTitle = compositionLocalOf { "" }
@@ -2954,6 +2673,7 @@ private const val SHIELD_ASSETS = "assets/polyplus/onboarding/shield/"
 private const val SHIELD_SCENE = "shield-scene.png"
 private const val SHIELD_LAYER = "shield-layer.png"
 private const val MAIN_MENU_ASSETS = "assets/polyplus/mainmenu/"
+private const val BRAND_ASSETS = "assets/polyplus/brand/"
 private const val GUIDE_ASSETS = "assets/polyplus/onboarding/guides/"
 private const val GUIDE_TEXT_Y = 128f
 private const val GUIDE_SHOT_Y = 188f
@@ -2961,24 +2681,7 @@ private const val GUIDE_HEIGHT = CONTENT_BOTTOM - GUIDE_SHOT_Y
 private const val GUIDE_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
 private const val GUIDE_MARGIN = CARD_MARGIN
 
-private val ButtonShape: Shape
-    @Composable
-    get() = ppShape(9.dp)
-
-private val PageBackground: Color
-    @Composable get() = OneConfigTheme.current.pageBackground
-private val ShadowColor = Color(0x26000000)
-
-private val ChoiceBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
-private val MenuBackground: Color
-    @Composable get() = SocialDropdownBackground
-
 private const val HUD_TEXT_SIZE = 21f
 private const val HUD_PADDING = HUD_TEXT_SIZE * (4f / 9f)
 private const val HUD_RADIUS = HUD_TEXT_SIZE * (4f / 9f)
-private val HudBackground = Color(0x80000000)
-private val ImpactGood = Color(0xFF6FD08C)
-private val ImpactWarn = Color(0xFFE7B85C)
-private val ImpactHeavy = Color(0xFFE8836B)
 

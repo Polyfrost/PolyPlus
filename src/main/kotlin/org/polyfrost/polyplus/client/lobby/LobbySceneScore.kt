@@ -3,10 +3,12 @@ package org.polyfrost.polyplus.client.lobby
 import net.minecraft.core.BlockPos
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 class LobbySurvey(val origin: BlockPos, val minY: Int, val realm: LobbyRealm = LobbyRealm.OVERWORLD) {
     val ground = IntArray(CELLS)
@@ -118,6 +120,7 @@ object LobbySceneScore {
         val breakdown: Breakdown? = null,
         val profile: Profile = breakdown?.profile ?: Profile.OUTDOOR,
         val realm: LobbyRealm = LobbyRealm.OVERWORLD,
+        val options: List<Verdict> = emptyList(),
     )
 
     private class Requirement(val label: String, val rejections: Set<Rejection>)
@@ -156,6 +159,7 @@ object LobbySceneScore {
     private const val FEET_COST = 0.2
     private const val OUTDOOR_MAX = FLAT_WEIGHT + SKY_WEIGHT + VARIETY_WEIGHT + RELIEF_WEIGHT + BUILT_WEIGHT + LIGHTS_WEIGHT + WATER_COST
     private const val FULL_SCORE = 100.0
+    private const val PICK_SPREAD = 8.0
 
     val passPoints: Int = display(MIN_SCORE + WATER_COST, OUTDOOR_MAX)
 
@@ -253,6 +257,7 @@ object LobbySceneScore {
         var best: Verdict? = null
         var worst: Rejection? = null
         var scored: Verdict? = null
+        val accepted = ArrayList<Verdict>()
         val reach = CANDIDATE_REACH
         for (cellX in -reach..reach step CANDIDATE_STEP) {
             for (cellZ in -reach..reach step CANDIDATE_STEP) {
@@ -261,12 +266,33 @@ object LobbySceneScore {
                 if (verdict.rejection != null) {
                     if (cellX == 0 && cellZ == 0) worst = verdict.rejection
                     worst = worst ?: verdict.rejection
-                } else if (verdict.score > (best?.score ?: Double.NEGATIVE_INFINITY)) {
-                    best = verdict
+                } else {
+                    accepted += verdict
+                    if (verdict.score > (best?.score ?: Double.NEGATIVE_INFINITY)) best = verdict
                 }
             }
         }
-        return (best ?: Verdict(null, 0.0, worst ?: Rejection.SMALL, scored?.breakdown)).copy(realm = survey.realm)
+        val found = best ?: return Verdict(null, 0.0, worst ?: Rejection.SMALL, scored?.breakdown, realm = survey.realm)
+        return found.copy(realm = survey.realm, options = accepted.map { it.copy(realm = survey.realm) })
+    }
+
+    fun choose(verdict: Verdict, view: LobbyCaptureView, keep: (Verdict) -> Boolean): Verdict {
+        if (view == LobbyCaptureView.BEST || verdict.options.size < 2) return verdict
+        val left = verdict.options.toMutableList()
+        val weights = left.mapTo(ArrayList()) { exp((it.score - verdict.score) / PICK_SPREAD) }
+        while (left.isNotEmpty()) {
+            var roll = Random.nextDouble() * weights.sum()
+            var index = 0
+            while (index < weights.lastIndex) {
+                roll -= weights[index]
+                if (roll <= 0.0) break
+                index++
+            }
+            if (keep(left[index])) return left[index]
+            left.removeAt(index)
+            weights.removeAt(index)
+        }
+        return verdict
     }
 
     private fun candidate(survey: LobbySurvey, cellX: Int, cellZ: Int): Verdict? {
@@ -487,6 +513,7 @@ object LobbySceneScore {
         var best: Verdict? = null
         var worst: Verdict? = null
         var scored: Verdict? = null
+        val accepted = ArrayList<Verdict>()
         for (cellX in -ROOM_REACH..ROOM_REACH step ROOM_STEP) {
             for (cellZ in -ROOM_REACH..ROOM_REACH step ROOM_STEP) {
                 val verdict = roomCandidate(room, cellX, cellZ) ?: continue
@@ -494,12 +521,13 @@ object LobbySceneScore {
                 if (verdict.rejection != null) {
                     if (cellX == 0 && cellZ == 0) worst = verdict
                     worst = worst ?: verdict
-                } else if (verdict.score > (best?.score ?: Double.NEGATIVE_INFINITY)) {
-                    best = verdict
+                } else {
+                    accepted += verdict
+                    if (verdict.score > (best?.score ?: Double.NEGATIVE_INFINITY)) best = verdict
                 }
             }
         }
-        best?.let { return it.copy(realm = room.realm) }
+        best?.let { found -> return found.copy(realm = room.realm, options = accepted.map { it.copy(realm = room.realm) }) }
         val profile = scored?.profile ?: worst?.profile ?: fallback(room)
         return Verdict(null, 0.0, worst?.rejection ?: Rejection.ROOM, scored?.breakdown, profile, room.realm)
     }

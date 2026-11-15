@@ -3,10 +3,6 @@
 package org.polyfrost.polyplus.client.gui.marketplace
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
@@ -27,93 +22,74 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.DropdownMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuHeading
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuRadioGroup
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSeparator
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
-import org.polyfrost.polyplus.client.cosmetics.SwatchArt
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.TextField
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowInk
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticVariantUi
 import org.polyfrost.polyplus.client.gui.wardrobe.PriceLabel
+import org.polyfrost.polyplus.client.gui.wardrobe.VariantSwatch
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeCartPane
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeGrid
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeSort
 import org.polyfrost.polyplus.client.gui.wardrobe.uiVariants
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
-private const val NAV_REST_ALPHA = 0.8f
 private const val CART_ICON = "assets/polyplus/ico/shopping-cart/0.svg"
 private const val BAG_ICON = "assets/polyplus/ico/shopping-bag.svg"
 
 private val SearchWidth = 250.dp
-private val FilterColumn = 180.dp
+private const val MAX_QUERY_LENGTH = 64
 
 internal class RailEntry(val label: String, val count: Int, val active: Boolean, val onClick: () -> Unit)
 
 @Composable
 internal fun CategoryRail(entries: List<RailEntry>, modifier: Modifier) {
     Column(modifier.panel().padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Label("BROWSE", 11.sp, Modifier.padding(start = 10.dp, bottom = 6.dp), weight = FontWeight.Medium)
-        if (entries.isEmpty()) Label("Nothing to browse", 12.sp, Modifier.padding(start = 10.dp), color = MutedText)
+        Text("BROWSE", Modifier.padding(start = 10.dp, bottom = 6.dp), style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        if (entries.isEmpty()) Text("Nothing to browse", Modifier.padding(start = 10.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         entries.forEach { RailRow(it) }
     }
 }
 
 @Composable
 private fun RailRow(entry: RailEntry) {
-    val (interaction, hovered) = rememberSocialHover()
     val theme = OneConfigTheme.current
-    val ink = when {
-        entry.active -> theme.accentTextColor
-        hovered -> theme.textColor
-        else -> theme.textColor.copy(alpha = NAV_REST_ALPHA)
-    }
     Row(
         Modifier
             .fillMaxWidth()
             .height(33.dp)
-            .rowFrame(entry.active, hovered)
-            .hoverable(interaction)
-            .clickableWithSound(entry.onClick)
+            .selectableRow(entry.active, entry.onClick, "${entry.label}, ${entry.count}", theme.sideBarNavigationEntryShape)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Label(entry.label, 14.sp, Modifier.weight(1f), color = ink)
-        Label(entry.count.toString(), 12.sp, color = if (entry.active) ink else MutedText)
+        Text(entry.label, Modifier.weight(1f), color = SelectionDefaults.itemContentColor(entry.active), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(entry.count.toString(), color = SelectionDefaults.itemSecondaryColor(entry.active, rest = theme.mutedText), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -127,17 +103,16 @@ internal fun MarketBody(state: MarketplaceState, grid: LazyGridState, entries: L
         ) {
             BackButton(onBack)
             PageTitle("Marketplace", Modifier.weight(1f))
-            TextField(
-                value = state.query,
-                onValueChange = { state.query = it },
-                modifier = Modifier.width(SearchWidth).height(38.dp),
+            SearchField(
+                query = state.query,
+                onQueryChange = { state.query = it.take(MAX_QUERY_LENGTH) },
+                modifier = Modifier.width(SearchWidth),
                 placeholder = "Search cosmetics",
-                leadingIcon = themedIcon(LobbyIcons.SEARCH),
-                maxLength = 64,
-                invalid = false,
+                clearable = false,
+                size = ControlSize.Large,
             )
             FilterButton(state)
-            TextButton("Cart (${state.cart.size})", themedIcon(CART_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.showCart = !state.showCart }
+            TextButton(text = "Cart (${state.cart.size})", icon = CART_ICON, onClick = { state.showCart = !state.showCart }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
         }
         if (entries.isEmpty()) {
             MarketEmpty(state, Modifier.weight(1f).fillMaxWidth())
@@ -177,11 +152,15 @@ internal fun MarketBody(state: MarketplaceState, grid: LazyGridState, entries: L
 @Composable
 private fun MarketEmpty(state: MarketplaceState, modifier: Modifier) {
     if (state.narrowed) {
-        EmptyState("No cosmetics match that filter", modifier) {
-            TextButton("Clear filters", themedIcon(LobbyIcons.CLOSE), Modifier.height(38.dp), ButtonStyle.Secondary, true, state::clearSearch)
-        }
+        EmptyState(
+            "No cosmetics match that filter",
+            modifier,
+            action = {
+                TextButton(text = "Clear filters", icon = LobbyIcons.CLOSE, onClick = state::clearSearch, modifier = Modifier, style = ControlStyle.Secondary, size = ControlSize.Large)
+            },
+        )
     } else {
-        EmptyState("The store is empty", modifier, "There are no cosmetics for sale right now.")
+        EmptyState("The store is empty", modifier, text = "There are no cosmetics for sale right now.")
     }
 }
 
@@ -189,77 +168,24 @@ private fun MarketEmpty(state: MarketplaceState, modifier: Modifier) {
 private fun FilterButton(state: MarketplaceState) {
     var open by remember { mutableStateOf(false) }
     val count = state.activeFilters
+    val themes = state.themes()
+    val entries = buildList<MenuEntry> {
+        add(MenuHeading("Sort"))
+        add(MenuRadioGroup(WardrobeSort.entries, state.sort, { it.label }, { state.sort = it }, closeOnSelect = false))
+        add(MenuSeparator)
+        add(MenuHeading("Show"))
+        add(MenuRadioGroup(OwnershipFilter.entries, state.ownership, { it.label }, { state.ownership = it }, closeOnSelect = false))
+        add(MenuSeparator)
+        add(MenuHeading("Theme"))
+        add(MenuRadioGroup(listOf<String?>(null) + themes, state.theme, { it?.titled() ?: "All themes" }, { state.theme = it }, closeOnSelect = false))
+        if (count > 0) {
+            add(MenuSeparator)
+            add(MenuAction("Clear filters", state::clearFilters, icon = LobbyIcons.CLOSE, dismissOnClick = false))
+        }
+    }
     Box(Modifier) {
-        TextButton(if (count > 0) "Filter ($count)" else "Filter", themedIcon(LobbyIcons.FILTER), Modifier.height(38.dp), ButtonStyle.Secondary, true) { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            FilterPopup(state) { open = false }
-        }
-    }
-}
-
-@Composable
-private fun rememberDropPosition(): PopupPositionProvider {
-    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
-    return remember(gap) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-                val x = (anchorBounds.right - popupContentSize.width).coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                return IntOffset(x, anchorBounds.bottom + gap)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterPopup(state: MarketplaceState, onDismiss: () -> Unit) {
-    Popup(popupPositionProvider = rememberDropPosition(), onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Column(Modifier.popup().padding(10.dp).width(FilterColumn * 2 + 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.width(FilterColumn), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilterGroup("Sort") {
-                        WardrobeSort.entries.forEach { sort -> FilterRow(sort.label, state.sort == sort) { state.sort = sort } }
-                    }
-                    FilterGroup("Show") {
-                        OwnershipFilter.entries.forEach { entry -> FilterRow(entry.label, state.ownership == entry) { state.ownership = entry } }
-                    }
-                }
-                Column(Modifier.width(FilterColumn), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilterGroup("Theme") {
-                        FilterRow("All themes", state.theme == null) { state.theme = null }
-                        state.themes().forEach { theme -> FilterRow(theme.titled(), state.theme == theme) { state.theme = theme } }
-                    }
-                }
-            }
-            if (state.activeFilters > 0) {
-                TextButton("Clear filters", themedIcon(LobbyIcons.CLOSE), Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Secondary, true, state::clearFilters)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterGroup(title: String, rows: @Composable () -> Unit) {
-    Column {
-        Label(title.uppercase(), 11.sp, Modifier.padding(start = 8.dp, top = 6.dp, bottom = 6.dp), weight = FontWeight.Medium)
-        rows()
-    }
-}
-
-@Composable
-private fun FilterRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(32.dp)
-            .rowFrame(selected, hovered)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Label(label, 12.sp, Modifier.weight(1f), color = rowInk(selected))
+        TextButton(text = if (count > 0) "Filter ($count)" else "Filter", icon = LobbyIcons.FILTER, onClick = { open = !open }, modifier = Modifier, style = ControlStyle.Secondary, size = ControlSize.Large)
+        DropdownMenu(open, { open = false }, entries, placement = Placement.BelowEnd)
     }
 }
 
@@ -295,9 +221,9 @@ private fun DetailCard(state: MarketplaceState, onWardrobe: () -> Unit) {
         when {
             item != null -> ItemDetail(state, item, onWardrobe)
             bundle != null -> BundleDetail(state, bundle)
-            else -> SocialText("Select a cosmetic to try it on your look.", 12.sp, color = MutedText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+            else -> Text("Select a cosmetic to try it on your look.", modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
         }
-        state.notice?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+        state.notice?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
 }
 
@@ -305,8 +231,8 @@ private fun DetailCard(state: MarketplaceState, onWardrobe: () -> Unit) {
 private fun DetailHeading(name: String, detail: String, price: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Label(name, 16.sp, weight = FontWeight.Medium)
-            Label(detail, 12.sp, color = MutedText)
+            Text(name, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(detail, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         price()
     }
@@ -321,20 +247,22 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
     DetailHeading(info.name, info.type.displayName) {
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
     }
-    info.description?.takeIf { it.isNotBlank() }?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    info.description?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     if (variants.size > 1) VariantRow(variants, variant) { state.pickVariant(info.id, it) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (owned) {
-            TextButton("Open in Wardrobe", themedIcon("profiles"), Modifier.height(38.dp), ButtonStyle.Primary, true, onWardrobe)
+            TextButton(text = "Open in Wardrobe", icon = "profiles", onClick = onWardrobe, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
         } else {
             TextButton(
-                if (inCart) "In cart" else "Add to cart",
-                themedIcon(if (inCart) LobbyIcons.TICK else CART_ICON),
-                Modifier.height(38.dp),
-                ButtonStyle.Secondary,
-                !inCart,
-            ) { state.addToCart(info, variant) }
-            TextButton("Buy now", themedIcon(BAG_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.buy(info, variant) }
+                text = if (inCart) "In cart" else "Add to cart",
+                icon = if (inCart) LobbyIcons.TICK else CART_ICON,
+                onClick = { state.addToCart(info, variant) },
+                modifier = Modifier,
+                style = ControlStyle.Secondary,
+                enabled = !inCart,
+                size = ControlSize.Large,
+            )
+            TextButton(text = "Buy now", icon = BAG_ICON, onClick = { state.buy(info, variant) }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
         }
     }
 }
@@ -343,46 +271,10 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
 @Composable
 private fun VariantRow(variants: List<CosmeticVariantUi>, selected: CosmeticVariantUi, onPick: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            variants.forEach { VariantSwatch(it, it.id == selected.id) { onPick(it.id) } }
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            variants.forEach { VariantSwatch(it, it.id, it.id == selected.id, 16.dp, UiSound.Click) { onPick(it.id) } }
         }
-        Label(selected.name, 12.sp, color = MutedText)
-    }
-}
-
-@Composable
-private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val theme = OneConfigTheme.current
-    val shape = ppShape(6.dp)
-    val version = CosmeticSwatches.version
-    val art = remember(variant.id, version) { CosmeticSwatches.get(variant.id) }
-    Box(
-        Modifier
-            .size(width = 16.dp, height = 22.dp)
-            .clip(shape)
-            .background(theme.chipBackground)
-            .hoverable(interaction)
-            .clickableWithSound(onClick),
-    ) {
-        when (art) {
-            is SwatchArt.Picture -> Image(art.bitmap, variant.name, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None)
-            is SwatchArt.Stripes -> Column(Modifier.fillMaxSize()) {
-                art.colors.forEach { Box(Modifier.fillMaxWidth().weight(1f).background(it)) }
-            }
-            null -> Unit
-        }
-        Box(
-            Modifier.fillMaxSize().border(
-                1.dp,
-                when {
-                    selected -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> theme.borderColor
-                },
-                shape,
-            ),
-        )
+        Text(selected.name, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -392,10 +284,10 @@ private fun BundleDetail(state: MarketplaceState, bundle: MarketBundle) {
     DetailHeading(bundle.info.name, bundle.label) {
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(bundle.info.basePrice, bundle.info.finalPrice, bundle.info.discounted) }
     }
-    bundle.info.description?.takeIf { it.isNotBlank() }?.let { SocialText(it, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-    SocialText(bundle.pieces.joinToString { it.info.name }, 12.sp, color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    bundle.info.description?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    Text(bundle.pieces.joinToString { it.info.name }, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextButton("Buy now", themedIcon(BAG_ICON), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.buyBundle(bundle.info) }
-        if (owned > 0) Label("You own $owned of ${bundle.pieces.size}", 12.sp, color = MutedText)
+        TextButton(text = "Buy now", icon = BAG_ICON, onClick = { state.buyBundle(bundle.info) }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
+        if (owned > 0) Text("You own $owned of ${bundle.pieces.size}", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }

@@ -2,25 +2,16 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,56 +23,39 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.config.v1.Properties
 import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
-import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenu
+import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.Select
+import org.polyfrost.oneconfig.api.ui.v1.components.Switch
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
-import org.polyfrost.oneconfig.api.ui.v1.components.onClick
-import org.polyfrost.oneconfig.api.ui.v1.components.rememberInteractionSource
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.popupMaxHeight
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.api.pause.PauseWidget
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
-import org.polyfrost.polyplus.client.gui.SocialSwitch
-import org.polyfrost.polyplus.client.gui.clickableTextWithSound
-import org.polyfrost.polyplus.client.gui.themedIcon
 import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.function.Supplier
 
 private val PANEL_WIDTH = 290.dp
 private val PICKER_WIDTH = 170.dp
-private val PICKER_HEIGHT = 32.dp
-private val PICKER_GAP = 6.dp
-private val SWITCH_WIDTH = 42.dp
-private val SWITCH_HEIGHT = 21.dp
 private val ROW_HEIGHT = 38.dp
 private val ROW_PADDING = 10.dp
 private val NESTED_INDENT = 14.dp
-private const val DISABLED_ALPHA = 0.5f
 private const val STYLE_OPTION = "pauseScreenStyle"
 private const val PREVIEW_OPTION = "flatPausePlayerPreview"
 private const val UNAVAILABLE = "Not available right now."
@@ -125,12 +99,18 @@ private fun switchOption(id: String, title: String, get: () -> Boolean, set: (Bo
 
 @Composable
 internal fun CustomizeButton(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
-    IconButton(themedIcon("paintbrush"), if (screen.customizeOpen) null else "Customize", modifier, screen::toggleCustomize)
+    IconButton(
+        icon = "paintbrush",
+        contentDescription = "Customize",
+        onClick = screen::toggleCustomize,
+        modifier = modifier,
+        tooltip = if (screen.customizeOpen) null else "Customize",
+    )
 }
 
 @Composable
 internal fun BoxScope.CustomizeDismiss(screen: OneClientPauseScreen) {
-    Box(Modifier.matchParentSize().clickableTextWithSound(screen::closeCustomize))
+    Box(Modifier.matchParentSize().notFocusable().oneConfigClickable(null, screen::closeCustomize, indication = false, pointerIcon = null))
 }
 
 @Composable
@@ -157,39 +137,39 @@ internal fun PauseCustomizePanel(screen: OneClientPauseScreen, modifier: Modifie
     val widgetRevision = PauseWidgetRegistry.revision
     val widgets = remember(widgetRevision) { PauseWidgetRegistry.view() }
     val optional = widgets.added + widgets.addable
-    Column(
-        modifier
-            .blockPointer()
-            .width(PANEL_WIDTH)
-            .heightIn(max = popupMaxHeight())
-            .pauseGlass(16.dp)
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(start = ROW_PADDING), verticalAlignment = Alignment.CenterVertically) {
-            Text("Customize", Modifier.weight(1f), theme.textColor, 15.sp, FontWeight.Medium)
-            IconButton(themedIcon("close"), null, Modifier, close)
-        }
-        sections.forEach { section ->
-            SectionTitle(section.title)
-            section.options.forEach { prop ->
-                ConfigOptionRow(prop)
-                if (prop.getID() == STYLE_OPTION && chosen == PauseScreenStyle.VANILLA) {
-                    Text(
-                        if (screen.fromVanilla) "Close to go back to the vanilla menu." else "Shows the next time you pause.",
-                        Modifier.padding(horizontal = ROW_PADDING).padding(bottom = 4.dp),
-                        theme.textColorSecondary,
-                        12.sp,
-                    )
+    val scroll = rememberScrollState()
+    ScrollContainer(scroll, modifier.blockPointer().width(PANEL_WIDTH).heightIn(max = popupMaxHeight()).pauseGlass(16.dp), scrollbar = false) {
+        Column(Modifier.fillMaxWidth().padding(8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start = ROW_PADDING), verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Customize", modifier = Modifier.weight(1f), color = theme.textColor, style = theme.typography.heading)
+                IconButton(icon = "close", contentDescription = "Close", onClick = close, tooltip = null)
+            }
+            sections.forEach { section ->
+                SectionTitle(section.title)
+                section.options.forEach { prop ->
+                    ConfigOptionRow(prop)
+                    if (prop.getID() == STYLE_OPTION && chosen == PauseScreenStyle.VANILLA) {
+                        Text(
+                            text = if (screen.fromVanilla) "Close to go back to the vanilla menu." else "Shows the next time you pause.",
+                            modifier = Modifier.padding(horizontal = ROW_PADDING).padding(bottom = 4.dp),
+                            color = theme.textColorSecondary,
+                            style = theme.typography.small,
+                        )
+                    }
+                }
+                if (section.options.any { PauseWidgetRegistry.builtInToggledBy(it.getID()) != null }) {
+                    optional.forEach { widget -> WidgetRows(screen, widget, widget in widgets.added) }
                 }
             }
-            if (section.options.any { PauseWidgetRegistry.builtInToggledBy(it.getID()) != null }) {
-                optional.forEach { widget -> WidgetRows(screen, widget, widget in widgets.added) }
-            }
-        }
-        TextButton("All settings", Modifier.align(Alignment.End).padding(top = 6.dp), ButtonStyle.Secondary) {
-            screen.customizeOpen = false
-            screen.openSettings()
+            TextButton(
+                text = "All settings",
+                onClick = {
+                    screen.customizeOpen = false
+                    screen.openSettings()
+                },
+                modifier = Modifier.align(Alignment.End).padding(top = 6.dp),
+                style = ControlStyle.Secondary,
+            )
         }
     }
 }
@@ -251,13 +231,7 @@ private fun Property<*>.assign(value: Any?, state: MutableState<Any?>) {
 @Composable
 private fun SectionTitle(title: String) {
     if (title.isEmpty()) return
-    Text(
-        title.uppercase(),
-        Modifier.padding(start = ROW_PADDING, top = 8.dp, bottom = 2.dp),
-        OneConfigTheme.current.textColorSecondary,
-        10.sp,
-        FontWeight.Medium,
-    )
+    SectionHeader(title, Modifier.padding(start = ROW_PADDING, top = 4.dp))
 }
 
 @Composable
@@ -279,17 +253,24 @@ private fun ConfigOptionRow(prop: Property<*>) {
 @Composable
 private fun OptionLine(prop: Property<*>, title: String, tooltip: String?, indent: Dp, enabled: Boolean = true) {
     val theme = OneConfigTheme.current
+    val disabledAlpha = theme.disabledAlpha
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = ROW_HEIGHT)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
             .padding(start = ROW_PADDING + indent, end = ROW_PADDING),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        TooltipBox(tooltip, Modifier.weight(1f)) {
-            Text(title, Modifier, theme.textColor, 13.sp, null, BaselineShift.None, FontWeight.Medium, TextAlign.Start, 1, TextOverflow.Ellipsis)
+        TooltipBox(tooltip, Modifier.weight(1f).graphicsLayer { alpha = if (enabled) 1f else disabledAlpha }) {
+            Text(
+                text = title,
+                color = theme.textColor,
+                style = theme.typography.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+            )
         }
         OptionControl(prop, title, enabled)
     }
@@ -301,77 +282,37 @@ private fun OptionControl(prop: Property<*>, title: String, enabled: Boolean) {
     when {
         choices != null -> ChoicePicker(prop, title, choices, enabled)
         isSwitch(prop) -> OptionSwitch(prop, title, enabled)
-        else -> Text(rememberValue(prop).value?.toString().orEmpty(), Modifier, OneConfigTheme.current.textColorSecondary, 12.sp)
+        else -> {
+            val disabledAlpha = OneConfigTheme.current.disabledAlpha
+            Text(
+                text = rememberValue(prop).value?.toString().orEmpty(),
+                modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else disabledAlpha },
+                color = OneConfigTheme.current.textColorSecondary,
+                style = OneConfigTheme.current.typography.small,
+            )
+        }
     }
 }
 
 @Composable
 private fun OptionSwitch(prop: Property<*>, title: String, enabled: Boolean) {
-    val theme = OneConfigTheme.current
     val value = rememberValue(prop)
-    val checked = value.value == true
-    val source = rememberInteractionSource()
-    Row(
-        Modifier
-            .a11y(title, A11yRole.Switch, null, checked, theme.circleShape, true)
-            .onClick(source, enabled) { prop.assign(!checked, value) }
-            .pointerHoverIcon(PointerIcon.Hand),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(if (checked) "On" else "Off", Modifier, theme.textColorSecondary, 12.sp)
-        SocialSwitch(checked, SWITCH_WIDTH, SWITCH_HEIGHT, theme.textColorSecondary.copy(alpha = DISABLED_ALPHA))
-    }
+    Switch(value.value == true, { prop.assign(it, value) }, enabled = enabled, label = title, stateLabel = true)
 }
 
 @Composable
 private fun ChoicePicker(prop: Property<*>, title: String, choices: List<Choice>, enabled: Boolean) {
-    val theme = OneConfigTheme.current
-    val accent = OneConfigTheme.accent
     val value = rememberValue(prop)
-    var expanded by remember { mutableStateOf(false) }
-    val source = rememberInteractionSource()
-    val hovered by source.collectIsHoveredAsState()
-    val label = choices.firstOrNull { it.value == value.value }?.label ?: value.value?.toString().orEmpty()
-    val border by animateColorAsState(
-        when {
-            expanded -> accent
-            hovered -> theme.textColorSecondary
-            else -> theme.borderColor
-        },
+    Select(
+        selected = choices.firstOrNull { it.value == value.value },
+        options = choices,
+        onSelect = { choice -> choice?.let { prop.assign(it.value, value) } },
+        modifier = Modifier.width(PICKER_WIDTH),
+        label = { it?.label.orEmpty() },
+        enabled = enabled,
+        placeholder = value.value?.toString(),
+        contentDescription = title,
     )
-    val content by animateColorAsState(if (hovered || expanded) theme.textColor else theme.textColorSecondary)
-    val chevron by animateFloatAsState(if (expanded) 0f else 180f)
-    val shape = theme.sideBarNavigationEntryShape
-    val drop = with(LocalDensity.current) { (PICKER_HEIGHT + PICKER_GAP).roundToPx() }
-    Box {
-        Row(
-            Modifier
-                .width(PICKER_WIDTH)
-                .height(PICKER_HEIGHT)
-                .clip(shape)
-                .background(theme.componentBackground, shape)
-                .border(1.dp, border, shape)
-                .hoverable(source, enabled)
-                .a11y("$title, $label", A11yRole.Option, null, null, shape, true)
-                .onClick(source, enabled) { expanded = !expanded }
-                .pointerHoverIcon(PointerIcon.Hand)
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(label, Modifier.weight(1f), content, 13.sp, null, BaselineShift.None, FontWeight.Normal, TextAlign.Start, 1, TextOverflow.Ellipsis)
-            Icon(themedIcon("up"), content, Modifier.size(14.dp).graphicsLayer { rotationZ = chevron })
-        }
-        ContextMenu(expanded, IntOffset(0, drop), { expanded = false }) {
-            choices.forEach { choice ->
-                MenuItem(choice.label, null, null, MenuItemSize.Compact, false, choice.value == value.value, true, null, Modifier, null) {
-                    expanded = false
-                    prop.assign(choice.value, value)
-                }
-            }
-        }
-    }
 }
 
 @Composable

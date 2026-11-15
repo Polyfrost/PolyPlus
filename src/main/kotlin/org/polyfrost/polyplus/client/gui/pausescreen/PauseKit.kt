@@ -5,9 +5,7 @@ package org.polyfrost.polyplus.client.gui.pausescreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,17 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -66,23 +59,34 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
+import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuCustomItem
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuHeading
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSeparator
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.ToastDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.components.liquidGlass
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
+import org.polyfrost.oneconfig.api.ui.v1.components.popupMaxHeight
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.trackScreenFocus
-import org.polyfrost.polyplus.client.gui.wrapTabFocus
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.liquidGlassTheme
-import org.polyfrost.oneconfig.internal.ui.components.liquidGlass
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.lobbyshell.LINKED_MOD_CAPTION
 import org.polyfrost.polyplus.client.gui.lobbyshell.ModLogo
@@ -90,19 +94,11 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.decodeModLogo
 import org.polyfrost.polyplus.client.gui.lobbyshell.icon
 import org.polyfrost.polyplus.client.gui.lobbyshell.label
 import org.polyfrost.polyplus.compat.LinkedModMenus
-import org.polyfrost.polyplus.client.gui.lobbyshell.MoreMenuPanel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModMenu
 import androidx.compose.ui.graphics.ImageBitmap
-import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.clickableTextWithSound
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.playButtonClickSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
@@ -110,8 +106,6 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.party.PartyJoin
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import kotlin.math.max
 import kotlin.math.min
 import org.polyfrost.polyplus.client.gui.usableScale
@@ -120,12 +114,13 @@ import org.polyfrost.polyplus.client.gui.usableSize
 private const val MIN_SCALE = 0.72f
 private const val COMPACT_WIDTH = 1300f
 private const val OPAQUE_FLOOR = 0.94f
-private const val MENU_REVEAL_NANOS = 160_000_000f
-private const val DISABLED_ALPHA = 0.4f
 private const val DANGER_REST_TINT = 0.1f
 private const val DANGER_HOVER_TINT = 0.2f
+private const val MENU_REVEAL_NANOS = 160_000_000f
 private val MOD_LOGO_SIZE = 16.dp
 private val MENU_ICON_SIZE = 18.dp
+private val MORE_MENU_WIDTH = 300.dp
+private val MORE_MENU_MAX_HEIGHT = 560.dp
 
 internal fun asset(name: String): String = "$SOCIAL_ASSETS$name.svg"
 
@@ -174,7 +169,7 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
             Box(Modifier.fillMaxSize()) {
                 val narrow = widthPx / scale < COMPACT_WIDTH
                 if (screen.stepBack) StepBackScreen(screen, narrow) else QuickDockScreen(screen, narrow)
-                SocialToastHost(Modifier.align(Alignment.TopCenter).padding(top = if (screen.stepBack) LobbyLayout.Top else 24.dp))
+                SocialToastHost(Modifier.padding(top = (if (screen.stepBack) LobbyLayout.Top else 24.dp) - ToastDefaults.margin))
                 PlayTogetherHooks(PauseHost)
                 Curtain()
             }
@@ -191,7 +186,7 @@ private fun BoxScope.Curtain() {
 
 @Composable
 internal fun Modifier.pauseGlass(radius: Dp = 20.dp): Modifier {
-    val shape = ppShape(radius)
+    val shape = OneConfigTheme.shape(radius)
     val surface = PanelSurface
     val glass = liquidGlassTheme
     return this
@@ -201,26 +196,8 @@ internal fun Modifier.pauseGlass(radius: Dp = 20.dp): Modifier {
 }
 
 @Composable
-internal fun Keycap(text: String) {
-    val shape = ppShape(6.dp)
-    Box(Modifier.height(22.dp).border(1.dp, SocialBorderColor, shape).padding(horizontal = 7.dp), contentAlignment = Alignment.Center) {
-        Label(text, 11.sp, color = MutedText, weight = FontWeight.Medium)
-    }
-}
-
-@Composable
-internal fun Eyebrow(text: String) {
-    SocialText(text, 11.sp, color = MutedText, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp, maxLines = 1)
-}
-
-@Composable
-internal fun Hairline(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-}
-
-@Composable
 internal fun PauseStateLine(state: PauseState) {
-    val dot = if (state.paused) MutedText else SocialSuccessColor
+    val dot = if (state.paused) OneConfigTheme.current.mutedText else SocialSuccessColor
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (state.paused) {
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -229,8 +206,17 @@ internal fun PauseStateLine(state: PauseState) {
         } else {
             Box(Modifier.size(8.dp).background(dot, OneConfigTheme.current.circleShape))
         }
-        Label(state.label, 12.sp, color = if (state.paused) MutedText else SocialTextPrimary, weight = FontWeight.Medium)
-        state.detail?.let { Label(it, 12.sp, color = MutedText) }
+        Text(
+            state.label,
+            color = if (state.paused) OneConfigTheme.current.mutedText else SocialTextPrimary,
+            style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+        )
+        state.detail?.let {
+            Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        }
     }
 }
 
@@ -269,26 +255,40 @@ internal fun MenuRow(
     logo: ImageBitmap? = null,
     onClick: () -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    val ink = if (danger) SocialDangerText else SocialTextPrimary
-    Box {
-        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter, 320.dp)
+    val hover = rememberHoverState()
+    val interaction = hover.interactionSource
+    val hovered = hover.hovered
+    val dangerInk = if (danger) SocialDangerText else null
+    val ink = dangerInk ?: SocialTextPrimary
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    TooltipBox(tooltip, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp, delayMillis = 0) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .height(height)
-                .then(if (danger) Modifier.background(SocialDangerText.copy(alpha = if (hovered && enabled) DANGER_HOVER_TINT else DANGER_REST_TINT), SocialFieldShape) else Modifier)
+                .then(if (dangerInk != null && liquidGlassTheme) Modifier.liquidGlass(SocialFieldShape, frosted = false) else Modifier)
+                .then(if (dangerInk != null) Modifier.background(dangerInk.copy(alpha = if (hovered && enabled) DANGER_HOVER_TINT else DANGER_REST_TINT), SocialFieldShape) else Modifier)
                 .rowFrame(false, hovered && enabled)
-                .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
+                .graphicsLayer { alpha = if (enabled) 1f else disabledAlpha }
                 .hoverable(interaction)
-                .then(if (enabled) Modifier.clickableWithSound(label, onClick = onClick) else Modifier)
+                .oneConfigClickable(label, onClick, enabled = enabled, indication = false, interactionSource = interaction)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (logo != null) ModMenuLogo(logo, ink) else PauseGlyph(icon, ink)
-            Label(label, size, Modifier.weight(1f), color = ink, weight = FontWeight.Medium)
-            detail?.let { Label(it, 12.sp, color = MutedText) }
+            Text(
+                label,
+                Modifier.weight(1f),
+                ink,
+                OneConfigTheme.current.typography.body.copy(fontSize = size, fontWeight = FontWeight.Medium),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+            detail?.let {
+                Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            }
         }
     }
 }
@@ -297,20 +297,17 @@ internal fun MenuRow(
 private fun MoreEntry(entry: PauseEntry, onDone: () -> Unit) {
     val sprite = entry.sprite
     MenuItem(
-        entry.label,
-        themedIcon(entry.glyph),
-        null,
-        MenuItemSize.Regular,
-        false,
-        false,
-        entry.enabled,
-        entry.tooltip,
-        Modifier,
-        sprite?.let { { Image(it, null, Modifier.size(MENU_ICON_SIZE), filterQuality = FilterQuality.None) } },
-    ) {
-        onDone()
-        entry.press()
-    }
+        label = entry.label,
+        onClick = {
+            onDone()
+            entry.press()
+        },
+        icon = entry.glyph,
+        size = MenuItemSize.Regular,
+        enabled = entry.enabled,
+        tooltip = entry.tooltip,
+        leading = sprite?.let { { Image(it, null, Modifier.size(MENU_ICON_SIZE), filterQuality = FilterQuality.None) } },
+    )
 }
 
 private fun pauseLinkedEntries(): List<LinkedModMenus.Entry> =
@@ -318,10 +315,15 @@ private fun pauseLinkedEntries(): List<LinkedModMenus.Entry> =
 
 @Composable
 private fun LinkedEntry(entry: LinkedModMenus.Entry, onDone: () -> Unit) {
-    MenuItem(entry.label, themedIcon(entry.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
-        onDone()
-        LinkedModMenus.open(entry)
-    }
+    MenuItem(
+        label = entry.label,
+        onClick = {
+            onDone()
+            LinkedModMenus.open(entry)
+        },
+        icon = entry.icon,
+        size = MenuItemSize.Regular,
+    )
 }
 
 @Composable
@@ -359,8 +361,6 @@ internal fun rememberMoreTrigger(open: Boolean): FocusRequester {
 
 @Composable
 internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvider, routes: Boolean = false) {
-    val first = remember { FocusRequester() }
-    val keyboard = remember { A11y.keyboardMode }
     Popup(popupPositionProvider = anchor, onDismissRequest = { screen.moreOpen = false }, properties = PopupProperties(focusable = true)) {
         MorePanel(
             screen,
@@ -368,17 +368,9 @@ internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvid
                 .heightIn(max = popupMaxHeight(POPUP_EDGE))
                 .blockPointer()
                 .trackScreenFocus()
-                .wrapTabFocus()
-                .focusRequester(first)
                 .focusGroup(),
             routes,
         )
-        if (keyboard) {
-            LaunchedEffect(Unit) {
-                withFrameNanos { }
-                runCatching { first.requestFocus() }
-            }
-        }
     }
 }
 
@@ -386,39 +378,62 @@ internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvid
 internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier, routes: Boolean = false) {
     val linked = remember { pauseLinkedEntries() }
     val close = { screen.moreOpen = false }
+    val menu = modifier.width(MORE_MENU_WIDTH).heightIn(max = MORE_MENU_MAX_HEIGHT)
     if (screen.moreLinked && linked.isNotEmpty()) {
-        MoreMenuPanel(Modifier.heightIn(max = 560.dp).pauseGlass().verticalScroll(rememberScrollState()), modifier) {
-            linked.forEach { LinkedEntry(it, close) }
-        }
+        MenuList(linked.map { entry -> MenuCustomItem { LinkedEntry(entry, close) } }, {}, menu, MenuItemSize.Regular, surface = MoreSurface, tabNavigation = true)
         return
     }
     val modMenu = rememberModMenu()
     val entries = screen.capture.more.filterNot { modMenu != null && it.modMenu }
     val game = if (routes) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
     val mods = modMenu.takeIf { routes }
-    MoreMenuPanel(Modifier.heightIn(max = 560.dp).pauseGlass().verticalScroll(rememberScrollState()), modifier) {
-        game.forEach { MoreEntry(it, close) }
+    val routed = linked.takeIf { routes }.orEmpty()
+    val items = buildList<MenuEntry> {
+        game.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }
         mods?.let { (button, logo) ->
-            MenuItem("Mods", themedIcon(button.icon), null, MenuItemSize.Regular, false, false, true, button.tooltip, Modifier, logo?.let { { ModMenuLogo(it, SocialTextPrimary) } }) {
-                close()
-                button.onClick(screen)
-            }
+            add(
+                MenuCustomItem {
+                    MenuItem(
+                        label = "Mods",
+                        onClick = {
+                            close()
+                            button.onClick(screen)
+                        },
+                        icon = button.icon,
+                        size = MenuItemSize.Regular,
+                        tooltip = button.tooltip,
+                        leading = logo?.let { { ModMenuLogo(it, SocialTextPrimary) } },
+                    )
+                },
+            )
         }
-        val routed = linked.takeIf { routes }.orEmpty()
         if (routed.isNotEmpty()) {
-            if (game.isNotEmpty() || mods != null) Hairline(Modifier.padding(vertical = 4.dp))
-            Label(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, 11.sp, Modifier.padding(start = 10.dp, top = 6.dp, bottom = 2.dp), color = MutedText, weight = FontWeight.Medium)
-            routed.forEach { LinkedEntry(it, close) }
+            if (game.isNotEmpty() || mods != null) add(MenuSeparator)
+            add(MenuHeading(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION))
+            routed.forEach { entry -> add(MenuCustomItem { LinkedEntry(entry, close) }) }
         }
-        if ((game.isNotEmpty() || mods != null || routed.isNotEmpty()) && entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
+        if ((game.isNotEmpty() || mods != null || routed.isNotEmpty()) && entries.isNotEmpty()) add(MenuSeparator)
         entries.groupBy { it.section }.forEach { (section, rows) ->
-            Label(section, 11.sp, Modifier.padding(start = 10.dp, top = 6.dp, bottom = 2.dp), color = MutedText, weight = FontWeight.Medium)
-            rows.forEach { MoreEntry(it, close) }
+            add(MenuHeading(section))
+            rows.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }
         }
-        if (entries.isNotEmpty()) Hairline(Modifier.padding(vertical = 4.dp))
-        MenuItem("Classic pause menu", themedIcon("dots-grid"), null, MenuItemSize.Regular, false, false, true, uncapturedHint(screen.capture.uncaptured), Modifier, null, screen::openClassic)
+        if (entries.isNotEmpty()) add(MenuSeparator)
+        add(
+            MenuCustomItem {
+                MenuItem(
+                    label = "Classic pause menu",
+                    onClick = screen::openClassic,
+                    icon = "dots-grid",
+                    size = MenuItemSize.Regular,
+                    tooltip = uncapturedHint(screen.capture.uncaptured),
+                )
+            },
+        )
     }
+    MenuList(items, {}, menu, MenuItemSize.Regular, surface = MoreSurface, tabNavigation = true)
 }
+
+private val MoreSurface: @Composable (Modifier) -> Modifier = { it.pauseGlass() }
 
 @Composable
 private fun ModMenuLogo(logo: ImageBitmap, tint: Color) {
@@ -433,7 +448,7 @@ private fun uncapturedHint(count: Int): String? = when (count) {
 
 @Composable
 internal fun BoxScope.MoreDismiss(screen: OneClientPauseScreen) {
-    Box(Modifier.matchParentSize().clickableTextWithSound { screen.moreOpen = false })
+    Box(Modifier.matchParentSize().notFocusable().oneConfigClickable(null, { screen.moreOpen = false }, indication = false, pointerIcon = null))
 }
 
 internal val POPUP_EDGE = 20.dp
@@ -448,22 +463,26 @@ internal fun BarTile(
     active: Boolean = false,
     onClick: (() -> Unit)? = null,
     glass: Boolean = true,
+    label: String? = tooltip,
     content: @Composable BoxScope.(hovered: Boolean) -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    Box(
-        modifier
-            .height(LobbyLayout.BarHeight)
-            .widthIn(min = LobbyLayout.BarHeight)
-            .then(if (glass) Modifier.pauseGlass() else Modifier)
-            .hoverable(interaction)
-            .then(if (onClick != null) Modifier.quietClick(interaction, onClick) else Modifier)
-            .padding(BAR_INSET),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (onClick != null) Box(Modifier.matchParentSize().rowFrame(false, hovered || active, ppShape(BAR_INNER_RADIUS)))
-        content(hovered)
-        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
+    val hover = rememberHoverState()
+    val interaction = hover.interactionSource
+    val hovered = hover.hovered
+    TooltipBox(tooltip, placement = TooltipPlacement.AboveCenter, delayMillis = 0) {
+        Box(
+            modifier
+                .height(LobbyLayout.BarHeight)
+                .widthIn(min = LobbyLayout.BarHeight)
+                .then(if (glass) Modifier.pauseGlass() else Modifier)
+                .hoverable(interaction)
+                .then(if (onClick != null) Modifier.oneConfigClickable(label, onClick, indication = false, interactionSource = interaction, focusRing = false) else Modifier)
+                .padding(BAR_INSET),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (onClick != null) Box(Modifier.matchParentSize().rowFrame(false, hovered || active, OneConfigTheme.shape(BAR_INNER_RADIUS)))
+            content(hovered)
+        }
     }
 }
 
@@ -475,25 +494,27 @@ internal fun CardRow(
     tooltip: String? = null,
     active: Boolean = false,
     onClick: (() -> Unit)? = null,
+    label: String? = tooltip,
     content: @Composable RowScope.(lit: Boolean) -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
+    val interaction = hover.interactionSource
+    val hovered = hover.hovered
     val lit = (hovered || active) && onClick != null
-    Box {
+    TooltipBox(tooltip, placement = TooltipPlacement.AboveCenter, delayMillis = 0) {
         Row(
             modifier
                 .fillMaxWidth()
                 .height(CARD_ROW)
-                .rowFrame(false, lit, ppShape(10.dp))
+                .rowFrame(false, lit, OneConfigTheme.shape(10.dp))
                 .hoverable(interaction)
-                .then(if (onClick != null) Modifier.quietClick(interaction, onClick) else Modifier)
+                .then(if (onClick != null) Modifier.oneConfigClickable(label, onClick, indication = false, interactionSource = interaction, focusRing = false) else Modifier)
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             content(lit)
         }
-        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
     }
 }
 
@@ -506,13 +527,15 @@ internal fun TabularLabel(
     modifier: Modifier = Modifier,
     align: TextAlign = TextAlign.Start,
 ) {
-    BasicText(
+    Text(
         text,
         modifier,
-        style = TextStyle(color = color, fontSize = size, fontWeight = weight, fontFamily = OneConfigTheme.current.fontFamily, textAlign = align, fontFeatureSettings = "tnum"),
+        color,
+        OneConfigTheme.typography.body.copy(fontSize = size, fontWeight = weight, fontFeatureSettings = "tnum"),
         maxLines = 1,
-        softWrap = false,
         overflow = TextOverflow.Clip,
+        softWrap = false,
+        textAlign = align,
     )
 }
 
@@ -535,33 +558,6 @@ internal fun rememberToolAnchor(side: Boolean): PopupPositionProvider {
     return if (side) beside else rise
 }
 
-internal fun Modifier.quietClick(interaction: MutableInteractionSource, onClick: () -> Unit): Modifier =
-    clickable(interactionSource = interaction, indication = null) {
-        playButtonClickSound()
-        onClick()
-    }
-
-private class RiseAnchor(private val gap: Int, private val centered: Boolean) : PopupPositionProvider {
-    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-        val above = anchorBounds.top - gap - popupContentSize.height
-        val y = if (above >= 0) above else anchorBounds.bottom + gap
-        val x = if (centered) anchorBounds.center.x - popupContentSize.width / 2 else anchorBounds.left
-        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        val maxY = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
-        return IntOffset(x.coerceIn(0, maxX), y.coerceIn(0, maxY))
-    }
-}
-
 @Composable
-internal fun rememberRiseAnchor(gap: Dp = 10.dp, centered: Boolean = false): PopupPositionProvider {
-    val px = with(LocalDensity.current) { gap.roundToPx() }
-    return remember(px, centered) { RiseAnchor(px, centered) }
-}
-
-@Composable
-internal fun popupMaxHeight(margin: Dp = 16.dp): Dp {
-    val root = LocalRootSize.current
-    val density = LocalDensity.current
-    if (root.height <= 0f) return Dp.Infinity
-    return (with(density) { root.height.toDp() } - margin * 2).coerceAtLeast(120.dp)
-}
+internal fun rememberRiseAnchor(gap: Dp = 10.dp, centered: Boolean = false): PopupPositionProvider =
+    rememberAnchoredPosition(if (centered) Placement.AboveCenter else Placement.AboveStart, gap)

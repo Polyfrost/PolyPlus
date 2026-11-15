@@ -15,6 +15,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import kotlinx.coroutines.launch
 
 object CosmeticCommands {
@@ -226,7 +227,7 @@ object CosmeticCommands {
         source.sendFeedback(Component.literal(pending).withStyle(ChatFormatting.GRAY))
 
         PolyPlusClient.SCOPE.launch {
-            val result = action()
+            val result = runSuspendCatching { action().getOrThrow() }
             ClientPlatform.runOnMain {
                 result.fold(
                     onSuccess = {

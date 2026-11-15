@@ -4,8 +4,6 @@ package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,32 +21,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.Switch
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.CapeResolver
-import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
-import org.polyfrost.polyplus.client.gui.SocialSwitch
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.SocialTextSecondary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.ppShape
 
 @Composable
 internal fun CapeGroupHeading(title: String, note: String, forceToggle: Boolean) {
+    val theme = OneConfigTheme.current
     Row(
         modifier = Modifier.fillMaxWidth().height(28.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(title, Modifier, theme.textColor, theme.typography.label)
         InfoTip(note)
         Spacer(Modifier.weight(1f))
         if (forceToggle) ForceCapesToggle()
@@ -59,64 +57,60 @@ internal fun CapeGroupHeading(title: String, note: String, forceToggle: Boolean)
 internal fun ForceCapesToggle() {
     var forced by remember { mutableStateOf(PolyPlusCosmeticsConfig.forcePolyPlusCapes) }
     val modName = CapeResolver.localOverrideModName
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     val theme = OneConfigTheme.current
     val toggle = {
         forced = !forced
         PolyPlusCosmeticsConfig.forcePolyPlusCapes = forced
         PolyPlusCosmeticsConfig.save()
     }
-    Row(
-        modifier = Modifier.hoverable(interaction).clickableWithSound(toggle),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val label = if (modName != null) "Show over $modName" else "Show over other mods"
+    val hover = rememberHoverState()
+    TooltipBox(
+        text = if (modName != null) {
+            "$modName sets your cape. Turn this on to show your PolyPlus cape instead, or your Minecraft cape if you have none."
+        } else {
+            "When another mod sets your cape, its cape is shown. Turn this on to show your PolyPlus cape instead, or your Minecraft cape if you have none."
+        },
+        placement = TooltipPlacement.AboveStart,
     ) {
-        Box {
-            SocialText(
-                if (modName != null) "Show over $modName" else "Show over other mods",
-                color = if (hovered) theme.textColor else theme.textColorSecondary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 220.dp),
+        Row(
+            modifier = Modifier
+                .hoverable(hover.interactionSource)
+                .oneConfigClickable(label, toggle, role = A11yRole.Switch, checked = forced, indication = false, interactionSource = hover.interactionSource),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(label, Modifier.widthIn(max = 220.dp), if (hover.hovered) theme.textColor else theme.textColorSecondary, theme.typography.small, 1, TextOverflow.Ellipsis)
+            Switch(
+                forced,
+                { toggle() },
+                Modifier.focusProperties { canFocus = false }.clearAndSetSemantics {},
+                stateLabel = true,
             )
-            if (hovered) {
-                TooltipPopup(
-                    if (modName != null) {
-                        "$modName sets your cape. Turn this on to show your PolyPlus cape instead, or your Minecraft cape if you have none."
-                    } else {
-                        "When another mod sets your cape, its cape is shown. Turn this on to show your PolyPlus cape instead, or your Minecraft cape if you have none."
-                    },
-                    TooltipPlacement.AboveStart,
-                )
-            }
         }
-        SocialText(if (forced) "On" else "Off", color = SocialTextSecondary, fontSize = 12.sp)
-        SocialSwitch(forced, 42.dp, 21.dp, SocialOffStateBackground)
     }
 }
 
 @Composable
 private fun InfoTip(text: String) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     val theme = OneConfigTheme.current
-    Box(Modifier.size(16.dp).hoverable(interaction), contentAlignment = Alignment.Center) {
-        Icon("info", color = if (hovered) theme.textColor else theme.textColorSecondary, modifier = Modifier.size(14.dp))
-        if (hovered) TooltipPopup(text, TooltipPlacement.AboveStart)
+    TooltipBox(text, Modifier.size(16.dp), TooltipPlacement.AboveStart) {
+        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+            Icon(name = "info", contentDescription = null, modifier = Modifier.size(14.dp), tint = theme.textColorSecondary)
+        }
     }
 }
 
 @Composable
 internal fun CapeSectionNote(text: String) {
+    val shape = OneConfigTheme.shape(16.dp)
     Box(
         modifier = Modifier.fillMaxWidth().height(57.dp)
-            .clip(ppShape(16.dp))
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .clip(shape)
+            .border(1.dp, OneConfigTheme.current.borderColor, shape)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        SocialText(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        Text(text, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
     }
 }

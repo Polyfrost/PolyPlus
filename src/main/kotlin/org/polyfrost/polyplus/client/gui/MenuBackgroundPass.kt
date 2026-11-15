@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import net.minecraft.client.Minecraft
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 
 //? if >= 26.1 {
@@ -40,19 +42,19 @@ private val GlowMask = listOf(
     GlowSpot(0.699f, 1.119f, 0.295f, 0.10f),
 )
 
+@OptIn(ExperimentalOneConfigUiApi::class)
 object MenuBackgroundPass {
     private val drawScope = CanvasDrawScope()
-    private val inline = InlineCanvas("menu_background")
 
     //? if >= 26.1 {
     @JvmStatic
-    fun renderInline(ctx: GuiGraphicsExtractor): Boolean = inline.draw(ctx) { render(it) }
+    fun renderInline(ctx: GuiGraphicsExtractor): Boolean = InlinePolyCanvas.draw(ctx) { render(it) }
     //?} elif > 1.8.9 {
     /*@JvmStatic
-    fun renderInline(ctx: GuiGraphics): Boolean = inline.draw(ctx) { render(it) }
+    fun renderInline(ctx: GuiGraphics): Boolean = InlinePolyCanvas.draw(ctx) { render(it) }
     *///?} else {
     /*@JvmStatic
-    fun renderInline(): Boolean = inline.draw { render(it) }
+    fun renderInline(): Boolean = InlinePolyCanvas.draw { render(it) }
     *///?}
 
     private fun render(canvas: Canvas) {

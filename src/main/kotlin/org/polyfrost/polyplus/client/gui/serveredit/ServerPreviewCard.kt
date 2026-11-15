@@ -30,18 +30,17 @@ import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.CardSurface
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
+import org.polyfrost.polyplus.client.gui.CardSurface
+import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyServers
 import org.polyfrost.polyplus.client.gui.lobbyshell.ServerBanner
 import org.polyfrost.polyplus.client.gui.lobbyshell.ServerIcon
-import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
-import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
 import org.polyfrost.polyplus.client.gui.lobbyshell.MotdLines
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 
 private val BannerHeight = 108.dp
 private val IconSize = 56.dp
@@ -68,7 +67,7 @@ internal fun ServerPreviewCard(name: String, addressValid: Boolean, probe: Serve
     val data = probe.data
     val revision = probe.revision
     val status = previewStatus(data, addressValid)
-    val shape = ppShape(16.dp)
+    val shape = OneConfigTheme.shape(16.dp)
     Box(modifier.clip(shape).background(CardSurface).border(1.dp, SocialBorderColor, shape)) {
         Column(Modifier.fillMaxSize()) {
             ServerBanner(data, revision, BannerHeight)
@@ -76,14 +75,14 @@ internal fun ServerPreviewCard(name: String, addressValid: Boolean, probe: Serve
                 Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = IconOverhang + 10.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                SocialText(name, 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 MetaLine(data, status)
                 if (status == PreviewStatus.Online || status == PreviewStatus.Incompatible) MotdLines(data)
             }
         }
         status.tag?.let {
-            val tone = if (status == PreviewStatus.Offline || status == PreviewStatus.Incompatible) TagTone.Danger else TagTone.Dark
-            Tag(it, tone, Modifier.align(Alignment.TopEnd).padding(10.dp))
+            val tone = if (status == PreviewStatus.Offline || status == PreviewStatus.Incompatible) BadgeTone.Danger else BadgeTone.Neutral
+            Badge(it.uppercase(), Modifier.align(Alignment.TopEnd).padding(10.dp), tone, overImage = true, style = BadgeStyle.Hairline)
         }
         Box(Modifier.offset(x = 12.dp, y = BannerHeight - IconSize + IconOverhang)) { ServerIcon(data, revision, IconSize) }
     }
@@ -91,7 +90,7 @@ internal fun ServerPreviewCard(name: String, addressValid: Boolean, probe: Serve
 
 @Composable
 private fun MetaLine(data: ServerData, status: PreviewStatus) {
-    val muted = MutedText
+    val muted = OneConfigTheme.current.mutedText
     val text = when (status) {
         PreviewStatus.Idle -> AnnotatedString("Enter an address to check status")
         PreviewStatus.Checking -> AnnotatedString("Checking status...")

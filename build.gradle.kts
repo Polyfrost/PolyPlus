@@ -363,6 +363,7 @@ dependencies {
 
     optionalProperty("deps.evergreenhud")?.let {
         modCompileOnly("maven.modrinth:evergreenhud:$it") { isTransitive = false }
+        modLocalRuntime("maven.modrinth:evergreenhud:$it") { isTransitive = false }
     }
 
     optionalProperty("deps.iris")?.let {

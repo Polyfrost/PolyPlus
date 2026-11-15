@@ -4,18 +4,20 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
+import org.polyfrost.oneconfig.api.event.v1.events.KeyInputEvent
+import org.polyfrost.oneconfig.api.event.v1.events.MouseInputEvent
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
+import org.polyfrost.oneconfig.api.event.v1.events.WindowFocusEvent
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeyModifiers
-import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
 import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
+import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.gui.WheelOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.mixin.client.ping.PingPickInvoker
 import kotlin.experimental.or
-import kotlin.math.abs
+import kotlin.math.roundToInt
 
 //? if > 1.8.9 {
 import com.mojang.blaze3d.platform.InputConstants
@@ -32,12 +34,22 @@ object PingInput {
     private var lastTap: LastTap? = null
 
     private const val HOLD_MS = 350L
+    private const val DRAG_DELAY_MS = 150L
     private const val DRAG_OPEN_PX = 7.0
-    private const val CLEAR_RADIUS = 14f
     private const val SEND_PITCH = 1.6f
     private const val RECEIVE_PITCH = 1.25f
     private const val REPLY_PITCH = 0.9f
+    private const val BLOCKED_PITCH = 0.7f
     private const val VOLUME = 0.6f
+    private const val HINT_MS = 1600L
+    private const val HINT_FADE_MS = 300L
+    private const val HINT_OFFSET = 16
+    private const val HINT_PAD_X = 4
+    private const val HINT_PAD_Y = 2
+    private const val HINT_PLATE = 0xB0101014.toInt()
+    private const val HINT_TEXT = 0xFFFFFFFF.toInt()
+    private const val MIN_ALPHA = 0.05f
+    private const val MS_PER_SECOND = 1000L
 
     @Volatile
     private var held = false
@@ -48,14 +60,31 @@ object PingInput {
     private var started = false
     private var seen: Set<String> = emptySet()
 
-    @Volatile
-    private var pickDeferred = false
-    private var vanillaPick = false
+    private var pickPress = false
+    private var swallowPick = false
+
+    private val downKeys = HashSet<Int>()
+    private val downMouse = HashSet<Int>()
+    private var rawActive = false
+    private var rawSeen = false
+
+    private var hint: String? = null
+    private var hintUntil = 0L
 
     fun ensureStarted() {
         if (started) return
         started = true
         eventHandler<TickEvent.End> { tick() }
+        eventHandler { (button, state): MouseInputEvent ->
+            if (state == MouseInputEvent.PRESSED) downMouse.add(button) else downMouse.remove(button)
+            syncRaw()
+        }
+        eventHandler { (key, _, state): KeyInputEvent ->
+            if (key == 0 || state == KeyInputEvent.REPEAT) return@eventHandler
+            if (state == KeyInputEvent.PRESSED) downKeys.add(key) else downKeys.remove(key)
+            syncRaw()
+        }
+        eventHandler { _: WindowFocusEvent.Lost -> resetRaw() }
     }
 
     fun isHeld(): Boolean = held
@@ -63,51 +92,77 @@ object PingInput {
     @JvmStatic
     fun onKeybindState(pressed: Boolean) {
         ensureStarted()
-        if (pressed) {
-            held = true
-            if (!canPing() || WheelOverlay.isOpen) return
-            pending = true
-            pressedAt = System.currentTimeMillis()
-            dragX = 0.0
-            dragY = 0.0
-            return
-        }
+        if (rawSeen) return
+        if (pressed) press() else release()
+    }
+
+    private fun syncRaw() {
+        val bind = PolyPlusConfig.pingKeybind
+        var mods = KeyModifiers.NONE
+        for (key in downKeys) mods = mods or KeyModifiers.of(key)
+        val active = bind.test(downKeys, downMouse, mods)
+        if (active == rawActive) return
+        rawActive = active
+        rawSeen = true
+        if (active) press() else release()
+    }
+
+    private fun resetRaw() {
+        downKeys.clear()
+        downMouse.clear()
+        if (!rawActive) return
+        rawActive = false
         held = false
-        if (!pending) {
-            pickDeferred = false
-            return
-        }
         pending = false
-        val deferred = pickDeferred
-        pickDeferred = false
-        if (!canPing()) return
-        if (deferred && crosshairInReach()) pickBlock() else tap()
+        pickPress = false
+    }
+
+    private fun press() {
+        held = true
+        pending = false
+        pickPress = false
+        swallowPick = false
+        if (!canPing() || WheelOverlay.isOpen || TextInputFocus.isTyping) return
+        pending = true
+        pressedAt = System.currentTimeMillis()
+        dragX = 0.0
+        dragY = 0.0
+        if (!sharesPickInput(PolyPlusConfig.pingKeybind)) return
+        if (hoveredTarget() == null && crosshairInReach() && !usingItem()) pickPress = true else swallowPick = true
+    }
+
+    private fun release() {
+        held = false
+        if (!pending) return
+        pending = false
+        val picked = pickPress
+        pickPress = false
+        if (!picked && canPing()) tap()
     }
 
     fun consumePendingLook(dx: Double, dy: Double): Boolean {
         if (!pending || !held) return false
+        if (System.currentTimeMillis() - pressedAt < DRAG_DELAY_MS) return false
         dragX += dx
         dragY += dy
         if (dragX * dragX + dragY * dragY < DRAG_OPEN_PX * DRAG_OPEN_PX) return true
         val seedX = dragX
         val seedY = dragY
         pending = false
-        pickDeferred = false
+        pickPress = false
         if (canPing() && !WheelOverlay.isOpen && openWheel()) WheelOverlay.consumeLook(seedX, seedY)
         return true
     }
 
     @JvmStatic
     fun takesPickBlock(): Boolean {
-        if (vanillaPick || !canPing()) return false
-        val bind = PolyPlusConfig.pingKeybind
-        if (!bind.isBound || !sharesPickInput(bind)) return false
-        if (!pending && !isBindDown(bind)) return false
-        pickDeferred = true
+        if (!swallowPick) return false
+        swallowPick = false
         return true
     }
 
     private fun sharesPickInput(bind: OneConfigKeybind): Boolean {
+        if (!bind.isBound) return false
         //? if > 1.8.9 {
         val key = InputConstants.getKey(Minecraft.getInstance().options.keyPickItem.saveString())
         if (key.type == InputConstants.Type.MOUSE) return bind.mouseBtns?.contains(key.value) == true
@@ -119,15 +174,6 @@ object PingInput {
         if (key.type == LegacyInputConstants.Type.MOUSE) return bind.mouseBtns?.contains(key.value) == true
         return bind.keyCodes?.contains(key.value) == true
         *///?}
-    }
-
-    private fun isBindDown(bind: OneConfigKeybind): Boolean {
-        val buttons = bind.mouseBtns
-        if (buttons != null && buttons.isNotEmpty()) return buttons.any { KeybindManager.isTriggeredByMouse(bind, it) }
-        val keys = KeybindManager.heldKeys
-        var mods = KeyModifiers.NONE
-        for (key in keys) mods = mods or KeyModifiers.of(key)
-        return bind.test(keys, emptySet(), mods)
     }
 
     fun canPing(): Boolean {
@@ -149,11 +195,20 @@ object PingInput {
 
     internal fun replyFromWheel(ping: Ping, reply: PingReply) {
         val next = if (PartyPings.myReply(ping.id) == reply) PingReply.NONE else reply
-        PartyPings.reply(ping, next)
+        sendReply(ping, next)
     }
 
     internal fun sendFromWheel(kind: PingKind, hit: PingHit?) {
-        send(kind, hit ?: PingTargeting.raycast(1f) ?: return)
+        val target = hit ?: PingTargeting.raycast(1f)
+        if (target == null) blocked("Nothing to ping there") else send(kind, target)
+    }
+
+    private fun usingItem(): Boolean {
+        //? if > 1.8.9 {
+        return Minecraft.getInstance().player?.isUsingItem == true
+        //?} else {
+        /*return false
+        *///?}
     }
 
     private fun crosshairInReach(): Boolean {
@@ -167,19 +222,11 @@ object PingInput {
         *///?}
     }
 
-    private fun pickBlock() {
-        vanillaPick = true
-        try {
-            (Minecraft.getInstance() as PingPickInvoker).`polyplus$pick`()
-        } finally {
-            vanillaPick = false
-        }
-    }
-
     private fun tick() {
+        if (!held) swallowPick = false
         if (pending && held && System.currentTimeMillis() - pressedAt >= HOLD_MS) {
             pending = false
-            pickDeferred = false
+            pickPress = false
             if (canPing() && !WheelOverlay.isOpen) openWheel()
         }
         val pings = PartyPings.pings.value
@@ -194,61 +241,109 @@ object PingInput {
         val now = System.currentTimeMillis()
         val previous = lastTap
         lastTap = null
-        if (previous != null && now - previous.at <= DOUBLE_TAP_MS) {
-            val ping = PartyPings.pings.value.firstOrNull { it.own && it.id == previous.id }
-            if (ping != null && (ping.kind == PingKind.GO || ping.kind == PingKind.LOOK) && (ping.target == null || ping.target.type == PingTargetType.BLOCK)) {
-                PartyPings.clear(ping.id)
-                send(PingKind.DANGER, previous.hit)
-                return
+        if (previous != null && now - previous.at <= DOUBLE_TAP_MS && escalate(previous)) return
+        val hovered = hoveredTarget()
+        if (hovered != null) {
+            if (hovered.own) {
+                PartyPings.clear(hovered.id)
+            } else {
+                sendReply(hovered, if (PartyPings.myReply(hovered.id) == PingReply.COMING) PingReply.NONE else PingReply.COMING)
             }
-        }
-        pingUnderCrosshair(PartyPings.pings.value.filter { it.own })?.let {
-            PartyPings.clear(it.id)
             return
         }
-        replyTarget()?.let {
-            val next = if (PartyPings.myReply(it.id) == PingReply.COMING) PingReply.NONE else PingReply.COMING
-            PartyPings.reply(it, next)
+        val hit = PingTargeting.raycast(1f)
+        if (hit == null) {
+            blocked("Nothing to ping there")
             return
         }
-        val hit = PingTargeting.raycast(1f) ?: return
         val id = send(hit.kind, hit) ?: return
         lastTap = LastTap(id, hit, now)
     }
 
-    private fun replyTarget(): Ping? {
-        if (pingUnderCrosshair(PartyPings.pings.value.filter { it.own }) != null) return null
-        return pingUnderCrosshair(PingMarkers.visiblePings().filter { !it.own && PartyPings.canReply(it) })
+    private fun escalate(previous: LastTap): Boolean {
+        val ping = PartyPings.pings.value.firstOrNull { it.own && it.id == previous.id } ?: return false
+        if (ping.kind != PingKind.GO && ping.kind != PingKind.LOOK) return false
+        if (ping.target != null && ping.target.type != PingTargetType.BLOCK) return false
+        PartyPings.clear(ping.id)
+        send(PingKind.DANGER, previous.hit)
+        return true
     }
 
-    private fun pingUnderCrosshair(candidates: List<Ping>): Ping? {
-        if (candidates.isEmpty()) return null
-        val cx = PingProjection.guiWidth() / 2f
-        val cy = PingProjection.guiHeight() / 2f
-        val radius = CLEAR_RADIUS * PolyPlusPartyConfig.pingMarkerScale / 100f
-        return candidates.firstOrNull { ping ->
-            val point = PingMarkers.screenPosition(ping, 1f) ?: return@firstOrNull false
-            point.onScreen && abs(point.x - cx) <= radius && abs(point.y - cy) <= radius
-        }
+    private fun hoveredTarget(): Ping? = PingMarkers.hoveredPing()?.takeIf { it.own || PartyPings.canReply(it) }
+
+    private fun replyTarget(): Ping? = hoveredTarget()?.takeUnless { it.own }
+
+    private fun sendReply(ping: Ping, reply: PingReply) {
+        if (PartyPings.reply(ping, reply)) return
+        val wait = PartyPings.replyCooldownMs()
+        blocked(if (wait > 0L) cooldownText(wait) else "Could not send your reply")
     }
 
     private fun send(kind: PingKind, hit: PingHit): String? {
         val dimension = PartyPings.currentDimension() ?: return null
         val label = hit.label?.takeIf { hit.target != null }
-        if (!PartyPings.send(kind, dimension, hit.x, hit.y, hit.z, hit.target, label)) return null
+        if (!PartyPings.send(kind, dimension, hit.x, hit.y, hit.z, hit.target, label)) {
+            val wait = PartyPings.sendCooldownMs()
+            blocked(if (wait > 0L) cooldownText(wait) else "Could not ping there")
+            return null
+        }
+        hint = null
         seen = seen + PartyPings.pings.value.map { it.id }
         playSound(SEND_PITCH)
         return PartyPings.pings.value.filter { it.own }.maxByOrNull { it.sentAt }?.id
     }
 
+    private fun cooldownText(wait: Long): String {
+        val seconds = (wait + MS_PER_SECOND - 1) / MS_PER_SECOND
+        return "Too many pings, try again in ${seconds}s"
+    }
+
+    private fun blocked(message: String) {
+        hint = message
+        hintUntil = System.currentTimeMillis() + HINT_MS
+        playSound(BLOCKED_PITCH, blocked = true)
+    }
+
+    @JvmStatic
+    fun renderHint(graphics: PingGraphics?) {
+        val message = hint ?: return
+        val left = hintUntil - System.currentTimeMillis()
+        if (left <= 0L || !canPing()) {
+            hint = null
+            return
+        }
+        val mc = Minecraft.getInstance()
+        //? if >= 26.2 {
+        if (mc.gui.hud.isHidden) return
+        //?} else {
+        /*if (mc.options.hideGui) return
+        *///?}
+        val alpha = (left.toFloat() / HINT_FADE_MS).coerceIn(0f, 1f)
+        if (alpha < MIN_ALPHA) return
+        val canvas = PingCanvas(graphics)
+        val cx = (PingProjection.guiWidth() / 2f).roundToInt()
+        val top = (PingProjection.guiHeight() / 2f).roundToInt() + HINT_OFFSET
+        val half = canvas.width(message) / 2 + HINT_PAD_X
+        val bottom = top + canvas.lineHeight + HINT_PAD_Y * 2
+        canvas.fill(cx - half, top, cx + half, bottom, scaled(HINT_PLATE, alpha))
+        canvas.text(message, cx - canvas.width(message) / 2, top + HINT_PAD_Y + 1, scaled(HINT_TEXT, alpha))
+    }
+
+    private fun scaled(argb: Int, alpha: Float): Int {
+        val base = (argb ushr 24) and 0xFF
+        return ((base * alpha).roundToInt() shl 24) or (argb and 0xFFFFFF)
+    }
+
     private class LastTap(val id: String, val hit: PingHit, val at: Long)
 
-    private fun playSound(pitch: Float) {
+    private fun playSound(pitch: Float, blocked: Boolean = false) {
         if (!PolyPlusPartyConfig.pingsSound) return
         //? if > 1.8.9 {
-        Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), pitch, VOLUME))
+        val sound = if (blocked) SoundEvents.NOTE_BLOCK_BASS.value() else SoundEvents.NOTE_BLOCK_BELL.value()
+        Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(sound, pitch, VOLUME))
         //?} else {
-        /*Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(Identifier("note.pling"), pitch, VOLUME))
+        /*val sound = Identifier(if (blocked) "note.bass" else "note.pling")
+        Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(sound, pitch, VOLUME))
         *///?}
     }
 }

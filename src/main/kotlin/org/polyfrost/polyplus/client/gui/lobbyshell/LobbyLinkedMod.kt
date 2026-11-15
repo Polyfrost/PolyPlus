@@ -2,11 +2,14 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.DropdownMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -32,11 +35,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.compose.backend.asComposeImageBitmap
@@ -44,20 +43,17 @@ import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.compat.LinkedModMenus
 import org.polyfrost.polyplus.compat.LinkedModMenus.Entry
 import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private const val NOTICE_POLL_MILLIS = 250L
 private const val MENU_WIDTH = 250
 private const val FALLBACK_ICON = "link-external-01"
 private val LOGO_SIZE = 18.dp
-private val POPUP_GAP = 10.dp
 
 internal val Entry.label: String
     get() = when (this) {
@@ -97,46 +93,31 @@ internal fun LinkedModButton(modifier: Modifier) {
     val entries = LinkedModMenus.entries
     if (entries.isEmpty()) return
     var open by remember { mutableStateOf(false) }
-    val lift = with(LocalDensity.current) { -(LobbyLayout.BarHeight + POPUP_GAP).roundToPx() }
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     Box(
         modifier
             .height(LobbyLayout.BarHeight)
             .panel()
-            .border(1.dp, if (hovered) SocialHoverBorder else Color.Transparent, ppShape(20.dp))
-            .hoverable(interaction)
-            .clickableWithSound(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, shape = ppShape(20.dp)) { open = !open }
+            .border(1.dp, if (hover.hovered) SocialHoverBorder else Color.Transparent, OneConfigTheme.shape(20.dp))
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, { open = !open }, shape = OneConfigTheme.shape(20.dp))
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LinkedModLogo()
-            Label(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, 14.sp)
+            Text(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        if (open) {
-            EscapeCloses { open = false }
-            Popup(
-                alignment = Alignment.BottomStart,
-                offset = IntOffset(0, lift),
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                LobbyUserTheme { LinkedModMenu(entries) { open = false } }
-            }
-        }
+        if (open) LobbyUserTheme { LinkedModMenu(entries) { open = false } }
     }
 }
 
 @Composable
 private fun LinkedModMenu(entries: List<Entry>, onClose: () -> Unit) {
-    MenuSurface(Modifier.width(MENU_WIDTH.dp)) {
-        entries.forEach { entry ->
-            MenuItem(entry.label, themedIcon(entry.icon), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
-                onClose()
-                LinkedModMenus.open(entry)
-            }
-        }
+    val items = entries.map { entry ->
+        MenuAction(entry.label, { LinkedModMenus.open(entry) }, icon = entry.icon, size = MenuItemSize.Regular)
     }
+    DropdownMenu(true, onClose, items, Modifier.width(MENU_WIDTH.dp), Placement.AboveStart, gap = 10.dp, flip = false)
 }
 
 @Composable

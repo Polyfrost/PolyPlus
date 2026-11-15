@@ -3,13 +3,10 @@
 package org.polyfrost.polyplus.client.gui.gamesocial
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,38 +21,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.api.ui.v1.theme.concentric
 import org.polyfrost.polyplus.client.gui.CompactStatusPicker
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
-import org.polyfrost.polyplus.client.gui.themedIcon
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
+import org.polyfrost.polyplus.client.gui.liquidGlassTheme
 import org.polyfrost.polyplus.client.gui.SocialGroupAvatar
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.lobbysocial.FriendFilter
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxItem
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxLine
@@ -67,7 +55,6 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.RosterRow
 import org.polyfrost.polyplus.client.gui.lobbysocial.RosterSections
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
 import org.polyfrost.polyplus.client.gui.lobbysocial.ChatAsPicker
-import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialDialog
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
@@ -86,23 +73,30 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.partyCells
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberSocialListState
 import org.polyfrost.polyplus.client.gui.lobbysocial.requestItems
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
-import org.polyfrost.polyplus.client.gui.lobbysocial.socialRow
-import org.polyfrost.polyplus.client.gui.lobbysocial.socialRowInk
-import org.polyfrost.polyplus.client.gui.lobbysocial.socialRowMuted
+import org.polyfrost.polyplus.client.gui.lobbysocial.socialRowFilled
+import org.polyfrost.polyplus.client.gui.lobbysocial.socialSelectableRow
 import org.polyfrost.polyplus.client.gui.lobbysocial.visibleFriends
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.ChatIdentity
 import org.polyfrost.polyplus.client.social.PlayerStatusRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ItemSelectionStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.liquidGlass
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 
 private val Inset = 8.dp
 private val ChipHeight = 34.dp
 private val ChipFace = 24.dp
-private val TabHeight = 34.dp
-private val TrackInset = 2.dp
 
 private enum class LeftTab(val label: String, val filter: ThreadFilter?) {
     Chats("Chats", ThreadFilter.All),
@@ -128,26 +122,17 @@ internal fun LeftPane(
         val inset = Modifier.padding(horizontal = Inset)
         SelfHeader(state, snapshot, reconnecting, onClose, inset, invites)
         TextField(
-            list.query,
-            {
+            value = list.query,
+            onValueChange = {
                 list.query = it
                 state.query = it
             },
-            inset.fillMaxWidth().height(38.dp),
-            "Search friends and chats",
-            themedIcon(LobbyIcons.SEARCH),
-            64,
-            false,
-            true,
-            true,
-            true,
-            14.sp,
-            null,
-            false,
-            null,
-            null,
-            { SearchAction(list, snapshot, tab) },
-            null,
+            modifier = inset.fillMaxWidth().height(38.dp),
+            placeholder = "Search friends and chats",
+            leadingIcon = LobbyIcons.SEARCH,
+            maxLength = 64,
+            fontSize = 14.sp,
+            trailing = { SearchAction(list, snapshot, tab) },
         )
         Row(inset.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Inset)) {
             PartyChip(window, snapshot, Modifier.weight(1f))
@@ -186,16 +171,23 @@ internal fun SelfHeader(
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Inset)) {
         PersonHead(self, 40.dp)
         Column(Modifier.weight(1f).padding(start = 2.dp)) {
-            Label(name, 16.sp, weight = FontWeight.Medium)
+            Text(name, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             if (reconnecting) {
-                Label("Reconnecting", 12.sp, color = MutedText)
+                Text("Reconnecting", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             } else {
                 CompactStatusPicker()
             }
             if (snapshot.delegations.isNotEmpty()) ChatAsPicker(state, snapshot)
         }
         InvitesBell(invites)
-        IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier, onClose)
+        IconButton(
+            icon = LobbyIcons.CLOSE,
+            contentDescription = "Close",
+            onClick = onClose,
+            modifier = Modifier.size(34.dp),
+            tint = OneConfigTheme.current.textColor,
+            tooltipPlacement = TooltipPlacement.BelowStart,
+        )
     }
 }
 
@@ -223,23 +215,26 @@ private fun PinnedChip(
     onClick: (() -> Unit)? = null,
     face: @Composable () -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
+    val theme = OneConfigTheme.current
     Row(
         modifier
             .height(ChipHeight)
+            .then(if (liquidGlassTheme) Modifier.liquidGlass(SocialFieldShape, frosted = false) else Modifier)
             .clip(SocialFieldShape)
             .background(SocialControlBackground)
-            .socialRow(selected, hovered && onClick != null)
-            .hoverable(interaction)
-            .then(if (onClick != null) Modifier.clickableWithSound(onClick) else Modifier)
+            .then(if (onClick != null) Modifier.socialSelectableRow(selected, onClick, listOfNotNull(title, detail).joinToString(", "), shape = SocialFieldShape) else Modifier)
             .padding(start = Inset, end = Inset),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         face()
-        Label(title, 14.sp, color = socialRowInk(selected), weight = FontWeight.Medium)
-        detail?.let { Label(it, 12.sp, Modifier.weight(1f), color = socialRowMuted(selected)) }
-        if (unread) Box(Modifier.size(Inset).clip(OneConfigTheme.current.circleShape).background(OneConfigTheme.accent))
+        val filled = socialRowFilled(selected)
+        Text(title, color = SelectionDefaults.itemContentColor(filled, ItemSelectionStyle.Accent), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        detail?.let { Text(it, modifier = Modifier.weight(1f), color = SelectionDefaults.itemSecondaryColor(filled, ItemSelectionStyle.Accent, theme.mutedText), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+        if (unread) {
+            val dot = Modifier.size(Inset).clip(theme.circleShape)
+            Box(if (filled) dot.background(SelectionDefaults.itemContentColor(true, ItemSelectionStyle.Accent)) else dot.background(OneConfigTheme.accent))
+        }
     }
 }
 
@@ -255,7 +250,6 @@ private fun PartyChip(window: SocialWindowState, snapshot: SocialSnapshot, modif
     val party = current
     var picking by remember { mutableStateOf(false) }
     val thread = snapshot.threads.firstOrNull { it.party && it.id == party?.chatGroupId }
-    val drop = with(LocalDensity.current) { (ChipHeight + 2.dp).roundToPx() }
     Box(modifier) {
         PinnedChip(
             title = if (party == null) "Start a party" else "Party",
@@ -266,7 +260,7 @@ private fun PartyChip(window: SocialWindowState, snapshot: SocialSnapshot, modif
             onClick = { if (party == null) picking = !picking else window.showParty() },
             face = {
                 if (party == null) {
-                    ThemedIcon(SOCIAL_ASSETS + "users-01.svg", MutedText, 16.dp)
+                    ThemedIcon(SOCIAL_ASSETS + "users-01.svg", OneConfigTheme.current.mutedText, 16.dp)
                 } else {
                     SocialGroupAvatar(party.members.map { it.player }, ChipFace, ringColor = Color.Transparent, grid = true)
                 }
@@ -275,8 +269,7 @@ private fun PartyChip(window: SocialWindowState, snapshot: SocialSnapshot, modif
         if (picking) {
             EscapeCloses { picking = false }
             Popup(
-                alignment = Alignment.TopStart,
-                offset = IntOffset(0, drop),
+                popupPositionProvider = rememberAnchoredPosition(Placement.BelowStart, 2.dp),
                 onDismissRequest = { picking = false },
                 properties = PopupProperties(focusable = true),
             ) { InvitePicker(party) }
@@ -298,78 +291,35 @@ private fun WorldChip(window: SocialWindowState, snapshot: SocialSnapshot, modif
         modifier = modifier,
         selected = window.view == WindowView.World,
         onClick = { window.showWorld() },
-        face = { ThemedIcon(SOCIAL_ASSETS + "globe-01.svg", MutedText, 16.dp) },
+        face = { ThemedIcon(SOCIAL_ASSETS + "globe-01.svg", OneConfigTheme.current.mutedText, 16.dp) },
     )
 }
 
 @Composable
 private fun Tabs(list: SocialListState, snapshot: SocialSnapshot, tab: LeftTab, modifier: Modifier, onSelect: (LeftTab) -> Unit) {
-    SegmentTrack(modifier.fillMaxWidth()) {
-        LeftTab.entries.filter { it != LeftTab.Special || snapshot.specialTarget }.forEach { entry ->
-            val count = when (entry) {
-                LeftTab.Chats -> list.unread(snapshot)
-                LeftTab.Friends -> snapshot.requests.count { it.incoming }
-                LeftTab.Groups -> 0
-                LeftTab.Special -> snapshot.threads.count { it.special && it.unread }
-            }
-            val selected = entry == tab
-            SegmentButton(entry.label, selected, Modifier.weight(1f).height(TabHeight), onClick = { onSelect(entry) }) {
-                when {
-                    count == 0 -> Unit
-                    selected -> Label(count.toString(), 10.sp, color = OneConfigTheme.current.accentTextColor)
-                    else -> CountPill(count)
-                }
-            }
+    val tabs = LeftTab.entries.filter { it != LeftTab.Special || snapshot.specialTarget }.map { entry ->
+        val count = when (entry) {
+            LeftTab.Chats -> list.unread(snapshot)
+            LeftTab.Friends -> snapshot.requests.count { it.incoming }
+            LeftTab.Groups -> 0
+            LeftTab.Special -> snapshot.threads.count { it.special && it.unread }
         }
+        TabItem(entry, entry.label, badge = count.takeIf { it > 0 }?.toString())
     }
-}
-
-@Composable
-internal fun SegmentTrack(modifier: Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(SocialFieldShape)
-            .background(SocialControlBackground)
-            .padding(TrackInset),
-        horizontalArrangement = Arrangement.spacedBy(TrackInset),
-        content = content,
-    )
-}
-
-@Composable
-internal fun SegmentButton(
-    label: String,
-    selected: Boolean,
-    modifier: Modifier,
-    fontSize: TextUnit = 14.sp,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-    trailing: @Composable () -> Unit = {},
-) {
-    val (interaction, hovered) = rememberSocialHover()
-    val active = enabled && hovered
-    val ink = when {
-        selected -> OneConfigTheme.current.accentTextColor
-        active -> SocialTextPrimary
-        else -> MutedText
-    }
-    Row(
-        modifier
-            .rowFrame(selected, active, SocialFieldShape.concentric(TrackInset))
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-    ) {
-        Label(label, fontSize, color = ink, weight = FontWeight.Medium)
-        trailing()
-    }
+    TabRow(tabs, tab, onSelect, modifier.fillMaxWidth(), style = TabStyle.Segmented, size = ControlSize.Large, slide = true)
 }
 
 @Composable
 private fun AddFriendButton(state: SocialPageState, modifier: Modifier = Modifier) {
-    TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), modifier.height(38.dp), ButtonStyle.Primary, true) { state.dialog = SocialDialog.AddFriend }
+    TextButton(
+        text = "Add friend",
+        icon = SOCIAL_ASSETS + "user-plus-01.svg",
+        onClick = { state.dialog = SocialDialog.AddFriend },
+        modifier = modifier,
+        style = ControlStyle.Primary,
+        enabled = true,
+        size = ControlSize.Large,
+    )
 }
 
 @Composable
@@ -382,9 +332,9 @@ private fun SearchResults(state: SocialPageState, list: SocialListState, snapsho
     }
     val activeId = SocialChatLink.active?.id
     ScrollFade(modifier, 2.dp) {
-        if (threads.isNotEmpty()) SectionHeading("Chats", Modifier.padding(start = Inset, top = 6.dp))
+        if (threads.isNotEmpty()) SectionHeader("Chats", Modifier.padding(start = Inset, top = 6.dp))
         threads.forEach { thread -> ThreadRow(thread, activeId == thread.id, { threadMenuItems(state, snapshot, thread) }) { state.source.open(thread) } }
-        if (friends.isNotEmpty()) SectionHeading("Friends", Modifier.padding(start = Inset, top = 6.dp))
+        if (friends.isNotEmpty()) SectionHeader("Friends", Modifier.padding(start = Inset, top = 6.dp))
         friends.forEach { RosterRow(state, it) }
     }
 }
@@ -392,7 +342,15 @@ private fun SearchResults(state: SocialPageState, list: SocialListState, snapsho
 @Composable
 private fun GroupsBody(state: SocialPageState, list: SocialListState, snapshot: SocialSnapshot, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Inset)) {
-        TextButton("New group", themedIcon(LobbyIcons.PLUS), Modifier.padding(horizontal = Inset).fillMaxWidth().height(38.dp), ButtonStyle.Secondary, true) { state.dialog = SocialDialog.NewGroup }
+        TextButton(
+            text = "New group",
+            icon = LobbyIcons.PLUS,
+            onClick = { state.dialog = SocialDialog.NewGroup },
+            modifier = Modifier.padding(horizontal = Inset).fillMaxWidth(),
+            style = ControlStyle.Secondary,
+            enabled = true,
+            size = ControlSize.Large,
+        )
         ThreadList(state, list, snapshot, Modifier.fillMaxWidth().weight(1f))
     }
 }
@@ -407,10 +365,10 @@ private fun FriendsBody(window: SocialWindowState, state: SocialPageState, snaps
     ScrollFade(modifier, 0.dp, paging = state.paging(snapshot, true, SocialList.Incoming, SocialList.Outgoing, SocialList.Friends)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = Inset), horizontalArrangement = Arrangement.spacedBy(Inset)) {
             AddFriendButton(state, Modifier.weight(1f))
-            if (snapshot.blocked.isNotEmpty()) TextButton("Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}", Modifier.height(38.dp), window::showBlocked)
+            if (snapshot.blocked.isNotEmpty()) TextButton(text = "Blocked ${snapshot.countLabel(snapshot.blocked.size, SocialList.Blocked)}", onClick = window::showBlocked, modifier = Modifier, size = ControlSize.Large)
         }
         if (requests.isNotEmpty()) {
-            SectionHeading("Requests ${snapshot.countLabel(requests.size, SocialList.Incoming, SocialList.Outgoing)}", Modifier.padding(start = Inset, top = 12.dp, bottom = 6.dp))
+            SectionHeader("Requests ${snapshot.countLabel(requests.size, SocialList.Incoming, SocialList.Outgoing)}", Modifier.padding(start = Inset, top = 12.dp, bottom = 6.dp))
             requests.forEach { Box(Modifier.padding(horizontal = Inset)) { InboxLine(it) } }
         }
         RosterSections(state, visibleFriends(state, snapshot, FriendFilter.All))

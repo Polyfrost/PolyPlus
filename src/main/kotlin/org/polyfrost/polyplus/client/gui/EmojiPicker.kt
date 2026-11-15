@@ -2,9 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,50 +32,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
-import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRecents
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
-import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
+import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 
 private const val PICKER_COLUMNS = 8
+private const val SEARCH_MAX_LENGTH = 32
 private val PickerWidth = 296.dp
 private val PickerGridHeight = 232.dp
 
 @Composable
-internal fun EmojiPickerButton(onPick: (String) -> Unit) {
+internal fun EmojiPickerButton(enabled: Boolean = true, onPick: (String) -> Unit) {
     if (!EmojiRegistry.enabled() || EmojiAtlas.bitmap == null) return
 
     var open by remember { mutableStateOf(false) }
-    val (interaction, hovered) = rememberSocialHover()
-    val background by animateColorAsState(
-        when {
-            open -> OneConfigTheme.accent.asSocialSelected
-            hovered -> SocialHoverOverlay
-            else -> Color.Transparent
-        },
-    )
+    val background by Motion.animateColorAsState(if (open) OneConfigTheme.accent.asSocialSelected else Color.Transparent)
     val buttonGlyph = remember { EmojiRegistry.resolve("smile") }
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
 
     Box {
         Box(
             modifier = Modifier
                 .size(34.dp)
+                .graphicsLayer { alpha = if (enabled) 1f else disabledAlpha }
                 .clip(SocialFieldShape)
                 .background(background)
-                .hoverable(interaction)
-                .clickableWithSound { open = !open },
+                .oneConfigClickable("Emoji picker", { open = !open }, enabled = enabled, shape = SocialFieldShape, recipe = ControlDefaults.Media),
             contentAlignment = Alignment.Center,
         ) {
             if (buttonGlyph != null) {
@@ -88,29 +86,13 @@ internal fun EmojiPickerButton(onPick: (String) -> Unit) {
         if (open) {
             EscapeCloses { open = false }
             Popup(
-                popupPositionProvider = remember { EmojiPickerPositionProvider },
+                popupPositionProvider = rememberAnchoredPosition(Placement.AboveEnd),
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
                 EmojiPickerPanel(onPick = onPick)
             }
         }
-    }
-}
-
-private object EmojiPickerPositionProvider : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset {
-        val gap = 6
-        val above = anchorBounds.top - gap - popupContentSize.height
-        val y = if (above >= 0) above else (anchorBounds.bottom + gap).coerceAtMost((windowSize.height - popupContentSize.height).coerceAtLeast(0))
-        val x = (anchorBounds.right - popupContentSize.width)
-            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-        return IntOffset(x, y)
     }
 }
 
@@ -133,54 +115,43 @@ private fun EmojiPickerPanel(onPick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .width(PickerWidth)
-            .sceneFrost(16.dp)
-            .clip(SocialPanelShape)
-            .background(SocialPopupBackground)
-            .border(SocialBorderWidth, SocialBorderColor, SocialPanelShape)
+            .popup(SocialPanelShape)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        TextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().height(38.dp),
+        SearchField(
+            query = query,
+            onQueryChange = { query = it.take(SEARCH_MAX_LENGTH) },
+            modifier = Modifier.fillMaxWidth(),
             placeholder = "Search emoji",
-            leadingIcon = themedIcon(SOCIAL_ASSETS + "search.svg"),
-            maxLength = 32,
-            invalid = false,
-            enabled = true,
-            singleLine = true,
-            framed = true,
-            fontSize = 14.sp,
-            label = null,
-            masked = false,
-            focusRequester = null,
-            interactionSource = null,
-            trailing = null,
-            onSubmit = null,
+            clearable = false,
         )
 
         if (results.isEmpty() && recents.isEmpty()) {
             Box(Modifier.fillMaxWidth().height(PickerGridHeight), contentAlignment = Alignment.Center) {
-                SocialText("No emoji match \"$query\"", fontSize = 12.sp, color = SocialTextSecondary)
+                Text("No emoji match \"$query\"", color = SocialTextSecondary, style = OneConfigTheme.current.typography.small)
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(PICKER_COLUMNS),
-                modifier = Modifier.fillMaxWidth().height(PickerGridHeight),
-                contentPadding = PaddingValues(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                if (query.isBlank() && recents.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) { EmojiSectionLabel("Recently used") }
-                    items(recents, key = { "recent-${it.glyph}" }) { entry ->
+            val grid = rememberLazyGridState()
+            ScrollContainer(grid, Modifier.fillMaxWidth().height(PickerGridHeight), scrollbar = false) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(PICKER_COLUMNS),
+                    state = grid,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (query.isBlank() && recents.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Recently used") }
+                        items(recents, key = { "recent-${it.glyph}" }) { entry ->
+                            EmojiCell(entry, onHover = { hovered = it }, onClick = { pick(entry) })
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("All emoji") }
+                    }
+                    items(results, key = { it.glyph }) { entry ->
                         EmojiCell(entry, onHover = { hovered = it }, onClick = { pick(entry) })
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) { EmojiSectionLabel("All emoji") }
-                }
-                items(results, key = { it.glyph }) { entry ->
-                    EmojiCell(entry, onHover = { hovered = it }, onClick = { pick(entry) })
                 }
             }
         }
@@ -193,18 +164,11 @@ private fun EmojiPickerPanel(onPick: (String) -> Unit) {
             val preview = hovered
             if (preview != null) {
                 EmojiGlyph(preview.glyph, Modifier.size(16.dp))
-                SocialText(":${preview.alias}:", fontSize = 12.sp, color = SocialTextSecondary, maxLines = 1)
+                Text(":${preview.alias}:", color = SocialTextSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
             } else {
-                SocialText("Pick an emoji", fontSize = 12.sp, color = SocialTextSecondary, maxLines = 1)
+                Text("Pick an emoji", color = SocialTextSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
             }
         }
-    }
-}
-
-@Composable
-private fun EmojiSectionLabel(label: String) {
-    Box(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp)) {
-        SocialText(label, fontSize = 11.sp, color = SocialTextSecondary, maxLines = 1)
     }
 }
 
@@ -214,15 +178,14 @@ private fun EmojiCell(
     onHover: (EmojiRegistry.EmojiEntry?) -> Unit,
     onClick: () -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    LaunchedEffect(hovered) { if (hovered) onHover(entry) }
+    val hover = rememberHoverState()
+    LaunchedEffect(hover.hovered) { if (hover.hovered) onHover(entry) }
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .clip(SocialFieldShape)
-            .background(if (hovered) SocialHoverOverlay else Color.Transparent)
-            .hoverable(interaction)
-            .clickableWithSound(onClick),
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(":${entry.alias}:", onClick, shape = SocialFieldShape, recipe = ControlDefaults.Media),
         contentAlignment = Alignment.Center,
     ) {
         EmojiGlyph(entry.glyph, Modifier.fillMaxSize().padding(4.dp))

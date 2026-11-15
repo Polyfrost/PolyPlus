@@ -20,20 +20,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentWidth
-import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageScrim
 import org.polyfrost.polyplus.client.gui.lobbyshell.centerColumn
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
+import org.polyfrost.oneconfig.api.ui.v1.components.LoadState
+import org.polyfrost.oneconfig.api.ui.v1.components.ToastDefaults
 
 internal enum class SocialAvailability { Ready, Connecting, SignedOut, Declined }
 
@@ -79,16 +80,14 @@ internal fun SocialPage(onBack: () -> Unit) {
     val state = rememberSocialPageState()
     val availability = rememberAvailability()
     Box(Modifier.fillMaxSize()) {
-        ContextMenuHost {
-            PageScrim()
-            if (availability == SocialAvailability.Ready) {
-                SocialDirectory(state, state.source.snapshot(), onBack)
-            } else {
-                BlockedMessage(availability, state.source, onBack, centerColumn())
-            }
-            SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = LobbyLayout.Top, end = LobbyLayout.Margin))
-            SocialDialogHost(state)
+        PageScrim()
+        if (availability == SocialAvailability.Ready) {
+            SocialDirectory(state, state.source.snapshot(), onBack)
+        } else {
+            BlockedMessage(availability, state.source, onBack, centerColumn())
         }
+        SocialToastHost(Modifier.padding(top = LobbyLayout.Top - ToastDefaults.margin, end = LobbyLayout.Margin - ToastDefaults.margin), alignment = Alignment.TopEnd)
+        SocialDialogHost(state)
     }
 }
 
@@ -100,17 +99,25 @@ internal fun BlockedMessage(availability: SocialAvailability, source: SocialSour
             SocialAvailability.SignedOut -> EmptyState(
                 "Not signed in",
                 Modifier.width(ConsentWidth).socialSurface(),
-                "Friends, messages and hosted worlds need a signed-in Minecraft account and a connection to OneClient.",
+                text = "Friends, messages and hosted worlds need a signed-in Minecraft account and a connection to OneClient.",
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton("Back", Modifier.height(38.dp), onBack)
-                    TextButton("Try again", themedIcon(LobbyIcons.REFRESH), Modifier.height(38.dp), ButtonStyle.Primary, true) {
-                        PolyConnection.reconnect()
-                        source.refresh()
-                    }
+                    TextButton(text = "Back", onClick = onBack, modifier = Modifier, size = ControlSize.Large)
+                    TextButton(
+                        text = "Try again",
+                        icon = LobbyIcons.REFRESH,
+                        onClick = {
+                            PolyConnection.reconnect()
+                            source.refresh()
+                        },
+                        modifier = Modifier,
+                        style = ControlStyle.Primary,
+                        enabled = true,
+                        size = ControlSize.Large,
+                    )
                 }
             }
-            else -> EmptyState("Connecting", Modifier.width(ConsentWidth).socialSurface())
+            else -> EmptyState("Connecting", Modifier.width(ConsentWidth).socialSurface(), state = LoadState.Loading)
         }
     }
 }

@@ -2,12 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.wardrobe
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,29 +14,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
-import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
-import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.CardSelectionStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlIndication
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.emotes.EmoteWheels
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private val WHEEL_GRID_ORDER: List<Pair<Int, Int>> = listOf(
     0 to 1, 0 to 2, 1 to 2, 2 to 2, 2 to 1, 2 to 0, 1 to 0, 0 to 0,
@@ -61,38 +55,55 @@ internal fun EmoteWheelEditor(
     val slots = EmoteWheels.slots(wheelIndex)
 
     Column(
-        modifier = modifier.then(if (framed) Modifier.wardrobePanel().padding(16.dp) else Modifier),
+        modifier = modifier.then(if (framed) Modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp)).padding(16.dp) else Modifier),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WheelIconButton("left-arrow", enabled = wheelCount > 1, onClick = {
-                EmoteWheels.cycle(-1)
-                onSelectSlot(null)
-            })
-            SocialText(
-                "Wheel ${wheelIndex + 1} of $wheelCount",
-                color = theme.textColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f),
+            IconButton(
+                "left-arrow",
+                "Previous wheel",
+                {
+                    EmoteWheels.cycle(-1)
+                    onSelectSlot(null)
+                },
+                enabled = wheelCount > 1,
+                style = IconButtonStyle.Framed,
+                size = ControlSize.Compact,
+                tooltip = null,
+                sound = null,
             )
-            WheelIconButton("right-arrow", enabled = wheelCount > 1, onClick = {
-                EmoteWheels.cycle(1)
-                onSelectSlot(null)
-            })
+            Text(
+                "Wheel ${wheelIndex + 1} of $wheelCount",
+                modifier = Modifier.weight(1f),
+                color = theme.textColor,
+                style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium),
+                textAlign = TextAlign.Center,
+            )
+            IconButton(
+                "right-arrow",
+                "Next wheel",
+                {
+                    EmoteWheels.cycle(1)
+                    onSelectSlot(null)
+                },
+                enabled = wheelCount > 1,
+                style = IconButtonStyle.Framed,
+                size = ControlSize.Compact,
+                tooltip = null,
+                sound = null,
+            )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (wheelCount < EmoteWheels.MAX_WHEELS) {
-                SmallButton("New wheel", iconPath = "plus", primary = false, onClick = {
+                TextButton("New wheel", "plus", {
                     if (EmoteWheels.addWheel()) onSelectSlot(null)
-                })
+                }, sound = null)
             }
             if (wheelCount > 1) {
-                SmallButton("Remove", iconPath = "trash", primary = false, onClick = {
+                TextButton("Remove", "trash", {
                     EmoteWheels.removeWheel(wheelIndex)
                     onSelectSlot(null)
-                })
+                }, sound = null)
             }
         }
 
@@ -107,6 +118,7 @@ internal fun EmoteWheelEditor(
                                 Spacer(Modifier.size(cell))
                             } else {
                                 WheelSlotCell(
+                                    slotNumber = slot + 1,
                                     emoteId = slots.getOrNull(slot),
                                     selected = selectedSlot == slot,
                                     coverForEmote = coverForEmote,
@@ -121,20 +133,21 @@ internal fun EmoteWheelEditor(
             }
         }
 
-        SocialText(
+        Text(
             if (selectedSlot == null) {
                 "Click an emote to add it to the wheel, or pick a slot first to choose where it goes."
             } else {
                 "Click an emote to put it in the selected slot."
             },
             color = theme.textColorSecondary,
-            fontSize = 12.sp,
+            style = OneConfigTheme.current.typography.small,
         )
     }
 }
 
 @Composable
 private fun WheelSlotCell(
+    slotNumber: Int,
     emoteId: Int?,
     selected: Boolean,
     coverForEmote: (Int) -> Int?,
@@ -143,24 +156,24 @@ private fun WheelSlotCell(
     onClear: () -> Unit,
 ) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
+    val hover = rememberHoverState()
+    val hovered = hover.hovered
     val name = emoteId?.let { CosmeticCatalog.getEmoteDefinition(it)?.name }
+    val shape = OneConfigTheme.shape(8.dp)
     Box(
         modifier = modifier
-            .clip(ppShape(8.dp))
-            .background(theme.chipBackground)
-            .border(
-                1.dp,
-                when {
-                    selected -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> theme.borderColor
-                },
-                ppShape(8.dp),
-            )
-            .hoverable(interaction)
-            .clickable(onClick = onClick),
+            .themedSurface(SurfaceKind.Field, shape, glass = false)
+            .hoverable(hover.interactionSource)
+            .selectableCard(
+                selected,
+                onClick,
+                "Wheel slot $slotNumber, ${name ?: "empty"}",
+                shape,
+                style = SlotOutline,
+                sound = null,
+                recipe = SlotHover,
+                interactionSource = hover.interactionSource,
+            ),
     ) {
         if (emoteId != null) {
             CosmeticThumbnail(
@@ -180,44 +193,28 @@ private fun WheelSlotCell(
                 )
             }
             if (hovered) {
-                Box(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp)
-                        .clip(ppShape(6.dp))
-                        .background(theme.popupBackground)
-                        .a11y("Clear slot", A11yRole.Button)
-                        .clickable(onClick = onClear),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon("close", color = theme.textColor, modifier = Modifier.size(12.dp))
-                }
+                IconButton(
+                    "close",
+                    "Clear slot",
+                    onClear,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp),
+                    style = IconButtonStyle.Framed,
+                    size = ControlSize.Compact,
+                    tooltip = null,
+                    sound = null,
+                )
             }
         } else {
-            SocialText(
+            Text(
                 "Empty",
-                color = theme.textColorSecondary,
-                fontSize = 10.sp,
                 modifier = Modifier.align(Alignment.Center),
+                color = theme.textColorSecondary,
+                style = OneConfigTheme.current.typography.body.copy(fontSize = 10.sp),
             )
         }
     }
 }
 
-@Composable
-internal fun WheelIconButton(iconPath: String, enabled: Boolean, tooltip: String? = null, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Box(
-        modifier = Modifier.size(28.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(ppShape(8.dp))
-            .background(theme.chipBackground)
-            .border(1.dp, theme.borderColor, ppShape(8.dp))
-            .hoverable(interaction)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(iconPath, color = theme.textColor, modifier = Modifier.size(14.dp))
-        if (tooltip != null && hovered) TooltipPopup(tooltip, TooltipPlacement.AboveStart)
-    }
-}
+private val SlotOutline = CardSelectionStyle(ringWidth = 1.dp, fillAlpha = 0f)
+
+private val SlotHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)

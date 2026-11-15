@@ -3,20 +3,28 @@
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
 import org.polyfrost.polyplus.client.gui.lobbyshell.lobbyHover
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowInk
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowMuted
 
 internal enum class SocialSurface { Glass, None }
 
@@ -76,18 +84,28 @@ internal fun Modifier.socialSurface(): Modifier =
 internal fun socialRowFilled(selected: Boolean): Boolean =
     selected && LocalSocialLook.current.selection == SocialSelection.Fill
 
-@Composable
-internal fun Modifier.socialRow(selected: Boolean, hovered: Boolean): Modifier {
+internal fun Modifier.socialSelectableRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    shape: Shape? = null,
+    interactionSource: MutableInteractionSource? = null,
+): Modifier = composed {
+    val outline = shape ?: SocialFieldShape
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
     val filled = socialRowFilled(selected)
-    val framed = rowFrame(filled, hovered && selected == filled)
-    return if (selected && !filled) framed.border(1.dp, OneConfigTheme.accent, SocialFieldShape) else framed
+    val edge = when {
+        selected && !filled -> OneConfigTheme.accent
+        hovered && !selected -> OneConfigTheme.current.borderColor
+        else -> Color.Transparent
+    }
+    clip(outline)
+        .background(if (filled) OneConfigTheme.accent else Color.Transparent)
+        .border(1.dp, edge, outline)
+        .hoverable(source)
+        .oneConfigClickable(label, onClick, A11yRole.Option, selected = selected, shape = outline, indication = false, interactionSource = source)
 }
-
-@Composable
-internal fun socialRowInk(selected: Boolean): Color = rowInk(socialRowFilled(selected))
-
-@Composable
-internal fun socialRowMuted(selected: Boolean): Color = rowMuted(socialRowFilled(selected))
 
 @Composable
 internal fun socialHover(name: String?): Modifier =

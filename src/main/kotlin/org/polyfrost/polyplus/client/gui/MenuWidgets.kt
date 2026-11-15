@@ -10,14 +10,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -58,10 +53,18 @@ import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import org.polyfrost.oneconfig.api.ui.v1.a11y.a11y
-import org.polyfrost.oneconfig.api.ui.v1.components.onClick
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.StatusDot
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
+import org.polyfrost.polyplus.client.gui.lobbyshell.socialDotLabel
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
@@ -107,13 +110,13 @@ internal const val ASSETS = "assets/polyplus/mainmenu/"
 private const val ONBOARDING_ASSETS = "assets/polyplus/onboarding/"
 
 internal val PanelBackground: Color
-    @Composable get() = OneConfigTheme.current.componentBackground.copy(alpha = 0.5f)
+    @Composable get() = OneConfigTheme.current.componentBackground
 private val ServerIconBackground: Color
     @Composable get() = SocialTextPrimary.copy(alpha = 0.2f)
 
 internal val PanelShape: Shape
     @Composable
-    get() = ppShape(9.dp)
+    get() = OneConfigTheme.shape(9.dp)
 
 internal val Outfit: FontFamily by lazy {
     runCatching {
@@ -172,7 +175,7 @@ internal fun SocialPill(screen: Screen, modifier: Modifier) {
         ASSETS + "message-chat-circle.svg",
         modifier,
         onClick = { SocialOverlay.open(screen) },
-        badge = groups.any { it.unread },
+        badge = socialDotLabel(groups.any { it.unread }),
     )
 }
 
@@ -244,7 +247,7 @@ internal fun themeToggle(): ThemeToggle? {
 }
 
 @Composable
-internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = Color.White, secondary: Color = SocialTextSecondary) {
+internal fun FooterBrandText(platform: String, fontSize: TextUnit = 13.sp, primary: Color = OneConfigTheme.current.onMedia, secondary: Color = SocialTextSecondary) {
     val bodyFont = OneConfigTheme.current.fontFamily
 
     BasicText(
@@ -277,18 +280,17 @@ internal fun CopyrightText(
     maxLines: Int = Int.MAX_VALUE,
 ) {
     //? if > 1.8.9 {
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     val link = Modifier
-        .hoverable(interaction)
-        .a11y(COPYRIGHT_TEXT, A11yRole.Link, null, null, null, true)
-        .clickableTextWithSound { ClientPlatform.setScreen(CreditsAndAttributionScreen(screen)) }
+        .hoverable(hover.interactionSource)
+        .oneConfigClickable(COPYRIGHT_TEXT, { ClientPlatform.setScreen(CreditsAndAttributionScreen(screen)) }, role = A11yRole.Link, indication = false)
         .pointerHoverIcon(PointerIcon.Hand)
-    val underline = if (hovered) TextDecoration.Underline else null
+    val underline = if (hover.hovered) TextDecoration.Underline else null
     //?} else {
     /*val link: Modifier = Modifier
     val underline: TextDecoration? = null
     *///?}
-    SocialText(COPYRIGHT_TEXT, fontSize, modifier.then(link), color = color, textAlign = textAlign, textDecoration = underline, maxLines = maxLines)
+    Text(COPYRIGHT_TEXT, modifier = modifier.then(link), color = color, style = OneConfigTheme.current.typography.body.copy(fontSize = fontSize, textDecoration = underline), maxLines = maxLines, softWrap = maxLines != 1, textAlign = textAlign)
 }
 
 internal val MenuMutedIcon: Color
@@ -306,7 +308,7 @@ internal fun Modifier.menuFrost(shape: Shape, radius: Dp, background: Color, hov
     val theme = OneConfigTheme.current
     val border by animateColorAsState(if (hovered) theme.textColorSecondary else theme.borderColor, menuFade())
     return this
-        .sceneFrost(radius)
+        .sceneFrost(shape)
         .clip(shape)
         .background(background, shape)
         .border(1.dp, border, shape)
@@ -323,59 +325,29 @@ internal fun Modifier.menuListRow(
 ): Modifier =
     menuFrost(shape, MenuButtonRadius, background, hovered)
         .hoverable(interaction)
-        .a11y(label, A11yRole.Button, null, null, shape, true)
-        .onClick(interaction, onClick)
-        .pointerHoverIcon(PointerIcon.Hand)
+        .oneConfigClickable(label, onClick, shape = shape, indication = false, interactionSource = interaction)
+
+internal val MenuButtonLabel = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium)
 
 @Composable
-internal fun MenuButtonSurface(
-    label: String?,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    content: @Composable BoxScope.(ink: Color, hovered: Boolean) -> Unit,
-) {
-    val theme = OneConfigTheme.current
-    val (interaction, hovered) = rememberSocialHover()
-    val shape = theme.buttonShape
-    Box(
-        modifier
-            .menuFrost(shape, MenuButtonRadius, theme.componentBackground, hovered)
-            .hoverable(interaction)
-            .a11y(label, A11yRole.Button, null, null, shape, true)
-            .onClick(interaction, onClick)
-            .pointerHoverIcon(PointerIcon.Hand),
-        contentAlignment = Alignment.Center,
-    ) {
-        content(theme.textColor, hovered)
-    }
-}
+internal fun Modifier.menuButtonFrost(): Modifier = sceneFrost(ButtonDefaults.shape)
 
 @Composable
-internal fun MenuButtonLabel(label: String, ink: Color, modifier: Modifier = Modifier) {
-    SocialText(label, 16.sp, modifier, color = ink, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, badge: Boolean = false) {
+internal fun PillButton(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}, badge: String? = null) {
     Box(modifier) {
-        MenuButtonSurface(label, Modifier.fillMaxWidth().height(45.dp), onClick) { ink, _ ->
-            Row(
-                Modifier.padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ThemedIcon(icon, ink, 18.dp)
-                MenuButtonLabel(label, ink)
-            }
-        }
-        if (badge) {
-            Box(
-                Modifier.align(Alignment.CenterEnd)
-                    .padding(end = 14.dp)
-                    .size(8.dp)
-                    .clip(OneConfigTheme.current.circleShape)
-                    .background(OneConfigTheme.accent),
-            )
+        TextButton(
+            label,
+            onClick,
+            Modifier.fillMaxWidth().menuButtonFrost(),
+            style = ControlStyle.Secondary,
+            size = ControlSize.ExtraLarge,
+            leading = { ThemedIcon(icon, ButtonDefaults.contentColor(ControlStyle.Secondary), 18.dp) },
+            contentDescription = badge?.let { "$label, $it" },
+            labelStyle = MenuButtonLabel,
+            glass = false,
+        )
+        if (badge != null) {
+            StatusDot(BadgeTone.Accent, Modifier.align(Alignment.CenterEnd).padding(end = 14.dp), size = 8.dp)
         }
     }
 }

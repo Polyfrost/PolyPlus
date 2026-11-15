@@ -2,6 +2,8 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.background
@@ -24,44 +26,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
-import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialDangerColor
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialSuccessColor
+import org.polyfrost.polyplus.client.gui.SocialSuccessText
 import org.polyfrost.polyplus.client.gui.PresenceDot
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
-import org.polyfrost.polyplus.client.gui.SocialDangerColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
-import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.SocialSuccessText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
-import org.polyfrost.polyplus.client.gui.lobbysocial.AbovePopup
 import org.polyfrost.polyplus.client.gui.lobbysocial.InvitePicker
-import org.polyfrost.polyplus.client.gui.lobbysocial.MemberPopover
+import org.polyfrost.polyplus.client.gui.lobbysocial.MemberPopoverContent
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCell
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyIcons
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyInviteCard
@@ -72,7 +66,6 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.partyCells
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberAbove
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
 import org.polyfrost.polyplus.client.gui.lobbysocial.socialHover
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyVoiceMode
 import org.polyfrost.polyplus.client.party.HostJoinRequests
@@ -81,11 +74,14 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
 import org.polyfrost.polyplus.client.gui.lobbysocial.memberMenuItems
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private val EntryHead = 30.dp
 private val OverflowWidth = 32.dp
 private val TagInviteSize = 22.dp
 private val SeatHeight = 60.dp
+private val PartyPopupGap = 14.dp
 private const val MAX_INVITE_CARDS = 3
 
 private const val LEAVE_VOICE = SOCIAL_ASSETS + "log-out-04.svg"
@@ -108,7 +104,7 @@ internal fun PartyRoster(host: SocialHost, party: Party, width: Dp) {
     val shown = if (tier.span(cells.size) <= width) cells else cells.take(((width - OverflowWidth + tier.gap) / slot).toInt().coerceAtLeast(1))
     Row(Modifier.centerVerticallyExact(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(tier.gap)) {
         shown.forEach { cell -> key(cell.id) { PartyEntry(host, party, cell, tier) } }
-        if (shown.size < cells.size) Label("+${cells.size - shown.size}", 12.sp, color = MutedText, weight = FontWeight.Medium)
+        if (shown.size < cells.size) Text("+${cells.size - shown.size}", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -139,73 +135,77 @@ internal fun PartySeats(host: SocialHost, party: Party, columns: Int, inviteSeat
 
 @Composable
 private fun InviteSeat(party: Party, modifier: Modifier) {
-    var open by remember { mutableStateOf(false) }
-    val (interaction, hovered) = rememberSocialHover()
-    Box(modifier) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(SeatHeight)
-                .rowFrame(false, hovered, SocialFieldShape)
-                .border(1.dp, SocialBorderColor, SocialFieldShape)
-                .hoverable(interaction)
-                .clickableWithSound("Invite to party") { open = !open },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        ) {
-            ThemedIcon(PartyIcons.INVITE, MutedText, 16.dp)
-            Label("Invite", 14.sp, color = MutedText)
-        }
-        if (open) {
-            EscapeCloses { open = false }
-            AbovePopup(onDismiss = { open = false }) { InvitePicker(party) }
-        }
-    }
+    val hover = rememberHoverState()
+    AnchoredPopupButton(
+        "Invite to party",
+        { _, toggle, triggerModifier ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .then(triggerModifier)
+                    .height(SeatHeight)
+                    .rowFrame(false, hover.hovered, SocialFieldShape)
+                    .border(1.dp, SocialBorderColor, SocialFieldShape)
+                    .hoverable(hover.interactionSource)
+                    .oneConfigClickable("Invite to party", toggle),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
+                ThemedIcon(PartyIcons.INVITE, OneConfigTheme.current.mutedText, 16.dp)
+                Text("Invite", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            }
+        },
+        modifier,
+        placement = Placement.AboveStart,
+        gap = PartyPopupGap,
+    ) { InvitePicker(party) }
 }
 
 @Composable
 private fun PartyEntry(host: SocialHost, party: Party, cell: PartyCell, tier: RosterTier, modifier: Modifier = Modifier.widthIn(max = tier.width)) {
     val compact = tier == RosterTier.Compact
-    var open by remember { mutableStateOf(false) }
-    val (interaction, hovered) = rememberSocialHover()
-    Box {
-        Row(
-            modifier
-                .height(IntrinsicSize.Max)
-                .rowFrame(false, hovered, ppShape(8.dp))
-                .contextMenu { memberMenuItems(host, party, cell) }
-                .hoverable(interaction)
-                .then(socialHover(cell.name))
-                .clickableWithSound(if (cell.leader) "${cell.name}, leader, ${cell.detail}" else "${cell.name}, ${cell.detail}", shape = ppShape(8.dp)) { open = !open },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
-        ) {
-            EntryHead(cell, Modifier.centerVerticallyExact())
-            if (tier != RosterTier.Heads) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Label(cell.name, if (compact) 12.sp else 14.sp, color = if (cell.speaking) SocialSuccessText else SocialTextPrimary, weight = FontWeight.Medium)
-                    if (!compact) Label(if (cell.leader) "Leader · ${cell.detail}" else cell.detail, 11.sp, color = MutedText)
+    val hover = rememberHoverState()
+    val label = if (cell.leader) "${cell.name}, leader, ${cell.detail}" else "${cell.name}, ${cell.detail}"
+    AnchoredPopupButton(
+        label,
+        { _, toggle, triggerModifier ->
+            Row(
+                modifier
+                    .then(triggerModifier)
+                    .height(IntrinsicSize.Max)
+                    .rowFrame(false, hover.hovered, OneConfigTheme.shape(8.dp))
+                    .contextMenu { memberMenuItems(host, party, cell) }
+                    .hoverable(hover.interactionSource)
+                    .then(socialHover(cell.name))
+                    .oneConfigClickable(label, toggle, shape = OneConfigTheme.shape(8.dp)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+            ) {
+                EntryHead(cell, Modifier.centerVerticallyExact())
+                if (tier != RosterTier.Heads) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(cell.name, color = if (cell.speaking) SocialSuccessText else SocialTextPrimary, style = OneConfigTheme.current.typography.body.copy(fontSize = if (compact) 12.sp else 14.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        if (!compact) Text(if (cell.leader) "Leader · ${cell.detail}" else cell.detail, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    }
                 }
             }
-        }
-        if (open) {
-            EscapeCloses { open = false }
-            MemberPopover(host, party, cell) { open = false }
-        }
-    }
+        },
+        placement = Placement.AboveStart,
+        gap = PartyPopupGap,
+    ) { close -> MemberPopoverContent(host, party, cell, close) }
 }
 
 @Composable
 private fun EntryHead(cell: PartyCell, modifier: Modifier) {
     Box(modifier) {
-        PlayerHead(seedOf(cell.id), EntryHead, Modifier.then(if (cell.speaking) Modifier.border(1.dp, SocialSuccessColor, headShape(EntryHead)) else Modifier), headShape(EntryHead))
+        PlayerHead(playerId = seedOf(cell.id), size = EntryHead, modifier = Modifier.then(if (cell.speaking) Modifier.border(1.dp, SocialSuccessColor, headShape(EntryHead)) else Modifier), shape = headShape(EntryHead))
         if (cell.muted) {
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
                     .offset(x = 4.dp, y = 4.dp)
                     .size(16.dp)
-                    .clip(ppShape(5.dp))
+                    .clip(OneConfigTheme.shape(5.dp))
                     .background(OneConfigTheme.current.popupBackground),
                 contentAlignment = Alignment.Center,
             ) {
@@ -231,7 +231,7 @@ internal fun PartyControls(host: SocialHost, party: Party?) {
 @Composable
 internal fun PartyActions(party: Party?, onVoice: (() -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (party?.settings?.voiceMode == PartyVoiceMode.Proximity) Label("Proximity", 11.sp, Modifier.padding(end = 4.dp), color = MutedText)
+        if (party?.settings?.voiceMode == PartyVoiceMode.Proximity) Text("Proximity", Modifier.padding(end = 4.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         VoiceButtons(party)
         PartyButtons(party, onVoice)
     }
@@ -239,7 +239,7 @@ internal fun PartyActions(party: Party?, onVoice: (() -> Unit)? = null) {
 
 @Composable
 internal fun LeaveVoiceButton() {
-    IconButton(themedIcon(LEAVE_VOICE), "Leave voice", Modifier, PartyVoice::leave)
+    NavIconButton(LEAVE_VOICE, "Leave voice", PartyVoice::leave)
 }
 
 @Composable
@@ -248,33 +248,25 @@ internal fun VoiceButtons(party: Party?, leave: Boolean = true) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (party != null && voice.inVoice) {
             if (voice.micBlocked || voice.micSilent) MicBlockedButton(voice.blockedNotice.orEmpty(), voice.micBlocked)
-            IconButton(
-                themedIcon(if (voice.muted) PartyIcons.MIC_OFF else PartyIcons.MIC),
-                if (voice.muted) "Unmute" else "Mute",
-                null,
-                Modifier,
-                null,
-                when {
+            NavIconButton(
+                icon = if (voice.muted) PartyIcons.MIC_OFF else PartyIcons.MIC,
+                contentDescription = if (voice.muted) "Unmute" else "Mute",
+                onClick = PartyVoice::toggleMute,
+                tint = when {
                     voice.muted -> SocialDangerColor
                     voice.talking -> SocialSuccessColor
-                    else -> SocialTextPrimary
+                    else -> Color.Unspecified
                 },
-                TooltipPlacement.BelowStart,
-                PartyVoice::toggleMute,
             )
-            IconButton(
-                themedIcon(if (voice.deafened) PartyIcons.HEADPHONES_OFF else PartyIcons.HEADPHONES),
-                if (voice.deafened) "Undeafen" else "Deafen",
-                null,
-                Modifier,
-                null,
-                if (voice.deafened) SocialDangerColor else SocialTextPrimary,
-                TooltipPlacement.BelowStart,
-                PartyVoice::toggleDeafen,
+            NavIconButton(
+                icon = if (voice.deafened) PartyIcons.HEADPHONES_OFF else PartyIcons.HEADPHONES,
+                contentDescription = if (voice.deafened) "Undeafen" else "Deafen",
+                onClick = PartyVoice::toggleDeafen,
+                tint = if (voice.deafened) SocialDangerColor else Color.Unspecified,
             )
             if (leave) LeaveVoiceButton()
         } else if (party != null && PartyVoiceSettings.voiceAvailable()) {
-            TextButton("Join voice", themedIcon(PartyIcons.MIC), Modifier.height(38.dp), ButtonStyle.Secondary, true, PartyVoice::join)
+            TextButton(text = "Join voice", icon = PartyIcons.MIC, onClick = PartyVoice::join, size = ControlSize.Large, style = ControlStyle.Secondary)
         }
     }
 }
@@ -289,36 +281,23 @@ internal fun PartyButtons(party: Party?, onVoice: (() -> Unit)? = null) {
 
 @Composable
 private fun MicBlockedButton(notice: String, blocked: Boolean) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(themedIcon(WARNING), if (open) null else if (blocked) "Can't talk" else "No sound yet", null, Modifier, null, SocialDangerColor, TooltipPlacement.BelowStart) { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            AbovePopup(alignEnd = true, onDismiss = { open = false }) {
-                Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Label(if (blocked) "Your microphone is blocked" else "We can't hear your microphone", 14.sp, weight = FontWeight.Medium)
-                    SocialText(notice, 12.sp, color = MutedText)
-                    TextButton("Try again", Modifier.fillMaxWidth().height(38.dp)) {
-                        open = false
-                        PartyVoice.retryMic()
-                    }
-                }
-            }
+    val warning = if (blocked) "Can't talk" else "No sound yet"
+    PartyPopupButton(WARNING, warning, SocialDangerColor) { close ->
+        Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(if (blocked) "Your microphone is blocked" else "We can't hear your microphone", style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(notice, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small)
+            TextButton(text = "Try again", modifier = Modifier.fillMaxWidth(), size = ControlSize.Large, onClick = {
+                close()
+                PartyVoice.retryMic()
+            })
         }
     }
 }
 
 @Composable
 internal fun InviteButton(party: Party?) {
-    var open by remember { mutableStateOf(false) }
     if (!PartyRepository.canInvite(party)) return
-    Box {
-        IconButton(themedIcon(PartyIcons.INVITE), if (open) null else "Invite to party", Modifier) { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            AbovePopup(alignEnd = true, onDismiss = { open = false }) { InvitePicker(party) }
-        }
-    }
+    PartyPopupButton(PartyIcons.INVITE, "Invite to party") { InvitePicker(party) }
 }
 
 @Composable
@@ -330,23 +309,29 @@ internal fun SceneTagInvite(player: String) {
     if (outgoing.any { PartyRepository.samePlayer(it.recipient, player) }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             ThemedIcon("check-circle", SocialSuccessColor, 14.dp)
-            Label("Invited", 12.sp, color = MutedText)
+            Text("Invited", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
     } else {
-        IconButton(themedIcon(PartyIcons.INVITE), "Invite to party", Modifier.size(TagInviteSize)) { PartyRepository.invite(player) }
+        NavIconButton(PartyIcons.INVITE, "Invite to party", { PartyRepository.invite(player) }, frameSize = TagInviteSize)
     }
 }
 
 @Composable
 private fun PartyMenuButton(party: Party, onVoice: (() -> Unit)?) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(themedIcon(PartyIcons.MORE), if (open) null else "Party", Modifier) { open = !open }
-        if (open) {
-            EscapeCloses { open = false }
-            AbovePopup(alignEnd = true, onDismiss = { open = false }) { PartyMenu(party, onVoice) { open = false } }
-        }
-    }
+    PartyPopupButton(PartyIcons.MORE, "Party") { close -> PartyMenu(party, onVoice, close) }
+}
+
+@Composable
+private fun PartyPopupButton(icon: String, contentDescription: String, tint: Color = Color.Unspecified, content: @Composable (close: () -> Unit) -> Unit) {
+    AnchoredPopupButton(
+        contentDescription,
+        { open, toggle, triggerModifier ->
+            NavIconButton(icon, contentDescription, toggle, triggerModifier, tint = tint, active = open, tooltip = if (open) null else contentDescription)
+        },
+        placement = Placement.AboveEnd,
+        gap = PartyPopupGap,
+        content = content,
+    )
 }
 
 @Composable

@@ -2,54 +2,54 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.polyplus.client.gui.themedIcon
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.polyplus.client.gui.lobbysocial.friendRowItems
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
-import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyActions
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartySeats
 import org.polyfrost.polyplus.client.gui.lobbyshell.card
 import org.polyfrost.polyplus.client.gui.lobbysocial.InboxItem
 import org.polyfrost.polyplus.client.gui.lobbysocial.PersonHead
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
-import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialDialog
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPageState
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPerson
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialSnapshot
-import org.polyfrost.polyplus.client.gui.lobbysocial.socialRow
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.party.PartyRepository
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 
 private const val SEAT_COLUMNS = 4
 private const val FRIEND_COLUMNS = 2
@@ -77,23 +77,28 @@ internal fun OverviewPane(host: SocialHost, state: SocialPageState, snapshot: So
 
 @Composable
 private fun QuietOverview(state: SocialPageState, snapshot: SocialSnapshot, modifier: Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PanelTitle(if (snapshot.friends.isEmpty()) "Add a friend to see them here" else "None of your friends are online")
-            AddFriendButton(state)
-        }
+    EmptyState(if (snapshot.friends.isEmpty()) "Add a friend to see them here" else "None of your friends are online", modifier) {
+        AddFriendButton(state)
     }
 }
 
 @Composable
 private fun AddFriendButton(state: SocialPageState) {
-    TextButton("Add friend", themedIcon(SOCIAL_ASSETS + "user-plus-01.svg"), Modifier.height(38.dp), ButtonStyle.Primary, true) { state.dialog = SocialDialog.AddFriend }
+    TextButton(
+        text = "Add friend",
+        icon = SOCIAL_ASSETS + "user-plus-01.svg",
+        onClick = { state.dialog = SocialDialog.AddFriend },
+        modifier = Modifier,
+        style = ControlStyle.Primary,
+        enabled = true,
+        size = ControlSize.Large,
+    )
 }
 
 @Composable
 private fun InvitesSection(invites: List<InboxItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(SectionGap)) {
-        SectionHeading("Invites ${invites.size}")
+        SectionHeader("Invites ${invites.size}")
         Column(Modifier.fillMaxWidth().card()) {
             invites.forEachIndexed { index, item -> InviteRow(item, index > 0, roomy = true) }
         }
@@ -104,7 +109,7 @@ private fun InvitesSection(invites: List<InboxItem>) {
 private fun PartySection(host: SocialHost, party: Party, onVoice: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(SectionGap)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeading("Party ${party.members.size} of ${PartyRepository.MAX_MEMBERS}", Modifier.weight(1f))
+            SectionHeader("Party ${party.members.size} of ${PartyRepository.MAX_MEMBERS}", Modifier.weight(1f))
             PartyActions(party, onVoice)
         }
         PartySeats(host, party, SEAT_COLUMNS)
@@ -114,7 +119,7 @@ private fun PartySection(host: SocialHost, party: Party, onVoice: () -> Unit) {
 @Composable
 private fun FriendsSection(state: SocialPageState, online: List<SocialPerson>) {
     Column(verticalArrangement = Arrangement.spacedBy(SectionGap)) {
-        SectionHeading("Online ${online.size}")
+        SectionHeader("Online ${online.size}")
         online.take(MAX_FRIENDS).chunked(FRIEND_COLUMNS).forEach { pair ->
             Row(horizontalArrangement = Arrangement.spacedBy(SectionGap)) {
                 pair.forEach { FriendCell(state, it, Modifier.weight(1f)) }
@@ -126,39 +131,36 @@ private fun FriendsSection(state: SocialPageState, online: List<SocialPerson>) {
 
 @Composable
 private fun FriendCell(state: SocialPageState, person: SocialPerson, modifier: Modifier) {
-    val (interaction, hovered) = rememberSocialHover()
     Row(
         modifier
             .height(52.dp)
-            .socialRow(false, hovered)
             .contextMenu { friendRowItems(state, person) }
-            .hoverable(interaction)
-            .clickableWithSound { state.toggle(person) }
+            .selectableRow(false, { state.toggle(person) }, "${person.name}, ${person.status}", role = A11yRole.Button)
             .padding(start = 8.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PersonHead(person, 38.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Label(person.name, 14.sp, weight = FontWeight.Medium)
-            Label(person.status, 12.sp, color = MutedText)
+            Text(person.name, color = SelectionDefaults.itemContentColor(false), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(person.status, color = SelectionDefaults.itemSecondaryColor(false, rest = OneConfigTheme.current.mutedText), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        IconButton(themedIcon(SOCIAL_ASSETS + "message-chat-circle.svg"), "Message", Modifier) { state.source.message(person) }
+        IconButton(icon = SOCIAL_ASSETS + "message-chat-circle.svg", contentDescription = "Message", onClick = { state.source.message(person) }, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
     }
 }
 
 @Composable
 private fun HostingSection(name: String) {
     Column(verticalArrangement = Arrangement.spacedBy(SectionGap)) {
-        SectionHeading("Hosting")
+        SectionHeader("Hosting")
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ThemedIcon(SOCIAL_ASSETS + "globe-01.svg", SocialTextPrimary, 18.dp)
-            Label(name, 14.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            TextButton("Stop hosting", Modifier.height(38.dp), SocialHosting::stop)
+            Text(name, modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            TextButton(text = "Stop hosting", onClick = SocialHosting::stop, modifier = Modifier, size = ControlSize.Large)
         }
     }
 }

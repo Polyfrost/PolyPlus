@@ -56,6 +56,7 @@
     //? if = 1.8.9
     //"client.MixinMinecraftStartGame",
     "client.MixinMinecraftSystemReport",
+    "client.MixinMinecraftTitle",
     //? if > 1.8.9
     "client.MixinMouseHandler",
     "client.MixinJoinMultiplayerScreen",
@@ -82,6 +83,7 @@
     //"client.MixinProgressRenderer",
     "client.MixinRenderTarget",
     "client.MixinScreen",
+    "client.MixinScreenWatermark",
     "client.MixinServerSelectionList",
     //? if = 1.8.9
     //"client.MixinSession",

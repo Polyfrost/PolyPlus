@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,15 +42,15 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.LocalComposerFocus
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialBorderWidth
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.SocialOpenAnimation
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
@@ -270,20 +270,18 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
                     .pointerInput(onClose) { detectTapGestures { onClose() } },
             ) {
                 SocialOpenAnimation {
-                    ContextMenuHost {
-                        val snapshot = state.source.snapshot()
-                        if (blocked) {
-                            BlockedWindow(window, layout, availability, state, snapshot, onClose)
-                        } else {
-                            FollowSocialChanges(state, snapshot)
-                            SelectionEffects(window, state)
-                            TwoPanes(window, layout, state, snapshot, connecting, onClose)
-                        }
-                        SocialToastHost(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp))
-                        SocialDialogHost(state)
-                        PlayTogetherHooks(WindowHost)
-                        LeaderJoinEffect(WindowHost)
+                    val snapshot = state.source.snapshot()
+                    if (blocked) {
+                        BlockedWindow(window, layout, availability, state, snapshot, onClose)
+                    } else {
+                        FollowSocialChanges(state, snapshot)
+                        SelectionEffects(window, state)
+                        TwoPanes(window, layout, state, snapshot, connecting, onClose)
                     }
+                    Box(Modifier.offset(layout.x, layout.y).size(layout.width, layout.height)) { SocialToastHost(alignment = Alignment.TopEnd, inPlace = true) }
+                    SocialDialogHost(state)
+                    PlayTogetherHooks(WindowHost)
+                    LeaderJoinEffect(WindowHost)
                 }
             }
         }
@@ -365,7 +363,7 @@ private fun TwoPanes(
         if (layout.singlePane) {
             if (opened) DetailPane(window, layout, state, snapshot, detail, invites, reconnecting, Modifier.fillMaxSize())
         } else {
-            Box(Modifier.width(SocialBorderWidth).fillMaxHeight().background(SocialBorderColor))
+            Divider(vertical = true)
             DetailPane(window, layout, state, snapshot, detail, invites, reconnecting, Modifier.weight(1f).fillMaxHeight())
         }
     }
@@ -394,9 +392,9 @@ private fun DetailPane(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 PanelTitle("Blocked", Modifier.weight(1f))
-                IconButton(themedIcon(LobbyIcons.CLOSE), "Close", Modifier) { window.blockedOpen = false }
+                IconButton(icon = LobbyIcons.CLOSE, contentDescription = "Close", onClick = { window.blockedOpen = false }, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
             }
-            PaneRule()
+            Divider()
             BlockedList(state, snapshot, Modifier.fillMaxWidth().weight(1f))
         }
         detail is SocialDetail.Friend -> FriendDetailPanel(state, snapshot, detail.person, modifier)
@@ -409,16 +407,11 @@ private fun DetailPane(
             offlineReason = "Reconnecting".takeIf { reconnecting },
             actions = { group -> HeaderAction(window, state, snapshot, detail.thread, group) },
             trailing = {
-                if (!layout.singlePane) IconButton(themedIcon(LobbyIcons.CLOSE), "Close chat", Modifier) { SocialChatLink.close() }
+                if (!layout.singlePane) IconButton(icon = LobbyIcons.CLOSE, contentDescription = "Close chat", onClick = { SocialChatLink.close() }, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
             },
         )
         else -> OverviewPane(WindowHost, state, snapshot, invites, window::showVoice, modifier)
     }
-}
-
-@Composable
-internal fun PaneRule(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(SocialBorderWidth).background(SocialBorderColor))
 }
 
 private fun memberLine(thread: SocialThread): String? {
@@ -439,10 +432,16 @@ private fun RowScope.HeaderAction(window: SocialWindowState, state: SocialPageSt
 
 @Composable
 private fun InviteGroupButton(group: GroupSummary) {
-    TextButton("Invite to world", Modifier.height(38.dp), ButtonStyle.Primary) { SocialHosting.inviteGroup(group, ChatIdentity.selfId()) }
+    TextButton(text = "Invite to world", onClick = { SocialHosting.inviteGroup(group, ChatIdentity.selfId()) }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
 }
 
 @Composable
 private fun StartHostingButton(window: SocialWindowState, group: GroupSummary) {
-    TextButton("Invite to world", Modifier.height(38.dp), ButtonStyle.Primary) { window.showWorld(group.members.filterNot { it == ChatIdentity.selfId() }) }
+    TextButton(
+        text = "Invite to world",
+        onClick = { window.showWorld(group.members.filterNot { it == ChatIdentity.selfId() }) },
+        modifier = Modifier,
+        style = ControlStyle.Primary,
+        size = ControlSize.Large,
+    )
 }

@@ -50,12 +50,17 @@ data class LobbySceneEntry(
     val renamed: Boolean = false,
     val y: Int? = null,
     val dimension: String = "",
+    val favourite: Boolean = false,
+    val worldName: String = "",
 ) {
     val realm: LobbyRealm
         get() = LobbyRealm.of(dimension)
 
     val bundled: Boolean
         get() = origin == ORIGIN_BUNDLED
+
+    val automatic: Boolean
+        get() = !manual && !bundled && origin != ORIGIN_PARTY
 
     val setting: LobbySceneScore.Profile
         get() = LobbySceneScore.Profile.of(profile)
@@ -156,6 +161,26 @@ object LobbySceneStore {
     val bundledScenes: List<LobbySceneEntry>
         get() = BUNDLED
 
+    val captures: List<LobbySceneEntry>
+        get() {
+            ensureLoaded()
+            return state.scenes
+        }
+
+    val storedBytes: Long
+        get() = captures.sumOf { it.bytes }
+
+    var captureLimit: Int = 0
+        set(value) {
+            field = value.coerceAtLeast(0)
+        }
+
+    val clearable: List<LobbySceneEntry>
+        get() {
+            ensureLoaded()
+            return state.scenes.filter { it.automatic && !it.favourite && it.id != state.pinned }
+        }
+
     var captureEnabled: Boolean
         get() {
             ensureLoaded()
@@ -171,6 +196,17 @@ object LobbySceneStore {
         set(value) = update { copy(pinned = value) }
 
     fun problem(entry: LobbySceneEntry): String? = LobbyPacks.problem(entry.packs, entry.gameVersion)
+
+    fun outdated(entry: LobbySceneEntry): Boolean = !entry.bundled && entry.dataVersion != LobbySnapshot.dataVersion
+
+    fun usable(entry: LobbySceneEntry): Boolean = !outdated(entry) && problem(entry) == null
+
+    fun worldName(entry: LobbySceneEntry): String = when {
+        entry.worldName.isNotBlank() -> entry.worldName
+        entry.bundled -> "Polyfrost"
+        !entry.renamed && entry.label.isNotBlank() -> entry.label
+        else -> entry.world.substringAfter(':')
+    }
 
     fun serverChoice(address: String): Boolean? {
         ensureLoaded()
@@ -216,7 +252,8 @@ object LobbySceneStore {
         val rivals = scenes.filter { !it.manual && it.world == world && it.realm == realm && it.dataVersion == LobbySnapshot.dataVersion && stackOf(it) == stack }
         val near = rivals.filter { hypot((it.x - x).toDouble(), (it.z - z).toDouble()) < SAME_SPOT_BLOCKS }
         if (near.any { it.score >= score }) return false
-        return near.isNotEmpty() || rivals.size < MAX_PER_WORLD || rivals.any { it.score < score }
+        val open = rivals.filterNot { it.favourite }
+        return near.any { !it.favourite } || open.size < MAX_PER_WORLD || open.any { it.score < score }
     }
 
     fun admit(candidate: LobbySceneEntry, data: ByteArray, saved: (Boolean) -> Unit = {}): Boolean {
@@ -227,11 +264,11 @@ object LobbySceneStore {
         val selected = state.pinned
         val inWorld = state.scenes.filter { it.world == candidate.world && it.realm == candidate.realm }
         val current = inWorld.filter { it.dataVersion == LobbySnapshot.dataVersion }
-        val rivals = current.filter { !it.manual && it.id != selected && stackOf(it) == stack }
+        val rivals = current.filter { !it.manual && !it.favourite && it.id != selected && stackOf(it) == stack }
         val replaced = ArrayList<LobbySceneEntry>()
         val legacy = fileName(candidate, legacy = true)
         val sameFile = state.scenes.filter { it.file == fileName(candidate) || (it.y == null && it.dataVersion == candidate.dataVersion && it.file == legacy) }
-        if (!candidate.manual && sameFile.any { it.id == selected }) return false
+        if (!candidate.manual && sameFile.any { it.id == selected || it.favourite }) return false
         val sameSpot = if (candidate.manual) sameFile else sameFile + inWorld.filter { !it.manual && stackOf(it) == stack && near(it, candidate) }
         val custom = sameSpot.filter { it.renamed }.maxByOrNull { it.capturedAt }
         replaced += sameFile
@@ -241,8 +278,12 @@ object LobbySceneStore {
             if (left.size >= MAX_PER_WORLD) replaced += left.sortedBy { it.score }.take(left.size - MAX_PER_WORLD + 1)
         }
         var kept = state.scenes - replaced.toSet()
+        val overLimit = overflow(if (candidate.manual) kept else kept + candidate, captureLimit, selected)
+        if (overLimit.any { it === candidate }) return false
+        replaced += overLimit
+        kept = kept - overLimit.toSet()
         var total = kept.sumOf { it.bytes } + data.size
-        val spare = kept.filterNot { it.manual || it.id == selected }.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, ::rank)).toMutableList()
+        val spare = kept.filterNot { it.manual || it.favourite || it.id == selected }.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, ::rank)).toMutableList()
         while (total > MAX_TOTAL_BYTES && spare.isNotEmpty()) {
             val dropped = spare.removeAt(0)
             replaced += dropped
@@ -254,6 +295,8 @@ object LobbySceneStore {
             bytes = data.size.toLong(),
             label = custom?.label ?: candidate.label,
             renamed = custom != null,
+            favourite = candidate.favourite || sameFile.any { it.favourite },
+            worldName = candidate.worldName.ifBlank { candidate.label },
         )
         val name = entry.file
         val stale = replaced.filter { it.file != name }
@@ -289,11 +332,52 @@ object LobbySceneStore {
     fun fileOf(entry: LobbySceneEntry): Path? = if (entry.bundled || entry.origin == LobbySceneEntry.ORIGIN_PARTY) null else folder.resolve(entry.file)
 
     fun delete(entry: LobbySceneEntry) {
-        if (entry.bundled) return
+        delete(listOf(entry))
+    }
+
+    fun delete(entries: Collection<LobbySceneEntry>): Int {
         ensureLoaded()
-        val path = folder.resolve(state.scenes.firstOrNull { it.id == entry.id }?.file ?: entry.file)
-        update { copy(scenes = scenes.filterNot { it.id == entry.id }, pinned = pinned?.takeUnless { it == entry.id }) }
-        writer.execute { runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
+        val ids = entries.filterNot { it.bundled }.mapTo(HashSet()) { it.id }
+        val gone = state.scenes.filter { it.id in ids }
+        discard(gone)
+        return gone.size
+    }
+
+    fun deleteAutomatic(): Int = delete(clearable)
+
+    fun pruneAutomatic(limit: Int = captureLimit): Int {
+        ensureLoaded()
+        val gone = overflow(state.scenes, limit, state.pinned)
+        discard(gone)
+        return gone.size
+    }
+
+    fun setFavourite(entries: Collection<LobbySceneEntry>, favourite: Boolean) {
+        ensureLoaded()
+        val ids = entries.filterNot { it.bundled }.mapTo(HashSet()) { it.id }
+        if (state.scenes.none { it.id in ids && it.favourite != favourite }) return
+        update { copy(scenes = scenes.map { if (it.id in ids) it.copy(favourite = favourite) else it }) }
+    }
+
+    fun setFavourite(entry: LobbySceneEntry, favourite: Boolean) = setFavourite(listOf(entry), favourite)
+
+    private fun overflow(scenes: List<LobbySceneEntry>, limit: Int, selected: String?): List<LobbySceneEntry> {
+        if (limit <= 0) return emptyList()
+        val automatic = scenes.filter { it.automatic }
+        if (automatic.size <= limit) return emptyList()
+        val spare = automatic.filter { !it.favourite && it.id != selected }
+        return spare.sortedWith(compareBy({ it.dataVersion == LobbySnapshot.dataVersion }, { it.capturedAt })).take(automatic.size - limit)
+    }
+
+    private fun discard(gone: List<LobbySceneEntry>) {
+        if (gone.isEmpty()) return
+        val ids = gone.mapTo(HashSet()) { it.id }
+        update { copy(scenes = scenes.filterNot { it.id in ids }, pinned = pinned?.takeUnless { it in ids }) }
+        val inUse = state.scenes.mapTo(HashSet()) { it.file }
+        val paths = gone.map { it.file }.filterNot { it in inUse }.distinct().map(folder::resolve)
+        writer.execute {
+            paths.forEach { path -> runCatching { path.deleteIfExists() }.onFailure { LOBBY_LOGGER.warn("Could not delete a scene", it) } }
+        }
     }
 
     fun canRename(entry: LobbySceneEntry): Boolean = !entry.bundled && entry.origin != LobbySceneEntry.ORIGIN_PARTY
@@ -353,6 +437,7 @@ object LobbySceneStore {
                 Files.move(indexFile, indexFile.resolveSibling("scenes.json.bad-${System.currentTimeMillis()}"))
             }.onFailure { LOBBY_LOGGER.warn("Could not set the scene index aside", it) }
         }
+        if (captureLimit > 0) pruneAutomatic()
     }
 
     private fun salvage(text: String?): State {

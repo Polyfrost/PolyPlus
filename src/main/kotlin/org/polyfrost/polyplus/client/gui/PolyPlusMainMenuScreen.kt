@@ -5,15 +5,11 @@ package org.polyfrost.polyplus.client.gui
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -55,8 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -85,15 +79,24 @@ import net.minecraft.realms.RealmsBridge
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ButtonDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.NotificationsCenterPanel
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
+import org.polyfrost.oneconfig.api.ui.v1.components.Icon as OneConfigIcon
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.ui.components.NotificationsCenter
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.RecentServer
@@ -101,6 +104,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalGlassRegistry
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
+import org.polyfrost.polyplus.client.gui.lobbyshell.sceneBlur
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -125,7 +129,8 @@ import net.minecraft.server.network.EventLoopGroupHolder
 /*import net.minecraft.client.gui.GuiGraphics
 *///?}
 
-class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
+class PolyPlusMainMenuScreen :
+    OneConfigComposeScreen(previous = null, renderMode = OneConfigComposeScreen.RenderMode.Continuous) {
     private val openedAt = System.currentTimeMillis()
     private var menuGuiScale by mutableStateOf(mcGuiScale())
 
@@ -134,9 +139,9 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
         if (gs != menuGuiScale) menuGuiScale = gs
     }
 
-    //? if > 1.8.9 {
-    override fun shouldCloseOnEsc(): Boolean = false
-    //?} else {
+    override val closeOnEscape: Boolean get() = false
+
+    //? if = 1.8.9 {
     /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         super.render(mouseX, mouseY, tickDelta)
@@ -179,7 +184,12 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
     //?}
 
     @Composable
-    override fun compose() {
+    override fun Content() {
+        ProvidePopupSounds(false) { MenuContent() }
+    }
+
+    @Composable
+    private fun MenuContent() {
         val mc = Minecraft.getInstance()
         var quickplay by remember { mutableStateOf<List<QuickplayEntry>?>(null) }
 
@@ -213,76 +223,74 @@ class PolyPlusMainMenuScreen : ComposeScreen(RenderMode.CONTINUOUS) {
             }
         }
 
-        ProvideOneConfigTheme {
-            MainMenu(
-                screen = this,
-                guiScale = menuGuiScale,
-                actions = MenuActions(
-                    singleplayer = {
+        MainMenu(
+            screen = this,
+            guiScale = menuGuiScale,
+            actions = MenuActions(
+                singleplayer = {
+                    //? if >= 26.2 {
+                    mc.gui.setScreen(SelectWorldScreen(this))
+                    //?} elif > 1.8.9 {
+                    /*mc.setScreen(SelectWorldScreen(this))
+                    *///?} else {
+                    /*mc.openScreen(SelectWorldScreen(this))
+                    *///?}
+                },
+                openWorld = { id ->
+                    //? if = 1.8.9 {
+                    /*HostWorldManager.openWorld(id)
+                    *///?} else {
+                    mc.createWorldOpenFlows().openWorld(id) {
                         //? if >= 26.2 {
-                        mc.gui.setScreen(SelectWorldScreen(this))
-                        //?} elif > 1.8.9 {
-                        /*mc.setScreen(SelectWorldScreen(this))
-                        *///?} else {
-                        /*mc.openScreen(SelectWorldScreen(this))
+                        mc.gui.setScreen(this)
+                        //?} else {
+                        /*mc.setScreen(this)
                         *///?}
-                    },
-                    openWorld = { id ->
-                        //? if = 1.8.9 {
-                        /*HostWorldManager.openWorld(id)
-                        *///?} else {
-                        mc.createWorldOpenFlows().openWorld(id) {
-                            //? if >= 26.2 {
-                            mc.gui.setScreen(this)
-                            //?} else {
-                            /*mc.setScreen(this)
-                            *///?}
-                        }
-                        //?}
-                    },
-                    multiplayer = {
+                    }
+                    //?}
+                },
+                multiplayer = {
+                    //? if >= 26.2 {
+                    mc.gui.setScreen(JoinMultiplayerScreen(this))
+                    //?} elif > 1.8.9 {
+                    /*mc.setScreen(JoinMultiplayerScreen(this))
+                    *///?} else {
+                    /*mc.openScreen(JoinMultiplayerScreen(this))
+                    *///?}
+                },
+                realms = if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
+                    {
                         //? if >= 26.2 {
-                        mc.gui.setScreen(JoinMultiplayerScreen(this))
+                        mc.gui.setScreen(RealmsMainScreen(this))
                         //?} elif > 1.8.9 {
-                        /*mc.setScreen(JoinMultiplayerScreen(this))
+                        /*mc.setScreen(RealmsMainScreen(this))
                         *///?} else {
-                        /*mc.openScreen(JoinMultiplayerScreen(this))
+                        /*RealmsBridge().createMainMenuScreen(this)
                         *///?}
-                    },
-                    realms = if (PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms) {
-                        {
-                            //? if >= 26.2 {
-                            mc.gui.setScreen(RealmsMainScreen(this))
-                            //?} elif > 1.8.9 {
-                            /*mc.setScreen(RealmsMainScreen(this))
-                            *///?} else {
-                            /*RealmsBridge().createMainMenuScreen(this)
-                            *///?}
-                        }
-                    } else null,
-                    settings = {
-                        //? if >= 26.3 {
-                        mc.gui.setScreen(OptionsScreen(this, mc.options))
-                        //?} elif >= 26.2 {
-                        /*mc.gui.setScreen(OptionsScreen(this, mc.options, false))
-                        *///?} elif >= 26.1 {
-                        /*mc.setScreen(OptionsScreen(this, mc.options, false))
-                        *///?} elif > 1.8.9 {
-                        /*mc.setScreen(OptionsScreen(this, mc.options))
-                        *///?} else {
-                        /*mc.openScreen(OptionsScreen(this, mc.options))
-                        *///?}
-                    },
-                    mods = { PolyPlusOneConfigIntegration.openMods() },
-                    fullscreen = ::toggleFullscreen,
-                    quit = { if (System.currentTimeMillis() - openedAt >= QUIT_COOLDOWN_MILLIS) mc.stop() },
-                    connect = { server -> connectTo(mc, server) },
-                ),
-                quickplay = quickplay,
-                pingTick = pingTick,
-            )
-            BadModsDialog()
-        }
+                    }
+                } else null,
+                settings = {
+                    //? if >= 26.3 {
+                    mc.gui.setScreen(OptionsScreen(this, mc.options))
+                    //?} elif >= 26.2 {
+                    /*mc.gui.setScreen(OptionsScreen(this, mc.options, false))
+                    *///?} elif >= 26.1 {
+                    /*mc.setScreen(OptionsScreen(this, mc.options, false))
+                    *///?} elif > 1.8.9 {
+                    /*mc.setScreen(OptionsScreen(this, mc.options))
+                    *///?} else {
+                    /*mc.openScreen(OptionsScreen(this, mc.options))
+                    *///?}
+                },
+                mods = { PolyPlusOneConfigIntegration.openMods() },
+                fullscreen = ::toggleFullscreen,
+                quit = { if (System.currentTimeMillis() - openedAt >= QUIT_COOLDOWN_MILLIS) mc.stop() },
+                connect = { server -> connectTo(mc, server) },
+            ),
+            quickplay = quickplay,
+            pingTick = pingTick,
+        )
+        BadModsDialog()
     }
 
     private fun recentServerData(server: RecentServer, saved: ServerList?): ServerData =
@@ -429,6 +437,8 @@ private fun MainMenu(
 private const val BASE_WIDTH = 1240f
 private const val QUICKPLAY_MAX = 3
 private const val QUIT_COOLDOWN_MILLIS = 500L
+private const val WORDMARK_SHADOW_ALPHA = 0.2f
+private const val FOOTER_MUTED_ALPHA = 0.7f
 
 private sealed interface QuickplayEntry {
     val lastPlayed: Long
@@ -445,7 +455,7 @@ private const val COLUMN_INSET = (BASE_HEIGHT - FULL_SIDE_COLUMN_HEIGHT) / 2f
 
 @Composable
 private fun Icon(path: String, color: Color, modifier: Modifier) =
-    org.polyfrost.oneconfig.api.ui.v1.components.Icon(themedIcon(path), color, modifier)
+    OneConfigIcon(name = path, contentDescription = null, modifier = modifier, tint = color)
 
 @Composable
 private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
@@ -453,8 +463,8 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
         MainLogo()
         Spacer(Modifier.height(16.dp))
         Box(contentAlignment = Alignment.Center) {
-            SocialText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color(0x33000000), fontFamily = Outfit, modifier = Modifier.offset(y = 3.dp), textAlign = TextAlign.Center)
-            SocialText("ONECLIENT", fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, color = Color.White, fontFamily = Outfit, textAlign = TextAlign.Center)
+            Text("ONECLIENT", modifier = Modifier.offset(y = 3.dp), color = OneConfigTheme.current.onMediaShadow.copy(alpha = WORDMARK_SHADOW_ALPHA), style = OneConfigTheme.current.typography.body.copy(fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit), textAlign = TextAlign.Center)
+            Text("ONECLIENT", color = OneConfigTheme.current.onMedia, style = OneConfigTheme.current.typography.body.copy(fontSize = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit), textAlign = TextAlign.Center)
         }
         Spacer(Modifier.height(48.dp))
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -474,8 +484,8 @@ private fun CenterColumn(modifier: Modifier, actions: MenuActions) {
 @Composable
 private fun MainLogo() {
     Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
-        Icon(ASSETS + "logo.svg", Color(0x33000000), Modifier.size(96.dp).offset(y = 3.dp))
-        Icon(ASSETS + "logo.svg", Color.White, Modifier.size(96.dp))
+        Icon(ASSETS + "logo.svg", OneConfigTheme.current.onMediaShadow.copy(alpha = WORDMARK_SHADOW_ALPHA), Modifier.size(96.dp).offset(y = 3.dp))
+        Icon(ASSETS + "logo.svg", OneConfigTheme.current.onMedia, Modifier.size(96.dp))
     }
 }
 
@@ -588,9 +598,9 @@ private fun ModIntegrationBar(
     if (buttons.isEmpty()) return
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         buttons.forEach { button ->
-            IconButton(
+            MenuIconButton(
                 icon = button.icon,
-                tooltip = button.tooltip,
+                label = button.tooltip,
                 tooltipPlacement = TooltipPlacement.AboveCenter,
                 onClick = { button.onClick(screen) },
             )
@@ -601,21 +611,21 @@ private fun ModIntegrationBar(
 @Composable
 private fun WindowControls(modifier: Modifier, actions: MenuActions) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        IconButton(ASSETS + "logo.svg", tooltip = "Switch to the lobby", onClick = MainMenuReplacement::switchToLobby)
-        IconButton(ASSETS + "minecraft-block.svg", tooltip = "Switch to vanilla main menu", onClick = MainMenuReplacement::switchToVanilla)
+        MenuIconButton(ASSETS + "logo.svg", "Switch to the lobby", onClick = MainMenuReplacement::switchToLobby)
+        MenuIconButton(ASSETS + "minecraft-block.svg", "Switch to vanilla main menu", onClick = MainMenuReplacement::switchToVanilla)
         ThemeToggleButton()
         NotificationBell()
         if (!ClientPlatform.isMac) {
-            IconButton("maximise", tooltip = "Toggle fullscreen", onClick = actions.fullscreen)
+            MenuIconButton("maximise", "Toggle fullscreen", onClick = actions.fullscreen)
         }
-        IconButton(ASSETS + "x-close.svg", danger = true, tooltip = "Quit game", onClick = actions.quit)
+        MenuIconButton(ASSETS + "x-close.svg", "Quit game", danger = true, onClick = actions.quit)
     }
 }
 
 @Composable
 private fun ThemeToggleButton() {
     val theme = themeToggle() ?: return
-    IconButton(icon = theme.icon, tooltip = theme.label, onClick = theme.toggle)
+    MenuIconButton(theme.icon, theme.label, onClick = theme.toggle)
 }
 
 @Composable
@@ -643,7 +653,7 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SocialText("SPONSORED", 11.sp, color = SocialTextSecondary, fontWeight = FontWeight.Medium, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("SPONSORED", color = SocialTextSecondary, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium, letterSpacing = 0.8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             Spacer(Modifier.weight(1f))
             if (MainMenuFeaturedServer.isDismissible(server)) {
                 DismissButton { MainMenuFeaturedServer.dismiss(server) }
@@ -652,8 +662,8 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CardThumbnail(catalogIcon ?: favicon)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SocialText(campaign.title, 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                SocialText(campaign.description, 13.sp, color = SocialTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(campaign.title, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                Text(campaign.description, color = SocialTextSecondary, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         CallToActionButton(campaign.ctaLabel) { actions.connect(data) }
@@ -662,7 +672,7 @@ private fun FeaturedServerCard(modifier: Modifier, pingTick: Int, actions: MenuA
 
 @Composable
 private fun CardThumbnail(image: ImageBitmap?) {
-    val modifier = Modifier.size(42.dp).clip(ppShape(6.dp))
+    val modifier = Modifier.size(42.dp).clip(OneConfigTheme.shape(6.dp))
     if (image != null) {
         Image(
             image,
@@ -678,25 +688,19 @@ private fun CardThumbnail(image: ImageBitmap?) {
 
 @Composable
 private fun DismissButton(onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val color by animateColorAsState(if (hovered) SocialTextPrimary else SocialTextSecondary, menuFade())
-    Row(
-        modifier = Modifier
-            .clip(ppShape(4.dp))
-            .hoverable(interaction)
-            .clickableTextWithSound(onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        SocialText("Dismiss", 11.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Icon(ASSETS + "x-close.svg", color, Modifier.size(11.dp))
-    }
+    TextButton(
+        "Dismiss",
+        onClick,
+        style = ControlStyle.Ghost,
+        size = ControlSize.Compact,
+        trailing = { Icon(ASSETS + "x-close.svg", ButtonDefaults.contentColor(ControlStyle.Ghost), Modifier.size(11.dp)) },
+        labelStyle = OneConfigTheme.current.typography.caption,
+    )
 }
 
 @Composable
 private fun CallToActionButton(label: String, onClick: () -> Unit) {
-    TextButton(label, null, Modifier.fillMaxWidth().height(34.dp), ButtonStyle.Primary, true, onClick)
+    TextButton(text = label, onClick = onClick, modifier = Modifier.fillMaxWidth().height(34.dp), style = ControlStyle.Primary, enabled = true)
 }
 
 @Composable
@@ -709,13 +713,13 @@ private fun Footer(modifier: Modifier, screen: Screen, edgeX: (Float) -> Dp, edg
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(ASSETS + "footer-logo.svg", Color.White, Modifier.size(25.dp))
-            FooterBrandText(platformLabel(), secondary = Color.White.copy(alpha = 0.7f))
+            Icon(ASSETS + "footer-logo.svg", OneConfigTheme.current.onMedia, Modifier.size(25.dp))
+            FooterBrandText(platformLabel(), secondary = OneConfigTheme.current.onMedia.copy(alpha = FOOTER_MUTED_ALPHA))
         }
         CopyrightText(
             screen,
             fontSize = 13.sp,
-            color = Color.White.copy(alpha = 0.7f),
+            color = OneConfigTheme.current.onMedia.copy(alpha = FOOTER_MUTED_ALPHA),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = edgeX(24f), bottom = edgeY(18f)),
@@ -725,17 +729,43 @@ private fun Footer(modifier: Modifier, screen: Screen, edgeX: (Float) -> Dp, edg
 }
 @Composable
 private fun DropdownPill(label: String, leadingIcon: String, expanded: Boolean, onClick: () -> Unit) {
-    val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
-    MenuButtonSurface(label, Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
-        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
-        Icon(leadingIcon, ink, Modifier.align(Alignment.CenterStart).padding(start = 12.dp).size(18.dp))
-        MenuButtonLabel(label, ink, Modifier.padding(horizontal = 40.dp))
-        Icon(
-            ASSETS + "chevron-up.svg",
-            chevronTint,
-            Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(16.dp).rotate(chevronAngle),
-        )
-    }
+    val chevronAngle by Motion.animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    val hover = rememberHoverState()
+    val ink = ButtonDefaults.contentColor(ControlStyle.Secondary)
+    val chevronTint by animateColorAsState(if (hover.hovered) ink else MenuMutedIcon, menuFade())
+    EdgePinnedPill(
+        label,
+        onClick,
+        hover.interactionSource,
+        leading = { Icon(leadingIcon, ink, Modifier.size(18.dp)) },
+        trailing = { Icon(ASSETS + "chevron-up.svg", chevronTint, Modifier.size(16.dp).rotate(chevronAngle)) },
+    )
+}
+
+@Composable
+private fun EdgePinnedPill(
+    label: String,
+    onClick: () -> Unit,
+    interactionSource: MutableInteractionSource,
+    contentDescription: String? = null,
+    leading: @Composable () -> Unit,
+    trailing: @Composable () -> Unit,
+) {
+    TextButton(
+        label,
+        onClick,
+        Modifier.fillMaxWidth().menuButtonFrost(),
+        style = ControlStyle.Secondary,
+        size = ControlSize.ExtraLarge,
+        leading = leading,
+        trailing = trailing,
+        interactionSource = interactionSource,
+        contentDescription = contentDescription,
+        labelStyle = MenuButtonLabel,
+        glass = false,
+        contentSpacing = 6.dp,
+        pinSlots = true,
+    )
 }
 
 @Composable
@@ -746,26 +776,26 @@ private fun ServerRow(
     fallbackPng: String,
     onClick: () -> Unit = {},
 ) {
-    val (interaction, hovered) = rememberSocialHover()
-    val chevronTint by animateColorAsState(if (hovered) SocialTextPrimary else MenuMutedIcon, menuFade())
+    val hover = rememberHoverState()
+    val chevronTint by animateColorAsState(if (hover.hovered) SocialTextPrimary else MenuMutedIcon, menuFade())
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .menuListRow(OneConfigTheme.current.buttonShape, OneConfigTheme.current.modCardBackground, "$title, $subtitle", interaction, hovered, onClick)
+            .menuListRow(OneConfigTheme.current.buttonShape, OneConfigTheme.current.modCardBackground, "$title, $subtitle", hover.interactionSource, hover.hovered, onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        val iconModifier = Modifier.size(42.dp).clip(ppShape(6.dp))
+        val iconModifier = Modifier.size(42.dp).clip(OneConfigTheme.shape(6.dp))
         if (favicon != null) {
             Image(favicon, contentDescription = null, modifier = iconModifier, contentScale = ContentScale.Crop)
         } else {
             RasterImage(fallbackPng, iconModifier, contentScale = ContentScale.Crop)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            SocialText(title, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            SocialText(subtitle, fontSize = 13.sp, color = SocialTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(subtitle, color = SocialTextSecondary, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         Icon(ASSETS + "chevron-right.svg", chevronTint, Modifier.size(20.dp))
     }
@@ -775,20 +805,23 @@ private fun ServerRow(
 private fun AccountPill(name: String, onClick: () -> Unit) {
     val localId = runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
     val headShape = OneConfigTheme.current.checkBoxShape
-    MenuButtonSurface("Accounts, $name", Modifier.fillMaxWidth().height(45.dp), onClick) { ink, hovered ->
-        val chevronTint by animateColorAsState(if (hovered) ink else MenuMutedIcon, menuFade())
-        if (localId != null) {
-            PlayerHead(localId, 28.dp, Modifier.align(Alignment.CenterStart).padding(start = 10.dp), headShape)
-        } else {
-            RasterImage(ASSETS + "avatar.png", Modifier.align(Alignment.CenterStart).padding(start = 10.dp).size(28.dp).clip(headShape), contentScale = ContentScale.Crop)
-        }
-        MenuButtonLabel(name, ink, Modifier.padding(horizontal = 44.dp))
-        Icon(
-            ASSETS + "chevron-up.svg",
-            chevronTint,
-            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp).size(16.dp).rotate(180f),
-        )
-    }
+    val hover = rememberHoverState()
+    val ink = ButtonDefaults.contentColor(ControlStyle.Secondary)
+    val chevronTint by animateColorAsState(if (hover.hovered) ink else MenuMutedIcon, menuFade())
+    EdgePinnedPill(
+        name,
+        onClick,
+        hover.interactionSource,
+        contentDescription = "Accounts, $name",
+        leading = {
+            if (localId != null) {
+                PlayerHead(playerId = localId, size = 28.dp, shape = headShape, contentDescription = null)
+            } else {
+                RasterImage(ASSETS + "avatar.png", Modifier.size(28.dp).clip(headShape), contentScale = ContentScale.Crop)
+            }
+        },
+        trailing = { Icon(ASSETS + "chevron-up.svg", chevronTint, Modifier.size(16.dp).rotate(180f)) },
+    )
 }
 
 @Composable
@@ -798,40 +831,54 @@ private fun AccountsDialog(onClose: () -> Unit) {
 }
 
 @Composable
-private fun IconButton(
+private fun MenuIconButton(
     icon: String,
+    label: String,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
-    tooltip: String? = null,
+    tooltip: String? = label,
     tooltipPlacement: TooltipPlacement = TooltipPlacement.BelowEnd,
     onClick: () -> Unit = {},
 ) {
-    MenuButtonSurface(tooltip, modifier.size(45.dp), onClick) { ink, hovered ->
-        val tint by animateColorAsState(if (danger && hovered) SocialDangerText else ink, menuFade())
-        Icon(icon, tint, Modifier.size(18.dp))
-        if (tooltip != null && hovered) TooltipPopup(tooltip, tooltipPlacement, Dp.Unspecified)
+    val theme = OneConfigTheme.current
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    val dangerTint by animateColorAsState(if (danger && hovered) SocialDangerText else theme.textColor, menuFade())
+    IconButton(
+        label,
+        onClick,
+        modifier.sceneBlur(theme.buttonShape),
+        style = IconButtonStyle.Framed,
+        size = ControlSize.ExtraLarge,
+        tooltip = tooltip,
+        tooltipPlacement = tooltipPlacement,
+        interactionSource = source,
+        shape = theme.buttonShape,
+        restTint = theme.textColor,
+        glass = false,
+    ) { tint ->
+        Icon(icon, if (danger) dangerTint else tint, Modifier.size(18.dp))
     }
 }
 
 @Composable
 private fun NotificationBell() {
     var expanded by remember { mutableStateOf(false) }
-    var bellSize by remember { mutableStateOf(IntSize.Zero) }
     Box {
-        IconButton(
+        MenuIconButton(
             ASSETS + "bell-01.svg",
-            modifier = Modifier.onSizeChanged { bellSize = it },
+            "Notifications",
             tooltip = if (expanded) null else "Notifications",
             onClick = { expanded = !expanded },
         )
         if (expanded) {
+            EscapeCloses { expanded = false }
             Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, bellSize.height + with(LocalDensity.current) { 12.dp.roundToPx() }),
+                popupPositionProvider = rememberAnchoredPosition(Placement.BelowEnd, 12.dp),
                 onDismissRequest = { expanded = false },
                 properties = PopupProperties(focusable = true),
             ) {
-                NotificationsCenter()
+                NotificationsCenterPanel()
             }
         }
     }

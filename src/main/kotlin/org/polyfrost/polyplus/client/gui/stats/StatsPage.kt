@@ -7,12 +7,13 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -35,36 +38,39 @@ import androidx.compose.ui.unit.sp
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.resources.language.I18n
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.oneconfig.api.ui.v1.components.PanelHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.ProgressBar
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyShell
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageScrim
-import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
+import org.polyfrost.polyplus.client.gui.lobbyshell.pageTitleStyle
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.ServerIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rightColumn
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
-import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
 import org.polyfrost.polyplus.client.stats.DayPlay
 import org.polyfrost.polyplus.client.stats.LocalStats
 import org.polyfrost.polyplus.client.stats.RankedPlace
 import org.polyfrost.polyplus.client.stats.StatsReport
 import org.polyfrost.polyplus.client.stats.VanillaStat
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import androidx.compose.ui.text.style.TextOverflow
 
 private val SheetGap = 12.dp
 private val IconSize = 34.dp
 private val HeroHeight = 146.dp
 private val WeekBarHeight = 118.dp
+private val DayBarWidth = 30.dp
 private const val MAX_ROWS = 20
 private const val MAX_TOTALS = 8
 private const val MIN_SHARE = 0.02f
@@ -111,12 +117,13 @@ private fun StatusSheet(loading: Boolean, onBack: () -> Unit, modifier: Modifier
 
 @Composable
 private fun PageHeader(onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        BackButton(onBack)
-        PageTitle("Stats")
-        Spacer(Modifier.weight(1f))
-        Label("Saved only on this PC", 12.sp, color = MutedText)
-    }
+    PanelHeader(
+        "Stats",
+        titleStyle = pageTitleStyle(),
+        leading = { BackButton(onBack) },
+        actions = { Text("Saved only on this PC", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) },
+        spacing = 8.dp,
+    )
 }
 
 @Composable
@@ -125,7 +132,7 @@ private fun HeroSheet(report: StatsReport, onBack: () -> Unit, modifier: Modifie
         PageHeader(onBack)
         Row(Modifier.fillMaxWidth().height(HeroHeight), horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
             TotalFigure(report, Modifier.weight(1f))
-            VerticalRule()
+            Divider(vertical = true)
             WeekFigure(report, Modifier.width(190.dp))
             WeekBars(report.days, Modifier.width(310.dp))
         }
@@ -136,9 +143,9 @@ private fun HeroSheet(report: StatsReport, onBack: () -> Unit, modifier: Modifie
 @Composable
 private fun TotalFigure(report: StatsReport, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SectionHeading("Total playtime")
-        Label(formatDuration(report.totalMillis), 64.sp, weight = FontWeight.SemiBold)
-        Label(playSplit(report), 12.sp, color = MutedText)
+        SectionHeader("Total playtime", contentPadding = PaddingValues(0.dp))
+        Text(formatDuration(report.totalMillis), style = OneConfigTheme.current.typography.body.copy(fontSize = 64.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(playSplit(report), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -151,9 +158,9 @@ private fun playSplit(report: StatsReport): String = listOfNotNull(
 private fun WeekFigure(report: StatsReport, modifier: Modifier) {
     val played = report.weekMillis > 0L
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SectionHeading("This week")
-        if (played) Label(formatDuration(report.weekMillis), 36.sp, weight = FontWeight.SemiBold)
-        Label(if (played) "Last 7 days" else "Counted from now on", 12.sp, color = MutedText)
+        SectionHeader("This week", contentPadding = PaddingValues(0.dp))
+        if (played) Text(formatDuration(report.weekMillis), style = OneConfigTheme.current.typography.body.copy(fontSize = 36.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(if (played) "Last 7 days" else "Counted from now on", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -162,9 +169,16 @@ private fun WeekBars(days: List<DayPlay>, modifier: Modifier) {
     val peak = days.maxOf { it.millis }.coerceAtLeast(1L)
     Row(modifier, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
         days.forEach { day ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                DayBar(day, (day.millis.toFloat() / peak).coerceAtLeast(MIN_BAR))
-                Label(day.label, 12.sp, color = if (day.today) OneConfigTheme.current.textColor else MutedText)
+            val share = (day.millis.toFloat() / peak).coerceAtLeast(MIN_BAR)
+            Column(
+                Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "${day.label}: ${formatDuration(day.millis)}"
+                },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                DayBar(day, share)
+                Text(day.label, color = if (day.today) OneConfigTheme.current.textColor else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
     }
@@ -173,15 +187,14 @@ private fun WeekBars(days: List<DayPlay>, modifier: Modifier) {
 @Composable
 private fun DayBar(day: DayPlay, share: Float) {
     val fill = if (day.today) OneConfigTheme.accent else OneConfigTheme.accent.copy(alpha = PAST_DAY_ALPHA)
-    Box(
-        Modifier
-            .size(30.dp, WeekBarHeight)
-            .clip(ppShape(6.dp))
-            .background(OneConfigTheme.current.componentBackground.copy(alpha = TRACK_ALPHA)),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Box(Modifier.fillMaxWidth().height(WeekBarHeight * share).background(fill))
-    }
+    ProgressBar(
+        share,
+        Modifier.height(WeekBarHeight),
+        tint = fill,
+        trackColor = OneConfigTheme.current.componentBackground.copy(alpha = TRACK_ALPHA),
+        thickness = DayBarWidth,
+        orientation = Orientation.Vertical,
+    )
 }
 
 @Composable
@@ -196,12 +209,12 @@ private fun SupportingFigures(report: StatsReport) {
         sessions.takeIf { it > 0L }?.let { formatDuration(report.sessionMillis / it) to "average session" },
     )
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HorizontalRule()
+        Divider()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(30.dp)) {
             figures.forEach { (value, label) ->
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Label(value, 20.sp, weight = FontWeight.SemiBold)
-                    Label(label, 12.sp, color = MutedText)
+                    Text(value, style = OneConfigTheme.current.typography.body.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    Text(label, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 }
             }
         }
@@ -218,7 +231,7 @@ private fun PlacesSheet(lobby: LobbyShell, report: StatsReport, modifier: Modifi
                 WorldRows(lobby, report.worlds)
             }
         }
-        VerticalRule()
+        Divider(vertical = true)
         PlaceColumn("Most played servers", Modifier.weight(1f)) {
             if (report.servers.isEmpty()) {
                 EmptyState("No servers yet", Modifier.fillMaxSize(), "Vanilla doesn't save server time, so it's counted from now on. Join a server to start.")
@@ -269,13 +282,13 @@ private fun ServerRows(lobby: LobbyShell, servers: List<RankedPlace>) {
 @Composable
 private fun WorldIcon(bytes: ByteArray?, size: Dp) {
     val icon = rememberFavicon(bytes)
-    val shape = ppShape(8.dp)
+    val shape = OneConfigTheme.shape(8.dp)
     val frame = Modifier.size(size).clip(shape).background(OneConfigTheme.current.componentBackground).border(1.dp, SocialBorderColor, shape)
     if (icon != null) {
         Image(icon, null, frame, contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
     } else {
         Box(frame, contentAlignment = Alignment.Center) {
-            ThemedIcon(SOCIAL_ASSETS + "minecraft-block.svg", MutedText, size / 2)
+            ThemedIcon(SOCIAL_ASSETS + "minecraft-block.svg", OneConfigTheme.current.mutedText, size / 2)
         }
     }
 }
@@ -283,12 +296,12 @@ private fun WorldIcon(bytes: ByteArray?, size: Dp) {
 @Composable
 private fun RankRow(rank: Int, name: String, millis: Long, peak: Long, icon: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().height(46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Box(Modifier.width(20.dp), contentAlignment = Alignment.CenterEnd) { Label(rank.toString(), 12.sp, color = MutedText) }
+        Box(Modifier.width(20.dp), contentAlignment = Alignment.CenterEnd) { Text(rank.toString(), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
         icon()
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Label(name, 14.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-                Label(formatDuration(millis), 12.sp, color = MutedText)
+                Text(name, Modifier.weight(1f), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                Text(formatDuration(millis), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
             ShareBar((millis.toFloat() / peak.coerceAtLeast(1L)).coerceIn(MIN_SHARE, 1f))
         }
@@ -297,9 +310,7 @@ private fun RankRow(rank: Int, name: String, millis: Long, peak: Long, icon: @Co
 
 @Composable
 private fun ShareBar(share: Float) {
-    Box(Modifier.fillMaxWidth().height(4.dp).clip(ppShape(2.dp)).background(OneConfigTheme.current.componentBackground.copy(alpha = TRACK_ALPHA))) {
-        Box(Modifier.fillMaxWidth(share).fillMaxHeight().background(OneConfigTheme.accent))
-    }
+    ProgressBar(share)
 }
 
 @Composable
@@ -313,7 +324,7 @@ private fun TotalsSheet(report: StatsReport, modifier: Modifier) {
         PanelTitle("Totals")
         ScrollFade(Modifier.fillMaxWidth().weight(1f), 0.dp) {
             rows.forEachIndexed { index, row ->
-                if (index > 0) HorizontalRule()
+                if (index > 0) Divider()
                 TotalLine(row)
             }
         }
@@ -342,19 +353,9 @@ private fun totalRows(report: StatsReport): List<TotalRow> {
 private fun TotalLine(row: TotalRow) {
     Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Label(row.label, 14.sp)
-            row.detail?.let { Label(it, 12.sp, color = MutedText) }
+            Text(row.label, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            row.detail?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
         }
-        Label(row.value, 17.sp, weight = FontWeight.SemiBold)
+        Text(row.value, style = OneConfigTheme.current.typography.body.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
-}
-
-@Composable
-private fun HorizontalRule() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-}
-
-@Composable
-private fun VerticalRule() {
-    Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
 }

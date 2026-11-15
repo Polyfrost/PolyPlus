@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.TextUnit
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.emoji.EmojiRegistry
 import kotlin.math.roundToInt
@@ -85,7 +86,7 @@ internal fun SocialEmojiText(
         if (EmojiRegistry.enabled()) EmojiRegistry.segments(text) else listOf(EmojiRegistry.Segment.Text(text))
     }
     if (segments.none { it is EmojiRegistry.Segment.Emoji } || EmojiAtlas.bitmap == null) {
-        SocialText(text, fontSize, modifier, color, fontWeight, maxLines = maxLines)
+        Text(text, modifier = modifier, color = color, style = OneConfigTheme.current.typography.body.copy(fontSize = fontSize, fontWeight = fontWeight), maxLines = maxLines, softWrap = maxLines != 1)
         return
     }
 
@@ -94,7 +95,7 @@ internal fun SocialEmojiText(
         Row(modifier.clipToBounds(), verticalAlignment = Alignment.CenterVertically) {
             segments.forEach { segment ->
                 when (segment) {
-                    is EmojiRegistry.Segment.Text -> SocialText(segment.text, fontSize, color = color, fontWeight = fontWeight, maxLines = 1)
+                    is EmojiRegistry.Segment.Text -> Text(segment.text, color = color, style = OneConfigTheme.current.typography.body.copy(fontSize = fontSize, fontWeight = fontWeight), maxLines = 1, softWrap = false)
                     is EmojiRegistry.Segment.Emoji -> EmojiGlyph(segment.glyph, Modifier.size(glyphSize))
                 }
             }
@@ -121,7 +122,7 @@ internal fun SocialEmojiText(
         FlowRow(maxLines = maxLines) {
             pieces.forEach { piece ->
                 when (piece) {
-                    is EmojiRegistry.Segment.Text -> SocialText(piece.text, fontSize, Modifier.align(Alignment.CenterVertically), color, fontWeight, maxLines = 1)
+                    is EmojiRegistry.Segment.Text -> Text(piece.text, modifier = Modifier.align(Alignment.CenterVertically), color = color, style = OneConfigTheme.current.typography.body.copy(fontSize = fontSize, fontWeight = fontWeight), maxLines = 1, softWrap = false)
                     is EmojiRegistry.Segment.Emoji -> EmojiGlyph(piece.glyph, Modifier.align(Alignment.CenterVertically).size(glyphSize))
                 }
             }

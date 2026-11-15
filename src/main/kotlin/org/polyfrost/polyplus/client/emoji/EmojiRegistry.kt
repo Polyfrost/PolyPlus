@@ -303,4 +303,16 @@ object EmojiRegistry {
         sb.append(text, last, text.length)
         return sb.toString()
     }
+
+    private val TEXT_DATA_COMMANDS = setOf(
+        "execute", "scoreboard", "tellraw", "title", "bossbar", "team", "data", "give", "item",
+        "summon", "setblock", "fill", "clone", "loot", "place", "function", "return", "dialog",
+        "waypoint", "trigger", "blockdata", "entitydata", "replaceitem", "testfor", "testforblock",
+    )
+
+    @JvmStatic
+    fun commandToShortcodes(command: String): String {
+        val root = command.removePrefix("/").substringBefore(' ').substringAfter(':').lowercase()
+        return if (root in TEXT_DATA_COMMANDS) command else toShortcodes(command)
+    }
 }

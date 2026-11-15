@@ -2,9 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.replays
 
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.polyplus.client.gui.lobbyshell.UnderlineTabs
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
@@ -28,7 +29,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.NoMatchState
@@ -37,6 +37,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PageHeader
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.compat.replay.ReplayEntry
 import org.polyfrost.polyplus.compat.replay.ReplayProvider
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 
 private class ReplaysView {
     var query by mutableStateOf("")
@@ -61,22 +62,20 @@ internal fun ReplaysPage(selected: ReplayEntry?, onBack: () -> Unit, onSelect: (
     if (!ReplayLibrary.enabled) return
     val view = remember { ReplaysView() }
     LaunchedEffect(Unit) { ReplayLibrary.reload() }
-    ContextMenuHost {
-        Row(
-            Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
-            horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
+    Row(
+        Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
+        horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
+    ) {
+        Column(
+            Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
+            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
         ) {
-            Column(
-                Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
-                verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-            ) {
-                ReplaysHeader(view, onBack)
-                val latest = ReplayLibrary.entries.firstOrNull()
-                if (latest != null && !view.narrowed) LatestReplayStrip(latest, latest.path == selected?.path, onSelect, onWatch)
-                ReplaysBody(view, latest, selected, onSelect, onWatch, Modifier.weight(1f).fillMaxWidth())
-            }
-            ReplayDetailsPanel(selected, onWatch, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
+            ReplaysHeader(view, onBack)
+            val latest = ReplayLibrary.entries.firstOrNull()
+            if (latest != null && !view.narrowed) LatestReplayStrip(latest, latest.path == selected?.path, onSelect, onWatch)
+            ReplaysBody(view, latest, selected, onSelect, onWatch, Modifier.weight(1f).fillMaxWidth())
         }
+        ReplayDetailsPanel(selected, onWatch, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
     }
 }
 
@@ -97,14 +96,14 @@ private fun ReplaysHeader(view: ReplaysView, onBack: () -> Unit) {
         },
     ) {
         if (ReplayLibrary.failed && ReplayLibrary.entries.isNotEmpty()) {
-            TextButton("Some replays didn't load. Try again", null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { ReplayLibrary.reload() }
+            TextButton(text = "Some replays didn't load. Try again", onClick = { ReplayLibrary.reload() }, style = ControlStyle.Secondary, size = ControlSize.Large)
         }
         if (focus != null) {
-            TextButton("Open folder", themedIcon(FOLDER_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openFolderSafely() }
-            TextButton("Open ${focus.name}", themedIcon(VIDEO_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { focus.openBrowserSafely() }
+            TextButton(text = "Open folder", icon = FOLDER_ICON, onClick = { focus.openFolderSafely() }, style = ControlStyle.Secondary, size = ControlSize.Large)
+            TextButton(text = "Open ${focus.name}", icon = VIDEO_ICON, onClick = { focus.openBrowserSafely() }, style = ControlStyle.Secondary, size = ControlSize.Large)
         } else {
             providers.forEach { provider ->
-                TextButton("Open ${provider.name}", themedIcon(VIDEO_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { provider.openBrowserSafely() }
+                TextButton(text = "Open ${provider.name}", icon = VIDEO_ICON, onClick = { provider.openBrowserSafely() }, style = ControlStyle.Secondary, size = ControlSize.Large)
             }
         }
     }
@@ -123,11 +122,11 @@ private fun ReplaysBody(
     when {
         entries.isEmpty() && (ReplayLibrary.loading || !ReplayLibrary.loaded) -> EmptyState("Loading replays", modifier.panel())
         entries.isEmpty() && ReplayLibrary.failed -> EmptyState("Couldn't load replays", modifier.panel(), "Your replay folder couldn't be read.") {
-            TextButton("Try again", null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true) { ReplayLibrary.reload() }
+            TextButton(text = "Try again", onClick = { ReplayLibrary.reload() }, style = ControlStyle.Primary, size = ControlSize.Large)
         }
         entries.isEmpty() -> EmptyState("No replays yet", modifier.panel(), "Start recording from the pause menu.") {
             view.provider(ReplayLibrary.providers)?.let { provider ->
-                TextButton("Open folder", themedIcon(FOLDER_ICON), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true) { provider.openFolderSafely() }
+                TextButton(text = "Open folder", icon = FOLDER_ICON, onClick = { provider.openFolderSafely() }, style = ControlStyle.Primary, size = ControlSize.Large)
             }
         }
         else -> {
@@ -146,14 +145,18 @@ private fun ReplaysBody(
 private fun ReplayGrid(entries: List<ReplayEntry>, selected: ReplayEntry?, onSelect: (ReplayEntry) -> Unit, onWatch: (ReplayEntry) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val rowHeight = PageGrid.rowHeight(maxHeight)
-        LazyVerticalGrid(
-            GridCells.Fixed(PageGrid.COLUMNS),
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-        ) {
-            items(entries, key = { "${it.provider.id}:${it.path}" }) { entry ->
-                ReplayCard(entry, entry.path == selected?.path, onSelect, onWatch, Modifier.fillMaxWidth().height(rowHeight))
+        val grid = rememberLazyGridState()
+        ScrollContainer(grid, Modifier.fillMaxSize(), scrollbar = false) {
+            LazyVerticalGrid(
+                GridCells.Fixed(PageGrid.COLUMNS),
+                Modifier.fillMaxSize(),
+                grid,
+                horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+                verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+            ) {
+                items(entries, key = { "${it.provider.id}:${it.path}" }) { entry ->
+                    ReplayCard(entry, entry.path == selected?.path, onSelect, onWatch, Modifier.fillMaxWidth().height(rowHeight))
+                }
             }
         }
     }

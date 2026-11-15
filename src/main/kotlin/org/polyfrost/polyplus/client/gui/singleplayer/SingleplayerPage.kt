@@ -2,9 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.singleplayer
 
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.polyplus.client.gui.lobbyshell.UnderlineTabs
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
@@ -27,16 +28,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.NoMatchState
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageGrid
 import org.polyfrost.polyplus.client.gui.lobbyshell.PageHeader
+import org.polyfrost.polyplus.client.gui.lobbyshell.PageScrim
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.Locale
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 
 @Composable
 internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSelect: (String) -> Unit, onHost: (String) -> Unit) {
@@ -48,21 +50,20 @@ internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSe
     LaunchedEffect(selectedWorldId) {
         if (selectedWorldId != null) state.selectedId = selectedWorldId
     }
-    ContextMenuHost {
-        Row(
-            Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
-            horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
+    PageScrim()
+    Row(
+        Modifier.fillMaxSize().padding(start = LobbyLayout.Margin, end = LobbyLayout.Margin, top = LobbyLayout.Top),
+        horizontalArrangement = Arrangement.spacedBy(LobbyLayout.Gap),
+    ) {
+        Column(
+            Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
+            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
         ) {
-            Column(
-                Modifier.weight(1f).fillMaxHeight().padding(bottom = LobbyLayout.PageBottom),
-                verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-            ) {
-                WorldsHeader(state, onBack)
-                if (!state.narrowed) LastPlayedWorldStrip(state, onHost)
-                WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
-            }
-            WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
+            WorldsHeader(state, onBack)
+            if (!state.narrowed) LastPlayedWorldStrip(state, onHost)
+            WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
         }
+        WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
     }
 }
 
@@ -81,7 +82,7 @@ private fun WorldsHeader(state: SingleplayerState, onBack: () -> Unit) {
             null
         },
     ) {
-        TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Secondary, true, state.flows::create)
+        TextButton(text = "Create world", icon = LobbyIcons.PLUS, onClick = state.flows::create, style = ControlStyle.Secondary, size = ControlSize.Large)
     }
 }
 
@@ -89,11 +90,11 @@ private fun WorldsHeader(state: SingleplayerState, onBack: () -> Unit) {
 private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modifier: Modifier) {
     when {
         state.phase == WorldListPhase.Failed -> EmptyState("Unable to load worlds", modifier.panel(), state.failure.orEmpty()) {
-            TextButton("Try again", themedIcon(LobbyIcons.REFRESH), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true, state::reload)
+            TextButton(text = "Try again", icon = LobbyIcons.REFRESH, onClick = state::reload, style = ControlStyle.Primary, size = ControlSize.Large)
         }
         state.phase == WorldListPhase.Loading -> EmptyState("Loading worlds", modifier.panel())
         state.worlds.isEmpty() -> EmptyState("No worlds yet", modifier.panel(), "Create a world to start playing.") {
-            TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, true, state.flows::create)
+            TextButton(text = "Create world", icon = LobbyIcons.PLUS, onClick = state.flows::create, style = ControlStyle.Primary, size = ControlSize.Large)
         }
         else -> {
             val visible = state.visible()
@@ -110,14 +111,18 @@ private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modif
 private fun WorldGrid(state: SingleplayerState, worlds: List<SingleplayerWorld>, onHost: (String) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val rowHeight = PageGrid.rowHeight(maxHeight)
-        LazyVerticalGrid(
-            GridCells.Fixed(PageGrid.COLUMNS),
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
-        ) {
-            items(worlds, key = { it.id }) { world ->
-                WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
+        val grid = rememberLazyGridState()
+        ScrollContainer(grid, Modifier.fillMaxSize(), scrollbar = false) {
+            LazyVerticalGrid(
+                GridCells.Fixed(PageGrid.COLUMNS),
+                Modifier.fillMaxSize(),
+                grid,
+                horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+                verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+            ) {
+                items(worlds, key = { it.id }) { world ->
+                    WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
+                }
             }
         }
     }

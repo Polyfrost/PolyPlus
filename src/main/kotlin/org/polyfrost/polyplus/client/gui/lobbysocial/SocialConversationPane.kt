@@ -2,10 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
+import androidx.compose.ui.text.style.TextOverflow
+import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -21,30 +21,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import org.polyfrost.polyplus.client.gui.ConfirmPrompt
 import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyUserTheme
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.MessageComposer
 import org.polyfrost.polyplus.client.gui.MessageTimeline
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.WorldInviteBanner
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
+import org.polyfrost.oneconfig.api.ui.v1.components.Confirm
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.network.http.responses.GroupSummary
 import org.polyfrost.polyplus.client.social.ChatIdentity
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 
 private const val INVITE_PENDING = "pending"
 
@@ -66,7 +63,7 @@ internal fun ConversationPane(
     if (look.backButton) EscapeCloses { if (SocialPageState.dialogOpen) SocialPageState.closeDialog() else SocialChatLink.close() }
     Column(modifier.socialSurface()) {
         ConversationHeader(state, thread, group, subtitle, actions, trailing)
-        if (framed) Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+        if (framed) Divider()
         ConversationBody(conversation, thread, group, if (framed) "Message ${thread.title}" else "Message ${thread.title}...", offlineReason)
     }
 }
@@ -111,7 +108,7 @@ private fun ConversationHeader(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             PanelTitle(thread.title)
             val status = subtitle ?: thread.people.firstOrNull()?.takeIf { !thread.group && it.presenceKnown }?.status
-            status?.let { Label(it, 12.sp, color = MutedText) }
+            status?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
         }
         actions(group)
         if (thread.group) {
@@ -129,22 +126,28 @@ internal fun groupMenuItems(
     val self = ChatIdentity.selfId()
     val convertible = group.special && specialTarget
     return listOfNotNull(
-        MenuAction("Invite Friends", SOCIAL_ASSETS + "user-plus-01.svg") { state.dialog = SocialDialog.InviteToGroup(group.id) },
-        MenuAction("Invite Group to Session", SOCIAL_ASSETS + "log-in-04.svg") { SocialHosting.inviteGroup(group, self) },
-        MenuAction("Convert to Normal Chat", SOCIAL_ASSETS + "check.svg") { GroupsRepository.claimSpecialChatGroup(group.id) }.takeIf { convertible },
-        MenuAction("Leave Group", SOCIAL_ASSETS + "x-close.svg", danger = true) {
-            ConfirmPrompt.ask("Leave ${group.name?.takeIf { it.isNotBlank() } ?: "this group"}?", "You will stop getting its messages until someone adds you back.", "Leave", SOCIAL_ASSETS + "x-close.svg") {
-                if (SocialChatLink.active?.id == group.id) SocialChatLink.close()
-                GroupsRepository.removeMember(group.id, self)
-            }
-        }.takeIf { !group.special },
+        MenuAction("Invite Friends", { state.dialog = SocialDialog.InviteToGroup(group.id) }, icon = SOCIAL_ASSETS + "user-plus-01.svg"),
+        MenuAction("Invite Group to Session", { SocialHosting.inviteGroup(group, self) }, icon = SOCIAL_ASSETS + "log-in-04.svg"),
+        MenuAction("Convert to Normal Chat", { GroupsRepository.claimSpecialChatGroup(group.id) }, icon = SOCIAL_ASSETS + "check.svg").takeIf { convertible },
+        MenuAction("Leave Group", {
+            Confirm.ask(
+                "Leave ${group.name?.takeIf { it.isNotBlank() } ?: "this group"}?",
+                "You will stop getting its messages until someone adds you back.",
+                "Leave",
+                {
+                    if (SocialChatLink.active?.id == group.id) SocialChatLink.close()
+                    GroupsRepository.removeMember(group.id, self)
+                },
+                icon = LobbyIcons.CLOSE,
+            )
+        }, icon = SOCIAL_ASSETS + "x-close.svg", danger = true, dangerColor = KitDangerColor).takeIf { !group.special },
     )
 }
 
 internal fun threadMenuItems(state: SocialPageState, snapshot: SocialSnapshot, thread: SocialThread): List<MenuAction> {
-    val open = MenuAction("Open chat", SOCIAL_ASSETS + "message-chat-circle.svg") { state.source.open(thread) }
+    val open = MenuAction("Open chat", { state.source.open(thread) }, icon = SOCIAL_ASSETS + "message-chat-circle.svg")
     if (thread.party) return listOf(open)
-    val hide = MenuAction("Hide conversation") { state.source.hide(thread) }
+    val hide = MenuAction("Hide conversation", { state.source.hide(thread) })
     val group = GroupsRepository.groups.value.firstOrNull { it.id == thread.id }
     if (thread.group) return listOf(open, hide) + group?.let { groupMenuItems(state, it) }.orEmpty()
     val person = thread.people.firstOrNull() ?: return listOf(open, hide)
@@ -154,7 +157,7 @@ internal fun threadMenuItems(state: SocialPageState, snapshot: SocialSnapshot, t
 @Composable
 private fun GroupMenu(state: SocialPageState, group: GroupSummary) {
     val status by SpecialChatRepository.status.collectAsState()
-    AnchoredPopupButton(themedIcon(LobbyIcons.MORE), "Group options") { close ->
+    AnchoredPopupButton(LobbyIcons.MORE, "Group options") { close ->
         LobbyUserTheme { MenuList(groupMenuItems(state, group, status?.isSpecialChatTarget == true), close) }
     }
 }

@@ -36,11 +36,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusPartyConfig
-import org.polyfrost.polyplus.client.gui.HudComposeHost
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -65,7 +64,7 @@ internal object PingMarkersCompose {
     private var itemY = 0f
     private var itemScale = 1f
 
-    private val host = HudComposeHost("ping_markers") { Content() }
+    private val layer = ComposeHudLayer("ping_markers") { Layer() }.apply { acceptsInput = false }
 
     fun draw(canvas: PingCanvas, graphics: PingGraphics?, ordered: List<PingMarkers.Frame>, now: Long): Boolean {
         frames = ordered
@@ -73,7 +72,11 @@ internal object PingMarkersCompose {
         itemStack = null
         tick++
         Snapshot.sendApplyNotifications()
-        val drawn = host.draw(graphics)
+        //? if > 1.8.9 {
+        val drawn = graphics != null && layer.draw(graphics)
+        //?} else {
+        /*val drawn = layer.draw()
+        *///?}
         frames = emptyList()
         val stack = itemStack
         itemStack = null
@@ -92,11 +95,6 @@ internal object PingMarkersCompose {
         itemX = x
         itemY = y
         itemScale = scale
-    }
-
-    @Composable
-    private fun Content() {
-        ProvideOneConfigTheme { Layer() }
     }
 
     @Composable

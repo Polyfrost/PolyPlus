@@ -8,9 +8,14 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyMediaSize
+import org.polyfrost.polyplus.client.lobby.LobbyCaptureFrequency
+import org.polyfrost.polyplus.client.lobby.LobbyCaptureView
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyReveal
+import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.lobby.LobbyTime
+import kotlin.math.roundToInt
 
 object PolyPlusLobbyConfig : Config(
     "${PolyPlusConstants.ID}-lobby.json",
@@ -80,11 +85,55 @@ object PolyPlusLobbyConfig : Config(
     )
     var quitWithoutConfirmation = false
 
+    @JvmStatic
+    @Switch(
+        title = "Media Widget",
+        description = "Show what's playing in the lobby dock.",
+    )
+    var lobbyMediaWidget = true
+
+    @JvmStatic
+    @Dropdown(
+        title = "Media Widget Size",
+        description = "Show what's playing as a small tile in the dock or a large card above it.",
+        options = ["Compact", "Large"],
+    )
+    var lobbyMediaWidgetSize: LobbyMediaSize = LobbyMediaSize.COMPACT
+
+    @JvmStatic
+    @Dropdown(
+        title = "Scene Capture",
+        description = "How often the lobby saves scenes while you play. You can still capture a spot by hand.",
+        options = ["Often", "Normal", "Rarely", "Off"],
+    )
+    var lobbyCaptureFrequency: LobbyCaptureFrequency = LobbyCaptureFrequency.NORMAL
+
+    @JvmStatic
+    @Dropdown(
+        title = "Scene View",
+        description = "Use the best view around you, or a random good one.",
+        options = ["Best", "Random"],
+    )
+    var lobbyCaptureView: LobbyCaptureView = LobbyCaptureView.BEST
+
+    @JvmStatic
+    @Slider(
+        title = "Automatic Scene Limit",
+        description = "How many automatic captures to keep. 0 keeps them all. Favourites are never removed.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+    )
+    var sceneCaptureLimit = 0f
+
     init {
         preload()
         migrateFromSplitConfigs()
+        LobbySceneStore.captureLimit = sceneCaptureLimit.roundToInt()
+        addCallback("sceneCaptureLimit") { LobbySceneStore.captureLimit = sceneCaptureLimit.roundToInt() }
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
+        hideIf("lobbyMediaWidgetSize") { !lobbyMediaWidget }
         inheritMusicVolume()
     }
 

@@ -2,24 +2,22 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,42 +25,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialBorderWidth
-import org.polyfrost.polyplus.client.gui.SocialDropdownBackground
-import org.polyfrost.polyplus.client.gui.SocialHoverBorder
-import org.polyfrost.polyplus.client.gui.SocialFieldShape
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.Select
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.VoiceButtons
-import org.polyfrost.polyplus.client.gui.lobbyshell.popup
-import org.polyfrost.polyplus.client.gui.lobbysocial.DeviceOptions
 import org.polyfrost.polyplus.client.gui.lobbysocial.DeviceVolume
 import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
-import org.polyfrost.polyplus.client.gui.lobbysocial.SectionHeading
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyVoiceMode
 import org.polyfrost.polyplus.client.party.PartyAudio
@@ -75,11 +58,6 @@ private val Edge = 24.dp
 private val ControlWidth = 300.dp
 private val ControlHeight = 32.dp
 private val LabelRoom = 140.dp
-private val PercentRoom = 50.dp
-private val MenuDrop = 34.dp
-private const val OPEN_CHEVRON = 180f
-
-private class Choice<T>(val label: String, val value: T)
 
 @Composable
 internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
@@ -96,12 +74,12 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
             if (back) BackButton(window::closeVoice)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 PanelTitle("Voice and devices")
-                Label(voiceStatus(party, voice.inVoice), 12.sp, color = MutedText)
+                Text(voiceStatus(party, voice.inVoice), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
             if (party != null) VoiceButtons(party)
-            if (!back) IconButton(themedIcon(LobbyIcons.CLOSE), "Close voice settings", Modifier, window::closeVoice)
+            if (!back) IconButton(icon = LobbyIcons.CLOSE, contentDescription = "Close voice settings", onClick = window::closeVoice, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
         }
-        PaneRule()
+        Divider()
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val control = (maxWidth - Edge * 2 - LabelRoom).coerceAtMost(ControlWidth)
             ScrollFade(Modifier.fillMaxSize().padding(start = Edge, end = Edge, top = Edge), 28.dp) {
@@ -131,7 +109,7 @@ private fun voiceStatus(party: Party?, inVoice: Boolean): String = when {
 @Composable
 private fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeading(title, Modifier.padding(bottom = 4.dp))
+        SectionHeader(title, Modifier.padding(bottom = 4.dp))
         rows()
     }
 }
@@ -139,85 +117,57 @@ private fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun SettingRow(label: String, control: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-        Label(label, 14.sp, Modifier.weight(1f))
+        Text(label, modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         control()
     }
 }
 
 @Composable
 private fun DeviceSelect(input: Boolean, width: Dp) {
-    var open by remember { mutableStateOf(false) }
-    val (interaction, hovered) = rememberSocialHover()
-    val drop = with(LocalDensity.current) { MenuDrop.roundToPx() }
     val device = if (input) PartyVoiceSettings.inputDevice() else PartyVoiceSettings.outputDevice()
-    val accent = OneConfigTheme.accent
-    val fill by animateColorAsState(if (open) accent else SocialDropdownBackground)
-    val edge by animateColorAsState(
-        when {
-            open -> accent
-            hovered -> SocialHoverBorder
-            else -> SocialBorderColor
-        },
-    )
-    val ink = if (open) OneConfigTheme.current.accentTextColor else null
-    Box {
-        Row(
-            Modifier
-                .width(width)
-                .height(ControlHeight)
-                .clip(SocialFieldShape)
-                .background(fill)
-                .border(SocialBorderWidth, edge, SocialFieldShape)
-                .hoverable(interaction)
-                .clickableWithSound { open = !open }
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Label(PartyAudio.deviceLabel(device).ifBlank { "Default" }, 14.sp, Modifier.weight(1f), color = ink ?: SocialTextPrimary)
-            ThemedIcon(SOCIAL_ASSETS + "chevron-up.svg", ink ?: MutedText, 14.dp, if (open) Modifier else Modifier.rotate(OPEN_CHEVRON))
-        }
-        if (open) {
-            EscapeCloses { open = false }
-            Popup(
-                alignment = Alignment.TopStart,
-                offset = IntOffset(0, drop),
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                Column(Modifier.width(width).popup().padding(6.dp)) { DeviceOptions(input) { open = false } }
-            }
-        }
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    var scans by remember { mutableStateOf(0) }
+    LaunchedEffect(pressed) { if (pressed) scans++ }
+    val options = remember(input, device, scans) {
+        val devices = listOf("") + if (input) PartyAudio.inputDevices() else PartyAudio.outputDevices()
+        if (device in devices) devices else devices + device
     }
+    Select(
+        selected = device,
+        options = options,
+        onSelect = { option -> if (input) PartyVoiceSettings.setInputDevice(option) else PartyVoiceSettings.setOutputDevice(option) },
+        modifier = Modifier.width(width),
+        label = { PartyAudio.deviceLabel(it).ifBlank { "Default" } },
+        interactionSource = source,
+        contentDescription = if (input) "Microphone" else "Speaker",
+    )
 }
 
 @Composable
 private fun VolumeControl(input: Boolean, width: Dp) {
-    DeviceVolume(input, Modifier.width(width).height(ControlHeight), label = null, sliderWidth = (width - PercentRoom).value)
-}
-
-@Composable
-private fun <T> Segments(options: List<Choice<T>>, selected: T, width: Dp, enabled: Boolean = true, onSelect: (T) -> Unit) {
-    SegmentTrack(Modifier.width(width).height(ControlHeight), enabled) {
-        options.forEach { option ->
-            SegmentButton(option.label, option.value == selected, Modifier.weight(1f).fillMaxHeight(), 12.sp, enabled, onClick = { onSelect(option.value) })
-        }
-    }
+    DeviceVolume(input, Modifier.width(width).height(ControlHeight), label = null)
 }
 
 @Composable
 private fun ModeControl(party: Party, width: Dp) {
-    val options = remember { listOf(Choice("Everyone", PartyVoiceMode.Party), Choice("Proximity", PartyVoiceMode.Proximity)) }
+    val tabs = remember { listOf(TabItem(PartyVoiceMode.Party, "Everyone"), TabItem(PartyVoiceMode.Proximity, "Proximity")) }
     val mode = if (party.settings.voiceMode == PartyVoiceMode.Proximity) PartyVoiceMode.Proximity else PartyVoiceMode.Party
-    Segments(options, mode, width, PartyRepository.isLeader(party)) { PartyRepository.setVoiceMode(it) }
+    TabRow(tabs, mode, { PartyRepository.setVoiceMode(it) }, Modifier.width(width), style = TabStyle.Segmented, enabled = PartyRepository.isLeader(party))
 }
 
 @Composable
 private fun InputControl(width: Dp) {
-    val options = remember { listOf(Choice("Voice activity", VoiceInputMode.VOICE_ACTIVITY), Choice("Push to talk", VoiceInputMode.PUSH_TO_TALK)) }
+    val tabs = remember { listOf(TabItem(VoiceInputMode.VOICE_ACTIVITY, "Voice activity"), TabItem(VoiceInputMode.PUSH_TO_TALK, "Push to talk")) }
     var mode by remember { mutableStateOf(PartyVoiceSettings.inputMode()) }
-    Segments(options, mode, width) {
-        mode = it
-        PartyVoiceSettings.setInputMode(it)
-    }
+    TabRow(
+        tabs,
+        mode,
+        {
+            mode = it
+            PartyVoiceSettings.setInputMode(it)
+        },
+        Modifier.width(width),
+        style = TabStyle.Segmented,
+    )
 }

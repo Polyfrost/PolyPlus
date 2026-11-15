@@ -4,16 +4,16 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.layout.PaddingValues
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeColors
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,10 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -57,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -66,6 +66,14 @@ import org.polyfrost.polyplus.client.launcher.OneLauncherAccounts
 import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
 import org.polyfrost.polyplus.client.social.PlayerStatusRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 
 @Composable
 internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit) {
@@ -80,6 +88,7 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
             modifier = Modifier
                 .fillMaxSize()
                 .background(SocialWindowScrim)
+                .notFocusable()
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }, onClick = onClose),
@@ -95,6 +104,7 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                     .socialGlow()
                     .background(SocialWindowBackground)
                     .border(SocialBorderWidth, SocialBorderColor, SocialWindowShape)
+                    .notFocusable()
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
             ) {
                 Row(
@@ -103,11 +113,18 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Announce("Accounts")
-                    SocialText(text = "Accounts", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Accounts", style = OneConfigTheme.current.typography.body.copy(fontSize = 24.sp, fontWeight = FontWeight.SemiBold))
                     Spacer(Modifier.weight(1f))
-                    IconButton(themedIcon(SOCIAL_ASSETS + "x-close.svg"), "Close", Modifier, onClose)
+                    IconButton(
+                        icon = SOCIAL_ASSETS + "x-close.svg",
+                        contentDescription = "Close",
+                        onClick = onClose,
+                        modifier = Modifier.size(34.dp),
+                        tint = OneConfigTheme.current.textColor,
+                        tooltipPlacement = TooltipPlacement.BelowStart,
+                    )
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+                Divider()
                 Row(Modifier.fillMaxWidth().weight(1f)) {
                     // the live preview reads the session user, so rebuild it when the active account changes
                     key(accounts?.firstOrNull { it.active }?.id) {
@@ -119,63 +136,63 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
                             modelScale = 0.35F
                         )
                     }
-                    Box(Modifier.width(1.dp).fillMaxHeight().background(SocialBorderColor))
+                    Divider(vertical = true)
+                    val scroll = rememberScrollState()
                     // scroll the whole column, as errors and the add buttons can outgrow short windows too
-                    Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            when {
-                                accounts == null -> SocialText(
-                                    "Loading…",
-                                    fontSize = 14.sp,
-                                    color = SocialTextSecondary
-                                )
+                    ScrollContainer(scroll, Modifier.weight(1f).fillMaxHeight(), scrollbar = false) {
+                        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                when {
+                                    accounts == null -> Text(
+                                        "Loading…",
+                                        color = SocialTextSecondary,
+                                        style = OneConfigTheme.current.typography.body,
+                                    )
 
-                                accounts.isEmpty() -> SocialText(
-                                    "No accounts found in the launcher",
-                                    fontSize = 14.sp,
-                                    color = SocialTextSecondary,
-                                )
+                                    accounts.isEmpty() -> Text(
+                                        "No accounts found in the launcher",
+                                        color = SocialTextSecondary,
+                                        style = OneConfigTheme.current.typography.body,
+                                    )
 
-                                else -> accounts.forEach { account ->
-                                    key(account.id) {
-                                        AccountButton(
-                                            account = account,
-                                            enabled = idle,
-                                            onClick = { actions.switchTo(account) },
-                                            onRemove = { actions.remove(account) },
-                                            onRefresh = { actions.refresh(account) },
-                                            refreshing = actions.refreshingId == account.id,
-                                        )
+                                    else -> accounts.forEach { account ->
+                                        key(account.id) {
+                                            AccountButton(
+                                                account = account,
+                                                enabled = idle,
+                                                onClick = { actions.switchTo(account) },
+                                                onRemove = { actions.remove(account) },
+                                                onRefresh = { actions.refresh(account) },
+                                                refreshing = actions.refreshingId == account.id,
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        AccountStatusText(actions.busy, actions.error, actions.errorSteps)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            AddAccountButton(
-                                icon = ASSETS + "globe-01.svg",
-                                text = "Add Microsoft account",
-                                enabled = idle,
-                                onClick = actions::addMicrosoft,
-                            )
-                            AddAccountButton(
-                                icon = ASSETS + "plus.svg",
-                                text = "Add offline account",
-                                enabled = idle,
-                                onClick = actions::openOfflineEntry,
-                            )
-                        }
+                            AccountStatusText(actions.busy, actions.error, actions.errorSteps)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                TextButton(
+                                    text = "Add Microsoft account",
+                                    icon = ASSETS + "globe-01.svg",
+                                    onClick = actions::addMicrosoft,
+                                    enabled = idle,
+                                )
+                                TextButton(
+                                    text = "Add offline account",
+                                    icon = ASSETS + "plus.svg",
+                                    onClick = actions::openOfflineEntry,
+                                    enabled = idle,
+                                )
+                            }
 
+                        }
                     }
                 }
             }
@@ -212,26 +229,30 @@ fun AccountButton(
     onRefresh: () -> Unit,
     refreshing: Boolean = false,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
+    val theme = OneConfigTheme.current
     var confirmRemove by remember { mutableStateOf(false) }
     val clickable = enabled && !account.active && !confirmRemove
     val accountLabel = account.username + ", " + if (account.microsoft) "Microsoft account" else "Offline account"
+    val dimAlpha = theme.disabledAlpha
+    val rowAlpha = when {
+        refreshing -> REFRESHING_ALPHA
+        enabled || account.active -> 1f
+        else -> dimAlpha
+    }
     val borderColor = when {
         account.expired -> SocialDangerColor
         account.active -> OneConfigTheme.accent
-        else -> OneConfigTheme.current.borderColor
+        else -> theme.borderColor
     }
+    val shape = OneConfigTheme.shape(8.dp)
 
     Row(
         modifier = Modifier
-            .clip(ppShape(8.dp))
-            .background(if (hovered && clickable) OneConfigTheme.current.componentBackground.copy(alpha = 0.4f) else Color.Transparent)
-            .hoverable(interaction)
-            .then(if (clickable) Modifier.clickableWithSound(accountLabel, selected = account.active.takeIf { it }, onClick = onClick) else Modifier)
-            .graphicsLayer { alpha = if (refreshing) 0.7f else if (enabled || account.active) 1f else 0.5f }
+            .clip(shape)
+            .oneConfigClickable(accountLabel, onClick, selected = account.active.takeIf { it }, enabled = clickable, shape = shape)
+            .graphicsLayer { alpha = rowAlpha }
             .fillMaxWidth()
-            .border(1.dp, borderColor, ppShape(8.dp))
+            .border(1.dp, borderColor, shape)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -239,27 +260,29 @@ fun AccountButton(
         PlayerHead(account.id, 36.dp, Modifier)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceEvenly) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SocialText(
+                Text(
                     account.username,
-                    fontSize = 20.sp,
                     modifier = Modifier.weight(1f, fill = false),
-                    color = OneConfigTheme.current.textColor,
-                    textAlign = TextAlign.Right,
+                    color = theme.textColor,
+                    style = OneConfigTheme.current.typography.body.copy(fontSize = 20.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                    textAlign = TextAlign.Right,
                 )
                 if (account.active) AccountBadge(ASSETS + "check-circle.svg", "Default", OneConfigTheme.accent)
                 if (account.active && account.microsoft && PrivacyConsent.allowsOnlineServices()) AccountStatusBadge()
                 if (account.expired) AccountBadge(ASSETS + "alert-triangle.svg", "Expired", SocialDangerText)
             }
-            SocialText(
+            Text(
                 if (confirmRemove) "Remove this account?"
                 else (if (account.microsoft) "Microsoft" else "Offline") + " · " + account.id,
-                fontSize = 13.sp,
-                color = if (confirmRemove) SocialDangerText else OneConfigTheme.current.textColorSecondary,
-                textAlign = TextAlign.Right,
+                color = if (confirmRemove) SocialDangerText else theme.textColorSecondary,
+                style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Normal),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                textAlign = TextAlign.Right,
             )
         }
         if (confirmRemove) {
@@ -283,57 +306,50 @@ fun AccountButton(
 }
 
 @Composable
-private fun AccountStatusBadge() {
-    val status by PlayerStatusRepository.status.collectAsState()
-    val hidden = status == PlayerStatus.Offline
-    Row(
-        modifier = Modifier
-            .clip(OneConfigTheme.current.circleShape)
-            .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, OneConfigTheme.current.borderColor, OneConfigTheme.current.circleShape)
-            .clickableWithSound(selfStatusLabel(status)) { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        PresenceDot(!hidden, 8.dp)
-        SocialText(selfStatusLabel(status), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = OneConfigTheme.current.textColor)
-    }
+private fun AccountActionIcon(icon: String, color: Color, enabled: Boolean, label: String, onClick: () -> Unit) {
+    IconButton(
+        icon = icon,
+        contentDescription = label,
+        onClick = onClick,
+        enabled = enabled,
+        tooltip = null,
+        tint = color,
+        frameSize = 30.dp,
+        iconSize = 18.dp,
+    )
 }
 
 @Composable
-private fun AccountBadge(icon: String, text: String, color: Color) {
-    Row(
-        modifier = Modifier
-            .clip(OneConfigTheme.current.circleShape)
-            .background(OneConfigTheme.current.componentBackground)
-            .border(1.dp, color, OneConfigTheme.current.circleShape)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        ThemedIcon(icon, color, 12.dp)
-        SocialText(text, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = color)
-    }
+private fun AccountStatusBadge() {
+    val status by PlayerStatusRepository.status.collectAsState()
+    val hidden = status == PlayerStatus.Offline
+    val shape = OneConfigTheme.current.shapes.pill
+    Badge(
+        selfStatusLabel(status),
+        Modifier.oneConfigClickable(selfStatusLabel(status), { PlayerStatusRepository.set(if (hidden) PlayerStatus.Online else PlayerStatus.Offline) }, shape = shape),
+        tone = if (hidden) BadgeTone.Neutral else BadgeTone.Success,
+        dot = true,
+    )
 }
 
 @Composable
 private fun RefreshAccountButton(color: Color, enabled: Boolean, spinning: Boolean, onClick: () -> Unit) {
     val rotation = if (spinning) {
-        val transition = rememberInfiniteTransition()
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(REFRESH_SPIN_MS, easing = LinearEasing)),
+        val angle by Motion.animateInfiniteFloat(
+            initial = 0f,
+            target = 360f,
+            spec = infiniteRepeatable(tween(REFRESH_SPIN_MS, easing = LinearEasing)),
         )
         angle
     } else 0f
+    val dimAlpha = OneConfigTheme.current.disabledAlpha
+    val shape = OneConfigTheme.shape(6.dp)
     Box(
         modifier = Modifier
             .size(30.dp)
-            .clip(ppShape(6.dp))
-            .graphicsLayer { alpha = if (enabled || spinning) 1f else 0.4f }
-            .then(if (enabled) Modifier.clickableWithSound("Refresh account", onClick = onClick) else Modifier),
+            .clip(shape)
+            .graphicsLayer { alpha = if (enabled || spinning) 1f else dimAlpha }
+            .oneConfigClickable("Refresh account", onClick, enabled = enabled, shape = shape),
         contentAlignment = Alignment.Center,
     ) {
         ThemedIcon(ASSETS + "refresh-cw-01.svg", color, 18.dp, Modifier.rotate(rotation))
@@ -363,4 +379,20 @@ private fun Modifier.socialGlow(opacity: Float = 0.25f): Modifier {
 
 private const val REFRESH_SPIN_MS = 800
 
+private const val REFRESHING_ALPHA = 0.7f
+
 private const val SOCIAL_UI_SCALE = 1.3f
+
+@Composable
+private fun AccountBadge(icon: String, text: String, color: Color) {
+    val theme = OneConfigTheme.current
+    Badge(
+        text,
+        style = BadgeStyle.Hairline,
+        icon = icon,
+        colors = BadgeColors(container = theme.componentBackground, content = color, border = color),
+        shape = theme.circleShape,
+        labelStyle = TextStyle(fontSize = 10.sp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+    )
+}

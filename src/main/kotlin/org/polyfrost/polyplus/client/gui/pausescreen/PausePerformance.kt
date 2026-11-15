@@ -50,20 +50,17 @@ import kotlinx.coroutines.delay
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
 import org.polyfrost.polyplus.client.gui.platformLabel
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.SparkCompat
@@ -73,6 +70,8 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private const val PERF_TICK_MILLIS = 500L
 private const val PERF_PULSE_NANOS = 1_600_000_000.0
@@ -200,7 +199,7 @@ internal fun performanceShown(): Boolean = SparkCompat.installed
 internal fun PerformanceBarTool(screen: OneClientPauseScreen, glass: Boolean = true) {
     val slots = rememberChipSlots()
     PerfTool(screen) { view, press, menu ->
-        BarTile(Modifier.growOnlyWidth(), active = menu, onClick = press, glass = glass) {
+        BarTile(Modifier.growOnlyWidth(), label = "Performance and spark tools", active = menu, onClick = press, glass = glass) {
             Row(
                 Modifier.padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -227,24 +226,24 @@ internal fun PerformanceBarTool(screen: OneClientPauseScreen, glass: Boolean = t
 internal fun PerformanceCardTool(screen: OneClientPauseScreen) {
     val slots = rememberChipSlots()
     PerfTool(screen, side = true) { view, press, menu ->
-        CardRow(active = menu, onClick = press) { lit ->
+        CardRow(label = "Performance and spark tools", active = menu, onClick = press) { lit ->
             when (val profile = view.profile) {
                 is SparkProfile.Running -> {
                     Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
                     ChipText("Profiling", SocialTextPrimary, FontWeight.Medium, size = CARD_TEXT)
                     Spacer(Modifier.weight(1f))
                     val seconds = ((System.currentTimeMillis() - profile.startedAt) / 1000L).coerceIn(0L, profile.seconds.toLong())
-                    ChipText(clock(seconds), MutedText, FontWeight.Normal, size = CARD_DETAIL)
+                    ChipText(clock(seconds), OneConfigTheme.current.mutedText, FontWeight.Normal, size = CARD_DETAIL)
                 }
                 SparkProfile.Uploading -> {
                     Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
                     ChipText("Uploading profile", SocialTextPrimary, FontWeight.Medium, size = CARD_TEXT)
                 }
                 else -> {
-                    Gauge(view.fps, if (lit) SocialTextPrimary else MutedText)
+                    Gauge(view.fps, if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText)
                     ChipText(fpsText(view), SocialTextPrimary, FontWeight.Medium, Modifier.widthIn(min = slots.cardFps), size = CARD_TEXT)
                     Spacer(Modifier.weight(1f))
-                    ChipText(frameText(view), MutedText, FontWeight.Normal, Modifier.widthIn(min = slots.cardFrame), TextAlign.End, CARD_DETAIL)
+                    ChipText(frameText(view), OneConfigTheme.current.mutedText, FontWeight.Normal, Modifier.widthIn(min = slots.cardFrame), TextAlign.End, CARD_DETAIL)
                 }
             }
         }
@@ -262,7 +261,9 @@ private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigge
     }
     val current = view ?: return
     val refresh: () -> Unit = { readPerf()?.let { view = it } }
-    val (interaction, hovered) = rememberSocialHover()
+    val hoverState = rememberHoverState()
+    val interaction = hoverState.interactionSource
+    val hovered = hoverState.hovered
     var menu by remember { mutableStateOf(false) }
     val anchor = rememberToolAnchor(side)
     Box(Modifier.hoverable(interaction)) {
@@ -279,6 +280,7 @@ private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigge
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
+                EscapeCloses(close)
                 MenuList(menuItems(screen, current, refresh), close)
             }
         }
@@ -290,7 +292,7 @@ private fun BarLines(top: String, bottom: String, topWidth: Dp, bottomWidth: Dp)
     val width = maxOf(topWidth, bottomWidth)
     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
         ChipText(top, SocialTextPrimary, FontWeight.Medium, Modifier.widthIn(min = width), size = BAR_TEXT)
-        ChipText(bottom, MutedText, FontWeight.Normal, Modifier.widthIn(min = width), size = BAR_DETAIL)
+        ChipText(bottom, OneConfigTheme.current.mutedText, FontWeight.Normal, Modifier.widthIn(min = width), size = BAR_DETAIL)
     }
 }
 
@@ -329,8 +331,8 @@ private fun PerfPanel(view: PerfView) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Label("Performance", 13.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            Label("spark", 11.sp, color = MutedText)
+            Text("Performance", Modifier.weight(1f), style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text("spark", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         PanelSection("Frame") {
             PanelStat("FPS", view.fps.toString())
@@ -340,7 +342,7 @@ private fun PerfPanel(view: PerfView) {
             PanelSection("Server") {
                 val server = view.stats?.server
                 if (view.worldPaused) {
-                    Label("Paused while this menu is open", 12.sp, color = MutedText)
+                    Text("Paused while this menu is open", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 } else {
                     PanelStat("TPS, 10s", server?.tps10s?.let(::one) ?: "--")
                     PanelStat("TPS, 1m", server?.tps1m?.let(::one) ?: "--")
@@ -357,16 +359,16 @@ private fun PerfPanel(view: PerfView) {
                 PanelStat("System", cpuSystem?.let(::percent) ?: "--")
             }
         }
-        Hairline()
-        Label(if (view.profiling) "spark is profiling. Click for options." else "Click for spark tools", 11.sp, color = MutedText)
+        Divider()
+        Text(if (view.profiling) "spark is profiling. Click for options." else "Click for spark tools", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
 private fun PanelSection(title: String, rows: @Composable ColumnScope.() -> Unit) {
-    Hairline()
+    Divider()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Label(title, 11.sp, color = MutedText, weight = FontWeight.Medium)
+        Text(title, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         rows()
     }
 }
@@ -374,7 +376,7 @@ private fun PanelSection(title: String, rows: @Composable ColumnScope.() -> Unit
 @Composable
 private fun PanelStat(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Label(label, 12.sp, Modifier.weight(1f), color = MutedText)
+        Text(label, Modifier.weight(1f), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         ChipText(value, SocialTextPrimary, FontWeight.Medium, align = TextAlign.End)
     }
 }
@@ -428,10 +430,11 @@ private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () 
 @Composable
 private fun ProfilingDot() {
     val frame by rememberFrame()
+    val reduced = Motion.reduced
     Box(
         Modifier
             .size(DOT_SIZE)
-            .graphicsLayer { alpha = (0.7f + 0.3f * cos(frame / PERF_PULSE_NANOS * 2.0 * Math.PI)).toFloat() }
+            .graphicsLayer { alpha = if (reduced) 1f else (0.7f + 0.3f * cos(frame / PERF_PULSE_NANOS * 2.0 * Math.PI)).toFloat() }
             .background(OneConfigTheme.accent, OneConfigTheme.current.circleShape),
     )
 }

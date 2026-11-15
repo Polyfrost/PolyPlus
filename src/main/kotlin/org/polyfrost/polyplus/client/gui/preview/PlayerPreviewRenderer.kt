@@ -1622,6 +1622,11 @@ object PlayerPreviewRenderer {
         GlStateManager.enableCull(); GlStateManager.disableCull()
         GlStateManager.enableBlend(); GlStateManager.disableBlend()
         GlStateManager.enableLighting(); GlStateManager.disableLighting()
+        GlStateManager.activeTexture(GLX.GL_TEXTURE0); GlStateManager.activeTexture(GLX.GL_TEXTURE1)
+        GlStateManager.enableTexture(); GlStateManager.disableTexture()
+        GlStateManager.activeTexture(GLX.GL_TEXTURE0)
+        GlStateManager.disableTexture(); GlStateManager.enableTexture()
+        GlStateManager.bindTexture(0)
         GL11.glDisable(GL11.GL_SCISSOR_TEST)
         GL11.glDisable(GL11.GL_STENCIL_TEST)
     }

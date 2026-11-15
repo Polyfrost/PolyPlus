@@ -2,10 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -52,6 +48,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -62,32 +62,34 @@ import kotlinx.coroutines.delay
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ProgressBar
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipChildHover
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.api.pause.PauseWidget
 import org.polyfrost.polyplus.api.pause.PauseWidgetContext
 import org.polyfrost.polyplus.api.pause.PauseWidgets
-import org.polyfrost.polyplus.client.gui.LIGHT_TEXT_LIMIT
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.compat.Mods
 import kotlin.math.abs
 import kotlin.math.sin
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private const val READ_MILLIS = 250L
-private const val DISABLED_ALPHA = 0.4f
 private const val TONE_MILLIS = 450
 private const val WASH_HEAD = 0.24f
 private const val WASH_TAIL = 0.08f
 private const val GLOW_ALPHA = 0.45f
 private const val MARQUEE_DELAY = 700
+private const val HINT_DWELL_MILLIS = 900L
+private const val MENU_HINT = "Right-click to move or remove"
 private val TITLE_SEPARATORS = listOf(" - ", " – ", " — ")
 private val DARK_INK = Color(0xFF101114)
 private val BAR_ART = 38.dp
@@ -251,8 +253,34 @@ private class MediaTone(val accent: Color, val average: Color, val presence: Flo
 
 private enum class MediaGlyph { PREVIOUS, NEXT, PLAY, PAUSE }
 
+private object MediaMenuHint {
+    var learned by mutableStateOf(false)
+}
+
+internal fun Modifier.learnsMenu(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) MediaMenuHint.learned = true
+        }
+    }
+}
+
 @Composable
-private fun rememberTrack(): PauseMediaTrack? {
+internal fun MediaMenuHinted(text: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    TooltipBox(
+        if (MediaMenuHint.learned) null else text,
+        modifier,
+        placement = TooltipPlacement.AboveCenter,
+        showOnFocus = false,
+        delayMillis = HINT_DWELL_MILLIS,
+        hideWhileChildHovered = true,
+        content = content,
+    )
+}
+
+@Composable
+internal fun rememberMediaTrack(): PauseMediaTrack? {
     DisposableEffect(Unit) {
         PauseEvergreenMedia.acquire()
         onDispose { PauseEvergreenMedia.release() }
@@ -285,15 +313,13 @@ private fun rememberNow(playing: Boolean): Long {
 }
 
 @Composable
-private fun rememberTone(track: PauseMediaTrack?, reduced: Boolean): MediaTone {
+private fun rememberTone(track: PauseMediaTrack?): MediaTone {
     val fallback = OneConfigTheme.accent
     val accent = track?.artAccent?.let(::Color) ?: fallback
     val average = track?.artAverage?.let(::Color) ?: accent
-    val colorSpec: AnimationSpec<Color> = if (reduced) snap() else tween(TONE_MILLIS)
-    val floatSpec: AnimationSpec<Float> = if (reduced) snap() else tween(TONE_MILLIS)
-    val animatedAccent by animateColorAsState(accent, colorSpec)
-    val animatedAverage by animateColorAsState(average, colorSpec)
-    val presence by animateFloatAsState(if (track != null) 1f else 0f, floatSpec)
+    val animatedAccent by Motion.animateColorAsState(accent, tween(TONE_MILLIS))
+    val animatedAverage by Motion.animateColorAsState(average, tween(TONE_MILLIS))
+    val presence by Motion.animateFloatAsState(if (track != null) 1f else 0f, tween(TONE_MILLIS))
     return MediaTone(animatedAccent, animatedAverage, presence)
 }
 
@@ -314,12 +340,12 @@ private fun BoxScope.Wash(tone: MediaTone, horizontal: Boolean) {
     val tail = tone.average.copy(alpha = WASH_TAIL * tone.presence)
     val stops = arrayOf(0f to head, 0.55f to tail, 1f to Color.Transparent)
     val brush = if (horizontal) Brush.horizontalGradient(*stops) else Brush.verticalGradient(*stops)
-    Box(Modifier.matchParentSize().background(brush, ppShape(TILE_RADIUS)))
+    Box(Modifier.matchParentSize().background(brush, OneConfigTheme.shape(TILE_RADIUS)))
 }
 
-private fun readableWash(color: Color, text: Color): Color {
+private fun readableWash(color: Color, lightTheme: Boolean): Color {
     val lum = color.luminance()
-    return if (text.luminance() > LIGHT_TEXT_LIMIT) {
+    return if (!lightTheme) {
         lerp(color, Color.Black, ((lum - 0.35f) / 0.65f).coerceIn(0f, 1f) * WASH_SHIFT_MAX)
     } else {
         lerp(color, Color.White, ((0.65f - lum) / 0.65f).coerceIn(0f, 1f) * WASH_SHIFT_MAX)
@@ -355,10 +381,10 @@ private fun vivid(color: Color, fallback: Color): Color {
 @Composable
 private fun BoxScope.PanelWash(tone: MediaTone) {
     if (tone.presence <= 0f) return
-    val text = SocialTextPrimary
-    val head = readableWash(tone.accent, text).copy(alpha = PANEL_WASH_HEAD * tone.presence)
-    val mid = readableWash(lerp(tone.accent, tone.average, 0.5f), text).copy(alpha = PANEL_WASH_MID * tone.presence)
-    val tail = readableWash(tone.average, text).copy(alpha = PANEL_WASH_TAIL * tone.presence)
+    val lightTheme = OneConfigTheme.current.isLight
+    val head = readableWash(tone.accent, lightTheme).copy(alpha = PANEL_WASH_HEAD * tone.presence)
+    val mid = readableWash(lerp(tone.accent, tone.average, 0.5f), lightTheme).copy(alpha = PANEL_WASH_MID * tone.presence)
+    val tail = readableWash(tone.average, lightTheme).copy(alpha = PANEL_WASH_TAIL * tone.presence)
     Box(Modifier.matchParentSize().background(Brush.horizontalGradient(0f to head, 0.45f to mid, 1f to tail)))
 }
 
@@ -370,7 +396,7 @@ private fun PanelArt(art: PolyBitmap?) {
         Image(bitmap, null, modifier, contentScale = ContentScale.Crop)
     } else {
         Box(modifier.background(SocialTextPrimary.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
-            PauseGlyph(asset("headphones-02"), MutedText, 40.dp)
+            PauseGlyph(asset("headphones-02"), OneConfigTheme.current.mutedText, 40.dp)
         }
     }
 }
@@ -380,17 +406,17 @@ private fun PanelMeta(track: PauseMediaTrack, accent: Color, reduced: Boolean) {
     val artist = track.artist.ifBlank { track.playerName }
     val player = track.playerName.takeIf { it.isNotBlank() && track.artist.isNotBlank() }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (artist.isNotBlank()) Label(artist, 12.sp, Modifier.weight(1f, fill = false), color = MutedText)
+        if (artist.isNotBlank()) Text(artist, Modifier.weight(1f, fill = false), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         if (track.playing) {
             if (reduced) Equalizer(accent, 0L) else LiveEqualizer(accent)
         }
         if (player != null) {
             Box(
                 Modifier
-                    .background(SocialTextPrimary.copy(alpha = 0.08f), ppShape(6.dp))
+                    .background(SocialTextPrimary.copy(alpha = 0.08f), OneConfigTheme.shape(6.dp))
                     .padding(horizontal = 6.dp, vertical = 1.dp),
             ) {
-                Label(player, 10.sp, color = MutedText, weight = FontWeight.Medium)
+                Text(player, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
     }
@@ -401,48 +427,54 @@ private fun PanelProgress(track: PauseMediaTrack, accent: Color, modifier: Modif
     val now = rememberNow(track.playing)
     val elapsed = clock(track.positionAt(now))
     if (track.lengthMs <= 0) {
-        Box(modifier) { TabularLabel(elapsed, 11.sp, MutedText, FontWeight.Normal) }
+        Box(modifier) { TabularLabel(elapsed, 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal) }
         return
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ProgressLine(fraction(track, now), accent, PANEL_PROGRESS)
+        ProgressBar(fraction(track, now), tint = accent, thickness = PANEL_PROGRESS)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TabularLabel(elapsed, 10.sp, MutedText, FontWeight.Normal)
+            TabularLabel(elapsed, 10.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
             Box(Modifier.weight(1f))
-            TabularLabel(clock(track.lengthMs), 10.sp, MutedText, FontWeight.Normal)
+            TabularLabel(clock(track.lengthMs), 10.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
         }
     }
 }
 
 @Composable
-private fun MediaPanel(reduced: Boolean) {
-    val track = rememberTrack()
-    val tone = rememberTone(track, reduced)
+private fun MediaPanel(reduced: Boolean) = MediaPanel(rememberMediaTrack(), reduced, MENU_HINT)
+
+@Composable
+internal fun MediaPanel(track: PauseMediaTrack?, reduced: Boolean, menuHint: String) {
+    val tone = rememberTone(track)
     val accent = vivid(tone.accent, OneConfigTheme.accent)
-    val (interaction, hovered) = rememberSocialHover()
-    Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT).hoverable(interaction)) {
-        PanelWash(tone)
-        Row(Modifier.fillMaxSize()) {
-            PanelArt(track?.art)
-            BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)) {
-                val inline = maxWidth >= PANEL_INLINE_WIDTH
-                Column(Modifier.fillMaxSize()) {
-                    if (track == null) {
-                        Label("Nothing playing", 15.sp, color = MutedText, weight = FontWeight.Medium)
-                        Label("Play something in another app", 12.sp, Modifier.padding(top = 3.dp), color = MutedText)
-                    } else {
-                        Title(track.displayTitle, 15.sp, hovered && !reduced)
-                        Box(Modifier.padding(top = 3.dp)) { PanelMeta(track, accent, reduced) }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (track != null && !inline) PanelProgress(track, accent, Modifier.fillMaxWidth().padding(bottom = 8.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        if (track != null && inline) {
-                            PanelProgress(track, accent, Modifier.weight(1f).padding(end = 14.dp))
+    val hoverState = rememberHoverState()
+    val interaction = hoverState.interactionSource
+    val hovered = hoverState.hovered
+    MediaMenuHinted(menuHint, Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
+        Box(Modifier.fillMaxSize().hoverable(interaction).learnsMenu()) {
+            PanelWash(tone)
+            Row(Modifier.fillMaxSize()) {
+                PanelArt(track?.art)
+                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)) {
+                    val inline = maxWidth >= PANEL_INLINE_WIDTH
+                    Column(Modifier.fillMaxSize()) {
+                        if (track == null) {
+                            Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                            Text("Play something in another app", Modifier.padding(top = 3.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                         } else {
-                            Spacer(Modifier.weight(1f))
+                            Title(track.displayTitle, 15.sp, hovered && !reduced)
+                            Box(Modifier.padding(top = 3.dp)) { PanelMeta(track, accent, reduced) }
                         }
-                        Controls(track, tone, PANEL_SKIP, PANEL_SKIP_ICON, PANEL_PLAY, PANEL_PLAY_ICON, 6.dp)
+                        Spacer(Modifier.weight(1f))
+                        if (track != null && !inline) PanelProgress(track, accent, Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (track != null && inline) {
+                                PanelProgress(track, accent, Modifier.weight(1f).padding(end = 14.dp))
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+                            Controls(track, tone, PANEL_SKIP, PANEL_SKIP_ICON, PANEL_PLAY, PANEL_PLAY_ICON, 6.dp)
+                        }
                     }
                 }
             }
@@ -452,67 +484,76 @@ private fun MediaPanel(reduced: Boolean) {
 
 @Composable
 private fun MediaBar(reduced: Boolean) {
-    val track = rememberTrack()
-    val tone = rememberTone(track, reduced)
-    BarTile(glass = false) { hovered ->
-        Wash(tone, horizontal = true)
-        Row(
-            Modifier.padding(start = 1.dp, end = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Artwork(track?.art, BAR_ART, 8.dp, tone)
-            Column(Modifier.width(BAR_TEXT_WIDTH)) {
-                if (track == null) {
-                    Label("Nothing playing", 13.sp, color = MutedText, weight = FontWeight.Medium)
-                } else {
-                    Title(track.displayTitle, 13.sp, hovered && !reduced)
-                    ArtistLine(track, 11.sp, tone.accent, reduced)
-                    val now = rememberNow(track.playing)
-                    ProgressLine(fraction(track, now), tone.accent, BAR_PROGRESS, Modifier.padding(top = 4.dp))
-                }
+    val track = rememberMediaTrack()
+    MediaMenuHinted(MENU_HINT) {
+        BarTile(Modifier.learnsMenu(), glass = false) { hovered -> MediaStrip(track, reduced, hovered) }
+    }
+}
+
+@Composable
+internal fun BoxScope.MediaStrip(track: PauseMediaTrack?, reduced: Boolean, hovered: Boolean, textWidth: Dp = BAR_TEXT_WIDTH) {
+    val tone = rememberTone(track)
+    Wash(tone, horizontal = true)
+    Row(
+        Modifier.padding(start = 1.dp, end = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Artwork(track?.art, BAR_ART, 8.dp, tone)
+        Column(Modifier.width(textWidth)) {
+            if (track == null) {
+                Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            } else {
+                Title(track.displayTitle, 13.sp, hovered && !reduced)
+                ArtistLine(track, 11.sp, tone.accent, reduced)
+                val now = rememberNow(track.playing)
+                ProgressBar(fraction(track, now), Modifier.padding(top = 4.dp), tint = tone.accent, thickness = BAR_PROGRESS)
             }
-            Controls(track, tone, BAR_SKIP, BAR_SKIP_ICON, BAR_PLAY, BAR_PLAY_ICON, 2.dp)
         }
+        Controls(track, tone, BAR_SKIP, BAR_SKIP_ICON, BAR_PLAY, BAR_PLAY_ICON, 2.dp)
     }
 }
 
 @Composable
 private fun MediaCard(reduced: Boolean) {
-    val track = rememberTrack()
-    val tone = rememberTone(track, reduced)
-    val (interaction, hovered) = rememberSocialHover()
-    Box(Modifier.fillMaxWidth().hoverable(interaction)) {
-        Wash(tone, horizontal = false)
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Artwork(track?.art, CARD_ART, 12.dp, tone)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (track == null) {
-                        Label("Nothing playing", 14.sp, color = MutedText, weight = FontWeight.Medium)
-                        Label("Play something in another app", 12.sp, color = MutedText)
-                    } else {
-                        Title(track.displayTitle, 14.sp, hovered && !reduced)
-                        ArtistLine(track, 12.sp, tone.accent, reduced)
+    val track = rememberMediaTrack()
+    val tone = rememberTone(track)
+    val hoverState = rememberHoverState()
+    val interaction = hoverState.interactionSource
+    val hovered = hoverState.hovered
+    MediaMenuHinted(MENU_HINT, Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().hoverable(interaction).learnsMenu()) {
+            Wash(tone, horizontal = false)
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Artwork(track?.art, CARD_ART, 12.dp, tone)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        if (track == null) {
+                            Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                            Text("Play something in another app", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        } else {
+                            Title(track.displayTitle, 14.sp, hovered && !reduced)
+                            ArtistLine(track, 12.sp, tone.accent, reduced)
+                        }
                     }
                 }
-            }
-            if (track != null) {
-                val now = rememberNow(track.playing)
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    ProgressLine(fraction(track, now), tone.accent, CARD_PROGRESS)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TabularLabel(clock(track.positionAt(now)), 11.sp, MutedText, FontWeight.Normal)
-                        Box(Modifier.weight(1f))
-                        if (track.lengthMs > 0) TabularLabel(clock(track.lengthMs), 11.sp, MutedText, FontWeight.Normal)
+                if (track != null) {
+                    val now = rememberNow(track.playing)
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        ProgressBar(fraction(track, now), tint = tone.accent, thickness = CARD_PROGRESS)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TabularLabel(clock(track.positionAt(now)), 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
+                            Box(Modifier.weight(1f))
+                            if (track.lengthMs > 0) TabularLabel(clock(track.lengthMs), 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
+                        }
                     }
                 }
-            }
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Controls(track, tone, CARD_SKIP, CARD_SKIP_ICON, CARD_PLAY, CARD_PLAY_ICON, 10.dp)
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Controls(track, tone, CARD_SKIP, CARD_SKIP_ICON, CARD_PLAY, CARD_PLAY_ICON, 10.dp)
+                }
             }
         }
     }
@@ -521,16 +562,15 @@ private fun MediaCard(reduced: Boolean) {
 @Composable
 private fun Title(text: String, size: TextUnit, scroll: Boolean) {
     if (scroll) {
-        SocialText(
+        Text(
             text,
-            size,
             Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = MARQUEE_DELAY, velocity = MARQUEE_SPEED),
-            fontWeight = FontWeight.Medium,
+            style = OneConfigTheme.current.typography.body.copy(fontSize = size, fontWeight = FontWeight.Medium),
             maxLines = 1,
             softWrap = false,
         )
     } else {
-        Label(text, size, weight = FontWeight.Medium)
+        Text(text, style = OneConfigTheme.current.typography.body.copy(fontSize = size, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -538,7 +578,7 @@ private fun Title(text: String, size: TextUnit, scroll: Boolean) {
 private fun ArtistLine(track: PauseMediaTrack, size: TextUnit, accent: Color, reduced: Boolean) {
     val artist = track.artist.ifBlank { track.playerName }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (artist.isNotBlank()) Label(artist, size, Modifier.weight(1f, fill = false), color = MutedText)
+        if (artist.isNotBlank()) Text(artist, Modifier.weight(1f, fill = false), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = size), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         if (track.playing) {
             if (reduced) Equalizer(accent, 0L) else LiveEqualizer(accent)
         }
@@ -581,7 +621,7 @@ private val EQ_PHASES = doubleArrayOf(0.0, 1.3, 2.4)
 @Composable
 private fun Artwork(art: PolyBitmap?, size: Dp, radius: Dp, tone: MediaTone) {
     val bitmap = rememberArt(art)
-    val shape = ppShape(radius)
+    val shape = OneConfigTheme.shape(radius)
     if (bitmap != null) {
         val glow = tone.accent.copy(alpha = GLOW_ALPHA * tone.presence)
         Box(
@@ -598,21 +638,13 @@ private fun Artwork(art: PolyBitmap?, size: Dp, radius: Dp, tone: MediaTone) {
             Modifier.size(size).background(SocialTextPrimary.copy(alpha = 0.05f), shape).border(1.dp, SocialBorderColor, shape),
             contentAlignment = Alignment.Center,
         ) {
-            PauseGlyph(asset("headphones-02"), MutedText, size * 0.42f)
+            PauseGlyph(asset("headphones-02"), OneConfigTheme.current.mutedText, size * 0.42f)
         }
     }
 }
 
 private fun fraction(track: PauseMediaTrack, now: Long): Float =
     if (track.lengthMs > 0) (track.positionAt(now).toFloat() / track.lengthMs).coerceIn(0f, 1f) else 0f
-
-@Composable
-private fun ProgressLine(fraction: Float, accent: Color, height: Dp, modifier: Modifier = Modifier) {
-    val shape = OneConfigTheme.current.circleShape
-    Box(modifier.fillMaxWidth().height(height).clip(shape).background(SocialTextPrimary.copy(alpha = 0.14f))) {
-        if (fraction > 0f) Box(Modifier.fillMaxWidth(fraction).height(height).background(accent, shape))
-    }
-}
 
 @Composable
 private fun Controls(track: PauseMediaTrack?, tone: MediaTone, skip: Dp, skipIcon: Dp, play: Dp, playIcon: Dp, gap: Dp) {
@@ -626,45 +658,52 @@ private fun Controls(track: PauseMediaTrack?, tone: MediaTone, skip: Dp, skipIco
 
 @Composable
 private fun SkipButton(glyph: MediaGlyph, tooltip: String, size: Dp, iconSize: Dp, enabled: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val lit = hovered && enabled
-    Box(
-        Modifier
-            .size(size)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .rowFrame(false, lit, ppShape(if (size > 28.dp) 10.dp else 8.dp))
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.quietClick(interaction, onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Glyph(glyph, if (lit) SocialTextPrimary else SocialTextPrimary.copy(alpha = 0.72f), iconSize)
-        if (lit) TooltipPopup(tooltip, TooltipPlacement.AboveCenter)
+    val hoverState = rememberHoverState()
+    TooltipChildHover(hoverState.hovered && enabled)
+    IconButton(
+        contentDescription = tooltip,
+        onClick = onClick,
+        enabled = enabled,
+        tooltip = tooltip.takeIf { enabled },
+        tooltipPlacement = TooltipPlacement.AboveCenter,
+        interactionSource = hoverState.interactionSource,
+        shape = OneConfigTheme.shape(if (size > 28.dp) 10.dp else 8.dp),
+        frameSize = size,
+        focusRing = false,
+    ) { tint ->
+        Glyph(glyph, tint, iconSize)
     }
 }
 
 @Composable
 private fun PlayButton(playing: Boolean, active: Boolean, tone: MediaTone, size: Dp, iconSize: Dp, enabled: Boolean) {
-    val (interaction, hovered) = rememberSocialHover()
+    val hoverState = rememberHoverState()
+    val interaction = hoverState.interactionSource
+    val hovered = hoverState.hovered
     val lit = hovered && enabled
-    val base = if (active) vivid(tone.accent, OneConfigTheme.accent) else SocialTextPrimary.copy(alpha = 0.08f)
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    TooltipChildHover(lit)
+    val base =if (active) vivid(tone.accent, OneConfigTheme.accent) else SocialTextPrimary.copy(alpha = 0.08f)
     val fill = if (lit && active) lerp(base, Color.White, 0.16f) else base
-    val ink = if (active) inkOn(fill) else MutedText
-    Box(
-        Modifier
-            .size(size)
-            .graphicsLayer {
-                alpha = if (enabled) 1f else DISABLED_ALPHA
-                val scale = if (lit) 1.06f else 1f
-                scaleX = scale
-                scaleY = scale
-            }
-            .background(fill, OneConfigTheme.current.circleShape)
-            .hoverable(interaction)
-            .then(if (enabled) Modifier.quietClick(interaction, PauseEvergreenMedia::toggle) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Glyph(if (playing) MediaGlyph.PAUSE else MediaGlyph.PLAY, ink, iconSize)
-        if (lit) TooltipPopup(if (playing) "Pause" else "Play", TooltipPlacement.AboveCenter)
+    val ink = if (active) inkOn(fill) else OneConfigTheme.current.mutedText
+    val label = if (playing) "Pause" else "Play"
+    TooltipBox(label.takeIf { enabled }, placement = TooltipPlacement.AboveCenter) {
+        Box(
+            Modifier
+                .size(size)
+                .graphicsLayer {
+                    alpha = if (enabled) 1f else disabledAlpha
+                    val scale = if (lit) 1.06f else 1f
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .background(fill, OneConfigTheme.current.circleShape)
+                .hoverable(interaction)
+                .then(if (enabled) Modifier.oneConfigClickable(label, PauseEvergreenMedia::toggle, indication = false, interactionSource = interaction, focusRing = false) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(if (playing) MediaGlyph.PAUSE else MediaGlyph.PLAY, ink, iconSize)
+        }
     }
 }
 

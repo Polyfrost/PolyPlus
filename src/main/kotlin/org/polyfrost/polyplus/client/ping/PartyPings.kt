@@ -316,6 +316,15 @@ object PartyPings {
         _pings.value = visible
     }
 
+    fun sendCooldownMs(): Long = synchronized(lock) { waitFor(sendTimes, SEND_LIMIT, System.currentTimeMillis()) }
+
+    fun replyCooldownMs(): Long = synchronized(lock) { waitFor(replyTimes, REPLY_LIMIT, System.currentTimeMillis()) }
+
+    private fun waitFor(times: ArrayDeque<Long>, limit: Int, now: Long): Long {
+        if (hasRoom(times, limit, now)) return 0L
+        return (times[times.size - limit] + SEND_WINDOW_MS - now).coerceAtLeast(1L)
+    }
+
     private fun hasRoom(times: ArrayDeque<Long>, limit: Int, now: Long): Boolean {
         while (times.isNotEmpty() && now - times.first() >= SEND_WINDOW_MS) times.removeFirst()
         return times.size < limit

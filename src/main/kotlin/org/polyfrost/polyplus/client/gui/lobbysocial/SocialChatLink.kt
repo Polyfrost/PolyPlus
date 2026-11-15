@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
+import androidx.compose.ui.text.style.TextOverflow
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,12 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.polyplus.client.gui.SocialEmojiText
 import org.polyfrost.polyplus.client.gui.formatCooldown
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.rememberCooldownRemaining
 import org.polyfrost.polyplus.client.social.SpecialChatRepository
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 
 internal const val CHAT_LINES = 5
 private const val CHIP_TITLE_LENGTH = 12
@@ -70,7 +71,7 @@ internal fun cooldownReason(conversationId: Int): String? {
 internal fun ChatLines(lines: List<ChatLine>, modifier: Modifier) {
     Box(modifier.clipToBounds(), contentAlignment = Alignment.BottomStart) {
         if (lines.isEmpty()) {
-            Label("No messages yet", 12.sp, color = MutedText)
+            Text("No messages yet", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             return@Box
         }
         Column(
@@ -86,8 +87,8 @@ internal fun ChatLines(lines: List<ChatLine>, modifier: Modifier) {
 private fun ChatLineRow(line: ChatLine) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Row {
-            Label(line.name, 14.sp, Modifier.widthIn(max = ChatNameWidth), weight = FontWeight.Medium)
-            Label(":", 14.sp, color = MutedText, weight = FontWeight.Medium)
+            Text(line.name, modifier = Modifier.widthIn(max = ChatNameWidth), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(":", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         SocialEmojiText(line.text, 14.sp, Modifier.weight(1f))
     }
@@ -97,5 +98,5 @@ private fun ChatLineRow(line: ChatLine) {
 internal fun ConversationChip(conversation: ChatConversation) {
     val title = conversation.title
     val label = if (title.length > CHIP_TITLE_LENGTH) title.take(CHIP_TITLE_LENGTH).trimEnd() + "..." else title
-    Box(Modifier) { Chip(label, selected = true) { } }
+    Box(Modifier) { Chip(label = label, selected = true, onClick = { }) }
 }

@@ -2,18 +2,14 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,9 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,9 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
@@ -49,26 +41,31 @@ import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.PanelSurface
-import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
-import org.polyfrost.polyplus.client.gui.SocialText
+import org.polyfrost.polyplus.client.gui.PanelSurface
+import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.SocialWarnColor
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
-import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.lobby.LobbyCapture
 import org.polyfrost.polyplus.client.lobby.LobbySceneScore
 import org.polyfrost.polyplus.client.lobby.LobbySpotAccess
 import org.polyfrost.polyplus.client.lobby.LobbySpotAction
 import org.polyfrost.polyplus.client.lobby.LobbySpotState
 import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.ProgressBar
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.popupMaxHeight
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private const val ACCESS_TICK_MILLIS = 500L
 private const val FULL_SCORE = 100
@@ -83,9 +80,7 @@ private val SCENE_PANEL_MAX = 520.dp
 private val RING_SIZE = 54.dp
 private val RING_STROKE = 5.dp
 private val METER_HEIGHT = 3.dp
-private val BADGE_HEIGHT = 16.dp
 private val BADGE_DOT = 8.dp
-private const val BLOCKED_ALPHA = 0.5f
 
 private enum class Tone { PASS, FAIL, NEUTRAL }
 
@@ -122,6 +117,7 @@ private fun SceneTool(side: Boolean = false, trigger: @Composable (SceneTrigger)
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
+                EscapeCloses(close)
                 ScenePanel(spot)
             }
         }
@@ -131,9 +127,10 @@ private fun SceneTool(side: Boolean = false, trigger: @Composable (SceneTrigger)
 @Composable
 internal fun SceneBarTool(glass: Boolean = true) {
     SceneTool { scene ->
-        BarTile(tooltip = scene.blocked ?: if (scene.open) null else "Scene check", active = scene.open, onClick = scene.press, glass = glass) { hovered ->
-            val ink = if ((hovered || scene.open) && scene.blocked == null) SocialTextPrimary else MutedText
-            Box(Modifier.graphicsLayer { alpha = if (scene.blocked != null) BLOCKED_ALPHA else 1f }) {
+        BarTile(tooltip = scene.blocked ?: if (scene.open) null else "Scene check", label = "Scene check", active = scene.open, onClick = scene.press, glass = glass) { hovered ->
+            val ink = if ((hovered || scene.open) && scene.blocked == null) SocialTextPrimary else OneConfigTheme.current.mutedText
+            val disabledAlpha = OneConfigTheme.current.disabledAlpha
+            Box(Modifier.graphicsLayer { alpha = if (scene.blocked != null) disabledAlpha else 1f }) {
                 PauseGlyph(asset("image-01"), ink, 20.dp)
             }
             SceneBadge(scene.spot, Modifier.align(Alignment.TopEnd))
@@ -144,10 +141,10 @@ internal fun SceneBarTool(glass: Boolean = true) {
 @Composable
 internal fun SceneCardTool() {
     SceneTool(side = true) { scene ->
-        CardRow(tooltip = scene.blocked, active = scene.open, onClick = scene.press) { lit ->
+        CardRow(tooltip = scene.blocked, label = "Scene check", active = scene.open, onClick = scene.press) { lit ->
             val usable = scene.blocked == null
-            PauseGlyph(asset("image-01"), if (lit) SocialTextPrimary else MutedText, 16.dp)
-            Label("Scene", 13.sp, color = if (usable) SocialTextPrimary else MutedText, weight = FontWeight.Medium)
+            PauseGlyph(asset("image-01"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, 16.dp)
+            Text("Scene", color = if (usable) SocialTextPrimary else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             Spacer(Modifier.weight(1f))
             if (usable) sceneDetail(scene.spot)?.let { (text, color) -> TabularLabel(text, 12.sp, color) }
         }
@@ -156,9 +153,9 @@ internal fun SceneCardTool() {
 
 @Composable
 private fun sceneDetail(spot: LobbySpotState): Pair<String, Color>? = when (spot) {
-    is LobbySpotState.Waiting -> "Waiting" to MutedText
-    is LobbySpotState.Surveying -> "${(spot.progress * FULL_SCORE).roundToInt()}%" to MutedText
-    is LobbySpotState.Saving -> "Saving" to MutedText
+    is LobbySpotState.Waiting -> "Waiting" to OneConfigTheme.current.mutedText
+    is LobbySpotState.Surveying -> "${(spot.progress * FULL_SCORE).roundToInt()}%" to OneConfigTheme.current.mutedText
+    is LobbySpotState.Saving -> "Saving" to OneConfigTheme.current.mutedText
     is LobbySpotState.Done -> spot.report.breakdown?.total?.let { it.toString() to toneColor(if (spot.report.passed) Tone.PASS else Tone.FAIL) }
     else -> null
 }
@@ -171,19 +168,12 @@ private fun SceneBadge(spot: LobbySpotState, modifier: Modifier) {
     }
     val done = spot as? LobbySpotState.Done ?: return
     val total = done.report.breakdown?.total ?: return
-    val tone = toneColor(if (done.report.passed) Tone.PASS else Tone.FAIL)
-    val shape = ppShape(BADGE_HEIGHT / 2)
-    Box(
-        modifier
-            .height(BADGE_HEIGHT)
-            .widthIn(min = BADGE_HEIGHT)
-            .background(PanelSurface.copy(alpha = 1f), shape)
-            .border(1.dp, tone, shape)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        TabularLabel(total.toString(), 10.sp, tone)
-    }
+    Badge(
+        total.toString(),
+        modifier.background(PanelSurface.copy(alpha = 1f), OneConfigTheme.current.shapes.pill),
+        if (done.report.passed) BadgeTone.Accent else BadgeTone.Danger,
+        style = BadgeStyle.Hairline,
+    )
 }
 
 private fun working(spot: LobbySpotState): Boolean =
@@ -197,22 +187,19 @@ private fun ScenePanel(spot: LobbySpotState) {
     val stale = shown != null && shown !== spot
     val verdict = verdict(spot, shown)
     Column(Modifier.width(SCENE_PANEL_WIDTH).heightIn(max = min(popupMaxHeight(POPUP_EDGE), SCENE_PANEL_MAX)).popup()) {
-        Column(
-            Modifier
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Header(shown, verdict)
-            if (shown != null) {
-                Column(Modifier.graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    shown.report.breakdown?.let { Categories(it) }
-                    Requirements(shown)
+        val scroll = rememberScrollState()
+        ScrollContainer(scroll, Modifier.weight(1f, fill = false), scrollbar = false) {
+            Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Header(shown, verdict)
+                if (shown != null) {
+                    Column(Modifier.graphicsLayer { alpha = if (stale) STALE_ALPHA else 1f }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        shown.report.breakdown?.let { Categories(it) }
+                        Requirements(shown)
+                    }
                 }
             }
         }
-        Hairline()
+        Divider()
         Actions(spot, shown)
     }
 }
@@ -221,7 +208,7 @@ private fun ScenePanel(spot: LobbySpotState) {
 private fun toneColor(tone: Tone): Color = when (tone) {
     Tone.PASS -> OneConfigTheme.accent
     Tone.FAIL -> SocialDangerText
-    Tone.NEUTRAL -> MutedText
+    Tone.NEUTRAL -> OneConfigTheme.current.mutedText
 }
 
 private fun extraScene(report: LobbySceneScore.Report): Boolean =
@@ -262,12 +249,12 @@ private fun Header(shown: LobbySpotState.Done?, verdict: Verdict) {
         ScoreRing(total, tone)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Label("Scene check", 13.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
+                Text("Scene check", Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 shown?.let { ProfileTag(it.report.profile.label) }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (shown?.saved == true) PauseGlyph(asset("check-circle"), tone, 13.dp)
-                SocialText(verdict.text, 12.sp, Modifier.weight(1f), color = if (verdict.tone == Tone.NEUTRAL) MutedText else tone, fontWeight = FontWeight.Medium)
+                Text(verdict.text, Modifier.weight(1f), color = if (verdict.tone == Tone.NEUTRAL) OneConfigTheme.current.mutedText else tone, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium))
             }
         }
     }
@@ -285,16 +272,13 @@ private fun ScoreRing(total: Int?, tone: Color) {
             drawArc(track, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(stroke))
             if (fraction > 0f) drawArc(tone, -90f, 360f * fraction, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
         }
-        Label(total?.toString() ?: "--", 17.sp, color = if (total == null) MutedText else SocialTextPrimary, weight = FontWeight.Medium)
+        Text(total?.toString() ?: "--", color = if (total == null) OneConfigTheme.current.mutedText else SocialTextPrimary, style = OneConfigTheme.current.typography.body.copy(fontSize = 17.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
 private fun ProfileTag(text: String) {
-    val shape = ppShape(6.dp)
-    Box(Modifier.border(1.dp, SocialBorderColor, shape).padding(horizontal = 6.dp, vertical = 1.dp), contentAlignment = Alignment.Center) {
-        Label(text, 10.sp, color = MutedText, weight = FontWeight.Medium)
-    }
+    Badge(text, style = BadgeStyle.Hairline)
 }
 
 private fun share(category: LobbySceneScore.Category): Double = if (category.max > 0.0) category.points / category.max else 1.0
@@ -336,7 +320,7 @@ private fun Categories(breakdown: LobbySceneScore.Breakdown) {
     }
     if (weak.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Label("Ways to score higher", 11.sp, color = MutedText, weight = FontWeight.Medium)
+            Text("Ways to score higher", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             weak.map { Tip(tipFor(it), gain(it, breakdown)) }.forEach { TipRow(it) }
         }
     }
@@ -346,26 +330,19 @@ private fun Categories(breakdown: LobbySceneScore.Breakdown) {
 private fun RowScope.Meter(category: LobbySceneScore.Category, weak: Boolean) {
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label(category.label, 11.sp, Modifier.weight(1f), color = if (weak) SocialTextPrimary else MutedText, weight = if (weak) FontWeight.Medium else FontWeight.Normal)
-            Label("${category.points.roundToInt()}/${category.max.roundToInt()}", 11.sp, color = SocialTextPrimary, weight = FontWeight.Medium)
+            Text(category.label, Modifier.weight(1f), color = if (weak) SocialTextPrimary else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = if (weak) FontWeight.Medium else FontWeight.Normal), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text("${category.points.roundToInt()}/${category.max.roundToInt()}", style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        Bar(share(category).toFloat(), if (weak) SocialWarnColor else OneConfigTheme.accent)
+        ProgressBar(share(category).toFloat(), tint = if (weak) OneConfigTheme.current.warning else OneConfigTheme.accent, trackColor = SocialBorderColor, thickness = METER_HEIGHT)
     }
 }
 
 @Composable
 private fun TipRow(tip: Tip) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(6.dp).background(SocialWarnColor, OneConfigTheme.current.circleShape))
-        SocialText(tip.text, 12.sp, Modifier.weight(1f), color = SocialTextPrimary)
-        Label("+${tip.gain}", 11.sp, color = MutedText, weight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun Bar(fraction: Float, color: Color) {
-    Box(Modifier.fillMaxWidth().height(METER_HEIGHT).background(SocialBorderColor, ppShape(2.dp))) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().background(color, ppShape(2.dp)))
+        Box(Modifier.size(6.dp).background(OneConfigTheme.current.warning, OneConfigTheme.current.circleShape))
+        Text(tip.text, Modifier.weight(1f), style = OneConfigTheme.current.typography.small)
+        Text("+${tip.gain}", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -381,7 +358,7 @@ private fun Requirements(done: LobbySpotState.Done) {
             failing.isNotEmpty() -> failing.forEach { FailRow(it) }
             !unchecked -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 PauseGlyph(asset("check-circle"), SocialSuccessText, 13.dp)
-                Label("All requirements met", 12.sp, color = SocialTextPrimary)
+                Text("All requirements met", style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
         notes.forEach { Footnote(it) }
@@ -395,15 +372,15 @@ private fun FailRow(check: LobbySceneScore.Check) {
             PauseGlyph(asset("alert-triangle"), SocialDangerText, 13.dp)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Label(check.label, 12.sp, color = SocialTextPrimary, weight = FontWeight.Medium)
-            check.reason?.let { SocialText(it, 11.sp, color = SocialDangerText) }
+            Text(check.label, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            check.reason?.let { Text(it, color = SocialDangerText, style = OneConfigTheme.current.typography.caption) }
         }
     }
 }
 
 @Composable
 private fun Footnote(text: String) {
-    SocialText(text, 11.sp, color = MutedText)
+    Text(text, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption)
 }
 
 @Composable
@@ -427,35 +404,21 @@ private fun Actions(spot: LobbySpotState, shown: LobbySpotState.Done?) {
 private fun Progress(text: String, progress: Float) {
     Column(Modifier.fillMaxWidth().height(28.dp), verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Label(text, 12.sp, Modifier.weight(1f), color = SocialTextPrimary)
-            Label("${(progress.coerceIn(0f, 1f) * FULL_SCORE).roundToInt()}%", 11.sp, color = MutedText, weight = FontWeight.Medium)
+            Text(text, Modifier.weight(1f), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text("${(progress.coerceIn(0f, 1f) * FULL_SCORE).roundToInt()}%", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        Bar(progress, OneConfigTheme.accent)
+        ProgressBar(progress)
     }
 }
 
 @Composable
 private fun RowScope.PanelButton(text: String, enabled: Boolean, primary: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val accent = OneConfigTheme.accent
-    val fill by animateColorAsState(if (primary && hovered && enabled) lerp(accent, Color.White, 0.1f) else if (primary) accent else Color.Transparent)
-    val ink = when {
-        primary -> OneConfigTheme.current.accentTextColor
-        hovered && enabled -> SocialTextPrimary
-        else -> MutedText
-    }
-    Row(
-        Modifier
-            .weight(1f)
-            .height(28.dp)
-            .then(if (primary) Modifier.background(fill, ppShape(8.dp)) else Modifier.border(1.dp, SocialBorderColor, ppShape(8.dp)).rowFrame(false, hovered && enabled, ppShape(8.dp)))
-            .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
-            .hoverable(interaction, enabled)
-            .then(if (enabled) Modifier.clickableWithSound(onClick) else Modifier)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Label(text, 12.sp, color = ink, weight = FontWeight.Medium)
-    }
+    TextButton(
+        text = text,
+        onClick = onClick,
+        modifier = Modifier.weight(1f),
+        style = if (primary) ControlStyle.Primary else ControlStyle.Secondary,
+        size = ControlSize.Compact,
+        enabled = enabled,
+    )
 }

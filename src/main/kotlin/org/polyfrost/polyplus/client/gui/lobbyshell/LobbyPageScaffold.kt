@@ -3,55 +3,50 @@
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.KeyValueRow
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.PanelHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
-import androidx.compose.animation.animateColorAsState
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import androidx.compose.ui.text.style.TextOverflow
 
 private const val DAYS_IN_WEEK = 7L
 private const val DAYS_IN_MONTH = 30L
 private const val DAYS_IN_YEAR = 365L
 private const val STRIP_WASH_ALPHA = 0.35f
+private const val MAX_QUERY = 64
 private val StripHeight = 60.dp
 
 internal object PageGrid {
@@ -72,56 +67,32 @@ internal fun PageHeader(
     filters: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    Row(
-        Modifier.fillMaxWidth().height(54.dp).panel(16.dp).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        BackButton(onBack)
-        PageTitle(title, Modifier.padding(end = 2.dp))
-        TextField(query, onQuery, Modifier.weight(1f).height(38.dp), searchPlaceholder, themedIcon(LobbyIcons.SEARCH), 64, false)
-        actions()
-    }
+    PanelHeader(
+        title,
+        Modifier.height(54.dp).panel(16.dp).padding(horizontal = 12.dp),
+        titleStyle = pageTitleStyle(),
+        leading = { BackButton(onBack) },
+        titleWeight = false,
+        spacing = 8.dp,
+        actions = {
+            SearchField(
+                query = query,
+                onQueryChange = { onQuery(it.take(MAX_QUERY)) },
+                modifier = Modifier.weight(1f).padding(start = 2.dp),
+                placeholder = searchPlaceholder,
+                clearable = false,
+                size = ControlSize.Large,
+            )
+            actions()
+        },
+    )
     filters?.invoke()
 }
 
 @Composable
 internal fun <T> UnderlineTabs(tabs: List<TabItem<T>>, selected: T, onSelect: (T) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        tabs.forEach { tab -> UnderlineTab(tab.label, tab.value == selected) { onSelect(tab.value) } }
-    }
+    TabRow(tabs, selected, onSelect, style = TabStyle.Underline, size = ControlSize.Large, fill = false)
 }
-
-@Composable
-private fun UnderlineTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val shape = ppShape(8.dp)
-    val ink by animateColorAsState(if (selected || hovered) SocialTextPrimary else MutedText)
-    val fill by animateColorAsState(if (hovered && !selected) SocialTextPrimary.copy(alpha = TAB_HOVER_ALPHA) else Color.Transparent)
-    val bar by animateColorAsState(if (selected) OneConfigTheme.accent else Color.Transparent)
-    Box(
-        Modifier
-            .widthIn(min = TAB_MIN_WIDTH)
-            .height(TAB_HEIGHT)
-            .clip(shape)
-            .background(fill)
-            .drawBehind {
-                val thickness = TAB_BAR_HEIGHT.toPx()
-                drawRect(bar, Offset(0f, size.height - thickness), Size(size.width, thickness))
-            }
-            .hoverable(interaction)
-            .clickableWithSound(label, A11yRole.Tab, selected, shape = shape, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Label(label, 15.sp, color = ink, weight = if (selected) FontWeight.Medium else FontWeight.Normal)
-    }
-}
-
-private val TAB_HEIGHT = 40.dp
-private val TAB_BAR_HEIGHT = 2.dp
-private val TAB_MIN_WIDTH = 88.dp
-private const val TAB_HOVER_ALPHA = 0.08f
 
 @Composable
 internal fun NoMatchState(noun: String, filterLabel: String?, query: String, modifier: Modifier) {
@@ -158,16 +129,15 @@ internal fun LastPlayedStrip(
     trailing: @Composable () -> Unit = {},
     detail: @Composable () -> Unit,
 ) {
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     Row(
         Modifier
             .fillMaxWidth()
             .height(StripHeight)
-            .cardFrame(selected, hovered)
+            .cardFrame(selected, hover.hovered)
             .then(wash ?: Modifier.background(Brush.horizontalGradient(listOf(OneConfigTheme.accent.copy(alpha = STRIP_WASH_ALPHA), Color.Transparent))))
-            .contextMenu(menu)
-            .hoverable(interaction)
-            .clickableWithSound("$tag, $name", selected = selected.takeIf { it }, shape = ppShape(16.dp), onClick = onClick)
+            .contextMenu(entries = menu)
+            .oneConfigClickable("$tag, $name", onClick, selected = selected.takeIf { it }, shape = OneConfigTheme.shape(16.dp), interactionSource = hover.interactionSource)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -176,24 +146,21 @@ internal fun LastPlayedStrip(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Tag(tag, TagTone.Accent)
+                    Badge(tag.uppercase(), tone = BadgeTone.Accent, style = BadgeStyle.Solid)
                     tags()
                 }
-                Label(name, 15.sp, Modifier.weight(1f, fill = false), weight = FontWeight.Medium)
+                Text(name, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.heading, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
             detail()
         }
         trailing()
-        TextButton(actionLabel, null, Modifier.height(38.dp), ButtonStyle.Primary, actionEnabled, onAction)
+        TextButton(text = actionLabel, onClick = onAction, size = ControlSize.Large, style = ControlStyle.Primary, enabled = actionEnabled)
     }
 }
 
 @Composable
 internal fun DetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Label(label, 12.sp, Modifier.weight(1f), color = MutedText)
-        Label(value, 12.sp)
-    }
+    KeyValueRow(label, value)
 }
 
 internal fun relativeDayText(epochMillis: Long): String? {

@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
-import org.polyfrost.oneconfig.internal.ui.themes.uiScalePercent
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigPrefs
 
 internal object MenuScale {
     private const val MIN_FACTOR = 0.5f
@@ -9,9 +12,9 @@ internal object MenuScale {
 
     val factor: Float
         get() {
-            val percent = runCatching { uiScalePercent }.getOrDefault(100f)
-            if (!percent.isFinite() || percent <= 0f) return 1f
-            return (percent / 100f).coerceIn(MIN_FACTOR, MAX_FACTOR)
+            val scale = runCatching { OneConfigPrefs.uiScale }.getOrDefault(1f)
+            if (!scale.isFinite() || scale <= 0f) return 1f
+            return scale.coerceIn(MIN_FACTOR, MAX_FACTOR)
         }
 
     fun scale(fit: Float, base: Float = fit): Float {

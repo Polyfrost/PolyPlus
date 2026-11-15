@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 //? if > 1.8.9 {
@@ -18,15 +17,16 @@ import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuInput
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuState
+import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
 import org.polyfrost.polyplus.client.ping.PingGraphics
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.exp
-import kotlin.math.max
-import kotlin.math.min
 
 class WheelSession(
     val held: () -> Boolean,
@@ -34,84 +34,36 @@ class WheelSession(
     val onScroll: ((Int) -> Unit)? = null,
     val content: @Composable (WheelSession) -> Unit,
 ) {
-    var pointer by mutableStateOf(Offset.Zero)
-    var selected by mutableStateOf(-1)
-    var closing by mutableStateOf(false)
+    val state = RadialMenuState()
+}
 
-    @Volatile
-    var hovered = -1
+private const val WHEEL_SURFACE_ALPHA = 0.78f
+private const val WHEEL_HUB_ALPHA = 0.88f
 
-    @Volatile
-    var radius = 0f
-
-    @Volatile
-    var square = false
-
-    @Volatile
-    var deadZone = 0f
-
-    @Volatile
-    var enabled: List<Boolean> = emptyList()
-
-    private var raw = Offset.Zero
-    private var aimed = -1
-
-    fun steer(delta: Offset) {
-        if (closing) return
-        val limit = radius
-        var next = raw + delta
-        if (limit > 0f) {
-            val reach = reach(next)
-            val cap = limit * RAW_CAP
-            if (reach > cap) next *= cap / reach
-        }
-        raw = next
-        pointer = if (limit > 0f) rubberBand(next, limit) else next
-        hovered = aim(pointer)
-        selected = hovered
-    }
-
-    private fun reach(p: Offset): Float = if (square) max(abs(p.x), abs(p.y)) else p.getDistance()
-
-    private fun rubberBand(p: Offset, limit: Float): Offset {
-        val reach = reach(p)
-        val knee = limit * KNEE_SHARE
-        if (reach <= knee) return p
-        val band = limit - knee
-        val soft = knee + band * (1f - exp(-(reach - knee) / band))
-        return p * (soft / reach)
-    }
-
-    private fun aim(p: Offset): Int {
-        val flags = enabled
-        val count = flags.size
-        if (count == 0 || reach(p) < deadZone) {
-            aimed = -1
-            return -1
-        }
-        val sector = 360f / count
-        val angle = (Math.toDegrees(atan2(p.y.toDouble(), p.x.toDouble())).toFloat() + 90f + 720f) % 360f
-        val previous = aimed
-        val keep = previous in 0 until count && run {
-            var diff = abs(angle - previous * sector) % 360f
-            if (diff > 180f) diff = 360f - diff
-            diff <= sector / 2f + min(HYSTERESIS_DEG, sector * HYSTERESIS_SHARE)
-        }
-        if (!keep) aimed = ((angle + sector / 2f) / sector).toInt() % count
-        return if (flags[aimed]) aimed else -1
-    }
-
-    private companion object {
-        const val RAW_CAP = 1.25f
-        const val KNEE_SHARE = 0.85f
-        const val HYSTERESIS_DEG = 5f
-        const val HYSTERESIS_SHARE = 0.2f
-    }
+@Composable
+fun HudRadialMenu(
+    items: List<RadialMenuItem>,
+    session: WheelSession,
+    title: String,
+    subtitle: String?,
+    below: (@Composable () -> Unit)? = null,
+) {
+    RadialMenu(
+        items = items,
+        state = session.state,
+        title = title,
+        subtitle = subtitle,
+        input = RadialMenuInput.Steered,
+        glass = liquidGlassTheme && hudBackdropGlass,
+        surfaceAlpha = WHEEL_SURFACE_ALPHA,
+        hubAlpha = WHEEL_HUB_ALPHA,
+        sounds = RadialMenuDefaults.silent,
+        pixelRatio = hudPixelRatio,
+        below = below,
+    )
 }
 
 object WheelOverlay {
-    const val FADE_MILLIS = 120
-
     private const val SCROLL_NOTCH = 1.0
     private const val PULL_GAIN = 1.9
 
@@ -121,7 +73,7 @@ object WheelOverlay {
     private var scrollAccum = 0.0
     private var started = false
 
-    private val host = HudComposeHost("radial_wheel") { Content() }
+    private val layer = ComposeHudLayer("radial_wheel") { Content() }.apply { acceptsInput = false }
 
     val isOpen: Boolean get() = session != null
 
@@ -135,13 +87,13 @@ object WheelOverlay {
         return true
     }
 
-    fun cancel() = finish(null)
+    fun cancel() = finish(false)
 
     @JvmStatic
     fun consumeLook(dx: Double, dy: Double): Boolean {
         val current = session ?: return PingInput.consumePendingLook(dx, dy)
-        val scale = PULL_GAIN * sensitivityGain() / host.density.coerceAtLeast(0.01f)
-        current.steer(Offset((dx * scale).toFloat(), (dy * scale).toFloat()))
+        val scale = PULL_GAIN * sensitivityGain() / layer.density.coerceAtLeast(0.01f)
+        current.state.steer((dx * scale).toFloat(), (dy * scale).toFloat())
         return true
     }
 
@@ -161,7 +113,7 @@ object WheelOverlay {
         val current = session ?: return false
         if (button != InputConstants.MOUSE_BUTTON_LEFT && button != InputConstants.MOUSE_BUTTON_RIGHT) return false
         if (!pressed) return false
-        if (isPhysicalLeft(button)) finish(current.hovered) else finish(null)
+        finish(isPhysicalLeft(button))
         return true
     }
 
@@ -202,7 +154,11 @@ object WheelOverlay {
         update()
         if (session == null && shown != null && System.currentTimeMillis() >= fadeEndsAt) shown = null
         if (shown == null) return
-        host.draw(graphics)
+        //? if > 1.8.9 {
+        if (graphics != null) layer.draw(graphics)
+        //?} else {
+        /*layer.draw()
+        *///?}
     }
 
     private fun update() {
@@ -211,15 +167,19 @@ object WheelOverlay {
             cancel()
             return
         }
-        if (!current.held()) finish(current.hovered)
+        if (!current.held()) finish(true)
     }
 
-    private fun finish(pick: Int?) {
+    private fun finish(pick: Boolean) {
         val current = session ?: return
         session = null
-        current.closing = true
-        fadeEndsAt = System.currentTimeMillis() + if (Motion.reduced) 0L else FADE_MILLIS.toLong()
-        if (pick != null && pick >= 0) current.onPick(pick)
+        fadeEndsAt = System.currentTimeMillis() + if (Motion.reduced) 0L else RadialMenuDefaults.fadeMillis.toLong()
+        if (!pick) {
+            current.state.dismiss()
+            return
+        }
+        val chosen = current.state.select()
+        if (chosen >= 0) current.onPick(chosen)
     }
 
     private fun ensureStarted() {
@@ -231,8 +191,6 @@ object WheelOverlay {
     @Composable
     private fun Content() {
         val current = shown ?: return
-        ProvideOneConfigTheme {
-            key(current) { current.content(current) }
-        }
+        key(current) { current.content(current) }
     }
 }

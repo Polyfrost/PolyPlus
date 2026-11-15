@@ -2,6 +2,10 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.polyplus.client.gui.KitDangerColor
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -24,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -60,13 +63,19 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.lobby.LobbyMotd*/
 import net.minecraft.network.chat.Component
-import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderAutoScroll
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderOverlay
+import org.polyfrost.oneconfig.api.ui.v1.components.reorderableItem
+import org.polyfrost.oneconfig.api.ui.v1.theme.legibleOn
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogButtons
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
@@ -79,23 +88,16 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.ASSETS
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.RasterImage
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.legibleOn
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialAvailability
 import org.polyfrost.polyplus.client.gui.lobbysocial.rememberAvailability
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.serveredit.DriveServerProbe
 import org.polyfrost.polyplus.client.gui.serveredit.ServerPreviewCard
 import org.polyfrost.polyplus.client.gui.serveredit.ServerStatusProbe
@@ -105,6 +107,10 @@ import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Locale
 import java.util.UUID
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
 
 private enum class ServerFilter(val label: String) {
     All("All"),
@@ -120,32 +126,30 @@ private val DirectPreviewHeight = 220.dp
 
 @Composable
 internal fun BoxScope.MultiplayerPage(lobby: LobbyShell) {
-    ContextMenuHost {
-        val availability = rememberAvailability()
-        val friends = rememberOnlineFriends(availability)
-        PageScrim()
-        ServerBrowser(
-            lobby,
-            onBack = { lobby.show(LobbyPage.Home) },
-            onDirect = { lobby.directOpen = true },
-            onDelete = { lobby.deleting = it },
-            modifier = Modifier
-                .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
-                .fillMaxSize(),
-        )
-        FriendsPanel(
-            friends,
-            availability,
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.RightColumnBottom)
-                .width(LobbyLayout.UnitWidth)
-                .fillMaxHeight(),
-        )
-        if (lobby.directOpen) DirectConnectDialog(lobby) { lobby.directOpen = false }
-        lobby.deleting?.let { entry ->
-            DeleteServerDialog(entry, onConfirm = { lobby.forget(entry) }, onDismiss = { lobby.deleting = null })
-        }
+    val availability = rememberAvailability()
+    val friends = rememberOnlineFriends(availability)
+    PageScrim()
+    ServerBrowser(
+        lobby,
+        onBack = { lobby.show(LobbyPage.Home) },
+        onDirect = { lobby.directOpen = true },
+        onDelete = { lobby.deleting = it },
+        modifier = Modifier
+            .padding(start = LobbyLayout.Margin, end = LobbyLayout.BarEnd, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
+            .fillMaxSize(),
+    )
+    FriendsPanel(
+        friends,
+        availability,
+        Modifier
+            .align(Alignment.TopEnd)
+            .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.RightColumnBottom)
+            .width(LobbyLayout.UnitWidth)
+            .fillMaxHeight(),
+    )
+    if (lobby.directOpen) DirectConnectDialog(lobby) { lobby.directOpen = false }
+    lobby.deleting?.let { entry ->
+        DeleteServerDialog(entry, onConfirm = { lobby.forget(entry) }, onDismiss = { lobby.deleting = null })
     }
 }
 
@@ -173,16 +177,22 @@ private fun FriendsPanel(friends: List<OnlineFriend>, availability: SocialAvaila
         when (availability) {
             SocialAvailability.Declined -> {
                 EmptyState("Online services are off", body, "Turn them on to see which friends are online.") {
-                    TextButton("Turn on", Modifier.height(38.dp), ButtonStyle.Primary) { consenting = true }
+                    TextButton(text = "Turn on", onClick = { consenting = true }, size = ControlSize.Large, style = ControlStyle.Primary)
                 }
                 return@Column
             }
             SocialAvailability.SignedOut -> {
                 EmptyState("Not signed in", body, "Friends need a signed-in Minecraft account and a connection to OneClient.") {
-                    TextButton("Try again", themedIcon(LobbyIcons.REFRESH), Modifier.height(38.dp), ButtonStyle.Primary, true) {
-                        PolyConnection.reconnect()
-                        FriendsRepository.refreshAll()
-                    }
+                    TextButton(
+                        text = "Try again",
+                        icon = LobbyIcons.REFRESH,
+                        onClick = {
+                            PolyConnection.reconnect()
+                            FriendsRepository.refreshAll()
+                        },
+                        style = ControlStyle.Primary,
+                        size = ControlSize.Large,
+                    )
                 }
                 return@Column
             }
@@ -203,10 +213,10 @@ private fun FriendsPanel(friends: List<OnlineFriend>, availability: SocialAvaila
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    PlayerHead(friend.seed, 38.dp, Modifier, headShape(38.dp))
+                    PlayerHead(playerId = friend.seed, size = 38.dp, modifier = Modifier, shape = headShape(38.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Label(friend.name, 14.sp, weight = FontWeight.Medium)
-                        Label(friend.detail, 12.sp, color = MutedText)
+                        Text(friend.name, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        Text(friend.detail, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                 }
             }
@@ -236,7 +246,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             onBack,
             filters = { UnderlineTabs(ServerFilter.entries.map { TabItem(it, it.label) }, filter) { filter = it } },
         ) {
-            TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, lobby::addServer)
+            TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, size = ControlSize.Large, style = ControlStyle.Primary)
             ServersMenu(lobby, listView, onDirect, remember(lobby) { lobby.serverListModButtons() }) {
                 listView = it
                 PolyPlusLobbyConfig.serverListView = it
@@ -249,7 +259,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
                 query.isNotBlank() -> NoMatchState("servers", filter.takeIf { it != ServerFilter.All }?.label?.lowercase(Locale.ROOT), query, body)
                 filter == ServerFilter.Recent -> EmptyState("No recent servers", body, "Servers you join show up here.")
                 else -> EmptyState("No saved servers", body, "Add a server, or use direct connect.") {
-                    TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(38.dp), ButtonStyle.Primary, true, lobby::addServer)
+                    TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, size = ControlSize.Large, style = ControlStyle.Primary)
                 }
             }
         } else if (listView) {
@@ -263,27 +273,20 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
 @Composable
 private fun ServersMenu(lobby: LobbyShell, listView: Boolean, onDirect: () -> Unit, modButtons: List<ServerListModButton>, onLayout: (Boolean) -> Unit) {
     val realms = PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms
-    AnchoredPopupButton(themedIcon(SOCIAL_ASSETS + "dots-vertical.svg"), "More", Modifier, Alignment.End, MENU_GAP) { close ->
+    NavPopupButton(SOCIAL_ASSETS + "dots-vertical.svg", "More", gap = MENU_GAP) { close ->
         LobbyUserTheme {
-            MenuSurface(Modifier.width(MENU_WIDTH.dp)) {
-                MenuEntry("Direct connect", SOCIAL_ASSETS + "globe-01.svg", close = close, action = onDirect)
-                if (realms) MenuEntry("Realms", SOCIAL_ASSETS + "minecraft-block.svg", close = close, action = lobby::openRealms)
-                MenuEntry("Refresh", LobbyIcons.REFRESH, close = close, action = lobby.servers::refresh)
-                if (listView) MenuEntry("Show as grid", GRID_ICON, close = close) { onLayout(false) }
-                else MenuEntry("Show as list", LIST_ICON, close = close) { onLayout(true) }
+            val entries = buildList<MenuEntry> {
+                add(MenuAction("Direct connect", onDirect, icon = SOCIAL_ASSETS + "globe-01.svg", size = MenuItemSize.Regular))
+                if (realms) add(MenuAction("Realms", lobby::openRealms, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
+                add(MenuAction("Refresh", lobby.servers::refresh, icon = LobbyIcons.REFRESH, size = MenuItemSize.Regular))
+                if (listView) add(MenuAction("Show as grid", { onLayout(false) }, icon = GRID_ICON, size = MenuItemSize.Regular))
+                else add(MenuAction("Show as list", { onLayout(true) }, icon = LIST_ICON, size = MenuItemSize.Regular))
                 modButtons.forEach { button ->
-                    MenuEntry(button.label, null, button.mod, button.enabled, close, button.press)
+                    add(MenuAction(button.label, button.press, detail = button.mod, enabled = button.enabled, size = MenuItemSize.Regular))
                 }
             }
+            MenuList(entries, close, Modifier.width(MENU_WIDTH.dp), MenuItemSize.Regular)
         }
-    }
-}
-
-@Composable
-private fun MenuEntry(label: String, icon: String?, detail: String? = null, enabled: Boolean = true, close: () -> Unit, action: () -> Unit) {
-    MenuItem(label, icon?.let { themedIcon(it) }, detail, MenuItemSize.Regular, false, false, enabled, null, Modifier, null) {
-        close()
-        action()
     }
 }
 
@@ -292,11 +295,10 @@ private val MENU_GAP = 8.dp
 
 @Composable
 private fun ServerGrid(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
-    Box(modifier) {
-        val gridState = rememberLazyGridState()
-        val viewport = remember(gridState) { GridReorderViewport(gridState) }
-        val reorder = rememberServerReorder(lobby, shown, canReorder, viewport)
-        Box(Modifier.fillMaxSize().serverReorderContainer(reorder)) {
+    val gridState = rememberLazyGridState()
+    val reorder = rememberServerReorder(lobby, shown, canReorder, gridState)
+    ScrollContainer(gridState, modifier, scrollbar = false) {
+        Box(Modifier.fillMaxSize().reorderContainer(reorder.state).reorderAutoScroll(reorder.state)) {
             LazyVerticalGrid(
                 GridCells.Adaptive(SERVER_CARD_MIN_WIDTH),
                 Modifier.fillMaxSize(),
@@ -304,11 +306,12 @@ private fun ServerGrid(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: 
                 horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
                 verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
             ) {
-                items(reorder.entries, key = { it.key }) { entry ->
-                    ServerCard(lobby, entry, canReorder, onDelete, Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()).serverReorderItem(reorder, entry.key))
+                itemsIndexed(reorder.entries, key = { _, entry -> entry.key }) { index, entry ->
+                    val drag = Modifier.reorderableItem(reorder.state, entry.key, index, canReorder && entry.kind == ServerKind.SAVED)
+                    ServerCard(lobby, entry, canReorder, onDelete, Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()).then(drag))
                 }
             }
-            reorder.overlayEntry?.let { entry -> ServerCard(lobby, entry, canReorder, onDelete, Modifier.serverReorderOverlay(reorder)) }
+            reorder.overlayEntry?.let { entry -> ServerCard(lobby, entry, canReorder, onDelete, Modifier.reorderOverlay(reorder.state)) }
         }
     }
 }
@@ -325,7 +328,7 @@ internal fun ServerIcon(data: ServerData, revision: Int, size: Dp) {
     @Suppress("UNUSED_EXPRESSION") revision
     ServerRevisions.of(data)
     val favicon = rememberFavicon(data.iconBytes)
-    val shape = ppShape(if (size > 48.dp) 12.dp else 8.dp)
+    val shape = OneConfigTheme.shape(if (size > 48.dp) 12.dp else 8.dp)
     val modifier = Modifier.size(size).clip(shape).background(OneConfigTheme.current.componentBackground).border(1.dp, SocialBorderColor, shape)
     if (favicon != null) {
         Image(favicon, null, modifier, contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
@@ -339,16 +342,16 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     val servers = lobby.servers
     val data = entry.data
     val revision = servers.revision
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     val selected = lobby.isSelected(data)
     val onClick = rememberCardClick({ lobby.join(data) }) { lobby.select(data) }
     LaunchedEffect(data) { servers.ping(data) }
     Box(
         modifier
-            .cardFrame(selected, hovered)
+            .cardFrame(selected, hover.hovered)
             .contextMenu { serverMenuItems(lobby, entry, canReorder, onDelete = onDelete) }
-            .hoverable(interaction)
-            .clickableWithSound(data.shownName, selected = selected.takeIf { it }, shape = ppShape(16.dp), onClick = onClick),
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(data.shownName, onClick, selected = selected.takeIf { it }, shape = OneConfigTheme.shape(16.dp)),
     ) {
         Row(
             Modifier.fillMaxWidth().serverWash(data, SERVER_CARD_WASH).padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
@@ -370,18 +373,18 @@ internal class ServerAction(val item: MenuAction, val rotation: Float? = null)
 
 internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: ((ServerEntry) -> Unit)?, vertical: Boolean = false): List<ServerAction> {
     val servers = lobby.servers
-    val save = ServerAction(MenuAction("Save to list", LobbyIcons.PLUS) { servers.saveUnsaved(entry) })
+    val save = ServerAction(MenuAction("Save to list", { servers.saveUnsaved(entry) }, icon = LobbyIcons.PLUS))
     return when (entry.kind) {
         ServerKind.SAVED -> listOfNotNull(
-            ServerAction(MenuAction(if (vertical) "Move up" else "Move left", enabled = entry.savedIndex > 0) { servers.move(entry, -1) }, if (vertical) 0f else -90f).takeIf { canReorder },
-            ServerAction(MenuAction(if (vertical) "Move down" else "Move right", enabled = entry.savedIndex < servers.saved.lastIndex) { servers.move(entry, 1) }, if (vertical) 180f else 90f).takeIf { canReorder },
-            ServerAction(MenuAction("Edit", SOCIAL_ASSETS + "edit-02.svg") { lobby.editServer(entry) }),
-            onDelete?.let { delete -> ServerAction(MenuAction("Delete", LobbyIcons.TRASH, danger = true) { delete(entry) }) },
+            ServerAction(MenuAction(if (vertical) "Move up" else "Move left", { servers.move(entry, -1) }, enabled = entry.savedIndex > 0), if (vertical) 0f else -90f).takeIf { canReorder },
+            ServerAction(MenuAction(if (vertical) "Move down" else "Move right", { servers.move(entry, 1) }, enabled = entry.savedIndex < servers.saved.lastIndex), if (vertical) 180f else 90f).takeIf { canReorder },
+            ServerAction(MenuAction("Edit", { lobby.editServer(entry) }, icon = SOCIAL_ASSETS + "edit-02.svg")),
+            onDelete?.let { delete -> ServerAction(MenuAction("Delete", { delete(entry) }, icon = LobbyIcons.TRASH, danger = true, dangerColor = KitDangerColor)) },
         )
         ServerKind.UNSAVED -> listOf(save)
         ServerKind.FEATURED, ServerKind.SPONSORED -> {
             val campaign = entry.featured?.featured?.takeIf { it.dismissibleInServerList }
-            listOfNotNull(save, campaign?.let { ServerAction(MenuAction("Dismiss", LobbyIcons.CLOSE) { FeaturedServers.dismissMultiplayer(it.campaignId) }) })
+            listOfNotNull(save, campaign?.let { ServerAction(MenuAction("Dismiss", { FeaturedServers.dismissMultiplayer(it.campaignId) }, icon = LobbyIcons.CLOSE)) })
         }
         ServerKind.LAN -> emptyList()
     }
@@ -394,7 +397,7 @@ internal fun serverMenuItems(
     vertical: Boolean = false,
     onDelete: ((ServerEntry) -> Unit)? = null,
 ): List<MenuAction> =
-    listOf(MenuAction("Join", SOCIAL_ASSETS + "log-in-04.svg") { lobby.join(entry.data) }) +
+    listOf(MenuAction("Join", { lobby.join(entry.data) }, icon = SOCIAL_ASSETS + "log-in-04.svg")) +
         serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
 
 @Composable
@@ -403,10 +406,10 @@ private fun ServerText(entry: ServerEntry, revision: Int) {
     ServerRevisions.of(entry.data)
     val data = entry.data
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Label(data.shownName, 15.sp, weight = FontWeight.Medium)
+        Text(data.shownName, style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (data.state() == ServerData.State.INCOMPATIBLE) Tag("Incompatible", TagTone.Danger)
-            Label(serverMeta(data), 12.sp, color = if (LobbyServers.failed(data)) SocialDangerText else MutedText)
+            if (data.state() == ServerData.State.INCOMPATIBLE) DangerTag("Incompatible".uppercase())
+            Text(serverMeta(data), color = if (LobbyServers.failed(data)) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         MotdText(entry, revision, reserve = true)
     }
@@ -434,8 +437,9 @@ internal fun MotdText(entry: ServerEntry, revision: Int, modifier: Modifier = Mo
 @Composable
 internal fun MotdLines(motd: Component?, modifier: Modifier = Modifier, reserve: Boolean = false) {
     val theme = OneConfigTheme.current
-    val muted = MutedText
-    val parsed = remember(motd, muted, theme.textColor, theme.popupBackground) { motdLines(motd, muted, theme.textColor, theme.popupBackground) }
+    val muted = theme.mutedText
+    val surface = theme.popupBackground.compositeOver(theme.pageSurface)
+    val parsed = remember(motd, muted, surface) { motdLines(motd, muted, surface) }
     val lines = if (reserve) parsed + List(VANILLA_MOTD_LINES - parsed.size) { AnnotatedString("") } else parsed
     if (lines.isEmpty()) return
     val style = TextStyle(
@@ -456,7 +460,7 @@ internal fun MotdLines(motd: Component?, modifier: Modifier = Modifier, reserve:
     }
 }
 
-private class MotdLineBuilder(private val fallback: Color, private val ink: Color, private val surface: Color) {
+private class MotdLineBuilder(private val fallback: Color, private val surface: Color) {
     private val builder = AnnotatedString.Builder()
     private val run = StringBuilder()
     private var runStyle: SpanStyle? = null
@@ -464,7 +468,7 @@ private class MotdLineBuilder(private val fallback: Color, private val ink: Colo
     fun add(color: Int?, bold: Boolean, italic: Boolean, underlined: Boolean, struck: Boolean, codepoint: Int) {
         val decorations = listOfNotNull(TextDecoration.Underline.takeIf { underlined }, TextDecoration.LineThrough.takeIf { struck })
         val next = SpanStyle(
-            color = legibleOn(color?.let { Color(0xFF000000 or it.toLong()) } ?: fallback, ink, surface),
+            color = (color?.let { Color(0xFF000000 or it.toLong()) } ?: fallback).legibleOn(surface),
             fontWeight = if (bold) FontWeight.Bold else null,
             fontStyle = if (italic) FontStyle.Italic else null,
             textDecoration = if (decorations.isEmpty()) null else TextDecoration.combine(decorations),
@@ -487,11 +491,11 @@ private class MotdLineBuilder(private val fallback: Color, private val ink: Colo
     }
 }
 
-internal fun motdLines(component: Component?, fallback: Color, ink: Color, surface: Color): List<AnnotatedString> {
+internal fun motdLines(component: Component?, fallback: Color, surface: Color): List<AnnotatedString> {
     component ?: return emptyList()
     //? if > 1.8.9 {
     return Minecraft.getInstance().font.split(component, VANILLA_MOTD_WIDTH).take(VANILLA_MOTD_LINES).map { line ->
-        val builder = MotdLineBuilder(fallback, ink, surface)
+        val builder = MotdLineBuilder(fallback, surface)
         line.accept { _, style, codepoint ->
             builder.add(style.color?.value, style.isBold, style.isItalic, style.isUnderlined, style.isStrikethrough, codepoint)
             true
@@ -500,7 +504,7 @@ internal fun motdLines(component: Component?, fallback: Color, ink: Color, surfa
     }
     //?} else {
     /*return Minecraft.getInstance().textRenderer.split(component.string, VANILLA_MOTD_WIDTH).take(VANILLA_MOTD_LINES).map { line ->
-        val builder = MotdLineBuilder(fallback, ink, surface)
+        val builder = MotdLineBuilder(fallback, surface)
         LobbyMotd.forEach(line) { value, codepoint -> builder.add(value, false, false, false, false, codepoint) }
         builder.build()
     }
@@ -524,7 +528,7 @@ private fun DirectConnectDialog(lobby: LobbyShell, onDismiss: () -> Unit) {
         if (lobby.directConnect(address)) onDismiss() else invalid = true
     }
     DriveServerProbe(probe, target, valid)
-    ModalDialog(onDismiss, 440.dp, true) {
+    ModalDialog(onDismiss = onDismiss, width = 440.dp, dismissOnScrim = true) {
         LaunchedEffect(Unit) { focus.requestFocus() }
         DialogTitle("Direct connect")
         TextField(
@@ -533,27 +537,21 @@ private fun DirectConnectDialog(lobby: LobbyShell, onDismiss: () -> Unit) {
                 address = it
                 invalid = false
             },
-            modifier = Modifier.fillMaxWidth().height(38.dp),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = "Server address",
-            leadingIcon = themedIcon(SOCIAL_ASSETS + "globe-01.svg"),
+            leadingIcon = SOCIAL_ASSETS + "globe-01.svg",
             maxLength = 255,
             invalid = invalid,
-            enabled = true,
-            singleLine = true,
-            framed = true,
+            size = ControlSize.Large,
             fontSize = 14.sp,
-            label = null,
-            masked = false,
             focusRequester = focus,
-            interactionSource = null,
-            trailing = null,
             onSubmit = ::connect,
         )
-        if (invalid) Label("Invalid address", 12.sp, color = SocialDangerText)
+        if (invalid) Text("Invalid address", color = SocialDangerText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         ServerPreviewCard(target.ifEmpty { "Server address" }, valid, probe, Modifier.fillMaxWidth().height(DirectPreviewHeight))
         DialogButtons {
-            TextButton("Cancel", Modifier.height(38.dp), onDismiss)
-            TextButton("Connect", null, Modifier.height(38.dp), ButtonStyle.Primary, address.isNotBlank(), ::connect)
+            TextButton(text = "Cancel", onClick = onDismiss, size = ControlSize.Large)
+            TextButton(text = "Connect", onClick = ::connect, size = ControlSize.Large, style = ControlStyle.Primary, enabled = address.isNotBlank())
         }
     }
 }
@@ -565,7 +563,7 @@ private fun DeleteServerDialog(entry: ServerEntry, onConfirm: () -> Unit, onDism
         text = "It will be removed from your server list.",
         confirmLabel = "Delete",
         dismissLabel = "Cancel",
-        icon = themedIcon(LobbyIcons.TRASH),
+        icon = LobbyIcons.TRASH,
         danger = true,
         confirmEnabled = true,
         onConfirm = onConfirm,

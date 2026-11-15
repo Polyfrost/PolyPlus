@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.page.currentPageSearchQuery
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
@@ -79,6 +80,7 @@ internal fun WardrobeShell(
     val query = currentPageSearchQuery
     var sort by remember { mutableStateOf(WardrobeSort.Popular) }
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
+    var previewRequest by remember { mutableIntStateOf(0) }
     var showCart by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var addingSkin by remember { mutableStateOf(false) }
@@ -140,6 +142,7 @@ internal fun WardrobeShell(
         owned = selectedOwned,
         variantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
         mojang = selectedMojang,
+        previewRequest = previewRequest,
     )
     val outfitPreview = rememberOutfitPreview(selectedOutfit)
     val skinPreview = rememberSkinPreview(selectedSkin)
@@ -166,7 +169,7 @@ internal fun WardrobeShell(
         val startYaw = previewRotation.yaw
         val startPitch = previewRotation.pitch
         val delta = ((target - startYaw) % 360f + 540f) % 360f - 180f
-        animate(0f, 1f, animationSpec = tween(300)) { progress, _ ->
+        animate(0f, 1f, animationSpec = Motion.spec(tween(300))) { progress, _ ->
             if (!previewRotation.userRotated) {
                 previewRotation.yaw = startYaw + delta * progress
                 previewRotation.pitch = startPitch * (1f - progress)
@@ -245,11 +248,13 @@ internal fun WardrobeShell(
                             addToWheel(item)
                         } else {
                             selection = WardrobeSelection.Owned(item.groupId, item.type)
+                            previewRequest++
                             showCart = false
                         }
                     },
                     onPreviewOwned = { item ->
                         selection = WardrobeSelection.Owned(item.groupId, item.type)
+                        previewRequest++
                         showCart = false
                     },
                     onSelectVariant = onSelectVariant,

@@ -1,7 +1,10 @@
 package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private val lookChangePending = AtomicBoolean(false)
 private val equipLock = Mutex()
+
+internal var auraColorFailures by mutableIntStateOf(0)
+    private set
 
 private const val LOOK_CHANGE_BUSY = "Another change is still running. Try again in a moment."
 
@@ -182,7 +188,10 @@ internal fun selectAuraColor(color: Int?, onStatus: (String) -> Unit) {
         onStatus,
         if (color != null) "Updating aura color..." else "Clearing aura color...",
         { CosmeticService.setParticleColor(color) },
-        { wardrobeFailure(it, "update your aura color") },
+        {
+            auraColorFailures++
+            wardrobeFailure(it, "update your aura color")
+        },
     ) { if (color != null) "Aura color updated." else "Aura color cleared." }
 }
 

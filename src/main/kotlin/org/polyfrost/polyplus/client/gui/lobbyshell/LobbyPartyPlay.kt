@@ -2,7 +2,8 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
-import androidx.compose.foundation.layout.height
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
@@ -27,12 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import net.minecraft.client.multiplayer.ServerData
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbysocial.LeaderJoinEffect
 import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCard
@@ -56,6 +55,8 @@ import org.polyfrost.polyplus.client.party.ServerCheck
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private val BannerWidth = 640.dp
 private const val TICK_MS = 200L
@@ -175,14 +176,14 @@ internal fun PlayTogetherBanner(modifier: Modifier) {
     LaunchedEffect(current.stage) { A11y.announce(bannerTitle(current, seconds, where)) }
     Column((if (framed) shell.card() else shell.panel()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PlayerHead(seedOf(current.leader), 36.dp, Modifier, headShape(36.dp))
+            PlayerHead(playerId = seedOf(current.leader), size = 36.dp, modifier = Modifier, shape = headShape(36.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label(bannerTitle(current, seconds, where), 16.sp, weight = FontWeight.Medium)
-                bannerDetail(current)?.let { Label(it, 12.sp, color = MutedText) }
+                Text(bannerTitle(current, seconds, where), style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                bannerDetail(current)?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
             }
             BannerActions(current)
         }
-        current.warning?.let { SocialText(it, 12.sp, color = SocialDangerText) }
+        current.warning?.let { Text(it, color = SocialDangerText, style = OneConfigTheme.current.typography.small) }
         if (current.leading) LeaderStatus(current)
     }
 }
@@ -207,10 +208,10 @@ private fun bannerDetail(current: PlayTogether.Active): String? = when {
 @Composable
 private fun BannerActions(current: PlayTogether.Active) {
     when {
-        current.stage == PlayTogether.Stage.DONE -> TextButton("Close", Modifier.height(38.dp), PlayTogether::dismiss)
-        current.leading -> TextButton("Cancel", Modifier.height(38.dp), PlayTogether::cancel)
+        current.stage == PlayTogether.Stage.DONE -> TextButton(text = "Close", onClick = PlayTogether::dismiss, size = ControlSize.Large)
+        current.leading -> TextButton(text = "Cancel", onClick = PlayTogether::cancel, size = ControlSize.Large)
         current.stage == PlayTogether.Stage.CONNECTING -> Unit
-        else -> TextButton("Not now", Modifier.height(38.dp), PlayTogether::cancel)
+        else -> TextButton(text = "Not now", onClick = PlayTogether::cancel, size = ControlSize.Large)
     }
 }
 
@@ -224,10 +225,10 @@ private fun LeaderStatus(play: PlayTogether.Active) {
             key(member.player) {
                 val status = play.responses[member.player]
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PlayerHead(seedOf(member.player), 22.dp, Modifier, headShape(22.dp))
+                    PlayerHead(playerId = seedOf(member.player), size = 22.dp, modifier = Modifier, shape = headShape(22.dp))
                     Column {
-                        Label(names[member.player] ?: PlayerNamesRepository.nameOr(member.player), 12.sp, weight = FontWeight.Medium)
-                        Label(statusText(status?.first, status?.second), 11.sp, color = statusColor(status?.first))
+                        Text(names[member.player] ?: PlayerNamesRepository.nameOr(member.player), style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        Text(statusText(status?.first, status?.second), color = statusColor(status?.first), style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                 }
             }
@@ -250,7 +251,7 @@ private fun statusText(response: PlayResponse?, reason: PlayReason?): String = w
 private fun statusColor(response: PlayResponse?) = when (response) {
     PlayResponse.Joined -> SocialSuccessText
     PlayResponse.Incompatible, PlayResponse.Failed -> SocialDangerText
-    else -> MutedText
+    else -> OneConfigTheme.current.mutedText
 }
 
 @Composable

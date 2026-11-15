@@ -2,10 +2,11 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +43,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,36 +56,34 @@ import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.ContextMenuHost
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.Confirm
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
-import org.polyfrost.polyplus.client.gui.ConfirmPrompt
+import org.polyfrost.polyplus.client.gui.SocialDangerColor
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.HostWorldFlow
-import org.polyfrost.polyplus.client.gui.LIGHT_TEXT_LIMIT
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialControlBackground
-import org.polyfrost.polyplus.client.gui.SocialDangerColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialFieldShape
-import org.polyfrost.polyplus.client.gui.SocialHoverBorder
-import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.rememberFavicon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
 import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
 import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerFlows
 import org.polyfrost.polyplus.client.gui.replays.ReplayThumb
@@ -103,6 +101,7 @@ import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.Collections
 import kotlin.math.PI
 import kotlin.math.sin
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private val PanelGutter = 12.dp
 private val HeroIconSize = 96.dp
@@ -145,29 +144,27 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
     }
     if (source == PlaySource.Replays) LaunchedEffect(Unit) { ReplayLibrary.reload() }
     Box((if (quick) modifier.height(LobbyLayout.UnitHeight) else modifier).panel()) {
-        ContextMenuHost {
-            HeroWash(lobby, target)
-            Column(Modifier.fillMaxWidth().then(if (quick) Modifier.fillMaxSize() else Modifier)) {
-                SourceSwitch(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = PanelGutter))
-                Box(
-                    Modifier.fillMaxWidth().then(if (quick) Modifier.weight(1f) else Modifier.padding(vertical = 16.dp)).padding(horizontal = PanelGutter),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Crossfade(target) { shown ->
-                        when (shown) {
-                            is ServerData -> ServerHero(lobby, shown)
-                            is LobbyWorld -> WorldHero(shown)
-                            is ReplayEntry -> ReplayHero(shown)
-                            else -> EmptyHero(lobby, source)
-                        }
+        HeroWash(lobby, target)
+        Column(Modifier.fillMaxWidth().then(if (quick) Modifier.fillMaxSize() else Modifier)) {
+            SourceSwitch(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = PanelGutter))
+            Box(
+                Modifier.fillMaxWidth().then(if (quick) Modifier.weight(1f) else Modifier.padding(vertical = 16.dp)).padding(horizontal = PanelGutter),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Crossfade(target, animationSpec = Motion.finiteSpec(tween())) { shown ->
+                    when (shown) {
+                        is ServerData -> ServerHero(lobby, shown)
+                        is LobbyWorld -> WorldHero(shown)
+                        is ReplayEntry -> ReplayHero(shown)
+                        else -> EmptyHero(lobby, source)
                     }
                 }
-                if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, singleplayer)
-                HostingStrip(lobby)
-                Spacer(Modifier.height(PanelGutter))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
-                Footer(lobby, source, quick)
             }
+            if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, singleplayer)
+            HostingStrip(lobby)
+            Spacer(Modifier.height(PanelGutter))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
+            Footer(lobby, source, quick)
         }
     }
 }
@@ -176,7 +173,7 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
 private fun BoxScope.HeroWash(lobby: LobbyShell, target: Any?) {
     @Suppress("UNUSED_EXPRESSION") lobby.servers.revision
     Box(Modifier.matchParentSize()) {
-        Crossfade(target, Modifier.fillMaxWidth().height(HeroWashHeight)) { shown ->
+        Crossfade(target, Modifier.fillMaxWidth().height(HeroWashHeight), Motion.finiteSpec(tween())) { shown ->
             when (shown) {
                 is ServerData -> {
                     ServerRevisions.of(shown)
@@ -187,7 +184,7 @@ private fun BoxScope.HeroWash(lobby: LobbyShell, target: Any?) {
                 else -> WashImage(null)
             }
         }
-        val scrim = if (SocialTextPrimary.luminance() > LIGHT_TEXT_LIMIT) Color.Black else Color.White
+        val scrim = if (OneConfigTheme.current.isLight) Color.White else Color.Black
         Box(Modifier.fillMaxWidth().height(ScrimHeight).background(Brush.verticalGradient(*scrimStops(scrim))))
     }
 }
@@ -314,45 +311,13 @@ private fun boxBlurTransposed(from: IntArray, to: IntArray) {
 
 @Composable
 private fun SourceSwitch(lobby: LobbyShell, modifier: Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .height(SourceHeight)
-            .clip(SocialFieldShape)
-            .background(SocialControlBackground)
-            .border(1.dp, SocialBorderColor, SocialFieldShape)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        PlaySource.entries.filter { it.shown }.forEach { entry ->
-            SourceTab(entry.name, entry == lobby.source, Modifier.weight(1f)) { lobby.chooseSource(entry) }
-        }
-    }
+    val tabs = PlaySource.entries.filter { it.shown }.map { TabItem(it, it.name) }
+    TabRow(tabs, lobby.source, { lobby.chooseSource(it) }, modifier.height(SourceHeight), style = TabStyle.Segmented, size = ControlSize.Regular, slide = true)
 }
 
 private fun LobbyShell.chooseSource(entry: PlaySource) {
     source = entry
     if (PlaySource.entries.any { it.page == page }) show(entry.page)
-}
-
-@Composable
-private fun SourceTab(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val shape = ppShape(6.dp)
-    val fill by animateColorAsState(if (selected) OneConfigTheme.accent else Color.Transparent)
-    val ink by animateColorAsState(
-        when {
-            selected -> OneConfigTheme.current.accentTextColor
-            hovered -> SocialTextPrimary
-            else -> MutedText
-        },
-    )
-    Box(
-        modifier.fillMaxSize().clip(shape).background(fill).hoverable(interaction).clickableWithSound(label, A11yRole.Tab, selected = selected, shape = shape, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Label(label, 14.sp, color = ink, weight = FontWeight.Medium)
-    }
 }
 
 @Composable
@@ -362,7 +327,7 @@ private fun HeroLayout(icon: @Composable () -> Unit, trailing: (@Composable () -
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Box(if (OneConfigTheme.current.shadowEnabled) Modifier.shadow(10.dp, ppShape(12.dp), ambientColor = OneConfigTheme.current.shadowColor, spotColor = OneConfigTheme.current.shadowColor) else Modifier) { icon() }
+        Box(if (OneConfigTheme.current.shadowEnabled) Modifier.shadow(10.dp, OneConfigTheme.shape(12.dp), ambientColor = OneConfigTheme.current.shadowColor, spotColor = OneConfigTheme.current.shadowColor) else Modifier) { icon() }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp), content = text)
         trailing?.invoke()
     }
@@ -370,12 +335,12 @@ private fun HeroLayout(icon: @Composable () -> Unit, trailing: (@Composable () -
 
 @Composable
 private fun HeroName(name: String) {
-    SocialText(name, 22.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Text(name, style = OneConfigTheme.current.typography.body.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium), maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
 private fun HeroDetail(text: String, color: Color = SocialTextPrimary.copy(alpha = HERO_DETAIL_ALPHA)) {
-    SocialText(text, 12.sp, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Text(text, color = color, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -402,7 +367,7 @@ private fun ServerStatus(data: ServerData, revision: Int) {
             SocialTextPrimary,
             trailing = "${data.ping} ms",
         )
-        else -> StatusLine(MutedText, "Checking status...")
+        else -> StatusLine(OneConfigTheme.current.mutedText, "Checking status...")
     }
 }
 
@@ -456,8 +421,8 @@ private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
     }
     val flows = remember { SingleplayerFlows() }
     val action: (@Composable () -> Unit)? = when {
-        source == PlaySource.Multiplayer -> { { TextButton("Add server", themedIcon(LobbyIcons.PLUS), Modifier.height(32.dp), ButtonStyle.Secondary, true, lobby::addServer) } }
-        singleplayer && lobby.worlds.loaded -> { { TextButton("Create world", themedIcon(LobbyIcons.PLUS), Modifier.height(32.dp), ButtonStyle.Secondary, true, flows::create) } }
+        source == PlaySource.Multiplayer -> { { TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, style = ControlStyle.Secondary) } }
+        singleplayer && lobby.worlds.loaded -> { { TextButton(text = "Create world", icon = LobbyIcons.PLUS, onClick = flows::create, style = ControlStyle.Secondary) } }
         else -> null
     }
     HeroLayout({ EmptyIcon(icon) }) {
@@ -469,12 +434,12 @@ private fun EmptyHero(lobby: LobbyShell, source: PlaySource) {
 
 @Composable
 private fun EmptyIcon(name: String) {
-    val shape = ppShape(12.dp)
+    val shape = OneConfigTheme.shape(12.dp)
     Box(
         Modifier.size(HeroIconSize).clip(shape).background(SocialControlBackground).border(1.dp, SocialBorderColor, shape),
         contentAlignment = Alignment.Center,
     ) {
-        PlayIcon(name, MutedText, HeroIconSize * EMPTY_ICON_SCALE)
+        PlayIcon(name, OneConfigTheme.current.mutedText, HeroIconSize * EMPTY_ICON_SCALE)
     }
 }
 
@@ -511,16 +476,15 @@ private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
 private fun WatchRow(lobby: LobbyShell) {
     val entry = lobby.activeReplay()
     val blocked = entry != null && !entry.playable
-    val (interaction, hovered) = rememberSocialHover()
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
     Row(Modifier.padding(horizontal = PanelGutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.weight(1f).hoverable(interaction)) {
+        TooltipBox(if (blocked) entry?.problem else null, Modifier.weight(1f), TooltipPlacement.AboveCenter, Dp.Unspecified) {
             PlayButton(
-                Modifier.fillMaxWidth().graphicsLayer { alpha = if (blocked) DISABLED_ALPHA else 1f },
+                Modifier.fillMaxWidth().graphicsLayer { alpha = if (blocked) disabledAlpha else 1f },
                 if (entry == null) "Choose a replay" else "Watch",
                 null,
                 zoom = entry != null && !blocked,
             ) { if (!blocked) lobby.play() }
-            if (blocked && hovered && entry != null) TooltipPopup(entry.problem, TooltipPlacement.AboveCenter, Dp.Unspecified)
         }
     }
 }
@@ -528,25 +492,25 @@ private fun WatchRow(lobby: LobbyShell) {
 private fun hostable(world: LobbyWorld, session: String?): Boolean = world.playable && session == null && hostWorldAllowed()
 
 private fun worldMenuItems(lobby: LobbyShell, world: LobbyWorld): List<MenuAction> = listOfNotNull(
-    MenuAction("Play", SOCIAL_ASSETS + "minecraft-block.svg", enabled = world.playable) { lobby.enter(world) },
-    MenuAction("Host world", SOCIAL_ASSETS + "log-in-04.svg") { lobby.host(world.id) }.takeIf { hostable(world, P2PSessionManager.currentSessionId) },
+    MenuAction("Play", { lobby.enter(world) }, icon = SOCIAL_ASSETS + "minecraft-block.svg", enabled = world.playable),
+    MenuAction("Host world", { lobby.host(world.id) }, icon = SOCIAL_ASSETS + "log-in-04.svg").takeIf { hostable(world, P2PSessionManager.currentSessionId) },
 )
 
 @Composable
 private fun HostTile(icon: String, label: String, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
+    val hover = rememberHoverState()
     Column(
         Modifier
             .width(HostTileWidth)
             .height(LobbyLayout.PlayHeight)
-            .cardFrame(false, hovered)
-            .hoverable(interaction)
-            .clickableWithSound(label, onClick = onClick),
+            .cardFrame(false, hover.hovered)
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(label, onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
         PlayIcon(icon, SocialTextPrimary, 18.dp)
-        Label(label, 12.sp)
+        Text(label, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -554,7 +518,6 @@ private fun HostTile(icon: String, label: String, onClick: () -> Unit) {
 private fun HostingStrip(lobby: LobbyShell) {
     val session by P2PSessionManager.currentSessionIdFlow.collectAsState()
     if (session == null) return
-    val (stopInteraction, stopHovered) = rememberSocialHover()
     Row(
         Modifier
             .padding(start = PanelGutter, end = PanelGutter, top = 8.dp)
@@ -566,14 +529,17 @@ private fun HostingStrip(lobby: LobbyShell) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.size(8.dp).clip(OneConfigTheme.current.circleShape).background(SocialSuccessColor))
-        Label("Hosting", 14.sp, weight = FontWeight.Medium)
-        Label(lobby.hostedWorldName.orEmpty(), 12.sp, Modifier.weight(1f), color = MutedText)
-        Box(
-            Modifier.height(26.dp).rowFrame(false, stopHovered, ppShape(6.dp)).hoverable(stopInteraction).clickableWithSound("Stop hosting", shape = ppShape(6.dp)) { ConfirmPrompt.ask("Stop hosting?", "Your world closes for everyone in it.", "Stop hosting", SOCIAL_ASSETS + "x-close.svg", lobby::stopHosting) }.padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Label("Stop", 12.sp, color = SocialDangerText, weight = FontWeight.Medium)
-        }
+        Text("Hosting", style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(lobby.hostedWorldName.orEmpty(), Modifier.weight(1f), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        val stopIcon = SOCIAL_ASSETS + "x-close.svg"
+        TextButton(
+            text = "Stop",
+            onClick = { Confirm.ask("Stop hosting?", "Your world closes for everyone in it.", "Stop hosting", lobby::stopHosting, icon = stopIcon) },
+            style = ControlStyle.Danger,
+            size = ControlSize.Compact,
+            dangerColor = SocialDangerText,
+            contentDescription = "Stop hosting",
+        )
     }
 }
 
@@ -596,9 +562,9 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
     ) {
         val listed = worlds.isNotEmpty() || rows.isNotEmpty() || replays.isNotEmpty()
         if (!listed) {
-            Label("$saved saved", 12.sp, Modifier.weight(1f), color = MutedText)
+            Text("$saved saved", Modifier.weight(1f), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         } else {
-            Label("Recent", 12.sp, Modifier.padding(end = 4.dp), color = MutedText)
+            Text("Recent", Modifier.padding(end = 4.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             worlds.forEach { world ->
                 RecentTile(world.name, lobby.isSelected(world), { lobby.select(world) }, { worldMenuItems(lobby, world) }) { WorldIcon(world, TileSize) }
             }
@@ -612,7 +578,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
             Spacer(Modifier.weight(1f))
         }
         when {
-            lobby.page == page -> if (listed) Label("$saved saved", 12.sp, color = MutedText)
+            lobby.page == page -> if (listed) Text("$saved saved", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             listed -> AllButton("All", "$saved") { lobby.show(page) }
             source == PlaySource.Singleplayer -> AllButton("All worlds", null) { lobby.show(page) }
             source == PlaySource.Replays -> AllButton("All replays", null) { lobby.show(page) }
@@ -623,41 +589,25 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
 
 @Composable
 private fun RecentTile(name: String, selected: Boolean, onClick: () -> Unit, menu: () -> List<MenuAction>, icon: @Composable () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val ring by animateColorAsState(
-        when {
-            selected -> OneConfigTheme.accent
-            hovered -> SocialHoverBorder
-            else -> Color.Transparent
-        },
-    )
-    Box(Modifier.size(TileSize).contextMenu(menu).hoverable(interaction).clickableWithSound(name, selected = selected.takeIf { it }, onClick = onClick)) {
-        icon()
-        Box(Modifier.matchParentSize().border(1.dp, ring, SocialFieldShape))
-        if (hovered) TooltipPopup(name, TooltipPlacement.AboveCenter, Dp.Unspecified)
+    TooltipBox(name, Modifier, TooltipPlacement.AboveCenter, Dp.Unspecified) {
+        Box(Modifier.size(TileSize).contextMenu(entries = menu).selectableCard(selected, onClick, name, SocialFieldShape, role = A11yRole.Button, recipe = ControlDefaults.Media)) {
+            icon()
+        }
     }
 }
 
 @Composable
 private fun AllButton(label: String, count: String?, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val border by animateColorAsState(if (hovered) SocialHoverBorder else SocialBorderColor)
-    Row(
-        Modifier
-            .height(TileSize)
-            .clip(SocialFieldShape)
-            .background(SocialControlBackground)
-            .border(1.dp, border, SocialFieldShape)
-            .hoverable(interaction)
-            .clickableWithSound(if (count == null) label else "$label, $count", shape = SocialFieldShape, onClick = onClick)
-            .padding(start = 12.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Label(label, 14.sp, weight = FontWeight.Medium)
-        count?.let { Label(it, 12.sp, color = MutedText) }
-        ThemedIcon("right-arrow", SocialTextPrimary, 14.dp)
-    }
+    TextButton(
+        text = label,
+        onClick = onClick,
+        modifier = Modifier.height(TileSize),
+        contentDescription = if (count == null) label else "$label, $count",
+        trailing = {
+            count?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+            ThemedIcon("right-arrow", SocialTextPrimary, 14.dp)
+        },
+    )
 }
 
 @Composable
@@ -680,13 +630,13 @@ internal fun HostWorldDialog(worldId: String, screen: Screen, onDismiss: () -> U
 
 @Composable
 private fun WorldIcon(world: LobbyWorld, size: Dp) {
-    val shape = ppShape(if (size > 48.dp) 12.dp else 8.dp)
+    val shape = OneConfigTheme.shape(if (size > 48.dp) 12.dp else 8.dp)
     val icon = rememberFavicon(world.icon)
     Box(Modifier.size(size).clip(shape).background(OneConfigTheme.current.componentBackground).border(1.dp, SocialBorderColor, shape), contentAlignment = Alignment.Center) {
         if (icon != null) {
             Image(icon, null, Modifier.size(size), contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
         } else {
-            PlayIcon("minecraft-block", MutedText, size * EMPTY_ICON_SCALE)
+            PlayIcon("minecraft-block", OneConfigTheme.current.mutedText, size * EMPTY_ICON_SCALE)
         }
     }
 }

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.ui.graphics.ColorFilter
@@ -10,6 +12,8 @@ import androidx.compose.ui.unit.IntSize
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
 import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
@@ -413,7 +417,7 @@ object PauseMenuPanel {
         if (layout.onLeft) hideEssentialFlags(screen)
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
         updateDrag(screen, layout)
-        inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
+        InlinePolyCanvas.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     //?} elif > 1.8.9 {
     /*@JvmStatic
@@ -422,7 +426,7 @@ object PauseMenuPanel {
         if (layout.onLeft) hideEssentialFlags(screen)
         if (playtimeDue()) playtimeButtons[screen]?.message = Component.literal(playtimeLabel())
         updateDrag(screen, layout)
-        inline.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
+        InlinePolyCanvas.draw(ctx) { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     *///?} else {
     /*@JvmStatic
@@ -433,11 +437,9 @@ object PauseMenuPanel {
             it.render(Minecraft.getInstance(), mouseX, mouseY)
         }
         updateDrag(screen, layout)
-        inline.draw { drawPreview(it, screen, layout); drawIcons(it, screen) }
+        InlinePolyCanvas.draw { drawPreview(it, screen, layout); drawIcons(it, screen) }
     }
     *///?}
-
-    private val inline = InlineCanvas("pause_menu_panel")
 
     private var playtimeRefreshedAt = 0L
 

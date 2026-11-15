@@ -3,17 +3,20 @@
 package org.polyfrost.polyplus.client.gui.singleplayer
 
 import org.polyfrost.oneconfig.api.platform.v1.Platform
+import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,39 +43,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.minecraft.network.chat.Component
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.CardSurface
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.DetailRow
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LastPlayedStrip
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
-import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
-import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
-import org.polyfrost.polyplus.client.gui.lobbyshell.cardFrame
 import org.polyfrost.polyplus.client.gui.lobbyshell.hostWorldAllowed
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberCardClick
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 
 private const val BANNER_FALLBACK_ALPHA = 0.22f
 private const val TOOLTIP_WIDTH = 240
-internal val BUTTON_HEIGHT = 38.dp
 
 private const val CARD_TAGS = 2
 
 private val WorldTone.color: Color
     @Composable get() = when (this) {
-        WorldTone.Neutral -> MutedText
+        WorldTone.Neutral -> OneConfigTheme.current.mutedText
         WorldTone.Warning -> SocialTextPrimary
         WorldTone.Danger -> SocialDangerText
     }
@@ -96,7 +93,7 @@ private fun WorldBanner(icon: ImageBitmap?, height: Dp) {
 
 @Composable
 private fun WorldTile(icon: ImageBitmap?, size: Dp) {
-    val shape = ppShape(if (size > 48.dp) 8.dp else 6.dp)
+    val shape = OneConfigTheme.shape(if (size > 48.dp) 8.dp else 6.dp)
     Box(
         Modifier.size(size).clip(shape).background(OneConfigTheme.current.componentBackground).border(1.dp, SocialBorderColor, shape),
         contentAlignment = Alignment.Center,
@@ -104,14 +101,14 @@ private fun WorldTile(icon: ImageBitmap?, size: Dp) {
         if (icon != null) {
             Image(icon, null, Modifier.size(size), contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
         } else {
-            ThemedIcon(SOCIAL_ASSETS + "minecraft-block.svg", MutedText, size / 2)
+            ThemedIcon(SOCIAL_ASSETS + "minecraft-block.svg", OneConfigTheme.current.mutedText, size / 2)
         }
     }
 }
 
 @Composable
 private fun WorldTagItems(world: SingleplayerWorld) {
-    world.tags.take(CARD_TAGS).forEach { Tag(it.label, if (it.tone == WorldTone.Danger) TagTone.Danger else TagTone.Dark) }
+    world.tags.take(CARD_TAGS).forEach { Badge(it.label.uppercase(), tone = if (it.tone == WorldTone.Danger) BadgeTone.Danger else BadgeTone.Neutral, overImage = true, style = BadgeStyle.Hairline) }
 }
 
 @Composable
@@ -124,13 +121,13 @@ private fun WorldTags(world: SingleplayerWorld, modifier: Modifier = Modifier) {
 @Composable
 private fun WorldCardText(world: SingleplayerWorld, titleSize: Int = 16) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Label(world.name, titleSize.sp, weight = FontWeight.Medium)
-        SocialText(world.meta, 12.sp, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(world.name, style = OneConfigTheme.current.typography.body.copy(fontSize = titleSize.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(world.meta, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
         val status = world.status
         if (status != null) {
-            SocialText(status, 12.sp, color = world.statusTone.color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(status, color = world.statusTone.color, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else if (world.id != world.name) {
-            Label(world.id, 12.sp, color = MutedText)
+            Text(world.id, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
     }
 }
@@ -141,7 +138,7 @@ private fun worldMenuItems(state: SingleplayerState, world: SingleplayerWorld, o
     MenuAction("Edit", SOCIAL_ASSETS + "edit-02.svg", enabled = world.canEdit) { state.flows.edit(world) },
     MenuAction("Backup", LobbyIcons.COPY, enabled = world.canBackup) { state.flows.backup(world) },
     MenuAction("Recreate", LobbyIcons.REFRESH, enabled = world.canRecreate) { state.flows.recreate(world) },
-    MenuAction("Delete", LobbyIcons.TRASH, danger = true, enabled = world.canDelete) { state.flows.delete(world) },
+    MenuAction("Delete", { state.flows.delete(world) }, icon = LobbyIcons.TRASH, enabled = world.canDelete, danger = true, dangerColor = KitDangerColor),
 )
 
 @Composable
@@ -150,13 +147,15 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
     val tile = 52.dp
     val overhang = 12.dp
     val icon = state.icons[world.id]
-    val (interaction, hovered) = rememberSocialHover()
+    val shape = OneConfigTheme.shape(16.dp)
+    val click = rememberWorldClick(state, world)
     Box(
         modifier
-            .cardFrame(state.selected === world, hovered)
+            .clip(shape)
+            .background(CardSurface)
+            .border(1.dp, SocialBorderColor, shape)
             .contextMenu { worldMenuItems(state, world, onHost) }
-            .hoverable(interaction)
-            .clickableWithSound(world.name, selected = (state.selected === world).takeIf { it }, shape = ppShape(16.dp), onClick = rememberWorldClick(state, world)),
+            .selectableCard(state.selected === world, click, world.name, shape, recipe = ControlDefaults.Media),
     ) {
         Column(Modifier.fillMaxSize()) {
             WorldBanner(icon, banner)
@@ -165,7 +164,7 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 WorldCardText(world)
-                TextButton(world.primaryLabel, null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, world.canPlay) { state.flows.play(world) }
+                TextButton(text = world.primaryLabel, onClick = { state.flows.play(world) }, style = ControlStyle.Primary, size = ControlSize.Large, enabled = world.canPlay)
             }
         }
         WorldTags(world, Modifier.padding(10.dp))
@@ -190,9 +189,9 @@ internal fun LastPlayedWorldStrip(state: SingleplayerState, onHost: (String) -> 
     ) {
         val status = world.status
         if (status != null) {
-            Label(status, 12.sp, color = world.statusTone.color)
+            Text(status, color = world.statusTone.color, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         } else {
-            Label(world.meta, 12.sp, color = MutedText)
+            Text(world.meta, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
     }
 }
@@ -200,7 +199,7 @@ internal fun LastPlayedWorldStrip(state: SingleplayerState, onHost: (String) -> 
 @Composable
 private fun ActionButton(label: String, icon: String, enabled: Boolean, tooltip: String?, modifier: Modifier, onClick: () -> Unit) {
     TooltipBox(tooltip, modifier, TooltipPlacement.AboveCenter, TOOLTIP_WIDTH.dp) {
-        TextButton(label, themedIcon(icon), Modifier.fillMaxWidth().height(BUTTON_HEIGHT), ButtonStyle.Secondary, enabled, onClick)
+        TextButton(text = label, icon = icon, onClick = onClick, modifier = Modifier.fillMaxWidth(), style = ControlStyle.Secondary, size = ControlSize.Large, enabled = enabled)
     }
 }
 
@@ -217,7 +216,7 @@ internal fun WorldDetailsPanel(state: SingleplayerState, onHost: (String) -> Uni
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             PanelTitle(world.name)
-            Label(world.id, 12.sp, color = MutedText)
+            Text(world.id, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (world.gameMode.isNotEmpty()) DetailRow("Game mode", world.gameMode)
@@ -225,7 +224,7 @@ internal fun WorldDetailsPanel(state: SingleplayerState, onHost: (String) -> Uni
             if (world.version.isNotEmpty()) DetailRow("Version", world.version)
             if (world.gameMode.isNotEmpty()) DetailRow("Cheats", if (world.commands) "On" else "Off")
         }
-        world.status?.let { SocialText(it, 12.sp, color = world.statusTone.color, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+        world.status?.let { Text(it, color = world.statusTone.color, style = OneConfigTheme.current.typography.small, maxLines = 4, overflow = TextOverflow.Ellipsis) }
         Spacer(Modifier.weight(1f))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (hostWorldAllowed()) ActionButton("Host", SOCIAL_ASSETS + "log-in-04.svg", world.canPlay, null, Modifier.fillMaxWidth()) { onHost(world.id) }
@@ -235,7 +234,7 @@ internal fun WorldDetailsPanel(state: SingleplayerState, onHost: (String) -> Uni
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionButton("Recreate", LobbyIcons.REFRESH, world.canRecreate, fixingTooltip(world, "recreate"), Modifier.weight(1f)) { state.flows.recreate(world) }
-                TextButton("Delete", themedIcon(LobbyIcons.TRASH), Modifier.weight(1f).height(BUTTON_HEIGHT), ButtonStyle.Danger, world.canDelete) { state.flows.delete(world) }
+                TextButton(text = "Delete", icon = LobbyIcons.TRASH, onClick = { state.flows.delete(world) }, modifier = Modifier.weight(1f), style = ControlStyle.Danger, size = ControlSize.Large, enabled = world.canDelete, dangerColor = KitDangerColor)
             }
         }
     }

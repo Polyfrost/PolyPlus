@@ -4,11 +4,6 @@ package org.polyfrost.polyplus.client.gui.wardrobe
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -26,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,13 +37,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.Chip
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -58,16 +54,18 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.SocialOffStateBackground
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private val PREVIEW_HEIGHT = 330.dp
+private const val BODY_MODEL_SCALE = 0.5f
+private const val BODY_ANCHOR = 0.5f
+private const val HAT_MODEL_SCALE = 0.4f
+private const val HAT_ANCHOR = 0.59f
 
 @Composable
 internal fun PreviewPanel(
@@ -92,9 +90,7 @@ internal fun PreviewPanel(
     val previewHeightPx = with(LocalDensity.current) { PREVIEW_HEIGHT.roundToPx() }
     val previewShift = if (hasHeader) (headerHeight - (panelHeight - previewHeightPx) / 2).coerceAtLeast(0) else 0
     Box(
-        modifier = modifier.clip(ppShape(12.dp))
-            .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+        modifier = modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(12.dp), glass = false)
             .onSizeChanged { panelHeight = it.height },
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
@@ -103,7 +99,8 @@ internal fun PreviewPanel(
             Modifier.align(Alignment.Center).offset { IntOffset(0, previewShift) }.fillMaxWidth().height(PREVIEW_HEIGHT),
             source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
             autoSpin = false,
-            verticalAnchor = if (hasHeadCosmetic) 0.64f else 0.5f,
+            modelScale = if (hasHeadCosmetic) HAT_MODEL_SCALE else BODY_MODEL_SCALE,
+            verticalAnchor = if (hasHeadCosmetic) HAT_ANCHOR else BODY_ANCHOR,
             initialYaw = FRONT_YAW_DEG,
             live = true,
             rotation = rotation,
@@ -115,12 +112,12 @@ internal fun PreviewPanel(
         ) {
             if (title != null) {
                 Column {
-                    SocialText(title, color = OneConfigTheme.current.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    subtitle?.let { SocialText(it, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp) }
+                    Text(title, color = OneConfigTheme.current.textColor, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium))
+                    subtitle?.let { Text(it, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small) }
                 }
             }
             if (status != null) {
-                SocialText(status, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                Text(status, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
             }
         }
         val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
@@ -132,13 +129,11 @@ internal fun PreviewPanel(
                 if (variants.isNotEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth()
-                            .clip(ppShape(12.dp))
-                            .background(OneConfigTheme.current.chipBackground)
-                            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(12.dp))
+                            .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(12.dp), glass = false)
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SocialText("Variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+                        Text("Variants", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
                         VariantChips(variants, selectedVariantId, onSelectVariant)
                     }
                 }
@@ -158,9 +153,18 @@ internal fun PreviewPanel(
 internal class SelectionPreview(val source: PlayerPreviewSource, val hasHeadCosmetic: Boolean)
 
 @Composable
-internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, mojang: MojangCape?): SelectionPreview? {
+internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, mojang: MojangCape?, previewRequest: Int = 0): SelectionPreview? {
     val slot = owned?.type?.defaultSlot()
-    val previewsOwned = owned != null && slot != null && variantId != null &&
+    val selectedKey = owned?.let { it.type to it.groupId }
+    val equippedNow = owned?.equipped == true
+    var wasEquipped by remember(selectedKey) { mutableStateOf(equippedNow) }
+    var droppedVariant by remember(selectedKey, previewRequest) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(selectedKey, equippedNow) {
+        droppedVariant = if (wasEquipped && !equippedNow) variantId else droppedVariant.takeUnless { equippedNow }
+        wasEquipped = equippedNow
+    }
+    val unequippedHere = (wasEquipped && !equippedNow) || (droppedVariant != null && droppedVariant == variantId)
+    val previewsOwned = owned != null && slot != null && variantId != null && !unequippedHere &&
         !(owned.equipped && owned.equippedVariantId == variantId)
     val installs = CosmeticAssetCache.installs
     val textureVersion = MojangCapeService.textureVersion
@@ -215,7 +219,7 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
 internal fun BoxScope.ResetRotationButton(rotation: PreviewRotation?, onReset: () -> Unit) {
     if (rotation?.userRotated != true) return
     Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
-        SmallButton("Reset view", iconPath = "refresh", primary = false, onClick = onReset)
+        TextButton("Reset view", "refresh", onReset, sound = null)
     }
 }
 
@@ -228,16 +232,10 @@ private fun PreviewPill(
 ) {
     var customOpen by remember { mutableStateOf(false) }
 
-    var pillHeight by remember { mutableIntStateOf(0) }
-    val popoverGapPx = with(LocalDensity.current) { 8.dp.roundToPx() }
-
     Box(modifier) {
         Row(
             modifier = Modifier
-                .onSizeChanged { pillHeight = it.height }
-                .clip(ppShape(PILL_RADIUS))
-                .background(OneConfigTheme.current.chipBackground)
-                .border(1.dp, OneConfigTheme.current.borderColor, ppShape(PILL_RADIUS))
+                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(PILL_RADIUS), glass = false)
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -250,18 +248,13 @@ private fun PreviewPill(
             )
         }
         if (customOpen) {
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, pillHeight + popoverGapPx),
-                onDismissRequest = { customOpen = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                AuraCustomPopover(
-                    selectedColor = auraColor,
-                    onPreview = onPreviewAuraColor,
-                    onCommit = onSelectAuraColor,
-                )
-            }
+            AuraColorPopup(
+                selectedColor = auraColor,
+                onPreview = onPreviewAuraColor,
+                onCommit = onSelectAuraColor,
+                onDismiss = { customOpen = false },
+                gap = 8.dp,
+            )
         }
     }
 }
@@ -274,7 +267,7 @@ internal fun VariantPicker(
     ownedVariantIds: Set<Int> = emptySet(),
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        SocialText("Variant", color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp)
+        Text("Variant", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
         VariantChips(variants, selectedVariantId, onSelect, ownedVariantIds)
     }
 }
@@ -287,18 +280,17 @@ internal fun VariantChips(
     onSelect: (Int) -> Unit,
     ownedVariantIds: Set<Int> = emptySet(),
 ) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().heightIn(max = MAX_CHIP_HEIGHT).verticalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        for (variant in variants) {
-            VariantChip(
-                variant = variant,
-                selected = variant.id == selectedVariantId,
-                dimmed = variant.id in ownedVariantIds && variant.id != selectedVariantId,
-                onClick = { onSelect(variant.id) },
-            )
+    val scroll = rememberScrollState()
+    ScrollContainer(scroll, Modifier.fillMaxWidth().heightIn(max = MAX_CHIP_HEIGHT), scrollbar = false) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (variant in variants) {
+                VariantChip(
+                    variant = variant,
+                    selected = variant.id == selectedVariantId,
+                    dimmed = variant.id in ownedVariantIds && variant.id != selectedVariantId,
+                    onClick = { onSelect(variant.id) },
+                )
+            }
         }
     }
 }
@@ -306,60 +298,40 @@ internal fun VariantChips(
 @Composable
 private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: Boolean, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
     val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
-    Row(
-        modifier = Modifier.height(28.dp)
-            .graphicsLayer { alpha = if (dimmed) 0.55f else 1f }
-            .clip(ppShape(6.dp))
-            .background(if (selected) OneConfigTheme.accent else SocialOffStateBackground)
-            .border(
-                1.dp,
-                when {
-                    selected -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> theme.borderColor
-                },
-                ppShape(6.dp),
-            )
-            .hoverable(interaction)
-            .clickable(onClick = onClick)
-            .padding(start = 4.dp, end = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(width = 13.dp, height = 20.dp).clip(ppShape(4.dp)).background(theme.chipBackground)) {
-            when (art) {
-                is SwatchArt.Picture -> Image(
-                    bitmap = art.bitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
-                    filterQuality = FilterQuality.None,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                is SwatchArt.Stripes -> Column(Modifier.fillMaxSize()) {
-                    for (color in art.colors) {
-                        Box(Modifier.fillMaxWidth().weight(1f).background(color))
+    val dimAlpha = if (dimmed) theme.disabledAlpha else 1f
+    Chip(
+        label = variant.name,
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.widthIn(max = MAX_CHIP_WIDTH).graphicsLayer { alpha = dimAlpha },
+        size = ControlSize.Compact,
+        sound = null,
+        leading = {
+            Box(Modifier.size(width = 13.dp, height = 20.dp).clip(OneConfigTheme.shape(4.dp)).background(theme.chipBackground)) {
+                when (art) {
+                    is SwatchArt.Picture -> Image(
+                        bitmap = art.bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.FillBounds,
+                        filterQuality = FilterQuality.None,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    is SwatchArt.Stripes -> Column(Modifier.fillMaxSize()) {
+                        for (color in art.colors) {
+                            Box(Modifier.fillMaxWidth().weight(1f).background(color))
+                        }
                     }
+                    null -> Unit
                 }
-                null -> Unit
             }
-        }
-        SocialText(
-            variant.name,
-            color = if (selected) theme.accentTextColor else theme.textColor,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = MAX_CHIP_LABEL_WIDTH),
-        )
-    }
+        },
+    )
 }
 
 private val MAX_CHIP_HEIGHT = 96.dp
 
-private val MAX_CHIP_LABEL_WIDTH = 120.dp
+private val MAX_CHIP_WIDTH = 168.dp
 
 private val PILL_RADIUS = 18.dp

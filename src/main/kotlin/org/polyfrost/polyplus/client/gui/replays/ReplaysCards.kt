@@ -3,14 +3,17 @@
 package org.polyfrost.polyplus.client.gui.replays
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.polyplus.client.gui.lobbyshell.DangerTag
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,34 +36,28 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
+import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.CardSurface
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
-import org.polyfrost.polyplus.client.gui.SocialDangerText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
 import org.polyfrost.polyplus.client.gui.lobbyshell.DetailRow
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LastPlayedStrip
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
-import org.polyfrost.polyplus.client.gui.lobbyshell.Tag
-import org.polyfrost.polyplus.client.gui.lobbyshell.TagTone
-import org.polyfrost.polyplus.client.gui.lobbyshell.cardFrame
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberCardClick
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.compat.replay.ReplayEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 
 private const val BANNER_FALLBACK_ALPHA = 0.22f
 private const val PLACEHOLDER_SCALE = 0.42f
 private val BannerHeight = 104.dp
 private val StripThumbWidth = 71.dp
 private val StripThumbHeight = 40.dp
-internal val BUTTON_HEIGHT = 38.dp
 
 internal const val VIDEO_ICON = SOCIAL_ASSETS + "video-recorder.svg"
 internal const val FOLDER_ICON = SOCIAL_ASSETS + "link-external-01.svg"
@@ -73,7 +70,7 @@ internal fun replayMenuItems(entry: ReplayEntry, onWatch: (ReplayEntry) -> Unit)
 
 @Composable
 internal fun ReplayThumb(entry: ReplayEntry, width: Dp, height: Dp) {
-    val shape = ppShape(if (minOf(width, height) > 48.dp) 12.dp else 8.dp)
+    val shape = OneConfigTheme.shape(if (minOf(width, height) > 48.dp) 12.dp else 8.dp)
     val icon = rememberReplayIcon(entry)
     Box(
         Modifier.size(width, height).clip(shape).background(OneConfigTheme.current.componentBackground).border(1.dp, SocialBorderColor, shape),
@@ -82,7 +79,7 @@ internal fun ReplayThumb(entry: ReplayEntry, width: Dp, height: Dp) {
         if (icon != null) {
             Image(icon, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.Medium)
         } else {
-            ThemedIcon(VIDEO_ICON, MutedText, minOf(width, height) * PLACEHOLDER_SCALE)
+            ThemedIcon(VIDEO_ICON, OneConfigTheme.current.mutedText, minOf(width, height) * PLACEHOLDER_SCALE)
         }
     }
 }
@@ -98,15 +95,15 @@ private fun ReplayBanner(entry: ReplayEntry) {
         if (icon != null) {
             Image(icon, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.Medium)
         } else {
-            ThemedIcon(VIDEO_ICON, MutedText, BannerHeight * PLACEHOLDER_SCALE)
+            ThemedIcon(VIDEO_ICON, OneConfigTheme.current.mutedText, BannerHeight * PLACEHOLDER_SCALE)
         }
     }
 }
 
 @Composable
 private fun ReplayTagItems(entry: ReplayEntry) {
-    if (ReplayLibrary.providers.size > 1) Tag(entry.provider.name)
-    if (!entry.playable) Tag("Can't open", TagTone.Danger) else if (!entry.warning.isNullOrBlank()) Tag("May not load", TagTone.Danger)
+    if (ReplayLibrary.providers.size > 1) Badge(entry.provider.name.uppercase(), overImage = true, style = BadgeStyle.Hairline)
+    if (!entry.playable) DangerTag("CAN'T OPEN") else if (!entry.warning.isNullOrBlank()) DangerTag("MAY NOT LOAD")
 }
 
 @Composable
@@ -120,13 +117,15 @@ private fun ReplayEntry.metaText(): String = listOf(dateText, sizeText).joinToSt
 
 @Composable
 internal fun ReplayCard(entry: ReplayEntry, selected: Boolean, onSelect: (ReplayEntry) -> Unit, onWatch: (ReplayEntry) -> Unit, modifier: Modifier) {
-    val (interaction, hovered) = rememberSocialHover()
+    val shape = OneConfigTheme.shape(16.dp)
+    val click = rememberReplayClick(entry, onSelect, onWatch)
     Box(
         modifier
-            .cardFrame(selected, hovered)
+            .clip(shape)
+            .background(CardSurface)
+            .border(1.dp, SocialBorderColor, shape)
             .contextMenu { replayMenuItems(entry, onWatch) }
-            .hoverable(interaction)
-            .clickableWithSound(entry.name, selected = selected.takeIf { it }, shape = ppShape(16.dp), onClick = rememberReplayClick(entry, onSelect, onWatch)),
+            .selectableCard(selected, click, entry.name, shape, recipe = ControlDefaults.Media),
     ) {
         Column(Modifier.fillMaxSize()) {
             ReplayBanner(entry)
@@ -135,16 +134,16 @@ internal fun ReplayCard(entry: ReplayEntry, selected: Boolean, onSelect: (Replay
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label(entry.name, 16.sp, weight = FontWeight.Medium)
-                    entry.world?.takeIf { it.isNotBlank() }?.let { Label(it, 12.sp, color = MutedText) }
-                    Label(entry.metaText(), 12.sp, color = MutedText)
+                    Text(entry.name, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    entry.world?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+                    Text(entry.metaText(), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 }
-                TextButton("Watch", null, Modifier.height(BUTTON_HEIGHT), ButtonStyle.Primary, entry.playable) { onWatch(entry) }
+                TextButton(text = "Watch", onClick = { onWatch(entry) }, style = ControlStyle.Primary, size = ControlSize.Large, enabled = entry.playable)
             }
         }
         ReplayTags(entry, Modifier.padding(10.dp))
         entry.lengthText?.let { length ->
-            Box(Modifier.align(Alignment.TopEnd).padding(top = BannerHeight - 28.dp, end = 10.dp)) { Tag(length) }
+            Box(Modifier.align(Alignment.TopEnd).padding(top = BannerHeight - 28.dp, end = 10.dp)) { Badge(length.uppercase(), overImage = true, style = BadgeStyle.Hairline) }
         }
     }
 }
@@ -164,7 +163,7 @@ internal fun LatestReplayStrip(entry: ReplayEntry, selected: Boolean, onSelect: 
         tags = { ReplayTagItems(entry) },
     ) {
         val detail = listOfNotNull(entry.world?.takeIf { it.isNotBlank() }, entry.lengthText, entry.dateText, entry.sizeText).joinToString(REPLAY_SEPARATOR)
-        if (entry.playable) Label(detail, 12.sp, color = MutedText) else Label(entry.problem, 12.sp, color = SocialDangerText)
+        if (entry.playable) Text(detail, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) else Text(entry.problem, color = SocialDangerText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
@@ -178,7 +177,7 @@ internal fun ReplayDetailsPanel(entry: ReplayEntry?, onWatch: (ReplayEntry) -> U
         ReplayThumb(entry, StripThumbWidth * 4, StripThumbHeight * 4)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             PanelTitle(entry.name)
-            entry.world?.takeIf { it.isNotBlank() }?.let { Label(it, 12.sp, color = MutedText) }
+            entry.world?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             entry.lengthText?.let { DetailRow("Length", it) }
@@ -186,13 +185,13 @@ internal fun ReplayDetailsPanel(entry: ReplayEntry?, onWatch: (ReplayEntry) -> U
             DetailRow("Size", entry.sizeText)
             DetailRow("Recorded with", entry.provider.name)
         }
-        if (!entry.playable || !entry.warning.isNullOrBlank()) SocialText(entry.problem, 12.sp, color = SocialDangerText, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        if (!entry.playable || !entry.warning.isNullOrBlank()) Text(entry.problem, color = SocialDangerText, style = OneConfigTheme.current.typography.small, maxLines = 4, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton("Watch", themedIcon(VIDEO_ICON), Modifier.fillMaxWidth().height(BUTTON_HEIGHT), ButtonStyle.Primary, entry.playable) { onWatch(entry) }
+            TextButton(text = "Watch", icon = VIDEO_ICON, onClick = { onWatch(entry) }, modifier = Modifier.fillMaxWidth(), style = ControlStyle.Primary, size = ControlSize.Large, enabled = entry.playable)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton("Show in folder", themedIcon(FOLDER_ICON), Modifier.weight(1f).height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { entry.provider.openFolderSafely() }
-                TextButton("Open ${entry.provider.name}", themedIcon(VIDEO_ICON), Modifier.weight(1f).height(BUTTON_HEIGHT), ButtonStyle.Secondary, true) { entry.provider.openBrowserSafely() }
+                TextButton(text = "Show in folder", icon = FOLDER_ICON, onClick = { entry.provider.openFolderSafely() }, modifier = Modifier.weight(1f), style = ControlStyle.Secondary, size = ControlSize.Large)
+                TextButton(text = "Open ${entry.provider.name}", icon = VIDEO_ICON, onClick = { entry.provider.openBrowserSafely() }, modifier = Modifier.weight(1f), style = ControlStyle.Secondary, size = ControlSize.Large)
             }
         }
     }

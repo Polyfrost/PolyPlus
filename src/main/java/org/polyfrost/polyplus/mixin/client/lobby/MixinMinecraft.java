@@ -95,15 +95,24 @@ public class MixinMinecraft {
 }
 //?} else {
 /*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import java.io.File;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.chat.ChatGui;
+import net.minecraft.client.render.pipeline.RenderTarget;
 import net.minecraft.client.render.platform.GLX;
 import net.minecraft.client.render.platform.GlStateManager;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.text.Text;
+import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.lobby.LobbyCapture;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -114,6 +123,30 @@ import org.lwjgl.opengl.GL13;
 public class MixinMinecraft {
     @Shadow
     volatile boolean running;
+
+    @Unique
+    private Runnable polyplus$pendingScreenshot;
+
+    @WrapOperation(method = "handleGuiKeyBindings", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Screenshot;take(Ljava/io/File;IILnet/minecraft/client/render/pipeline/RenderTarget;)Lnet/minecraft/text/Text;"))
+    private Text polyplus$deferComposeScreenshot(File dir, int width, int height, RenderTarget target, Operation<Text> original) {
+        Minecraft self = (Minecraft) (Object) this;
+        if (!(self.screen instanceof ComposeScreen)) return original.call(dir, width, height, target);
+        polyplus$pendingScreenshot = () -> self.gui.getChat().addMessage(original.call(dir, width, height, target));
+        return null;
+    }
+
+    @WrapWithCondition(method = "handleGuiKeyBindings", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/chat/ChatGui;addMessage(Lnet/minecraft/text/Text;)V"))
+    private boolean polyplus$skipDeferredScreenshotMessage(ChatGui chat, Text message) {
+        return message != null;
+    }
+
+    @Inject(method = "runGame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/pipeline/RenderTarget;draw(II)V", shift = At.Shift.AFTER))
+    private void polyplus$takeDeferredScreenshot(CallbackInfo ci) {
+        Runnable pending = polyplus$pendingScreenshot;
+        if (pending == null) return;
+        polyplus$pendingScreenshot = null;
+        pending.run();
+    }
 
     @Inject(method = "runGame", at = @At("HEAD"))
     private void polyplus$stepLobbyClock(CallbackInfo ci) {

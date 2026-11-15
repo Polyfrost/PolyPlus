@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalOneConfigUiApi::class)
+
 package org.polyfrost.polyplus.client.gui.preview
 
 //? if > 1.8.9 {
@@ -14,9 +16,10 @@ import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.RecordingCanvas
 import org.polyfrost.compose.backend.drawPoly
 import org.polyfrost.compose.render.RenderContext
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.platform.isOneConfigComposeScreen
 import org.polyfrost.oneconfig.internal.ui.OffscreenTarget
 import org.polyfrost.oneconfig.internal.ui.TextureRenderer
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
 
@@ -84,7 +87,7 @@ object PlayerPreviewOffscreen {
         disposeReleased()
         if (entries.isEmpty()) return
         if (java.lang.Boolean.getBoolean("pp.preview.off")) return
-        val composeScreen = ClientPlatform.currentScreen() is ComposeScreen
+        val composeScreen = isOneConfigComposeScreen(ClientPlatform.currentScreen())
         val now = System.nanoTime()
         for (e in entries) {
             val sinceDraw = now - e.lastDrawNanos

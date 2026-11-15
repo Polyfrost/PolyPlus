@@ -6,6 +6,8 @@ import org.apache.logging.log4j.Logger
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import org.polyfrost.oneconfig.api.config.v1.Tree
+import org.polyfrost.compose.render.PolyColor
+import org.polyfrost.oneconfig.api.config.v1.annotations.Color
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Keybind
@@ -17,6 +19,7 @@ import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
+import org.polyfrost.polyplus.client.gui.ClientWatermark
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
@@ -25,6 +28,7 @@ import org.polyfrost.polyplus.client.party.VoiceInputMode
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
+import org.polyfrost.polyplus.privacy.LauncherEnvironment
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -46,6 +50,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var alphabeticalModOrder = false
+
+    @JvmStatic @Include
+    var modSortModeSynced = false
 
     @JvmStatic @Include
     var onboardingCompleted = false
@@ -100,6 +107,78 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var vanillaOfferDismissed = false
+
+    @JvmStatic @Include
+    var watermarkAsked = false
+
+    @JvmStatic
+    @Switch(
+        title = "OneClient Watermark",
+        description = "Show the OneClient logo in inventories and options screens.",
+        subcategory = "Watermark",
+    )
+    var watermarkEnabled = false
+
+    @JvmStatic
+    @Dropdown(
+        title = "Position",
+        description = "Where the watermark sits on your screen.",
+        options = [
+            "Top Left", "Top Right", "Bottom Left", "Bottom Right",
+            "Top Center", "Bottom Center", "Left Center", "Right Center",
+        ],
+        subcategory = "Watermark",
+    )
+    var watermarkPosition = ClientWatermark.POSITION_BOTTOM_RIGHT
+
+    @JvmStatic
+    @Slider(
+        title = "Scale",
+        description = "Watermark size, as a percentage of normal.",
+        min = 50f,
+        max = 400f,
+        step = 5f,
+        subcategory = "Watermark",
+    )
+    var watermarkScale = 100f
+
+    @JvmStatic
+    @Slider(
+        title = "Horizontal Offset",
+        description = "How far the watermark sits from the left or right edge of the screen.",
+        min = 0f,
+        max = 200f,
+        step = 1f,
+        subcategory = "Watermark",
+    )
+    var watermarkOffsetX = 6f
+
+    @JvmStatic
+    @Slider(
+        title = "Vertical Offset",
+        description = "How far the watermark sits from the top or bottom edge of the screen.",
+        min = 0f,
+        max = 200f,
+        step = 1f,
+        subcategory = "Watermark",
+    )
+    var watermarkOffsetY = 6f
+
+    @JvmStatic
+    @Switch(
+        title = "Use Accent Color",
+        description = "Draw the watermark in your OneConfig accent color.",
+        subcategory = "Watermark",
+    )
+    var watermarkAccentColor = true
+
+    @JvmStatic
+    @Color(
+        title = "Color",
+        description = "Color of the watermark logo and text.",
+        subcategory = "Watermark",
+    )
+    var watermarkColor: PolyColor = PolyColor.WHITE
 
     @JvmStatic @Include
     var dynamicFov = true
@@ -445,6 +524,22 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     init {
         hideIf("apiUrl") { !PolyPlusConstants.IS_DEV_ENV }
 
+        hideIf("watermarkEnabled") { !LauncherEnvironment.isOneClient }
+        for (option in listOf("watermarkPosition", "watermarkScale", "watermarkAccentColor")) {
+            hideIf(option) { !watermarkShown() }
+        }
+        hideIf("watermarkOffsetX") {
+            !watermarkShown() ||
+                watermarkPosition == ClientWatermark.POSITION_TOP_CENTER ||
+                watermarkPosition == ClientWatermark.POSITION_BOTTOM_CENTER
+        }
+        hideIf("watermarkOffsetY") {
+            !watermarkShown() ||
+                watermarkPosition == ClientWatermark.POSITION_LEFT_CENTER ||
+                watermarkPosition == ClientWatermark.POSITION_RIGHT_CENTER
+        }
+        hideIf("watermarkColor") { !watermarkShown() || watermarkAccentColor }
+
         addCallback("acceptedLegalTerms") {
             PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
         }
@@ -463,6 +558,8 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
             PolyPlusClient.refresh()
         }
     }
+
+    private fun watermarkShown(): Boolean = LauncherEnvironment.isOneClient && watermarkEnabled
 }
 
 /** Folds the pre-split polyplus.json into one of the configs made out of it. */

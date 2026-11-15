@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,21 +42,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.polyplus.client.gui.MENU_PREVIEW_YAW
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.menuPreviewSpec
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyDarkChrome
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
-import org.polyfrost.polyplus.client.gui.lobbyshell.NavTab
+import org.polyfrost.polyplus.client.gui.lobbyshell.NavTabRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.navTabBadge
+import org.polyfrost.polyplus.client.gui.lobbyshell.socialDotLabel
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyActions
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyRoster
@@ -67,6 +69,8 @@ import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.roundToInt
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import androidx.compose.ui.text.style.TextOverflow
 
 private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
@@ -85,6 +89,8 @@ private val FLAT_AVATAR_MIN = 120.dp
 private val FLAT_PREVIEW_COLUMN = 300.dp
 private val FLAT_TAG_ROOM = 56.dp
 private val FLAT_TAG_GAP = 4.dp
+
+private enum class PauseNavTab { Game, Wardrobe, Social }
 
 private class PanelSlots(val count: Int, val width: Dp, val height: Dp)
 
@@ -130,24 +136,21 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
-            Column(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp)
-                    .width(if (narrow) 340.dp else 400.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Eyebrow(place.eyebrow)
-                Spacer(Modifier.height(6.dp))
-                SocialText(place.title, 24.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                Spacer(Modifier.height(2.dp))
-                if (place.detail.isNotBlank()) Label(place.detail, 14.sp, color = MutedText)
-                Spacer(Modifier.height(6.dp))
-                PauseStateLine(state)
-                Spacer(Modifier.height(if (narrow) 12.dp else 18.dp))
-                PlayButton(Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", null, screen::resume)
-                Spacer(Modifier.height(if (narrow) 8.dp else 12.dp))
-                StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
+            val scroll = rememberScrollState()
+            ScrollContainer(scroll, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp).width(if (narrow) 340.dp else 400.dp), scrollbar = false) {
+                Column(Modifier.fillMaxWidth()) {
+                    SectionHeader(place.eyebrow, contentPadding = PaddingValues(0.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(place.title, style = OneConfigTheme.current.typography.body.copy(fontSize = 24.sp, fontWeight = FontWeight.Medium), maxLines = 1, softWrap = false)
+                    Spacer(Modifier.height(2.dp))
+                    if (place.detail.isNotBlank()) Text(place.detail, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    Spacer(Modifier.height(6.dp))
+                    PauseStateLine(state)
+                    Spacer(Modifier.height(if (narrow) 12.dp else 18.dp))
+                    PlayButton(Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", null, screen::resume)
+                    Spacer(Modifier.height(if (narrow) 8.dp else 12.dp))
+                    StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
+                }
             }
         }
         Row(
@@ -202,7 +205,7 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
         if (moreShown) MorePopup(screen, rememberToolAnchor(true))
     }
     Spacer(Modifier.height(6.dp))
-    Hairline()
+    Divider()
     Spacer(Modifier.height(6.dp))
     capture.entry(PauseSlot.QUIT)?.let { MenuRow(it.glyph, it.label, height = rowHeight, danger = true, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
 }
@@ -216,17 +219,27 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) { Wordmark() }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            NavTab("Game", active = true) { }
-            NavTab("Wardrobe", active = false, onClick = screen::openWardrobe)
-            if (screen.online) NavTab("Social", active = false, unread = groups.any { it.unread } || invites.isNotEmpty(), onClick = screen::openSocial)
+        val tabs = buildList {
+            add(TabItem(PauseNavTab.Game, "Game"))
+            add(TabItem(PauseNavTab.Wardrobe, "Wardrobe"))
+            if (screen.online) {
+                val dot = socialDotLabel(groups.any { it.unread }, invites.isNotEmpty())
+                add(TabItem(PauseNavTab.Social, "Social", badge = navTabBadge(dot != null), badgeDescription = dot))
+            }
         }
+        NavTabRow(tabs, PauseNavTab.Game, { tab ->
+            when (tab) {
+                PauseNavTab.Game -> Unit
+                PauseNavTab.Wardrobe -> screen.openWardrobe()
+                PauseNavTab.Social -> screen.openSocial()
+            }
+        })
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
             CustomizeButton(screen)
-            IconButton(themedIcon("settings"), "Settings", Modifier, screen::openSettings)
+            IconButton(icon = "settings", contentDescription = "Settings", onClick = screen::openSettings)
             Spacer(Modifier.width(2.dp))
-            Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)
-            PlayerHead(ClientPlatform.localPlayerUuid(), 38.dp, Modifier, headShape(38.dp))
+            Text(ClientPlatform.localPlayerName(), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            PlayerHead(playerId = ClientPlatform.localPlayerUuid(), size = 38.dp, modifier = Modifier, shape = headShape(38.dp))
         }
     }
 }
@@ -245,10 +258,10 @@ private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
                 PartyRoster(PauseHost, current, maxWidth)
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PlayerHead(ClientPlatform.localPlayerUuid(), 30.dp, Modifier, headShape(30.dp))
+                    PlayerHead(playerId = ClientPlatform.localPlayerUuid(), size = 30.dp, modifier = Modifier, shape = headShape(30.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)
-                        Label("You", 11.sp, color = MutedText)
+                        Text(ClientPlatform.localPlayerName(), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        Text("You", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                 }
             }
@@ -320,9 +333,9 @@ private fun AvatarTagCard(where: String, modifier: Modifier) {
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Label(ClientPlatform.localPlayerName(), 14.sp, weight = FontWeight.Medium)
-            Label("You", 12.sp, color = MutedText)
+            Text(ClientPlatform.localPlayerName(), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text("You", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        Label(where, 11.sp, color = MutedText)
+        Text(where, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }

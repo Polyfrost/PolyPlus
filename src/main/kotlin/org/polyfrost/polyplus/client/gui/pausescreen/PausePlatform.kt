@@ -191,12 +191,10 @@ internal object PausePlatform {
         }
 
     fun motionScale(): Float {
-        val options = Minecraft.getInstance().options
         //? if > 1.8.9 {
-        val bob = if (options.bobView().get()) 1f else 0f
-        return bob * options.screenEffectScale().get().toFloat()
+        return Minecraft.getInstance().options.screenEffectScale().get().toFloat()
         //?} else {
-        /*return if (options.viewBobbing) 1f else 0f
+        /*return 1f
         *///?}
     }
 

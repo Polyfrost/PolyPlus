@@ -13,11 +13,10 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
-import org.polyfrost.oneconfig.internal.ThemeConfig
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
-import org.polyfrost.oneconfig.internal.ui.themes.Theme
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -47,7 +46,7 @@ class OneClientPauseScreen(
     private val style: PauseScreenStyle,
     customizing: Boolean = false,
     internal val fromVanilla: Boolean = false,
-) : ComposeScreen(RenderMode.CONTINUOUS) {
+) : OneConfigComposeScreen(previous = null, renderMode = OneConfigComposeScreen.RenderMode.Continuous) {
     internal val capture = PauseCapture(vanilla)
     internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
     internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !Motion.reduced
@@ -58,7 +57,6 @@ class OneClientPauseScreen(
     internal var customizeOpen by mutableStateOf(customizing)
     internal var playerPreview by mutableStateOf(style != PauseScreenStyle.STEP_BACK_FLAT || PolyPlusPauseConfig.flatPausePlayerPreview)
     private var decided = false
-    private var openedAt = 0L
     internal var resumeBounds = Rect.Zero
     private var resumeArmed = false
     private var resumed = false
@@ -82,14 +80,12 @@ class OneClientPauseScreen(
         if (!decided) {
             decided = true
             staged = stages && PauseStage.enter()
-            openedAt = System.currentTimeMillis()
         }
     }
 
-    override fun blurAlpha(): Float {
-        if (!stepBack || staged || !ThemeConfig.enableBackgroundBlur) return 0f
-        return ((System.currentTimeMillis() - openedAt).toFloat() / FLAT_BLUR_MS).coerceIn(0f, 1f)
-    }
+    override val blurBackground: Boolean get() = stepBack && !staged && super.blurBackground
+
+    override val dimBackground: Boolean get() = false
 
     internal fun resyncMenu() = capture.sync(width, height)
 
@@ -227,14 +223,8 @@ class OneClientPauseScreen(
     private val hostLabel: String get() = PauseWorldAccess.hostLabel
 
     @Composable
-    override fun compose() {
-        Theme {
-            PauseRoot(this)
-        }
-    }
-
-    private companion object {
-        const val FLAT_BLUR_MS = 160f
+    override fun Content() {
+        ProvidePopupSounds(false) { PauseRoot(this) }
     }
 }
 

@@ -5,8 +5,6 @@ package org.polyfrost.polyplus.client.gui.marketplace
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -30,11 +27,13 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
@@ -43,7 +42,6 @@ import org.polyfrost.polyplus.client.gui.wardrobe.BACK_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.FRONT_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.OwnershipBadge
 import org.polyfrost.polyplus.client.gui.wardrobe.ResetRotationButton
-import org.polyfrost.polyplus.client.gui.wardrobe.cardBrush
 import org.polyfrost.polyplus.client.gui.wardrobe.isPreviewAssetLoaded
 import org.polyfrost.polyplus.client.gui.wardrobe.outfitPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
@@ -99,15 +97,12 @@ internal fun TryOnPreview(state: MarketplaceState, modifier: Modifier) {
         if (rotation.userRotated) return@LaunchedEffect
         val start = rotation.yaw
         val delta = ((targetYaw - start) % FULL_TURN + FULL_TURN + HALF_TURN) % FULL_TURN - HALF_TURN
-        animate(0f, 1f, animationSpec = tween(TURN_MILLIS)) { progress, _ ->
+        animate(0f, 1f, animationSpec = Motion.spec(tween(TURN_MILLIS))) { progress, _ ->
             if (!rotation.userRotated) rotation.yaw = start + delta * progress
         }
     }
     BoxWithConstraints(
-        modifier
-            .clip(ppShape(16.dp))
-            .background(cardBrush())
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp)),
+        modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp), glass = false),
     ) {
         val modelScale = (maxWidth.value * WIDTH_ROOM / (maxHeight.value * look.reach.span)).coerceIn(MIN_MODEL_SCALE, MAX_MODEL_SCALE)
         val blockSize = maxHeight.value * modelScale

@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
-import androidx.compose.foundation.layout.height
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -44,26 +43,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Announce
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
 import org.polyfrost.polyplus.client.gui.a11yRegion
 import org.polyfrost.polyplus.client.gui.A11yRegion
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.style.TextOverflow
 
 internal enum class TourAnchor { Play, Wardrobe, Social, Tools }
 
 private class TourStop(val anchor: TourAnchor, val title: String, val text: String)
 
-private const val SCRIM_ALPHA = 0.4f
 private const val APPEAR_MILLIS = 450
-private const val START_DELAY_MILLIS = 1300
+private const val START_DELAY_MILLIS = 1300L
 private val HolePad = 8.dp
 private val CardGap = 16.dp
 private val CardWidth = 340.dp
@@ -111,8 +110,12 @@ internal fun Modifier.tourAnchor(anchors: MutableMap<TourAnchor, Rect>, anchor: 
 @Composable
 internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: () -> Unit) {
     EscapeCloses(onEnd)
+    val theme = OneConfigTheme.current
     val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, tween(APPEAR_MILLIS, START_DELAY_MILLIS)) }
+    LaunchedEffect(Unit) {
+        delay(START_DELAY_MILLIS)
+        appear.animateTo(1f, Motion.finiteSpec(tween(APPEAR_MILLIS)))
+    }
     val density = LocalDensity.current
     val pad = with(density) { HolePad.toPx() }
     val gap = with(density) { CardGap.toPx() }
@@ -124,7 +127,7 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
         LobbyDarkChrome { Spotlight(hole) }
         key(tour.index) {
             val shown = remember { Animatable(0f) }
-            LaunchedEffect(Unit) { shown.animateTo(1f, tween(APPEAR_MILLIS)) }
+            LaunchedEffect(Unit) { shown.animateTo(1f, Motion.finiteSpec(tween(APPEAR_MILLIS))) }
             Announce("${tour.title()}. ${tour.text()}")
             Column(
                 Modifier
@@ -137,14 +140,14 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Label(tour.kicker(), 12.sp, color = MutedText, weight = FontWeight.Medium)
+                    Text(tour.kicker(), color = theme.mutedText, style = theme.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     PanelTitle(tour.title())
                 }
-                SocialText(tour.text(), 12.sp, color = MutedText)
+                Text(tour.text(), Modifier, theme.mutedText, theme.typography.small)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton("Skip tour", Modifier.height(38.dp), onEnd)
+                    TextButton(text = "Skip tour", onClick = onEnd, size = ControlSize.Large)
                     Spacer(Modifier.weight(1f))
-                    TextButton(if (tour.last) "Done" else "Next", Modifier.height(38.dp), ButtonStyle.Primary) { if (!tour.next()) onEnd() }
+                    TextButton(text = if (tour.last) "Done" else "Next", onClick = { if (!tour.next()) onEnd() }, size = ControlSize.Large, style = ControlStyle.Primary)
                 }
             }
         }
@@ -189,8 +192,8 @@ private fun Modifier.placed(at: (IntSize) -> IntOffset): Modifier = layout { mea
 @Composable
 private fun Spotlight(hole: Rect) {
     val root = LocalRootSize.current
-    val scrim = OneConfigTheme.current.pageBackground.copy(alpha = SCRIM_ALPHA)
-    val shape = ppShape(16.dp)
+    val scrim = OneConfigTheme.current.scrimColor
+    val shape = OneConfigTheme.shape(16.dp)
     Box(
         Modifier.pixels(Rect(0f, 0f, root.width, root.height)).pointerInput(Unit) { detectTapGestures { } }.drawBehind {
             val cut = Path().apply {

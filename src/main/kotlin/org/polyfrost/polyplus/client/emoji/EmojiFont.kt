@@ -28,7 +28,7 @@ object EmojiFont {
 
     //? if > 1.8.9 {
     fun glyph(codepoint: String, base: Style): Component =
-        Component.literal(codepoint).setStyle(apply(base))
+        Component.literal(codepoint).setStyle(apply(base).withColor(0xFFFFFF))
     //?} else {
     /*private val ATLAS: Identifier = Identifier.fromNamespaceAndPath("polyplus", "textures/emoji/emoji_0.png")
     private const val LEGACY_BASE = 0xF100

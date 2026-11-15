@@ -6,8 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.polyplus.client.gui.RadialWheel
-import org.polyfrost.polyplus.client.gui.RadialWheelEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
+import org.polyfrost.polyplus.client.gui.HudRadialMenu
 import org.polyfrost.polyplus.client.gui.WheelOverlay
 import org.polyfrost.polyplus.client.gui.WheelSession
 import org.polyfrost.polyplus.client.gui.isMinecraftTheme
@@ -44,17 +44,16 @@ private fun PingReplyContent(session: WheelSession, ping: Ping, current: PingRep
     val pixel = isMinecraftTheme
     val entries = remember(pixel, current) {
         WHEEL_REPLIES.map { reply ->
-            RadialWheelEntry(
-                icon = null,
+            RadialMenuItem(
                 label = reply.title,
-                sublabel = if (reply == current) "Pick again to take it back" else reply.hint,
+                detail = if (reply == current) "Pick again to take it back" else reply.hint,
                 dot = Color(0xFF000000.toInt() or reply.color),
                 drawIcon = { size, ink -> drawReplyIcon(reply, size, ink, pixel) },
             )
         }
     }
-    RadialWheel(
-        entries = entries,
+    HudRadialMenu(
+        items = entries,
         session = session,
         title = "Reply",
         subtitle = PingTargeting.localLabel(ping.label) ?: ping.kind.title,
@@ -66,17 +65,16 @@ private fun PingWheelContent(session: WheelSession, target: PingHit?, shared: Bo
     val pixel = isMinecraftTheme
     val entries = remember(pixel) {
         WHEEL_KINDS.map { kind ->
-            RadialWheelEntry(
-                icon = null,
+            RadialMenuItem(
                 label = kind.title,
-                sublabel = kind.hint,
+                detail = kind.hint,
                 dot = Color(0xFF000000.toInt() or kind.color),
                 drawIcon = { size, ink -> drawPingIcon(kind, size, ink, pixel) },
             )
         }
     }
-    RadialWheel(
-        entries = entries,
+    HudRadialMenu(
+        items = entries,
         session = session,
         title = target?.label ?: "Ping",
         subtitle = if (shared) "Your party sees this" else "Only you see this",

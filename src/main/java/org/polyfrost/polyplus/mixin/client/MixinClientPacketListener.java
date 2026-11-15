@@ -17,7 +17,7 @@ public class MixinClientPacketListener {
 
     @ModifyVariable(method = "sendCommand(Ljava/lang/String;)V", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private String polyplus$emojiCommand(String command) {
-        return EmojiRegistry.toShortcodes(command);
+        return EmojiRegistry.commandToShortcodes(command);
     }
 }
 //?} else {
@@ -40,7 +40,7 @@ public class MixinClientPacketListener {
     private Packet polyplus$emojiChat(Packet packet) {
         if (packet instanceof ChatMessageC2SPacket chat) {
             String message = chat.getMessage();
-            String converted = EmojiRegistry.toShortcodes(message);
+            String converted = message.startsWith("/") ? EmojiRegistry.commandToShortcodes(message) : EmojiRegistry.toShortcodes(message);
             if (!converted.equals(message)) {
                 return new ChatMessageC2SPacket(converted);
             }

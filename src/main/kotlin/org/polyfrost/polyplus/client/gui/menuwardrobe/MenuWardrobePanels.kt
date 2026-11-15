@@ -3,13 +3,14 @@
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.BundleCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
@@ -44,20 +48,13 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.FeaturedBundle
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.ThemedIcon
-import org.polyfrost.polyplus.client.gui.clickableWithSound
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
-import org.polyfrost.polyplus.client.gui.ppShape
-import org.polyfrost.polyplus.client.gui.themedIcon
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.rememberRemoteImage
-import org.polyfrost.polyplus.client.gui.rememberSocialHover
 import org.polyfrost.polyplus.client.gui.wardrobe.BACK_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticUiItem
 import org.polyfrost.polyplus.client.gui.wardrobe.OutfitSwitcher
@@ -65,6 +62,7 @@ import org.polyfrost.polyplus.client.gui.wardrobe.PriceLabel
 import org.polyfrost.polyplus.client.gui.wardrobe.createOutfitFromCurrent
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private const val MOJANG_CAPE_SCALE = 0.68f
 private const val OFFER_COUNT = 2
@@ -90,13 +88,6 @@ private val COMPACT_SLOTS = listOf(
     CosmeticType.Glove,
     CosmeticType.Boots,
 )
-
-@Composable
-internal fun StatusChip(text: String) {
-    Box(Modifier.panel(16.dp).padding(horizontal = 12.dp, vertical = 8.dp)) {
-        SocialText(text, 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
 
 internal class RailSlot(val type: CosmeticType, val item: CosmeticUiItem?, val cape: MojangCape?) {
     val name: String? get() = item?.name ?: cape?.name
@@ -131,9 +122,9 @@ internal fun EquippedRail(
         verticalArrangement = Arrangement.spacedBy(SlotRowGap),
     ) {
         Row(Modifier.fillMaxWidth().height(RailHeaderHeight).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlineIconButton("left-arrow.svg", onClick = onBack)
-            Label(title, 20.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            IconButton(themedIcon(LobbyIcons.REFRESH), "Refresh", Modifier, onRefresh)
+            OutlineIconButton("left-arrow", onClick = onBack)
+            Text(title, Modifier.weight(1f), style = OneConfigTheme.current.typography.body.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            IconButton(icon = LobbyIcons.REFRESH, contentDescription = "Refresh", onClick = onRefresh)
         }
         for (slot in slots) {
             SlotRow(slot, active = slot.type == activeType, onClick = { onSelect(slot.type) })
@@ -152,20 +143,18 @@ internal fun EquippedRail(
 
 @Composable
 private fun SlotRow(slot: RailSlot, active: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
+    val theme = OneConfigTheme.current
     val name = slot.name
     Row(
         Modifier
             .fillMaxWidth()
             .height(SlotRowHeight)
-            .listRow(active, hovered)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .selectableRow(active, onClick, if (name == null) slot.type.displayName else "${slot.type.displayName}, $name", theme.sideBarNavigationEntryShape)
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(36.dp).clip(ppShape(5.dp)).background(OneConfigTheme.current.componentBackground), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(36.dp).clip(OneConfigTheme.shape(5.dp)).background(theme.componentBackground), contentAlignment = Alignment.Center) {
             val item = slot.item
             val cape = slot.cape
             when {
@@ -174,12 +163,13 @@ private fun SlotRow(slot: RailSlot, active: Boolean, onClick: () -> Unit) {
                 else -> SlotPlaceholder()
             }
         }
+        val ink = SelectionDefaults.itemContentColor(active)
         if (name == null) {
-            Label(slot.type.displayName, 14.sp, Modifier.weight(1f), color = rowText(active, hovered))
+            Text(slot.type.displayName, Modifier.weight(1f), color = ink, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         } else {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Label(name, 14.sp, color = rowText(active, hovered))
-                Label(slot.type.displayName, 12.sp, color = if (active) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColorSecondary)
+                Text(name, color = ink, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                Text(slot.type.displayName, color = SelectionDefaults.itemSecondaryColor(active), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
     }
@@ -187,39 +177,37 @@ private fun SlotRow(slot: RailSlot, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun MoreRow(open: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
-    val color = rowText(selected = false, hovered = hovered)
+    val theme = OneConfigTheme.current
+    val color = theme.textColor
+    val shape = theme.sideBarNavigationEntryShape
     Row(
         Modifier
             .fillMaxWidth()
             .height(CompactRowHeight)
-            .listRow(selected = false, hovered = hovered)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .clip(shape)
+            .oneConfigClickable("More slots", onClick, shape = shape, recipe = OutlineOnHover)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Label("More slots", 14.sp, Modifier.weight(1f), color = color)
-        ThemedIcon(if (open) "/assets/oneconfig/ico/up.svg" else "/assets/oneconfig/ico/down.svg", color, 14.dp)
+        Text("More slots", Modifier.weight(1f), color = color, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        ThemedIcon(if (open) "up" else "down", color, 14.dp)
     }
 }
 
 @Composable
 private fun CompactRow(slot: RailSlot, active: Boolean, onClick: () -> Unit) {
-    val (interaction, hovered) = rememberSocialHover()
+    val theme = OneConfigTheme.current
     Row(
         Modifier
             .fillMaxWidth()
             .height(CompactRowHeight)
-            .listRow(active, hovered)
-            .hoverable(interaction)
-            .clickableWithSound(onClick)
+            .selectableRow(active, onClick, slot.type.displayName, theme.sideBarNavigationEntryShape)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Label(slot.type.displayName, 14.sp, Modifier.weight(1f), color = rowText(active, hovered))
-        slot.name?.let { Label(it, 12.sp, Modifier.widthIn(max = 110.dp), color = if (active) OneConfigTheme.current.accentTextColor else OneConfigTheme.current.textColorSecondary) }
+        Text(slot.type.displayName, Modifier.weight(1f), color = SelectionDefaults.itemContentColor(active), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        slot.name?.let { Text(it, Modifier.widthIn(max = 110.dp), color = SelectionDefaults.itemSecondaryColor(active), style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
     }
 }
 
@@ -281,29 +269,27 @@ internal fun SeasonalBundlePanel(items: List<CosmeticUiItem>, onMarketplace: () 
     val secondary = OneConfigTheme.current.textColorSecondary
     Column(modifier.panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label(offer.label, 12.sp, color = secondary)
+            Text(offer.label, color = secondary, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Label(offer.name, 20.sp, Modifier.weight(1f), weight = FontWeight.Medium)
+                Text(offer.name, Modifier.weight(1f), style = OneConfigTheme.current.typography.body.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 offer.info?.let { PriceLabel(it.basePrice, it.finalPrice, it.discounted) }
             }
-            offer.description?.let { SocialText(it, 12.sp, color = secondary) }
+            offer.description?.let { Text(it, color = secondary, style = OneConfigTheme.current.typography.small) }
         }
         Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (row in offer.rows) {
                 BundleRow(row, Modifier.fillMaxWidth().weight(1f))
             }
         }
-        TextButton("Open Marketplace", Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, onMarketplace)
+        TextButton(text = "Open Marketplace", onClick = onMarketplace, modifier = Modifier.fillMaxWidth(), style = ControlStyle.Primary, size = ControlSize.Large)
     }
 }
 
 @Composable
 private fun BundleRow(item: CosmeticUiItem, modifier: Modifier) {
     val theme = OneConfigTheme.current
-    val shape = ppShape(12.dp)
-    val thumbShape = ppShape(5.dp)
     Row(
-        modifier.clip(shape).background(theme.modCardBackground).border(1.dp, theme.borderColor, shape).padding(12.dp),
+        modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(12.dp), glass = false).padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -311,15 +297,13 @@ private fun BundleRow(item: CosmeticUiItem, modifier: Modifier) {
             Modifier
                 .fillMaxHeight()
                 .aspectRatio(1f)
-                .clip(thumbShape)
-                .background(theme.chipBackground)
-                .border(1.dp, theme.borderColor, thumbShape),
+                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(5.dp), glass = false),
         ) {
             CosmeticArt(item, item.variants.firstOrNull()?.id, Modifier.fillMaxSize().padding(6.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label(item.name, 14.sp, weight = FontWeight.Medium)
-            Label(item.collection, 12.sp, color = theme.textColorSecondary)
+            Text(item.name, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(item.collection, color = theme.textColorSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
     }
 }
@@ -328,8 +312,8 @@ private fun BundleRow(item: CosmeticUiItem, modifier: Modifier) {
 internal fun CapesOnlyPanel(onTurnOn: () -> Unit, modifier: Modifier) {
     Column(modifier.panel().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PanelTitle("Minecraft capes only")
-        SocialText("Cosmetics and outfits need online services. Your Minecraft capes still work.", 14.sp, color = MutedText)
-        TextButton("Turn on online services", Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, onTurnOn)
+        Text("Cosmetics and outfits need online services. Your Minecraft capes still work.", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body)
+        TextButton(text = "Turn on online services", onClick = onTurnOn, modifier = Modifier.fillMaxWidth(), style = ControlStyle.Primary, size = ControlSize.Large)
     }
 }
 
@@ -341,6 +325,6 @@ internal fun OutfitPanel(onStatus: (String) -> Unit, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) { OutfitSwitcher(onStatus) }
-        TextButton("Save this look", Modifier.height(38.dp)) { createOutfitFromCurrent(onStatus) }
+        TextButton(text = "Save this look", onClick = { createOutfitFromCurrent(onStatus) }, modifier = Modifier, size = ControlSize.Large)
     }
 }

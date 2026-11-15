@@ -23,11 +23,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.rememberRemoteImage
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private const val BRAND_MARK = "assets/polyplus/brand/oneclient.svg"
 private const val FALLBACK_TOP_ALPHA = 0.38f
@@ -55,6 +54,6 @@ internal fun NewsCover(post: NewsPost, modifier: Modifier, height: Dp) {
 internal fun NewsKicker(text: String, unread: Boolean, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (unread) Box(Modifier.size(7.dp).clip(OneConfigTheme.current.circleShape).background(OneConfigTheme.accent))
-        SocialText(text, 11.sp, color = if (unread) SocialTextPrimary else MutedText, fontWeight = FontWeight.Medium, letterSpacing = 0.2.sp, maxLines = 1)
+        Text(text, color = if (unread) SocialTextPrimary else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption.copy(fontWeight = FontWeight.Medium, letterSpacing = 0.2.sp), maxLines = 1, softWrap = false)
     }
 }

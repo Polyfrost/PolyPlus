@@ -3,13 +3,17 @@
 package org.polyfrost.polyplus.client.gui.lobbysocial
 
 import androidx.compose.foundation.layout.height
+import org.polyfrost.polyplus.client.gui.KitDangerColor
 import androidx.compose.foundation.border
+import androidx.compose.ui.text.style.TextOverflow
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,39 +28,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
-import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Confirm
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
-import org.polyfrost.oneconfig.api.ui.v1.components.DialogButtons
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ModalDialog
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.themedIcon
-import org.polyfrost.polyplus.client.gui.ConfirmPrompt
-import org.polyfrost.polyplus.client.gui.ConfirmPromptHost
-import org.polyfrost.polyplus.client.gui.MutedText
-import org.polyfrost.polyplus.client.gui.OnboardingSlider
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
-import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialNotices
-import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.client.gui.lobbyshell.Label
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.LocationKind
@@ -78,16 +63,24 @@ import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.roundToInt
 import org.polyfrost.polyplus.client.party.LeaderFollow
+import org.polyfrost.oneconfig.api.ui.v1.components.ChipDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuItem
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.Slider
+import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
+import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
+import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 
 internal val PartyPopoverWidth = 260.dp
 private val MenuWidth = 280.dp
 private val PickerWidth = 300.dp
 private val PartyCardWidth = 300.dp
-private const val POPOVER_GAP = 14
+private val PopoverGap = 14.dp
 private const val PERCENT = 100f
 private const val SLIDER_MAX_PERCENT = 200f
 private const val SLIDER_STEP_PERCENT = 5f
-private const val SLIDER_WIDTH = 130f
 
 internal object PartyIcons {
     const val MIC = SOCIAL_ASSETS + "microphone-01.svg"
@@ -172,28 +165,9 @@ internal fun partyCells(party: Party): List<PartyCell> {
     return listOf(local) + others
 }
 
-private class AbovePosition(private val gap: Int, private val alignEnd: Boolean = false) : PopupPositionProvider {
-    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-        val x = if (alignEnd) anchorBounds.right - popupContentSize.width else anchorBounds.left
-        val clampedX = x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-        val above = anchorBounds.top - popupContentSize.height - gap
-        val below = (anchorBounds.bottom + gap).coerceAtMost((windowSize.height - popupContentSize.height).coerceAtLeast(0))
-        return IntOffset(clampedX, if (above >= 0) above else below)
-    }
-}
-
 @Composable
-internal fun rememberAbove(alignEnd: Boolean = false): PopupPositionProvider {
-    val density = LocalDensity.current
-    return remember(density, alignEnd) { AbovePosition(with(density) { POPOVER_GAP.dp.roundToPx() }, alignEnd) }
-}
-
-@Composable
-internal fun AbovePopup(alignEnd: Boolean = false, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Popup(popupPositionProvider = rememberAbove(alignEnd), onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        content()
-    }
-}
+internal fun rememberAbove(alignEnd: Boolean = false): PopupPositionProvider =
+    rememberAnchoredPosition(if (alignEnd) Placement.AboveEnd else Placement.AboveStart, PopoverGap)
 
 private fun joinable(cell: PartyCell): String? {
     if (cell.self) return null
@@ -206,43 +180,61 @@ private fun joinable(cell: PartyCell): String? {
 
 internal fun memberJoinItem(host: SocialHost, cell: PartyCell, onClose: () -> Unit = {}): MenuAction? {
     LeaderFollow.hostedFor(cell.id)?.let { hosted ->
-        return MenuAction(hosted.status ?: "Join ${cell.name}'s world", SOCIAL_ASSETS + "log-in-04.svg", enabled = !hosted.busy) {
-            onClose()
-            LeaderFollow.joinHosted()
-        }
+        return MenuAction(
+            hosted.status ?: "Join ${cell.name}'s world",
+            {
+                onClose()
+                LeaderFollow.joinHosted()
+            },
+            icon = SOCIAL_ASSETS + "log-in-04.svg",
+            enabled = !hosted.busy,
+        )
     }
     val address = joinable(cell) ?: return null
-    return MenuAction("Join ${cell.name}", SOCIAL_ASSETS + "log-in-04.svg") {
-        onClose()
-        host.joinAddress(address)
-    }
+    return MenuAction(
+        "Join ${cell.name}",
+        {
+            onClose()
+            host.joinAddress(address)
+        },
+        icon = SOCIAL_ASSETS + "log-in-04.svg",
+    )
 }
 
 internal fun memberMuteItem(cell: PartyCell): MenuAction? {
     if (cell.self) return null
     val mutedForMe = cell.id.lowercase() in PartyVoiceSettings.memberMutes
-    return MenuAction(if (mutedForMe) "Unmute for me" else "Mute for me", if (mutedForMe) PartyIcons.MIC else PartyIcons.MIC_OFF) {
-        PartyVoiceSettings.toggleMute(cell.id)
-    }
+    return MenuAction(
+        if (mutedForMe) "Unmute for me" else "Mute for me",
+        { PartyVoiceSettings.toggleMute(cell.id) },
+        icon = if (mutedForMe) PartyIcons.MIC else PartyIcons.MIC_OFF,
+    )
 }
 
 internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Unit = {}): List<MenuAction> {
     if (!PartyRepository.isLeader(party) || cell.self) return emptyList()
     val hardMuted = cell.member?.voiceHardMuted == true
     return listOf(
-        MenuAction("Make leader") {
-            onClose()
-            PartyRepository.makeLeader(cell.id)
-        },
-        MenuAction(if (hardMuted) "Let them talk" else "Mute their voice for everyone") {
-            PartyRepository.setHardMuted(cell.id, !hardMuted)
-        },
-        MenuAction("Remove from party", danger = true) {
-            onClose()
-            ConfirmPrompt.ask("Remove ${cell.name}?", "They will be removed from the party.", "Remove", SOCIAL_ASSETS + "x-close.svg") {
-                PartyRepository.kick(cell.id)
-            }
-        },
+        MenuAction(
+            "Make leader",
+            {
+                onClose()
+                PartyRepository.makeLeader(cell.id)
+            },
+        ),
+        MenuAction(
+            if (hardMuted) "Let them talk" else "Mute their voice for everyone",
+            { PartyRepository.setHardMuted(cell.id, !hardMuted) },
+        ),
+        MenuAction(
+            "Remove from party",
+            {
+                onClose()
+                Confirm.ask("Remove ${cell.name}?", "They will be removed from the party.", "Remove", { PartyRepository.kick(cell.id) }, icon = LobbyIcons.CLOSE)
+            },
+            danger = true,
+            dangerColor = KitDangerColor,
+        ),
     )
 }
 
@@ -251,9 +243,11 @@ internal fun memberSocialItems(cell: PartyCell): List<MenuAction> {
     if (FriendsRepository.blocked.value.any { PartyRepository.samePlayer(it.player, cell.id) }) return emptyList()
     val friend = FriendsRepository.friends.value.any { PartyRepository.samePlayer(it.player, cell.id) }
     val requested = (FriendsRepository.incomingRequests.value + FriendsRepository.outgoingRequests.value).any { PartyRepository.samePlayer(it.player, cell.id) }
-    val add = MenuAction("Add friend", PartyIcons.INVITE) {
-        FriendsRepository.sendRequest(cell.id) { SocialNotices.emit("Friend request sent to ${cell.name}") }
-    }.takeUnless { friend || requested }
+    val add = MenuAction(
+        "Add friend",
+        { FriendsRepository.sendRequest(cell.id) { SocialNotices.emit("Friend request sent to ${cell.name}") } },
+        icon = PartyIcons.INVITE,
+    ).takeUnless { friend || requested }
     return listOfNotNull(add, blockMenuItem(cell.name) { FriendsRepository.block(cell.id) })
 }
 
@@ -265,37 +259,38 @@ internal fun partyInviteItem(
     party: Party? = PartyRepository.party.value,
     outgoing: List<PartyInvite> = PartyRepository.outgoingInvites.value,
 ): MenuAction? = when {
-    party?.members?.any { PartyRepository.samePlayer(it.player, friendId) } == true -> MenuAction("In your party", enabled = false) {}
-    outgoing.any { PartyRepository.samePlayer(it.recipient, friendId) } -> MenuAction("Invited to party", enabled = false) {}
-    PartyRepository.canInvite(party) -> MenuAction("Invite to party", PartyIcons.INVITE) { PartyRepository.invite(friendId) }
+    party?.members?.any { PartyRepository.samePlayer(it.player, friendId) } == true -> MenuAction("In your party", {}, enabled = false)
+    outgoing.any { PartyRepository.samePlayer(it.recipient, friendId) } -> MenuAction("Invited to party", {}, enabled = false)
+    PartyRepository.canInvite(party) -> MenuAction("Invite to party", { PartyRepository.invite(friendId) }, icon = PartyIcons.INVITE)
     else -> null
 }
 
 @Composable
-internal fun MemberPopover(host: SocialHost, party: Party, cell: PartyCell, onClose: () -> Unit) {
-    AbovePopup(onDismiss = onClose) {
-        Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PlayerHead(seedOf(cell.id), 38.dp, Modifier.then(if (cell.speaking) Modifier.border(1.dp, SocialSuccessColor, headShape(38.dp)) else Modifier), headShape(38.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Label(if (cell.leader) "${cell.name} · Leader" else cell.name, 14.sp, weight = FontWeight.Medium)
-                    Label(locationLabel(cell.state, cell.self || cell.member?.online == true), 12.sp, color = MutedText)
-                    voiceLabel(cell.member, cell.state)?.let { Label(it, 12.sp, color = MutedText) }
-                }
+internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCell, onClose: () -> Unit) {
+    val theme = OneConfigTheme.current
+    val join = memberJoinItem(host, cell, onClose)
+    val mute = memberMuteItem(cell)
+    val joinIcon = join?.icon
+    val muteIcon = mute?.icon
+    val leaderItems = memberLeaderItems(party, cell, onClose)
+    Column(Modifier.width(PartyPopoverWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PlayerHead(seedOf(cell.id), 38.dp, Modifier.then(if (cell.speaking) Modifier.border(1.dp, SocialSuccessColor, headShape(38.dp)) else Modifier), shape = headShape(38.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(if (cell.leader) "${cell.name} · Leader" else cell.name, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                Text(locationLabel(cell.state, cell.self || cell.member?.online == true), color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                voiceLabel(cell.member, cell.state)?.let { Text(it, color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
             }
-            memberJoinItem(host, cell, onClose)?.let { join ->
-                TextButton(join.label, join.icon?.let { themedIcon(it) }, Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Primary, true, join.onClick)
-            }
-            memberMuteItem(cell)?.let { mute ->
-                MemberVolume(cell.id)
-                TextButton(mute.label, mute.icon?.let { themedIcon(it) }, Modifier.fillMaxWidth().height(38.dp), ButtonStyle.Secondary, true, mute.onClick)
-            }
-            val leaderItems = memberLeaderItems(party, cell, onClose)
-            if (leaderItems.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    leaderItems.forEach { item ->
-                        MenuItem(item.label, null, null, MenuItemSize.Compact, item.danger, false, item.enabled, null, Modifier, null, item.onClick)
-                    }
+        }
+        join?.let { OptionalIconTextButton(it.label, joinIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Primary, true) }
+        mute?.let {
+            MemberVolume(cell.id)
+            OptionalIconTextButton(it.label, muteIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Secondary, true)
+        }
+        if (leaderItems.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                leaderItems.forEach { item ->
+                    MenuItem(item.label, item.onClick, size = MenuItemSize.Compact, enabled = item.enabled, danger = item.danger)
                 }
             }
         }
@@ -314,25 +309,28 @@ private fun VolumeRow(
     percent: Float,
     modifier: Modifier = Modifier,
     label: String? = "Volume",
-    sliderWidth: Float = SLIDER_WIDTH,
     onRelease: () -> Unit = {},
     onChange: (Float) -> Unit,
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        label?.let { Label(it, 12.sp, color = MutedText) }
-        Box(Modifier.weight(1f)) {
-            OnboardingSlider(percent / SLIDER_MAX_PERCENT, sliderWidth, thumbSize = 15.dp, trackHeight = 5.dp, onRelease = onRelease) { progress ->
-                onChange((progress * SLIDER_MAX_PERCENT / SLIDER_STEP_PERCENT).roundToInt() * SLIDER_STEP_PERCENT)
-            }
-        }
-        Label("${percent.roundToInt()}%", 12.sp)
+        label?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+        Slider(
+            value = percent,
+            onValueChange = onChange,
+            modifier = Modifier.weight(1f),
+            range = 0f..SLIDER_MAX_PERCENT,
+            step = SLIDER_STEP_PERCENT,
+            onValueChangeFinished = onRelease,
+            sound = null,
+        )
+        Text("${percent.roundToInt()}%", style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
-internal fun DeviceVolume(input: Boolean, modifier: Modifier = Modifier.padding(horizontal = 10.dp), label: String? = "Volume", sliderWidth: Float = SLIDER_WIDTH) {
+internal fun DeviceVolume(input: Boolean, modifier: Modifier = Modifier.padding(horizontal = 10.dp), label: String? = "Volume") {
     var percent by remember(input) { mutableStateOf(if (input) PartyVoiceSettings.inputVolume() else PartyVoiceSettings.outputVolume()) }
-    VolumeRow(percent, modifier, label, sliderWidth, PartyVoiceSettings::saveVolumes) { value ->
+    VolumeRow(percent, modifier, label, PartyVoiceSettings::saveVolumes) { value ->
         percent = value
         if (input) PartyVoiceSettings.setInputVolume(value) else PartyVoiceSettings.setOutputVolume(value)
     }
@@ -351,26 +349,26 @@ internal fun InvitePicker(party: Party?) {
         .sortedWith(compareByDescending<Friend> { it.online }.thenBy { (names[it.player] ?: it.player).lowercase() })
     Column(Modifier.width(PickerWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Label("Invite to party", 15.sp, Modifier.weight(1f), weight = FontWeight.Medium)
-            Label("${members.size.coerceAtLeast(1)} of ${PartyRepository.MAX_MEMBERS}", 12.sp, color = MutedText)
+            Text("Invite to party", modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text("${members.size.coerceAtLeast(1)} of ${PartyRepository.MAX_MEMBERS}", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         if (candidates.isEmpty()) {
-            Label("No friends to invite yet", 12.sp, color = MutedText)
+            Text("No friends to invite yet", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         val paging = ListPaging(more, loading, friends.size, true, FriendsRepository.friendsPaging::loadMore)
         ScrollFade(Modifier, 6.dp, maxHeight = 280.dp, ink = OneConfigTheme.current.pageBackground, paging = paging) {
             candidates.forEach { friend ->
                 val invite = outgoing.firstOrNull { PartyRepository.samePlayer(it.recipient, friend.player) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PlayerHead(seedOf(friend.player), 28.dp, Modifier, headShape(28.dp))
+                    PlayerHead(seedOf(friend.player), 28.dp, Modifier, shape = headShape(28.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Label(names[friend.player] ?: PlayerNamesRepository.nameOr(friend.player), 14.sp, weight = FontWeight.Medium)
-                        Label(if (friend.online) "Online" else "Offline", 11.sp, color = MutedText)
+                        Text(names[friend.player] ?: PlayerNamesRepository.nameOr(friend.player), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        Text(if (friend.online) "Online" else "Offline", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                     if (invite != null) {
-                        TextButton("Cancel invite", Modifier.height(38.dp)) { PartyRepository.cancel(invite) }
+                        TextButton(text = "Cancel invite", onClick = { PartyRepository.cancel(invite) }, modifier = Modifier, size = ControlSize.Large)
                     } else {
-                        TextButton("Invite", Modifier.height(38.dp), ButtonStyle.Primary) { PartyRepository.invite(friend.player) }
+                        TextButton(text = "Invite", onClick = { PartyRepository.invite(friend.player) }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
                     }
                 }
             }
@@ -381,11 +379,14 @@ internal fun InvitePicker(party: Party?) {
 @Composable
 internal fun VoiceModeChips(party: Party) {
     val leader = PartyRepository.isLeader(party)
-    val mode = party.settings.voiceMode
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("Everyone", selected = mode != PartyVoiceMode.Proximity) { if (leader) PartyRepository.setVoiceMode(PartyVoiceMode.Party) }
-        Chip("Proximity", selected = mode == PartyVoiceMode.Proximity) { if (leader) PartyRepository.setVoiceMode(PartyVoiceMode.Proximity) }
-    }
+    val tabs = listOf(TabItem(PartyVoiceMode.Party, "Everyone"), TabItem(PartyVoiceMode.Proximity, "Proximity"))
+    val selected = if (party.settings.voiceMode == PartyVoiceMode.Proximity) PartyVoiceMode.Proximity else PartyVoiceMode.Party
+    TabRow(tabs, selected, { if (leader) PartyRepository.setVoiceMode(it) }, style = TabStyle.Chips, size = ChipDefaults.size, fill = false)
+}
+
+@Composable
+private fun PartyMenuHeading(text: String) {
+    Text(text, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
 }
 
 @Composable
@@ -398,39 +399,52 @@ internal fun PartyMenu(party: Party, onVoice: (() -> Unit)? = null, onClose: () 
             DevicePicker(input = picking) { devices = null }
             return@Column
         }
-        Label("Voice", 12.sp, color = MutedText, weight = FontWeight.Medium)
+        PartyMenuHeading("Voice")
         VoiceModeChips(party)
         if (leader) {
-            Label("Who can invite", 12.sp, color = MutedText, weight = FontWeight.Medium)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val policy = party.settings.invitePolicy
-                Chip("Only me", selected = policy != PartyInvitePolicy.Members) { PartyRepository.setInvitePolicy(PartyInvitePolicy.Leader) }
-                Chip("Everyone", selected = policy == PartyInvitePolicy.Members) { PartyRepository.setInvitePolicy(PartyInvitePolicy.Members) }
-            }
+            PartyMenuHeading("Who can invite")
+            val tabs = listOf(TabItem(PartyInvitePolicy.Leader, "Only me"), TabItem(PartyInvitePolicy.Members, "Everyone"))
+            val policy = if (party.settings.invitePolicy == PartyInvitePolicy.Members) PartyInvitePolicy.Members else PartyInvitePolicy.Leader
+            TabRow(tabs, policy, { PartyRepository.setInvitePolicy(it) }, style = TabStyle.Chips, size = ChipDefaults.size, fill = false)
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (onVoice != null) {
-                MenuItem("Voice and devices", themedIcon(PartyIcons.SETTINGS), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
-                    onClose()
-                    onVoice()
-                }
+                MenuItem(
+                    "Voice and devices",
+                    {
+                        onClose()
+                        onVoice()
+                    },
+                    icon = PartyIcons.SETTINGS,
+                    size = MenuItemSize.Regular,
+                )
             } else {
-                MenuItem("Microphone: ${PartyAudio.deviceLabel(PartyVoiceSettings.inputDevice()).ifBlank { "Default" }}", themedIcon(PartyIcons.MIC), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) { devices = true }
+                MenuItem("Microphone: ${PartyAudio.deviceLabel(PartyVoiceSettings.inputDevice()).ifBlank { "Default" }}", { devices = true }, icon = PartyIcons.MIC, size = MenuItemSize.Regular)
                 DeviceVolume(input = true)
-                MenuItem("Speaker: ${PartyAudio.deviceLabel(PartyVoiceSettings.outputDevice()).ifBlank { "Default" }}", themedIcon(PartyIcons.HEADPHONES), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) { devices = false }
+                MenuItem("Speaker: ${PartyAudio.deviceLabel(PartyVoiceSettings.outputDevice()).ifBlank { "Default" }}", { devices = false }, icon = PartyIcons.HEADPHONES, size = MenuItemSize.Regular)
                 DeviceVolume(input = false)
             }
-            MenuItem("Leave party", themedIcon(SOCIAL_ASSETS + "x-close.svg"), null, MenuItemSize.Regular, false, false, true, null, Modifier, null) {
-                onClose()
-                PartyRepository.leave()
-            }
-            if (leader) {
-                MenuItem("Disband party", themedIcon(SOCIAL_ASSETS + "trash-01.svg"), null, MenuItemSize.Regular, true, false, true, null, Modifier, null) {
+            MenuItem(
+                "Leave party",
+                {
                     onClose()
-                    ConfirmPrompt.ask("Disband party?", "Everyone will be removed from the party.", "Disband") {
-                        PartyRepository.disband()
-                    }
-                }
+                    PartyRepository.leave()
+                },
+                icon = SOCIAL_ASSETS + "x-close.svg",
+                size = MenuItemSize.Regular,
+            )
+            if (leader) {
+                MenuItem(
+                    "Disband party",
+                    {
+                        onClose()
+                        Confirm.ask("Disband party?", "Everyone will be removed from the party.", "Disband", { PartyRepository.disband() }, icon = LobbyIcons.TRASH)
+                    },
+                    icon = SOCIAL_ASSETS + "trash-01.svg",
+                    size = MenuItemSize.Regular,
+                    danger = true,
+                    dangerColor = KitDangerColor,
+                )
             }
         }
     }
@@ -438,9 +452,9 @@ internal fun PartyMenu(party: Party, onVoice: (() -> Unit)? = null, onClose: () 
 
 @Composable
 private fun DevicePicker(input: Boolean, onBack: () -> Unit) {
-    Label(if (input) "Microphone" else "Speaker", 12.sp, color = MutedText, weight = FontWeight.Medium)
+    PartyMenuHeading(if (input) "Microphone" else "Speaker")
     DeviceOptions(input, onBack)
-    TextButton("Back", Modifier.fillMaxWidth().height(38.dp), onBack)
+    TextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth(), size = ControlSize.Large)
 }
 
 @Composable
@@ -449,10 +463,15 @@ internal fun DeviceOptions(input: Boolean, onPicked: () -> Unit) {
     val current = if (input) PartyVoiceSettings.inputDevice() else PartyVoiceSettings.outputDevice()
     ScrollFade(Modifier, 2.dp, maxHeight = 260.dp, ink = OneConfigTheme.current.pageBackground) {
         (listOf("") + options).forEach { option ->
-            MenuItem(option.ifBlank { "Default" }.let(PartyAudio::deviceLabel), null, null, MenuItemSize.Compact, false, option == current, true, null, Modifier, null) {
-                if (input) PartyVoiceSettings.setInputDevice(option) else PartyVoiceSettings.setOutputDevice(option)
-                onPicked()
-            }
+            MenuItem(
+                option.ifBlank { "Default" }.let(PartyAudio::deviceLabel),
+                {
+                    if (input) PartyVoiceSettings.setInputDevice(option) else PartyVoiceSettings.setOutputDevice(option)
+                    onPicked()
+                },
+                size = MenuItemSize.Compact,
+                selected = option == current,
+            )
         }
     }
 }
@@ -464,7 +483,6 @@ internal fun PartyDialogs() {
     ConfirmLeaveDialog()
     LeaveWorldDialog()
     PartySceneConsent()
-    ConfirmPromptHost()
 }
 
 internal object PartyCardText {
@@ -501,17 +519,25 @@ internal fun PartyCard(
 ) {
     Column(modifier.width(PartyCardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PlayerHead(seedOf(player), 34.dp, Modifier, headShape(34.dp))
+            PlayerHead(seedOf(player), 34.dp, Modifier, shape = headShape(34.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                if (captionFirst) Label(caption, 12.sp, color = MutedText)
-                Label(heading, 14.sp, weight = FontWeight.Medium)
-                if (!captionFirst) Label(caption, 12.sp, color = MutedText)
+                if (captionFirst) Text(caption, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                Text(heading, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                if (!captionFirst) Text(caption, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
         }
-        warning?.let { Label(it, 12.sp, color = SocialDangerText) }
+        warning?.let { Text(it, color = SocialDangerText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(dismissLabel, null, Modifier.weight(1f).height(38.dp), ButtonStyle.Secondary, dismissEnabled, onDismiss)
-            TextButton(acceptLabel, themedIcon(SOCIAL_ASSETS + "log-in-04.svg"), Modifier.weight(1f).height(38.dp), ButtonStyle.Primary, acceptEnabled, onAccept)
+            TextButton(text = dismissLabel, onClick = onDismiss, modifier = Modifier.weight(1f), style = ControlStyle.Secondary, enabled = dismissEnabled, size = ControlSize.Large)
+            TextButton(
+                text = acceptLabel,
+                icon = SOCIAL_ASSETS + "log-in-04.svg",
+                onClick = onAccept,
+                modifier = Modifier.weight(1f),
+                style = ControlStyle.Primary,
+                enabled = acceptEnabled,
+                size = ControlSize.Large,
+            )
         }
     }
 }
@@ -538,15 +564,11 @@ private fun ConfirmLeaveDialog() {
     val names by PlayerNamesRepository.names.collectAsState()
     val name = names[invite.sender] ?: PlayerNamesRepository.nameOr(invite.sender)
     ConfirmDialog(
-        "You're already in a party",
-        "Leave it and join $name's party?",
-        "Leave and join",
-        "Cancel",
-        null,
-        false,
-        true,
-        { PartyRepository.confirmAccept(true) },
-        { PartyRepository.confirmAccept(false) },
+        title = "You're already in a party",
+        text = "Leave it and join $name's party?",
+        confirmLabel = "Leave and join",
+        onConfirm = { PartyRepository.confirmAccept(true) },
+        onDismiss = { PartyRepository.confirmAccept(false) },
     )
 }
 
@@ -560,31 +582,35 @@ private fun leaveWorldText(pending: PartyJoin.Pending): String = when (pending.h
 private fun LeaveWorldDialog() {
     val pending = PartyJoin.pending ?: return
     val problem = pending.problem
-    ModalDialog(PartyJoin::cancel) {
-        DialogTitle(if (problem != null) "Can't join" else "Leave this world?")
-        SocialText(problem ?: leaveWorldText(pending), 14.sp, color = if (problem != null) SocialDangerText else MutedText)
-        DialogButtons {
-            TextButton(if (problem != null) "Close" else "Cancel", Modifier.height(38.dp), PartyJoin::cancel)
+    ModalDialog(
+        PartyJoin::cancel,
+        title = { DialogTitle(if (problem != null) "Can't join" else "Leave this world?") },
+        buttons = {
+            TextButton(text = if (problem != null) "Close" else "Cancel", onClick = PartyJoin::cancel)
             if (problem == null) {
-                TextButton(if (pending.ready) "Leave and join" else "Checking...", null, Modifier.height(38.dp), ButtonStyle.Primary, pending.ready, PartyJoin::confirm)
+                TextButton(
+                    text = if (pending.ready) "Leave and join" else "Checking...",
+                    onClick = PartyJoin::confirm,
+                    style = ControlStyle.Primary,
+                    enabled = pending.ready,
+                )
             }
-        }
+        },
+    ) {
+        Text(problem ?: leaveWorldText(pending), color = if (problem != null) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body)
     }
 }
 
 @Composable
 private fun VoiceNoticeDialog() {
     ConfirmDialog(
-        "Party voice",
-        "Voice goes through Epic Online Services. On Linux, and when that isn't available, it goes peer-to-peer through Epic relays. " +
+        title = "Party voice",
+        text = "Voice goes through Epic Online Services. On Linux, and when that isn't available, it goes peer-to-peer through Epic relays. " +
             "Your microphone only turns on when you join voice.",
-        "Join voice",
-        "Cancel",
-        themedIcon(PartyIcons.MIC),
-        false,
-        true,
-        PartyVoice::acceptNotice,
-        PartyVoice::dismissNotice,
+        confirmLabel = "Join voice",
+        onConfirm = PartyVoice::acceptNotice,
+        onDismiss = PartyVoice::dismissNotice,
+        icon = PartyIcons.MIC,
     )
 }
 
@@ -597,21 +623,34 @@ internal fun PartyInvitePrompt(friendId: String, modifier: Modifier = Modifier, 
         Spacer(Modifier)
         return
     }
-    TextButton(item.label, item.icon.takeUnless { filled }?.let { themedIcon(it) }, modifier.height(38.dp), if (filled && item.enabled) ButtonStyle.Primary else ButtonStyle.Secondary, item.enabled, item.onClick)
+    OptionalIconTextButton(
+        item.label,
+        item.icon.takeUnless { filled },
+        item.onClick,
+        modifier,
+        if (filled && item.enabled) ControlStyle.Primary else ControlStyle.Secondary,
+        item.enabled,
+    )
 }
 
 @Composable
 private fun PartySceneConsent() {
     val entry = PartyScene.consentPrompt ?: return
     ConfirmDialog(
-        "Share this scene?",
-        "Show your party this spot from ${entry.label}? They'll see the blocks around it.",
-        "Share",
-        "Use a built-in scene",
-        null,
-        false,
-        true,
-        { PartyScene.answerConsent(true) },
-        { PartyScene.answerConsent(false) },
+        title = "Share this scene?",
+        text = "Show your party this spot from ${entry.label}? They'll see the blocks around it.",
+        confirmLabel = "Share",
+        onConfirm = { PartyScene.answerConsent(true) },
+        onDismiss = { PartyScene.answerConsent(false) },
+        dismissLabel = "Use a built-in scene",
     )
+}
+
+@Composable
+private fun OptionalIconTextButton(text: String, icon: String?, onClick: () -> Unit, modifier: Modifier, style: ControlStyle, enabled: Boolean) {
+    if (icon != null) {
+        TextButton(text = text, icon = icon, onClick = onClick, modifier = modifier, style = style, enabled = enabled, size = ControlSize.Large)
+    } else {
+        TextButton(text = text, onClick = onClick, modifier = modifier, style = style, enabled = enabled, size = ControlSize.Large)
+    }
 }

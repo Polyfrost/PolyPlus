@@ -5,15 +5,11 @@ package org.polyfrost.polyplus.client.gui.wardrobe
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,7 +27,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,33 +38,55 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.CardSelectionStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlIndication
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.MoreButton
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
+import org.polyfrost.oneconfig.api.ui.v1.components.SelectionRingTone
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import org.polyfrost.oneconfig.api.ui.v1.components.ButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TextField
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
-import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPopup
+import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.cardSelection
+import org.polyfrost.oneconfig.api.ui.v1.components.controlInteraction
+import org.polyfrost.oneconfig.api.ui.v1.components.hiddenUntilHover
+import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
+import org.polyfrost.oneconfig.api.ui.v1.components.popupSurface
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
+import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableSwatch
+import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
@@ -81,16 +98,13 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
-import org.polyfrost.polyplus.client.gui.DISABLED_ALPHA
-import org.polyfrost.polyplus.client.gui.SocialText
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
-import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.ppShapeOf
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 @Composable
 internal fun WardrobeGrid(
@@ -123,264 +137,275 @@ internal fun WardrobeGrid(
     columns: Int = 4,
     onConsent: () -> Unit = {},
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        state = state,
-        modifier = modifier,
-        contentPadding = PaddingValues(bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(
-            entries,
-            key = { it.key },
-            span = { if (it.fullSpan) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
-        ) { entry ->
-            when (entry) {
-                is WardrobeEntry.Divider -> WardrobeDivider(entry.label)
-                is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
-                is WardrobeEntry.Note -> if (entry.id == CONSENT_NOTE_ID) ConsentNote(entry.text, onConsent) else CapeSectionNote(entry.text)
-                is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
-                is WardrobeEntry.Owned -> {
-                    val item = entry.item
-                    val variantId = selectedVariantId(item, variantPicks)
-                    val artId = item.artId(variantId)
-                    WardrobeCard(
-                        name = item.name,
-                        detail = { CardDetailText(item.collection) },
-                        action = equipAction(item.equipped),
-                        onAction = { onOwned(item) },
-                        equipped = item.equipped,
-                        selected = selection == WardrobeSelection.Owned(item.groupId, item.type),
-                        onClick = { onClickOwned(item) },
-                        variants = item.variants,
-                        selectedVariantId = variantId,
-                        onPickVariant = { onSelectVariant(item.groupId, it) },
-                        menu = listOf(
-                            CardMenuAction("Preview") { onPreviewOwned(item) },
-                            CardMenuAction(if (item.equipped) "Unequip" else "Equip") { onOwned(item) },
-                        ),
-                    ) { modifier ->
-                        val (source, loadTick) = if (artId != null) {
-                            rememberCosmeticPreviewSource(artId, item.type)
-                        } else {
-                            null to 0
+    ScrollContainer(state, modifier, scrollbar = false) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            state = state,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(
+                entries,
+                key = { it.key },
+                span = { if (it.fullSpan) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
+            ) { entry ->
+                when (entry) {
+                    is WardrobeEntry.Divider -> SectionHeader(
+                        entry.label,
+                        contentPadding = PaddingValues(top = 6.dp),
+                        title = { style, color ->
+                            Divider(Modifier.weight(1f))
+                            Text(entry.label.uppercase(), color = color, style = style, maxLines = 1)
+                            Divider(Modifier.weight(1f))
+                        },
+                    )
+                    is WardrobeEntry.Group -> CapeGroupHeading(entry.title, entry.note, entry.forceToggle)
+                    is WardrobeEntry.Note -> if (entry.id == CONSENT_NOTE_ID) ConsentNote(entry.text, onConsent) else CapeSectionNote(entry.text)
+                    is WardrobeEntry.Banner -> WardrobeBanner(entry.text, entry.action, onAction = { OneConfigUI.open("oneconfig:keybinds") })
+                    is WardrobeEntry.Owned -> {
+                        val item = entry.item
+                        val variantId = selectedVariantId(item, variantPicks)
+                        val artId = item.artId(variantId)
+                        WardrobeCard(
+                            name = item.name,
+                            detail = { CardDetailText(item.collection) },
+                            action = equipAction(item.equipped),
+                            onAction = { onOwned(item) },
+                            equipped = item.equipped,
+                            selected = selection == WardrobeSelection.Owned(item.groupId, item.type),
+                            onClick = { onClickOwned(item) },
+                            variants = item.variants,
+                            selectedVariantId = variantId,
+                            onPickVariant = { onSelectVariant(item.groupId, it) },
+                            menu = listOf(
+                                MenuAction("Preview", { onPreviewOwned(item) }),
+                                MenuAction(if (item.equipped) "Unequip" else "Equip", { onOwned(item) }),
+                            ),
+                        ) { modifier ->
+                            val (source, loadTick) = if (artId != null) {
+                                rememberCosmeticPreviewSource(artId, item.type)
+                            } else {
+                                null to 0
+                            }
+                            CosmeticThumbnail(
+                                source,
+                                item.type,
+                                "card-${item.groupId}-$artId-$loadTick",
+                                modifier,
+                                checker = false,
+                                coverAssetId = coverFor(item),
+                            )
                         }
-                        CosmeticThumbnail(
-                            source,
-                            item.type,
-                            "card-${item.groupId}-$artId-$loadTick",
-                            modifier,
-                            checker = false,
-                            coverAssetId = coverFor(item),
-                        )
                     }
-                }
-                is WardrobeEntry.Shop -> {
-                    val info = entry.info
-                    val variant = selectedStoreVariant(info, storeVariantPicks, ownedIds)
-                    val owned = info.fullyOwned(ownedIds)
-                    val inCart = cosmeticCartKey(variant.id) in cartKeys
-                    val variants = info.uiVariants()
-                    val variantCount = variants.size
-                    WardrobeCard(
-                        name = info.name,
-                        detail = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                PriceLabel(info)
-                                if (variantCount > 1) {
-                                    SocialText("$variantCount variants", color = OneConfigTheme.current.textColorSecondary, fontSize = 11.sp)
+                    is WardrobeEntry.Shop -> {
+                        val info = entry.info
+                        val variant = selectedStoreVariant(info, storeVariantPicks, ownedIds)
+                        val owned = info.fullyOwned(ownedIds)
+                        val inCart = cosmeticCartKey(variant.id) in cartKeys
+                        val variants = info.uiVariants()
+                        val variantCount = variants.size
+                        WardrobeCard(
+                            name = info.name,
+                            detail = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    PriceLabel(info)
+                                    if (variantCount > 1) {
+                                        Text("$variantCount variants", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.caption)
+                                    }
                                 }
-                            }
-                        },
-                        action = when {
-                            owned || variant.id in ownedIds -> CardAction("Owned", "tick", enabled = false)
-                            inCart -> CardAction("In cart", "tick", enabled = false)
-                            else -> CardAction("Add to cart", "plus")
-                        },
-                        onAction = { onAddToCart(info, variant) },
-                        equipped = false,
-                        selected = selection == WardrobeSelection.Shop(info.id),
-                        badge = when {
-                            owned -> null
-                            info.discounted -> CardBadge("${info.discountRate}% OFF", CardBadgeStyle.Sale)
-                            isNewItem(info.createdAt) -> CardBadge("NEW", CardBadgeStyle.New)
-                            else -> null
-                        },
-                        onClick = { onShop(info) },
-                        variants = variants,
-                        selectedVariantId = variant.id,
-                        onPickVariant = { onPickStoreVariant(info.id, it) },
-                        menu = listOf(
-                            CardMenuAction("Preview") { onShop(info) },
-                            CardMenuAction("Add to cart", enabled = !inCart && !owned && variant.id !in ownedIds) { onAddToCart(info, variant) },
-                            CardMenuAction("Buy now", enabled = !owned && variant.id !in ownedIds) { onBuyNow(info, variant) },
-                        ),
-                    ) { modifier ->
-                        val (source, loadTick) = rememberCosmeticPreviewSource(variant.id, info.type)
-                        CosmeticThumbnail(
-                            source,
-                            info.type,
-                            "shop-${variant.id}-$loadTick",
-                            modifier,
-                            checker = false,
-                            coverAssetId = info.coverAssetId,
-                        )
-                    }
-                }
-                is WardrobeEntry.Mojang -> {
-                    val cape = entry.cape
-                    WardrobeCard(
-                        name = cape.name,
-                        detail = { CardDetailText(MOJANG_CAPE_COLLECTION) },
-                        action = equipAction(cape.active),
-                        onAction = { onMojang(cape) },
-                        equipped = cape.active,
-                        selected = selection == WardrobeSelection.Mojang(cape.id),
-                        enabled = !mojangBusy,
-                        onClick = { onPreviewMojang(cape) },
-                        menu = listOf(
-                            CardMenuAction("Preview") { onPreviewMojang(cape) },
-                            CardMenuAction(if (cape.active) "Remove" else "Equip") { onMojang(cape) },
-                        ),
-                    ) { modifier ->
-                        val textureVersion = MojangCapeService.textureVersion
-                        val texture = remember(cape.textureHash, textureVersion) { MojangCapeService.texture(cape) }
-                        val source = remember(texture) {
-                            texture?.let { PlayerPreviewSource.Override(CosmeticEquipment(), mojangCape = it) }
+                            },
+                            action = when {
+                                owned || variant.id in ownedIds -> CardAction("Owned", "tick", enabled = false)
+                                inCart -> CardAction("In cart", "tick", enabled = false)
+                                else -> CardAction("Add to cart", "plus")
+                            },
+                            onAction = { onAddToCart(info, variant) },
+                            equipped = false,
+                            selected = selection == WardrobeSelection.Shop(info.id),
+                            badge = when {
+                                owned -> null
+                                info.discounted -> CardBadge("${info.discountRate}% OFF", CardBadgeStyle.Sale)
+                                isNewItem(info.createdAt) -> CardBadge("NEW", CardBadgeStyle.New)
+                                else -> null
+                            },
+                            onClick = { onShop(info) },
+                            variants = variants,
+                            selectedVariantId = variant.id,
+                            onPickVariant = { onPickStoreVariant(info.id, it) },
+                            menu = listOf(
+                                MenuAction("Preview", { onShop(info) }),
+                                MenuAction("Add to cart", { onAddToCart(info, variant) }, enabled = !inCart && !owned && variant.id !in ownedIds),
+                                MenuAction("Buy now", { onBuyNow(info, variant) }, enabled = !owned && variant.id !in ownedIds),
+                            ),
+                        ) { modifier ->
+                            val (source, loadTick) = rememberCosmeticPreviewSource(variant.id, info.type)
+                            CosmeticThumbnail(
+                                source,
+                                info.type,
+                                "shop-${variant.id}-$loadTick",
+                                modifier,
+                                checker = false,
+                                coverAssetId = info.coverAssetId,
+                            )
                         }
-                        CosmeticThumbnail(
-                            source,
-                            CosmeticType.Cape,
-                            "mojang-${cape.textureHash}-${texture != null}",
-                            modifier,
-                            checker = false,
-                        )
                     }
-                }
-                is WardrobeEntry.Bundle -> {
-                    val bundle = entry.bundle
-                    WardrobeCard(
-                        name = bundle.name,
-                        detail = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted)
+                    is WardrobeEntry.Mojang -> {
+                        val cape = entry.cape
+                        WardrobeCard(
+                            name = cape.name,
+                            detail = { CardDetailText(MOJANG_CAPE_COLLECTION) },
+                            action = equipAction(cape.active),
+                            onAction = { onMojang(cape) },
+                            equipped = cape.active,
+                            selected = selection == WardrobeSelection.Mojang(cape.id),
+                            enabled = !mojangBusy,
+                            onClick = { onPreviewMojang(cape) },
+                            menu = listOf(
+                                MenuAction("Preview", { onPreviewMojang(cape) }),
+                                MenuAction(if (cape.active) "Remove" else "Equip", { onMojang(cape) }),
+                            ),
+                        ) { modifier ->
+                            val textureVersion = MojangCapeService.textureVersion
+                            val texture = remember(cape.textureHash, textureVersion) { MojangCapeService.texture(cape) }
+                            val source = remember(texture) {
+                                texture?.let { PlayerPreviewSource.Override(CosmeticEquipment(), mojangCape = it) }
                             }
-                        },
-                        action = CardAction("View bundle", "right-arrow"),
-                        onAction = { onBundle(bundle) },
-                        equipped = false,
-                        selected = selection == WardrobeSelection.Bundle(bundle.id),
-                        badge = if (bundle.discounted) {
-                            CardBadge("SAVE ${bundle.discountRate}%", CardBadgeStyle.Sale)
-                        } else {
-                            CardBadge("BUNDLE", CardBadgeStyle.Accent)
-                        },
-                        onClick = { onBundle(bundle) },
-                        menu = listOf(
-                            CardMenuAction("View bundle") { onBundle(bundle) },
-                            CardMenuAction("Buy now") { onBuyBundle(bundle) },
-                        ),
-                    ) { modifier ->
-                        CoverThumbnail(bundle.assetId, modifier)
+                            CosmeticThumbnail(
+                                source,
+                                CosmeticType.Cape,
+                                "mojang-${cape.textureHash}-${texture != null}",
+                                modifier,
+                                checker = false,
+                            )
+                        }
                     }
-                }
-                is WardrobeEntry.LibraryHeader -> LibraryIntro(
-                    note = entry.note,
-                    action = entry.action,
-                    onAction = { onLibraryAction(entry.section) },
-                )
-                is WardrobeEntry.Outfit -> {
-                    val outfit = entry.outfit
-                    var renaming by remember { mutableStateOf(false) }
-                    var deleting by remember { mutableStateOf(false) }
-                    WardrobeCard(
-                        name = outfit.name,
-                        detail = {
-                            CardDetailText(if (entry.active) "Active" else cosmeticCountLabel(outfit.equipped.size))
-                            if (renaming) {
-                                RenamePopup(
-                                    current = outfit.name,
-                                    onSave = { renameOutfit(outfit, it, onStatus) },
-                                    onDismiss = { renaming = false },
-                                )
-                            }
-                            if (deleting) {
-                                ConfirmDialog(
-                                    title = "Delete ${outfit.name}?",
-                                    text = "This outfit will be removed from your wardrobe.",
-                                    confirmLabel = "Delete",
-                                    onConfirm = {
-                                        deleting = false
-                                        deleteOutfit(outfit, onStatus)
-                                    },
-                                    onDismiss = { deleting = false },
-                                )
-                            }
-                        },
-                        action = wearAction(entry.active),
-                        onAction = { wearOutfit(outfit, onStatus) },
-                        equipped = entry.active,
-                        selected = selection == WardrobeSelection.Outfit(outfit.id),
-                        enabled = !OutfitLibrary.busy,
-                        badge = favoriteBadge(outfit.favorite),
-                        onClick = { onSelectOutfit(outfit) },
-                        menu = listOf(
-                            CardMenuAction("Wear", enabled = !entry.active) { wearOutfit(outfit, onStatus) },
-                            CardMenuAction("Rename") { renaming = true },
-                            CardMenuAction(favoriteMenuLabel(outfit.favorite)) { toggleOutfitFavorite(outfit, onStatus) },
-                            CardMenuAction("Delete") { deleting = true },
-                        ),
-                    ) { modifier ->
-                        OutfitThumbnail(outfit, modifier)
+                    is WardrobeEntry.Bundle -> {
+                        val bundle = entry.bundle
+                        WardrobeCard(
+                            name = bundle.name,
+                            detail = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    PriceLabel(bundle.basePrice, bundle.finalPrice, bundle.discounted)
+                                }
+                            },
+                            action = CardAction("View bundle", "right-arrow"),
+                            onAction = { onBundle(bundle) },
+                            equipped = false,
+                            selected = selection == WardrobeSelection.Bundle(bundle.id),
+                            badge = if (bundle.discounted) {
+                                CardBadge("SAVE ${bundle.discountRate}%", CardBadgeStyle.Sale)
+                            } else {
+                                CardBadge("BUNDLE", CardBadgeStyle.Accent)
+                            },
+                            onClick = { onBundle(bundle) },
+                            menu = listOf(
+                                MenuAction("View bundle", { onBundle(bundle) }),
+                                MenuAction("Buy now", { onBuyBundle(bundle) }),
+                            ),
+                        ) { modifier ->
+                            CoverThumbnail(bundle.assetId, modifier)
+                        }
                     }
-                }
-                is WardrobeEntry.Skin -> {
-                    val skin = entry.skin
-                    var renaming by remember { mutableStateOf(false) }
-                    var deleting by remember { mutableStateOf(false) }
-                    WardrobeCard(
-                        name = skin.name,
-                        detail = {
-                            CardDetailText(skin.model.label)
-                            if (renaming) {
-                                RenamePopup(
-                                    current = skin.name,
-                                    onSave = { renameSkin(skin, it, onStatus) },
-                                    onDismiss = { renaming = false },
-                                )
-                            }
-                            if (deleting) {
-                                ConfirmDialog(
-                                    title = "Delete ${skin.name}?",
-                                    text = "This skin will be removed from your wardrobe.",
-                                    confirmLabel = "Delete",
-                                    onConfirm = {
-                                        deleting = false
-                                        deleteSkin(skin, onStatus)
-                                    },
-                                    onDismiss = { deleting = false },
-                                )
-                            }
-                        },
-                        action = wearAction(entry.worn),
-                        onAction = { wearSkin(skin, onStatus) },
-                        equipped = entry.worn,
-                        selected = selection == WardrobeSelection.Skin(skin.id),
-                        enabled = !SkinLibrary.busy,
-                        badge = favoriteBadge(skin.favorite),
-                        onClick = { onSelectSkin(skin) },
-                        menu = listOf(
-                            CardMenuAction("Wear", enabled = !entry.worn) { wearSkin(skin, onStatus) },
-                            CardMenuAction("Rename") { renaming = true },
-                            CardMenuAction(favoriteMenuLabel(skin.favorite)) { toggleSkinFavorite(skin, onStatus) },
-                            CardMenuAction(
-                                if (skin.model == SkinModel.Slim) "Switch to classic arms" else "Switch to slim arms",
-                            ) { switchSkinModel(skin, onStatus) },
-                            CardMenuAction("Delete") { deleting = true },
-                        ),
-                    ) { modifier ->
-                        SkinThumbnail(skin, modifier)
+                    is WardrobeEntry.LibraryHeader -> LibraryIntro(
+                        note = entry.note,
+                        action = entry.action,
+                        onAction = { onLibraryAction(entry.section) },
+                    )
+                    is WardrobeEntry.Outfit -> {
+                        val outfit = entry.outfit
+                        var renaming by remember { mutableStateOf(false) }
+                        var deleting by remember { mutableStateOf(false) }
+                        WardrobeCard(
+                            name = outfit.name,
+                            detail = {
+                                CardDetailText(if (entry.active) "Active" else cosmeticCountLabel(outfit.equipped.size))
+                                if (renaming) {
+                                    RenamePopup(
+                                        current = outfit.name,
+                                        onSave = { renameOutfit(outfit, it, onStatus) },
+                                        onDismiss = { renaming = false },
+                                    )
+                                }
+                                if (deleting) {
+                                    ConfirmDialog(
+                                        title = "Delete ${outfit.name}?",
+                                        text = "This outfit will be removed from your wardrobe.",
+                                        confirmLabel = "Delete",
+                                        onConfirm = {
+                                            deleting = false
+                                            deleteOutfit(outfit, onStatus)
+                                        },
+                                        onDismiss = { deleting = false },
+                                    )
+                                }
+                            },
+                            action = wearAction(entry.active),
+                            onAction = { wearOutfit(outfit, onStatus) },
+                            equipped = entry.active,
+                            selected = selection == WardrobeSelection.Outfit(outfit.id),
+                            enabled = !OutfitLibrary.busy,
+                            badge = favoriteBadge(outfit.favorite),
+                            onClick = { onSelectOutfit(outfit) },
+                            menu = listOf(
+                                MenuAction("Wear", { wearOutfit(outfit, onStatus) }, enabled = !entry.active),
+                                MenuAction("Rename", { renaming = true }),
+                                MenuAction(favoriteMenuLabel(outfit.favorite), { toggleOutfitFavorite(outfit, onStatus) }),
+                                MenuAction("Delete", { deleting = true }),
+                            ),
+                        ) { modifier ->
+                            OutfitThumbnail(outfit, modifier)
+                        }
+                    }
+                    is WardrobeEntry.Skin -> {
+                        val skin = entry.skin
+                        var renaming by remember { mutableStateOf(false) }
+                        var deleting by remember { mutableStateOf(false) }
+                        WardrobeCard(
+                            name = skin.name,
+                            detail = {
+                                CardDetailText(skin.model.label)
+                                if (renaming) {
+                                    RenamePopup(
+                                        current = skin.name,
+                                        onSave = { renameSkin(skin, it, onStatus) },
+                                        onDismiss = { renaming = false },
+                                    )
+                                }
+                                if (deleting) {
+                                    ConfirmDialog(
+                                        title = "Delete ${skin.name}?",
+                                        text = "This skin will be removed from your wardrobe.",
+                                        confirmLabel = "Delete",
+                                        onConfirm = {
+                                            deleting = false
+                                            deleteSkin(skin, onStatus)
+                                        },
+                                        onDismiss = { deleting = false },
+                                    )
+                                }
+                            },
+                            action = wearAction(entry.worn),
+                            onAction = { wearSkin(skin, onStatus) },
+                            equipped = entry.worn,
+                            selected = selection == WardrobeSelection.Skin(skin.id),
+                            enabled = !SkinLibrary.busy,
+                            badge = favoriteBadge(skin.favorite),
+                            onClick = { onSelectSkin(skin) },
+                            menu = listOf(
+                                MenuAction("Wear", { wearSkin(skin, onStatus) }, enabled = !entry.worn),
+                                MenuAction("Rename", { renaming = true }),
+                                MenuAction(favoriteMenuLabel(skin.favorite), { toggleSkinFavorite(skin, onStatus) }),
+                                MenuAction(
+                                    if (skin.model == SkinModel.Slim) "Switch to classic arms" else "Switch to slim arms",
+                                    { switchSkinModel(skin, onStatus) },
+                                ),
+                                MenuAction("Delete", { deleting = true }),
+                            ),
+                        ) { modifier ->
+                            SkinThumbnail(skin, modifier)
+                        }
                     }
                 }
             }
@@ -388,23 +413,7 @@ internal fun WardrobeGrid(
     }
 }
 
-@Composable
-private fun WardrobeDivider(label: String) {
-    val theme = OneConfigTheme.current
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(Modifier.weight(1f).height(1.dp).background(theme.borderColor))
-        SocialText(label.uppercase(), color = theme.textColorSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-        Box(Modifier.weight(1f).height(1.dp).background(theme.borderColor))
-    }
-}
-
 private data class CardAction(val label: String, val icon: String, val enabled: Boolean = true)
-
-private class CardMenuAction(val label: String, val enabled: Boolean = true, val onSelect: () -> Unit)
 
 private enum class CardBadgeStyle { New, Sale, Accent }
 
@@ -428,10 +437,6 @@ private fun cosmeticCountLabel(count: Int): String = when (count) {
     else -> "$count cosmetics"
 }
 
-private val CARD_SUCCESS = Color(0xFF239A60)
-private val CARD_NEUTRAL_CHIP = Color(0xFFD9D9D9)
-private val CARD_HIGHLIGHT = Color(0x0DFFFFFF)
-
 @Composable
 private fun CardDetailText(text: String) {
     CardLabel(text, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
@@ -451,43 +456,49 @@ private fun WardrobeCard(
     variants: List<CosmeticVariantUi> = emptyList(),
     selectedVariantId: Int? = null,
     onPickVariant: (Int) -> Unit = {},
-    menu: List<CardMenuAction> = emptyList(),
+    menu: List<MenuEntry> = emptyList(),
     thumbnail: @Composable (Modifier) -> Unit,
 ) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
+    val hover = rememberHoverState()
+    val hovered = hover.hovered
     var menuOpen by remember { mutableStateOf(false) }
-    val outline = when {
-        equipped -> OneConfigTheme.accent
-        selected || (hovered && enabled) -> theme.textColorSecondary
-        else -> theme.borderColor
-    }
+    val shape = OneConfigTheme.shape(12.dp)
+    val highlight = theme.textColor.copy(alpha = theme.textColor.alpha * theme.hoverOverlayAlpha)
     Box(
         modifier = Modifier.fillMaxWidth()
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(ppShape(12.dp))
-            .background(theme.modCardBackground)
+            .graphicsLayer { alpha = if (enabled) 1f else theme.disabledAlpha }
+            .themedSurface(SurfaceKind.Card, shape, glass = false)
             .drawBehind {
                 drawRect(
                     Brush.radialGradient(
-                        colors = listOf(Color.Transparent, CARD_HIGHLIGHT),
+                        colors = listOf(Color.Transparent, highlight),
                         center = Offset(size.width / 2f, size.height * 0.8f),
                         radius = size.maxDimension * 0.75f,
                     ),
                 )
             }
-            .border(1.dp, outline, ppShape(12.dp))
-            .hoverable(interaction)
-            .clickable(enabled = enabled, onClick = onClick),
+            .then(if (equipped) Modifier.border(1.dp, OneConfigTheme.accent, shape) else Modifier)
+            .hoverable(hover.interactionSource)
+            .cardSelection(selected && !equipped, shape, CardOutline)
+            .controlInteraction(hover.interactionSource, shape, if (equipped) NoHoverFill else OutlineOnHover, enabled, focusRing = false, pointerIcon = null)
+            .oneConfigClickable(
+                name,
+                onClick,
+                role = A11yRole.Option,
+                enabled = enabled,
+                selected = selected,
+                shape = shape,
+                indication = false,
+                sound = null,
+                interactionSource = hover.interactionSource,
+            ),
     ) {
         Column(Modifier.fillMaxWidth()) {
             BoxWithConstraints(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp)) {
                 Box(
                     modifier = Modifier.fillMaxWidth().height(maxWidth)
-                        .clip(ppShape(5.dp))
-                        .background(OneConfigTheme.current.chipBackground)
-                        .border(1.dp, OneConfigTheme.current.borderColor, ppShape(5.dp)),
+                        .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(5.dp), glass = false),
                 ) {
                     thumbnail(Modifier.fillMaxSize())
                     if (hovered && variants.size > 1) {
@@ -495,7 +506,7 @@ private fun WardrobeCard(
                             variants = variants,
                             selectedVariantId = selectedVariantId,
                             onPick = onPickVariant,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
                         )
                     }
                 }
@@ -507,16 +518,19 @@ private fun WardrobeCard(
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     CardLabel(name, color = theme.textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                    if (menu.isNotEmpty() && (hovered || menuOpen)) {
+                    if (menu.isNotEmpty()) {
                         Box(
                             modifier = Modifier.padding(start = 6.dp).size(width = 22.dp, height = 0.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            CardMenuButton(
-                                actions = menu,
-                                enabled = enabled,
-                                open = menuOpen,
-                                onOpenChange = { menuOpen = it },
+                            MoreButton(
+                                entries = if (enabled) menu else menu.map { entry -> if (entry is MenuAction) MenuAction(entry.labelText, entry.onClick, enabled = false) else entry },
+                                expanded = menuOpen,
+                                onExpandedChange = { menuOpen = it },
+                                modifier = Modifier.requiredSize(ControlSize.Compact.height).hiddenUntilHover(hovered || menuOpen),
+                                sound = null,
+                                tooltip = null,
+                                menuSound = null,
                             )
                         }
                     }
@@ -524,7 +538,23 @@ private fun WardrobeCard(
                 detail()
             }
             Spacer(Modifier.height(12.dp))
-            CardActionStrip(action, active = equipped, enabled = enabled && action.enabled, onAction = onAction)
+            if (action.enabled) {
+                TextButton(
+                    text = action.label,
+                    icon = action.icon,
+                    onClick = onAction,
+                    modifier = Modifier.height(CardStripHeight),
+                    style = if (equipped) ControlStyle.Primary else ControlStyle.Footer,
+                    enabled = enabled,
+                    fillWidth = true,
+                    labelStyle = CardActionLabel,
+                    glass = false,
+                    sound = null,
+                    shape = RectangleShape,
+                )
+            } else {
+                CardStateLabel(action)
+            }
         }
         if (badge != null) {
             CardBadgeTab(badge, Modifier.align(Alignment.TopCenter))
@@ -539,30 +569,29 @@ private fun VariantSwatches(
     onPick: (Int) -> Unit,
     modifier: Modifier,
 ) {
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        variants.forEach { variant ->
-            VariantSwatch(variant, selected = variant.id == selectedVariantId, onClick = { onPick(variant.id) })
+    val scroll = rememberScrollState()
+    ScrollContainer(scroll, modifier, scrollbar = false) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+            variants.forEach { variant ->
+                TooltipBox(variant.name, Modifier, TooltipPlacement.AboveStart) {
+                    VariantSwatch(variant, variant.artId, variant.id == selectedVariantId, 14.dp, null) { onPick(variant.id) }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick: () -> Unit) {
+internal fun VariantSwatch(variant: CosmeticVariantUi, artId: Int, selected: Boolean, width: Dp, sound: UiSound?, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
     val swatchVersion = CosmeticSwatches.version
-    val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
+    val art = remember(artId, swatchVersion) { CosmeticSwatches.get(artId) }
+    val shape = theme.shapes.small
     Box(
-        modifier = Modifier.size(width = 14.dp, height = 22.dp)
-            .clip(ppShape(5.dp))
-            .background(theme.chipBackground)
-            .hoverable(interaction)
-            .clickable(onClick = onClick),
+        modifier = Modifier.selectableSwatch(selected, onClick, variant.name, circle = false, sound = sound)
+            .size(width = width, height = 22.dp)
+            .clip(shape)
+            .background(theme.chipBackground),
     ) {
         when (art) {
             is SwatchArt.Picture -> Image(
@@ -579,113 +608,24 @@ private fun VariantSwatch(variant: CosmeticVariantUi, selected: Boolean, onClick
             }
             null -> Unit
         }
-        Box(
-            Modifier.fillMaxSize().border(
-                1.dp,
-                when {
-                    selected -> OneConfigTheme.accent
-                    hovered -> theme.textColorSecondary
-                    else -> OneConfigTheme.current.borderColor
-                },
-                ppShape(5.dp),
-            ),
-        )
-        if (hovered) {
-            TooltipPopup(variant.name, TooltipPlacement.AboveStart)
-        }
+        Box(Modifier.fillMaxSize().border(1.dp, theme.borderColor, shape))
     }
 }
 
 @Composable
-private fun CardMenuButton(
-    actions: List<CardMenuAction>,
-    enabled: Boolean,
-    open: Boolean,
-    onOpenChange: (Boolean) -> Unit,
-) {
+private fun CardStateLabel(action: CardAction) {
     val theme = OneConfigTheme.current
-    Box(
-        modifier = Modifier.requiredSize(22.dp)
-            .clip(ppShape(6.dp))
-            .background(theme.chipBackground)
-            .clickable { onOpenChange(!open) },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon("dots-vertical", color = theme.textColor, modifier = Modifier.size(14.dp))
-        if (open) {
-            CardMenuPopup(actions, enabled = enabled, onDismiss = { onOpenChange(false) })
-        }
-    }
-}
-
-@Composable
-internal fun rememberDropdownPosition(): PopupPositionProvider {
-    val gap = with(LocalDensity.current) { 4.dp.roundToPx() }
-    return remember(gap) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val x = (anchorBounds.right - popupContentSize.width)
-                    .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                val below = anchorBounds.bottom + gap
-                val y = if (below + popupContentSize.height <= windowSize.height) {
-                    below
-                } else {
-                    (anchorBounds.top - gap - popupContentSize.height).coerceAtLeast(0)
-                }
-                return IntOffset(x, y)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CardMenuPopup(actions: List<CardMenuAction>, enabled: Boolean, onDismiss: () -> Unit) {
-    val theme = OneConfigTheme.current
-    EscapeCloses(onDismiss)
-    Popup(
-        popupPositionProvider = rememberDropdownPosition(),
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        Column(
-            modifier = Modifier.widthIn(min = 160.dp).width(IntrinsicSize.Max)
-                .sceneFrost(16.dp)
-                .clip(ppShape(16.dp))
-                .background(theme.popupBackground)
-                .border(1.dp, theme.borderColor, ppShape(16.dp))
-                .padding(6.dp),
+    val color = theme.textColor
+    Column(Modifier.fillMaxWidth().background(theme.chipBackground)) {
+        Divider()
+        Row(
+            modifier = Modifier.fillMaxWidth().height(CardStripHeight - 1.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            actions.forEach { action ->
-                CardMenuRow(action.label, enabled = enabled && action.enabled) {
-                    onDismiss()
-                    action.onSelect()
-                }
-            }
+            Icon(name = action.icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = color)
+            Text(action.label, color = color, style = theme.typography.body.merge(CardActionLabel), maxLines = 1)
         }
-    }
-}
-
-@Composable
-private fun CardMenuRow(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Box(
-        modifier = Modifier.fillMaxWidth().height(32.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-            .clip(ppShape(8.dp))
-            .background(if (hovered && enabled) theme.chipBackground else Color.Transparent)
-            .hoverable(interaction)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        SocialText(label, color = theme.textColor, fontSize = 12.sp, maxLines = 1)
     }
 }
 
@@ -694,7 +634,7 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
     val theme = OneConfigTheme.current
     var value by remember { mutableStateOf(current) }
     val focusRequester = remember { FocusRequester() }
-    val save = {
+    val save: () -> Unit = {
         val name = value.trim()
         if (name.isNotEmpty()) {
             onDismiss()
@@ -703,77 +643,59 @@ private fun RenamePopup(current: String, onSave: (String) -> Unit, onDismiss: ()
     }
     EscapeCloses(onDismiss)
     Popup(
-        popupPositionProvider = rememberDropdownPosition(),
+        popupPositionProvider = rememberAnchoredPosition(Placement.BelowEnd, 4.dp),
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
         Column(
-            modifier = Modifier.width(240.dp)
-                .sceneFrost(16.dp)
-                .clip(ppShape(16.dp))
-                .background(theme.popupBackground)
-                .border(1.dp, theme.borderColor, ppShape(16.dp))
-                .padding(10.dp),
+            modifier = Modifier.width(240.dp).popupSurface().padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SocialText("Rename", color = theme.textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            WardrobeTextField(
+            Text("Rename", color = theme.textColor, style = theme.typography.label)
+            TextField(
                 value = value,
                 onValueChange = { value = it },
+                modifier = Modifier.fillMaxWidth(),
                 placeholder = current,
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                size = ControlSize.Compact,
                 maxLength = MAX_LIBRARY_NAME_LENGTH,
+                focusRequester = focusRequester,
                 onSubmit = save,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
-                SmallButton("Cancel", iconPath = "close", primary = false, onClick = onDismiss)
-                SmallButton("Save", iconPath = "tick", primary = true, onClick = save)
+                TextButton("Cancel", "close", onDismiss, size = ControlSize.Compact, sound = null)
+                TextButton("Save", "tick", save, style = ControlStyle.Primary, size = ControlSize.Compact, enabled = value.isNotBlank(), sound = null)
             }
         }
         LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     }
 }
 
-@Composable
-private fun CardActionStrip(action: CardAction, active: Boolean, enabled: Boolean, onAction: () -> Unit) {
-    val theme = OneConfigTheme.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val color = if (active) theme.accentTextColor else theme.textColor
-    Box(Modifier.fillMaxWidth().height(36.dp)) {
-        Row(
-            modifier = Modifier.fillMaxSize()
-                .background(if (active) OneConfigTheme.accent else OneConfigTheme.current.chipBackground)
-                .hoverable(interaction)
-                .clickable(enabled = enabled, onClick = onAction),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(action.icon, color = color, modifier = Modifier.size(16.dp))
-            SocialText(action.label, color = color, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-        if (!active) {
-            Box(
-                Modifier.fillMaxWidth().height(1.dp)
-                    .background(if (hovered && enabled) theme.textColorSecondary else theme.borderColor),
-            )
-        }
-    }
-}
+private val CardActionLabel = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)
+
+private val CardStripHeight = 36.dp
+
+private val CardOutline = CardSelectionStyle(ringWidth = 1.dp, fillAlpha = 0f, ringTone = SelectionRingTone.Text)
+
+private val OutlineOnHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)
+
+private val NoHoverFill = ControlIndication(hoverAlpha = 0f)
 
 @Composable
 private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
     val theme = OneConfigTheme.current
+    val favourite = badge.label.isEmpty()
     val color = when (badge.style) {
         CardBadgeStyle.New -> Color.White
-        CardBadgeStyle.Sale -> Color(0xFF101114)
+        CardBadgeStyle.Sale -> CARD_SALE_TEXT
         CardBadgeStyle.Accent -> theme.accentTextColor
     }
     Row(
-        modifier = modifier.widthIn(min = if (badge.label.isEmpty()) 40.dp else 81.dp).height(21.dp)
+        modifier = modifier.widthIn(min = if (favourite) 40.dp else 81.dp).height(21.dp)
+            .then(if (favourite) Modifier.semantics { contentDescription = "Favourite" } else Modifier)
             .clip(ppShapeOf(bottomStart = 7.dp, bottomEnd = 7.dp))
             .background(
                 when (badge.style) {
@@ -787,30 +709,31 @@ private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (badge.icon != null) {
-            Icon(badge.icon, color = color, modifier = Modifier.size(12.dp))
+            Icon(name = badge.icon, contentDescription = null, modifier = Modifier.size(12.dp), tint = color)
         }
-        if (badge.label.isNotEmpty()) {
-            SocialText(
-                badge.label,
-                color = color,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            )
+        if (!favourite) {
+            Text(badge.label, color = color, style = theme.typography.body.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium), maxLines = 1)
         }
     }
 }
+
+private val CARD_SUCCESS = Color(0xFF239A60)
+
+private val CARD_NEUTRAL_CHIP = Color(0xFFD9D9D9)
+
+private val CARD_SALE_TEXT = Color(0xFF101114)
 
 @Composable
 internal fun WardrobeBanner(text: String, action: String, onAction: () -> Unit) {
     val theme = OneConfigTheme.current
     Row(
-        modifier = Modifier.fillMaxWidth().wardrobePanel().padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon("alert-circle", color = theme.textColor, modifier = Modifier.size(16.dp))
-        SocialText(text, color = theme.textColor, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        SmallButton(action, iconPath = "keyboard", primary = false, onClick = onAction)
+        Icon(name = "alert-circle", contentDescription = null, modifier = Modifier.size(16.dp), tint = theme.warning)
+        Text(text, modifier = Modifier.weight(1f), color = theme.textColor, style = OneConfigTheme.current.typography.small)
+        TextButton(action, "keyboard", onAction, sound = null)
     }
 }
 
@@ -821,9 +744,9 @@ private fun LibraryIntro(note: String, action: String?, onAction: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SocialText(note, color = OneConfigTheme.current.textColorSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(note, modifier = Modifier.weight(1f), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
         if (action != null) {
-            SmallButton(action, iconPath = "plus", primary = false, onClick = onAction)
+            TextButton(action, "plus", onAction, sound = null)
         }
     }
 }
@@ -838,15 +761,16 @@ private fun ConsentNote(text: String, onConsent: () -> Unit) {
         }
         return
     }
+    val shape = OneConfigTheme.shape(16.dp)
     Row(
         modifier = Modifier.fillMaxWidth().height(57.dp)
-            .clip(ppShape(16.dp))
-            .border(1.dp, OneConfigTheme.current.borderColor, ppShape(16.dp))
+            .clip(shape)
+            .border(1.dp, OneConfigTheme.current.borderColor, shape)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SocialText(text, 12.sp, Modifier.weight(1f), color = OneConfigTheme.current.textColorSecondary)
-        TextButton("Turn on online services", Modifier.height(38.dp), ButtonStyle.Primary) { open = true }
+        Text(text, Modifier.weight(1f), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+        TextButton(text = "Turn on online services", onClick = { open = true }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
     }
 }

@@ -137,6 +137,7 @@ class LobbyAvatar(
         val head = yHeadRot
         val waiting = arrival == Arrival.WAITING
         val moving = stepArrival()
+        if (!moving && arrival == Arrival.LANDED) followBody()
         super.tick()
         if (moving) {
             yBodyRot = yRot
@@ -156,6 +157,7 @@ class LobbyAvatar(
     }
 
     override fun tick() {
+        if (!moving && arrival == Arrival.LANDED) followBody()
         super.tick()
         if (moving) {
             yBodyRot = yRot
@@ -163,6 +165,11 @@ class LobbyAvatar(
         }
     }
     *///?}
+
+    private fun followBody() {
+        yRot = yBodyRot
+        yRotO = yBodyRot
+    }
 
     private fun stepArrival(): Boolean {
         val current = motion ?: return false

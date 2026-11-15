@@ -7,14 +7,15 @@ import net.minecraft.client.gui.screens.TitleScreen
 import org.polyfrost.oneconfig.api.ui.v1.ChangelogSources
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.ModCardIcons
-import org.polyfrost.oneconfig.api.ui.v1.ModsPageDecorator
-import org.polyfrost.oneconfig.api.ui.v1.ModsPageDecorators
+import org.polyfrost.oneconfig.api.ui.v1.ModSortModes
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPage
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.api.ui.v1.page.PageGroup
 import org.polyfrost.oneconfig.api.ui.v1.page.PageText
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -40,18 +41,13 @@ object PolyPlusOneConfigIntegration {
         override val order: Int get() = 150
 
         @Composable
-        override fun Content() = PolyPlusCosmeticsScreen()
-    }
-
-    private val modOrderToggle = object : ModsPageDecorator() {
-        @Composable
-        override fun Decorate(content: @Composable () -> Unit) = ModOrderToggle.Overlay(content)
+        override fun Content() = ProvidePopupSounds(false) { PolyPlusCosmeticsScreen() }
     }
 
     fun register() {
         if (OneConfigPages.byId(wardrobePage.id) == null) OneConfigPages.register(wardrobePage)
-        ModsPageDecorators.register(modOrderToggle)
         ModCardIcons.register { modId, defaultIcon -> modCardIcon(modId, defaultIcon) }
+        ModSortModes.register(DefaultModOrder.recommendedMode)
         ChangelogSources.register(ModpackChangelog)
         OneConfigTheme.overrideLogo(BRAND_LOGO)
     }

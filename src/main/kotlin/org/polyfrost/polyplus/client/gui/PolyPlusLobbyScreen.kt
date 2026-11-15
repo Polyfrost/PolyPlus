@@ -12,8 +12,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
-import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyShell
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyRoot
@@ -22,14 +22,16 @@ import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 
-class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeScreen(RenderMode.ON_DEMAND) {
+class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfigComposeScreen(previous = null) {
     constructor() : this(LobbyPage.Home)
 
     internal val lobby = LobbyShell(this, firstPage)
 
-    //? if > 1.8.9 {
-    override fun shouldCloseOnEsc(): Boolean = false
-    //?}
+    override val closeOnEscape: Boolean get() = false
+
+    override val blurBackground: Boolean get() = false
+
+    override val dimBackground: Boolean get() = false
 
     override fun init() {
         lobby.open()
@@ -106,10 +108,8 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : ComposeSc
     *///?}
 
     @Composable
-    override fun compose() {
-        ProvideOneConfigTheme {
-            LobbyRoot(lobby, this)
-        }
+    override fun Content() {
+        ProvidePopupSounds(false) { LobbyRoot(lobby, this) }
     }
 
     internal fun showPage(page: LobbyPage) = lobby.show(page)
