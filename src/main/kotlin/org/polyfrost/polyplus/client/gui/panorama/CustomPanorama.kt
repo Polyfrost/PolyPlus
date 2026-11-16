@@ -150,6 +150,7 @@ object CustomPanorama {
 
     private fun shouldApply(): Boolean {
         if (!PolyPlusMainMenuConfig.customPanorama) return false
+        if (MenuPanorama.vanillaPanorama()) return false
         if (resourcePackOverridesPanorama()) return false
         val screen =
             //? if >= 26.2 {

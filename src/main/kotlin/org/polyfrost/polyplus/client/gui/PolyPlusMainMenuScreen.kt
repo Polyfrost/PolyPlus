@@ -145,7 +145,7 @@ class PolyPlusMainMenuScreen :
     /*override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
         syncGuiScaleState()
         super.render(mouseX, mouseY, tickDelta)
-        if (MenuPanorama.panoramaBackdrop()) MenuBackgroundPass.renderInline()
+        if (MenuPanorama.panoramaBackdrop() && !MenuPanorama.vanillaPanorama()) MenuBackgroundPass.renderInline()
     }
     *///?}
 
@@ -156,7 +156,8 @@ class PolyPlusMainMenuScreen :
         syncGuiScaleState()
         if (MenuPanorama.panoramaBackdrop()) {
             renderPanorama(ctx, tickDelta)
-            if (firstFrameDrawn) {
+            val vanilla = MenuPanorama.vanillaPanorama()
+            if (firstFrameDrawn && !vanilla) {
                 val gameRenderer = Minecraft.getInstance().gameRenderer
                 //? if <1.21.4 {
                 gameRenderer.processBlurEffect(tickDelta)
@@ -164,7 +165,7 @@ class PolyPlusMainMenuScreen :
                 /^gameRenderer.processBlurEffect()
                 ^///?}
             }
-            MenuBackgroundPass.renderInline(ctx)
+            if (!vanilla) MenuBackgroundPass.renderInline(ctx)
         }
         super.render(ctx, mouseX, mouseY, tickDelta)
         firstFrameDrawn = true

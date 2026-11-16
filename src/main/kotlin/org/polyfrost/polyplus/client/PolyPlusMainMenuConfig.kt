@@ -10,6 +10,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.MainMenuBackground
+import org.polyfrost.polyplus.client.gui.MenuPanorama
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 //? if >= 1.21.11 {
@@ -139,7 +140,7 @@ object PolyPlusMainMenuConfig : Config(
     @Dropdown(
         title = "Menu Backdrop",
         description = "Choose what appears behind the PolyPlus menu.",
-        options = ["PolyPlus", "Minecraft Panorama"],
+        options = ["PolyPlus", "Minecraft Panorama", "Vanilla Panorama"],
         subcategory = "Background",
     )
     var mainMenuBackground: MainMenuBackground = MainMenuBackground.PANORAMA
@@ -193,7 +194,9 @@ object PolyPlusMainMenuConfig : Config(
         }
 
         addDependency("customPanorama", "Custom Panorama is unavailable") {
-            if (customPanoramaSupported()) Display.SHOWN else Display.HIDDEN
+            if (!customPanoramaSupported()) Display.HIDDEN
+            else if (MenuPanorama.vanillaPanorama()) Display.DISABLED
+            else Display.SHOWN
         }
 
         addCallback("customPanorama") {

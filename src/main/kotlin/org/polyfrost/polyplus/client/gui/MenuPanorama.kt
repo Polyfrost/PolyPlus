@@ -91,7 +91,11 @@ object MenuPanorama {
         MainMenuReplacement.replacesTitleScreen() && !MainMenuReplacement.enabled()
 
     @JvmStatic
-    fun panoramaBackdrop(): Boolean = PolyPlusMainMenuConfig.mainMenuBackground == MainMenuBackground.PANORAMA
+    fun panoramaBackdrop(): Boolean = PolyPlusMainMenuConfig.mainMenuBackground != MainMenuBackground.DEFAULT
+
+    @JvmStatic
+    fun vanillaPanorama(): Boolean =
+        classicMenuActive() && PolyPlusMainMenuConfig.mainMenuBackground == MainMenuBackground.VANILLA_PANORAMA
 
     private fun classicBackdropActive(): Boolean = classicMenuActive() && !panoramaBackdrop()
 
@@ -136,6 +140,7 @@ object MenuPanorama {
                 .extractRenderState(ctx, width, height, true)
                 *///?}
         }
+        if (vanillaPanorama()) return true
         ctx.blurBeforeThisStratum()
         MenuBackgroundPass.renderInline(ctx)
         return true
