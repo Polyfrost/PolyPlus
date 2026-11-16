@@ -10,24 +10,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,24 +48,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
-import org.polyfrost.oneconfig.api.ui.v1.components.ProgressBar
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipChildHover
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.api.pause.PauseWidget
-import org.polyfrost.polyplus.api.pause.PauseWidgetContext
-import org.polyfrost.polyplus.api.pause.PauseWidgets
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
-import org.polyfrost.polyplus.compat.Mods
 import kotlin.math.abs
 import kotlin.math.sin
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
@@ -84,40 +69,17 @@ import androidx.compose.ui.text.style.TextOverflow
 
 private const val READ_MILLIS = 250L
 private const val TONE_MILLIS = 450
-private const val WASH_HEAD = 0.24f
-private const val WASH_TAIL = 0.08f
 private const val GLOW_ALPHA = 0.45f
 private const val MARQUEE_DELAY = 700
 private const val HINT_DWELL_MILLIS = 900L
-private const val MENU_HINT = "Right-click to move or remove"
+internal const val MENU_HINT = "Right-click to move or remove"
 private val TITLE_SEPARATORS = listOf(" - ", " – ", " — ")
 private val DARK_INK = Color(0xFF101114)
-private val BAR_ART = 38.dp
-private val BAR_TEXT_WIDTH = 140.dp
-private val BAR_SKIP = 26.dp
-private val BAR_SKIP_ICON = 12.dp
-private val BAR_PLAY = 30.dp
-private val BAR_PLAY_ICON = 13.dp
-private val CARD_ART = 56.dp
-private val CARD_SKIP = 32.dp
-private val CARD_SKIP_ICON = 14.dp
-private val CARD_PLAY = 40.dp
-private val CARD_PLAY_ICON = 16.dp
-private val BAR_PROGRESS = 3.dp
-private val CARD_PROGRESS = 4.dp
-private val TILE_RADIUS = 14.dp
 private val MARQUEE_SPEED = 22.dp
 private const val PANEL_WASH_HEAD = 0.42f
 private const val PANEL_WASH_MID = 0.2f
 private const val PANEL_WASH_TAIL = 0.06f
 private const val WASH_SHIFT_MAX = 0.55f
-private val PANEL_HEIGHT = 144.dp
-private val PANEL_INLINE_WIDTH = 250.dp
-private val PANEL_SKIP = 28.dp
-private val PANEL_SKIP_ICON = 12.dp
-private val PANEL_PLAY = 36.dp
-private val PANEL_PLAY_ICON = 14.dp
-private val PANEL_PROGRESS = 4.dp
 private const val VIVID_GREY = 0.08f
 private const val VIVID_SATURATION = 0.45f
 private const val VIVID_LIGHT_MIN = 0.42f
@@ -218,40 +180,9 @@ internal fun prettyPlayer(raw: String): String {
     }
 }
 
-internal object PauseMediaWidgets {
-    fun register() {
-        if (!Mods.evergreenHud) return
-        PauseWidgets.register(MediaWidget)
-        PauseEvergreenMedia.keepWarmInWorld(MediaWidget.id)
-    }
-}
+internal class MediaTone(val accent: Color, val average: Color, val presence: Float)
 
-internal object MediaWidget : PauseWidget, FullBleedPanel, PauseWidgetPresence {
-    override val id = "polyplus:media"
-    override val title = "Media"
-    override val icon = asset("headphones-02")
-
-    override fun isAvailable(): Boolean = PauseEvergreenMedia.supported()
-
-    override fun shown() = PauseEvergreenMedia.acquire()
-
-    override fun hidden() = PauseEvergreenMedia.release()
-
-    @Composable
-    override fun Bar(context: PauseWidgetContext) = MediaBar(context.reducedMotion)
-
-    @Composable
-    override fun Card(context: PauseWidgetContext) = MediaCard(context.reducedMotion)
-
-    override val supportsPanel: Boolean get() = true
-
-    @Composable
-    override fun Panel(context: PauseWidgetContext) = MediaPanel(context.reducedMotion)
-}
-
-private class MediaTone(val accent: Color, val average: Color, val presence: Float)
-
-private enum class MediaGlyph { PREVIOUS, NEXT, PLAY, PAUSE }
+internal enum class MediaGlyph { PREVIOUS, NEXT, PLAY, PAUSE }
 
 private object MediaMenuHint {
     var learned by mutableStateOf(false)
@@ -300,20 +231,20 @@ private fun rememberArt(art: PolyBitmap?): ImageBitmap? =
     remember(art) { art?.let { runCatching { it.asComposeImageBitmap() }.getOrNull() } }
 
 @Composable
-private fun rememberNow(playing: Boolean): Long {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+internal fun rememberClock(playing: Boolean): State<Long> {
+    val now = remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(playing) {
-        now = System.currentTimeMillis()
+        now.longValue = System.currentTimeMillis()
         while (playing) {
             delay(READ_MILLIS)
-            now = System.currentTimeMillis()
+            now.longValue = System.currentTimeMillis()
         }
     }
     return now
 }
 
 @Composable
-private fun rememberTone(track: PauseMediaTrack?): MediaTone {
+internal fun rememberTone(track: PauseMediaTrack?): MediaTone {
     val fallback = OneConfigTheme.accent
     val accent = track?.artAccent?.let(::Color) ?: fallback
     val average = track?.artAverage?.let(::Color) ?: accent
@@ -325,22 +256,14 @@ private fun rememberTone(track: PauseMediaTrack?): MediaTone {
 
 private fun inkOn(fill: Color): Color = if (fill.luminance() > 0.45f) DARK_INK else Color.White
 
+internal fun mediaClock(ms: Long): String = clock(ms)
+
 private fun clock(ms: Long): String {
     val seconds = (ms / 1000L).coerceAtLeast(0L)
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
-}
-
-@Composable
-private fun BoxScope.Wash(tone: MediaTone, horizontal: Boolean) {
-    if (tone.presence <= 0f) return
-    val head = tone.accent.copy(alpha = WASH_HEAD * tone.presence)
-    val tail = tone.average.copy(alpha = WASH_TAIL * tone.presence)
-    val stops = arrayOf(0f to head, 0.55f to tail, 1f to Color.Transparent)
-    val brush = if (horizontal) Brush.horizontalGradient(*stops) else Brush.verticalGradient(*stops)
-    Box(Modifier.matchParentSize().background(brush, OneConfigTheme.shape(TILE_RADIUS)))
 }
 
 private fun readableWash(color: Color, lightTheme: Boolean): Color {
@@ -367,7 +290,7 @@ private fun hsl(color: Color): FloatArray {
     return floatArrayOf(hue, saturation.coerceIn(0f, 1f), lightness)
 }
 
-private fun vivid(color: Color, fallback: Color): Color {
+internal fun vivid(color: Color, fallback: Color): Color {
     val (hue, saturation, lightness) = hsl(color)
     val source = if (saturation < VIVID_GREY) hsl(fallback) else floatArrayOf(hue, saturation, lightness)
     return Color.hsl(
@@ -379,7 +302,7 @@ private fun vivid(color: Color, fallback: Color): Color {
 }
 
 @Composable
-private fun BoxScope.PanelWash(tone: MediaTone) {
+internal fun BoxScope.PanelWash(tone: MediaTone) {
     if (tone.presence <= 0f) return
     val lightTheme = OneConfigTheme.current.isLight
     val head = readableWash(tone.accent, lightTheme).copy(alpha = PANEL_WASH_HEAD * tone.presence)
@@ -389,178 +312,7 @@ private fun BoxScope.PanelWash(tone: MediaTone) {
 }
 
 @Composable
-private fun PanelArt(art: PolyBitmap?) {
-    val bitmap = rememberArt(art)
-    val modifier = Modifier.fillMaxHeight().aspectRatio(1f)
-    if (bitmap != null) {
-        Image(bitmap, null, modifier, contentScale = ContentScale.Crop)
-    } else {
-        Box(modifier.background(SocialTextPrimary.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
-            PauseGlyph(asset("headphones-02"), OneConfigTheme.current.mutedText, 40.dp)
-        }
-    }
-}
-
-@Composable
-private fun PanelMeta(track: PauseMediaTrack, accent: Color, reduced: Boolean) {
-    val artist = track.artist.ifBlank { track.playerName }
-    val player = track.playerName.takeIf { it.isNotBlank() && track.artist.isNotBlank() }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (artist.isNotBlank()) Text(artist, Modifier.weight(1f, fill = false), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-        if (track.playing) {
-            if (reduced) Equalizer(accent, 0L) else LiveEqualizer(accent)
-        }
-        if (player != null) {
-            Box(
-                Modifier
-                    .background(SocialTextPrimary.copy(alpha = 0.08f), OneConfigTheme.shape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-            ) {
-                Text(player, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PanelProgress(track: PauseMediaTrack, accent: Color, modifier: Modifier = Modifier) {
-    val now = rememberNow(track.playing)
-    val elapsed = clock(track.positionAt(now))
-    if (track.lengthMs <= 0) {
-        Box(modifier) { TabularLabel(elapsed, 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal) }
-        return
-    }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ProgressBar(fraction(track, now), tint = accent, thickness = PANEL_PROGRESS)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TabularLabel(elapsed, 10.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
-            Box(Modifier.weight(1f))
-            TabularLabel(clock(track.lengthMs), 10.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
-        }
-    }
-}
-
-@Composable
-private fun MediaPanel(reduced: Boolean) = MediaPanel(rememberMediaTrack(), reduced, MENU_HINT)
-
-@Composable
-internal fun MediaPanel(track: PauseMediaTrack?, reduced: Boolean, menuHint: String) {
-    val tone = rememberTone(track)
-    val accent = vivid(tone.accent, OneConfigTheme.accent)
-    val hoverState = rememberHoverState()
-    val interaction = hoverState.interactionSource
-    val hovered = hoverState.hovered
-    MediaMenuHinted(menuHint, Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
-        Box(Modifier.fillMaxSize().hoverable(interaction).learnsMenu()) {
-            PanelWash(tone)
-            Row(Modifier.fillMaxSize()) {
-                PanelArt(track?.art)
-                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)) {
-                    val inline = maxWidth >= PANEL_INLINE_WIDTH
-                    Column(Modifier.fillMaxSize()) {
-                        if (track == null) {
-                            Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                            Text("Play something in another app", Modifier.padding(top = 3.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                        } else {
-                            Title(track.displayTitle, 15.sp, hovered && !reduced)
-                            Box(Modifier.padding(top = 3.dp)) { PanelMeta(track, accent, reduced) }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        if (track != null && !inline) PanelProgress(track, accent, Modifier.fillMaxWidth().padding(bottom = 8.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            if (track != null && inline) {
-                                PanelProgress(track, accent, Modifier.weight(1f).padding(end = 14.dp))
-                            } else {
-                                Spacer(Modifier.weight(1f))
-                            }
-                            Controls(track, tone, PANEL_SKIP, PANEL_SKIP_ICON, PANEL_PLAY, PANEL_PLAY_ICON, 6.dp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MediaBar(reduced: Boolean) {
-    val track = rememberMediaTrack()
-    MediaMenuHinted(MENU_HINT) {
-        BarTile(Modifier.learnsMenu(), glass = false) { hovered -> MediaStrip(track, reduced, hovered) }
-    }
-}
-
-@Composable
-internal fun BoxScope.MediaStrip(track: PauseMediaTrack?, reduced: Boolean, hovered: Boolean, textWidth: Dp = BAR_TEXT_WIDTH) {
-    val tone = rememberTone(track)
-    Wash(tone, horizontal = true)
-    Row(
-        Modifier.padding(start = 1.dp, end = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Artwork(track?.art, BAR_ART, 8.dp, tone)
-        Column(Modifier.width(textWidth)) {
-            if (track == null) {
-                Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            } else {
-                Title(track.displayTitle, 13.sp, hovered && !reduced)
-                ArtistLine(track, 11.sp, tone.accent, reduced)
-                val now = rememberNow(track.playing)
-                ProgressBar(fraction(track, now), Modifier.padding(top = 4.dp), tint = tone.accent, thickness = BAR_PROGRESS)
-            }
-        }
-        Controls(track, tone, BAR_SKIP, BAR_SKIP_ICON, BAR_PLAY, BAR_PLAY_ICON, 2.dp)
-    }
-}
-
-@Composable
-private fun MediaCard(reduced: Boolean) {
-    val track = rememberMediaTrack()
-    val tone = rememberTone(track)
-    val hoverState = rememberHoverState()
-    val interaction = hoverState.interactionSource
-    val hovered = hoverState.hovered
-    MediaMenuHinted(MENU_HINT, Modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().hoverable(interaction).learnsMenu()) {
-            Wash(tone, horizontal = false)
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Artwork(track?.art, CARD_ART, 12.dp, tone)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        if (track == null) {
-                            Text("Nothing playing", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                            Text("Play something in another app", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                        } else {
-                            Title(track.displayTitle, 14.sp, hovered && !reduced)
-                            ArtistLine(track, 12.sp, tone.accent, reduced)
-                        }
-                    }
-                }
-                if (track != null) {
-                    val now = rememberNow(track.playing)
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        ProgressBar(fraction(track, now), tint = tone.accent, thickness = CARD_PROGRESS)
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TabularLabel(clock(track.positionAt(now)), 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
-                            Box(Modifier.weight(1f))
-                            if (track.lengthMs > 0) TabularLabel(clock(track.lengthMs), 11.sp, OneConfigTheme.current.mutedText, FontWeight.Normal)
-                        }
-                    }
-                }
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Controls(track, tone, CARD_SKIP, CARD_SKIP_ICON, CARD_PLAY, CARD_PLAY_ICON, 10.dp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Title(text: String, size: TextUnit, scroll: Boolean) {
+internal fun Title(text: String, size: TextUnit, scroll: Boolean) {
     if (scroll) {
         Text(
             text,
@@ -574,43 +326,23 @@ private fun Title(text: String, size: TextUnit, scroll: Boolean) {
     }
 }
 
-@Composable
-private fun ArtistLine(track: PauseMediaTrack, size: TextUnit, accent: Color, reduced: Boolean) {
-    val artist = track.artist.ifBlank { track.playerName }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (artist.isNotBlank()) Text(artist, Modifier.weight(1f, fill = false), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = size), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-        if (track.playing) {
-            if (reduced) Equalizer(accent, 0L) else LiveEqualizer(accent)
+internal fun DrawScope.equalizer(color: Color, frameNanos: Long) {
+    val seconds = frameNanos / 1_000_000_000.0
+    val bar = size.width / 4.2f
+    val gap = (size.width - bar * 3f) / 2f
+    for (i in 0 until 3) {
+        val level = if (frameNanos == 0L) {
+            STATIC_LEVELS[i]
+        } else {
+            0.25f + 0.75f * abs(sin(seconds * EQ_SPEEDS[i] + EQ_PHASES[i])).toFloat()
         }
-    }
-}
-
-@Composable
-private fun LiveEqualizer(color: Color) {
-    val frame by rememberFrame()
-    Equalizer(color, frame)
-}
-
-@Composable
-private fun Equalizer(color: Color, frameNanos: Long) {
-    Canvas(Modifier.size(10.dp, 9.dp)) {
-        val seconds = frameNanos / 1_000_000_000.0
-        val bar = size.width / 4.2f
-        val gap = (size.width - bar * 3f) / 2f
-        for (i in 0 until 3) {
-            val level = if (frameNanos == 0L) {
-                STATIC_LEVELS[i]
-            } else {
-                0.25f + 0.75f * abs(sin(seconds * EQ_SPEEDS[i] + EQ_PHASES[i])).toFloat()
-            }
-            val h = size.height * level
-            drawRoundRect(
-                color,
-                topLeft = Offset(i * (bar + gap), size.height - h),
-                size = Size(bar, h),
-                cornerRadius = CornerRadius(bar / 2f),
-            )
-        }
+        val h = size.height * level
+        drawRoundRect(
+            color,
+            topLeft = Offset(i * (bar + gap), size.height - h),
+            size = Size(bar, h),
+            cornerRadius = CornerRadius(bar / 2f),
+        )
     }
 }
 
@@ -619,7 +351,7 @@ private val EQ_SPEEDS = doubleArrayOf(5.1, 6.7, 4.3)
 private val EQ_PHASES = doubleArrayOf(0.0, 1.3, 2.4)
 
 @Composable
-private fun Artwork(art: PolyBitmap?, size: Dp, radius: Dp, tone: MediaTone) {
+internal fun Artwork(art: PolyBitmap?, size: Dp, radius: Dp, tone: MediaTone) {
     val bitmap = rememberArt(art)
     val shape = OneConfigTheme.shape(radius)
     if (bitmap != null) {
@@ -643,21 +375,11 @@ private fun Artwork(art: PolyBitmap?, size: Dp, radius: Dp, tone: MediaTone) {
     }
 }
 
-private fun fraction(track: PauseMediaTrack, now: Long): Float =
+internal fun fraction(track: PauseMediaTrack, now: Long): Float =
     if (track.lengthMs > 0) (track.positionAt(now).toFloat() / track.lengthMs).coerceIn(0f, 1f) else 0f
 
 @Composable
-private fun Controls(track: PauseMediaTrack?, tone: MediaTone, skip: Dp, skipIcon: Dp, play: Dp, playIcon: Dp, gap: Dp) {
-    val playing = track?.playing == true
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(gap)) {
-        SkipButton(MediaGlyph.PREVIOUS, "Previous", skip, skipIcon, track?.canPrevious == true, PauseEvergreenMedia::previous)
-        PlayButton(playing, track != null, tone, play, playIcon, track?.canToggle == true)
-        SkipButton(MediaGlyph.NEXT, "Next", skip, skipIcon, track?.canNext == true, PauseEvergreenMedia::next)
-    }
-}
-
-@Composable
-private fun SkipButton(glyph: MediaGlyph, tooltip: String, size: Dp, iconSize: Dp, enabled: Boolean, onClick: () -> Unit) {
+internal fun SkipButton(glyph: MediaGlyph, tooltip: String, size: Dp, iconSize: Dp, enabled: Boolean, onClick: () -> Unit) {
     val hoverState = rememberHoverState()
     TooltipChildHover(hoverState.hovered && enabled)
     IconButton(
@@ -676,7 +398,7 @@ private fun SkipButton(glyph: MediaGlyph, tooltip: String, size: Dp, iconSize: D
 }
 
 @Composable
-private fun PlayButton(playing: Boolean, active: Boolean, tone: MediaTone, size: Dp, iconSize: Dp, enabled: Boolean) {
+internal fun PlayButton(playing: Boolean, active: Boolean, tone: MediaTone, size: Dp, iconSize: Dp, enabled: Boolean) {
     val hoverState = rememberHoverState()
     val interaction = hoverState.interactionSource
     val hovered = hoverState.hovered

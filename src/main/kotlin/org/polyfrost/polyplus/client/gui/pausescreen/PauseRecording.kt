@@ -5,8 +5,10 @@ package org.polyfrost.polyplus.client.gui.pausescreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -20,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -38,6 +39,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.widgets.WidgetScope
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSize
 import org.polyfrost.polyplus.compat.replay.ReplayProvider
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import kotlin.math.cos
@@ -47,9 +50,14 @@ import androidx.compose.ui.text.style.TextOverflow
 private const val TICK_MILLIS = 250L
 private const val DISCARD_ARM_MILLIS = 3000L
 private const val PULSE_NANOS = 1_600_000_000.0
-private val BAR_CONTROL = 32.dp
-private val CARD_CONTROL = 24.dp
-private val CARD_GLYPH = 16.dp
+private val LIVE_CONTROL = 32.dp
+private val BLOCK_ICON = 44.dp
+private val BLOCK_ICON_RADIUS = 12.dp
+private val BLOCK_GLYPH = 20.dp
+private val BLOCK_GAP = 12.dp
+private val START_PILL = 28.dp
+private val TIME_TEXT = 18.sp
+private const val ICON_WASH = 0.08f
 
 private sealed interface RecordingView
 
@@ -107,68 +115,89 @@ private fun rememberRecording(): RecordingHandle {
 }
 
 @Composable
-internal fun RecordingBarTool(screen: OneClientPauseScreen, glass: Boolean = true) {
+internal fun RecordingWidget(scope: WidgetScope) {
     val recording = rememberRecording()
-    when (val view = recording.view ?: return) {
-        is IdleView -> StartTool(screen, view.starters) { press, choosing ->
-            BarTile(tooltip = if (choosing) null else "Start recording", label = "Start recording", active = choosing, onClick = press, glass = glass) { hovered ->
-                PauseGlyph(asset("video-recorder"), if (hovered || choosing) SocialTextPrimary else OneConfigTheme.current.mutedText, 20.dp)
+    when (val view = recording.view) {
+        null -> WidgetFace(WidgetSize.BLOCK.height) {
+            BlockLayout(asset("video-recorder"), false, "Record", "Not available right now")
+        }
+        is IdleView -> StartTool(scope::closeHost, view.starters) { press, choosing ->
+            WidgetFace(WidgetSize.BLOCK.height, label = "Start recording", active = choosing, onClick = press) { lit ->
+                val detail = view.starters.singleOrNull()?.let { "Save a replay with ${it.name}" } ?: "Pick what records this session"
+                BlockLayout(asset("video-recorder"), lit, "Record", detail) { StartPill() }
             }
         }
-        is LiveView -> BarTile(glass = glass) {
+        is LiveView -> WidgetFace(WidgetSize.BLOCK.height) {
             Row(
-                Modifier.padding(start = 10.dp),
+                Modifier.fillMaxWidth().padding(horizontal = WIDGET_INSET),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(BLOCK_GAP),
             ) {
-                RecordingDot(view.paused)
-                RecordingTime(view, 14.sp)
-                LiveControls(screen, view, recording.refresh, BAR_CONTROL)
+                Box(Modifier.size(BLOCK_ICON).background(SocialDangerText.copy(alpha = ICON_WASH), OneConfigTheme.shape(BLOCK_ICON_RADIUS)), contentAlignment = Alignment.Center) {
+                    RecordingDot(view.paused)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    RecordingTime(view)
+                    Text(view.provider.name, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                }
+                LiveControls(scope::closeHost, view, recording.refresh, LIVE_CONTROL)
             }
         }
     }
 }
 
 @Composable
-internal fun RecordingCardTool(screen: OneClientPauseScreen) {
-    val recording = rememberRecording()
-    when (val view = recording.view ?: return) {
-        is IdleView -> StartTool(screen, view.starters, side = true) { press, choosing ->
-            CardRow(label = "Start recording", active = choosing, onClick = press) { lit ->
-                Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) {
-                    PauseGlyph(asset("video-recorder"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, CARD_GLYPH)
-                }
-                Text("Record", style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            }
+internal fun BlockLayout(
+    icon: String,
+    lit: Boolean,
+    title: String,
+    detail: String,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val muted = OneConfigTheme.current.mutedText
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = WIDGET_INSET),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(BLOCK_GAP),
+    ) {
+        Box(Modifier.size(BLOCK_ICON).background(SocialTextPrimary.copy(alpha = ICON_WASH), OneConfigTheme.shape(BLOCK_ICON_RADIUS)), contentAlignment = Alignment.Center) {
+            PauseGlyph(icon, if (lit) SocialTextPrimary else muted, BLOCK_GLYPH)
         }
-        is LiveView -> CardRow {
-            Box(Modifier.size(CARD_GLYPH), contentAlignment = Alignment.Center) { RecordingDot(view.paused) }
-            Text(if (view.paused) "Paused" else "Rec", color = if (view.paused) OneConfigTheme.current.mutedText else SocialTextPrimary, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            view.elapsedSeconds?.let { TabularLabel(elapsedText(it), 13.sp, if (view.paused) OneConfigTheme.current.mutedText else SocialTextPrimary) }
-            Spacer(Modifier.weight(1f))
-            LiveControls(screen, view, recording.refresh, CARD_CONTROL)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(detail, color = muted, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun StartPill() {
+    Box(
+        Modifier.height(START_PILL).background(OneConfigTheme.accent, OneConfigTheme.current.shapes.pill).padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("Start", color = OneConfigTheme.current.accentTextColor, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, softWrap = false)
     }
 }
 
 @Composable
 private fun StartTool(
-    screen: OneClientPauseScreen,
+    closeHost: () -> Unit,
     starters: List<ReplayProvider>,
-    side: Boolean = false,
     trigger: @Composable (press: () -> Unit, choosing: Boolean) -> Unit,
 ) {
     var choosing by remember { mutableStateOf(false) }
     val start: (ReplayProvider) -> Unit = { provider ->
         runCatching { provider.start() }
-        screen.closeIfCurrent()
+        closeHost()
     }
-    Box {
+    Box(Modifier.fillMaxWidth()) {
         trigger({ if (starters.size == 1) start(starters.first()) else choosing = !choosing }, choosing)
         if (choosing && starters.size > 1) {
             val close = { choosing = false }
             Popup(
-                popupPositionProvider = rememberToolAnchor(side),
+                popupPositionProvider = rememberWidgetAnchor(),
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
@@ -180,19 +209,16 @@ private fun StartTool(
 }
 
 @Composable
-private fun RecordingTime(live: LiveView, size: TextUnit) {
+private fun RecordingTime(live: LiveView) {
     val ink = if (live.paused) OneConfigTheme.current.mutedText else SocialTextPrimary
-    val seconds = live.elapsedSeconds
-    if (seconds != null) {
-        TabularLabel(elapsedText(seconds), size, ink)
-        if (live.paused) Text("Paused", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body.copy(fontSize = size), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-    } else {
-        Text(if (live.paused) "Paused" else "Recording", color = ink, style = OneConfigTheme.current.typography.body.copy(fontSize = size, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        live.elapsedSeconds?.let { TabularLabel(elapsedText(it), TIME_TEXT, ink) }
+        Text(if (live.paused) "Paused" else "Recording", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
-private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: () -> Unit, size: Dp) {
+private fun LiveControls(closeHost: () -> Unit, live: LiveView, refresh: () -> Unit, size: Dp) {
     val provider = live.provider
     var armed by remember(provider) { mutableStateOf(false) }
     LaunchedEffect(armed) {
@@ -214,7 +240,7 @@ private fun LiveControls(screen: OneClientPauseScreen, live: LiveView, refresh: 
         }
         ChipButton(asset("check-circle"), provider.finishLabel, size) {
             runCatching { provider.finish() }
-            screen.closeIfCurrent()
+            closeHost()
         }
         if (live.canDiscard) {
             ChipButton(asset("trash-01"), if (armed) "Click again to discard" else "Discard recording", size, danger = armed) {

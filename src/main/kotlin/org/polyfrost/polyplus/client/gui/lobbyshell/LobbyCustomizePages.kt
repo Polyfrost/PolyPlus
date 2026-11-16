@@ -37,6 +37,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.KitDangerColor
+import org.polyfrost.polyplus.client.gui.widgets.WidgetListEditor
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSurface
 import org.polyfrost.polyplus.client.lobby.LobbyCaptureFrequency
 import org.polyfrost.polyplus.client.lobby.LobbyCaptureView
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
@@ -287,6 +289,14 @@ internal fun RevealPage(lobby: LobbyShell, state: CustomizeState) {
 private fun revealDetail(reveal: LobbyReveal): String? = when (reveal) {
     LobbyReveal.RANDOM -> "A different one each time"
     else -> null
+}
+
+@Composable
+internal fun WidgetsPage(lobby: LobbyShell, state: CustomizeState) {
+    PanelPageColumn {
+        PanelHint("Turn widgets on and drag to reorder them.")
+        WidgetListEditor(WidgetSurface.LOBBY)
+    }
 }
 
 @Composable

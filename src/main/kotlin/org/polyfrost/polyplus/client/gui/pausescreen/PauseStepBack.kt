@@ -3,6 +3,8 @@
 package org.polyfrost.polyplus.client.gui.pausescreen
 
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.polyplus.client.gui.lobbyshell.centerVerticallyExact
+import androidx.compose.foundation.layout.fillMaxHeight
 import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import androidx.compose.foundation.background
@@ -19,14 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -36,7 +35,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,37 +73,15 @@ private val CLASSIC_ROW = 44.dp
 private val TIGHT_ROW = 38.dp
 private const val FLAT_DIM = 0.45f
 private val TOOLS_GAP = 8.dp
-private val MENU_RESERVE = 472.dp
-private val PANEL_WIDTH = 360.dp
-private val PANEL_MIN_WIDTH = 240.dp
-private val PANEL_PREFERRED_MIN = 300.dp
-private val PANEL_MAX_HEIGHT = 220.dp
-private val PANEL_MIN_HEIGHT = 120.dp
-private const val MAX_PANELS = 2
 private const val FLAT_AVATAR_X = 0.35f
 private const val FLAT_AVATAR_SHARE = 0.85f
 private val FLAT_AVATAR_MIN = 120.dp
 private val FLAT_PREVIEW_COLUMN = 300.dp
 private val FLAT_TAG_ROOM = 56.dp
 private val FLAT_TAG_GAP = 4.dp
+private val BAR_HEAD = 30.dp
 
 private enum class PauseNavTab { Game, Wardrobe, Social }
-
-private class PanelSlots(val count: Int, val width: Dp, val height: Dp)
-
-private val NO_PANELS = PanelSlots(0, 0.dp, 0.dp)
-
-private fun panelSlots(narrow: Boolean, wanted: Int, maxWidth: Dp, maxHeight: Dp, rowWidth: Dp): PanelSlots {
-    if (narrow || wanted == 0) return NO_PANELS
-    val preferred = if (rowWidth > 0.dp) maxOf(rowWidth, PANEL_PREFERRED_MIN) else PANEL_WIDTH
-    val width = minOf(preferred, maxWidth - LobbyLayout.Margin - MENU_RESERVE - LobbyLayout.Gap)
-    if (width < PANEL_MIN_WIDTH) return NO_PANELS
-    val room = maxHeight - LobbyLayout.NavbarHeight - LobbyLayout.Gap - LobbyLayout.BarHeight - LobbyLayout.Margin - LobbyLayout.Gap
-    var count = minOf(MAX_PANELS, wanted)
-    while (count > 0 && (room - LobbyLayout.Gap * (count - 1)) / count < PANEL_MIN_HEIGHT) count--
-    if (count == 0) return NO_PANELS
-    return PanelSlots(count, width, minOf(PANEL_MAX_HEIGHT, (room - LobbyLayout.Gap * (count - 1)) / count))
-}
 
 @Composable
 internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean) {
@@ -124,14 +100,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         Box(Modifier.graphicsLayer { alpha = reveal }.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(0f to ink.copy(alpha = 0.92f), 0.42f to ink.copy(alpha = 0.74f), 1f to ink.copy(alpha = 0f))))
         Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
     }
-    val widgets = rememberPauseWidgets()
-    val density = LocalDensity.current
-    var rowWidth by remember { mutableStateOf(0.dp) }
     BoxWithConstraints(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
-        val slots = panelSlots(narrow, widgets.view.panels.size, maxWidth, maxHeight, rowWidth)
-        val panels = widgets.view.panels.take(slots.count)
-        val panelArea = panelSlots(narrow, 1, maxWidth, maxHeight, rowWidth).count > 0
-        val panelled = remember(panels) { panels.mapTo(HashSet()) { it.id } }
         if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
@@ -152,27 +121,18 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 }
             }
         }
-        Row(
+        val toolsWidth = pauseWidgetWidth(narrow)
+        val widgetRoom = maxHeight - LobbyLayout.NavbarHeight - LobbyLayout.Gap - LobbyLayout.BarHeight - TOOLS_GAP - LobbyLayout.Margin
+        Column(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = LobbyLayout.Margin, end = (if (narrow) 368.dp else 472.dp) + LobbyLayout.Gap, bottom = LobbyLayout.Margin)
-                .onGloballyPositioned { rowWidth = with(density) { it.size.width.toDp() } },
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(TOOLS_GAP),
+                .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
+                .width(toolsWidth),
+            verticalArrangement = Arrangement.spacedBy(TOOLS_GAP),
         ) {
-            PartyBar(screen, Modifier.weight(1f, fill = false))
-            PauseWidgetBar(screen, widgets, panelled, panelArea = panelArea)
+            PauseWidgetColumn(screen, toolsWidth, widgetRoom.coerceAtLeast(0.dp))
+            PartyBar(screen, Modifier.fillMaxWidth())
         }
-        PauseWidgetPanels(
-            screen,
-            widgets,
-            panels,
-            slots.width,
-            slots.height,
-            Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin + LobbyLayout.BarHeight + LobbyLayout.Gap),
-        )
     }
     if (screen.moreOpen) MoreDismiss(screen)
     if (screen.customizeOpen) {
@@ -245,17 +205,17 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
 private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
     val party by PartyRepository.party.collectAsState()
     Row(
-        modifier.height(LobbyLayout.BarHeight).pauseGlass().padding(horizontal = 12.dp),
+        modifier.height(LobbyLayout.BarHeight).pauseGlass().padding(start = (LobbyLayout.BarHeight - BAR_HEAD) / 2, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val current = party
-        BoxWithConstraints(Modifier.widthIn(max = 520.dp).weight(1f, fill = false)) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
             if (current != null) {
                 PartyRoster(PauseHost, current, maxWidth)
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PlayerHead(playerId = ClientPlatform.localPlayerUuid(), size = 30.dp, modifier = Modifier, shape = headShape(30.dp))
+                Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PlayerHead(playerId = ClientPlatform.localPlayerUuid(), size = BAR_HEAD, modifier = Modifier.centerVerticallyExact(), shape = headShape(BAR_HEAD))
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(ClientPlatform.localPlayerName(), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                         Text("You", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
@@ -263,7 +223,7 @@ private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
                 }
             }
         }
-        PartyActions(current, onVoice = { SocialOverlay.openVoice(screen) }.takeIf { screen.online })
+        Box(Modifier.centerVerticallyExact()) { PartyActions(current, onVoice = { SocialOverlay.openVoice(screen) }.takeIf { screen.online }) }
         if (screen.online) PartyInviteCards(PauseHost)
     }
 }

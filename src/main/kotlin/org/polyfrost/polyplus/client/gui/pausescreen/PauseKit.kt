@@ -453,39 +453,6 @@ internal fun BoxScope.MoreDismiss(screen: OneClientPauseScreen) {
 
 internal val POPUP_EDGE = 20.dp
 private val SIDE_GAP = 14.dp
-private val BAR_INSET = 6.dp
-private val BAR_INNER_RADIUS = 14.dp
-
-@Composable
-internal fun BarTile(
-    modifier: Modifier = Modifier,
-    tooltip: String? = null,
-    active: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    glass: Boolean = true,
-    label: String? = tooltip,
-    content: @Composable BoxScope.(hovered: Boolean) -> Unit,
-) {
-    val hover = rememberHoverState()
-    val interaction = hover.interactionSource
-    val hovered = hover.hovered
-    TooltipBox(tooltip, placement = TooltipPlacement.AboveCenter, delayMillis = 0) {
-        Box(
-            modifier
-                .height(LobbyLayout.BarHeight)
-                .widthIn(min = LobbyLayout.BarHeight)
-                .then(if (glass) Modifier.pauseGlass() else Modifier)
-                .hoverable(interaction)
-                .then(if (onClick != null) Modifier.oneConfigClickable(label, onClick, indication = false, interactionSource = interaction, focusRing = false) else Modifier)
-                .padding(BAR_INSET),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (onClick != null) Box(Modifier.matchParentSize().rowFrame(false, hovered || active, OneConfigTheme.shape(BAR_INNER_RADIUS)))
-            content(hovered)
-        }
-    }
-}
-
 private val CARD_ROW = 34.dp
 
 @Composable

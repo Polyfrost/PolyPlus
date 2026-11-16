@@ -74,7 +74,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.registerPolyPlusPixelIcons
-import org.polyfrost.polyplus.client.gui.pausescreen.PauseMediaWidgets
+import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
 
 //? if wwaypoints
 import org.polyfrost.polyplus.compat.WWaypointsCompat
@@ -182,7 +182,7 @@ object PolyPlusClient {
         step("default settings") { DefaultSettings.initialize() }
         step("pixel icons") { registerPolyPlusPixelIcons() }
         step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
-        step("pause media widget") { PauseMediaWidgets.register() }
+        step("widgets") { ShellWidgetRegistry.registerBuiltIns() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }

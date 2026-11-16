@@ -10,13 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,15 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +52,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.widgets.WidgetScope
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHosting
 import org.polyfrost.polyplus.client.gui.platformLabel
@@ -67,7 +63,6 @@ import org.polyfrost.polyplus.compat.SparkCompat
 import org.polyfrost.polyplus.compat.SparkProfile
 import org.polyfrost.polyplus.compat.SparkStats
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
@@ -77,11 +72,9 @@ private const val PERF_TICK_MILLIS = 500L
 private const val PERF_PULSE_NANOS = 1_600_000_000.0
 private const val TABULAR = "tnum"
 private val CHIP_TEXT = 12.sp
-private val BAR_TEXT = 14.sp
-private val BAR_DETAIL = 11.sp
-private val CARD_TEXT = 13.sp
-private val CARD_DETAIL = 12.sp
-private val GAUGE_SIZE = 16.dp
+private val MAIN_TEXT = 14.sp
+private val DETAIL_TEXT = 11.sp
+private val GAUGE_SIZE = 22.dp
 private val GAUGE_STROKE = 2.dp
 private const val GAUGE_FULL_FPS = 240f
 private const val GAUGE_START = 135f
@@ -130,9 +123,7 @@ private fun percent(value: Double): String = "${(value * 100).roundToInt()}%"
 
 private fun fpsText(view: PerfView): String = "${view.fps} FPS"
 
-private fun frameText(view: PerfView): String = view.frameMs?.let { "${millis(it)} ms" } ?: "-- ms"
-
-
+private fun frameText(view: PerfView): String = view.frameMs?.let { "${millis(it)} ms per frame" } ?: "-- ms per frame"
 
 private fun modCount(): Int? = runCatching { FabricLoader.getInstance().allMods.size }.getOrNull()
 
@@ -156,102 +147,59 @@ private fun snapshot(view: PerfView): String {
     return lines.joinToString("\n")
 }
 
-private class ChipSlots(val barFps: Dp, val barFrame: Dp, val barStatus: Dp, val cardFps: Dp, val cardFrame: Dp)
-
 private fun chipStyle(family: FontFamily, weight: FontWeight, color: Color = Color.Unspecified, size: TextUnit = CHIP_TEXT, align: TextAlign = TextAlign.Start) =
     TextStyle(color = color, fontSize = size, fontWeight = weight, fontFamily = family, textAlign = align, fontFeatureSettings = TABULAR)
-
-@Composable
-private fun rememberChipSlots(): ChipSlots {
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val family = OneConfigTheme.current.fontFamily
-    return remember(measurer, density, family) {
-        fun widest(template: String, weight: FontWeight, size: TextUnit): Dp {
-            val style = chipStyle(family, weight, size = size)
-            val px = ('0'..'9').maxOf { digit -> measurer.measure(template.replace('#', digit), style).size.width }
-            return with(density) { px.toDp() }
-        }
-        ChipSlots(
-            widest("### FPS", FontWeight.Medium, BAR_TEXT),
-            widest("##.# ms", FontWeight.Normal, BAR_DETAIL),
-            maxOf(widest("Profiling", FontWeight.Medium, BAR_TEXT), widest("Uploading", FontWeight.Medium, BAR_TEXT)),
-            widest("### FPS", FontWeight.Medium, CARD_TEXT),
-            widest("##.# ms", FontWeight.Normal, CARD_DETAIL),
-        )
-    }
-}
-
-@Composable
-private fun Modifier.growOnlyWidth(): Modifier {
-    val widest = remember { intArrayOf(0) }
-    return layout { measurable, constraints ->
-        val floor = widest[0].coerceAtMost(constraints.maxWidth).coerceAtLeast(constraints.minWidth)
-        val placeable = measurable.measure(constraints.copy(minWidth = floor))
-        widest[0] = max(widest[0], placeable.width)
-        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-    }
-}
 
 internal fun performanceShown(): Boolean = SparkCompat.installed
 
 @Composable
-internal fun PerformanceBarTool(screen: OneClientPauseScreen, glass: Boolean = true) {
-    val slots = rememberChipSlots()
-    PerfTool(screen) { view, press, menu ->
-        BarTile(Modifier.growOnlyWidth(), label = "Performance and spark tools", active = menu, onClick = press, glass = glass) {
+internal fun PerformanceWidget(scope: WidgetScope) {
+    PerfTool(scope::closeHost) { view, press, menu ->
+        WidgetFace(WidgetSize.ROW.height, label = "Performance and spark tools", active = menu, onClick = press) { lit ->
             Row(
-                Modifier.padding(horizontal = 10.dp),
+                Modifier.fillMaxWidth().padding(horizontal = WIDGET_INSET),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                val muted = OneConfigTheme.current.mutedText
                 when (val profile = view.profile) {
                     is SparkProfile.Running -> {
-                        ProfilingDot()
+                        Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
+                        StatLines("Profiling", "Click for options", Modifier.weight(1f))
                         val seconds = ((System.currentTimeMillis() - profile.startedAt) / 1000L).coerceIn(0L, profile.seconds.toLong())
-                        BarLines("Profiling", clock(seconds), slots.barStatus, slots.barFrame)
+                        ChipText(clock(seconds), SocialTextPrimary, FontWeight.Medium, size = MAIN_TEXT)
                     }
                     SparkProfile.Uploading -> {
-                        ProfilingDot()
-                        BarLines("Uploading", "to spark", slots.barStatus, slots.barFrame)
+                        Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
+                        StatLines("Uploading", "Sending the profile", Modifier.weight(1f))
                     }
-                    else -> BarLines(fpsText(view), frameText(view), slots.barFps, slots.barFrame)
+                    else -> {
+                        Gauge(view.fps, if (lit) SocialTextPrimary else muted)
+                        StatLines(fpsText(view), frameText(view), Modifier.weight(1f))
+                        sideStat(view)?.let { (value, label) -> StatLines(value, label, align = TextAlign.End) }
+                    }
                 }
             }
         }
     }
 }
 
+private fun sideStat(view: PerfView): Pair<String, String>? {
+    val tps = view.stats?.server?.tps10s
+    if (view.showServer && tps != null) return one(tps) to "TPS"
+    return view.stats?.cpuProcess?.let { percent(it) to "CPU" }
+}
+
 @Composable
-internal fun PerformanceCardTool(screen: OneClientPauseScreen) {
-    val slots = rememberChipSlots()
-    PerfTool(screen, side = true) { view, press, menu ->
-        CardRow(label = "Performance and spark tools", active = menu, onClick = press) { lit ->
-            when (val profile = view.profile) {
-                is SparkProfile.Running -> {
-                    Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
-                    ChipText("Profiling", SocialTextPrimary, FontWeight.Medium, size = CARD_TEXT)
-                    Spacer(Modifier.weight(1f))
-                    val seconds = ((System.currentTimeMillis() - profile.startedAt) / 1000L).coerceIn(0L, profile.seconds.toLong())
-                    ChipText(clock(seconds), OneConfigTheme.current.mutedText, FontWeight.Normal, size = CARD_DETAIL)
-                }
-                SparkProfile.Uploading -> {
-                    Box(Modifier.size(GAUGE_SIZE), contentAlignment = Alignment.Center) { ProfilingDot() }
-                    ChipText("Uploading profile", SocialTextPrimary, FontWeight.Medium, size = CARD_TEXT)
-                }
-                else -> {
-                    Gauge(view.fps, if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText)
-                    ChipText(fpsText(view), SocialTextPrimary, FontWeight.Medium, Modifier.widthIn(min = slots.cardFps), size = CARD_TEXT)
-                    Spacer(Modifier.weight(1f))
-                    ChipText(frameText(view), OneConfigTheme.current.mutedText, FontWeight.Normal, Modifier.widthIn(min = slots.cardFrame), TextAlign.End, CARD_DETAIL)
-                }
-            }
-        }
+private fun StatLines(top: String, bottom: String, modifier: Modifier = Modifier, align: TextAlign = TextAlign.Start) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(1.dp), horizontalAlignment = if (align == TextAlign.End) Alignment.End else Alignment.Start) {
+        ChipText(top, SocialTextPrimary, FontWeight.Medium, align = align, size = MAIN_TEXT)
+        ChipText(bottom, OneConfigTheme.current.mutedText, FontWeight.Normal, align = align, size = DETAIL_TEXT)
     }
 }
 
 @Composable
-private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigger: @Composable (view: PerfView, press: () -> Unit, menu: Boolean) -> Unit) {
+private fun PerfTool(closeHost: () -> Unit, trigger: @Composable (view: PerfView, press: () -> Unit, menu: Boolean) -> Unit) {
     var view by remember { mutableStateOf(readPerf()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -265,8 +213,8 @@ private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigge
     val interaction = hoverState.interactionSource
     val hovered = hoverState.hovered
     var menu by remember { mutableStateOf(false) }
-    val anchor = rememberToolAnchor(side)
-    Box(Modifier.hoverable(interaction)) {
+    val anchor = rememberWidgetAnchor()
+    Box(Modifier.fillMaxWidth().hoverable(interaction)) {
         trigger(current, { menu = !menu }, menu)
         if (hovered && !menu) {
             Popup(popupPositionProvider = anchor, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
@@ -281,18 +229,9 @@ private fun PerfTool(screen: OneClientPauseScreen, side: Boolean = false, trigge
                 properties = PopupProperties(focusable = true),
             ) {
                 EscapeCloses(close)
-                MenuList(menuItems(screen, current, refresh), close)
+                MenuList(menuItems(closeHost, current, refresh), close)
             }
         }
-    }
-}
-
-@Composable
-private fun BarLines(top: String, bottom: String, topWidth: Dp, bottomWidth: Dp) {
-    val width = maxOf(topWidth, bottomWidth)
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        ChipText(top, SocialTextPrimary, FontWeight.Medium, Modifier.widthIn(min = width), size = BAR_TEXT)
-        ChipText(bottom, OneConfigTheme.current.mutedText, FontWeight.Normal, Modifier.widthIn(min = width), size = BAR_DETAIL)
     }
 }
 
@@ -381,17 +320,17 @@ private fun PanelStat(label: String, value: String) {
     }
 }
 
-private fun profileItem(screen: OneClientPauseScreen, seconds: Int, label: String, view: PerfView, refresh: () -> Unit) =
+private fun profileItem(closeHost: () -> Unit, seconds: Int, label: String, view: PerfView, refresh: () -> Unit) =
     MenuAction(label, asset("play-circle"), enabled = view.available) {
         if (SparkCompat.startProfile(seconds)) {
-            screen.closeIfCurrent()
+            closeHost()
         } else {
             SocialErrors.emit("spark couldn't start the profiler.")
         }
         refresh()
     }
 
-private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () -> Unit): List<MenuAction> {
+private fun menuItems(closeHost: () -> Unit, view: PerfView, refresh: () -> Unit): List<MenuAction> {
     val items = mutableListOf<MenuAction>()
     if (view.profiling) {
         items += MenuAction("Stop and upload now", asset("check-circle"), enabled = view.profile != SparkProfile.Uploading) {
@@ -399,8 +338,8 @@ private fun menuItems(screen: OneClientPauseScreen, view: PerfView, refresh: () 
             refresh()
         }
     } else {
-        items += profileItem(screen, SparkCompat.SHORT_PROFILE_SECONDS, "Profile 30 seconds", view, refresh)
-        items += profileItem(screen, SparkCompat.LONG_PROFILE_SECONDS, "Profile 2 minutes", view, refresh)
+        items += profileItem(closeHost, SparkCompat.SHORT_PROFILE_SECONDS, "Profile 30 seconds", view, refresh)
+        items += profileItem(closeHost, SparkCompat.LONG_PROFILE_SECONDS, "Profile 2 minutes", view, refresh)
     }
     val health = SparkCompat.healthRunning
     items += MenuAction(if (health) "Making health report" else "Health report", asset("globe-01"), enabled = view.available && !health) {

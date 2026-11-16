@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
@@ -43,9 +45,9 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
-import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.popup
 import org.polyfrost.polyplus.client.lobby.LobbyCapture
 import org.polyfrost.polyplus.client.lobby.LobbySceneScore
@@ -56,7 +58,6 @@ import kotlin.math.roundToInt
 import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.Divider
@@ -79,8 +80,10 @@ private val SCENE_PANEL_WIDTH = 320.dp
 private val SCENE_PANEL_MAX = 520.dp
 private val RING_SIZE = 54.dp
 private val RING_STROKE = 5.dp
+private val RING_TEXT = 17.sp
+private val BLOCK_RING = 48.dp
+private val BLOCK_RING_TEXT = 15.sp
 private val METER_HEIGHT = 3.dp
-private val BADGE_DOT = 8.dp
 
 private enum class Tone { PASS, FAIL, NEUTRAL }
 
@@ -95,7 +98,7 @@ internal fun sceneShown(): Boolean = readAccess() !is LobbySpotAccess.Hidden
 private class SceneTrigger(val blocked: String?, val spot: LobbySpotState, val open: Boolean, val press: (() -> Unit)?)
 
 @Composable
-private fun SceneTool(side: Boolean = false, trigger: @Composable (SceneTrigger) -> Unit) {
+private fun SceneTool(trigger: @Composable (SceneTrigger) -> Unit) {
     var access by remember { mutableStateOf(readAccess()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -108,12 +111,12 @@ private fun SceneTool(side: Boolean = false, trigger: @Composable (SceneTrigger)
     var open by remember { mutableStateOf(false) }
     val blocked = (current as? LobbySpotAccess.Blocked)?.reason
     val spot = LobbyCapture.spot
-    Box {
+    Box(Modifier.fillMaxWidth()) {
         trigger(SceneTrigger(blocked, spot, open && blocked == null, if (blocked == null) ({ open = !open }) else null))
         if (open && blocked == null) {
             val close = { open = false }
             Popup(
-                popupPositionProvider = rememberToolAnchor(side),
+                popupPositionProvider = rememberWidgetAnchor(),
                 onDismissRequest = close,
                 properties = PopupProperties(focusable = true),
             ) {
@@ -125,55 +128,47 @@ private fun SceneTool(side: Boolean = false, trigger: @Composable (SceneTrigger)
 }
 
 @Composable
-internal fun SceneBarTool(glass: Boolean = true) {
+internal fun SceneWidget() {
     SceneTool { scene ->
-        BarTile(tooltip = scene.blocked ?: if (scene.open) null else "Scene check", label = "Scene check", active = scene.open, onClick = scene.press, glass = glass) { hovered ->
-            val ink = if ((hovered || scene.open) && scene.blocked == null) SocialTextPrimary else OneConfigTheme.current.mutedText
-            val disabledAlpha = OneConfigTheme.current.disabledAlpha
-            Box(Modifier.graphicsLayer { alpha = if (scene.blocked != null) disabledAlpha else 1f }) {
-                PauseGlyph(asset("image-01"), ink, 20.dp)
+        val usable = scene.blocked == null
+        val done = scene.spot as? LobbySpotState.Done
+        val verdict = scene.blocked?.let { Verdict(it, Tone.NEUTRAL) } ?: verdict(scene.spot, done)
+        val total = done?.report?.breakdown?.total
+        val tone = toneColor(verdict.tone)
+        val disabledAlpha = OneConfigTheme.current.disabledAlpha
+        WidgetFace(
+            WidgetSize.BLOCK.height,
+            Modifier.graphicsLayer { alpha = if (usable) 1f else disabledAlpha },
+            label = "Scene check",
+            active = scene.open,
+            onClick = scene.press,
+        ) { lit ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = WIDGET_INSET),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ScoreRing(if (working(scene.spot)) null else total, tone, BLOCK_RING, BLOCK_RING_TEXT, progress(scene.spot))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Scene check", style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    Text(
+                        verdict.text,
+                        color = if (verdict.tone == Tone.NEUTRAL) OneConfigTheme.current.mutedText else tone,
+                        style = OneConfigTheme.current.typography.small,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (usable) PauseGlyph(asset("chevron-right"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, 16.dp)
             }
-            SceneBadge(scene.spot, Modifier.align(Alignment.TopEnd))
         }
     }
 }
 
-@Composable
-internal fun SceneCardTool() {
-    SceneTool(side = true) { scene ->
-        CardRow(tooltip = scene.blocked, label = "Scene check", active = scene.open, onClick = scene.press) { lit ->
-            val usable = scene.blocked == null
-            PauseGlyph(asset("image-01"), if (lit) SocialTextPrimary else OneConfigTheme.current.mutedText, 16.dp)
-            Text("Scene", color = if (usable) SocialTextPrimary else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.label, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            Spacer(Modifier.weight(1f))
-            if (usable) sceneDetail(scene.spot)?.let { (text, color) -> TabularLabel(text, 12.sp, color) }
-        }
-    }
-}
-
-@Composable
-private fun sceneDetail(spot: LobbySpotState): Pair<String, Color>? = when (spot) {
-    is LobbySpotState.Waiting -> "Waiting" to OneConfigTheme.current.mutedText
-    is LobbySpotState.Surveying -> "${(spot.progress * FULL_SCORE).roundToInt()}%" to OneConfigTheme.current.mutedText
-    is LobbySpotState.Saving -> "Saving" to OneConfigTheme.current.mutedText
-    is LobbySpotState.Done -> spot.report.breakdown?.total?.let { it.toString() to toneColor(if (spot.report.passed) Tone.PASS else Tone.FAIL) }
+private fun progress(spot: LobbySpotState): Float? = when (spot) {
+    is LobbySpotState.Surveying -> spot.progress
+    is LobbySpotState.Saving -> spot.progress
     else -> null
-}
-
-@Composable
-private fun SceneBadge(spot: LobbySpotState, modifier: Modifier) {
-    if (working(spot)) {
-        Box(modifier.padding(2.dp).size(BADGE_DOT).background(OneConfigTheme.accent, OneConfigTheme.current.circleShape))
-        return
-    }
-    val done = spot as? LobbySpotState.Done ?: return
-    val total = done.report.breakdown?.total ?: return
-    Badge(
-        total.toString(),
-        modifier.background(PanelSurface.copy(alpha = 1f), OneConfigTheme.current.shapes.pill),
-        if (done.report.passed) BadgeTone.Accent else BadgeTone.Danger,
-        style = BadgeStyle.Hairline,
-    )
 }
 
 private fun working(spot: LobbySpotState): Boolean =
@@ -261,18 +256,19 @@ private fun Header(shown: LobbySpotState.Done?, verdict: Verdict) {
 }
 
 @Composable
-private fun ScoreRing(total: Int?, tone: Color) {
+private fun ScoreRing(total: Int?, tone: Color, diameter: Dp = RING_SIZE, text: TextUnit = RING_TEXT, progress: Float? = null) {
     val track = SocialBorderColor
-    val fraction = (total ?: 0).coerceIn(0, FULL_SCORE) / FULL_SCORE.toFloat()
-    Box(Modifier.size(RING_SIZE), contentAlignment = Alignment.Center) {
+    val fraction = progress?.coerceIn(0f, 1f) ?: ((total ?: 0).coerceIn(0, FULL_SCORE) / FULL_SCORE.toFloat())
+    val arcTone = if (progress != null) OneConfigTheme.accent else tone
+    Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = RING_STROKE.toPx()
             val inset = stroke / 2f
             val arc = Size(size.width - stroke, size.height - stroke)
             drawArc(track, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(stroke))
-            if (fraction > 0f) drawArc(tone, -90f, 360f * fraction, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
+            if (fraction > 0f) drawArc(arcTone, -90f, 360f * fraction, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
         }
-        Text(total?.toString() ?: "--", color = if (total == null) OneConfigTheme.current.mutedText else SocialTextPrimary, style = OneConfigTheme.current.typography.body.copy(fontSize = 17.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(total?.toString() ?: "--", color = if (total == null) OneConfigTheme.current.mutedText else SocialTextPrimary, style = OneConfigTheme.current.typography.body.copy(fontSize = text, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 

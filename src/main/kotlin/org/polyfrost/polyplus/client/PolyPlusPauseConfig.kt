@@ -7,6 +7,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
+import org.polyfrost.polyplus.client.gui.widgets.WidgetMigration
 
 object PolyPlusPauseConfig : Config(
     "${PolyPlusConstants.ID}-pause.json",
@@ -24,6 +25,9 @@ object PolyPlusPauseConfig : Config(
 
     @JvmStatic @Include
     var pauseWidgetPanels = ""
+
+    @JvmStatic @Include
+    var pauseWidgetOrder = ""
 
     @JvmStatic
     @Dropdown(
@@ -74,33 +78,22 @@ object PolyPlusPauseConfig : Config(
     )
     var replacePauseLanButton = true
 
-    @JvmStatic
-    @Switch(
-        title = "Recording widget",
-        description = "Shows recording controls.",
-        subcategory = "Widgets",
-    )
+    @JvmStatic @Include
     var pauseRecordingWidget = true
 
-    @JvmStatic
-    @Switch(
-        title = "Performance widget",
-        description = "Shows performance stats.",
-        subcategory = "Widgets",
-    )
+    @JvmStatic @Include
     var pausePerformanceWidget = true
 
-    @JvmStatic
-    @Switch(
-        title = "Scene check widget",
-        description = "Rates your spot as a lobby backdrop.",
-        subcategory = "Widgets",
-    )
+    @JvmStatic @Include
     var pauseSceneWidget = true
+
+    @JvmStatic @Include
+    var widgetsMigrated = false
 
     init {
         preload()
         migrateFromSplitConfigs()
+        migrateWidgets()
         hideIf("spotlightCameraPan") { pauseScreenStyle != PauseScreenStyle.STEP_BACK }
         hideIf("flatPausePlayerPreview") { pauseScreenStyle != PauseScreenStyle.STEP_BACK_FLAT }
         hideIf("vanillaPausePlayerPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
@@ -113,6 +106,13 @@ object PolyPlusPauseConfig : Config(
         loadPolyPlusOptions("${PolyPlusConstants.ID}.json", "pause screen", LOGGER, ::loadFrom)
         loadPolyPlusOptions("${PolyPlusConstants.ID}-mainmenu.json", "pause screen", LOGGER, ::loadFrom)
         migratedFromSplitConfigs = true
+        save()
+    }
+
+    private fun migrateWidgets() {
+        if (widgetsMigrated) return
+        pauseWidgets = WidgetMigration.pause(pauseWidgets, pauseWidgetPanels, pauseRecordingWidget, pausePerformanceWidget, pauseSceneWidget)
+        widgetsMigrated = true
         save()
     }
 }

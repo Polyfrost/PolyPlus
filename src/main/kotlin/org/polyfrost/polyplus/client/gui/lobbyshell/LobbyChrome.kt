@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -162,6 +161,9 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
+import org.polyfrost.polyplus.client.gui.widgets.WidgetColumn
+import org.polyfrost.polyplus.client.gui.widgets.WidgetScope
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSurface
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -306,18 +308,8 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     val stackChat by Motion.animateFloatAsState(if (home && social) 1f else 0f, spring())
     val barChatShown = !home && lobby.page != LobbyPage.Social && social
     val barChatWidth by Motion.animateDpAsState(if (barChatShown) LobbyLayout.ChatWidth else 0.dp, spring(visibilityThreshold = Dp.VisibilityThreshold))
-    val media = remember { LobbyMediaState() }
-    val track = if (home) rememberLobbyMedia() else null
-    val large = rememberLobbyMediaLarge()
-    if (home) {
-        media.card = track != null && large
-        media.tile = track != null && !large
-    }
-    if (track != null) media.track = track
-    val cardShown by Motion.animateFloatAsState(if (media.card) 1f else 0f, mediaSwapSpec())
-    val tileShown by Motion.animateFloatAsState(if (media.tile) 1f else 0f, mediaSwapSpec())
     var dockTiles by remember { mutableIntStateOf(0) }
-    var dockMedia by remember { mutableIntStateOf(0) }
+    var stackRest by remember { mutableIntStateOf(0) }
     BoxWithConstraints(
         Modifier
             .align(Alignment.BottomStart)
@@ -326,35 +318,39 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     ) {
         val density = LocalDensity.current
         val row = STACK_BAR_MIN + LobbyLayout.Gap + with(density) { dockTiles.toDp() }
-        val cardWidth = maxOf(LobbyMediaCardWidth, row).coerceAtMost(maxWidth)
-        val rowWidth = row + with(density) { dockMedia.toDp() } * tileShown
-        val stackWidth = maxOf(lerp(LobbyLayout.ChatWidth, cardWidth, cardShown), rowWidth).coerceAtMost(maxWidth)
+        val stackWidth = maxOf(LobbyLayout.ChatWidth, row).coerceAtMost(maxWidth)
+        val stackHeight = maxHeight
         Column {
             if (home) {
-                val shownTrack = media.track
-                if (cardShown > 0f && shownTrack != null) LobbyMediaCard(shownTrack, cardShown, LobbyLayout.Gap, Modifier.width(cardWidth))
-                if (LinkedModMenus.entries.isNotEmpty()) {
+                val widgetRoom = stackHeight - LobbyLayout.Top - LobbyLayout.Gap - STACK_ROW_GAP - with(density) { stackRest.toDp() }
+                val widgetScope = remember(lobby, screen, stackWidth) { LobbyWidgetScope(lobby, screen, stackWidth) }
+                if (widgetRoom > 0.dp) {
+                    WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP))
+                }
+            }
+            Column(Modifier.onSizeChanged { stackRest = it.height }) {
+                if (home && LinkedModMenus.entries.isNotEmpty()) {
                     LinkedModButton(Modifier.width(stackWidth))
-                    Spacer(Modifier.height(LobbyLayout.Gap))
+                    Spacer(Modifier.height(STACK_ROW_GAP))
                 }
-            }
-            if (stackChat > 0f) {
-                ChatDock(lobby, stackWidth * stackChat, stackWidth, fill = true)
-                Spacer(Modifier.height(LobbyLayout.Gap))
-            }
-            if (home) {
-                Row(Modifier.width(stackWidth), verticalAlignment = Alignment.Bottom) {
-                    key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f).onGloballyPositioned { barStart = it.positionInRoot().x }, fill = true) }
-                    Spacer(Modifier.width(LobbyLayout.Gap))
-                    LobbyDock(lobby, media.track, tileShown, { dockTiles = it }, { dockMedia = it })
+                if (stackChat > 0f) {
+                    ChatDock(lobby, stackWidth * stackChat, stackWidth, fill = true)
+                    Spacer(Modifier.height(STACK_ROW_GAP))
                 }
-            } else {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    if (barChatShown || barChatWidth > 0.dp) {
-                        ChatDock(lobby, barChatWidth, LobbyLayout.ChatWidth, fill = false)
-                        Spacer(Modifier.width(barChatWidth.coerceAtMost(LobbyLayout.Gap)))
+                if (home) {
+                    Row(Modifier.width(stackWidth), verticalAlignment = Alignment.Bottom) {
+                        key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f), fill = true) }
+                        Spacer(Modifier.width(LobbyLayout.Gap))
+                        LobbyDock(lobby) { dockTiles = it }
                     }
-                    key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false)) }
+                } else {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        if (barChatShown || barChatWidth > 0.dp) {
+                            ChatDock(lobby, barChatWidth, LobbyLayout.ChatWidth, fill = false)
+                            Spacer(Modifier.width(barChatWidth.coerceAtMost(LobbyLayout.Gap)))
+                        }
+                        key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f, fill = false)) }
+                    }
                 }
             }
         }
@@ -606,6 +602,7 @@ private const val MORE_MENU_WIDTH = 300
 private const val MIN_SHOWN_PLAYTIME = 60_000L
 private const val QUIT_ARM_MILLIS = 3_000L
 private val BAR_POPUP_GAP = 12.dp
+private val STACK_ROW_GAP = 8.dp
 private val MOD_LOGO_SIZE = 16.dp
 private val STACK_BAR_MIN = 220.dp
 
@@ -875,4 +872,17 @@ private fun SceneTag(label: LobbyScene.Label, modifier: Modifier) {
             label.invite?.let { SceneTagInvite(it) }
         }
     }
+}
+
+private class LobbyWidgetScope(private val lobby: LobbyShell, private val screen: Screen, override val width: Dp) : WidgetScope {
+    override val surface: WidgetSurface get() = WidgetSurface.LOBBY
+    override val reducedMotion: Boolean get() = Motion.reduced
+
+    override fun openScreen(factory: (Screen) -> Screen?) {
+        factory(screen)?.let(ClientPlatform::setScreen)
+    }
+
+    override fun closeHost() = Unit
+
+    override fun openCustomize() = lobby.openCustomize(CustomizePage.Widgets)
 }

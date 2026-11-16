@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.polyfrost.oneconfig.api.config.v1.Properties
 import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
@@ -45,11 +44,12 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.popupMaxHeight
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-import org.polyfrost.polyplus.api.pause.PauseWidget
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
+import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
+import org.polyfrost.polyplus.client.gui.widgets.WidgetListEditor
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSurface
 import java.util.function.Consumer
 import java.util.function.Predicate
-import java.util.function.Supplier
 
 private val PANEL_WIDTH = 290.dp
 private val PICKER_WIDTH = 170.dp
@@ -58,7 +58,6 @@ private val ROW_PADDING = 10.dp
 private val NESTED_INDENT = 14.dp
 private const val STYLE_OPTION = "pauseScreenStyle"
 private const val PREVIEW_OPTION = "flatPausePlayerPreview"
-private const val UNAVAILABLE = "Not available right now."
 //? if >= 26.3 {
 private val PANEL_EXCLUDED = setOf("replacePauseLanButton")
 //?} else {
@@ -94,9 +93,6 @@ private fun pauseOptionSections(): List<OptionSection> {
     return sections.map { (title, options) -> OptionSection(title, options) }
 }
 
-private fun switchOption(id: String, title: String, get: () -> Boolean, set: (Boolean) -> Unit): Property<Boolean> =
-    Properties.functional(Supplier(get), Consumer(set), id, title, null, Boolean::class.java)
-
 @Composable
 internal fun CustomizeButton(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
     IconButton(
@@ -127,16 +123,14 @@ internal fun PauseCustomizePanel(screen: OneClientPauseScreen, modifier: Modifie
         when {
             prop.getID() == STYLE_OPTION -> if (value is PauseScreenStyle) pickedStyle = value
             prop.getID() == PREVIEW_OPTION -> screen.playerPreview = value == true
-            PauseWidgetRegistry.builtInToggledBy(prop.getID()) != null -> PauseWidgetRegistry.invalidate()
             else -> menuChanges++
         }
     }
     LaunchedEffect(pickedStyle) { pickedStyle?.let(screen::restyle) }
     LaunchedEffect(menuChanges) { if (menuChanges > 0) screen.resyncMenu() }
     val chosen = pickedStyle ?: initialStyle
-    val widgetRevision = PauseWidgetRegistry.revision
-    val widgets = remember(widgetRevision) { PauseWidgetRegistry.view() }
-    val optional = widgets.added + widgets.addable
+    val widgetRevision = ShellWidgetRegistry.revision
+    val hasWidgets = remember(widgetRevision) { ShellWidgetRegistry.all(WidgetSurface.PAUSE).isNotEmpty() }
     val scroll = rememberScrollState()
     ScrollContainer(scroll, modifier.blockPointer().width(PANEL_WIDTH).heightIn(max = popupMaxHeight()).pauseGlass(16.dp), scrollbar = false) {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
@@ -157,9 +151,10 @@ internal fun PauseCustomizePanel(screen: OneClientPauseScreen, modifier: Modifie
                         )
                     }
                 }
-                if (section.options.any { PauseWidgetRegistry.builtInToggledBy(it.getID()) != null }) {
-                    optional.forEach { widget -> WidgetRows(screen, widget, widget in widgets.added) }
-                }
+            }
+            if (hasWidgets) {
+                SectionTitle("Widgets")
+                WidgetListEditor(WidgetSurface.PAUSE, Modifier.padding(end = ROW_PADDING))
             }
             TextButton(
                 text = "All settings",
@@ -238,13 +233,11 @@ private fun SectionTitle(title: String) {
 private fun ConfigOptionRow(prop: Property<*>) {
     val display = rememberDisplay(prop)
     if (display == Property.Display.HIDDEN) return
-    val widget = PauseWidgetRegistry.builtInToggledBy(prop.getID())
-    val ready = widget == null || runCatching { widget.isAvailable() }.getOrDefault(false)
     val description = prop.description?.toString()?.takeIf { it.isNotBlank() }
     OptionLine(
         prop,
         prop.getTitle()?.toString() ?: prop.getID(),
-        if (ready) description else UNAVAILABLE,
+        description,
         if (prop.getMetadata<Any>("dependencyNames") != null) NESTED_INDENT else 0.dp,
         display != Property.Display.DISABLED,
     )
@@ -313,23 +306,4 @@ private fun ChoicePicker(prop: Property<*>, title: String, choices: List<Choice>
         placeholder = value.value?.toString(),
         contentDescription = title,
     )
-}
-
-@Composable
-private fun WidgetRows(screen: OneClientPauseScreen, widget: PauseWidget, shown: Boolean) {
-    val added = remember(widget.id) {
-        switchOption(widget.id, widget.title, { PauseWidgetRegistry.isAdded(widget.id) }) {
-            if (it) PauseWidgetRegistry.add(widget.id) else PauseWidgetRegistry.remove(widget.id)
-        }
-    }
-    OptionLine(added, widget.title, null, 0.dp)
-    val panelCapable = runCatching { widget.supportsPanel }.getOrDefault(false)
-    if (shown && screen.stepBack && panelCapable) {
-        val panel = remember(widget.id) {
-            switchOption("${widget.id}.panel", "Show as panel", { PauseWidgetRegistry.isPanel(widget.id) }) {
-                PauseWidgetRegistry.setPanel(widget.id, it)
-            }
-        }
-        OptionLine(panel, "Show as panel", null, NESTED_INDENT)
-    }
 }

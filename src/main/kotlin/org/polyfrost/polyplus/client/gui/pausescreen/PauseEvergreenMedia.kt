@@ -4,6 +4,8 @@ import org.polyfrost.evergreenhud.client.utils.media.MediaCommand
 import org.polyfrost.evergreenhud.client.utils.media.MediaService
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.TickEvent
+import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
+import org.polyfrost.polyplus.client.gui.widgets.WidgetSurface
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 
 private const val WARM_CHECK_TICKS = 10
@@ -24,10 +26,11 @@ internal object PauseEvergreenMedia {
     }
 
     private fun wantsWarm(widgetId: String): Boolean = runCatching {
-        PausePlatform.player() != null &&
-            !LobbyScene.showing() &&
-            PauseWidgetRegistry.isAdded(widgetId) &&
-            supported()
+        supported() && when {
+            LobbyScene.showing() -> ShellWidgetRegistry.contains(WidgetSurface.LOBBY, widgetId)
+            PausePlatform.player() != null -> ShellWidgetRegistry.contains(WidgetSurface.PAUSE, widgetId)
+            else -> false
+        }
     }.getOrDefault(false)
 
     private fun setWarm(wanted: Boolean) {

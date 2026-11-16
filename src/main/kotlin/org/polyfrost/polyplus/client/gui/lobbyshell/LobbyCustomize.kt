@@ -47,6 +47,7 @@ internal enum class CustomizePage(val title: String) {
     Music("Music"),
     Capture("Capture"),
     Reveal("Opening animation"),
+    Widgets("Widgets"),
 }
 
 internal class CustomizeState {
@@ -117,6 +118,7 @@ internal fun CustomizePanel(lobby: LobbyShell) {
                 CustomizePage.Music -> MusicPage(lobby, state)
                 CustomizePage.Capture -> CapturePage(lobby, state)
                 CustomizePage.Reveal -> RevealPage(lobby, state)
+                CustomizePage.Widgets -> WidgetsPage(lobby, state)
             }
         }
     }
@@ -130,6 +132,9 @@ private fun HomePage(lobby: LobbyShell, state: CustomizeState) {
         AmbienceSection(state)
         TimeSection(state)
         if (PartyScene.isMember(party)) PartySection()
+        PanelSection(null) {
+            DrillRow("package-01", "Widgets", null, { state.open(CustomizePage.Widgets) })
+        }
     }
 }
 

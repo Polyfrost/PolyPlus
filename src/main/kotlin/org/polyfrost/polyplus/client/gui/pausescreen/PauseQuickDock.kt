@@ -12,6 +12,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,7 +67,7 @@ private const val HUD_GUI_PIXELS = 48
 private const val RISE_PIXELS = 24f
 private val DOCK_HEIGHT = 72.dp
 private val CARD_MARGIN = 20.dp
-private val CARD_WIDTH = 236.dp
+private val DOCK_RESERVE = 142.dp
 private val DOCK_ITEM_WIDTH = 64.dp
 private val DOCK_ITEM_HEIGHT = 56.dp
 private val CUSTOMIZE_DROP = 46.dp
@@ -150,7 +151,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             screen.capture.entry(PauseSlot.QUIT)?.let { DockItem(it.glyph, if (it.relabelled) it.label else if (PauseWorldAccess.singleplayer) "Quit" else "Leave", danger = true, enabled = it.enabled, onClick = it.press) }
         }
     }
-    ToolsCard(screen, reveal, rise)
+    ToolsCard(screen, narrow, reveal, rise)
     Box(
         Modifier
             .align(Alignment.TopStart)
@@ -172,19 +173,25 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
 }
 
 @Composable
-private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, reveal: Float, rise: Float) {
-    PauseWidgetCard(
-        screen,
-        Modifier
-            .align(Alignment.TopEnd)
-            .padding(top = CARD_MARGIN, end = CARD_MARGIN)
-            .graphicsLayer {
-                alpha = reveal
-                translationY = -rise * density
-            }
-            .blockPointer(),
-        CARD_WIDTH,
-    )
+private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, narrow: Boolean, reveal: Float, rise: Float) {
+    val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
+    val width = pauseWidgetWidth(narrow)
+    BoxWithConstraints(Modifier.matchParentSize()) {
+        val room = maxHeight - CARD_MARGIN - lift - DOCK_RESERVE
+        PauseWidgetColumn(
+            screen,
+            width,
+            room.coerceAtLeast(0.dp),
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = CARD_MARGIN, end = CARD_MARGIN)
+                .graphicsLayer {
+                    alpha = reveal
+                    translationY = -rise * density
+                }
+                .blockPointer(),
+        )
+    }
 }
 
 internal fun Modifier.blockPointer(): Modifier = pointerInput(Unit) {

@@ -8,13 +8,14 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.polyplus.PolyPlusConstants
-import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyMediaSize
+import org.polyfrost.polyplus.client.gui.widgets.WidgetMigration
 import org.polyfrost.polyplus.client.lobby.LobbyCaptureFrequency
 import org.polyfrost.polyplus.client.lobby.LobbyCaptureView
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyReveal
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.lobby.LobbyTime
+import org.polyfrost.polyplus.compat.SparkCompat
 import kotlin.math.roundToInt
 
 object PolyPlusLobbyConfig : Config(
@@ -101,20 +102,20 @@ object PolyPlusLobbyConfig : Config(
     )
     var quitClickTwice = false
 
-    @JvmStatic
-    @Switch(
-        title = "Media Widget",
-        description = "Show what's playing in the lobby dock.",
-    )
+    @JvmStatic @Include
     var lobbyMediaWidget = true
 
-    @JvmStatic
-    @Dropdown(
-        title = "Media Widget Size",
-        description = "Show what's playing as a small tile in the dock or a large card above it.",
-        options = ["Compact", "Large"],
-    )
+    @JvmStatic @Include
     var lobbyMediaWidgetSize: LobbyMediaSize = LobbyMediaSize.COMPACT
+
+    @JvmStatic @Include
+    var lobbyWidgets = ""
+
+    @JvmStatic @Include
+    var lobbyWidgetOrder = ""
+
+    @JvmStatic @Include
+    var widgetsMigrated = false
 
     @JvmStatic
     @Dropdown(
@@ -145,11 +146,11 @@ object PolyPlusLobbyConfig : Config(
     init {
         preload()
         migrateFromSplitConfigs()
+        migrateWidgets()
         LobbySceneStore.captureLimit = sceneCaptureLimit.roundToInt()
         addCallback("sceneCaptureLimit") { LobbySceneStore.captureLimit = sceneCaptureLimit.roundToInt() }
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
-        hideIf("lobbyMediaWidgetSize") { !lobbyMediaWidget }
         hideIf("quitClickTwice") { quitWithoutConfirmation }
         inheritMusicVolume()
     }
@@ -168,4 +169,18 @@ object PolyPlusLobbyConfig : Config(
         migratedFromSplitConfigs = true
         save()
     }
+
+    private fun migrateWidgets() {
+        if (widgetsMigrated) return
+        lobbyWidgets = WidgetMigration.lobby(lobbyWidgets, lobbyMediaWidget, SparkCompat.installed)
+        widgetsMigrated = true
+        save()
+    }
+}
+
+enum class LobbyMediaSize(private val label: String) {
+    COMPACT("Compact"),
+    LARGE("Large");
+
+    override fun toString(): String = label
 }

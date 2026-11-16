@@ -15,16 +15,19 @@ interface PauseWidget {
 
     fun isAvailable(): Boolean = true
 
+    @Deprecated("The pause menu no longer shows a widget bar. Implement Card instead.")
     @Composable
     fun Bar(context: PauseWidgetContext)
 
     @Composable
     fun Card(context: PauseWidgetContext) {
+        @Suppress("DEPRECATION")
         Bar(context)
     }
 
     val supportsPanel: Boolean get() = false
 
+    @Deprecated("Pause widgets now live in one column. Panel still renders as a large card there.")
     @Composable
     fun Panel(context: PauseWidgetContext) {
         Card(context)
