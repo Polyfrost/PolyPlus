@@ -21,6 +21,9 @@
         ],
         "debugify": [
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
+        ],
+        "mixinsquared": [
+            "org.polyfrost.polyplus.compat.RrlsMixinCanceller"
         ]
     },
     "languageAdapters": {
@@ -40,7 +43,6 @@
     },
     "breaks": {
         "auto-reauth": "*",
-        "rrls": "*",
         "wwaypoints": "<0.8.0"
     }
 }
