@@ -98,6 +98,8 @@ object StartupOverlay {
             cardGrow = 0f
             overlayDrawn = false
             active = true
+        } else if (active) {
+            overlayDrawn = false
         }
         return initial
     }
