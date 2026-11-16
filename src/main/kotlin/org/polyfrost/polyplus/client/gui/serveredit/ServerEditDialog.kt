@@ -71,6 +71,13 @@ import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.serverapi.ServerApiProtocol
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.polyplus.client.featured.ServerFolders
+import org.polyfrost.polyplus.client.gui.lobbyshell.FOLDER_ICON
+import org.polyfrost.polyplus.client.gui.lobbyshell.FOLDER_NAME_MAX
 
 private const val NAME_MAX_LENGTH = 32
 private const val ADDRESS_MAX_LENGTH = 128
@@ -93,6 +100,9 @@ private class ServerEditForm(server: ServerData?) {
     var finished = false
     val showCapture = server?.isLan != true && LobbySceneStore.captureEnabled
     var captureDraft by mutableStateOf<Boolean?>(null)
+    val showFolder = server?.isLan != true
+    var folder by mutableStateOf(server?.ip?.let(ServerFolders::folderOf).orEmpty())
+    val folderNames = ServerFolders.names()
 
     val addressValid: Boolean get() = ServerAddress.isValidAddress(address.text)
     val displayName: String get() = name.text.ifEmpty { I18n.get(DEFAULT_NAME_KEY) }
@@ -131,7 +141,7 @@ internal fun ServerEditDialog(
     val save: () -> Unit = save@{
         if (form.finished || form.confirmingDelete || !form.addressValid) return@save
         form.finished = true
-        ServerEditStore.save(server, serverIndex, form.displayName, form.address.text, form.packStatus)
+        ServerEditStore.save(server, serverIndex, form.displayName, form.address.text, form.packStatus, form.folder.takeIf { form.showFolder })
         if (form.showCapture) form.applyCapture()
         onDone()
     }
@@ -282,7 +292,37 @@ private fun ServerFields(form: ServerEditForm, nameFocus: FocusRequester) {
             leadingLabel = "Use",
         )
     }
+    if (form.showFolder) FolderField(form)
     if (form.showCapture) CaptureRow(form)
+}
+
+@Composable
+private fun FolderField(form: ServerEditForm) {
+    FormField("Folder", helper = "Leave empty to keep it out of folders.") {
+        TextField(
+            value = form.folder,
+            onValueChange = { form.folder = it },
+            modifier = Modifier.fillMaxWidth(),
+            size = ControlSize.Large,
+            placeholder = "No folder",
+            fontSize = 14.sp,
+            label = "Folder",
+            leadingIcon = FOLDER_ICON,
+            maxLength = FOLDER_NAME_MAX,
+            trailing = if (form.folderNames.isEmpty()) null else {
+                {
+                    AnchoredPopupButton(
+                        icon = "down",
+                        contentDescription = "Pick a folder",
+                        modifier = Modifier.focusProperties { canFocus = false },
+                        placement = Placement.BelowEnd,
+                    ) { close ->
+                        MenuList(form.folderNames.map { name -> MenuAction(name, { form.folder = name }, checked = name.equals(form.folder.trim(), ignoreCase = true)) }, close)
+                    }
+                }
+            },
+        )
+    }
 }
 
 @Composable

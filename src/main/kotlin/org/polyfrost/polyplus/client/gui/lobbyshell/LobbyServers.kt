@@ -26,8 +26,12 @@ import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.RecentServer
 import org.polyfrost.polyplus.client.featured.FeaturedServer
 import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.featured.ServerFolders
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
 import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseText
+//? if = 1.8.9
+/*import org.polyfrost.polyplus.client.lobby.LobbyI18n*/
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.WeakHashMap
 
@@ -42,7 +46,62 @@ internal class ServerEntry(
     val key: String get() = "$kind:${System.identityHashCode(data)}:${data.ip}"
 }
 
+internal sealed interface ServerSlot {
+    val key: String
+}
+
+internal class EntrySlot(val entry: ServerEntry, val nested: Boolean = false) : ServerSlot {
+    override val key: String get() = entry.key
+}
+
+internal class FolderSlot(val folder: String, val count: Int, val collapsed: Boolean, val order: List<String>) : ServerSlot {
+    override val key: String get() = "folder:$folder"
+}
+
+internal class SectionSlot(val label: String) : ServerSlot {
+    override val key: String get() = "section:$label"
+}
+
+internal class GroupSlot(val label: String, val count: Int) : ServerSlot {
+    override val key: String get() = "group:$label"
+}
+
+internal fun List<ServerSlot>.withGroupHeader(label: String): List<ServerSlot> =
+    listOf(GroupSlot(label, takeWhile { it is EntrySlot }.size)) + this
+
+internal class ServerLayout(val slots: List<ServerSlot>, val grouped: Boolean)
+
+internal sealed interface FolderPrompt
+
+internal class MoveFolderPrompt(val entry: ServerEntry) : FolderPrompt
+
+internal class RenameFolderPrompt(val folder: String) : FolderPrompt
+
+internal class DeleteFolderPrompt(val folder: String) : FolderPrompt
+
 internal val ServerData.shownName: String get() = PolyPlusRecentServers.listLabel(name, ip)
+
+internal class PlayerSample(val online: Int, val names: List<String>) {
+    val more: Int get() = (online - names.size).coerceAtLeast(0)
+}
+
+private const val AND_MORE_KEY = "multiplayer.status.and_more"
+
+internal fun playerSample(data: ServerData): PlayerSample? {
+    if (data.isLan || LobbyServers.failed(data)) return null
+    if (data.state() != ServerData.State.SUCCESSFUL && data.state() != ServerData.State.INCOMPATIBLE) return null
+    val online = data.players?.online() ?: return null
+    //? if > 1.8.9 {
+    val names = data.playerList.orEmpty()
+        .filterNot { (it.contents as? TranslatableContents)?.key == AND_MORE_KEY }
+        .map { PauseText.plain(it.string).trim() }
+        .filter { it.isNotEmpty() }
+    //?} else {
+    /*val lines = data.entry.onlinePlayers.orEmpty().split('\n').map { PauseText.plain(it).trim() }.filter { it.isNotEmpty() }
+    val names = if (lines.isNotEmpty() && lines.last() == PauseText.plain(LobbyI18n.get(AND_MORE_KEY, online - (lines.size - 1))).trim()) lines.dropLast(1) else lines
+    *///?}
+    return PlayerSample(online, names)
+}
 
 internal object ServerRevisions {
     private val states = WeakHashMap<ServerData, MutableIntState>()
@@ -87,6 +146,11 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         private set
     var pinned by mutableStateOf<List<ServerEntry>>(emptyList())
         private set
+    var pins by mutableStateOf<List<RecentServer>>(emptyList())
+        private set
+    var folderRevision by mutableIntStateOf(ServerFolders.revision())
+        private set
+    var folderPrompt by mutableStateOf<FolderPrompt?>(null)
 
     val serverList: ServerList get() = list
 
@@ -127,6 +191,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         }
         pinger.tick()
         if (FeaturedServers.revision() != featuredRevision) rebuildFeatured()
+        syncFolders()
         if (watching.isNotEmpty()) {
             watching.toList().forEach(::checkChanged)
             watching.removeAll { it.state() != ServerData.State.PINGING }
@@ -154,7 +219,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
             ServerEntry(list.get(it), ServerKind.SAVED, savedIndex = it)
         }
         recent = PolyPlusRecentServers.recent().map(::entryFor)
-        pinned = PolyPlusRecentServers.pinned().map(::entryFor)
+        syncPins()
         hero = recent.firstOrNull() ?: saved.firstOrNull()
         rebuildFeatured()
         revision++
@@ -191,6 +256,99 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         persistAndRebuild()
     }
 
+    fun moveInFolder(entry: ServerEntry, direction: Int) {
+        val siblings = folderSiblings(entry)
+        val target = siblings.getOrNull(siblings.indexOfFirst { it.data === entry.data } + direction) ?: return
+        if (entry.savedIndex < 0 || target.savedIndex < 0) return
+        list.swap(entry.savedIndex, target.savedIndex)
+        persistAndRebuild()
+    }
+
+    fun drop(entry: ServerEntry, folder: String?, after: ServerEntry?, before: ServerEntry?, toEnd: Boolean) {
+        if (ServerFolders.folderOf(entry.data.ip) != folder) ServerFolders.setFolder(entry.data.ip, folder.orEmpty())
+        val anchor = if (toEnd) {
+            saved.lastOrNull { it.data !== entry.data && ServerFolders.folderOf(it.data.ip) == ServerFolders.folderOf(entry.data.ip) }
+        } else {
+            after ?: before
+        }
+        val from = savedIndexOf(entry.data)
+        val at = anchor?.let { savedIndexOf(it.data) } ?: -1
+        if (from >= 0 && at >= 0) {
+            val to = if (toEnd || after != null) (if (from < at) at else at + 1) else (if (from < at) at - 1 else at)
+            if (to != from) moveTo(entry, to)
+        }
+        syncFolders()
+    }
+
+    private fun savedIndexOf(data: ServerData): Int = (0 until list.size()).firstOrNull { list.get(it) === data } ?: -1
+
+    fun folderSiblings(entry: ServerEntry): List<ServerEntry> {
+        val folder = ServerFolders.folderOf(entry.data.ip)
+        return saved.filter { ServerFolders.folderOf(it.data.ip) == folder }
+    }
+
+    fun layout(entries: List<ServerEntry>): ServerLayout {
+        val savedEntries = entries.filter { it.kind == ServerKind.SAVED }
+        val groups = ServerFolders.layout(savedEntries, { it.data.ip }, { it.data.shownName })
+        val sorted = ServerFolders.sort() != ServerFolders.Sort.CUSTOM
+        if (groups.none { it.folder != null }) {
+            if (!sorted) return ServerLayout(entries.map(::EntrySlot), false)
+            val ordered = groups.firstOrNull()?.items.orEmpty()
+            return ServerLayout((entries.filter { it.kind == ServerKind.FEATURED } + ordered + entries.filter { it.kind != ServerKind.FEATURED && it.kind != ServerKind.SAVED }).map(::EntrySlot), true)
+        }
+        val order = groups.mapNotNull { it.folder }
+        val slots = ArrayList<ServerSlot>()
+        entries.filter { it.kind == ServerKind.FEATURED }.mapTo(slots, ::EntrySlot)
+        groups.firstOrNull { it.folder == null }?.items?.mapTo(slots, ::EntrySlot)
+        val rest = entries.filter { it.kind != ServerKind.FEATURED && it.kind != ServerKind.SAVED }
+        for (group in groups) {
+            val folder = group.folder ?: continue
+            val collapsed = ServerFolders.isCollapsed(folder)
+            slots += FolderSlot(folder, group.items.size, collapsed, order)
+            if (!collapsed) group.items.mapTo(slots) { EntrySlot(it, nested = true) }
+        }
+        if (rest.isNotEmpty()) {
+            slots += SectionSlot(MORE_SERVERS)
+            rest.mapTo(slots, ::EntrySlot)
+        }
+        return ServerLayout(slots, true)
+    }
+
+    fun setFolder(entry: ServerEntry, folder: String) {
+        ServerFolders.setFolder(entry.data.ip, folder)
+        syncFolders()
+    }
+
+    fun toggleFolder(folder: String) {
+        ServerFolders.toggle(folder)
+        syncFolders()
+    }
+
+    fun renameFolder(folder: String, to: String) {
+        ServerFolders.renameFolder(folder, to)
+        syncFolders()
+    }
+
+    fun deleteFolder(folder: String) {
+        ServerFolders.deleteFolder(folder)
+        syncFolders()
+    }
+
+    fun moveFolder(folder: String, by: Int, order: List<String>) {
+        ServerFolders.moveFolder(folder, by, order)
+        syncFolders()
+    }
+
+    fun setSort(sort: ServerFolders.Sort) {
+        ServerFolders.setSort(sort)
+        syncFolders()
+    }
+
+    fun syncFolders() {
+        val current = ServerFolders.revision()
+        if (current != folderRevision) folderRevision = current
+    }
+
     fun saveUnsaved(entry: ServerEntry) {
         if (list.unhide(entry.data.ip) == null) list.add(entry.data, false)
         persistAndRebuild()
@@ -198,11 +356,26 @@ internal class LobbyServers(private val minecraft: Minecraft) {
 
     fun isPinned(data: ServerData): Boolean = pinned.any { it.data.ip.equals(data.ip, ignoreCase = true) }
 
-    fun canPin(): Boolean = pinned.size < PolyPlusRecentServers.PINNED_MAX
+    fun canPin(): Boolean = pins.size < PolyPlusRecentServers.PINNED_MAX
 
     fun setPinned(data: ServerData, pin: Boolean) {
         PolyPlusRecentServers.setPinned(data.name, data.ip, pin)
-        pinned = PolyPlusRecentServers.pinned().map(::entryFor)
+        syncPins()
+    }
+
+    fun movePinned(from: Int, to: Int) {
+        PolyPlusRecentServers.movePinned(from, to)
+        syncPins()
+    }
+
+    fun setPinnedOrder(ips: List<String>) {
+        PolyPlusRecentServers.setPinnedOrder(ips)
+        syncPins()
+    }
+
+    private fun syncPins() {
+        pins = PolyPlusRecentServers.pinned()
+        pinned = pins.filterNot { it.isRealm }.map(::entryFor)
     }
 
     fun quickRows(pinned: ServerData?): List<ServerEntry> {
@@ -269,6 +442,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
 
     companion object {
         const val QUICK_ROWS = 3
+        private const val MORE_SERVERS = "More servers"
         private val PING_DISPATCHER = Dispatchers.IO.limitedParallelism(5)
         private val SAVED_INDICES = WeakHashMap<ServerData, Int>()
 

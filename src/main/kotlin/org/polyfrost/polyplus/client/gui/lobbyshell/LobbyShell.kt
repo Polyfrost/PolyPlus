@@ -28,6 +28,8 @@ import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.gui.AccountActions
+import org.polyfrost.polyplus.client.featured.ServerFolders
+import org.polyfrost.polyplus.client.featured.normalizeServerAddress
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
@@ -411,6 +413,9 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         servers.serverList.remove(entry.data)
         servers.serverList.save()
         PolyPlusRecentServers.setPinned(entry.data.name, entry.data.ip, false)
+        if (servers.saved.none { it.data !== entry.data && normalizeServerAddress(it.data.ip) == normalizeServerAddress(entry.data.ip) }) {
+            ServerFolders.forget(entry.data.ip)
+        }
         selectedServer = null
         deleting = null
         servers.rebuild()

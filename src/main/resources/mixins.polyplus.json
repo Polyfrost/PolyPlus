@@ -50,6 +50,7 @@
     //? if >= 1.21.11
     "client.MixinGuiMessage",
     "client.MixinIntegratedServer",
+    "client.MixinManageServerScreen",
     //? if = 1.8.9
     //"client.MixinIntegratedServerStop",
     "client.MixinMinecraft",

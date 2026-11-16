@@ -4,10 +4,18 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.ServerList
 import org.polyfrost.polyplus.client.featured.FeaturedServers
+import org.polyfrost.polyplus.client.featured.ServerFolders
+import org.polyfrost.polyplus.client.featured.normalizeServerAddress
 
 internal object ServerEditStore {
-    fun save(server: ServerData?, index: Int, name: String, address: String, packStatus: ServerData.ServerPackStatus) {
+    fun save(server: ServerData?, index: Int, name: String, address: String, packStatus: ServerData.ServerPackStatus, folder: String? = null) {
+        val previous = server?.ip
         if (server == null) add(name, address, packStatus) else update(server, index, name, address, packStatus)
+        if (folder == null) return
+        if (previous != null && normalizeServerAddress(previous) != normalizeServerAddress(address) && !loadList().has(previous)) {
+            ServerFolders.forget(previous)
+        }
+        ServerFolders.setFolder(address, folder)
     }
 
     fun delete(server: ServerData, index: Int) {
@@ -15,6 +23,12 @@ internal object ServerEditStore {
         val list = loadList()
         list.find(server, index)?.let(list::remove)
         list.save()
+        if (!list.has(server.ip)) ServerFolders.forget(server.ip)
+    }
+
+    private fun ServerList.has(address: String): Boolean {
+        val key = normalizeServerAddress(address)
+        return (0 until size()).any { normalizeServerAddress(get(it).ip) == key }
     }
 
     private fun add(name: String, address: String, packStatus: ServerData.ServerPackStatus) {

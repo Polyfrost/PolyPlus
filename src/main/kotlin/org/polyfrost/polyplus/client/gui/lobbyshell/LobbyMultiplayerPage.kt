@@ -75,6 +75,14 @@ import org.polyfrost.oneconfig.api.ui.v1.components.reorderableItem
 import org.polyfrost.oneconfig.api.ui.v1.theme.legibleOn
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuHeading
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuRadioGroup
+import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import androidx.compose.ui.focus.focusProperties
+import org.polyfrost.polyplus.client.featured.ServerFolders
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogButtons
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogTitle
@@ -151,7 +159,91 @@ internal fun BoxScope.MultiplayerPage(lobby: LobbyShell) {
     lobby.deleting?.let { entry ->
         DeleteServerDialog(entry, onConfirm = { lobby.forget(entry) }, onDismiss = { lobby.deleting = null })
     }
+    FolderPromptDialog(lobby.servers)
 }
+
+@Composable
+private fun FolderPromptDialog(servers: LobbyServers) {
+    val close = { servers.folderPrompt = null }
+    when (val prompt = servers.folderPrompt) {
+        is MoveFolderPrompt -> FolderNameDialog(
+            title = "Move to folder",
+            initial = ServerFolders.folderOf(prompt.entry.data.ip).orEmpty(),
+            confirmLabel = "Move",
+            onDismiss = close,
+            suggestions = ServerFolders.names(),
+        ) { servers.setFolder(prompt.entry, it) }
+        is RenameFolderPrompt -> FolderNameDialog("Rename folder", prompt.folder, "Rename", close) { servers.renameFolder(prompt.folder, it) }
+        is DeleteFolderPrompt -> ConfirmDialog(
+            title = "Delete ${prompt.folder}?",
+            text = "The servers in it stay in your list.",
+            confirmLabel = "Delete folder",
+            dismissLabel = "Cancel",
+            icon = LobbyIcons.TRASH,
+            danger = true,
+            confirmEnabled = true,
+            onConfirm = {
+                servers.deleteFolder(prompt.folder)
+                close()
+            },
+            onDismiss = close,
+        )
+        null -> Unit
+    }
+}
+
+@Composable
+private fun FolderNameDialog(
+    title: String,
+    initial: String,
+    confirmLabel: String,
+    onDismiss: () -> Unit,
+    suggestions: List<String> = emptyList(),
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(initial) }
+    val focus = remember { FocusRequester() }
+    fun confirm() {
+        if (name.isBlank()) return
+        onConfirm(name.trim())
+        onDismiss()
+    }
+    ModalDialog(onDismiss = onDismiss, width = 400.dp, dismissOnScrim = true) {
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        DialogTitle(title)
+        TextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = "Folder name",
+            leadingIcon = FOLDER_ICON,
+            maxLength = FOLDER_NAME_MAX,
+            size = ControlSize.Large,
+            fontSize = 14.sp,
+            focusRequester = focus,
+            onSubmit = ::confirm,
+            trailing = if (suggestions.isEmpty()) null else {
+                {
+                    AnchoredPopupButton(
+                        icon = "down",
+                        contentDescription = "Pick a folder",
+                        modifier = Modifier.focusProperties { canFocus = false },
+                        placement = Placement.BelowEnd,
+                    ) { closeMenu ->
+                        MenuList(suggestions.map { folder -> MenuAction(folder, { name = folder }, checked = folder.equals(name.trim(), ignoreCase = true)) }, closeMenu)
+                    }
+                }
+            },
+        )
+        DialogButtons {
+            TextButton(text = "Cancel", onClick = onDismiss, size = ControlSize.Large)
+            TextButton(text = confirmLabel, onClick = ::confirm, size = ControlSize.Large, style = ControlStyle.Primary, enabled = name.isNotBlank())
+        }
+    }
+}
+
+internal const val FOLDER_ICON = "folder"
+internal const val FOLDER_NAME_MAX = 32
 
 @Composable
 private fun rememberOnlineFriends(availability: SocialAvailability): List<OnlineFriend> {
@@ -237,6 +329,11 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
     }
     val shown = base.filter { query.isBlank() || it.data.shownName.contains(query.trim(), true) || (!hideAddress && it.data.ip.contains(query.trim(), true)) }
     val canReorder = filter == ServerFilter.All && query.isBlank()
+    @Suppress("UNUSED_EXPRESSION") servers.folderRevision
+    val layout = if (canReorder) servers.layout(shown) else null
+    val needle = query.trim()
+    val sectioned = realmsShown || layout?.slots?.any { it is FolderSlot } == true
+    val slots = layout?.slots?.let { if (sectioned) it.withGroupHeader(SERVERS_GROUP) else it }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(PageGrid.Gap)) {
         PageHeader(
             "Servers",
@@ -247,6 +344,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             filters = { UnderlineTabs(ServerFilter.entries.map { TabItem(it, it.label) }, filter) { filter = it } },
         ) {
             TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, size = ControlSize.Large, style = ControlStyle.Primary)
+            if (filter == ServerFilter.All) SortMenu(servers)
             ServersMenu(lobby, listView, onDirect, remember(lobby) { lobby.serverListModButtons() }) {
                 listView = it
                 PolyPlusLobbyConfig.serverListView = it
@@ -262,13 +360,50 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
                     TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, size = ControlSize.Large, style = ControlStyle.Primary)
                 }
             }
-        } else if (listView) {
-            ServerList(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
+        } else if (slots != null && ServerFolders.sort() == ServerFolders.Sort.CUSTOM) {
+            DraggableServerSlots(
+                servers,
+                slots,
+                grid = !listView,
+                minCell = SERVER_CARD_MIN_WIDTH,
+                gap = if (listView) SERVER_ROW_GAP else PageGrid.Gap,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            ) { slot, placed, handle ->
+                if (listView) ServerRow(lobby, slot.entry, canReorder, onDelete, placed, handle)
+                else ServerCard(lobby, slot.entry, canReorder, onDelete, placed, handle)
+            }
+        } else if (layout != null && slots != null && (layout.grouped || sectioned)) {
+            if (listView) GroupedServerList(lobby, slots, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
+            else GroupedServerGrid(lobby, slots, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
         } else {
-            ServerGrid(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
+            if (listView) ServerList(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
+            else ServerGrid(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
         }
     }
 }
+
+@Composable
+private fun SortMenu(servers: LobbyServers) {
+    @Suppress("UNUSED_EXPRESSION") servers.folderRevision
+    val sort = ServerFolders.sort()
+    NavPopupButton(LobbyIcons.FILTER, "Sort: ${sortLabel(sort)}", gap = MENU_GAP) { close ->
+        LobbyUserTheme {
+            val entries = listOf(
+                MenuHeading("Sort saved servers"),
+                MenuRadioGroup(ServerFolders.Sort.entries, sort, ::sortLabel, servers::setSort),
+            )
+            MenuList(entries, close, Modifier.width(SORT_MENU_WIDTH.dp), MenuItemSize.Regular)
+        }
+    }
+}
+
+private fun sortLabel(sort: ServerFolders.Sort): String = when (sort) {
+    ServerFolders.Sort.CUSTOM -> "Custom"
+    ServerFolders.Sort.A_Z -> "A–Z"
+    ServerFolders.Sort.Z_A -> "Z–A"
+}
+
+private const val SORT_MENU_WIDTH = 220
 
 @Composable
 private fun ServersMenu(lobby: LobbyShell, listView: Boolean, onDirect: () -> Unit, modButtons: List<ServerListModButton>, onLayout: (Boolean) -> Unit) {
@@ -317,6 +452,30 @@ private fun ServerGrid(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: 
 }
 
 @Composable
+private fun GroupedServerGrid(lobby: LobbyShell, slots: List<ServerSlot>, canMove: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
+    val gridState = rememberLazyGridState()
+    ScrollContainer(gridState, modifier, scrollbar = false) {
+        LazyVerticalGrid(
+            GridCells.Adaptive(SERVER_CARD_MIN_WIDTH),
+            Modifier.fillMaxSize(),
+            gridState,
+            horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+            verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
+        ) {
+            itemsIndexed(slots, key = { _, slot -> slot.key }, span = { _, slot -> if (slot is EntrySlot) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { index, slot ->
+                val placed = Modifier.animateItem(placementSpec = Motion.itemPlacementSpec()).groupGap(slot, index)
+                when (slot) {
+                    is EntrySlot -> ServerCard(lobby, slot.entry, canMove, onDelete, placed)
+                    is FolderSlot -> FolderHeader(lobby.servers, slot, placed)
+                    is SectionSlot -> SectionLabel(slot.label, placed)
+                    is GroupSlot -> GroupHeader(slot, placed)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun ServerBanner(data: ServerData, revision: Int, height: Dp) {
     @Suppress("UNUSED_EXPRESSION") revision
     ServerRevisions.of(data)
@@ -338,7 +497,7 @@ internal fun ServerIcon(data: ServerData, revision: Int, size: Dp) {
 }
 
 @Composable
-private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {
+private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier, drag: Modifier = Modifier) {
     val servers = lobby.servers
     val data = entry.data
     val revision = servers.revision
@@ -349,9 +508,10 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
     Box(
         modifier
             .cardFrame(selected, hover.hovered)
-            .contextMenu { serverMenuItems(lobby, entry, canReorder, onDelete = onDelete) }
+            .contextMenu { serverMenuItems(lobby, entry, canReorder, onDelete = onDelete, folders = true) }
             .hoverable(hover.interactionSource)
-            .oneConfigClickable(data.shownName, onClick, selected = selected.takeIf { it }, shape = OneConfigTheme.shape(16.dp)),
+            .oneConfigClickable(data.shownName, onClick, selected = selected.takeIf { it }, shape = OneConfigTheme.shape(16.dp))
+            .then(drag),
     ) {
         Row(
             Modifier.fillMaxWidth().serverWash(data, SERVER_CARD_WASH).padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
@@ -366,13 +526,24 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
 }
 
 private val SERVER_CARD_MIN_WIDTH = 320.dp
+private val SERVER_ROW_GAP = 6.dp
 private val SERVER_CARD_ICON = 56.dp
 private const val SERVER_CARD_WASH = 0.35f
 
 internal class ServerAction(val item: MenuAction, val rotation: Float? = null)
 
-internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: ((ServerEntry) -> Unit)?, vertical: Boolean = false): List<ServerAction> {
+internal fun serverActions(
+    lobby: LobbyShell,
+    entry: ServerEntry,
+    canReorder: Boolean,
+    onDelete: ((ServerEntry) -> Unit)?,
+    vertical: Boolean = false,
+    folders: Boolean = false,
+): List<ServerAction> {
     val servers = lobby.servers
+    val canMove = canReorder && entry.kind == ServerKind.SAVED && ServerFolders.sort() == ServerFolders.Sort.CUSTOM
+    val siblings = if (canMove) servers.folderSiblings(entry) else emptyList()
+    val position = siblings.indexOfFirst { it.data === entry.data }
     val save = ServerAction(MenuAction("Save to list", { servers.saveUnsaved(entry) }, icon = LobbyIcons.PLUS))
     val pinned = servers.isPinned(entry.data)
     val pin = ServerAction(
@@ -385,9 +556,11 @@ internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Bo
     )
     return when (entry.kind) {
         ServerKind.SAVED -> listOfNotNull(
-            ServerAction(MenuAction(if (vertical) "Move up" else "Move left", { servers.move(entry, -1) }, enabled = entry.savedIndex > 0), if (vertical) 0f else -90f).takeIf { canReorder },
-            ServerAction(MenuAction(if (vertical) "Move down" else "Move right", { servers.move(entry, 1) }, enabled = entry.savedIndex < servers.saved.lastIndex), if (vertical) 180f else 90f).takeIf { canReorder },
+            ServerAction(MenuAction(if (vertical) "Move up" else "Move left", { servers.moveInFolder(entry, -1) }, enabled = position > 0), if (vertical) 0f else -90f).takeIf { canMove },
+            ServerAction(MenuAction(if (vertical) "Move down" else "Move right", { servers.moveInFolder(entry, 1) }, enabled = position in 0 until siblings.lastIndex), if (vertical) 180f else 90f).takeIf { canMove },
             pin,
+            ServerAction(MenuAction("Move to folder…", { servers.folderPrompt = MoveFolderPrompt(entry) }, icon = FOLDER_ICON)).takeIf { folders },
+            ServerAction(MenuAction("Remove from folder", { servers.setFolder(entry, "") }, icon = LobbyIcons.CLOSE)).takeIf { folders && ServerFolders.folderOf(entry.data.ip) != null },
             ServerAction(MenuAction("Edit", { lobby.editServer(entry) }, icon = SOCIAL_ASSETS + "edit-02.svg")),
             onDelete?.let { delete -> ServerAction(MenuAction("Delete", { delete(entry) }, icon = LobbyIcons.TRASH, danger = true, dangerColor = KitDangerColor)) },
         )
@@ -400,15 +573,27 @@ internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Bo
     }
 }
 
+internal fun folderMenuItems(servers: LobbyServers, slot: FolderSlot): List<MenuAction> {
+    val custom = ServerFolders.sort() == ServerFolders.Sort.CUSTOM
+    val index = slot.order.indexOf(slot.folder)
+    return listOfNotNull(
+        MenuAction("Move up", { servers.moveFolder(slot.folder, -1, slot.order) }, enabled = index > 0).takeIf { custom },
+        MenuAction("Move down", { servers.moveFolder(slot.folder, 1, slot.order) }, enabled = index in 0 until slot.order.lastIndex).takeIf { custom },
+        MenuAction("Rename", { servers.folderPrompt = RenameFolderPrompt(slot.folder) }, icon = SOCIAL_ASSETS + "edit-02.svg"),
+        MenuAction("Delete folder", { servers.folderPrompt = DeleteFolderPrompt(slot.folder) }, icon = LobbyIcons.TRASH, danger = true, dangerColor = KitDangerColor),
+    )
+}
+
 internal fun serverMenuItems(
     lobby: LobbyShell,
     entry: ServerEntry,
     canReorder: Boolean = false,
     vertical: Boolean = false,
     onDelete: ((ServerEntry) -> Unit)? = null,
+    folders: Boolean = false,
 ): List<MenuAction> =
     listOf(MenuAction("Join", { lobby.join(entry.data) }, icon = SOCIAL_ASSETS + "log-in-04.svg")) +
-        serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
+        serverActions(lobby, entry, canReorder, onDelete, vertical, folders).map { it.item }
 
 @Composable
 private fun ServerText(entry: ServerEntry, revision: Int, pinned: Boolean) {
@@ -422,7 +607,9 @@ private fun ServerText(entry: ServerEntry, revision: Int, pinned: Boolean) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (data.state() == ServerData.State.INCOMPATIBLE) DangerTag("Incompatible".uppercase())
-            Text(serverMeta(data), color = if (LobbyServers.failed(data)) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            PlayerSampleTooltip(data, Modifier.weight(1f, fill = false)) {
+                Text(serverMeta(data), color = if (LobbyServers.failed(data)) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            }
         }
         MotdText(entry, revision, reserve = true)
     }

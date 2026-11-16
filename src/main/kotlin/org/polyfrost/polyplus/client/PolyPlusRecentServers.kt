@@ -6,10 +6,20 @@ import java.io.File
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RecentServer(val name: String, val ip: String, val lastPlayed: Long = 0L)
+data class RecentServer(
+    val name: String,
+    val ip: String,
+    val lastPlayed: Long = 0L,
+    val kind: String = PolyPlusRecentServers.KIND_SERVER,
+    val realm: Long = 0L,
+) {
+    val isRealm: Boolean get() = kind == PolyPlusRecentServers.KIND_REALM
+}
 
 object PolyPlusRecentServers {
     private const val RECORDED_MAX = 32
+    const val KIND_SERVER = "server"
+    const val KIND_REALM = "realm"
 
     @Serializable
     private data class State(val recents: List<RecentServer> = emptyList(), val pinned: List<RecentServer> = emptyList())
@@ -96,6 +106,25 @@ object PolyPlusRecentServers {
         } else if (!pins.removeAll { it.ip.equals(address, ignoreCase = true) }) {
             return
         }
+        persist()
+    }
+
+    @Synchronized
+    fun movePinned(from: Int, to: Int) {
+        ensureLoaded()
+        if (from == to || from !in pins.indices || to !in pins.indices) return
+        pins.add(to, pins.removeAt(from))
+        persist()
+    }
+
+    @Synchronized
+    fun setPinnedOrder(ips: List<String>) {
+        ensureLoaded()
+        val keys = ips.map { it.trim().lowercase() }
+        val ordered = pins.sortedBy { pin -> keys.indexOf(pin.ip.trim().lowercase()).let { if (it < 0) Int.MAX_VALUE else it } }
+        if (ordered == pins) return
+        pins.clear()
+        pins.addAll(ordered)
         persist()
     }
 

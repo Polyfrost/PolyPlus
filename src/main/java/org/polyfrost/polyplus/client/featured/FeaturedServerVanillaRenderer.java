@@ -41,6 +41,10 @@ public final class FeaturedServerVanillaRenderer {
         0b1100011,
     };
     private static final int GLYPH_CAP_HEIGHT = 7;
+    private static final int FOLDER_ARROW_WIDTH = 12;
+    private static final int LABEL_COLOR = 0xFFAAAAAA;
+    private static final int ARROW_HOVER_COLOR = 0xFFFFFFFF;
+    private static final int ARROW_DISABLED_COLOR = 0xFF555555;
 
     private FeaturedServerVanillaRenderer() {
     }
@@ -55,11 +59,13 @@ public final class FeaturedServerVanillaRenderer {
         int x,
         int y,
         int width,
-        int height
+        int height,
+        int mouseX,
+        int mouseY
     ) {
         row.bounds(x, y, width, height);
         if (row.header()) {
-            var label = Component.translatable("polyplus.featured.sponsored");
+            var label = headerLabel(row);
             var font = Minecraft.getInstance().font;
             int labelWidth = font.width(label);
             int labelX = x + (width - labelWidth) / 2;
@@ -73,21 +79,55 @@ public final class FeaturedServerVanillaRenderer {
                 lineY + 1,
                 lineColor
             );
+            boolean arrows = folderArrows(row)
+                && mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+            int lineEnd = x + width - SECTION_INSET - (arrows ? 2 * FOLDER_ARROW_WIDTH + SECTION_LABEL_GAP : 0);
             graphics.fill(
-                Math.min(x + width - SECTION_INSET, labelX + labelWidth + SECTION_LABEL_GAP),
+                Math.min(lineEnd, labelX + labelWidth + SECTION_LABEL_GAP),
                 lineY,
-                x + width - SECTION_INSET,
+                lineEnd,
                 lineY + 1,
                 lineColor
             );
+            if (arrows) {
+                var shown = FeaturedServerRowRegistry.folders(row.list());
+                int index = shown.indexOf(row.folder());
+                int arrowX = x + width - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+                int hit = folderArrowHit(row, mouseX);
+                int upColor = index <= 0 ? ARROW_DISABLED_COLOR : hit < 0 ? ARROW_HOVER_COLOR : LABEL_COLOR;
+                int downColor = index < 0 || index >= shown.size() - 1 ? ARROW_DISABLED_COLOR : hit > 0 ? ARROW_HOVER_COLOR : LABEL_COLOR;
+                //? if >= 26.1 {
+                graphics.text(font, "\u25B2", arrowX + 2, labelY, upColor);
+                graphics.text(font, "\u25BC", arrowX + FOLDER_ARROW_WIDTH + 2, labelY, downColor);
+                //?} else {
+                /*graphics.drawString(font, "\u25B2", arrowX + 2, labelY, upColor);
+                graphics.drawString(font, "\u25BC", arrowX + FOLDER_ARROW_WIDTH + 2, labelY, downColor);
+                *///?}
+            }
             //? if >= 26.1 {
-            graphics.text(font, label, labelX, labelY, 0xFFAAAAAA);
+            graphics.text(font, label, labelX, labelY, LABEL_COLOR);
             //?} else {
-            /*graphics.drawString(font, label, labelX, labelY, 0xFFAAAAAA);
+            /*graphics.drawString(font, label, labelX, labelY, LABEL_COLOR);
             *///?}
             return;
         }
         drawOutline(graphics, row.server().getOutlineStyle(), x, y, width, height);
+    }
+
+    public static Component headerLabel(FeaturedServerRowRegistry.Row row) {
+        if (row.folder() == null) return Component.translatable("polyplus.featured.sponsored");
+        return Component.literal((ServerFolders.isCollapsed(row.folder()) ? "\u25B6 " : "\u25BC ") + row.folder());
+    }
+
+    private static boolean folderArrows(FeaturedServerRowRegistry.Row row) {
+        return row.folder() != null && ServerFolders.sort() == ServerFolders.Sort.CUSTOM;
+    }
+
+    public static int folderArrowHit(FeaturedServerRowRegistry.Row row, double mouseX) {
+        if (!folderArrows(row)) return 0;
+        int arrowX = row.x() + row.width() - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+        if (mouseX < arrowX || mouseX >= arrowX + 2 * FOLDER_ARROW_WIDTH) return 0;
+        return mouseX < arrowX + FOLDER_ARROW_WIDTH ? -1 : 1;
     }
 
     public static void after(
@@ -274,8 +314,77 @@ public final class FeaturedServerVanillaRenderer {
         0b1100011,
     };
     private static final int GLYPH_CAP_HEIGHT = 7;
+    private static final int FOLDER_ARROW_WIDTH = 12;
+    private static final int TRIANGLE_SIZE = 7;
+    private static final int TRIANGLE_GAP = 4;
+    private static final int LABEL_COLOR = 0xFFAAAAAA;
+    private static final int LINE_COLOR = 0xFF666666;
+    private static final int ARROW_HOVER_COLOR = 0xFFFFFFFF;
+    private static final int ARROW_DISABLED_COLOR = 0xFF555555;
 
     private FeaturedServerVanillaRenderer() {
+    }
+
+    public static void folderHeader(
+        FeaturedServerRowRegistry.FolderHeader header,
+        int x, int y, int width, int height, int mouseX, boolean hovered
+    ) {
+        var font = Minecraft.getInstance().textRenderer;
+        String label = header.folder();
+        int labelWidth = font.getWidth(label);
+        int contentWidth = TRIANGLE_SIZE + TRIANGLE_GAP + labelWidth;
+        int contentX = x + (width - contentWidth) / 2;
+        int labelY = y + (height - font.fontHeight) / 2;
+        int lineY = labelY + (font.fontHeight - 1) / 2;
+        GuiElement.fill(x + SECTION_INSET, lineY, Math.max(x + SECTION_INSET, contentX - SECTION_LABEL_GAP), lineY + 1, LINE_COLOR);
+        boolean arrows = hovered && folderArrows();
+        int lineEnd = x + width - SECTION_INSET - (arrows ? 2 * FOLDER_ARROW_WIDTH + SECTION_LABEL_GAP : 0);
+        GuiElement.fill(Math.min(lineEnd, contentX + contentWidth + SECTION_LABEL_GAP), lineY, lineEnd, lineY + 1, LINE_COLOR);
+        if (ServerFolders.isCollapsed(header.folder())) {
+            triangleRight(contentX + 2, labelY, LABEL_COLOR);
+        } else {
+            triangleDown(contentX, labelY + 2, LABEL_COLOR);
+        }
+        font.draw(label, contentX + TRIANGLE_SIZE + TRIANGLE_GAP, labelY, LABEL_COLOR);
+        if (!arrows) return;
+        var shown = ((FeaturedServerListAccess) header.list()).polyplus$folders();
+        int index = shown.indexOf(header.folder());
+        int arrowX = x + width - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+        int hit = folderArrowHit(header, mouseX);
+        int upColor = index <= 0 ? ARROW_DISABLED_COLOR : hit < 0 ? ARROW_HOVER_COLOR : LABEL_COLOR;
+        int downColor = index < 0 || index >= shown.size() - 1 ? ARROW_DISABLED_COLOR : hit > 0 ? ARROW_HOVER_COLOR : LABEL_COLOR;
+        triangleUp(arrowX + 2, labelY + 2, upColor);
+        triangleDown(arrowX + FOLDER_ARROW_WIDTH + 2, labelY + 2, downColor);
+    }
+
+    private static boolean folderArrows() {
+        return ServerFolders.sort() == ServerFolders.Sort.CUSTOM;
+    }
+
+    public static int folderArrowHit(FeaturedServerRowRegistry.FolderHeader header, int mouseX) {
+        if (!folderArrows()) return 0;
+        int arrowX = header.x() + header.width() - SECTION_INSET - 2 * FOLDER_ARROW_WIDTH;
+        if (mouseX < arrowX || mouseX >= arrowX + 2 * FOLDER_ARROW_WIDTH) return 0;
+        return mouseX < arrowX + FOLDER_ARROW_WIDTH ? -1 : 1;
+    }
+
+    public static void triangleDown(int x, int y, int color) {
+        for (int row = 0; row < (TRIANGLE_SIZE + 1) / 2; row++) {
+            GuiElement.fill(x + row, y + row, x + TRIANGLE_SIZE - row, y + row + 1, color);
+        }
+    }
+
+    public static void triangleUp(int x, int y, int color) {
+        int rows = (TRIANGLE_SIZE + 1) / 2;
+        for (int row = 0; row < rows; row++) {
+            GuiElement.fill(x + row, y + rows - 1 - row, x + TRIANGLE_SIZE - row, y + rows - row, color);
+        }
+    }
+
+    public static void triangleRight(int x, int y, int color) {
+        for (int col = 0; col < (TRIANGLE_SIZE + 1) / 2; col++) {
+            GuiElement.fill(x + col, y + col, x + col + 1, y + TRIANGLE_SIZE - col, color);
+        }
     }
 
     public static void header(int x, int y, int width, int height) {
