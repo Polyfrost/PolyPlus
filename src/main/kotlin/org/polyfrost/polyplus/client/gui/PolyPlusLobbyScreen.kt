@@ -48,9 +48,15 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
         if (LobbyScene.cannotRun()) MainMenuReplacement.fallBackToVanilla() else lobby.tick()
     }
 
-    override fun handleMouseClicked(button: Int): Boolean = StartupOverlay.active || lobby.skipIntro()
+    private var keyNavigated = false
+
+    override fun handleMouseClicked(button: Int): Boolean {
+        keyNavigated = false
+        return StartupOverlay.active || lobby.skipIntro()
+    }
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
+        if (key in navigationKeys) keyNavigated = true
         LobbyAntics.key(key, lobby.calm())
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
         if (lobby.setup && OnboardingKeyCapture.capture(key)) return true
@@ -62,7 +68,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
             *///?}
         }
         val enter = key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER
-        if (enter && (lobby.tour != null || !LobbyA11y.keyboardFocused()) && lobby.openSocial()) return true
+        if (enter && (lobby.tour != null || !keyNavigated || !LobbyA11y.keyboardFocused()) && lobby.openSocial()) return true
         return super.handleKeyPressed(key, modifiers)
     }
 
@@ -113,4 +119,10 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
     }
 
     internal fun showPage(page: LobbyPage) = lobby.show(page)
+
+    private companion object {
+        val navigationKeys = intArrayOf(
+            InputConstants.KEY_TAB, InputConstants.KEY_UP, InputConstants.KEY_DOWN, InputConstants.KEY_LEFT, InputConstants.KEY_RIGHT,
+        )
+    }
 }
