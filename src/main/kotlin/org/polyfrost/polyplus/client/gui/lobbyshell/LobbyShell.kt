@@ -27,9 +27,9 @@ import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.featured.FeaturedServers
-import org.polyfrost.polyplus.client.gui.AccountActions
 import org.polyfrost.polyplus.client.featured.ServerFolders
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
+import org.polyfrost.polyplus.client.gui.AccountsPanelState
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
@@ -118,7 +118,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     val anchors = mutableStateMapOf<TourAnchor, Rect>()
     var accountsOpen by mutableStateOf(false)
         private set
-    var accountActions by mutableStateOf<AccountActions?>(null)
+    var accountsPanel by mutableStateOf<AccountsPanelState?>(null)
     var profileVersion by mutableIntStateOf(0)
         private set
     private var profileId = ClientPlatform.localPlayerUuid()
@@ -202,12 +202,18 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     }
 
     fun openAccounts() {
-        if (!PolyPlusMainMenuConfig.hideMainMenuAltManager) accountsOpen = true
+        if (setup) return
+        customize.close()
+        show(LobbyPage.Home)
+        accountsOpen = true
     }
 
     fun closeAccounts() {
-        if (accountActions?.idle != false) accountsOpen = false
+        accountsPanel?.reset()
+        accountsOpen = false
     }
+
+    fun toggleAccounts() = if (accountsOpen) closeAccounts() else openAccounts()
 
     fun syncAccount() = ClientPlatform.runOnMain {
         val id = ClientPlatform.localPlayerUuid()
@@ -219,13 +225,8 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         }
     }
 
-    private fun escapeAccounts() {
-        val actions = accountActions
-        when {
-            actions?.loginSession != null -> actions.cancelLogin()
-            actions?.offlineEntry == true -> if (actions.idle) actions.cancelOfflineEntry()
-            else -> closeAccounts()
-        }
+    fun escapeAccounts() {
+        if (accountsPanel?.back() != true) closeAccounts()
     }
 
     fun quickServers(): List<ServerEntry> = servers.quickRows(selectedServer)

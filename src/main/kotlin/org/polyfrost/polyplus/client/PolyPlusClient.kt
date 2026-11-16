@@ -54,6 +54,7 @@ import org.polyfrost.polyplus.client.pets.PetEntities
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
+import org.polyfrost.polyplus.client.social.DiscordLink
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
@@ -234,6 +235,7 @@ object PolyPlusClient {
                     // GlobalChatRepository.refreshHistory() // Global chat is disabled for now.
                     SessionsRepository.refreshIncoming()
                     PartyRepository.refresh()
+                    DiscordLink.refresh()
                 }
             }
         }

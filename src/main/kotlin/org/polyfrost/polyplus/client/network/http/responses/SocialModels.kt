@@ -36,6 +36,17 @@ enum class PlayerStatus(val serializedName: String) {
 data class PlayerStatusBody(val status: PlayerStatus)
 
 @Serializable
+data class LinkedAccountInfo(
+    val provider: String,
+    @SerialName("provider_user_id") val providerUserId: String,
+    val username: String? = null,
+    @SerialName("linked_at") val linkedAt: String,
+)
+
+@Serializable
+data class StartLinkResponse(val url: String)
+
+@Serializable
 data class Friend(
     val player: String,
     val kind: RelationshipKind,

@@ -104,7 +104,8 @@ import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.SocialDangerColor
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
-import org.polyfrost.polyplus.client.gui.AccountSwitcherContent
+import org.polyfrost.polyplus.client.gui.AccountsPage
+import org.polyfrost.polyplus.client.gui.AccountsPanelContent
 import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
@@ -132,7 +133,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPage
 import org.polyfrost.polyplus.client.gui.marketplace.MarketplacePage
 import org.polyfrost.polyplus.client.gui.menuwardrobe.WardrobePage
 import org.polyfrost.polyplus.client.gui.platformLabel
-import org.polyfrost.polyplus.client.gui.rememberAccountActions
+import org.polyfrost.polyplus.client.gui.rememberAccountsPanelState
 import org.polyfrost.polyplus.client.gui.serveredit.ServerEditDialog
 import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerPage
 import org.polyfrost.polyplus.client.gui.replays.ReplaysPage
@@ -238,7 +239,6 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
                 }
                 lobby.tour?.let { tour -> TourLayer(tour, lobby.anchors, lobby::endTour) }
             }
-            if (lobby.accountsOpen) AccountsDialog(lobby)
             if (departing) {
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = depart * depart }.background(Color.White))
             }
@@ -249,15 +249,25 @@ internal fun LobbyRoot(lobby: LobbyShell, screen: Screen) {
 }
 
 @Composable
-private fun AccountsDialog(lobby: LobbyShell) {
-    val actions = rememberAccountActions()
-    DisposableEffect(actions) {
-        lobby.accountActions = actions
-        onDispose { lobby.accountActions = null }
+private fun AccountsDock(lobby: LobbyShell) {
+    val state = rememberAccountsPanelState()
+    val actions = state.actions
+    DisposableEffect(state) {
+        lobby.accountsPanel = state
+        onDispose { lobby.accountsPanel = null }
     }
+    val open = lobby.accountsOpen && lobby.page == LobbyPage.Home
+    LaunchedEffect(open) { if (open) actions.reload() }
     val active = actions.accounts?.firstOrNull { it.active }?.id
     LaunchedEffect(active) { if (active != null) lobby.syncAccount() }
-    AccountSwitcherContent(actions, lobby::closeAccounts)
+    val page = state.page
+    DockedPanel(
+        open,
+        page.title,
+        lobby::closeAccounts,
+        if (page != AccountsPage.Home) ({ state.back() }) else null,
+        lobby::escapeAccounts,
+    ) { AccountsPanelContent(state) }
 }
 
 @Composable
@@ -371,6 +381,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     }
     Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) {
         CustomizePanel(lobby)
+        AccountsDock(lobby)
     }
     if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer(screen) }
     if (lobby.page != LobbyPage.Social) {
@@ -576,13 +587,12 @@ private fun ModMenuSlot(screen: Screen) {
 
 @Composable
 private fun ProfileChip(lobby: LobbyShell, modifier: Modifier) {
-    val switcher = !PolyPlusMainMenuConfig.hideMainMenuAltManager
     val hover = rememberHoverState()
     Row(
         modifier
-            .rowFrame(false, hover.hovered && switcher)
+            .rowFrame(false, hover.hovered || lobby.accountsOpen)
             .hoverable(hover.interactionSource)
-            .then(if (switcher) Modifier.oneConfigClickable("Accounts, ${ClientPlatform.localPlayerName()}", lobby::openAccounts) else Modifier)
+            .oneConfigClickable("Accounts, ${ClientPlatform.localPlayerName()}", lobby::toggleAccounts)
             .padding(start = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
