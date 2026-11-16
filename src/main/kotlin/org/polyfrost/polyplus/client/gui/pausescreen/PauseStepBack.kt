@@ -63,7 +63,6 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyRoster
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Wordmark
-import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModMenu
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -192,9 +191,7 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     if (screen.canHost) MenuRow(asset("log-in-04"), PauseWorldAccess.hostLabel, height = rowHeight, onClick = screen::openHost)
     capture.entry(PauseSlot.ADVANCEMENTS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
     capture.entry(PauseSlot.STATS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
-    rememberModMenu()?.let { (modMenu, logo) ->
-        MenuRow(modMenu.icon, "Mods", height = rowHeight, logo = logo, tooltip = modMenu.tooltip) { modMenu.onClick(screen) }
-    }
+    MenuRow("settings", "Mods", height = rowHeight, onClick = screen::openMods)
     LinkedModRow(screen, rowHeight)
     val moreShown = screen.moreOpen && !screen.moreLinked
     Box(Modifier.focusRequester(rememberMoreTrigger(moreShown))) {

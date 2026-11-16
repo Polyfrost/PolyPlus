@@ -386,7 +386,7 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
     val modMenu = rememberModMenu()
     val entries = screen.capture.more.filterNot { modMenu != null && it.modMenu }
     val game = if (routes) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
-    val mods = modMenu.takeIf { routes }
+    val mods = modMenu
     val routed = linked.takeIf { routes }.orEmpty()
     val items = buildList<MenuEntry> {
         game.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }

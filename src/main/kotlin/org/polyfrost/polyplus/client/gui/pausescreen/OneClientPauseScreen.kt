@@ -215,6 +215,11 @@ class OneClientPauseScreen(
         PolyPlusOneConfigIntegration.openSettings()
     }
 
+    internal fun openMods() {
+        PauseRouter.holdPause()
+        PolyPlusOneConfigIntegration.openMods()
+    }
+
     internal val online: Boolean get() = PrivacyConsent.allowsOnlineServices()
 
     internal val canHost: Boolean
