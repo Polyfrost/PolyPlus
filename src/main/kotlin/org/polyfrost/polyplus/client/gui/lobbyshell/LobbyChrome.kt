@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
@@ -95,6 +96,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.NotificationsCenterPanel
 import org.polyfrost.oneconfig.api.ui.v1.components.Placement
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ToggleRow
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -595,6 +597,7 @@ private const val QUIT_ICON = SOCIAL_ASSETS + "x-close.svg"
 private const val QUIT_CARD_WIDTH = 330
 private const val MORE_MENU_WIDTH = 300
 private const val MIN_SHOWN_PLAYTIME = 60_000L
+private const val QUIT_ARM_MILLIS = 3_000L
 private val BAR_POPUP_GAP = 12.dp
 private val MOD_LOGO_SIZE = 16.dp
 private val STACK_BAR_MIN = 220.dp
@@ -607,16 +610,44 @@ private fun NotificationsButton() {
 @Composable
 private fun QuitButton() {
     val mc = Minecraft.getInstance()
-    if (PolyPlusLobbyConfig.quitWithoutConfirmation) {
-        NavIconButton(QUIT_ICON, "Quit game", mc::stop)
-    } else {
-        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PlaySessions.log(ClientPlatform.localPlayerUuid()) } }
-        NavPopupButton(QUIT_ICON, "Quit game") { close -> LobbyUserTheme { QuitConfirm(mc::stop, close) } }
+    when {
+        PolyPlusLobbyConfig.quitWithoutConfirmation -> NavIconButton(QUIT_ICON, "Quit game", mc::stop)
+        PolyPlusLobbyConfig.quitClickTwice -> QuitTwiceButton(mc::stop)
+        else -> {
+            LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PlaySessions.log(ClientPlatform.localPlayerUuid()) } }
+            NavPopupButton(QUIT_ICON, "Quit game") { close -> LobbyUserTheme { QuitConfirm(mc::stop, close) } }
+        }
     }
 }
 
 @Composable
+private fun QuitTwiceButton(onQuit: () -> Unit) {
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) {
+        if (armed) {
+            delay(QUIT_ARM_MILLIS)
+            armed = false
+        }
+    }
+    NavIconButton(
+        QUIT_ICON,
+        if (armed) "Click again to quit" else "Quit game",
+        {
+            if (armed) {
+                onQuit()
+            } else {
+                armed = true
+                A11y.announce("Click again to quit")
+            }
+        },
+        tint = if (armed) KitDangerColor else Color.Unspecified,
+        active = armed,
+    )
+}
+
+@Composable
 private fun QuitConfirm(onQuit: () -> Unit, onCancel: () -> Unit) {
+    var skipNextTime by remember { mutableStateOf(false) }
     val player = ClientPlatform.localPlayerUuid()
     val log = remember(player) { PlaySessions.log(player) }
     val today = log.days[LocalDate.now().toEpochDay()]?.takeIf { it >= MIN_SHOWN_PLAYTIME }
@@ -635,9 +666,16 @@ private fun QuitConfirm(onQuit: () -> Unit, onCancel: () -> Unit) {
         }
         Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 12.dp, end = 18.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (today != null || lastPlace != null) QuitRecap(today, lastPlace)
+            ToggleRow(label = "Don't ask again", checked = skipNextTime, onCheckedChange = { skipNextTime = it }, modifier = Modifier)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextButton(text = "Cancel", onClick = onCancel, modifier = Modifier.weight(1f), size = ControlSize.Large)
-                TextButton(text = "Quit", icon = QUIT_ICON, onClick = onQuit, modifier = Modifier.weight(1f), style = ControlStyle.Danger, size = ControlSize.Large, dangerColor = KitDangerColor)
+                TextButton(text = "Quit", icon = QUIT_ICON, onClick = {
+                    if (skipNextTime) {
+                        PolyPlusLobbyConfig.quitWithoutConfirmation = true
+                        PolyPlusLobbyConfig.save()
+                    }
+                    onQuit()
+                }, modifier = Modifier.weight(1f), style = ControlStyle.Danger, size = ControlSize.Large, dangerColor = KitDangerColor)
             }
         }
     }

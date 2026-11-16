@@ -80,10 +80,19 @@ object PolyPlusLobbyConfig : Config(
 
     @JvmStatic
     @Switch(
-        title = "Quit Without Confirmation",
-        description = "Close the game as soon as you press Quit in the lobby, without asking first.",
+        title = "Quit Without Asking",
+        description = "Close the game as soon as you press the X button in the lobby, without asking first.",
+        subcategory = "Quit Button",
     )
     var quitWithoutConfirmation = false
+
+    @JvmStatic
+    @Switch(
+        title = "Click Twice to Quit",
+        description = "Press the X button twice to close the game, with no popup.",
+        subcategory = "Quit Button",
+    )
+    var quitClickTwice = false
 
     @JvmStatic
     @Switch(
@@ -134,6 +143,7 @@ object PolyPlusLobbyConfig : Config(
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("lobbyMediaWidgetSize") { !lobbyMediaWidget }
+        hideIf("quitClickTwice") { quitWithoutConfirmation }
         inheritMusicVolume()
     }
 
