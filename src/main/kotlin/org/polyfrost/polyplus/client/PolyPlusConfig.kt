@@ -105,6 +105,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var brandedStartup = true
 
+    @JvmStatic
+    @Switch(
+        title = "Startup Time Notification",
+        description = "Show how long the game took to load once it finishes starting.",
+    )
+    var startupTimeNotification = false
+
     @JvmStatic @Include
     var vanillaOfferDismissed = false
 

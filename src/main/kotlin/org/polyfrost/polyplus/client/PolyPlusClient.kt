@@ -34,6 +34,7 @@ import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.JvmAdvisor
+import org.polyfrost.polyplus.client.features.StartupTimeNotice
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.PauseMenuPanel
@@ -189,6 +190,7 @@ object PolyPlusClient {
         /*step("lobby shaders") { LobbyPipelines.register() }*/
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
+        step("startup time notice") { StartupTimeNotice.register() }
         step("modpack diff") { ModpackDiff.logAsync() }
         step("bad mods") { BadMods.checkAsync() }
         step("login gate") { MinecraftLoginGate.register() }
