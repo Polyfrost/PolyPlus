@@ -36,11 +36,12 @@ internal fun LobbyDock(lobby: LobbyShell, onTiles: (Int) -> Unit = {}) {
         DockTile("Customize lobby", DockTileWidth, first = true, last = false, active = lobby.customizeOpen, onClick = lobby.customize::toggle) {
             LobbyIcon("image-01")
         }
+        LobbyMusicButton(lobby, first = false, last = true)
     }
 }
 
 @Composable
-private fun DockTile(
+internal fun DockTile(
     label: String,
     width: Dp,
     first: Boolean,

@@ -135,7 +135,7 @@ object LobbyAmbience {
     private fun playing(): Boolean = voices.isNotEmpty() || intro != null
 
     private fun ownsMusic(mc: Minecraft): Boolean =
-        PolyPlusLobbyConfig.lobbyMusic != LobbyMusic.MINECRAFT && lobbyUp(mc) && !(unavailable && loops() && audible(mc))
+        lobbyUp(mc) && (PolyPlusLobbyConfig.lobbyMusicMuted || PolyPlusLobbyConfig.lobbyMusic != LobbyMusic.MINECRAFT && !(unavailable && loops() && audible(mc)))
 
     private fun handingOff(): Boolean {
         //? if > 1.8.9 {
@@ -407,7 +407,8 @@ object LobbyAmbience {
             *///?}
 
     private fun audible(mc: Minecraft): Boolean =
-        volume() > 0f &&
+        !PolyPlusLobbyConfig.lobbyMusicMuted &&
+            volume() > 0f &&
             //? if > 1.8.9 {
             mc.options.getSoundSourceVolume(SoundSource.MASTER) > 0f
             //?} else {
