@@ -60,10 +60,10 @@ private val DOCK_RADIUS = 20.dp
 private val DOCK_INSET = 6.dp
 private val DOCK_GAP = 3.dp
 private val TILE_RADIUS = 14.dp
-private val SCENE_TILE = LobbyLayout.BarHeight - DOCK_INSET * 2
 private val SPARK_TILE = 84.dp
 private val MEDIA_TEXT_WIDTH = 120.dp
 private const val SPARK_TICK_MILLIS = 500L
+internal val DockTileWidth = LobbyLayout.BarHeight - DOCK_INSET * 2
 
 @Composable
 internal fun LobbyDock(
@@ -74,20 +74,9 @@ internal fun LobbyDock(
     onMedia: (Int) -> Unit = {},
 ) {
     if (lobby.page != LobbyPage.Home) return
-    val spark = SparkCompat.installed
-    val trailing = DOCK_INSET - DOCK_GAP
-    val trailingPx = with(LocalDensity.current) { trailing.roundToPx() }
-    val mediaVisible = media != null && mediaShown > 0f
-    Row(Modifier.height(LobbyLayout.BarHeight).panel(DOCK_RADIUS), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.fillMaxHeight().onSizeChanged { onTiles(it.width + if (mediaVisible) trailingPx else 0) }, verticalAlignment = Alignment.CenterVertically) {
-            DockTile("Change scene", SCENE_TILE, first = true, last = !spark && !mediaVisible, active = lobby.sceneOpen, onClick = { lobby.sceneOpen = !lobby.sceneOpen }) {
-                LobbyIcon("image-01")
-            }
-            if (spark) SparkTile(first = false, last = !mediaVisible)
-        }
-        if (media != null && mediaVisible) {
-            MediaTile(media, mediaShown, onMedia)
-            Spacer(Modifier.width(trailing))
+    Row(Modifier.height(LobbyLayout.BarHeight).panel(DOCK_RADIUS).onSizeChanged { onTiles(it.width) }, verticalAlignment = Alignment.CenterVertically) {
+        DockTile("Customize lobby", DockTileWidth, first = true, last = false, active = lobby.customizeOpen, onClick = lobby.customize::toggle) {
+            LobbyIcon("image-01")
         }
     }
 }

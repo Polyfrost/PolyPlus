@@ -63,11 +63,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
@@ -167,6 +167,7 @@ import androidx.compose.ui.text.style.TextOverflow
 
 private const val FROST_MILLIS = 220
 private const val REVEAL_MILLIS = 700
+private const val PLAY_SLIDE_MILLIS = 240
 
 private class LobbyTab(val label: String, val page: LobbyPage)
 
@@ -299,7 +300,6 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }
         LobbyPage.News -> NewsPage { lobby.show(LobbyPage.Home) }
     } }
-    var barStart by remember { mutableFloatStateOf(Float.NaN) }
     LobbyDarkChrome { Navbar(lobby, screen) }
     val home = lobby.page == LobbyPage.Home
     val social = !LobbyPage.Social.hidden
@@ -359,16 +359,23 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             }
         }
     }
-    Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) { SceneControl(lobby) { barStart } }
-    PlayUnit(
-        lobby,
-        Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
-            .width(LobbyLayout.UnitWidth)
-            .tourAnchor(lobby.anchors, TourAnchor.Play)
-            .a11yRegion(A11yRegion.Play),
-    )
+    val playAway by Motion.animateFloatAsState(if (((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
+    if (playAway < 1f) {
+        PlayUnit(
+            lobby,
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
+                .width(LobbyLayout.UnitWidth)
+                .offset { IntOffset((playAway * (LobbyLayout.UnitWidth + LobbyLayout.Margin).toPx()).roundToInt(), 0) }
+                .graphicsLayer { alpha = 1f - playAway }
+                .tourAnchor(lobby.anchors, TourAnchor.Play)
+                .a11yRegion(A11yRegion.Play),
+        )
+    }
+    Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) {
+        CustomizePanel(lobby)
+    }
     if (!PolyPlusMainMenuConfig.hideMainMenuFooter) LobbyDarkChrome { Footer(screen) }
     if (lobby.page != LobbyPage.Social) {
         SocialToastHost(Modifier.padding(top = LobbyLayout.Top - ToastDefaults.margin))

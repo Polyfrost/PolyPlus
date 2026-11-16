@@ -97,7 +97,10 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     var source by mutableStateOf(choice.source)
     var editing by mutableStateOf<ServerEdit?>(null)
     var directOpen by mutableStateOf(false)
-    var sceneOpen by mutableStateOf(false)
+    val customize = CustomizeState().also { it.onOpen = ::closeAccounts }
+    var customizeOpen: Boolean
+        get() = customize.shown
+        set(value) = if (value) customize.open() else customize.close()
     var deleting by mutableStateOf<ServerEntry?>(null)
     var hostWorldId by mutableStateOf<String?>(null)
     var selectedWorldId by mutableStateOf(choice.worldId)
@@ -131,6 +134,9 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     fun close() {
         choice = PlayChoice(source, selectedServer, selectedWorldId, selectedReplay)
+        customize.close()
+        closeAccounts()
+        LobbyFraming.panelInset = 0f
         servers.close()
         SocialChatLink.close()
         HostWorldManager.worldOpener = { it() }
@@ -172,6 +178,22 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         }
         page = shown
         LobbyWardrobe.open = shown == LobbyPage.Wardrobe
+        if (shown != LobbyPage.Home) {
+            customize.close()
+            closeAccounts()
+        }
+    }
+
+    fun openCustomize(page: CustomizePage = CustomizePage.Home) {
+        if (setup) return
+        show(LobbyPage.Home)
+        customize.open(page)
+    }
+
+    fun openAmbience() {
+        if (setup) return
+        show(LobbyPage.Home)
+        customize.focusAmbience()
     }
 
     fun openAccounts() {
@@ -356,7 +378,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     private fun covered(): Boolean = accountsOpen || EscapeStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
 
-    fun calm(): Boolean = !setup && tour == null && !sceneOpen && !covered() && !SocialPageState.dialogOpen && !TextInputFocus.isTyping
+    fun calm(): Boolean = !setup && tour == null && !customizeOpen && !covered() && !SocialPageState.dialogOpen && !TextInputFocus.isTyping
 
     fun openSocial(): Boolean {
         tour?.let { current ->

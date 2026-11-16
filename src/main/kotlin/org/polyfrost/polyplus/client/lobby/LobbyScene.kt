@@ -158,6 +158,7 @@ import java.util.concurrent.CompletableFuture
 //? if < 1.21.10 && > 1.8.9
 /*import java.util.function.Supplier*/
 import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
@@ -1620,6 +1621,7 @@ object LobbyScene {
         val elapsed = (time - lastPoseTime).coerceIn(0.0, 0.1)
         lastPoseTime = time
         LobbyWardrobe.advance(elapsed)
+        LobbyFraming.settleInset(elapsed, driven == null && !embedded, still || !scene.started)
         settlePointer(mc, scene, elapsed)
         settleFocus(mc, scene, elapsed)
         val parallaxShare = 1.0 - (1.0 - PARALLAX_FOCUS_SHARE) * focusBlend.value
@@ -1659,11 +1661,13 @@ object LobbyScene {
             LobbyWardrobe.poseAvatar(local, scene.portrait, time)
         }
         currentFov = CAMERA_FOV
+        var plunge = 0.0
 
         if (departNanos != 0L) {
             val leaving = ((Util.getNanos() - departNanos) / 1_000_000_000.0 / DEPART_SECONDS).coerceIn(0.0, 1.0)
             departProgress = leaving.toFloat()
             val push = if (still) 0.0 else leaving * leaving
+            plunge = push
             distance = Mth.lerp(push, distance, DEPART_REACH)
             currentFov = (CAMERA_FOV + (DEPART_FOV - CAMERA_FOV) * push).toFloat()
             if (leaving >= 1.0) {
@@ -1683,9 +1687,15 @@ object LobbyScene {
         }
         val yawRad = Math.toRadians(yaw)
         val pitchRad = Math.toRadians(pitch)
-        val look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
+        var look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
         if (stage.interior) distance = wallClamp(scene, aim, look, distance, elapsed)
         val camera = aim.subtract(look.scale(distance))
+        val nudge = LobbyFraming.insetYaw(currentFov.toDouble(), viewAspect(mc), (1.0 - portrait) * (1.0 - plunge))
+        if (nudge != 0.0) {
+            yaw += nudge
+            val turned = Math.toRadians(yaw)
+            look = Vec3(-sin(turned) * cos(pitchRad), -sin(pitchRad), cos(turned) * cos(pitchRad))
+        }
         currentDistance = distance.toFloat()
         settleLens(camera, look, stage)
         LobbyWaveState.view(look, currentFov)
@@ -2456,6 +2466,9 @@ object LobbyScene {
 object LobbyFraming {
     enum class Reaction { NOD, GLANCE, WAVE }
 
+    @Volatile
+    var panelInset = 0f
+
     const val PITCH = 9.0
     const val DISTANCE = 6.2
     const val SCREEN_X = 0.58
@@ -2463,6 +2476,7 @@ object LobbyFraming {
     private const val CHEST = 1.05
     private const val EYE = 1.62
     private const val RATE = 4.0
+    private const val MAX_INSET = 0.45
     private const val FOCUS_ZOOM = 0.42
     private const val MIN_SHOT_DEPTH = 0.5
     private const val FOCUS_CENTER_PULL = 0.2
@@ -2490,7 +2504,9 @@ object LobbyFraming {
     var onboarding = false
 
     private val ease = LobbyEase()
+    private val insetEase = LobbyEase()
     private var amount = 0.0
+    private var inset = 0.0
     private var cardX = -0.45
     private var cardY = 0.0
     private var camera = Vec3(0.0, 0.0, 0.0)
@@ -2534,6 +2550,20 @@ object LobbyFraming {
         return amount * eased
     }
 
+    fun settleInset(elapsed: Double, active: Boolean, snap: Boolean) {
+        val wanted = panelInset.toDouble()
+        val target = if (active && wanted.isFinite()) wanted.coerceIn(0.0, MAX_INSET) else 0.0
+        if (snap || Motion.reduced) insetEase.snap(target) else insetEase.step(target, RATE, elapsed)
+        inset = insetEase.value.coerceIn(0.0, MAX_INSET)
+    }
+
+    fun insetYaw(fov: Double, aspect: Double, share: Double): Double {
+        val covered = inset * share.coerceIn(0.0, 1.0)
+        if (!(covered > 0.0) || !(aspect > 0.0)) return 0.0
+        val turn = Math.toDegrees(atan(tan(Math.toRadians(fov / 2.0)) * aspect * covered))
+        return if (turn.isFinite()) turn else 0.0
+    }
+
     fun shot(view: LobbyEntrance.View, feet: Vec3, height: Double, diving: Boolean): Shot? {
         val raise = height * FOCUS_SUBJECT_SHARE
         val subject = feet.add(0.0, raise, 0.0)
@@ -2546,12 +2576,12 @@ object LobbyFraming {
         val unitX = 2.0 * minOf(1.0 / LobbyLayout.DESIGN_WIDTH, 1.0 / (LobbyLayout.DESIGN_HEIGHT * view.aspect))
         val unitY = 2.0 * minOf(view.aspect / LobbyLayout.DESIGN_WIDTH, 1.0 / LobbyLayout.DESIGN_HEIGHT)
         val halfWidth = maxOf(FOCUS_BODY_HALF / (span * view.aspect), FOCUS_TAG_HALF * unitX)
-        val side = 1.0 - LobbyLayout.BarEnd.value * unitX - halfWidth
+        val side = 1.0 - inset - LobbyLayout.BarEnd.value * unitX - halfWidth
         val above = (height - raise + FOCUS_TAG_LIFT) * view.up.y / span + FOCUS_TAG_HEIGHT * unitY
         val below = raise * view.up.y / span
         val top = 1.0 - LobbyLayout.Top.value * unitY - above
         val bottom = LobbyLayout.PageBottom.value * unitY + below - 1.0
-        val x = fit(offset.dot(view.right) / (depth * view.tanHalf * view.aspect) * (1.0 - FOCUS_CENTER_PULL), -side, side)
+        val x = fit(offset.dot(view.right) / (depth * view.tanHalf * view.aspect) * (1.0 - FOCUS_CENTER_PULL) * (1.0 - inset), -side, side)
         val y = fit(offset.dot(view.up) / (depth * view.tanHalf) * (1.0 - FOCUS_CENTER_PULL), bottom, top)
         return Shot(subject.subtract(view.right.scale(x * span * view.aspect)).subtract(view.up.scale(y * span)), reach, subject)
     }
@@ -2561,7 +2591,7 @@ object LobbyFraming {
     fun aim(rest: Vec3, yaw: Double, pitch: Double, fov: Double, aspect: Double): Vec3 {
         val (right, up) = basis(lookOf(yaw, pitch))
         val half = DISTANCE * tan(Math.toRadians(fov / 2.0))
-        return rest.add(0.0, CHEST, 0.0).subtract(right.scale(SCREEN_X * half * aspect)).subtract(up.scale(SCREEN_Y * half))
+        return rest.add(0.0, CHEST, 0.0).subtract(right.scale(SCREEN_X * (1.0 - inset) * half * aspect)).subtract(up.scale(SCREEN_Y * half))
     }
 
     fun viewed(camera: Vec3, look: Vec3, fov: Double, aspect: Double) {

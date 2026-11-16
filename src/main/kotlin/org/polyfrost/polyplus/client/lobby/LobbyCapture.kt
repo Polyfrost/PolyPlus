@@ -410,7 +410,8 @@ object LobbyCapture {
         val entry = back.entry
         when {
             entry == null -> if (!back.pending) returning = null
-            LobbySceneStore.pinned != null -> returning = null
+            LobbySceneStore.mode == SceneMode.PICK && LobbySceneStore.pinned != null -> returning = null
+            LobbySceneStore.mode == SceneMode.FOLLOW_SERVER && LobbySceneStore.serverScene(back.world) != null -> returning = null
             PartyScene.followed() != null -> returning = null
             LobbyScene.currentId == entry.id -> if (!back.pending) returning = null
             back.tried != entry.id && LobbyScene.phase == LobbyScene.Phase.READY -> if (LobbyScene.switchTo(entry)) back.tried = entry.id
@@ -437,6 +438,7 @@ object LobbyCapture {
             return
         }
         returning = Return(source.world, recent?.takeIf { it.world == source.world })
+        LobbySceneStore.recordLeave(source.world)
         inFlight?.let {
             it.handOver = true
             it.left = level

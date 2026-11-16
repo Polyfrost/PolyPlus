@@ -56,16 +56,27 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import org.polyfrost.oneconfig.api.ui.v1.components.DropdownMenu
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSeparator
+import org.polyfrost.oneconfig.api.ui.v1.components.Placement
+import org.polyfrost.polyplus.client.lobby.SceneMode
 
 internal const val AUTOMATIC_KEY = "automatic"
-private val HeaderHeight = 52.dp
+private val HeaderHeight = 48.dp
 private val StatusHeight = 20.dp
 private val WideGrid = 480.dp
 private const val WIDE_COLUMNS = 3
 private const val NARROW_COLUMNS = 2
 
 @Composable
-internal fun SceneCard(state: SceneManagerState, entry: LobbySceneEntry?, canPick: Boolean) {
+internal fun SceneCard(state: SceneBrowserState, entry: LobbySceneEntry?, canPick: Boolean) {
     val key = entry?.id ?: AUTOMATIC_KEY
     val checked = if (state.selecting && entry != null && !entry.bundled) entry.id in state.selected else null
     val inert = state.selecting && (entry == null || entry.bundled)
@@ -88,7 +99,9 @@ internal fun SceneCard(state: SceneManagerState, entry: LobbySceneEntry?, canPic
                 else -> state.expanded = if (open) null else key
             }
         }
-        SceneCardHeader(entry, header, shape, hover.interactionSource, click)
+        SceneCardHeader(entry, header, shape, hover.interactionSource, click) {
+            if (!state.selecting) SceneOverflow(state, entry, canPick)
+        }
         AnimatedVisibility(
             open,
             enter = Motion.enter(expandVertically(tween(SCENE_FADE_MILLIS)) + fadeIn(tween(SCENE_FADE_MILLIS))),
@@ -102,7 +115,14 @@ internal fun SceneCard(state: SceneManagerState, entry: LobbySceneEntry?, canPic
 private class HeaderState(val open: Boolean, val checked: Boolean?, val inert: Boolean)
 
 @Composable
-private fun SceneCardHeader(entry: LobbySceneEntry?, header: HeaderState, shape: Shape, interaction: MutableInteractionSource, onClick: () -> Unit) {
+private fun SceneCardHeader(
+    entry: LobbySceneEntry?,
+    header: HeaderState,
+    shape: Shape,
+    interaction: MutableInteractionSource,
+    onClick: () -> Unit,
+    trailing: @Composable () -> Unit,
+) {
     val theme = OneConfigTheme.current
     val problem = entry?.let(::sceneProblem)
     val title = entry?.label ?: "Automatic"
@@ -120,9 +140,9 @@ private fun SceneCardHeader(entry: LobbySceneEntry?, header: HeaderState, shape:
             .fillMaxWidth()
             .height(HeaderHeight)
             .then(click)
-            .padding(horizontal = 14.dp),
+            .padding(start = 14.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (checked != null) Checkbox(checked, null)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -131,23 +151,24 @@ private fun SceneCardHeader(entry: LobbySceneEntry?, header: HeaderState, shape:
         }
         if (entry?.favourite == true) FavouriteStar()
         if (checked == null && !header.inert) ThemedIcon(SOCIAL_ASSETS + "chevron-up.svg", theme.textColorSecondary, 14.dp, Modifier.rotate(turn))
+        trailing()
     }
 }
 
 @Composable
-private fun SceneCardBody(state: SceneManagerState, entry: LobbySceneEntry?, canPick: Boolean) {
-    val pinned = LobbySceneStore.pinned
+private fun SceneCardBody(state: SceneBrowserState, entry: LobbySceneEntry?, canPick: Boolean) {
+    val chosen = chosenId()
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Divider()
-        StatusLine(entry, pinned)
+        StatusLine(entry, chosen)
         FactGrid(entry?.let(::sceneFacts) ?: automaticFacts())
-        SceneActions(state, entry, canPick, pinned)
+        SceneActions(entry, canPick, chosen)
     }
 }
 
 @Composable
-private fun StatusLine(entry: LobbySceneEntry?, pinned: String?) {
-    val picked = pinned == entry?.id
+private fun StatusLine(entry: LobbySceneEntry?, chosen: String?) {
+    val picked = chosen == (entry?.id ?: AUTOMATIC_KEY)
     val showing = entry != null && LobbyScene.currentId == entry.id
     val unavailable = entry != null && !LobbySceneStore.usable(entry)
     val theme = OneConfigTheme.current
@@ -184,36 +205,51 @@ private fun FactGrid(facts: List<Pair<String, String>>) {
 }
 
 @Composable
-private fun SceneActions(state: SceneManagerState, entry: LobbySceneEntry?, canPick: Boolean, pinned: String?) {
-    val inUse = pinned == entry?.id
+private fun SceneActions(entry: LobbySceneEntry?, canPick: Boolean, chosen: String?) {
+    val inUse = chosen == (entry?.id ?: AUTOMATIC_KEY)
     val usable = entry == null || LobbySceneStore.usable(entry)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-        if (entry != null && !entry.bundled) {
-            TextButton(
-                text = "Delete",
-                onClick = { state.pending = singleDeletion(entry) },
-                size = ControlSize.Large,
-                style = ControlStyle.DangerFilled,
-                dangerColor = KitDangerColor,
-            )
-            if (LobbySceneStore.canRename(entry)) {
-                TextButton(text = "Rename", onClick = { state.renaming = entry }, size = ControlSize.Large, style = ControlStyle.Secondary)
-            }
-            TextButton(
-                text = if (entry.favourite) "Unfavourite" else "Favourite",
-                onClick = { LobbySceneStore.setFavourite(entry, !entry.favourite) },
-                size = ControlSize.Large,
-                style = ControlStyle.Secondary,
-            )
-        }
         TextButton(
             text = if (inUse) "In use" else "Use",
             onClick = { pickScene(entry?.id) },
-            size = ControlSize.Large,
+            size = ControlSize.Regular,
             style = ControlStyle.Primary,
             enabled = canPick && usable && !inUse,
         )
     }
+}
+
+@Composable
+private fun SceneOverflow(state: SceneBrowserState, entry: LobbySceneEntry?, canPick: Boolean) {
+    var open by remember { mutableStateOf(false) }
+    val inUse = chosenId() == (entry?.id ?: AUTOMATIC_KEY)
+    val usable = entry == null || LobbySceneStore.usable(entry)
+    val entries = buildList<MenuEntry> {
+        add(MenuAction(if (inUse) "In use" else "Use", { pickScene(entry?.id) }, enabled = canPick && usable && !inUse))
+        if (entry != null && !entry.bundled) {
+            if (LobbySceneStore.canRename(entry)) add(MenuAction("Rename", { state.renaming = entry }))
+            add(MenuAction(if (entry.favourite) "Unfavourite" else "Favourite", { LobbySceneStore.setFavourite(entry, !entry.favourite) }))
+            add(MenuSeparator)
+            add(MenuAction("Delete", { state.pending = singleDeletion(entry) }, danger = true, dangerColor = KitDangerColor))
+        }
+    }
+    Box {
+        IconButton(
+            SOCIAL_ASSETS + "dots-vertical.svg",
+            "More",
+            { open = !open },
+            size = ControlSize.Compact,
+            tooltip = null,
+            active = open,
+        )
+        DropdownMenu(open, { open = false }, entries, placement = Placement.BelowEnd)
+    }
+}
+
+private fun chosenId(): String? = when (LobbySceneStore.mode) {
+    SceneMode.AUTOMATIC -> AUTOMATIC_KEY
+    SceneMode.PICK -> LobbySceneStore.pinned ?: AUTOMATIC_KEY
+    SceneMode.FOLLOW_SERVER -> null
 }
 
 private fun automaticFacts(): List<Pair<String, String>> {

@@ -9,6 +9,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.client.Minecraft
@@ -74,6 +75,8 @@ data class LobbySceneEntry(
     }
 }
 
+enum class SceneMode { AUTOMATIC, PICK, FOLLOW_SERVER }
+
 object LobbySceneStore {
     const val MAX_LABEL_LENGTH = 32
 
@@ -84,7 +87,12 @@ object LobbySceneStore {
         val pinned: String? = null,
         val servers: Map<String, Boolean> = emptyMap(),
         val serverPolicies: Map<String, String> = emptyMap(),
+        val mode: String = "AUTOMATIC",
+        val lastWorld: String? = null,
+        val serverScenes: Map<String, String> = emptyMap(),
     )
+
+    private const val SERVER_PREFIX = "server:"
 
     //? if > 1.8.9 {
     private const val BUNDLED_ROOT = "/assets/polyplus/lobby/scenes/"
@@ -195,6 +203,55 @@ object LobbySceneStore {
         }
         set(value) = update { copy(pinned = value) }
 
+    var mode: SceneMode
+        get() {
+            ensureLoaded()
+            return modeOf(state.mode)
+        }
+        set(value) {
+            if (mode == value) return
+            update { copy(mode = value.name) }
+        }
+
+    var lastWorld: String?
+        get() {
+            ensureLoaded()
+            return state.lastWorld
+        }
+        set(value) {
+            if (lastWorld == value) return
+            update { copy(lastWorld = value) }
+        }
+
+    fun recordLeave(world: String) {
+        lastWorld = world
+    }
+
+    fun serverScene(address: String): String? {
+        ensureLoaded()
+        return state.serverScenes[serverKey(address)]?.takeIf { id -> sceneById(id) != null }
+    }
+
+    fun setServerScene(address: String, id: String?) {
+        ensureLoaded()
+        val key = serverKey(address)
+        if (state.serverScenes[key] == id) return
+        update { copy(serverScenes = if (id == null) serverScenes - key else serverScenes + (key to id)) }
+    }
+
+    fun choose(id: String?) {
+        ensureLoaded()
+        val next = if (id == null) SceneMode.AUTOMATIC else SceneMode.PICK
+        if (state.pinned == id && modeOf(state.mode) == next) return
+        update { copy(pinned = id, mode = next.name) }
+    }
+
+    fun resetChoice() {
+        ensureLoaded()
+        if (state.pinned == null && state.serverScenes.isEmpty() && modeOf(state.mode) == SceneMode.AUTOMATIC) return
+        update { copy(pinned = null, serverScenes = emptyMap(), mode = SceneMode.AUTOMATIC.name) }
+    }
+
     fun problem(entry: LobbySceneEntry): String? = LobbyPacks.problem(entry.packs, entry.gameVersion)
 
     fun outdated(entry: LobbySceneEntry): Boolean = !entry.bundled && entry.dataVersion != LobbySnapshot.dataVersion
@@ -233,7 +290,19 @@ object LobbySceneStore {
 
     fun queue(): List<LobbySceneEntry> {
         val usable = usableScenes
-        val choice = pinned?.let { id -> (usable + BUNDLED).firstOrNull { it.id == id } } ?: LobbyCapture.returnEntry()?.takeIf { problem(it) == null }
+        val pick = pinned?.let { id -> (usable + BUNDLED).firstOrNull { it.id == id } }
+        val back = LobbyCapture.returnEntry()?.takeIf { problem(it) == null }
+        val choice = when (mode) {
+            SceneMode.AUTOMATIC -> back
+            SceneMode.PICK -> pick ?: back
+            SceneMode.FOLLOW_SERVER -> {
+                val world = state.lastWorld
+                world?.let { state.serverScenes[it] }?.let { id -> (usable + BUNDLED).firstOrNull { it.id == id } }
+                    ?: world?.let { w -> usable.filter { it.world == w }.maxByOrNull { it.capturedAt } }
+                    ?: pick
+                    ?: back
+            }
+        }
         val own = listOfNotNull(choice) + usable.filterNot { it.id == choice?.id } + BUNDLED.filterNot { it == choice }
         val party = PartyScene.startEntries()
         return party + own.filterNot { entry -> party.any { it.id == entry.id } }
@@ -372,7 +441,7 @@ object LobbySceneStore {
     private fun discard(gone: List<LobbySceneEntry>) {
         if (gone.isEmpty()) return
         val ids = gone.mapTo(HashSet()) { it.id }
-        update { copy(scenes = scenes.filterNot { it.id in ids }, pinned = pinned?.takeUnless { it in ids }) }
+        update { copy(scenes = scenes.filterNot { it.id in ids }, pinned = pinned?.takeUnless { it in ids }, serverScenes = serverScenes.filterValues { it !in ids }) }
         val inUse = state.scenes.mapTo(HashSet()) { it.file }
         val paths = gone.map { it.file }.filterNot { it in inUse }.distinct().map(folder::resolve)
         writer.execute {
@@ -400,6 +469,12 @@ object LobbySceneStore {
     }
 
     private fun key(address: String): String = address.trim().lowercase(Locale.ROOT)
+
+    private fun serverKey(address: String): String = worldKey(address.trim().removePrefix(SERVER_PREFIX))
+
+    private fun modeOf(name: String): SceneMode = SceneMode.entries.firstOrNull { it.name == name } ?: SceneMode.AUTOMATIC
+
+    private fun sceneById(id: String): LobbySceneEntry? = (usableScenes + BUNDLED).firstOrNull { it.id == id }
 
     private fun near(entry: LobbySceneEntry, other: LobbySceneEntry): Boolean =
         hypot((entry.x - other.x).toDouble(), (entry.z - other.z).toDouble()) < SAME_SPOT_BLOCKS
@@ -429,7 +504,9 @@ object LobbySceneStore {
         if (!Files.exists(indexFile)) return
         val text = runCatching { Files.readString(indexFile) }.getOrNull()
         runCatching {
-            state = PolyPlusClient.JSON.decodeFromString(State.serializer(), text ?: error("unreadable"))
+            val root = PolyPlusClient.JSON.parseToJsonElement(text ?: error("unreadable")).jsonObject
+            val decoded = PolyPlusClient.JSON.decodeFromJsonElement(State.serializer(), root)
+            state = if (root["mode"] == null && decoded.pinned != null) decoded.copy(mode = SceneMode.PICK.name) else decoded
         }.onFailure { error ->
             LOBBY_LOGGER.warn("Could not read the scene index", error)
             state = salvage(text)
@@ -444,7 +521,17 @@ object LobbySceneStore {
         val root = runCatching { PolyPlusClient.JSON.parseToJsonElement(text ?: "").jsonObject }.getOrNull()
         val servers = root?.let { section(it, "servers", Boolean.serializer()) }.orEmpty()
         val policies = root?.let { section(it, "serverPolicies", String.serializer()) }.orEmpty()
-        return State(capture = root != null && runCatching { root["capture"]?.jsonPrimitive?.boolean }.getOrNull() != false, servers = servers, serverPolicies = policies)
+        val serverScenes = root?.let { section(it, "serverScenes", String.serializer()) }.orEmpty()
+        val mode = root?.let { runCatching { it["mode"]?.jsonPrimitive?.content }.getOrNull() }?.let(::modeOf)?.takeUnless { it == SceneMode.PICK } ?: SceneMode.AUTOMATIC
+        val lastWorld = root?.let { runCatching { it["lastWorld"]?.jsonPrimitive?.contentOrNull }.getOrNull() }
+        return State(
+            capture = root != null && runCatching { root["capture"]?.jsonPrimitive?.boolean }.getOrNull() != false,
+            servers = servers,
+            serverPolicies = policies,
+            mode = mode.name,
+            lastWorld = lastWorld,
+            serverScenes = serverScenes,
+        )
     }
 
     private fun <T> section(root: JsonObject, name: String, value: KSerializer<T>): Map<String, T>? =

@@ -73,6 +73,13 @@ object PolyPlusLobbyConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Mute Lobby Music",
+        description = "Silence the lobby music without changing your track or volume.",
+    )
+    var lobbyMusicMuted = false
+
+    @JvmStatic
+    @Switch(
         title = "Mute When Unfocused",
         description = "Fade out the lobby music while the game window isn't focused.",
     )

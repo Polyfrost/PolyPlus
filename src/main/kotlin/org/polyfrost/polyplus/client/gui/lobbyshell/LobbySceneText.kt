@@ -24,7 +24,15 @@ internal const val MISSING_FACT = "-"
 
 private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")
 
-internal enum class SceneMood { DAY, SUNSET, NIGHT, CAVE, INDOOR, NETHER, END }
+internal enum class SceneMood(val top: Long, val bottom: Long, val fadeStart: Float = 0f) {
+    DAY(0xFF6BB5DE, 0xFF3E7A3C, 0.4f),
+    SUNSET(0xFFE8A05A, 0xFF7B3651),
+    NIGHT(0xFF283466, 0xFF13182F),
+    CAVE(0xFF4C4842, 0xFF1C1B1A),
+    INDOOR(0xFFB98552, 0xFF4A2F1E),
+    NETHER(0xFFD2452E, 0xFF4A1216),
+    END(0xFFB7A3E6, 0xFF3A2366),
+}
 
 internal fun sceneMood(entry: LobbySceneEntry): SceneMood = when {
     entry.realm == LobbyRealm.NETHER -> SceneMood.NETHER
