@@ -36,6 +36,14 @@ object PolyPlusPauseConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Always pan camera",
+        description = "Moves the camera to your player when you pause, even with reduced motion on.",
+        subcategory = "Style",
+    )
+    var spotlightCameraPan = false
+
+    @JvmStatic
+    @Switch(
         title = "Player preview",
         description = "Shows your player beside the menu.",
         subcategory = "Style",
@@ -93,6 +101,7 @@ object PolyPlusPauseConfig : Config(
     init {
         preload()
         migrateFromSplitConfigs()
+        hideIf("spotlightCameraPan") { pauseScreenStyle != PauseScreenStyle.STEP_BACK }
         hideIf("flatPausePlayerPreview") { pauseScreenStyle != PauseScreenStyle.STEP_BACK_FLAT }
         hideIf("vanillaPausePlayerPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         hideIf("compactPauseMenuPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }

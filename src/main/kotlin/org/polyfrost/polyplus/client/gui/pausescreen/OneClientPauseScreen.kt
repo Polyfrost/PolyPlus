@@ -49,7 +49,7 @@ class OneClientPauseScreen(
 ) : OneConfigComposeScreen(previous = null, renderMode = OneConfigComposeScreen.RenderMode.Continuous) {
     internal val capture = PauseCapture(vanilla)
     internal val stepBack = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
-    internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && !Motion.reduced
+    internal val stages: Boolean get() = style == PauseScreenStyle.STEP_BACK && (!Motion.reduced || PolyPlusPauseConfig.spotlightCameraPan)
     internal var staged by mutableStateOf(false)
         private set
     internal var moreOpen by mutableStateOf(false)

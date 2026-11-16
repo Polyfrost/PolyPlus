@@ -5,6 +5,7 @@ package org.polyfrost.polyplus.client.gui.pausescreen
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.lobby.LobbyEase
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.Easing
@@ -279,7 +280,7 @@ object PauseStage {
             fresh = true
             lastNanos = System.nanoTime()
             motion = PausePlatform.motionScale().coerceIn(0f, 1f)
-            cut = motion < REDUCED_MOTION || Motion.reduced
+            cut = !PolyPlusPauseConfig.spotlightCameraPan && (motion < REDUCED_MOTION || Motion.reduced)
             slack.snap(0.0)
             parallaxX.snap(0.0)
             parallaxY.snap(0.0)
