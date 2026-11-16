@@ -58,7 +58,7 @@ import net.minecraft.world.WorldView
 import net.minecraft.world.biome.Biome
 import com.mojang.authlib.GameProfile
 import com.mojang.authlib.minecraft.MinecraftProfileTexture
-import net.minecraft.resource.Identifier
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -79,39 +79,33 @@ object LobbyUtil {
     fun ioPool(): Executor = pool
 }
 
-class LobbyAccountSkin {
-    @Volatile
-    var texture: Identifier? = null
-    @Volatile
-    var slim: Boolean? = null
-    @Volatile
-    var cape: Identifier? = null
-}
-
 object LobbyAccountSkins {
-    private val loaded = ConcurrentHashMap<UUID, LobbyAccountSkin>()
+    private val loaded = ConcurrentHashMap<UUID, LocalAccountSkin.Textures>()
     private val retries = ConcurrentHashMap<UUID, Retry>()
     private val RETRY_MILLIS = longArrayOf(30_000L, 120_000L, 600_000L)
+    private const val REFRESH_MILLIS = 1_800_000L
 
     private class Retry(val attempt: Int, val at: Long)
 
-    fun of(uuid: UUID, name: String, local: Boolean): LobbyAccountSkin {
-        val skin = loaded.computeIfAbsent(uuid) { LobbyAccountSkin().also { load(it, uuid, name, local, 0) } }
+    fun of(uuid: UUID, name: String): LocalAccountSkin.Textures {
+        val skin = loaded.computeIfAbsent(uuid) { LocalAccountSkin.Textures().also { load(it, uuid, name, 0) } }
         val retry = retries[uuid]
-        if (retry != null && System.currentTimeMillis() >= retry.at && retries.remove(uuid, retry)) load(skin, uuid, name, local, retry.attempt)
+        if (retry != null && System.currentTimeMillis() >= retry.at && retries.remove(uuid, retry)) load(skin, uuid, name, retry.attempt)
         return skin
     }
 
-    private fun load(skin: LobbyAccountSkin, uuid: UUID, name: String, local: Boolean, attempt: Int) {
+    private fun load(skin: LocalAccountSkin.Textures, uuid: UUID, name: String, attempt: Int) {
         val mc = Minecraft.getInstance()
         LobbyUtil.ioPool().execute {
             val profile = runCatching {
-                if (local) mc.session.profile else mc.sessionService.fillProfileProperties(GameProfile(uuid, name), false)
-            }.getOrNull()?.takeIf { local || it.properties.containsKey("textures") }
+                mc.sessionService.fillProfileProperties(GameProfile(uuid, name), true)
+            }.getOrNull()?.takeIf { it.properties.containsKey("textures") }
             if (profile == null) {
-                if (attempt < RETRY_MILLIS.size) retries[uuid] = Retry(attempt + 1, System.currentTimeMillis() + RETRY_MILLIS[attempt])
+                val wait = RETRY_MILLIS.getOrNull(attempt) ?: REFRESH_MILLIS
+                retries[uuid] = Retry((attempt + 1).coerceAtMost(RETRY_MILLIS.size), System.currentTimeMillis() + wait)
                 return@execute
             }
+            retries[uuid] = Retry(0, System.currentTimeMillis() + REFRESH_MILLIS)
             runCatching {
                 mc.skinManager.register(profile, { type, location, texture ->
                     when (type) {

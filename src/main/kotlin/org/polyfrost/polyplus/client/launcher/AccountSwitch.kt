@@ -20,6 +20,7 @@ import net.minecraft.client.Session
 *///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyRealms
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -57,6 +58,7 @@ object AccountSwitch {
             accessor.`polyplus$setUserApiService`(userApiService)
             userProperties?.let { accessor.`polyplus$setUserPropertiesFuture`(CompletableFuture.completedFuture(it)) }
             accessor.`polyplus$setProfileKeyPairManager`(keyPairManager(mc, user, userApiService, microsoft))
+            LocalAccountSkin.onAccountSwitched(newId, profile?.profile())
             AccountSwitchCompat.notifySwitch(user.profileId, user.name, user.accessToken)
             previousId != newId
         }
@@ -73,6 +75,7 @@ object AccountSwitch {
                 clear()
                 profile?.let { putAll(it.properties) }
             }
+            LocalAccountSkin.onAccountSwitched(newId, profile)
             previousId != newId
         }
         *///?}

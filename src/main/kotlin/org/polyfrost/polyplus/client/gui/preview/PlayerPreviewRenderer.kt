@@ -15,6 +15,7 @@ import org.joml.Quaternionf
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
@@ -841,52 +842,9 @@ object PlayerPreviewRenderer {
         return equipment
     }
 
-    @Volatile
-    private var resolvedProfile: GameProfile? = null
-    private var resolvingProfileId: UUID? = null
-
-    private fun texturedProfile(mc: Minecraft): GameProfile? {
-        val id = mc.user.profileId
-        val startup = mc.gameProfile
-        if (startup.id == id) return startup // startup profile already carries textures
-        resolvedProfile?.let { if (it.id == id) return it }
-        synchronized(this) {
-            if (resolvingProfileId != id) {
-                resolvingProfileId = id
-                val name = mc.user.name
-                PolyPlusClient.SCOPE.launch {
-                    val fetched = runCatching {
-                        //? if >= 1.21.10 {
-                        mc.services().sessionService().fetchProfile(id, false)?.profile()
-                        //?} else {
-                        /*mc.minecraftSessionService.fetchProfile(id, false)?.profile()
-                        *///?}
-                    }.getOrNull() ?: GameProfile(id, name)
-                    synchronized(this@PlayerPreviewRenderer) {
-                        if (resolvingProfileId == id) {
-                            resolvedProfile = fetched
-                            resolvingProfileId = null
-                        }
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    //? if >= 1.21.10 {
-    private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(GameProfile(mc.user.profileId, mc.user.name))
-        return runCatching { mc.skinManager.createLookup(profile, false).get() }.getOrNull()
-            ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
-    }
-    //?} else {
-    /*private fun localSkin(mc: Minecraft): PlayerSkin? {
-        val profile = texturedProfile(mc) ?: return DefaultPlayerSkin.get(GameProfile(mc.user.profileId, mc.user.name))
-        return runCatching { mc.skinManager.getInsecureSkin(profile) }.getOrNull()
-            ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
-    }
-    *///?}
+    private fun localSkin(mc: Minecraft): PlayerSkin? =
+        runCatching { LocalAccountSkin.skin() }.getOrNull()
+            ?: runCatching { DefaultPlayerSkin.get(LocalAccountSkin.profile()) }.getOrNull()
 
     //? if >= 1.21.10 {
     private fun directState(skin: PlayerSkin): AvatarRenderState = AvatarRenderState().apply {
@@ -935,7 +893,7 @@ object PlayerPreviewRenderer {
 
     private fun dummy(mc: Minecraft, level: ClientLevel): AbstractClientPlayer? {
         // A bare-profile dummy would cache the default skin and never refresh under the same uuid
-        val profile = texturedProfile(mc) ?: return null
+        val profile = LocalAccountSkin.profile()
         dummy?.let { if (dummyProfileId == profile.id && it.level() === level) return it }
         return runCatching { RemotePlayer(level, profile) }.getOrNull()?.also {
             it.id = PREVIEW_ENTITY_ID
@@ -1249,11 +1207,9 @@ object PlayerPreviewRenderer {
     *///?}
 
     //? if >= 1.21.4 {
-    private fun legacySkin(mc: Minecraft): PlayerSkin? {
-        val profile = mc.gameProfile
-        return runCatching { mc.skinManager.getInsecureSkin(profile) }.getOrNull()
-            ?: runCatching { DefaultPlayerSkin.get(profile) }.getOrNull()
-    }
+    private fun legacySkin(mc: Minecraft): PlayerSkin? =
+        runCatching { LocalAccountSkin.skin() }.getOrNull()
+            ?: runCatching { DefaultPlayerSkin.get(LocalAccountSkin.profile()) }.getOrNull()
 
     private fun legacyPlayerRenderer(mc: Minecraft, skin: PlayerSkin): PlayerRenderer? {
         val map = (mc.entityRenderDispatcher as EntityRenderDispatcherAccessor)
@@ -1305,7 +1261,7 @@ object PlayerPreviewRenderer {
         //? if < 1.21.4 {
         /*// 1.21.1 has no render states: it must render a real entity, which needs a client
         val level = mc.level ?: PreviewWorld.level() ?: return false
-        val accountSkin = mc.skinManager.getInsecureSkin(mc.gameProfile) ?: DefaultPlayerSkin.get(mc.gameProfile)
+        val accountSkin = runCatching { LocalAccountSkin.skin() }.getOrNull() ?: DefaultPlayerSkin.get(LocalAccountSkin.profile())
         val skin = previewSkin(source)?.let { LocalSkinOverride.withSkin(accountSkin, it) } ?: accountSkin
         val player = legacyDummy(mc, level) ?: return false
         val cape = capeOverride(source)
@@ -1465,7 +1421,6 @@ import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.client.render.platform.Lighting
 import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.resources.Identifier
-import com.mojang.authlib.minecraft.MinecraftProfileTexture
 import org.polyfrost.compose.render.PolyBitmap
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
@@ -1483,6 +1438,7 @@ import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -1817,29 +1773,9 @@ object PlayerPreviewRenderer {
         return equipment
     }
 
-    @Volatile
-    private var fetchedSkin: Pair<Identifier, Boolean>? = null
-    @Volatile
-    private var fetchedCape: Identifier? = null
-    private var skinRequestedFor: UUID? = null
-
     private fun localSkin(mc: Minecraft): Pair<Identifier, Boolean> {
         mc.player?.let { return it.skinTextureLocation to (it.modelType == "slim") }
-        val profile = mc.session.profile
-        if (skinRequestedFor != profile.id) {
-            val id = profile.id
-            skinRequestedFor = id
-            fetchedSkin = null
-            fetchedCape = null
-            mc.skinManager.register(profile, { type, location, texture ->
-                if (skinRequestedFor == id) when (type) {
-                    MinecraftProfileTexture.Type.SKIN -> fetchedSkin = location to (texture.getMetadata("model") == "slim")
-                    MinecraftProfileTexture.Type.CAPE -> fetchedCape = location
-                    else -> {}
-                }
-            }, false)
-        }
-        fetchedSkin?.let { return it }
+        LocalAccountSkin.textures()?.let { textures -> textures.texture?.let { return it to (textures.slim == true) } }
         val id = ClientPlatform.localPlayerUuid()
         return DefaultSkinUtils.getDefaultSkin(id) to (DefaultSkinUtils.getDefaultModelType(id) == "slim")
     }
@@ -1852,8 +1788,7 @@ object PlayerPreviewRenderer {
         return if (tint != null) tint.particleColor else CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
     }
 
-    private fun accountCape(mc: Minecraft): Identifier? =
-        fetchedCape.takeIf { skinRequestedFor == mc.session.profile.id }
+    private fun accountCape(mc: Minecraft): Identifier? = LocalAccountSkin.textures()?.cape
 
     private val OPTIFINE_USERNAME = Regex("[A-Za-z0-9_]+")
     private val optifineCapesRequested = ConcurrentHashMap.newKeySet<String>()

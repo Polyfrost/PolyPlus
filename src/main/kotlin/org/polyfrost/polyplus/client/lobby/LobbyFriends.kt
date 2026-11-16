@@ -42,6 +42,7 @@ object LobbyFriends {
     private val retries = ConcurrentHashMap<UUID, Retry>()
     private val RETRY_MILLIS = longArrayOf(30_000L, 120_000L, 600_000L)
     private const val FALLBACK_RETRY_MILLIS = 300_000L
+    private const val REFRESH_MILLIS = 1_800_000L
 
     private class Retry(val attempt: Int, val at: Long)
     //? if >= 1.21.10 {
@@ -122,17 +123,17 @@ object LobbyFriends {
                 val mc = Minecraft.getInstance()
                 val fetched = runCatching {
                     //? if >= 1.21.10 {
-                    mc.services().sessionService().fetchProfile(friend.uuid, false)?.profile()
+                    mc.services().sessionService().fetchProfile(friend.uuid, true)?.profile()
                     //?} elif > 1.8.9 {
-                    /*mc.minecraftSessionService.fetchProfile(friend.uuid, false)?.profile()
+                    /*mc.minecraftSessionService.fetchProfile(friend.uuid, true)?.profile()
                     *///?} else {
-                    /*mc.sessionService.fillProfileProperties(GameProfile(friend.uuid, friend.name), false)?.takeIf { it.properties.containsKey("textures") }
+                    /*mc.sessionService.fillProfileProperties(GameProfile(friend.uuid, friend.name), true)?.takeIf { it.properties.containsKey("textures") }
                     *///?}
                 }.getOrNull()
                 when {
                     fetched != null -> {
                         profiles[friend.uuid] = fetched
-                        retries.remove(friend.uuid)
+                        retries[friend.uuid] = Retry(0, System.currentTimeMillis() + REFRESH_MILLIS)
                     }
                     attempt < RETRY_MILLIS.size -> retries[friend.uuid] = Retry(attempt + 1, System.currentTimeMillis() + RETRY_MILLIS[attempt])
                     else -> {

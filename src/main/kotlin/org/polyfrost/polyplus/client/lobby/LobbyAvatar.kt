@@ -27,6 +27,7 @@ import org.polyfrost.polyplus.client.cosmetics.CapeResolver
 /*import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache*/
 //? if = 1.8.9
 /*import org.polyfrost.polyplus.client.cosmetics.MojangCapeService*/
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import kotlin.math.hypot
 
@@ -79,22 +80,24 @@ class LobbyAvatar(
 
     //? if > 1.8.9 {
     override fun getSkin(): PlayerSkin {
-        val skin = CapeResolver.applyCape(uuid, gameProfile, skinSource())
-        if (!isLocal) return skin
+        if (!isLocal) return CapeResolver.applyCape(uuid, gameProfile, skinSource())
+        val skin = CapeResolver.applyCape(uuid, LocalAccountSkin.profile(), LocalAccountSkin.skin())
         val chosen = LobbyWardrobe.preview?.skin?.let { LocalSkinOverride.withSkin(skin, it) } ?: LocalSkinOverride.apply(uuid, skin)
         return LobbyWardrobe.withPreviewCape(chosen)
     }
     //?} else {
     /*override fun getLightLevel(tickDelta: Float): Int = LobbyScene.lightFor(this, super.getLightLevel(tickDelta))
 
-    private val account by lazy { LobbyAccountSkins.of(uuid, gameProfile.name, isLocal) }
+    private val friendSkin by lazy { LobbyAccountSkins.of(uuid, gameProfile.name) }
+
+    private fun account(): LocalAccountSkin.Textures? = if (isLocal) LocalAccountSkin.textures() else friendSkin
 
     private fun chosenSkin() = (LobbyWardrobe.preview?.skin ?: LocalSkinOverride.forPlayer(uuid)).takeIf { isLocal }
 
-    override fun getSkinTextureLocation(): Identifier = chosenSkin()?.texture ?: account.texture ?: skinSource().texture()
+    override fun getSkinTextureLocation(): Identifier = chosenSkin()?.texture ?: account()?.texture ?: skinSource().texture()
 
     override fun getModelType(): String {
-        val slim = chosenSkin()?.slim ?: account.slim ?: return super.getModelType()
+        val slim = chosenSkin()?.slim ?: account()?.slim ?: return super.getModelType()
         return if (slim) "slim" else "default"
     }
 
@@ -111,7 +114,7 @@ class LobbyAvatar(
             MojangCapeService.localCapeTexture()?.let { return it }
             if (MojangCapeService.localCapeHidden()) return null
         }
-        return account.cape ?: game
+        return account()?.cape ?: game
     }
 
     var scale = 1f
