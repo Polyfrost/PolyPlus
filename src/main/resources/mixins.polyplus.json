@@ -203,6 +203,7 @@
     //? if = 1.8.9
     //"client.lobby.MixinGameGui",
     "client.lobby.MixinGameRenderer",
+    "client.lobby.MixinLobbyHand",
     //? if < 26.1 && > 1.8.9
     //"client.lobby.MixinLevelRenderer",
     //? if < 1.21.8 && > 1.8.9
