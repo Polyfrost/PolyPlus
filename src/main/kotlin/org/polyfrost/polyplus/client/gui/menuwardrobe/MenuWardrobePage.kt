@@ -5,16 +5,13 @@ package org.polyfrost.polyplus.client.gui.menuwardrobe
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,7 +36,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,8 +49,8 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
+import org.polyfrost.polyplus.client.gui.lobbyshell.CustomizeKit
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
-import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberOnlineConsent
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
@@ -95,13 +91,18 @@ private const val SHADOW_HEIGHT = 0.05f
 
 private val SideScrim = Color(0xFF0B1013)
 private val FrameTop = 76.dp
-private val CarouselLift = 8.dp
+private val FrameStart = LobbyLayout.Margin + RailWidth + LobbyLayout.Gap
+private val FrameEnd = LobbyLayout.Margin + CustomizeKit.PanelWidth + LobbyLayout.Gap
+private val FrameBottom = LobbyLayout.PageBottom
+private val DrawerBottom = LobbyLayout.PageBottom
+private val OutfitRowHeight = 46.dp
+private val LoadingHeight = 220.dp
 
-private fun wardrobeFrame(width: Float, height: Float, start: Dp, bottom: Dp) = LobbyWardrobe.Frame(
-    start.value / width,
+private fun wardrobeFrame(width: Float, height: Float) = LobbyWardrobe.Frame(
+    FrameStart.value / width,
     FrameTop.value / height,
-    1f - LobbyLayout.BarEnd.value / width,
-    1f - bottom.value / height,
+    1f - FrameEnd.value / width,
+    1f - FrameBottom.value / height,
 )
 
 private fun sideScrim() = Brush.horizontalGradient(
@@ -128,11 +129,10 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
     var refreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf<String?>(null) }
     var loadState by remember { mutableStateOf(CosmeticLoadProgress.snapshot()) }
-    var pickerType by remember { mutableStateOf<CosmeticType?>(null) }
+    val drawer = remember { DrawerState() }
     var selected by remember { mutableStateOf<Pair<CosmeticType, Int>?>(null) }
     var selectedCape by remember { mutableStateOf<MojangCape?>(null) }
     var hovered by remember { mutableStateOf<PickerEntry?>(null) }
-    var view by remember { mutableStateOf<WardrobeView?>(null) }
     var selection by remember { mutableStateOf<WardrobeSelection?>(null) }
     var wheelSlot by remember { mutableStateOf<Int?>(null) }
     var historyKey by remember { mutableIntStateOf(0) }
@@ -144,7 +144,7 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
     val rotation = remember { PreviewRotation(FRONT_YAW) }
 
     LaunchedEffect(online) {
-        if (online) PolyPlusClient.refreshCosmeticsIfNeeded() else pickerType = CosmeticType.Cape
+        if (online) PolyPlusClient.refreshCosmeticsIfNeeded() else drawer.open(DrawerPage.Slot(CosmeticType.Cape))
         MojangCapeService.refreshIfNeeded()
         while (true) {
             loadState = CosmeticLoadProgress.snapshot()
@@ -154,6 +154,8 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
         }
     }
     LaunchedEffect(refreshKey) { auraColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid()) }
+    val view = drawer.view
+    val pickerType = drawer.slotType ?: CosmeticType.Emote.takeIf { view == WardrobeView.Wheel }
     LaunchedEffect(view) {
         when (view) {
             WardrobeView.Outfits -> OutfitLibrary.refreshIfNeeded(reload = true)
@@ -222,23 +224,9 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
         wheelSlot = null
     }
 
-    fun openSlot(type: CosmeticType) {
-        pickerType = if (pickerType == type) null else type
-        view = null
-        clearPicks()
-    }
+    LaunchedEffect(drawer.page) { clearPicks() }
 
-    fun openView(next: WardrobeView) {
-        view = next.takeUnless { it == view }
-        pickerType = CosmeticType.Emote.takeIf { view == WardrobeView.Wheel }
-        clearPicks()
-    }
-
-    fun closePanels() {
-        view = null
-        pickerType = null
-        clearPicks()
-    }
+    fun openSlot(type: CosmeticType) = drawer.open(DrawerPage.Slot(type))
 
     fun retryLoad() {
         PolyPlusClient.refreshCosmetics()
@@ -301,7 +289,7 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
                     toggleMojangCape(cape) { status = it }
                 }
             },
-            onClose = { openSlot(type) },
+            onClose = drawer::back,
             onMarketplace = onMarketplace.takeIf { online },
             aura = AuraChoice(
                 auraColor,
@@ -316,6 +304,8 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
             ).takeIf { type == CosmeticType.Aura && entries.isNotEmpty() },
             forceToggle = online && type == CosmeticType.Cape,
             note = capeNote(mojangState).takeIf { type == CosmeticType.Cape },
+            status = status,
+            picksToWheel = wheelPicking,
         )
     }
 
@@ -341,20 +331,40 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
         }
     }
 
+    val groups = remember(items, mojangCapes, online) { railGroups(items, mojangCapes, online) }
+
+    fun wearing(type: CosmeticType): SlotWearing {
+        val slot = groups.asSequence().flatMap { it.slots }.firstOrNull { it.type == type }
+        val item = slot?.item
+        val cape = slot?.cape
+        val action: (() -> Unit)? = when {
+            item != null -> {
+                {
+                    selected = null
+                    status = "Unequipping ${item.name}..."
+                    unequip(item, item.equippedVariantId, ::completed)
+                }
+            }
+            cape != null -> {
+                {
+                    selectedCape = null
+                    toggleMojangCape(cape) { status = it }
+                }
+            }
+            else -> null
+        }
+        return SlotWearing(slot?.name, action)
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val width = maxWidth.value
         val height = maxHeight.value
-        val picker = pickerType?.let(::pickerModel)
-        val shownView = view
-        val frameStart = if (shownView != null) LobbyLayout.BarStart + shownView.width + LobbyLayout.Gap else LobbyLayout.BarStart
-        val frameBottom = if (picker != null) LobbyLayout.PageBottom + CarouselLift + CarouselHeight + LobbyLayout.Gap else LobbyLayout.PageBottom
-        if (picker != null || shownView != null) EscapeCloses(::closePanels)
-        LaunchedEffect(width, height, frameStart, frameBottom) {
-            LobbyWardrobe.frame = wardrobeFrame(width, height, frameStart, frameBottom)
+        LaunchedEffect(width, height) {
+            LobbyWardrobe.frame = wardrobeFrame(width, height)
         }
         Box(Modifier.fillMaxSize().background(sideScrim()))
         val freeArea = Modifier
-            .padding(start = frameStart, end = LobbyLayout.BarEnd, top = FrameTop, bottom = frameBottom)
+            .padding(start = FrameStart, end = FrameEnd, top = FrameTop, bottom = FrameBottom)
             .fillMaxSize()
         if (liveScene) {
             Box(
@@ -391,87 +401,78 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
                 lights = FALLBACK_LIGHTS,
             )
         }
-        val railSlots = remember(items, mojangCapes, online) { railSlots(items, mojangCapes).filter { online || it.type == CosmeticType.Cape } }
-        val compactSlots = remember(items) { compactSlots(items) }
         EquippedRail(
-            slots = railSlots,
-            compact = compactSlots,
+            groups = groups,
             title = when {
                 !online -> "Capes"
                 loadState.ready -> "Equipped"
                 else -> loadState.failure ?: loadState.label
             },
-            activeType = pickerType,
+            activeType = drawer.slotType,
             onBack = onBack,
             onRefresh = ::refresh,
             onSelect = ::openSlot,
             modifier = Modifier
-                .padding(start = LobbyLayout.Margin, top = LobbyLayout.Top)
-                .width(RailWidth),
+                .padding(start = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = FrameBottom)
+                .width(RailWidth)
+                .fillMaxHeight(),
         )
-        Column(
+        WardrobeDrawer(
+            drawer,
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = LobbyLayout.RightColumnBottom)
-                .width(LobbyLayout.UnitWidth)
+                .padding(end = LobbyLayout.Margin, top = LobbyLayout.Top, bottom = DrawerBottom)
+                .width(CustomizeKit.PanelWidth)
                 .fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when {
-                online -> {
-                    OutfitPanel(onStatus = { status = it }, modifier = Modifier.fillMaxWidth().height(46.dp))
-                    ViewTabs(shownView, ::openView, Modifier.fillMaxWidth().height(46.dp))
-                    if (loadState.ready) {
-                        SeasonalBundlePanel(items, onMarketplace, Modifier.fillMaxWidth().weight(1f))
-                    } else {
-                        Box(Modifier.fillMaxWidth().weight(1f).panel().padding(16.dp)) {
-                            CosmeticsLoadingScreen(loadState, ::retryLoad)
+        ) { page ->
+            when (page) {
+                DrawerPage.Home -> DrawerHomePage(
+                    drawer,
+                    top = {
+                        when {
+                            online -> OutfitPanel(onStatus = { status = it }, modifier = Modifier.fillMaxWidth().height(OutfitRowHeight))
+                            consentCard -> ConsentStep(
+                                "Cosmetics and outfits need online services.",
+                                Modifier.fillMaxWidth(),
+                                { consentCard = false },
+                                onAccepted,
+                            )
+                            else -> CapesOnlyPanel({ consentCard = true }, Modifier.fillMaxWidth())
                         }
-                    }
-                }
-                consentCard -> ConsentStep(
-                    "Cosmetics and outfits need online services.",
-                    Modifier.fillMaxWidth(),
-                    { consentCard = false },
-                    onAccepted,
+                    },
+                    bottom = when {
+                        !online -> null
+                        loadState.ready -> {
+                            { SeasonalBundlePanel(items, onMarketplace, Modifier.fillMaxWidth()) }
+                        }
+                        else -> {
+                            { Box(Modifier.fillMaxWidth().height(LoadingHeight)) { CosmeticsLoadingScreen(loadState, ::retryLoad) } }
+                        }
+                    },
+                    libraries = online,
                 )
-                else -> CapesOnlyPanel({ consentCard = true }, Modifier.fillMaxWidth())
+                is DrawerPage.Slot -> DrawerSlotPage(pickerModel(page.type), wearing(page.type))
+                is DrawerPage.Library -> LibraryPage(
+                    view = page.view,
+                    selection = selection,
+                    wheelSlot = wheelSlot,
+                    wheelPicker = pickerModel(CosmeticType.Emote).takeIf { page.view == WardrobeView.Wheel },
+                    store = store,
+                    ownedIds = ownedIds,
+                    refreshKey = refreshKey,
+                    historyKey = historyKey,
+                    actions = DrawerActions(
+                        onSelect = { selection = it },
+                        onSelectSlot = { wheelSlot = it },
+                        onStatus = { status = it },
+                    ),
+                )
             }
         }
-        if (shownView != null) {
-            LibraryDrawer(
-                view = shownView,
-                selection = selection,
-                wheelSlot = wheelSlot,
-                store = store,
-                ownedIds = ownedIds,
-                refreshKey = refreshKey,
-                historyKey = historyKey,
-                actions = DrawerActions(
-                    onSelect = { selection = it },
-                    onSelectSlot = { wheelSlot = it },
-                    onStatus = { status = it },
-                    onClose = ::closePanels,
-                ),
-                modifier = Modifier
-                    .padding(start = LobbyLayout.BarStart, top = LobbyLayout.Top, bottom = LobbyLayout.PageBottom)
-                    .width(shownView.width)
-                    .fillMaxHeight(),
-            )
-        }
-        if (picker != null) {
-            CarouselPicker(
-                picker,
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = frameStart, end = LobbyLayout.BarEnd, bottom = LobbyLayout.PageBottom + CarouselLift)
-                    .fillMaxWidth(),
-            )
-        }
-        status?.let {
+        status?.takeIf { pickerType == null }?.let {
             Box(
                 Modifier
-                    .padding(start = frameStart, end = LobbyLayout.BarEnd, bottom = frameBottom + LobbyLayout.Gap)
+                    .padding(start = FrameStart, end = FrameEnd, bottom = FrameBottom + LobbyLayout.Gap)
                     .fillMaxSize(),
                 contentAlignment = Alignment.BottomCenter,
             ) {

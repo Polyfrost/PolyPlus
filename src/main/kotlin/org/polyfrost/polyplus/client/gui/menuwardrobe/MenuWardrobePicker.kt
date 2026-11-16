@@ -1,66 +1,72 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
+@file:OptIn(ExperimentalOneConfigUiApi::class, ExperimentalLayoutApi::class)
 
 package org.polyfrost.polyplus.client.gui.menuwardrobe
 
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
-import org.polyfrost.oneconfig.api.ui.v1.components.Badge
-import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
-import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
-import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
-import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlIndication
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ItemSelectionStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
 import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
+import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
@@ -68,31 +74,22 @@ import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.gui.ThemedIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.CustomizeKit
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.PanelHint
+import org.polyfrost.polyplus.client.gui.lobbyshell.Segmented
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.wardrobe.AuraColorPopup
 import org.polyfrost.polyplus.client.gui.wardrobe.AuraSwatchRow
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticUiItem
 import org.polyfrost.polyplus.client.gui.wardrobe.ForceCapesToggle
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import kotlin.math.abs
-import kotlin.math.roundToInt
-import org.polyfrost.oneconfig.api.ui.v1.components.Text
-import androidx.compose.ui.text.style.TextOverflow
 
-private val CarouselHeaderHeight = 38.dp
-private val CarouselPadding = 10.dp
-private val CarouselRowGap = 8.dp
-private val CarouselTileHeight = 100.dp
-private val CarouselTileWidth = 100.dp
-private val CarouselTileGap = 8.dp
-private val CarouselWidth = 700.dp
-private val FadingEdge = 32.dp
-private val CarouselWheelStep = 108.dp
-private val VariantWheelStep = 40.dp
-private const val WheelNotchDp = 150f
-private val NoteTileWidth = 260.dp
+private const val GRID_COLUMNS = 3
+private const val DOUBLE_CLICK_MS = 400L
+private val TileGap = 8.dp
+private val TileRadius = 12.dp
 internal val OutlineOnHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)
-internal val CarouselHeight = CarouselPadding * 2 + CarouselHeaderHeight + CarouselRowGap + CarouselTileHeight
 
 internal class PickerEntry(val key: String, val name: String, val equipped: Boolean, val item: CosmeticUiItem?, val cape: MojangCape?)
 
@@ -114,7 +111,43 @@ internal class PickerModel(
     val aura: AuraChoice?,
     val forceToggle: Boolean,
     val note: String?,
+    val status: String? = null,
+    val picksToWheel: Boolean = false,
 )
+
+private enum class PickerFilter(val label: String) {
+    All("All"),
+    Equipped("Equipped"),
+    PolyPlus("PolyPlus"),
+    Minecraft("Minecraft"),
+}
+
+private enum class ApplyAction { Equip, Unequip, Equipped }
+
+private fun filtersFor(type: CosmeticType): List<PickerFilter> =
+    if (type == CosmeticType.Cape) listOf(PickerFilter.All, PickerFilter.PolyPlus, PickerFilter.Minecraft)
+    else listOf(PickerFilter.All, PickerFilter.Equipped)
+
+private fun PickerEntry.matches(filter: PickerFilter, query: String): Boolean {
+    val passes = when (filter) {
+        PickerFilter.All -> true
+        PickerFilter.Equipped -> equipped
+        PickerFilter.PolyPlus -> item != null
+        PickerFilter.Minecraft -> cape != null
+    }
+    return passes && (query.isBlank() || name.contains(query.trim(), ignoreCase = true))
+}
+
+private fun PickerModel.applyAction(): ApplyAction? {
+    val target = target ?: return null
+    return when {
+        unequips && selected == null -> ApplyAction.Equipped
+        unequips -> ApplyAction.Unequip
+        else -> ApplyAction.Equip
+    }
+}
+
+private fun PickerModel.variantItem(): CosmeticUiItem? = (selected ?: target)?.item?.takeIf { it.hasVariants }
 
 @Composable
 private fun EntryArt(entry: PickerEntry, model: PickerModel, modifier: Modifier) {
@@ -127,8 +160,12 @@ private fun EntryArt(entry: PickerEntry, model: PickerModel, modifier: Modifier)
 }
 
 @Composable
-private fun TryOnWhileHovered(entry: PickerEntry, hovered: Boolean, model: PickerModel) {
-    LaunchedEffect(entry.key, hovered) { model.onHover(entry, hovered) }
+private fun TryOnWhileHovered(entry: PickerEntry, hovered: Boolean, onHover: (PickerEntry, Boolean) -> Unit) {
+    val callback by rememberUpdatedState(onHover)
+    DisposableEffect(entry.key, hovered) {
+        if (hovered) callback(entry, true)
+        onDispose { if (hovered) callback(entry, false) }
+    }
 }
 
 @Composable
@@ -153,24 +190,286 @@ internal fun OutlineIconButton(icon: String, modifier: Modifier = Modifier, onCl
 }
 
 @Composable
-internal fun CarouselPicker(model: PickerModel, modifier: Modifier) {
-    Box(modifier, contentAlignment = Alignment.BottomCenter) {
-        Column(
-            Modifier.widthIn(max = CarouselWidth).fillMaxWidth().panel(16.dp).padding(CarouselPadding),
-            verticalArrangement = Arrangement.spacedBy(CarouselRowGap),
-        ) {
-            Row(Modifier.fillMaxWidth().height(CarouselHeaderHeight), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(model.type.displayName, Modifier.padding(start = 2.dp), style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                Box(Modifier.weight(1f)) { CarouselVariants(model) }
-                model.aura?.let { AuraControl(it) }
-                if (model.forceToggle) ForceCapesToggle()
-                model.target?.let { target ->
-                    Text(target.name, Modifier.widthIn(max = 130.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                    TextButton(text = if (model.unequips) "Unequip" else "Equip", onClick = model.onApply, modifier = Modifier, style = if (model.unequips) ControlStyle.Secondary else ControlStyle.Primary, size = ControlSize.Large)
-                }
-                OutlineIconButton("close", Modifier, model.onClose)
+internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
+    val current by rememberUpdatedState(model)
+    var query by remember(model.type) { mutableStateOf("") }
+    var filter by remember(model.type) { mutableStateOf(PickerFilter.All) }
+    var cursor by remember(model.type) { mutableStateOf(model.selected?.key) }
+    val grid = remember(model.type) { LazyGridState() }
+    val focus = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    val filters = filtersFor(model.type)
+    val shown = model.entries.filter { it.matches(filter, query) }
+
+    LaunchedEffect(model.selected?.key) { model.selected?.key?.let { cursor = it } }
+    LaunchedEffect(model.type) { runCatching { focus.requestFocus() } }
+
+    fun move(delta: Int) {
+        val list = current.entries.filter { it.matches(filter, query) }
+        if (list.isEmpty()) return
+        val from = list.indexOfFirst { it.key == (cursor ?: current.selected?.key ?: current.target?.key) }
+        val next = if (from < 0) 0 else (from + delta).coerceIn(0, list.lastIndex)
+        val entry = list[next]
+        cursor = entry.key
+        if (!current.picksToWheel) current.onPick(entry)
+        scope.revealItem(grid, next)
+    }
+
+    fun confirm(): Boolean {
+        val model = current
+        if (model.picksToWheel) {
+            val entry = model.entries.firstOrNull { it.key == cursor } ?: return false
+            model.onPick(entry)
+            return true
+        }
+        val action = model.applyAction() ?: return false
+        if (action == ApplyAction.Equipped) return false
+        model.onApply()
+        return true
+    }
+
+    fun onKey(event: KeyEvent): Boolean {
+        if (event.type != KeyEventType.KeyDown) return false
+        return when (event.key) {
+            Key.DirectionLeft -> { move(-1); true }
+            Key.DirectionRight -> { move(1); true }
+            Key.DirectionUp -> { move(-GRID_COLUMNS); true }
+            Key.DirectionDown -> { move(GRID_COLUMNS); true }
+            Key.Enter, Key.NumPadEnter -> confirm()
+            else -> false
+        }
+    }
+
+    Column(modifier.fillMaxSize()) {
+        if (model.entries.isEmpty()) {
+            EmptySlot(model, Modifier.fillMaxWidth().weight(1f))
+        } else {
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(CustomizeKit.SectionGap),
+            ) {
+                SearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = "Search ${model.type.displayName.lowercase()}",
+                    size = ControlSize.Regular,
+                )
+                Segmented(filters, filter, { filter = it }, label = { it.label })
+                model.note?.let { PanelHint(it) }
             }
-            CarouselStrip(model)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = CustomizeKit.SectionGap)
+                    .focusRequester(focus)
+                    .onPreviewKeyEvent(::onKey)
+                    .focusable(),
+            ) {
+                if (shown.isEmpty() && model.onMarketplace == null) {
+                    NoMatches(Modifier.fillMaxSize())
+                } else {
+                    PickerGrid(model, shown, grid, cursor) { entry ->
+                        cursor = entry.key
+                        runCatching { focus.requestFocus() }
+                    }
+                    if (shown.isEmpty()) NoMatches(Modifier.fillMaxWidth().padding(top = 140.dp))
+                }
+            }
+        }
+        model.status?.let {
+            Box(Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                Badge(it, overImage = true)
+            }
+        }
+        PickerFooter(model)
+    }
+}
+
+private fun CoroutineScope.revealItem(grid: LazyGridState, index: Int) {
+    val visible = grid.layoutInfo.visibleItemsInfo
+    val viewport = grid.layoutInfo.viewportEndOffset
+    val info = visible.firstOrNull { it.index == index }
+    val fullyVisible = info != null && info.offset.y >= 0 && info.offset.y + info.size.height <= viewport
+    if (!fullyVisible) launch { grid.animateScrollToItem(index) }
+}
+
+@Composable
+private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyGridState, cursor: String?, onTileClick: (PickerEntry) -> Unit) {
+    val current by rememberUpdatedState(model)
+    var lastClickKey by remember { mutableStateOf<String?>(null) }
+    var lastClickAt by remember { mutableLongStateOf(0L) }
+
+    fun click(entry: PickerEntry) {
+        val now = System.currentTimeMillis()
+        val doubled = lastClickKey == entry.key && now - lastClickAt <= DOUBLE_CLICK_MS
+        lastClickKey = entry.key
+        lastClickAt = now
+        onTileClick(entry)
+        val model = current
+        if (model.picksToWheel) {
+            model.onPick(entry)
+            return
+        }
+        if (!doubled) {
+            model.onPick(entry)
+            return
+        }
+        lastClickKey = null
+        if (model.selected?.key == entry.key && !model.unequips) model.onApply()
+    }
+
+    ScrollContainer(grid, Modifier.fillMaxSize(), scrollbar = false, fadingEdges = true) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(GRID_COLUMNS),
+            state = grid,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TileGap),
+            verticalArrangement = Arrangement.spacedBy(TileGap),
+        ) {
+            items(shown, key = { it.key }) { entry ->
+                PickerTile(
+                    entry = entry,
+                    model = model,
+                    selected = entry.key == model.selected?.key || (model.picksToWheel && entry.key == cursor),
+                    onClick = { click(entry) },
+                )
+            }
+            model.onMarketplace?.let { open -> item(key = "get-more") { GetMoreTile(open) } }
+        }
+    }
+}
+
+@Composable
+private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean, onClick: () -> Unit) {
+    val hover = rememberHoverState()
+    TryOnWhileHovered(entry, hover.hovered, model.onHover)
+    val theme = OneConfigTheme.current
+    val shape = OneConfigTheme.shape(TileRadius)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(if (entry.equipped && !selected) Modifier.border(1.5.dp, OneConfigTheme.accent, shape) else Modifier)
+            .hoverable(hover.interactionSource)
+            .selectableRow(selected, onClick, entry.name, shape, style = ItemSelectionStyle.Accent, interactionSource = hover.interactionSource)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(8.dp), glass = false),
+        ) {
+            EntryArt(entry, model, Modifier.fillMaxSize().padding(6.dp))
+            if (entry.equipped) EquippedCheck(Modifier.align(Alignment.TopEnd).padding(4.dp))
+        }
+        Text(
+            entry.name,
+            Modifier.fillMaxWidth(),
+            color = SelectionDefaults.itemContentColor(selected, ItemSelectionStyle.Accent),
+            style = theme.typography.small.copy(fontWeight = FontWeight.Medium),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+        )
+    }
+}
+
+@Composable
+private fun EquippedCheck(modifier: Modifier) {
+    Box(
+        modifier.size(18.dp).clip(CircleShape).background(OneConfigTheme.accent),
+        contentAlignment = Alignment.Center,
+    ) {
+        LobbyIcon("check", SelectionDefaults.itemContentColor(true, ItemSelectionStyle.Accent), 12.dp)
+    }
+}
+
+@Composable
+private fun GetMoreTile(onClick: () -> Unit) {
+    val theme = OneConfigTheme.current
+    val color = theme.textColorSecondary
+    val shape = OneConfigTheme.shape(TileRadius)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.8f)
+            .clip(shape)
+            .border(1.dp, theme.textColorSecondary.copy(alpha = 0.25f), shape)
+            .oneConfigClickable("Get more in the Marketplace", onClick, shape = shape, recipe = OutlineOnHover)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+    ) {
+        ThemedIcon("plus", color, 16.dp)
+        Text("Get more", color = color, style = theme.typography.small, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun NoMatches(modifier: Modifier) {
+    Box(modifier, contentAlignment = Alignment.TopCenter) {
+        Text("Nothing matches", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+    }
+}
+
+@Composable
+private fun EmptySlot(model: PickerModel, modifier: Modifier) {
+    val name = model.type.displayName.lowercase()
+    Box(modifier, contentAlignment = Alignment.Center) {
+        EmptyState(
+            title = if (model.type == CosmeticType.Cape) "No capes yet" else "No $name yet",
+            text = model.note ?: "You don't own any $name yet. Find one you like in the Marketplace.",
+            action = model.onMarketplace?.let { open ->
+                { TextButton(text = "Open Marketplace", onClick = open, style = ControlStyle.Primary) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PickerFooter(model: PickerModel) {
+    val variantItem = model.variantItem()
+    val action = model.applyAction()
+    val aura = model.aura
+    if (variantItem == null && aura == null && !model.forceToggle && action == null) return
+    Column(
+        Modifier.fillMaxWidth().padding(top = CustomizeKit.SectionGap),
+        verticalArrangement = Arrangement.spacedBy(CustomizeKit.SectionGap),
+    ) {
+        if (variantItem != null) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                for (variant in variantItem.variants) {
+                    Chip(label = variant.name, selected = variant.id == model.variantOf(variantItem), onClick = { model.onPickVariant(variantItem, variant.id) })
+                }
+            }
+        }
+        if (aura != null) AuraControl(aura)
+        if (model.forceToggle) ForceCapesToggle()
+        val target = model.target
+        if (action != null && target != null) {
+            TextButton(
+                text = when (action) {
+                    ApplyAction.Equip -> "Equip ${target.name}"
+                    ApplyAction.Unequip -> "Unequip ${target.name}"
+                    ApplyAction.Equipped -> "Equipped"
+                },
+                onClick = model.onApply,
+                style = if (action == ApplyAction.Equip) ControlStyle.Primary else ControlStyle.Secondary,
+                size = ControlSize.Large,
+                enabled = action != ApplyAction.Equipped,
+                fillWidth = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -183,158 +482,6 @@ private fun AuraControl(aura: AuraChoice) {
         if (customOpen) {
             AuraColorPopup(aura.color, aura.onPreview, aura.onCommit, onDismiss = { customOpen = false })
         }
-    }
-}
-
-@Composable
-private fun CarouselVariants(model: PickerModel) {
-    val item = (model.selected ?: model.target)?.item?.takeIf { it.hasVariants } ?: return
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    val wheelStep = with(LocalDensity.current) { VariantWheelStep.toPx() }
-    ScrollContainer(
-        scroll,
-        Modifier.wheelSteps(scroll, scope, wheelStep),
-        orientation = Orientation.Horizontal,
-        scrollbar = false,
-        smoothWheel = false,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (variant in item.variants) {
-                Box(Modifier) {
-                    Chip(label = variant.name, selected = variant.id == model.variantOf(item), onClick = { model.onPickVariant(item, variant.id) })
-                }
-            }
-        }
-    }
-}
-
-private fun Modifier.wheelSteps(scroll: ScrollState, scope: CoroutineScope, step: Float): Modifier =
-    pointerInput(scroll, step) {
-        var target = Float.NaN
-        awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                if (event.type != PointerEventType.Scroll) continue
-                val change = event.changes.firstOrNull() ?: continue
-                val delta = change.scrollDelta
-                val notches = (if (abs(delta.x) > abs(delta.y)) delta.x else delta.y) / WheelNotchDp
-                val from = if (target.isNaN() || !scroll.isScrollInProgress) scroll.value.toFloat() else target
-                val next = (from + notches * step).coerceIn(0f, scroll.maxValue.toFloat())
-                target = next
-                scope.launch {
-                    scroll.animateScrollTo(next.roundToInt(), Motion.spec(spring()))
-                    if (target == next) target = Float.NaN
-                }
-                change.consume()
-            }
-        }
-    }
-
-@Composable
-private fun CarouselStrip(model: PickerModel) {
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    val wheelStep = with(LocalDensity.current) { CarouselWheelStep.toPx() }
-    val edge = OneConfigTheme.current.pageBackground
-    val startAlpha by Motion.animateFloatAsState(if (scroll.canScrollBackward) 1f else 0f)
-    val endAlpha by Motion.animateFloatAsState(if (scroll.canScrollForward) 1f else 0f)
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .height(CarouselTileHeight)
-            .wheelSteps(scroll, scope, wheelStep)
-            .drawWithContent {
-                drawContent()
-                val length = FadingEdge.toPx()
-                drawRect(
-                    Brush.horizontalGradient(listOf(edge, Color.Transparent), startX = 0f, endX = length),
-                    size = Size(length, size.height),
-                    alpha = startAlpha,
-                )
-                drawRect(
-                    Brush.horizontalGradient(listOf(Color.Transparent, edge), startX = size.width - length, endX = size.width),
-                    topLeft = Offset(size.width - length, 0f),
-                    size = Size(length, size.height),
-                    alpha = endAlpha,
-                )
-            },
-    ) {
-        ScrollContainer(
-            scroll,
-            Modifier.fillMaxHeight(),
-            orientation = Orientation.Horizontal,
-            scrollbar = false,
-            smoothWheel = false,
-        ) {
-            Row(
-                Modifier.fillMaxHeight().widthIn(min = maxWidth),
-                horizontalArrangement = Arrangement.spacedBy(CarouselTileGap, Alignment.CenterHorizontally),
-            ) {
-                model.note?.let { NoteTile(it) }
-                for (entry in model.entries) CarouselTile(entry, model)
-                model.onMarketplace?.let { MarketplaceTile(it) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CarouselTile(entry: PickerEntry, model: PickerModel) {
-    val hover = rememberHoverState()
-    TryOnWhileHovered(entry, hover.hovered, model)
-    val selected = entry.key == model.selected?.key
-    val theme = OneConfigTheme.current
-    val shape = OneConfigTheme.shape(12.dp)
-    Column(
-        Modifier
-            .width(CarouselTileWidth)
-            .fillMaxHeight()
-            .themedSurface(SurfaceKind.Card, shape, glass = false)
-            .then(if (entry.equipped && !selected) Modifier.border(1.dp, OneConfigTheme.accent, shape) else Modifier)
-            .hoverable(hover.interactionSource)
-            .selectableRow(selected, { model.onPick(entry) }, entry.name, shape, interactionSource = hover.interactionSource)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(5.dp), glass = false),
-        ) {
-            EntryArt(entry, model, Modifier.fillMaxSize().padding(6.dp))
-            if (entry.equipped) Box(Modifier.align(Alignment.TopStart).padding(2.dp)) { Badge("Equipped", tone = BadgeTone.Accent, style = BadgeStyle.Solid) }
-        }
-        Text(entry.name, color = SelectionDefaults.itemContentColor(selected), style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-    }
-}
-
-@Composable
-private fun NoteTile(text: String) {
-    Box(Modifier.width(NoteTileWidth).fillMaxHeight().padding(6.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun MarketplaceTile(onClick: () -> Unit) {
-    val theme = OneConfigTheme.current
-    val color = theme.textColor
-    val shape = theme.sideBarNavigationEntryShape
-    Column(
-        Modifier
-            .width(CarouselTileWidth)
-            .fillMaxHeight()
-            .clip(shape)
-            .oneConfigClickable("Get more in Marketplace", onClick, shape = shape, recipe = OutlineOnHover)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
-    ) {
-        ThemedIcon("plus", color, 14.dp)
-        Text("Get more in Marketplace", color = color, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
     }
 }
 
