@@ -27,6 +27,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyTime
 import org.polyfrost.polyplus.client.party.PartyRepository
@@ -134,6 +135,10 @@ private fun HomePage(lobby: LobbyShell, state: CustomizeState) {
         if (PartyScene.isMember(party)) PartySection()
         PanelSection(null) {
             DrillRow("package-01", "Widgets", null, { state.open(CustomizePage.Widgets) })
+        }
+        PanelSection("Main menu") {
+            DrillRow("logo", "Switch to PolyPlus main menu", null, { state.close(); MainMenuReplacement.switchToPolyPlusMenu() })
+            DrillRow("minecraft-block", "Switch to vanilla main menu", null, { state.close(); MainMenuReplacement.switchToVanilla() })
         }
     }
 }

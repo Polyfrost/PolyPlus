@@ -108,7 +108,6 @@ import org.polyfrost.polyplus.client.gui.AccountsPage
 import org.polyfrost.polyplus.client.gui.AccountsPanelContent
 import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
-import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.MainMenuRasterAssets
 import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
@@ -501,6 +500,7 @@ private const val INVITE_PENDING = "pending"
 private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
     Row(Modifier.tourAnchor(lobby.anchors, TourAnchor.Tools).a11yRegion(A11yRegion.Tools), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val mc = Minecraft.getInstance()
+        NavIconButton(SOCIAL_ASSETS + "discord.svg", "Join our Discord", { ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL) })
         NotificationsButton()
         ModMenuSlot(screen)
         NavIconButton("settings", "Mods", { PolyPlusOneConfigIntegration.openMods() })
@@ -746,8 +746,6 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     val theme = themeToggle()
     val entries = buildList<MenuEntry> {
         if (theme != null) add(MenuAction(theme.label, theme.toggle, icon = theme.icon, size = MenuItemSize.Regular))
-        add(MenuAction("Switch to PolyPlus main menu", { onClose(); MainMenuReplacement.switchToPolyPlusMenu() }, icon = SOCIAL_ASSETS + "logo.svg", size = MenuItemSize.Regular))
-        add(MenuAction("Switch to vanilla main menu", { onClose(); MainMenuReplacement.switchToVanilla() }, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
         add(MenuAction("Replay tour", { onClose(); lobby.replayTour() }, icon = SOCIAL_ASSETS + "play-circle.svg", size = MenuItemSize.Regular))
         if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
             ModIntegrationButtons.withoutModMenu().forEach { button ->
