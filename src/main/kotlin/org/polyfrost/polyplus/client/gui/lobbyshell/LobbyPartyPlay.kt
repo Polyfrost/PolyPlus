@@ -224,11 +224,14 @@ private fun LeaderStatus(play: PlayTogether.Active) {
         PartyRepository.others(current).forEach { member ->
             key(member.player) {
                 val status = play.responses[member.player]
+                val response = status?.first ?: PlayResponse.Incompatible.takeIf { member.player in play.warned }
+                val reason = if (status == null && response != null) PlayReason.Version else status?.second
+                val label = PlayTogether.versionStatus(member.player, reason).takeIf { response == PlayResponse.Incompatible } ?: statusText(response, reason)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     PlayerHead(playerId = seedOf(member.player), size = 22.dp, modifier = Modifier, shape = headShape(22.dp))
                     Column {
                         Text(names[member.player] ?: PlayerNamesRepository.nameOr(member.player), style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-                        Text(statusText(status?.first, status?.second), color = statusColor(status?.first), style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                        Text(label, color = statusColor(response), style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                     }
                 }
             }

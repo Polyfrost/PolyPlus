@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.network.http.responses.LocationKind
 import org.polyfrost.polyplus.client.network.http.responses.MemberLocation
 import org.polyfrost.polyplus.client.network.http.responses.MemberScene
 import org.polyfrost.polyplus.client.network.http.responses.Party
+import org.polyfrost.polyplus.client.network.http.responses.PartyMember
 import org.polyfrost.polyplus.client.network.http.responses.SceneKind
 import java.nio.file.Files
 import java.nio.file.Path
@@ -88,7 +89,7 @@ object PartyScene {
     private var consents: Map<String, Boolean> = parseConsents(PolyPlusPartyConfig.partySceneConsents)
 
     fun localScene(): MemberScene? {
-        followed()?.let { return it }
+        followed()?.let { return if (it.mcVersion == mcVersion) it else it.copy(mcVersion = mcVersion) }
         val entry = ownEntry() ?: return published
         val scene = describe(entry)
         val previous = published
@@ -207,6 +208,8 @@ object PartyScene {
         if (!leader.online) return null
         return leader.state?.scene
     }
+
+    fun versionOf(member: PartyMember): String? = member.state?.scene?.mcVersion?.trim()?.takeIf { it.isNotEmpty() }
 
     fun followedClock(): Long? = followed()?.clock?.toLong()
 

@@ -17,6 +17,8 @@ import org.polyfrost.polyplus.client.launcher.SessionRefresh
 import org.polyfrost.polyplus.client.network.http.PartyApi
 import org.polyfrost.polyplus.client.network.http.SessionsApi
 import org.polyfrost.polyplus.client.network.http.responses.LocationKind
+import org.polyfrost.polyplus.client.network.http.responses.Party
+import org.polyfrost.polyplus.client.network.http.responses.PartyMember
 import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
 import org.polyfrost.polyplus.client.network.http.responses.PlayDestinationKind
 import org.polyfrost.polyplus.client.network.http.responses.PlayEndReason
@@ -70,10 +72,11 @@ object PlayTogether {
         internal var connectAt = 0L
         internal var offered = false
         internal val pendingInvites = HashMap<String, Int>()
+        internal val warned = HashSet<String>()
         val leaderName: String get() = PlayerNamesRepository.nameOr(leader)
     }
 
-    private class Plan(val destination: PlayDestination, val worldId: String?, val at: Long)
+    private class Plan(val destination: PlayDestination, val worldId: String?, val at: Long, val warning: String?, val warned: Set<String>)
 
     var active by mutableStateOf<Active?>(null)
         private set
@@ -121,8 +124,31 @@ object PlayTogether {
             SocialErrors.emit("Couldn't start Play together. You're offline")
             return
         }
-        plan = Plan(destination, worldId, System.currentTimeMillis())
+        val party = PartyRepository.party.value
+        val version = destination.mcVersion?.takeIf { destination.kind == PlayDestinationKind.World }
+        val behind = if (party != null && version != null) versionMismatches(party, version) else emptyList()
+        val warning = version?.let { mismatchText(behind, it) }
+        if (warning != null) SocialErrors.emit(warning)
+        plan = Plan(destination, worldId, System.currentTimeMillis(), warning, behind.mapTo(HashSet()) { it.player })
     }
+
+    fun versionMismatches(party: Party, version: String): List<PartyMember> =
+        PartyRepository.others(party).filter { member -> PartyScene.versionOf(member)?.let { it != version } == true }
+
+    private fun mismatchText(members: List<PartyMember>, version: String): String? {
+        if (members.isEmpty()) return null
+        val versions = members.mapNotNull(PartyScene::versionOf).distinct()
+        if (members.size == 1 || versions.size == 1) {
+            val who = joinNames(members.map { PlayerNamesRepository.nameOr(it.player) })
+            val verb = if (members.size == 1) "is" else "are"
+            return "$who $verb on Minecraft ${versions.first()} and can't join your $version world"
+        }
+        val who = joinNames(members.map { "${PlayerNamesRepository.nameOr(it.player)} (${PartyScene.versionOf(it)})" })
+        return "$who can't join your Minecraft $version world"
+    }
+
+    private fun joinNames(names: List<String>): String =
+        if (names.size <= 1) names.joinToString() else names.dropLast(1).joinToString(", ") + " and " + names.last()
 
     fun bringHere() {
         val address = PartyJoin.serverAddress() ?: return
@@ -178,7 +204,12 @@ object PlayTogether {
 
     private fun onStarted(packet: ClientboundPacket.PlayTogetherStarted) {
         val party = PartyRepository.party.value ?: return
-        if (party.id != packet.partyId || PartyRepository.isSelf(packet.leader)) return
+        if (party.id != packet.partyId) return
+        if (PartyRepository.isSelf(packet.leader)) {
+            if (active?.id != packet.id) adopt(packet.id, party)
+            active?.takeIf { it.id == packet.id && packet.sessionId != null }?.sessionId = packet.sessionId
+            return
+        }
         if (!PartyRepository.samePlayer(packet.leader, party.leader)) {
             LOGGER.warn("Ignoring Play together {} from {}, who isn't the party leader", packet.id, packet.leader)
             return
@@ -269,11 +300,13 @@ object PlayTogether {
     private fun checkWorld(current: Active) {
         val destination = current.destination
         if (destination.mcVersion != null && destination.mcVersion != PartyScene.mcVersion) {
-            incompatible(current, PlayReason.Version, "Needs Minecraft ${destination.mcVersion}")
+            current.warning = "${current.leaderName} is on Minecraft ${destination.mcVersion} and you're on ${PartyScene.mcVersion}. Switch to ${destination.mcVersion} to join."
+            incompatible(current, PlayReason.Version, "Can't join ${current.leaderName}'s world")
             return
         }
         if (destination.loader != null && destination.loader != loader()) {
-            incompatible(current, PlayReason.Version, "Needs the ${destination.loader} loader")
+            current.warning = "${current.leaderName}'s world runs on the ${destination.loader} loader. Switch to it to join."
+            incompatible(current, PlayReason.Version, "Can't join ${current.leaderName}'s world")
             return
         }
         val mine = localMods().associate { it.substringBefore('@') to it.substringAfter('@') }
@@ -294,25 +327,46 @@ object PlayTogether {
     }
 
     private fun onUpdated(packet: ClientboundPacket.PlayTogetherUpdated) {
-        val pending = plan
-        if (active?.id != packet.id && pending != null && PartyRepository.isSelf(packet.player)) {
-            val party = PartyRepository.party.value ?: return
-            plan = null
-            worldId = pending.worldId
-            active?.check?.close()
-            active = Active(packet.id, party.leader, pending.destination, pending.at + COUNTDOWN_MS, leading = true).also {
-                it.partyId = party.id
-                if (pending.destination.kind == PlayDestinationKind.Server) it.session = SessionRefresh.prepareForJoin()
-            }
+        if (active?.id != packet.id && plan != null && PartyRepository.isSelf(packet.player)) {
+            adopt(packet.id, PartyRepository.party.value ?: return)
         }
         val current = active?.takeIf { it.id == packet.id } ?: return
         if (packet.sessionId != null) current.sessionId = packet.sessionId
         if (!PartyRepository.samePlayer(packet.player, current.leader)) current.responses[packet.player] = packet.response to packet.reason
-        val reason = packet.reason
-        if (current.leading && packet.response == PlayResponse.Incompatible) {
-            val name = PlayerNamesRepository.nameOr(packet.player)
-            SocialErrors.emit("$name can't join: ${reasonText(reason)}")
+        if (current.leading && packet.response == PlayResponse.Incompatible && current.warned.add(packet.player)) {
+            SocialErrors.emit(incompatibleText(current, packet.player, packet.reason))
         }
+    }
+
+    private fun adopt(id: String, party: Party) {
+        val pending = plan ?: return
+        plan = null
+        worldId = pending.worldId
+        active?.check?.close()
+        active = Active(id, party.leader, pending.destination, pending.at + COUNTDOWN_MS, leading = true).also {
+            it.partyId = party.id
+            it.warning = pending.warning
+            it.warned += pending.warned
+            if (pending.destination.kind == PlayDestinationKind.Server) it.session = SessionRefresh.prepareForJoin()
+        }
+    }
+
+    private fun incompatibleText(current: Active, player: String, reason: PlayReason?): String {
+        val name = PlayerNamesRepository.nameOr(player)
+        if (reason != PlayReason.Version) return "$name can't join: ${reasonText(reason)}"
+        val theirs = PartyRepository.party.value?.member(player)?.let(PartyScene::versionOf)
+        val ours = current.destination.mcVersion
+        return when {
+            current.destination.kind != PlayDestinationKind.World -> "$name can't join: their Minecraft version doesn't match the server"
+            theirs != null && ours != null && theirs != ours -> "$name can't join: they're on Minecraft $theirs and your world is on $ours"
+            ours != null -> "$name can't join: they're on a different Minecraft version than your $ours world"
+            else -> "$name can't join: they're on a different Minecraft version"
+        }
+    }
+
+    fun versionStatus(player: String, reason: PlayReason?): String? {
+        if (reason != PlayReason.Version) return null
+        return PartyRepository.party.value?.member(player)?.let(PartyScene::versionOf)?.let { "Can't join: on $it" }
     }
 
     fun reasonText(reason: PlayReason?): String = when (reason) {
@@ -392,7 +446,12 @@ object PlayTogether {
         }
         current.check?.let { check ->
             when (check.poll()) {
-                ServerCheck.Result.INCOMPATIBLE -> incompatible(current, PlayReason.Version, "Needs Minecraft ${check.serverVersion.ifBlank { "another version" }}")
+                ServerCheck.Result.INCOMPATIBLE -> {
+                    val needs = check.serverVersion.ifBlank { null }
+                    current.warning = needs?.let { "${current.destination.name} needs Minecraft $it and you're on ${PartyScene.mcVersion}" }
+                        ?: "${current.destination.name} needs a different Minecraft version than your ${PartyScene.mcVersion}"
+                    incompatible(current, PlayReason.Version, "Can't join ${current.destination.name}")
+                }
                 ServerCheck.Result.UNREACHABLE, ServerCheck.Result.OK -> current.check = null
                 ServerCheck.Result.PENDING -> if (now - current.checkAt > CHECK_TIMEOUT_MS) {
                     check.close()
