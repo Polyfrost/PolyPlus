@@ -2,6 +2,8 @@ package org.polyfrost.polyplus.client.gui
 
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
+//? if > 1.8.9
+import com.mojang.realmsclient.RealmsMainScreen
 import org.polyfrost.polyplus.client.MainMenuChoice
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -119,6 +121,12 @@ object MainMenuReplacement {
             return screen
         }
         if (inWorld) return screen
+        //? if > 1.8.9 {
+        if (left && screen is RealmsMainScreen) {
+            playing = false
+            return lobbyPage(LobbyPage.Home)
+        }
+        //?}
         when (screen?.javaClass) {
             JoinMultiplayerScreen::class.java -> {
                 if (!left && keepsVanillaServerList()) return screen

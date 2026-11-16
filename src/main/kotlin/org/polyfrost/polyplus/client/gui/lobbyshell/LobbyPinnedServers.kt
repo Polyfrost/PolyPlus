@@ -285,6 +285,10 @@ private class ServerPinChip(val entry: ServerEntry) : PinChip {
     override val key: String get() = pinKey(entry)
 }
 
+private class RealmPinChip(val pin: RecentServer, val realm: RealmEntry?) : PinChip {
+    override val key: String get() = pin.ip.trim().lowercase()
+}
+
 @Composable
 internal fun PinnedServersStrip(lobby: LobbyShell, modifier: Modifier = Modifier) {
     val servers = lobby.servers
@@ -364,6 +368,46 @@ private fun pinMoves(lobby: LobbyShell, index: Int, count: Int): List<MenuAction
     MenuAction("Move left", { lobby.servers.movePinned(index, index - 1) }, enabled = index > 0),
     MenuAction("Move right", { lobby.servers.movePinned(index, index + 1) }, enabled = index in 0 until count - 1),
 )
+
+@Composable
+private fun RealmChip(lobby: LobbyShell, chip: RealmPinChip, index: Int, count: Int, reorder: ChipReorder, drag: Modifier) {
+    val realm = chip.realm
+    val name = realm?.name ?: chip.pin.name
+    val hover = rememberHoverState()
+    val id = chip.key
+    TooltipBox(realm?.let { "$name · ${it.status}" } ?: name, Modifier, TooltipPlacement.AboveCenter, Dp.Unspecified) {
+        Row(
+            Modifier
+                .height(StripHeight)
+                .cardFrame(false, hover.hovered || reorder.dragging == id)
+                .contextMenu { realmPinMenuItems(lobby, chip, index, count) }
+                .hoverable(hover.interactionSource)
+                .oneConfigClickable("Join $name", {
+                    if (reorder.dragged == id) reorder.dragged = null else lobby.playRealm(chip.pin.realm)
+                })
+                .then(drag)
+                .padding(start = 5.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (realm != null) RealmHead(realm, ChipIcon) else ThemedIcon(REALM_ICON, OneConfigTheme.current.mutedText, ChipIcon)
+            Text(name, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        }
+    }
+}
+
+private fun realmPinMenuItems(lobby: LobbyShell, chip: RealmPinChip, index: Int, count: Int): List<MenuAction> {
+    val realm = chip.realm
+    val unpin = MenuAction("Unpin from home", {
+        PolyPlusRecentServers.setRealmPinned(chip.pin.realm, chip.pin.name, false)
+        lobby.servers.rebuild()
+    }, icon = PINNED_ICON)
+    if (realm == null) {
+        return listOf(MenuAction("Open in Realms", lobby::openRealms, icon = REALM_ICON)) + pinMoves(lobby, index, count) + unpin
+    }
+    val items = realmMenuItems(lobby, realm)
+    return items.take(1) + pinMoves(lobby, index, count) + items.drop(1)
+}
 
 @Composable
 internal fun PinnedMark() {

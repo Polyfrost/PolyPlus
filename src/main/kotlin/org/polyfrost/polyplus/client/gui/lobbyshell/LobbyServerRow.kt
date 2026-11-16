@@ -257,6 +257,106 @@ internal val GroupGap = 12.dp
 private val GroupHeaderInset = 36.dp
 
 @Composable
+internal fun RealmsHeader(lobby: LobbyShell, count: Int, modifier: Modifier = Modifier) {
+    val hover = rememberHoverState()
+    val shape = OneConfigTheme.shape(12.dp)
+    val collapsed = LobbyRealms.collapsed
+    val invites = LobbyRealms.invites
+    val problem = LobbyRealms.problem
+    val realms = if (count == 1) "1 realm" else "$count realms"
+    val inlineStatus = collapsed || LobbyRealms.realms.isNotEmpty()
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RowGap)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(FolderHeaderHeight)
+                .contextMenu { realmsGroupMenuItems(lobby) }
+                .hoverable(hover.interactionSource)
+                .oneConfigClickable("Realms, $realms, ${if (collapsed) "collapsed" else "expanded"}", LobbyRealms::toggleCollapsed, shape = shape)
+                .rowFrame(false, hover.hovered, shape)
+                .padding(start = 10.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            LobbyIcon(CHEVRON, OneConfigTheme.current.mutedText, 16.dp, Modifier.rotate(if (collapsed) 0f else 90f))
+            ThemedIcon(REALM_ICON, SocialTextPrimary, 18.dp)
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Realms", style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, softWrap = false)
+                Text(count.toString(), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
+                if (invites > 0) {
+                    val label = if (invites == 1) "1 invite" else "$invites invites"
+                    Badge(label, Modifier.height(18.dp).oneConfigClickable("Open $label", lobby::openRealms), tone = BadgeTone.Accent)
+                }
+                when {
+                    !inlineStatus -> Unit
+                    problem != null -> Text(problem, Modifier.weight(1f, fill = false), color = SocialDangerText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                    LobbyRealms.loading -> Text("Refreshing...", Modifier.weight(1f, fill = false), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                }
+            }
+            NavPopupButton(LobbyIcons.MORE, "Realms options", gap = MORE_MENU_GAP) { close ->
+                LobbyUserTheme { MenuList(realmsGroupMenuItems(lobby), close) }
+            }
+        }
+        RealmsGroupBody(lobby)
+    }
+}
+
+@Composable
+internal fun RealmRow(lobby: LobbyShell, realm: RealmEntry, modifier: Modifier = Modifier) {
+    val hover = rememberHoverState()
+    val selected = lobby.isSelected(realm)
+    val doubleClick = rememberDoubleClick { lobby.playRealm(realm) }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(RowHeight)
+            .contextMenu { realmMenuItems(lobby, realm) }
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(
+                "${realm.name}, ${realm.status}",
+                {
+                    doubleClick()
+                    lobby.select(realm)
+                },
+                selected = selected.takeIf { it },
+                shape = OneConfigTheme.shape(16.dp),
+            )
+            .cardFrame(selected, hover.hovered)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RealmHead(realm, RowIcon)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(realm.name, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                if (lobby.servers.isRealmPinned(realm.id)) PinnedMark()
+                RealmStatusBadge(realm)
+            }
+            val warning = realm.warning
+            Text(
+                warning ?: realm.motd,
+                color = if (warning != null) SocialDangerText else OneConfigTheme.current.mutedText,
+                style = OneConfigTheme.current.typography.small,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+        }
+        Text(realm.detail, Modifier.width(PlayersWidth + PingWidth), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        TextButton(text = if (realm.joinable) "Join" else "Open", onClick = { lobby.playRealm(realm) }, size = ControlSize.Large, style = ControlStyle.Primary)
+        RealmMoreMenu(lobby, realm)
+    }
+}
+
+@Composable
+internal fun RealmMoreMenu(lobby: LobbyShell, realm: RealmEntry) {
+    NavPopupButton(LobbyIcons.MORE, "More", gap = MORE_MENU_GAP) { close ->
+        LobbyUserTheme { MenuList(realmMenuItems(lobby, realm), close) }
+    }
+}
+
+@Composable
 internal fun SectionLabel(label: String, modifier: Modifier = Modifier) {
     Text(
         label,

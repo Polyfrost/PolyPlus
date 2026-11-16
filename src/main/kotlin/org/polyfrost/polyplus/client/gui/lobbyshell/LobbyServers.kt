@@ -363,6 +363,13 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         syncPins()
     }
 
+    fun isRealmPinned(id: Long): Boolean = pins.any { it.isRealm && it.realm == id }
+
+    fun setRealmPinned(realm: RealmEntry, pin: Boolean) {
+        PolyPlusRecentServers.setRealmPinned(realm.id, realm.name, pin)
+        syncPins()
+    }
+
     fun movePinned(from: Int, to: Int) {
         PolyPlusRecentServers.movePinned(from, to)
         syncPins()

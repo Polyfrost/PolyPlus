@@ -120,6 +120,8 @@
     "client.access.LightingInvoker",
     "client.access.MinecraftAccessor",
     //? if > 1.8.9
+    "client.access.MinecraftRealmsAccessor",
+    //? if > 1.8.9
     "client.access.SimplePreparableReloadListenerInvoker",
     //? if = 1.8.9
     //"client.access.MinecraftServerAccessor",
@@ -134,6 +136,10 @@
     "client.access.PostChainAccessor",
     //? if >= 1.21.8 || = 1.21.4
     "client.access.PostPassAccessor",
+    //? if > 1.8.9
+    "client.access.RealmsAvailabilityAccessor",
+    //? if >= 1.21.5
+    "client.access.RealmsClientAccessor",
     //? if >= 1.21.5
     "client.access.RenderPipelinesAccessor",
     "client.access.ScreenAccessor",

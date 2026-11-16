@@ -135,7 +135,6 @@ internal fun hostWorldAllowed(): Boolean =
 @Composable
 internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
     val source = lobby.source.takeIf { it.shown } ?: PlaySource.Multiplayer
-    val singleplayer = source == PlaySource.Singleplayer
     val quick = !PolyPlusMainMenuConfig.hideMainMenuQuickplay
     val target: Any? = when (source) {
         PlaySource.Singleplayer -> lobby.activeWorld()
@@ -143,6 +142,7 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
         PlaySource.Replays -> lobby.activeReplay()
     }
     if (source == PlaySource.Replays) LaunchedEffect(Unit) { ReplayLibrary.reload() }
+    LaunchedEffect(Unit) { LobbyRealms.refresh() }
     Box((if (quick) modifier.height(LobbyLayout.UnitHeight) else modifier).panel()) {
         HeroWash(lobby, target)
         Column(Modifier.fillMaxWidth().then(if (quick) Modifier.fillMaxSize() else Modifier)) {
@@ -160,7 +160,7 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
                     }
                 }
             }
-            if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, singleplayer)
+            if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, source)
             HostingStrip(lobby)
             PinnedServersStrip(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = 8.dp))
             Spacer(Modifier.height(PanelGutter))
@@ -445,7 +445,8 @@ private fun EmptyIcon(name: String) {
 }
 
 @Composable
-private fun PlayRow(lobby: LobbyShell, singleplayer: Boolean) {
+private fun PlayRow(lobby: LobbyShell, source: PlaySource) {
+    val singleplayer = source == PlaySource.Singleplayer
     val session by P2PSessionManager.currentSessionIdFlow.collectAsState()
     val world = lobby.activeWorld()?.takeIf { it.playable }
     val ready = if (singleplayer) world != null else lobby.activeServer() != null
@@ -556,6 +557,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
         PlaySource.Multiplayer -> servers.saved.size
         PlaySource.Replays -> ReplayLibrary.entries.size
     }
+    val count = "$saved saved"
     Row(
         Modifier.fillMaxWidth().height(FooterHeight).padding(horizontal = PanelGutter),
         verticalAlignment = Alignment.CenterVertically,
@@ -563,7 +565,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
     ) {
         val listed = worlds.isNotEmpty() || rows.isNotEmpty() || replays.isNotEmpty()
         if (!listed) {
-            Text("$saved saved", Modifier.weight(1f), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(count, Modifier.weight(1f), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         } else {
             Text("Recent", Modifier.padding(end = 4.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             worlds.forEach { world ->
@@ -579,7 +581,7 @@ private fun Footer(lobby: LobbyShell, source: PlaySource, quick: Boolean) {
             Spacer(Modifier.weight(1f))
         }
         when {
-            lobby.page == page -> if (listed) Text("$saved saved", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            lobby.page == page -> if (listed) Text(count, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             listed -> AllButton("All", "$saved") { lobby.show(page) }
             source == PlaySource.Singleplayer -> AllButton("All worlds", null) { lobby.show(page) }
             source == PlaySource.Replays -> AllButton("All replays", null) { lobby.show(page) }

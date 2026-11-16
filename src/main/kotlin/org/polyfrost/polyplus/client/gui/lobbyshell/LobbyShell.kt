@@ -78,7 +78,10 @@ internal enum class PlaySource(val page: LobbyPage) {
     ;
 
     val shown: Boolean
-        get() = this != Replays || ReplayLibrary.enabled
+        get() = when (this) {
+            Replays -> ReplayLibrary.enabled
+            else -> true
+        }
 }
 
 internal class ServerEdit(val server: ServerData?, val index: Int = -1) {
@@ -251,6 +254,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     fun select(data: ServerData) {
         selectedServer = data
+        selectedRealmId = null
         source = PlaySource.Multiplayer
     }
 
@@ -292,6 +296,27 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     //?} else {
     /*fun openRealms() = RealmsBridge().createMainMenuScreen(screen)
     *///?}
+
+    private var selectedRealmId by mutableStateOf<Long?>(null)
+
+    fun isSelected(realm: RealmEntry): Boolean = realm.id == selectedRealmId
+
+    fun select(realm: RealmEntry) {
+        selectedRealmId = realm.id
+    }
+
+    fun playRealm(realm: RealmEntry) {
+        select(realm)
+        if (!realm.joinable) {
+            openRealms()
+            return
+        }
+        depart { LobbyRealms.play(realm, screen) }
+    }
+
+    fun playRealm(id: Long) {
+        LobbyRealms.find(id)?.let(::playRealm) ?: openRealms()
+    }
 
     val hostedWorldName: String? get() = SocialHosting.hostedName
 

@@ -22,6 +22,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -136,6 +141,7 @@ private val DirectPreviewHeight = 220.dp
 internal fun BoxScope.MultiplayerPage(lobby: LobbyShell) {
     val availability = rememberAvailability()
     val friends = rememberOnlineFriends(availability)
+    LaunchedEffect(Unit) { LobbyRealms.refresh() }
     PageScrim()
     ServerBrowser(
         lobby,
@@ -332,6 +338,12 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
     @Suppress("UNUSED_EXPRESSION") servers.folderRevision
     val layout = if (canReorder) servers.layout(shown) else null
     val needle = query.trim()
+    val realms = if (filter == ServerFilter.All && LobbyRealms.shown()) {
+        LobbyRealms.realms.filter { needle.isEmpty() || it.name.contains(needle, true) || it.owner.contains(needle, true) }
+    } else {
+        null
+    }
+    val realmsShown = realms != null && (needle.isEmpty() || realms.isNotEmpty())
     val sectioned = realmsShown || layout?.slots?.any { it is FolderSlot } == true
     val slots = layout?.slots?.let { if (sectioned) it.withGroupHeader(SERVERS_GROUP) else it }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(PageGrid.Gap)) {
@@ -351,6 +363,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
                 PolyPlusLobbyConfig.save()
             }
         }
+        if (realms != null && realmsShown) RealmsSection(lobby, realms, listView, Modifier.fillMaxWidth().padding(bottom = GroupGap / 2))
         if (shown.isEmpty()) {
             val body = Modifier.fillMaxWidth().weight(1f).panel(16.dp)
             when {
@@ -376,6 +389,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             if (listView) GroupedServerList(lobby, slots, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
             else GroupedServerGrid(lobby, slots, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
         } else {
+            if (realmsShown) GroupHeader(GroupSlot(SERVERS_GROUP, shown.size))
             if (listView) ServerList(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
             else ServerGrid(lobby, shown, canReorder, onDelete, Modifier.fillMaxWidth().weight(1f))
         }
@@ -412,8 +426,18 @@ private fun ServersMenu(lobby: LobbyShell, listView: Boolean, onDirect: () -> Un
         LobbyUserTheme {
             val entries = buildList<MenuEntry> {
                 add(MenuAction("Direct connect", onDirect, icon = SOCIAL_ASSETS + "globe-01.svg", size = MenuItemSize.Regular))
-                if (realms) add(MenuAction("Realms", lobby::openRealms, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
-                add(MenuAction("Refresh", lobby.servers::refresh, icon = LobbyIcons.REFRESH, size = MenuItemSize.Regular))
+                if (realms) add(MenuAction("Realms", lobby::openRealms, icon = REALM_ICON, badge = LobbyRealms.invites.takeIf { it > 0 }?.toString(), size = MenuItemSize.Regular))
+                add(
+                    MenuAction(
+                        "Refresh",
+                        {
+                            lobby.servers.refresh()
+                            LobbyRealms.refresh(force = true)
+                        },
+                        icon = LobbyIcons.REFRESH,
+                        size = MenuItemSize.Regular,
+                    ),
+                )
                 if (listView) add(MenuAction("Show as grid", { onLayout(false) }, icon = GRID_ICON, size = MenuItemSize.Regular))
                 else add(MenuAction("Show as list", { onLayout(true) }, icon = LIST_ICON, size = MenuItemSize.Regular))
                 modButtons.forEach { button ->
@@ -524,6 +548,93 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
         }
     }
 }
+
+@Composable
+private fun RealmsSection(lobby: LobbyShell, realms: List<RealmEntry>, listView: Boolean, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(if (listView) REALM_ROW_GAP else PageGrid.Gap)) {
+        RealmsHeader(lobby, LobbyRealms.realms.size)
+        if (LobbyRealms.collapsed || realms.isEmpty()) return@Column
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = REALMS_MAX_HEIGHT).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(if (listView) REALM_ROW_GAP else PageGrid.Gap),
+        ) {
+            if (listView) {
+                realms.forEach { realm -> key(realm.key) { RealmRow(lobby, realm) } }
+            } else {
+                RealmCardGrid(lobby, realms)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RealmCardGrid(lobby: LobbyShell, realms: List<RealmEntry>) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val gap = PageGrid.Gap
+        val columns = ((maxWidth + gap) / (SERVER_CARD_MIN_WIDTH + gap)).toInt().coerceAtLeast(1)
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            realms.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { realm -> key(realm.key) { RealmCard(lobby, realm, Modifier.weight(1f)) } }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RealmCard(lobby: LobbyShell, realm: RealmEntry, modifier: Modifier) {
+    val hover = rememberHoverState()
+    val selected = lobby.isSelected(realm)
+    val onClick = rememberCardClick({ lobby.playRealm(realm) }) { lobby.select(realm) }
+    Box(
+        modifier
+            .cardFrame(selected, hover.hovered)
+            .contextMenu { realmMenuItems(lobby, realm) }
+            .hoverable(hover.interactionSource)
+            .oneConfigClickable(realm.name, onClick, selected = selected.takeIf { it }, shape = OneConfigTheme.shape(16.dp)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RealmHead(realm, SERVER_CARD_ICON)
+            Box(Modifier.weight(1f)) { RealmText(realm, lobby.servers.isRealmPinned(realm.id)) }
+            RealmMoreMenu(lobby, realm)
+        }
+    }
+}
+
+@Composable
+private fun RealmText(realm: RealmEntry, pinned: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(realm.name, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            if (pinned) PinnedMark()
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            RealmStatusBadge(realm)
+            val warning = realm.warning
+            Text(
+                warning ?: realm.detail,
+                color = if (warning != null) SocialDangerText else OneConfigTheme.current.mutedText,
+                style = OneConfigTheme.current.typography.small,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(REALM_MOTD_HEIGHT)) {
+            Text(realm.motd, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private val REALMS_MAX_HEIGHT = 236.dp
+private val REALM_ROW_GAP = 6.dp
+private val REALM_MOTD_HEIGHT = 34.dp
 
 private val SERVER_CARD_MIN_WIDTH = 320.dp
 private val SERVER_ROW_GAP = 6.dp

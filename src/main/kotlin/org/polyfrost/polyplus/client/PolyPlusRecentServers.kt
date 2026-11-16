@@ -22,7 +22,11 @@ object PolyPlusRecentServers {
     const val KIND_REALM = "realm"
 
     @Serializable
-    private data class State(val recents: List<RecentServer> = emptyList(), val pinned: List<RecentServer> = emptyList())
+    private data class State(
+        val recents: List<RecentServer> = emptyList(),
+        val pinned: List<RecentServer> = emptyList(),
+        val realmsCollapsed: Boolean = false,
+    )
 
     const val PINNED_MAX = 4
 
@@ -33,6 +37,7 @@ object PolyPlusRecentServers {
     *///?}
     private val recents = mutableListOf<RecentServer>()
     private val pins = mutableListOf<RecentServer>()
+    private var realmsCollapsed = false
     private var loaded = false
 
     private fun ensureLoaded() {
@@ -45,6 +50,7 @@ object PolyPlusRecentServers {
                 recents.addAll(state.recents)
                 pins.clear()
                 pins.addAll(state.pinned.distinctBy { it.ip.lowercase() }.take(PINNED_MAX))
+                realmsCollapsed = state.realmsCollapsed
             }
         }
     }
@@ -52,8 +58,53 @@ object PolyPlusRecentServers {
     private fun persist() {
         runCatching {
             file.parentFile?.mkdirs()
-            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), State(recents.toList(), pins.toList())))
+            val state = State(recents.toList(), pins.toList(), realmsCollapsed)
+            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), state))
         }
+    }
+
+    fun realmKey(id: Long): String = "$KIND_REALM:$id"
+
+    @Synchronized
+    fun isRealmPinned(id: Long): Boolean {
+        ensureLoaded()
+        return pins.any { it.isRealm && it.realm == id }
+    }
+
+    @Synchronized
+    fun setRealmPinned(id: Long, name: String?, pinned: Boolean) {
+        ensureLoaded()
+        if (pinned) {
+            if (pins.size >= PINNED_MAX || pins.any { it.isRealm && it.realm == id }) return
+            val label = name?.trim().takeUnless { it.isNullOrEmpty() } ?: "Realm"
+            pins.add(RecentServer(label, realmKey(id), System.currentTimeMillis(), KIND_REALM, id))
+        } else if (!pins.removeAll { it.isRealm && it.realm == id }) {
+            return
+        }
+        persist()
+    }
+
+    @Synchronized
+    fun renameRealmPin(id: Long, name: String) {
+        ensureLoaded()
+        val index = pins.indexOfFirst { it.isRealm && it.realm == id }
+        if (index < 0 || name.isBlank() || pins[index].name == name) return
+        pins[index] = pins[index].copy(name = name)
+        persist()
+    }
+
+    @Synchronized
+    fun realmsCollapsed(): Boolean {
+        ensureLoaded()
+        return realmsCollapsed
+    }
+
+    @Synchronized
+    fun setRealmsCollapsed(collapsed: Boolean) {
+        ensureLoaded()
+        if (realmsCollapsed == collapsed) return
+        realmsCollapsed = collapsed
+        persist()
     }
 
     @JvmStatic
