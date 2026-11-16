@@ -25,6 +25,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
+import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.gui.AccountActions
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
@@ -387,6 +388,7 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
         FeaturedServers.dismissMultiplayerByAddress(entry.data.ip)
         servers.serverList.remove(entry.data)
         servers.serverList.save()
+        PolyPlusRecentServers.setPinned(entry.data.name, entry.data.ip, false)
         selectedServer = null
         deleting = null
         servers.rebuild()

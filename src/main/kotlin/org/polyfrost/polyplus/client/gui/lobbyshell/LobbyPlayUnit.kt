@@ -162,6 +162,7 @@ internal fun PlayUnit(lobby: LobbyShell, modifier: Modifier) {
             }
             if (source == PlaySource.Replays) WatchRow(lobby) else PlayRow(lobby, singleplayer)
             HostingStrip(lobby)
+            PinnedServersStrip(lobby, Modifier.padding(start = PanelGutter, end = PanelGutter, top = 8.dp))
             Spacer(Modifier.height(PanelGutter))
             Box(Modifier.fillMaxWidth().height(1.dp).background(SocialBorderColor))
             Footer(lobby, source, quick)

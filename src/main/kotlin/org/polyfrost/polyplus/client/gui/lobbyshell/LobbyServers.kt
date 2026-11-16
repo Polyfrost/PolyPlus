@@ -85,6 +85,8 @@ internal class LobbyServers(private val minecraft: Minecraft) {
         private set
     var hero by mutableStateOf<ServerEntry?>(null)
         private set
+    var pinned by mutableStateOf<List<ServerEntry>>(emptyList())
+        private set
 
     val serverList: ServerList get() = list
 
@@ -152,6 +154,7 @@ internal class LobbyServers(private val minecraft: Minecraft) {
             ServerEntry(list.get(it), ServerKind.SAVED, savedIndex = it)
         }
         recent = PolyPlusRecentServers.recent().map(::entryFor)
+        pinned = PolyPlusRecentServers.pinned().map(::entryFor)
         hero = recent.firstOrNull() ?: saved.firstOrNull()
         rebuildFeatured()
         revision++
@@ -191,6 +194,15 @@ internal class LobbyServers(private val minecraft: Minecraft) {
     fun saveUnsaved(entry: ServerEntry) {
         if (list.unhide(entry.data.ip) == null) list.add(entry.data, false)
         persistAndRebuild()
+    }
+
+    fun isPinned(data: ServerData): Boolean = pinned.any { it.data.ip.equals(data.ip, ignoreCase = true) }
+
+    fun canPin(): Boolean = pinned.size < PolyPlusRecentServers.PINNED_MAX
+
+    fun setPinned(data: ServerData, pin: Boolean) {
+        PolyPlusRecentServers.setPinned(data.name, data.ip, pin)
+        pinned = PolyPlusRecentServers.pinned().map(::entryFor)
     }
 
     fun quickRows(pinned: ServerData?): List<ServerEntry> {

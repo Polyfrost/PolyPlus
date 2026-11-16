@@ -359,7 +359,7 @@ private fun ServerCard(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ServerIcon(data, revision, SERVER_CARD_ICON)
-            Box(Modifier.weight(1f)) { ServerText(entry, revision) }
+            Box(Modifier.weight(1f)) { ServerText(entry, revision, servers.isPinned(data)) }
             ServerMoreMenu(lobby, entry, canReorder, onDelete, vertical = false)
         }
     }
@@ -374,17 +374,27 @@ internal class ServerAction(val item: MenuAction, val rotation: Float? = null)
 internal fun serverActions(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolean, onDelete: ((ServerEntry) -> Unit)?, vertical: Boolean = false): List<ServerAction> {
     val servers = lobby.servers
     val save = ServerAction(MenuAction("Save to list", { servers.saveUnsaved(entry) }, icon = LobbyIcons.PLUS))
+    val pinned = servers.isPinned(entry.data)
+    val pin = ServerAction(
+        MenuAction(
+            if (pinned) "Unpin from home" else "Pin to home",
+            { servers.setPinned(entry.data, !pinned) },
+            icon = if (pinned) PINNED_ICON else PIN_ICON,
+            enabled = pinned || servers.canPin(),
+        ),
+    )
     return when (entry.kind) {
         ServerKind.SAVED -> listOfNotNull(
             ServerAction(MenuAction(if (vertical) "Move up" else "Move left", { servers.move(entry, -1) }, enabled = entry.savedIndex > 0), if (vertical) 0f else -90f).takeIf { canReorder },
             ServerAction(MenuAction(if (vertical) "Move down" else "Move right", { servers.move(entry, 1) }, enabled = entry.savedIndex < servers.saved.lastIndex), if (vertical) 180f else 90f).takeIf { canReorder },
+            pin,
             ServerAction(MenuAction("Edit", { lobby.editServer(entry) }, icon = SOCIAL_ASSETS + "edit-02.svg")),
             onDelete?.let { delete -> ServerAction(MenuAction("Delete", { delete(entry) }, icon = LobbyIcons.TRASH, danger = true, dangerColor = KitDangerColor)) },
         )
-        ServerKind.UNSAVED -> listOf(save)
+        ServerKind.UNSAVED -> listOf(save, pin)
         ServerKind.FEATURED, ServerKind.SPONSORED -> {
             val campaign = entry.featured?.featured?.takeIf { it.dismissibleInServerList }
-            listOfNotNull(save, campaign?.let { ServerAction(MenuAction("Dismiss", { FeaturedServers.dismissMultiplayer(it.campaignId) }, icon = LobbyIcons.CLOSE)) })
+            listOfNotNull(save, pin, campaign?.let { ServerAction(MenuAction("Dismiss", { FeaturedServers.dismissMultiplayer(it.campaignId) }, icon = LobbyIcons.CLOSE)) })
         }
         ServerKind.LAN -> emptyList()
     }
@@ -401,12 +411,15 @@ internal fun serverMenuItems(
         serverActions(lobby, entry, canReorder, onDelete, vertical).map { it.item }
 
 @Composable
-private fun ServerText(entry: ServerEntry, revision: Int) {
+private fun ServerText(entry: ServerEntry, revision: Int, pinned: Boolean) {
     @Suppress("UNUSED_EXPRESSION") revision
     ServerRevisions.of(entry.data)
     val data = entry.data
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(data.shownName, style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(data.shownName, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.heading.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            if (pinned) PinnedMark()
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (data.state() == ServerData.State.INCOMPATIBLE) DangerTag("Incompatible".uppercase())
             Text(serverMeta(data), color = if (LobbyServers.failed(data)) SocialDangerText else OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)

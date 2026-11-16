@@ -105,6 +105,7 @@ internal fun ServerRow(lobby: LobbyShell, entry: ServerEntry, canReorder: Boolea
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(data.shownName, Modifier.weight(1f, fill = false), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                if (servers.isPinned(data)) PinnedMark()
                 if (data.state() == ServerData.State.INCOMPATIBLE) DangerTag("Incompatible".uppercase())
             }
             MotdText(entry, revision)

@@ -12,7 +12,9 @@ object PolyPlusRecentServers {
     private const val RECORDED_MAX = 32
 
     @Serializable
-    private data class State(val recents: List<RecentServer> = emptyList())
+    private data class State(val recents: List<RecentServer> = emptyList(), val pinned: List<RecentServer> = emptyList())
+
+    const val PINNED_MAX = 4
 
     //? if > 1.8.9 {
     private val file: File by lazy { File(Minecraft.getInstance().gameDirectory, "polyplus/recent_servers.json") }
@@ -20,6 +22,7 @@ object PolyPlusRecentServers {
     /*private val file: File by lazy { File(Minecraft.getInstance().gameDir, "polyplus/recent_servers.json") }
     *///?}
     private val recents = mutableListOf<RecentServer>()
+    private val pins = mutableListOf<RecentServer>()
     private var loaded = false
 
     private fun ensureLoaded() {
@@ -30,6 +33,8 @@ object PolyPlusRecentServers {
                 val state = PolyPlusClient.JSON.decodeFromString(State.serializer(), file.readText())
                 recents.clear()
                 recents.addAll(state.recents)
+                pins.clear()
+                pins.addAll(state.pinned.distinctBy { it.ip.lowercase() }.take(PINNED_MAX))
             }
         }
     }
@@ -37,7 +42,7 @@ object PolyPlusRecentServers {
     private fun persist() {
         runCatching {
             file.parentFile?.mkdirs()
-            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), State(recents.toList())))
+            file.writeText(PolyPlusClient.JSON.encodeToString(State.serializer(), State(recents.toList(), pins.toList())))
         }
     }
 
@@ -60,6 +65,38 @@ object PolyPlusRecentServers {
     fun recent(): List<RecentServer> {
         ensureLoaded()
         return recents.toList()
+    }
+
+    @Synchronized
+    fun pinned(): List<RecentServer> {
+        ensureLoaded()
+        return pins.toList()
+    }
+
+    @Synchronized
+    fun isPinned(ip: String?): Boolean {
+        ensureLoaded()
+        return ip != null && pins.any { it.ip.equals(ip.trim(), ignoreCase = true) }
+    }
+
+    @Synchronized
+    fun canPin(): Boolean {
+        ensureLoaded()
+        return pins.size < PINNED_MAX
+    }
+
+    @Synchronized
+    fun setPinned(name: String?, ip: String?, pinned: Boolean) {
+        val address = ip?.trim().orEmpty()
+        if (address.isEmpty()) return
+        ensureLoaded()
+        if (pinned) {
+            if (pins.size >= PINNED_MAX || pins.any { it.ip.equals(address, ignoreCase = true) }) return
+            pins.add(RecentServer(name?.trim().takeUnless { it.isNullOrEmpty() } ?: address, address, System.currentTimeMillis()))
+        } else if (!pins.removeAll { it.ip.equals(address, ignoreCase = true) }) {
+            return
+        }
+        persist()
     }
 
     private const val DEFAULT_NAME_KEY = "selectServer.defaultName"
