@@ -9,11 +9,17 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import net.minecraft.network.chat.contents.TranslatableFormatException
 import org.polyfrost.polyplus.mixin.client.access.TranslatableContentsInvoker
 import java.util.Optional
+//?}
 
 // resolves widget text the way it reads without server resource packs; the vanilla pause screen still shows the
 // server's version, since only it draws with the server's fonts
 internal object PauseText {
-    fun of(component: Component): String = buildString { flatten(component, this) }
+    private val FORMATTING = Regex("§.?")
+
+    fun plain(text: String): String = text.replace(FORMATTING, "")
+
+    //? if > 1.8.9 {
+    fun of(component: Component): String = plain(buildString { flatten(component, this) })
 
     private fun flatten(component: Component, out: StringBuilder) {
         when (val contents = component.contents) {
@@ -39,5 +45,5 @@ internal object PauseText {
             template
         }
     }
+    //?}
 }
-//?}

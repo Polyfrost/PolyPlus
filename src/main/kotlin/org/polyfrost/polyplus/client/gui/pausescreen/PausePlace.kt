@@ -103,9 +103,9 @@ internal object PauseWorld {
     }
 
     fun place(): PausePlace {
-        if (!singleplayer) return PausePlace("MULTIPLAYER", serverName(), serverDetail())
-        val name = SocialHosting.worldName ?: "World"
-        val detail = listOf(gameMode(), difficulty()).filter { it.isNotBlank() }.joinToString(SEPARATOR)
+        if (!singleplayer) return PausePlace("MULTIPLAYER", PauseText.plain(serverName()).ifBlank { GENERIC_SERVER }, serverDetail())
+        val name = SocialHosting.worldName?.let(PauseText::plain)?.takeIf { it.isNotBlank() } ?: "World"
+        val detail = listOf(gameMode(), difficulty()).map(PauseText::plain).filter { it.isNotBlank() }.joinToString(SEPARATOR)
         return when {
             hosted -> PausePlace("HOSTED WORLD", name, serverDetail())
             SocialHosting.lanOpen -> PausePlace("OPEN TO LAN", name, detail)

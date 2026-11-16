@@ -228,7 +228,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
             PauseEntry(
                 System.identityHashCode(button),
                 slot,
-                button.message.ifBlank { UNNAMED },
+                PauseText.plain(button.message).ifBlank { UNNAMED },
                 section(mod, GROUP_OTHER),
                 button.active,
                 null,
