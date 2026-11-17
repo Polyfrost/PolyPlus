@@ -1033,14 +1033,7 @@ private fun ScreensPage(choices: Map<ScreenPart, Boolean>, onChoices: (Map<Scree
     Header("Continuing with", "Screens")
     Column(Modifier.offset(CARD_MARGIN.dp, SCREENS_TOP.dp).width(SCREENS_WIDTH.dp)) {
         Row(Modifier.height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                SCREENS_TEXT,
-                modifier = Modifier.weight(1f),
-                color = SocialTextSecondary,
-                style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
-                maxLines = 2,
-            )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.weight(1f))
             TextButton(
                 "Use all",
                 { onChoices(ScreenPart.shown.associateWith { true }) },
@@ -2501,7 +2494,7 @@ private fun pageSpeech(step: OnboardingStep, page: Int, waiting: Boolean): Strin
             "Welcome to OneClient. Agree to the Terms of Service and Privacy Policy to use online features. $TERMS_NOTE"
         OnboardingStep.LookAndFeel -> "Look and Feel. Choose the UI colors, UI style and GUI scale."
         OnboardingStep.Screens ->
-            "Screens. $SCREENS_TEXT " + ScreenPart.shown.joinToString(", ") { it.title } + "."
+            "Screens. " + ScreenPart.shown.joinToString(", ") { it.title } + "."
         OnboardingStep.ModOrder -> "Mod Sorting. $MOD_ORDER_TEXT"
         OnboardingStep.Sprint -> "Toggle Sprint. $SPRINT_TEXT"
         is OnboardingStep.Mods -> "Mods: " + step.cards.joinToString(" and ") { modCardTitle(it) } + "."
@@ -2795,7 +2788,6 @@ private const val MOD_ORDER_TEXT = "Choose how the mods list is sorted. Recommen
 private const val SPRINT_TEXT = "Turn sprinting into a toggle so you keep running after you let go of the key."
 private const val WATERMARK_TEXT =
     "Show the OneClient logo in inventories and options screens. You can move, resize or recolor it later in settings."
-private const val SCREENS_TEXT = "Pick which screens OneClient replaces. Vanilla keeps Minecraft's."
 private const val SCREENS_TOP = 122f
 private const val SCREENS_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
 private const val SCREENS_ACTION_WIDTH = 96f
