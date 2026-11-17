@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.gui.screens.settings
 
-//? if >= 26.3 {
+import java.util.Locale
+//? if > 1.8.9 {
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 //?} elif = 1.8.9 {
@@ -43,21 +44,46 @@ internal object SettingsLabels {
         "options.glintStrength" to "Enchantment glint strength",
     )
 
+    private val categoryKeys = mapOf(
+        SettingsCategory.Video to listOf("options.videoTitle"),
+        SettingsCategory.Sound to listOf("options.sounds.title"),
+        SettingsCategory.Controls to listOf("controls.title"),
+        SettingsCategory.Mouse to listOf("options.mouse_settings.title"),
+        SettingsCategory.Skin to listOf("options.skinCustomisation.title"),
+        SettingsCategory.Accessibility to listOf("options.accessibility.title"),
+        SettingsCategory.Language to listOf("options.language.title", "options.language"),
+        SettingsCategory.Chat to listOf("options.chat.title"),
+        SettingsCategory.Online to listOf("options.online.title"),
+        SettingsCategory.Packs to listOf("resourcePack.title"),
+    )
+
+    fun category(category: SettingsCategory): String {
+        if (isEnglish()) return category.english
+        val keys = categoryKeys[category] ?: return category.english
+        for (key in keys) {
+            val translated = runCatching { translate(key) }.getOrNull() ?: continue
+            if (translated == key) continue
+            val cleaned = translated.trim().removeSuffix("...").removeSuffix("…").trim()
+            if (cleaned.isNotEmpty()) return cleaned
+        }
+        return category.english
+    }
+
     fun label(key: String, fallback: String): String = if (isEnglish()) english[key] ?: fallback else fallback
 
-    //? if >= 26.3 {
-    fun text(key: String): String = label(key, Component.translatable(key).string)
+    //? if > 1.8.9 {
+    fun text(key: String): String = label(key, translate(key))
 
-    private fun isEnglish(): Boolean = runCatching { Minecraft.getInstance().languageManager.selected }.getOrNull() in ENGLISH
+    private fun translate(key: String): String = Component.translatable(key).string
+
+    private fun isEnglish(): Boolean = isEnglishCode(runCatching { Minecraft.getInstance().languageManager.selected }.getOrNull())
     //?} elif = 1.8.9 {
-    /*fun text(key: String): String = label(key, I18n.translate(key))
+    /*fun text(key: String): String = label(key, translate(key))
+
+    private fun translate(key: String): String = I18n.translate(key)
 
     private fun isEnglish(): Boolean = SettingsLegacyOptions.isEnglish()
-    *///?} else {
-    /*fun text(key: String): String = key
-
-    private fun isEnglish(): Boolean = false
     *///?}
 
-    private val ENGLISH = setOf("en_us", "en_gb")
+    private fun isEnglishCode(code: String?): Boolean = code != null && code.lowercase(Locale.ROOT).startsWith("en_")
 }

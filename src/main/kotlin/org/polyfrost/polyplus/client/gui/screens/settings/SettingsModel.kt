@@ -2,7 +2,7 @@ package org.polyfrost.polyplus.client.gui.screens.settings
 
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 
-internal enum class SettingsCategory(val label: String, val icon: String) {
+internal enum class SettingsCategory(val english: String, val icon: String) {
     Video("Video", "hud"),
     Sound("Sound", SOCIAL_ASSETS + "volume-max.svg"),
     Controls("Controls", "keyboard"),
@@ -13,7 +13,9 @@ internal enum class SettingsCategory(val label: String, val icon: String) {
     Chat("Chat", SOCIAL_ASSETS + "message-chat-circle.svg"),
     Online("Online", "cloud"),
     Packs("Resource packs", SOCIAL_ASSETS + "package-01.svg"),
-    Mods("More from mods", "spanner"),
+    Mods("More from mods", "spanner");
+
+    val label: String get() = SettingsLabels.category(this)
 }
 
 internal val SettingsCategory.entryId: String get() = "minecraft:" + name.lowercase()

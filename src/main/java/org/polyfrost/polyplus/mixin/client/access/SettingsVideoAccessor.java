@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.screens.options.VideoSettingsScreen;
@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(VideoSettingsScreen.class)
 public interface SettingsVideoAccessor {
+    //? if >= 1.21.11 {
     @Invoker("displayOptions")
     static OptionInstance<?>[] polyplus$displayOptions(Options options) {
         throw new AssertionError();
@@ -23,5 +24,11 @@ public interface SettingsVideoAccessor {
     static OptionInstance<?>[] polyplus$preferenceOptions(Options options) {
         throw new AssertionError();
     }
+    //?} else {
+    /*@Invoker("options")
+    static OptionInstance<?>[] polyplus$options(Options options) {
+        throw new AssertionError();
+    }
+    *///?}
 }
 //?}

@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.client.gui.screens.settings
 /*import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.chat.ChatGui
 import net.minecraft.client.options.GameOptions
+import net.minecraft.client.render.Window
 import net.minecraft.client.render.model.PlayerModelPart
 import net.minecraft.client.resource.language.I18n
 import net.minecraft.client.sound.SoundCategory
@@ -77,7 +78,7 @@ internal object SettingsLegacyOptions {
         options.save()
     }
 
-    fun isEnglish(): Boolean = runCatching { currentLanguage().lowercase(Locale.ROOT) }.getOrNull() in ENGLISH
+    fun isEnglish(): Boolean = runCatching { currentLanguage().lowercase(Locale.ROOT) }.getOrNull()?.startsWith("en_") == true
 
     private fun toggle(option: GameOptions.Option): SettingKind = SettingKind.Toggle(options.getBoolean(option)) { on ->
         if (options.getBoolean(option) != on) options.set(option, 1)
@@ -97,7 +98,13 @@ internal object SettingsLegacyOptions {
         return SettingKind.Choice(labels, current) { index ->
             val now = choiceState(option)?.second ?: current
             val delta = ((index - now) % labels.size + labels.size) % labels.size
-            if (delta != 0) options.set(option, delta)
+            if (delta != 0) {
+                options.set(option, delta)
+                if (option == GameOptions.Option.GUI_SCALE) {
+                    val window = Window(mc)
+                    mc.screen?.init(mc, window.width, window.height)
+                }
+            }
         }
     }
 
@@ -144,7 +151,5 @@ internal object SettingsLegacyOptions {
         GameOptions.Option.MIPMAP_LEVELS -> if (value.roundToInt() == 0) text("options.off") else value.roundToInt().toString()
         else -> percentOrOff(value)
     }
-
-    private val ENGLISH = setOf("en_us", "en_gb")
 }
 *///?}

@@ -11,9 +11,12 @@ import org.polyfrost.polyplus.client.gui.screens.Routed
 import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.util.Collections
+import java.util.WeakHashMap
 
 object SettingsRoutes {
     private var passing: Screen? = null
+    private val kept: MutableSet<Screen> = Collections.newSetFromMap(WeakHashMap())
 
     internal fun pass(screen: Screen) {
         passing = screen
@@ -23,9 +26,12 @@ object SettingsRoutes {
     fun route(screen: Screen, origin: ScreenShell?): Routed? {
         if (screen === passing) {
             passing = null
+            if (SettingsPlatform.replaces(screen)) kept += screen
             return null
         }
-        if (origin == null || !SettingsPlatform.replaces(screen)) return null
+        if (screen in kept) return null
+        if (!SettingsPlatform.replaces(screen)) return null
+        val shell = origin ?: ScreenRouter.fallbackShell()
         if (origin == ScreenShell.InGame) {
             (ClientPlatform.currentScreen() as? OneClientPauseScreen)?.let { pause ->
                 pause.openGameSettings()
@@ -38,6 +44,6 @@ object SettingsRoutes {
                 return Routed.Consumed
             }
         }
-        return Routed.show(SettingsScreen(origin, SettingsPlatform.parentOf(screen)))
+        return Routed.show(SettingsScreen(shell, SettingsPlatform.parentOf(screen)))
     }
 }

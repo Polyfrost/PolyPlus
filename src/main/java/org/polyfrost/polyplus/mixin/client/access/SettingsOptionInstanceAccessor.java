@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import java.util.function.Function;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.network.chat.Component;
@@ -14,5 +14,8 @@ public interface SettingsOptionInstanceAccessor {
 
     @Accessor("tooltip")
     OptionInstance.TooltipSupplier<Object> polyplus$tooltip();
+
+    @Accessor("caption")
+    Component polyplus$caption();
 }
 //?}

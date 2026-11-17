@@ -5,23 +5,27 @@ import net.minecraft.client.gui.screens.Screen
 //?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
-//? if >= 26.3 {
-import com.mojang.blaze3d.Blaze3D
+//? if > 1.8.9 {
 import net.minecraft.client.Minecraft
 import net.minecraft.client.OptionInstance
 import net.minecraft.client.Options
-import net.minecraft.client.gui.screens.PrivacyConfirmLinkScreen
-import net.minecraft.client.gui.screens.friends.FriendsListConfirmScreen
 import net.minecraft.client.gui.screens.telemetry.TelemetryInfoScreen
 import net.minecraft.sounds.SoundSource
-import net.minecraft.util.CommonLinks
-import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.SettingsGeneralChatAccessor
 import org.polyfrost.polyplus.mixin.client.access.SettingsGeneralMouseAccessor
-import org.polyfrost.polyplus.mixin.client.access.SettingsGeneralOnlineAccessor
 //?} elif = 1.8.9 {
 /*import net.minecraft.client.options.GameOptions
 *///?}
+//? if >= 26.3 {
+import com.mojang.blaze3d.Blaze3D
+//?}
+//? if >= 26.2 {
+import net.minecraft.client.gui.screens.PrivacyConfirmLinkScreen
+import net.minecraft.client.gui.screens.friends.FriendsListConfirmScreen
+import net.minecraft.util.CommonLinks
+import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.mixin.client.access.SettingsGeneralOnlineAccessor
+//?}
 
 internal class GeneralAction(
     val key: String,
@@ -33,7 +37,7 @@ internal class GeneralAction(
 
 internal class GeneralSection(val section: SettingSection, val actions: List<GeneralAction> = emptyList())
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 internal object GeneralOptions {
     private val mc: Minecraft get() = Minecraft.getInstance()
     private val options: Options get() = mc.options
@@ -59,7 +63,11 @@ internal object GeneralOptions {
         return listOf(
             GeneralSection(SettingSection("Volume", volumes)),
             GeneralSection(SettingSection("Output", listOfNotNull(row(o.soundDevice()), row(o.directionalAudio()), row(o.showSubtitles())))),
+            //? if >= 1.21.11 {
             GeneralSection(SettingSection("Music", listOfNotNull(row(o.musicFrequency()), row(o.musicToast())))),
+            //?} elif >= 1.21.8 {
+            /*GeneralSection(SettingSection("Music", listOfNotNull(row(o.musicFrequency()), row(o.showNowPlayingToast())))),
+            *///?}
         )
     }
 
@@ -67,11 +75,19 @@ internal object GeneralOptions {
         val o = options
         return grouped(
             SettingsGeneralMouseAccessor.`polyplus$options`(o),
+            //? if >= 1.21.10 {
             listOf(
                 "Movement" to setOf(o.sensitivity(), o.invertMouseX(), o.invertMouseY()),
                 "Scrolling" to setOf(o.mouseWheelSensitivity(), o.discreteMouseScroll()),
                 "Cursor" to setOf(o.allowCursorChanges()),
             ),
+            //?} else {
+            /*listOf(
+                "Movement" to setOf(o.sensitivity(), o.invertYMouse()),
+                "Scrolling" to setOf(o.mouseWheelSensitivity(), o.discreteMouseScroll()),
+                "Other" to emptySet(),
+            ),
+            *///?}
         )
     }
 
@@ -82,7 +98,11 @@ internal object GeneralOptions {
             listOf(
                 "Messages" to setOf(o.chatVisibility(), o.chatColors(), o.chatLinks(), o.chatLinksPrompt(), o.chatDelay(), o.hideMatchedNames(), o.onlyShowSecureChat()),
                 "Appearance" to setOf(o.chatOpacity(), o.textBackgroundOpacity(), o.chatScale(), o.chatLineSpacing(), o.chatWidth(), o.chatHeightFocused(), o.chatHeightUnfocused()),
+                //? if >= 1.21.10 {
                 "Other" to setOf(o.narrator(), o.autoSuggestions(), o.saveChatDrafts(), o.reducedDebugInfo()),
+                //?} else {
+                /*"Other" to setOf(o.narrator(), o.autoSuggestions(), o.reducedDebugInfo()),
+                *///?}
             ),
         )
     }
@@ -96,6 +116,7 @@ internal object GeneralOptions {
         }
     }
 
+    //? if >= 26.2 {
     private fun online(parent: () -> Screen?): List<GeneralSection> {
         val o = options
         val social = mc.playerSocialManager
@@ -175,13 +196,38 @@ internal object GeneralOptions {
         SettingsRoutes.pass(
             PrivacyConfirmLinkScreen(
                 { open ->
+                    //? if >= 26.3 {
                     if (open) Blaze3D.openUri(uri)
+                    //?} else {
+                    /*if (open) ClientPlatform.openUri(uri.toString())
+                    *///?}
                     ClientPlatform.setScreen(host)
                 },
+                //? if >= 26.3 {
                 uri,
+                //?} else {
+                /*uri.toString(),
+                *///?}
             ),
         )
     }
+    //?} else {
+    /*private fun online(parent: () -> Screen?): List<GeneralSection> {
+        val o = options
+        val telemetryAllowed = mc.allowsTelemetry()
+        val telemetry = GeneralAction(
+            TELEMETRY_KEY,
+            text("options.telemetry"),
+            if (telemetryAllowed) null else text("options.telemetry.disabled"),
+            telemetryAllowed,
+        ) { parent()?.let { SettingsRoutes.pass(TelemetryInfoScreen(it, options)) } }
+        return listOf(
+            GeneralSection(SettingSection("Servers", listOfNotNull(row(o.allowServerListing())))),
+            GeneralSection(SettingSection("Realms", listOfNotNull(row(o.realmsNotifications())))),
+            GeneralSection(SettingSection("Privacy", emptyList()), listOf(telemetry)),
+        )
+    }
+    *///?}
 
     private fun text(key: String): String = SettingsLabels.text(key)
 
@@ -190,9 +236,11 @@ internal object GeneralOptions {
         return SettingsOptionRows.row(instance, wide, active)
     }
 
+    //? if >= 26.2 {
     private const val FRIENDS_KEY = "options.friendsList"
     private const val FRIEND_REQUESTS_KEY = "options.allowFriendRequests"
     private const val XBOX_KEY = "options.online.xboxSettings"
+    //?}
     private const val TELEMETRY_KEY = "options.telemetry"
 }
 //?} elif = 1.8.9 {
@@ -233,13 +281,5 @@ internal object GeneralOptions {
     }
 
     private fun section(title: String, rows: List<SettingRow>): GeneralSection = GeneralSection(SettingSection(title, rows))
-}
-*///?} else {
-/*internal object GeneralOptions {
-    fun supports(category: SettingsCategory): Boolean = false
-
-    fun save() {}
-
-    fun sections(category: SettingsCategory, parent: () -> Screen?): List<GeneralSection> = emptyList()
 }
 *///?}

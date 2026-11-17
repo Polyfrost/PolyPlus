@@ -5,7 +5,7 @@ import net.minecraft.client.gui.screens.Screen
 //?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import net.minecraft.client.Minecraft
 import net.minecraft.client.OptionInstance
 import net.minecraft.client.Options
@@ -13,7 +13,6 @@ import net.minecraft.client.gui.screens.ConfirmLinkScreen
 import net.minecraft.network.chat.Component
 import net.minecraft.util.CommonLinks
 import net.minecraft.world.entity.player.PlayerModelPart
-import net.minecraft.world.flag.FeatureFlags
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.SettingsInputAccessibilityAccessor
 import org.polyfrost.polyplus.mixin.client.access.SettingsInputControlsAccessor
@@ -22,10 +21,13 @@ import java.util.Locale
 //?} elif = 1.8.9 {
 /*import net.minecraft.client.options.GameOptions
 *///?}
+//? if >= 1.21.4 {
+import net.minecraft.world.flag.FeatureFlags
+//?}
 
 internal class LanguageEntry(val code: String, val label: String, val search: String)
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 internal object InputSettingsPlatform {
     private val mc: Minecraft get() = Minecraft.getInstance()
     private val options: Options get() = mc.options
@@ -43,7 +45,11 @@ internal object InputSettingsPlatform {
         val o = options
         val parts = PlayerModelPart.entries.map { part ->
             SettingRow("part-" + part.id, part.getName().string, null, SettingKind.Toggle(o.isModelPartEnabled(part)) {
+                //? if >= 1.21.4 {
                 o.setModelPart(part, it)
+                //?} else {
+                /*o.toggleModelPart(part, it)
+                *///?}
                 o.save()
             })
         }
@@ -57,12 +63,23 @@ internal object InputSettingsPlatform {
         val o = options
         val all = SettingsInputAccessibilityAccessor.`polyplus$options`(o).toList()
         val groups = listOf(
+            //? if >= 1.21.4 {
             "General" to listOf(o.narrator(), o.narratorHotkey(), o.showSubtitles(), o.highContrast(), o.highContrastBlockOutline()),
+            //?} else {
+            /*"General" to listOf(o.narrator(), o.narratorHotkey(), o.showSubtitles(), o.highContrast()),
+            *///?}
             "Text and chat" to listOf(o.textBackgroundOpacity(), o.backgroundForChatOnly(), o.chatOpacity(), o.chatLineSpacing(), o.chatDelay(), o.notificationDisplayTime()),
+            //? if >= 1.21.4 {
             "Effects" to listOf(
                 o.bobView(), o.screenEffectScale(), o.fovEffectScale(), o.darknessEffectScale(), o.damageTiltStrength(),
                 o.glintSpeed(), o.glintStrength(), o.hideLightningFlash(), o.rotateWithMinecart(),
             ),
+            //?} else {
+            /*"Effects" to listOf(
+                o.bobView(), o.screenEffectScale(), o.fovEffectScale(), o.darknessEffectScale(), o.damageTiltStrength(),
+                o.glintSpeed(), o.glintStrength(), o.hideLightningFlash(),
+            ),
+            *///?}
             "Menus" to listOf(o.menuBackgroundBlurriness(), o.darkMojangStudiosBackground(), o.panoramaSpeed(), o.hideSplashTexts()),
         )
         val grouped = groups.flatMap { it.second }.toSet()
@@ -96,7 +113,11 @@ internal object InputSettingsPlatform {
         SettingsRoutes.pass(ConfirmLinkScreen({ open ->
             if (open) ClientPlatform.openUri(uri.toString())
             SettingsRoutes.pass(parent)
+        //? if >= 26.3 {
         }, uri, true))
+        //?} else {
+        /*}, uri.toString(), true))
+        *///?}
     }
 
     fun accessibilityGuideLabel(): String = text("options.accessibility.link")
@@ -104,7 +125,9 @@ internal object InputSettingsPlatform {
     private fun enabled(instance: OptionInstance<*>): Boolean = when {
         instance === options.narrator() -> mc.narrator.isActive
         instance === options.highContrast() -> mc.resourcePackRepository.availableIds.contains("high_contrast")
+        //? if >= 1.21.4 {
         instance === options.rotateWithMinecart() -> mc.level?.enabledFeatures()?.contains(FeatureFlags.MINECART_IMPROVEMENTS) == true
+        //?}
         else -> true
     }
 
@@ -114,7 +137,11 @@ internal object InputSettingsPlatform {
     }
 
     private val holdOrToggle: List<OptionInstance<Boolean>>
+        //? if >= 1.21.10 {
         get() = listOf(options.toggleCrouch(), options.toggleSprint(), options.toggleAttack(), options.toggleUse())
+        //?} else {
+        /*get() = listOf(options.toggleCrouch(), options.toggleSprint())
+        *///?}
 
     private fun row(instance: OptionInstance<*>): SettingRow? {
         val base = SettingsOptionRows.row(instance, enabled = enabled(instance), hint = disabledHint(instance)) ?: return null
@@ -151,34 +178,6 @@ internal object InputSettingsPlatform {
     fun languages(): List<LanguageEntry> = SettingsLegacyOptions.languages()
 
     fun applyLanguage(code: String) = SettingsLegacyOptions.applyLanguage(code)
-
-    fun openAccessibilityGuide(parent: Screen) {}
-
-    fun accessibilityGuideLabel(): String = ""
-}
-*///?} else {
-/*internal object InputSettingsPlatform {
-    const val available: Boolean = false
-
-    fun text(key: String): String = key
-
-    fun save() {}
-
-    fun controlsSections(): List<SettingSection> = emptyList()
-
-    fun skinSections(): List<SettingSection> = emptyList()
-
-    fun accessibilitySections(): List<SettingSection> = emptyList()
-
-    fun fontSection(): SettingSection = SettingSection("", emptyList())
-
-    fun languageWarning(): String = ""
-
-    fun currentLanguage(): String = ""
-
-    fun languages(): List<LanguageEntry> = emptyList()
-
-    fun applyLanguage(code: String) {}
 
     fun openAccessibilityGuide(parent: Screen) {}
 

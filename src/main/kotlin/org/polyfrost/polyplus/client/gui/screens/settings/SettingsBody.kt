@@ -67,6 +67,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PanelToggle
 import org.polyfrost.polyplus.client.gui.lobbyshell.Segmented
 import org.polyfrost.polyplus.client.gui.lobbyshell.UnderlineTabs
 import org.polyfrost.polyplus.client.gui.lobbyshell.card
+import org.polyfrost.polyplus.client.gui.screens.world.ConfirmDialog
 
 private val RailWidth = 212.dp
 private val RailRowHeight = 36.dp
@@ -270,6 +271,7 @@ private fun VideoPage() {
     }
     val sections = remember(revision) { SettingsPlatform.videoSections() }
     val restart = remember(revision) { SettingsPlatform.restartRequired() }
+    val warning = remember(revision) { SettingsPlatform.graphicsWarning() }
     val changed: () -> Unit = { revision++ }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val columns = if (maxWidth >= TwoColumnWidth) 2 else 1
@@ -278,6 +280,12 @@ private fun VideoPage() {
                 VideoHeader(restart)
                 sections.forEach { section -> SectionBlock(section, columns, changed) }
             }
+        }
+    }
+    warning?.let { spec ->
+        ConfirmDialog(spec) { accepted ->
+            spec.onResult(accepted)
+            changed()
         }
     }
 }

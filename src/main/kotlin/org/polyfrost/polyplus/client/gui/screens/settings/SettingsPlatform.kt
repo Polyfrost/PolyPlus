@@ -5,13 +5,14 @@ import net.minecraft.client.gui.screens.Screen
 //?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
-//? if >= 26.3 {
+import org.polyfrost.polyplus.client.gui.screens.world.DialogSpec
+//? if > 1.8.9 {
 import com.mojang.blaze3d.platform.Monitor
+import com.mojang.blaze3d.platform.VideoMode
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.OptionInstance
 import net.minecraft.client.Options
-import net.minecraft.client.TextureFilteringMethod
 import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen
 import net.minecraft.client.gui.screens.options.ChatOptionsScreen
 import net.minecraft.client.gui.screens.options.LanguageSelectScreen
@@ -43,9 +44,22 @@ import net.minecraft.client.options.GameOptions
 import org.polyfrost.polyplus.mixin.client.access.SettingsLegacyOptionsAccessor
 import org.polyfrost.polyplus.mixin.client.access.SettingsLegacyVideoAccessor
 *///?}
+//? if >= 1.21.11 {
+import net.minecraft.client.TextureFilteringMethod
+//?}
+//? if > 1.8.9 && < 26.1 {
+/*import org.polyfrost.polyplus.mixin.client.access.SettingsOptionsScreenAccessor
+*///?}
+//? if > 1.8.9 && < 1.21.11 {
+/*import net.minecraft.client.GraphicsStatus
+*///?}
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
+//? if >= 1.21.11 {
 internal class VideoSession(val mipmaps: Int, val anisotropy: Int, val filtering: TextureFilteringMethod)
+//?} else {
+/*internal class VideoSession(val mipmaps: Int)
+*///?}
 
 internal object SettingsPlatform {
     private val mc: Minecraft get() = Minecraft.getInstance()
@@ -61,12 +75,20 @@ internal object SettingsPlatform {
 
     fun save() = options.save()
 
+    //? if >= 26.2 {
     fun restartRequired(): Boolean = options.isRestartRequiredToApplyVideoSettings
 
     fun restartNotice(): String = Component.translatable("options.restartRequired").string
+    //?} else {
+    /*fun restartRequired(): Boolean = false
 
+    fun restartNotice(): String = "Restart the game to apply."
+    *///?}
+
+    //? if >= 1.21.11 {
     fun beginVideo(): VideoSession {
         mc.gpuWarnlistManager.resetWarnings()
+        if (warnedFeatureOn()) mc.gpuWarnlistManager.dismissWarning()
         return VideoSession(options.mipmapLevels().get(), options.maxAnisotropyBit().get(), options.textureFiltering().get())
     }
 
@@ -97,6 +119,115 @@ internal object SettingsPlatform {
             ),
         )
     }
+    //?} else {
+    /*fun beginVideo(): VideoSession {
+        mc.gpuWarnlistManager.resetWarnings()
+        if (warnedFeatureOn()) mc.gpuWarnlistManager.dismissWarning()
+        return VideoSession(options.mipmapLevels().get())
+    }
+
+    fun endVideo(session: VideoSession) {
+        mc.window.changeFullscreenVideoMode()
+        val mipmaps = options.mipmapLevels().get()
+        if (mipmaps != session.mipmaps) {
+            mc.updateMaxMipLevel(mipmaps)
+            mc.delayTextureReload()
+        }
+        options.save()
+    }
+
+    fun videoSections(): List<SettingSection> {
+        val o = options
+        val all = SettingsVideoAccessor.`polyplus$options`(o).toList()
+        val display: List<OptionInstance<*>> = listOfNotNull(o.framerateLimit(), o.enableVsync(), inactivityLimit(), o.guiScale(), o.fullscreen(), o.gamma())
+        val preferences: List<OptionInstance<*>> = listOf(
+            o.bobView(), o.attackIndicator(), o.showAutosaveIndicator(), o.screenEffectScale(), o.fovEffectScale(), o.glintSpeed(), o.glintStrength(),
+        )
+        val quality = listOf(o.biomeBlendRadius()) +
+            all.filter { it !in display && it !in preferences && it !== o.graphicsMode() && it !== o.biomeBlendRadius() }
+        return listOf(
+            SettingSection("Display", listOf(fullscreenModeRow()) + display.mapNotNull { row(it) }),
+            SettingSection("Quality", listOfNotNull(row(o.graphicsMode(), wide = true)) + quality.mapNotNull { row(it) }),
+            SettingSection("Preferences", listOfNotNull(row(o.fov())) + preferences.mapNotNull { row(it) }),
+        )
+    }
+    *///?}
+
+    fun graphicsWarning(): DialogSpec? {
+        val warnlist = mc.gpuWarnlistManager
+        if (!warnlist.isShowingWarning) return null
+        val feature = Component.translatable(WARNED_FEATURE)
+        val lines = listOfNotNull(
+            Component.translatable("options.graphics.warning.message", feature, feature).string,
+            warnlist.rendererWarnings?.let { Component.translatable("options.graphics.warning.renderer", it).string },
+            warnlist.vendorWarnings?.let { Component.translatable("options.graphics.warning.vendor", it).string },
+            warnlist.versionWarnings?.let { Component.translatable("options.graphics.warning.version", it).string },
+        )
+        return DialogSpec(
+            text("options.graphics.warning.title"),
+            lines.joinToString("\n\n"),
+            text("options.graphics.warning.accept"),
+            text("options.graphics.warning.cancel"),
+            danger = true,
+            onResult = { accepted -> if (mc.gpuWarnlistManager.isShowingWarning) resolveGraphicsWarning(accepted) },
+        )
+    }
+
+    //? if >= 26.2 {
+    private fun resolveGraphicsWarning(accepted: Boolean) {
+        val warnlist = mc.gpuWarnlistManager
+        if (accepted) {
+            options.improvedTransparency().set(true)
+            mc.levelExtractor.allChanged()
+            warnlist.dismissWarning()
+        } else {
+            warnlist.dismissWarning()
+            options.improvedTransparency().set(false)
+        }
+        options.save()
+    }
+    //?} elif >= 1.21.11 {
+    /*private fun resolveGraphicsWarning(accepted: Boolean) {
+        val warnlist = mc.gpuWarnlistManager
+        if (accepted) {
+            options.improvedTransparency().set(true)
+            mc.levelRenderer.allChanged()
+            warnlist.dismissWarning()
+        } else {
+            warnlist.dismissWarning()
+            options.improvedTransparency().set(false)
+        }
+        options.save()
+    }
+    *///?} else {
+    /*private fun resolveGraphicsWarning(accepted: Boolean) {
+        val warnlist = mc.gpuWarnlistManager
+        if (accepted) {
+            options.graphicsMode().set(GraphicsStatus.FABULOUS)
+            mc.levelRenderer.allChanged()
+            warnlist.dismissWarning()
+        } else {
+            warnlist.dismissWarningAndSkipFabulous()
+        }
+        options.save()
+    }
+    *///?}
+
+    //? if >= 1.21.11 {
+    private fun warnedFeatureOn(): Boolean = options.improvedTransparency().get()
+
+    private const val WARNED_FEATURE = "options.improvedTransparency"
+    //?} else {
+    /*private fun warnedFeatureOn(): Boolean = options.graphicsMode().get() == GraphicsStatus.FABULOUS
+
+    private const val WARNED_FEATURE = "options.graphics.fabulous"
+    *///?}
+
+    //? if >= 1.21.4 && < 1.21.11 {
+    /*private fun inactivityLimit(): OptionInstance<*>? = options.inactivityFpsLimit()
+    *///?} elif < 1.21.4 {
+    /*private fun inactivityLimit(): OptionInstance<*>? = null
+    *///?}
 
     fun open(category: SettingsCategory, parent: Screen) {
         val o = options
@@ -119,7 +250,11 @@ internal object SettingsPlatform {
                 mc.resourcePackDirectory,
                 Component.translatable("resourcePack.title"),
             )
+            //? if >= 26.3 || < 26.1 {
             SettingsCategory.Mods -> OptionsScreen(parent, o)
+            //?} else {
+            /*SettingsCategory.Mods -> OptionsScreen(parent, o, mc.level != null)
+            *///?}
         }
         SettingsRoutes.pass(screen)
     }
@@ -128,7 +263,11 @@ internal object SettingsPlatform {
         screen.javaClass == OptionsScreen::class.java || (!sodium && screen.javaClass == VideoSettingsScreen::class.java)
 
     fun parentOf(screen: Screen): Screen? = when (screen) {
+        //? if >= 26.1 {
         is OptionsScreen -> screen.lastScreen
+        //?} else {
+        /*is OptionsScreen -> (screen as Any as SettingsOptionsScreenAccessor).`polyplus$optionsLastScreen`()
+        *///?}
         is SettingsOptionsSubScreenAccessor -> screen.`polyplus$lastScreen`()
         else -> null
     }
@@ -147,33 +286,60 @@ internal object SettingsPlatform {
     private fun fullscreenModeRow(): SettingRow {
         val window = mc.window
         val monitor = window.findBestMonitor()
+        //? if >= 26.3 {
         val caption = text("options.fullscreen.exclusive.mode")
-        val hint = text("options.fullscreen.exclusive.mode.tooltip")
+        val hint: String? = text("options.fullscreen.exclusive.mode.tooltip")
+        //?} else {
+        /*val caption = text("options.fullscreen.resolution")
+        val hint: String? = null
+        *///?}
         if (monitor == null) {
             return SettingRow(FULLSCREEN_KEY, caption, hint, SettingKind.Choice(listOf(text("options.fullscreen.unavailable")), 0) {}, enabled = false)
         }
-        val labels = listOf(text("options.fullscreen.current")) + (0 until monitor.modeCount()).map { modeLabel(monitor, it) }
-        val selected = window.preferredFullscreenVideoMode.map { monitor.indexOfMode(it) }.orElse(-1) + 1
+        val labels = listOf(text("options.fullscreen.current")) + (0 until modeCount(monitor)).map { modeLabel(monitor, it) }
+        val selected = window.preferredFullscreenVideoMode.map { modeIndex(monitor, it) }.orElse(-1) + 1
         return SettingRow(FULLSCREEN_KEY, caption, hint, SettingKind.Choice(labels, selected) { index ->
-            window.setPreferredFullscreenVideoMode(if (index <= 0) Optional.empty() else Optional.of(monitor.mode(index - 1)))
+            window.setPreferredFullscreenVideoMode(if (index <= 0) Optional.empty() else Optional.of(modeAt(monitor, index - 1)))
         })
     }
 
+    //? if >= 26.2 {
+    private fun modeCount(monitor: Monitor): Int = monitor.modeCount()
+
+    private fun modeAt(monitor: Monitor, index: Int): VideoMode = monitor.mode(index)
+
+    private fun modeIndex(monitor: Monitor, mode: VideoMode): Int = monitor.indexOfMode(mode)
+    //?} else {
+    /*private fun modeCount(monitor: Monitor): Int = monitor.getModeCount()
+
+    private fun modeAt(monitor: Monitor, index: Int): VideoMode = monitor.getMode(index)
+
+    private fun modeIndex(monitor: Monitor, mode: VideoMode): Int = monitor.getVideoModeIndex(mode)
+    *///?}
+
     private fun modeLabel(monitor: Monitor, index: Int): String {
-        val mode = monitor.mode(index)
+        val mode = modeAt(monitor, index)
         return Component.translatable(
             "options.fullscreen.entry",
             mode.width,
             mode.height,
+            //? if >= 26.3 {
             mode.refreshRateLabel(),
+            //?} else {
+            /*mode.refreshRate,
+            *///?}
             mode.redBits + mode.greenBits + mode.blueBits,
         ).string
     }
 
+    //? if >= 1.21.11 {
     private fun row(instance: OptionInstance<*>, wide: Boolean = false): SettingRow? {
         val enabled = instance !== options.maxAnisotropyBit() || options.textureFiltering().get() == TextureFilteringMethod.ANISOTROPIC
         return SettingsOptionRows.row(instance, wide, enabled)
     }
+    //?} else {
+    /*private fun row(instance: OptionInstance<*>, wide: Boolean = false): SettingRow? = SettingsOptionRows.row(instance, wide)
+    *///?}
 
     private const val SODIUM_ID = "sodium"
     private const val FULLSCREEN_KEY = "fullscreen-mode"
@@ -205,6 +371,8 @@ internal object SettingsPlatform {
     fun beginVideo(): VideoSession = VideoSession()
 
     fun endVideo(session: VideoSession) = options.save()
+
+    fun graphicsWarning(): DialogSpec? = null
 
     fun videoSections(): List<SettingSection> = listOf(
         SettingSection(
@@ -259,33 +427,5 @@ internal object SettingsPlatform {
         is VideoOptionsScreen -> (screen as Any as? SettingsLegacyVideoAccessor)?.`polyplus$videoParent`()
         else -> null
     }
-}
-*///?} else {
-/*internal class VideoSession
-
-internal object SettingsPlatform {
-    val sodium: Boolean get() = false
-
-    val videoModName: String? get() = null
-
-    fun supports(category: SettingsCategory): Boolean = true
-
-    fun save() {}
-
-    fun restartRequired(): Boolean = false
-
-    fun restartNotice(): String = ""
-
-    fun beginVideo(): VideoSession = VideoSession()
-
-    fun endVideo(session: VideoSession) {}
-
-    fun videoSections(): List<SettingSection> = emptyList()
-
-    fun open(category: SettingsCategory, parent: Screen) {}
-
-    fun replaces(screen: Screen): Boolean = false
-
-    fun parentOf(screen: Screen): Screen? = null
 }
 *///?}
