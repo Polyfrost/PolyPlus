@@ -3,7 +3,7 @@
 package org.polyfrost.polyplus.client.gui.screens.realms
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,11 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mojang.realmsclient.RealmsAvailability
-import com.mojang.realmsclient.RealmsMainScreen
 import com.mojang.realmsclient.dto.PendingInvite
 import com.mojang.realmsclient.dto.RealmsServer
-import com.mojang.realmsclient.util.RealmsUtil
-import net.minecraft.world.level.GameType
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
@@ -188,7 +185,7 @@ private fun Toolbar(screen: RealmsShellScreen) {
                 trailing = if (screen.unreadNews) ({ Badge("New", tone = BadgeTone.Accent) }) else null,
             )
         }
-        TextButton("Join with code", onClick = screen::joinWithCode, size = ControlSize.Large)
+        if (RealmsCompat.JOIN_WITH_CODE) TextButton("Join with code", onClick = screen::joinWithCode, size = ControlSize.Large)
         BuyButton(screen)
     }
 }
@@ -233,7 +230,7 @@ private fun ColumnScope.RealmList(screen: RealmsShellScreen) {
         servers == null -> StateBlock("Loading realms", loading = true)
         servers.isEmpty() -> StateBlock(
             "You're not in any realms yet",
-            if (screen.trialAvailable) "Try a realm free, or join a friend's with an invite code." else "Start your own realm, or join a friend's with an invite code.",
+            emptyRealmsText(screen.trialAvailable),
         ) { BuyButton(screen) }
         else -> ScrollContainer(modifier = Modifier.fillMaxWidth().weight(1f)) {
             RealmGrid(screen, servers)
@@ -263,7 +260,7 @@ private fun RealmGrid(screen: RealmsShellScreen, servers: List<RealmsServer>) {
 private fun RealmCard(screen: RealmsShellScreen, server: RealmsServer, modifier: Modifier) {
     val hover = rememberHoverState()
     val mine = screen.isMine(server)
-    val here = screen.onlinePlayers?.getProfileResultsFor(server.id)?.map { it.partialProfile().id() }.orEmpty()
+    val here = screen.onlinePlayers?.playersIn(server.id).orEmpty()
     val friendsHere = here.filter(FriendsRepository::isFriend)
     val entry = realmEntry(server, mine, here.size)
     val setup = server.state == RealmsServer.State.UNINITIALIZED
@@ -377,7 +374,7 @@ private fun RealmActions(screen: RealmsShellScreen, server: RealmsServer, mine: 
                 modifier = primary,
                 size = ControlSize.Large,
                 style = ControlStyle.Primary,
-                enabled = server.shouldPlayButtonBeActive(),
+                enabled = server.playable,
                 fillWidth = true,
             )
         }
@@ -391,6 +388,12 @@ private fun RealmActions(screen: RealmsShellScreen, server: RealmsServer, mine: 
     }
 }
 
+private fun emptyRealmsText(trial: Boolean): String = when {
+    !RealmsCompat.JOIN_WITH_CODE -> if (trial) "Try a realm free, or ask a friend for an invite." else "Start your own realm, or ask a friend for an invite."
+    trial -> "Try a realm free, or join a friend's with an invite code."
+    else -> "Start your own realm, or join a friend's with an invite code."
+}
+
 private fun cardLine(server: RealmsServer, entry: RealmEntry, mine: Boolean, setup: Boolean): String = when {
     setup -> "Set it up to start playing."
     server.expired && mine -> if (server.expiredTrial) "Your trial has ended." else "Your subscription has ended. Renew it to keep playing."
@@ -400,13 +403,13 @@ private fun cardLine(server: RealmsServer, entry: RealmEntry, mine: Boolean, set
 
 private fun detail(server: RealmsServer, entry: RealmEntry): String = listOfNotNull(
     if (entry.mine) "Your realm" else entry.owner.takeIf { it.isNotBlank() }?.let { "By $it" },
-    server.gameMode.takeIf { !server.isMinigameActive && GameType.isValidId(it) }?.let { RealmsMainScreen.getGameModeComponent(it, server.isHardcore).string },
+    server.gameModeLabel,
     server.activeVersion.takeIf { it.isNotBlank() && !server.isMinigameActive },
 ).joinToString(" · ")
 
 private fun bannerSource(server: RealmsServer): String? =
     if (server.isMinigameActive) server.minigameImage?.takeIf { it.isNotBlank() }
-    else server.slots[server.activeSlot]?.options?.templateImage?.takeIf { it.isNotBlank() }
+    else server.slotImage?.takeIf { it.isNotBlank() }
 
 private fun realmHues(id: Long): Pair<Color, Color> {
     val hue = Math.floorMod(id * HUE_STEP, FULL_TURN.toLong()).toFloat()
@@ -460,10 +463,11 @@ private fun ColumnScope.InviteList(screen: RealmsShellScreen) {
             "No invites right now",
             "When a friend invites you to their realm, it shows up here.",
             INVITES_ICON,
-        ) { TextButton("Join with code", onClick = screen::joinWithCode, size = ControlSize.Large, style = ControlStyle.Primary) }
+            action = if (RealmsCompat.JOIN_WITH_CODE) ({ TextButton("Join with code", onClick = screen::joinWithCode, size = ControlSize.Large, style = ControlStyle.Primary) }) else null,
+        )
         else -> ScrollContainer(modifier = Modifier.fillMaxWidth().weight(1f)) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RowGap)) {
-                invites.forEach { invite -> key(invite.invitationId()) { InviteRow(screen, invite) } }
+                invites.forEach { invite -> key(invite.inviteId) { InviteRow(screen, invite) } }
             }
         }
     }
@@ -471,7 +475,7 @@ private fun ColumnScope.InviteList(screen: RealmsShellScreen) {
 
 @Composable
 private fun InviteRow(screen: RealmsShellScreen, invite: PendingInvite) {
-    val busy = invite.invitationId() in screen.answering
+    val busy = invite.inviteId in screen.answering
     val hover = rememberHoverState()
     Row(
         Modifier
@@ -487,14 +491,14 @@ private fun InviteRow(screen: RealmsShellScreen, invite: PendingInvite) {
         InviteHead(invite, RowHead)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                invite.realmName().ifBlank { "Realm" },
+                invite.inviteRealm.ifBlank { "Realm" },
                 style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false,
             )
             Text(
-                listOfNotNull(invite.realmOwnerName().takeIf { it.isNotBlank() }?.let { "From $it" }, RealmsUtil.convertToAgePresentationFromInstant(invite.date()).string)
+                listOfNotNull(invite.inviteOwner.takeIf { it.isNotBlank() }?.let { "From $it" }, invite.inviteAge)
                     .joinToString(" · "),
                 color = OneConfigTheme.current.mutedText,
                 style = OneConfigTheme.current.typography.small,
@@ -510,6 +514,6 @@ private fun InviteRow(screen: RealmsShellScreen, invite: PendingInvite) {
 
 @Composable
 private fun InviteHead(invite: PendingInvite, size: Dp) {
-    PlayerHead(playerId = invite.realmOwnerUuid(), size = size, name = invite.realmOwnerName().ifBlank { null }, shape = headShape(size))
+    PlayerHead(playerId = invite.inviteOwnerId, size = size, name = invite.inviteOwner.ifBlank { null }, shape = headShape(size))
 }
 //?}

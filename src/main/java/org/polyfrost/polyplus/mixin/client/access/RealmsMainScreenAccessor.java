@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import com.mojang.realmsclient.RealmsMainScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
