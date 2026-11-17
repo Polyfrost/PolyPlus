@@ -22,7 +22,7 @@ import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import java.nio.file.Path
 import org.polyfrost.polyplus.client.gui.screens.packs.PackDrops
 //?}
@@ -117,7 +117,7 @@ class OneClientPauseScreen(
     }
     *///?}
 
-    //? if >= 26.3 {
+    //? if > 1.8.9 {
     override fun onFilesDrop(files: List<Path>) {
         if (!PackDrops.drop(files)) super.onFilesDrop(files)
     }

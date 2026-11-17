@@ -43,11 +43,15 @@ object PolyPlusScreensConfig : Config(
     var customDeath = true
 
     @JvmStatic
+    //? if > 1.8.9 {
     @Switch(
         title = "Realms",
         description = "Uses OneClient's Realms screens.",
         subcategory = "Screens",
     )
+    //?} else {
+    /*@Include
+    *///?}
     var customRealms = true
 
     @JvmStatic @Include

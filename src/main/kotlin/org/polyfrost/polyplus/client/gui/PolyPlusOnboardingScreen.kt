@@ -276,7 +276,7 @@ internal fun OnboardingFlow(
     }
     var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
     var watermark by remember { mutableStateOf(PolyPlusConfig.watermarkEnabled) }
-    var screens by remember { mutableStateOf(ScreenPart.entries.associateWith { it.read() }) }
+    var screens by remember { mutableStateOf(ScreenPart.shown.associateWith { it.read() }) }
     var alphabeticalMods by remember { mutableStateOf(DefaultModOrder.alphabetical()) }
     var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
     var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
@@ -1021,6 +1021,14 @@ private enum class ScreenPart(val title: String, val description: String) {
             LOADING -> PolyPlusConfig.brandedStartup = ours
         }
     }
+
+    companion object {
+        //? if > 1.8.9 {
+        val shown: List<ScreenPart> = entries
+        //?} else {
+        /*val shown: List<ScreenPart> = entries - REALMS
+        *///?}
+    }
 }
 
 @Composable
@@ -1038,7 +1046,7 @@ private fun ScreensPage(choices: Map<ScreenPart, Boolean>, onChoices: (Map<Scree
             Spacer(Modifier.width(12.dp))
             TextButton(
                 "Use all",
-                { onChoices(ScreenPart.entries.associateWith { true }) },
+                { onChoices(ScreenPart.shown.associateWith { true }) },
                 Modifier.width(SCREENS_ACTION_WIDTH.dp),
                 size = ControlSize.Compact,
                 enabled = choices.values.any { !it },
@@ -1047,7 +1055,7 @@ private fun ScreensPage(choices: Map<ScreenPart, Boolean>, onChoices: (Map<Scree
             Spacer(Modifier.width(8.dp))
             TextButton(
                 "Use none",
-                { onChoices(ScreenPart.entries.associateWith { false }) },
+                { onChoices(ScreenPart.shown.associateWith { false }) },
                 Modifier.width(SCREENS_ACTION_WIDTH.dp),
                 size = ControlSize.Compact,
                 enabled = choices.values.any { it },
@@ -1056,7 +1064,7 @@ private fun ScreensPage(choices: Map<ScreenPart, Boolean>, onChoices: (Map<Scree
         }
         Spacer(Modifier.height(SCREENS_HEADER_GAP.dp))
         Column(verticalArrangement = Arrangement.spacedBy(SCREEN_ROW_GAP.dp)) {
-            ScreenPart.entries.forEach { part ->
+            ScreenPart.shown.forEach { part ->
                 ScreenRow(part, choices[part] ?: true) { onChoices(choices + (part to it)) }
             }
         }
@@ -2496,7 +2504,7 @@ private fun pageSpeech(step: OnboardingStep, page: Int, waiting: Boolean): Strin
             "Welcome to OneClient. Agree to the Terms of Service and Privacy Policy to use online features. $TERMS_NOTE"
         OnboardingStep.LookAndFeel -> "Look and Feel. Choose the UI colors, UI style and GUI scale."
         OnboardingStep.Screens ->
-            "Screens. $SCREENS_TEXT " + ScreenPart.entries.joinToString(", ") { it.title } + "."
+            "Screens. $SCREENS_TEXT " + ScreenPart.shown.joinToString(", ") { it.title } + "."
         OnboardingStep.ModOrder -> "Mod Sorting. $MOD_ORDER_TEXT"
         OnboardingStep.Sprint -> "Toggle Sprint. $SPRINT_TEXT"
         is OnboardingStep.Mods -> "Mods: " + step.cards.joinToString(" and ") { modCardTitle(it) } + "."

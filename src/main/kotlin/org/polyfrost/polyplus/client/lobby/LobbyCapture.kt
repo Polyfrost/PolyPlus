@@ -7,8 +7,6 @@ import net.minecraft.client.Minecraft
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.client.gui.screens.PauseScreen
-//? if >= 26.3
-import org.polyfrost.polyplus.client.gui.screens.connection.DeathShellScreen
 //?} else {
 /*import net.minecraft.client.gui.screen.game.DeathScreen
 import net.minecraft.client.gui.screen.menu.GameMenuScreen as PauseScreen
@@ -42,6 +40,7 @@ import net.minecraft.world.level.levelgen.Heightmap
 //? if > 1.8.9
 import net.minecraft.world.level.storage.LevelResource
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
+import org.polyfrost.polyplus.client.gui.screens.connection.DeathShellScreen
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
@@ -263,11 +262,7 @@ object LobbyCapture {
         rememberPolicy(mc)
         val screen = ClientPlatform.currentScreen()
         val pausing = screen is PauseScreen || screen is OneClientPauseScreen
-        //? if >= 26.3 {
         val dying = screen is DeathScreen || screen is DeathShellScreen
-        //?} else {
-        /*val dying = screen is DeathScreen
-        *///?}
         if (pausing || dying) {
             (copying?.source ?: surveying?.source)?.handOver = true
         } else {

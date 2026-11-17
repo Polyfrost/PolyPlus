@@ -12,7 +12,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import java.nio.file.Path
 import org.polyfrost.polyplus.client.gui.screens.packs.PackDrops
 //?}
@@ -39,7 +39,7 @@ abstract class ShellScreen(
 
     override val panoramaBackground: Boolean get() = shell != ScreenShell.Lobby || !LobbyScene.showing()
 
-    //? if >= 26.3 {
+    //? if > 1.8.9 {
     override fun onFilesDrop(files: List<Path>) {
         if (!PackDrops.drop(files)) super.onFilesDrop(files)
     }
