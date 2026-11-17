@@ -79,6 +79,7 @@ private val SUN_RADIUS = 5.dp
 private val SUN_HALO = 13.dp
 private val MOON_RADIUS = 5.5.dp
 private val STAR_RADIUS = 0.9.dp
+private val CLOUD_PUFF = 4.dp
 private val SECONDS_THICKNESS = 2.dp
 private val SECONDS_BOTTOM = 5.dp
 private const val SKY_DOTS = 15
@@ -92,9 +93,14 @@ private const val CLOCK_ICON_FALLBACK = "moon-star"
 private const val SUNRISE = 360f
 private const val SUNSET = 1080f
 private const val DAY_MINUTES = 1440f
-private const val WASH_HEAD = 0.42f
-private const val WASH_MID = 0.18f
-private const val WASH_TAIL = 0.04f
+private const val WASH_HEAD_NIGHT = 0.42f
+private const val WASH_HEAD_DAY = 0.85f
+private const val WASH_MID_NIGHT = 0.18f
+private const val WASH_MID_DAY = 0.42f
+private const val WASH_TAIL_NIGHT = 0.04f
+private const val WASH_TAIL_DAY = 0.14f
+private const val STAR_ALPHA = 0.7f
+private const val CLOUD_ALPHA = 0.38f
 private const val WASH_SHIFT_MAX = 0.55f
 private const val ARC_TRACK_ALPHA = 0.16f
 private const val ARC_TRAVELED_ALPHA = 0.34f
@@ -131,7 +137,19 @@ private val SKY = listOf(
     SkyStop(DAY_MINUTES, NIGHT_HEAD, NIGHT_TAIL),
 )
 
-private val STARS = listOf(Offset(0.18f, 0.22f), Offset(0.42f, 0.08f), Offset(0.7f, 0.3f), Offset(0.88f, 0.12f))
+private class Star(val at: Offset, val scale: Float)
+
+private val STARS = listOf(
+    Star(Offset(0.12f, 0.38f), 0.8f),
+    Star(Offset(0.18f, 0.12f), 1.1f),
+    Star(Offset(0.34f, 0.3f), 0.7f),
+    Star(Offset(0.46f, 0.04f), 1.2f),
+    Star(Offset(0.62f, 0.22f), 0.8f),
+    Star(Offset(0.78f, 0.06f), 1f),
+    Star(Offset(0.9f, 0.32f), 0.9f),
+)
+
+private val CLOUDS = listOf(Offset(0.24f, 0.34f), Offset(0.78f, 0.56f))
 
 object ClockWidget : ShellWidget {
     override val id = WidgetMigration.CLOCK
@@ -211,6 +229,8 @@ private fun nightAmount(minute: Float): Float = when {
     else -> 1f
 }
 
+private fun mix(from: Float, to: Float, t: Float): Float = from + (to - from) * t.coerceIn(0f, 1f)
+
 private fun readable(color: Color, lightTheme: Boolean): Color {
     val lum = color.luminance()
     return if (!lightTheme) {
@@ -228,15 +248,16 @@ private fun ClockCard(reduced: Boolean) {
     val date = remember(minute.toLocalDate()) { plainSpaces(runCatching { formats.date.format(minute) }.getOrDefault("")) }
     val ofDay = minuteOfDay(minute)
     val lightTheme = OneConfigTheme.current.isLight
-    val sky = remember(ofDay, lightTheme) { skyAt(ofDay).let { SkyTone(readable(it.head, lightTheme), readable(it.tail, lightTheme)) } }
+    val sky = remember(ofDay, lightTheme) { skyAt(ofDay).let { SkyTone(it.head, readable(it.tail, lightTheme)) } }
+    val night = nightAmount(ofDay)
     val day = ofDay >= SUNRISE && ofDay < SUNSET
     val progress = if (day) (ofDay - SUNRISE) / (SUNSET - SUNRISE) else ((ofDay - SUNSET).mod(DAY_MINUTES)) / (DAY_MINUTES - (SUNSET - SUNRISE))
     val glyph = if (day) lerp(SUN_LOW, SUN_HIGH, sin(PI * progress).toFloat()) else if (lightTheme) MOON_LIGHT_THEME else MOON_DARK_THEME
     val ink = SocialTextPrimary
     val muted = OneConfigTheme.current.mutedText
     Box(Modifier.fillMaxWidth().height(WidgetSize.BLOCK.height).clip(OneConfigTheme.shape(CLOCK_RADIUS))) {
-        SkyWash(sky)
-        SkyArc(progress, day, glyph, ink, nightAmount(ofDay), Modifier.align(Alignment.TopEnd).padding(top = SKY_TOP, end = SKY_END).size(SKY_WIDTH, SKY_HEIGHT))
+        SkyWash(sky, 1f - night)
+        SkyArc(progress, day, glyph, ink, night, Modifier.align(Alignment.TopEnd).padding(top = SKY_TOP, end = SKY_END).size(SKY_WIDTH, SKY_HEIGHT))
         Crossfade(
             parts to date,
             Modifier.fillMaxSize().padding(start = CLOCK_PADDING_X, end = SKY_END + SKY_WIDTH + SKY_GAP, top = CLOCK_PADDING_Y, bottom = CLOCK_PADDING_Y),
@@ -253,10 +274,10 @@ private fun ClockCard(reduced: Boolean) {
 }
 
 @Composable
-private fun BoxScope.SkyWash(sky: SkyTone) {
-    val head = sky.head.copy(alpha = WASH_HEAD)
-    val mid = lerp(sky.head, sky.tail, 0.5f).copy(alpha = WASH_MID)
-    val tail = sky.tail.copy(alpha = WASH_TAIL)
+private fun BoxScope.SkyWash(sky: SkyTone, daylight: Float) {
+    val head = sky.head.copy(alpha = mix(WASH_HEAD_NIGHT, WASH_HEAD_DAY, daylight))
+    val mid = lerp(sky.head, sky.tail, 0.5f).copy(alpha = mix(WASH_MID_NIGHT, WASH_MID_DAY, daylight))
+    val tail = sky.tail.copy(alpha = mix(WASH_TAIL_NIGHT, WASH_TAIL_DAY, daylight))
     Canvas(Modifier.matchParentSize()) {
         drawRect(Brush.linearGradient(0f to head, 0.5f to mid, 1f to tail, start = Offset(size.width, 0f), end = Offset(size.width * 0.2f, size.height)))
     }
@@ -315,8 +336,12 @@ private fun SkyArc(progress: Float, day: Boolean, glyph: Color, ink: Color, nigh
             return Offset(cx - rx * cos(angle).toFloat(), horizon - ry * sin(angle).toFloat())
         }
         if (night > 0f) {
-            val star = glyph.copy(alpha = 0.35f * night)
-            STARS.forEach { drawCircle(star, STAR_RADIUS.toPx(), Offset(it.x * size.width, it.y * size.height + inset * 0.3f)) }
+            val star = glyph.copy(alpha = STAR_ALPHA * night)
+            STARS.forEach { drawCircle(star, STAR_RADIUS.toPx() * it.scale, Offset(it.at.x * size.width, it.at.y * size.height + inset * 0.3f)) }
+        }
+        if (night < 1f) {
+            val puff = CLOUD_PUFF.toPx()
+            CLOUDS.forEach { cloud(Offset(it.x * size.width, it.y * size.height), puff, Color.White.copy(alpha = CLOUD_ALPHA * (1f - night))) }
         }
         drawLine(ink.copy(alpha = HORIZON_ALPHA), Offset(0f, horizon), Offset(size.width, horizon), SKY_HORIZON.toPx(), StrokeCap.Round)
         val dot = SKY_DOT.toPx()
@@ -327,6 +352,15 @@ private fun SkyArc(progress: Float, day: Boolean, glyph: Color, ink: Color, nigh
         val at = point(progress.coerceIn(0f, 1f))
         if (day) sun(at, glyph) else moon(at, glyph)
     }
+}
+
+private fun DrawScope.cloud(at: Offset, puff: Float, color: Color) {
+    val shape = Path().apply {
+        addOval(Rect(at, puff))
+        addOval(Rect(Offset(at.x - puff * 0.95f, at.y + puff * 0.3f), puff * 0.7f))
+        addOval(Rect(Offset(at.x + puff * 1.0f, at.y + puff * 0.25f), puff * 0.78f))
+    }
+    drawPath(shape, color)
 }
 
 private fun DrawScope.sun(at: Offset, color: Color) {
