@@ -99,7 +99,7 @@ object LobbyAmbience {
     private const val FAILED_TICKS = 200
     private const val HANDOFF_SECONDS = 3.2
     private const val INITIAL_FADE_NANOS = 400_000_000L
-    private const val AMBIENCE_GAIN = 0.5f
+    private const val AMBIENCE_GAIN = 0.16f
     private val EASE = 1f - exp(-TICK_SECONDS / EASE_SECONDS)
     private val OUTDOOR = listOf(Layer.DAY, Layer.NIGHT, Layer.GOLDEN, Layer.AURORA)
     private val NETHER_BIOMES = setOf("nether_wastes", "crimson_forest", "warped_forest", "soul_sand_valley", "basalt_deltas", "hell")
