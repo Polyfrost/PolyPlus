@@ -33,8 +33,8 @@ object GenericModNames {
         "AppleSkin" to "Saturation",
         "WaveyCapes" to "Wavey Capes",
         "LegacyWaveyCapes" to "Wavey Capes",
-        "Gamma Utils" to "Full Bright",
-        "FullBright" to "Full Bright",
+        "Gamma Utils" to "Fullbright",
+        "FullBright" to "Fullbright",
     )
 
     fun initialize() {
