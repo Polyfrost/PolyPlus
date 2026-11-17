@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.client.gui.screens.settings
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
@@ -25,7 +25,7 @@ internal class SodiumAction(val key: String, val label: String, val hint: String
 
 internal class SodiumGroup(val title: String?, val rows: List<SettingRow>, val actions: List<SodiumAction>)
 
-internal class SodiumBridge private constructor() {
+internal class SodiumBridge private constructor() : SodiumBackend {
     private val config: Field = sodium("client.config.ConfigManager").getField("CONFIG")
 
     private val configClass = sodium("client.config.structure.Config")
@@ -96,9 +96,9 @@ internal class SodiumBridge private constructor() {
 
     private fun text(component: Any?): String = (component as? Component)?.string.orEmpty()
 
-    fun usable(): Boolean = config() != null && call(optionsReadOnly, call(sodiumOptions, null)) != true
+    override fun usable(): Boolean = config() != null && call(optionsReadOnly, call(sodiumOptions, null)) != true
 
-    fun pages(): List<SodiumPageRef> {
+    override fun pages(): List<SodiumPageRef> {
         val config = config() ?: return emptyList()
         val out = mutableListOf<SodiumPageRef>()
         (call(getModOptions, config) as List<*>).filterNotNull().forEach { mod ->
@@ -119,7 +119,7 @@ internal class SodiumBridge private constructor() {
         return out
     }
 
-    fun groups(page: Any, parent: () -> Screen?): List<SodiumGroup> =
+    override fun groups(page: Any, parent: () -> Screen?): List<SodiumGroup> =
         (call(pageGroups, page) as List<*>).filterNotNull().map { group ->
             val rows = mutableListOf<SettingRow>()
             val actions = mutableListOf<SodiumAction>()
@@ -134,22 +134,22 @@ internal class SodiumBridge private constructor() {
             SodiumGroup(text(call(groupName, group)).ifBlank { null }, rows, actions)
         }
 
-    fun dirty(): Boolean = config()?.let { call(anyOptionChanged, it) as Boolean } ?: false
+    override fun dirty(): Boolean = config()?.let { call(anyOptionChanged, it) as Boolean } ?: false
 
-    fun begin() {
+    override fun begin() {
         val config = config() ?: return
         if (!dirty()) call(resetAllOptions, config)
         call(invalidateRebuild, config)
     }
 
-    fun apply() {
+    override fun apply() {
         val config = config() ?: return
         if (!dirty()) return
         if (pendingRestart(config)) restartPending = true
         call(applyAllOptions, config)
     }
 
-    fun undo() {
+    override fun undo() {
         config()?.let { call(resetAllOptions, it) }
     }
 
@@ -263,18 +263,18 @@ internal class SodiumBridge private constructor() {
         private val logger = LoggerFactory.getLogger("${PolyPlusConstants.ID}/sodium-settings")
 
         var restartPending = false
-            private set
+            internal set
 
         private var failed = false
 
-        private val instance: SodiumBridge? by lazy {
+        private val instance: SodiumBackend? by lazy {
             if (!FabricLoader.getInstance().isModLoaded(SODIUM_ID)) return@lazy null
-            runCatching { SodiumBridge() }.onFailure { fail(it) }.getOrNull()
+            runCatching { if (SodiumLegacyBridge.supported() && !modern()) SodiumLegacyBridge() else SodiumBridge() }.onFailure { fail(it) }.getOrNull()
         }
 
-        fun get(): SodiumBridge? = if (failed) null else instance
+        fun get(): SodiumBackend? = if (failed) null else instance
 
-        fun <T> guard(fallback: T, block: (SodiumBridge) -> T): T {
+        fun <T> guard(fallback: T, block: (SodiumBackend) -> T): T {
             val bridge = get() ?: return fallback
             return try {
                 block(bridge)
@@ -289,6 +289,9 @@ internal class SodiumBridge private constructor() {
             failed = true
             logger.warn("Could not read Sodium's options, video settings will open Sodium's own screen", t)
         }
+
+        private fun modern(): Boolean =
+            runCatching { Class.forName("net.caffeinemc.mods.sodium.client.config.structure.Config", false, SodiumBridge::class.java.classLoader) }.isSuccess
 
         private fun sodium(name: String): Class<*> = Class.forName("net.caffeinemc.mods.sodium.$name")
     }

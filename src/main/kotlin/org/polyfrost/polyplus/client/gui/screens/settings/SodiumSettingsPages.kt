@@ -2,7 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.screens.settings
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,7 +42,7 @@ import org.polyfrost.polyplus.compat.Mods
 //?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 private val SodiumTwoColumnWidth = 620.dp
 private val SodiumSectionGap = 20.dp
 private const val SODIUM_REFRESH_MILLIS = 500L
