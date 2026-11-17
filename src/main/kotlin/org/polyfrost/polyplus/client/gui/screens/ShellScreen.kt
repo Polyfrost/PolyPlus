@@ -31,6 +31,8 @@ abstract class ShellScreen(
 
     open val chrome: Boolean get() = true
 
+    open val revealLift: Boolean get() = true
+
     override val pausesGame: Boolean get() = shell == ScreenShell.InGame
 
     override val blurBackground: Boolean get() = shell == ScreenShell.InGame

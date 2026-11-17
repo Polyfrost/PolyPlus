@@ -22,6 +22,8 @@ class StatusMessageScreen(shell: ScreenShell, val vanilla: GenericMessageScreen)
 
     override val chrome: Boolean get() = false
 
+    override val revealLift: Boolean get() = world != null
+
     @Composable
     override fun Body() {
         val claim = world

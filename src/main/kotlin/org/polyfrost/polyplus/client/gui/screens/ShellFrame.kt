@@ -87,8 +87,9 @@ private val NavHead = 34.dp
 @Composable
 fun ShellFrame(host: ScreenHost, title: String, content: @Composable () -> Unit) {
     val chrome = (host as? ShellScreen)?.chrome ?: true
+    val lift = (host as? ShellScreen)?.revealLift ?: true
     when (host.shell) {
-        ScreenShell.Lobby -> PageViewport { LobbyFrame(title, host::back, chrome, content) }
+        ScreenShell.Lobby -> PageViewport { LobbyFrame(title, host::back, chrome, lift, content) }
         ScreenShell.Menu -> ModalViewport { MenuFrame(title, host::back, chrome, content) }
         ScreenShell.InGame -> ModalViewport { InGameFrame(title, host::back, chrome, content) }
     }
@@ -179,11 +180,11 @@ private fun rememberReveal(): Float {
 }
 
 @Composable
-private fun BoxScope.PageContent(title: String, onBack: () -> Unit, chrome: Boolean, content: @Composable () -> Unit) {
+private fun BoxScope.PageContent(title: String, onBack: () -> Unit, chrome: Boolean, lift: Boolean, content: @Composable () -> Unit) {
     val reveal = rememberReveal()
     val motion = Modifier.graphicsLayer {
         alpha = reveal
-        translationY = (1f - reveal) * REVEAL_LIFT * density
+        if (lift) translationY = (1f - reveal) * REVEAL_LIFT * density
     }
     if (!chrome) {
         Box(Modifier.matchParentSize().then(motion)) { content() }
@@ -277,10 +278,10 @@ private fun BoxScope.Shade() {
 }
 
 @Composable
-private fun BoxScope.LobbyFrame(title: String, onBack: () -> Unit, chrome: Boolean, content: @Composable () -> Unit) {
+private fun BoxScope.LobbyFrame(title: String, onBack: () -> Unit, chrome: Boolean, lift: Boolean, content: @Composable () -> Unit) {
     PageScrim()
     if (chrome) Shade()
-    PageContent(title, onBack, chrome, content)
+    PageContent(title, onBack, chrome, lift, content)
 }
 
 @Composable
