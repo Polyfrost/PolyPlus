@@ -33,6 +33,7 @@ import org.polyfrost.polyplus.client.features.BadMods
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
+import org.polyfrost.polyplus.client.features.GenericModNames
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.StartupTimeNotice
 import org.polyfrost.polyplus.client.features.ModpackDiff
@@ -194,6 +195,7 @@ object PolyPlusClient {
         step("widgets") { ShellWidgetRegistry.registerBuiltIns() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }
+        step("generic mod names") { GenericModNames.initialize() }
         step("onboarding") { OnboardingFeatures.initialize() }
         //? if < 1.21.4 && > 1.8.9
         /*step("lobby shaders") { LobbyPipelines.register() }*/

@@ -48,6 +48,7 @@ object ModConfigDefaults {
         Default("dynamic_fps", "dynamic_fps.json", "states.invisible.volume_multipliers.master", 1.0),
         Default("citresewn", "citresewn.json", "broken_paths", true),
         Default("simpleblockoverlay", "simpleblockoverlay.json", "disableOverlay", true, newInstallsOnly = true),
+        Default("vignettetweaks", "vignettetweaks.json", "enabled", false, newInstallsOnly = true),
     )
 
     fun applyEarly() = applyMatching { it.modId in EARLY_MODS }

@@ -1,3 +1,7 @@
+## Unreleased changes
+- Added generic names for mods in the OneConfig mod list, such as Motion Blur for PolyBlur and Toggle Sprint for PolySprint
+- Vignette Tweaks now starts disabled on new installs
+
 ## 2.1.0
 Requires OneConfig 1.8.0.
 
