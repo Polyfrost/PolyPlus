@@ -208,6 +208,8 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
     override fun create() = access.polyplusOnCreate()
 
     override fun cancel() = screen.popScreen()
+
+    override fun useVanilla() = WorldRoutes.openVanilla(screen)
 }
 
 //? if >= 1.21.11 {

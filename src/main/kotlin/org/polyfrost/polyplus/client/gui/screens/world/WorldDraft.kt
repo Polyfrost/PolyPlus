@@ -76,6 +76,7 @@ interface WorldDraft {
 
     fun create()
     fun cancel()
+    fun useVanilla()
 }
 
 enum class WorldRuleKind { Toggle, Number }

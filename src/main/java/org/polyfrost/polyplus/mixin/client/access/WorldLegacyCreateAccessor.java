@@ -28,5 +28,32 @@ public interface WorldLegacyCreateAccessor {
 
     @Accessor("generatorType")
     int polyplusGeneratorType();
+
+    @Accessor("worldName")
+    void polyplusSetWorldName(String value);
+
+    @Accessor("seed")
+    void polyplusSetSeed(String value);
+
+    @Accessor("gameModeName")
+    void polyplusSetGameModeName(String value);
+
+    @Accessor("structures")
+    void polyplusSetStructures(boolean value);
+
+    @Accessor("allowCommands")
+    void polyplusSetAllowCommands(boolean value);
+
+    @Accessor("cheatsEnabled")
+    void polyplusSetCheatsEnabled(boolean value);
+
+    @Accessor("bonusChest")
+    void polyplusSetBonusChest(boolean value);
+
+    @Accessor("hardcore")
+    void polyplusSetHardcore(boolean value);
+
+    @Accessor("generatorType")
+    void polyplusSetGeneratorType(int value);
 }
 *///?}

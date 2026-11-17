@@ -122,6 +122,7 @@ private fun CreateFooter(draft: WorldDraft, step: Int, count: Int, go: (Int) -> 
     val theme = OneConfigTheme.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton("Cancel", draft::cancel, style = ControlStyle.Ghost, size = ControlSize.Large)
+        TextButton("Use vanilla screen", draft::useVanilla, style = ControlStyle.Ghost, size = ControlSize.Large)
         Spacer(Modifier.weight(1f))
         if (blocked != null) {
             Text(blocked, color = theme.error, style = theme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
