@@ -2798,7 +2798,7 @@ private const val MOD_ORDER_TEXT = "Choose how the mods list is sorted. Recommen
 private const val SPRINT_TEXT = "Turn sprinting into a toggle so you keep running after you let go of the key."
 private const val WATERMARK_TEXT =
     "Show the OneClient logo in inventories and options screens. You can move, resize or recolor it later in settings."
-private const val SCREENS_TEXT = "Choose which screens OneClient replaces. Pick Vanilla to keep Minecraft's original for that screen."
+private const val SCREENS_TEXT = "Pick which screens OneClient replaces. Vanilla keeps Minecraft's."
 private const val SCREENS_TOP = 122f
 private const val SCREENS_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
 private const val SCREENS_ACTION_WIDTH = 96f
