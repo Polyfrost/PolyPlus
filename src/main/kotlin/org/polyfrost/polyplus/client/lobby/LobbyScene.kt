@@ -117,6 +117,8 @@ import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
+import org.polyfrost.polyplus.client.gui.screens.ScreenShell
+import org.polyfrost.polyplus.client.gui.screens.ShellScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.party.PartyScene
@@ -144,6 +146,7 @@ import org.lwjgl.sdl.SDLMouse
 *///?} else {
 /*import org.lwjgl.input.Mouse
 import org.lwjgl.opengl.Display
+import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 *///?}
 //? if >= 26.2 {
 import org.joml.Matrix4f
@@ -161,6 +164,7 @@ import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 //? if < 26.3 && > 1.8.9
@@ -305,6 +309,17 @@ object LobbyScene {
     private const val NETHER_FOG_END = 52f
     private const val DEPART_REACH = 0.9
     private const val DEPART_FOV = 96f
+    private const val RETURN_SECONDS = 0.6
+    private const val SKY_REVEAL_SECONDS = 0.7
+    private const val SKY_RETURN_SECONDS = 0.75
+    private const val WHITE_OUT_SECONDS = 0.3
+    private const val SKY_PITCH = -58.0
+    private const val SKY_PITCH_SWAY = 1.5
+    private const val SKY_RISE = 3.0
+    private const val SKY_YAW_RATE = 1.2
+    private const val SKY_FLOAT = 1.5
+    private const val SKY_FLOAT_SECONDS = 20.0
+    private const val SKY_LENS = 96.0
     private const val PARALLAX_YAW_DEGREES = 1.6
     private const val PARALLAX_PITCH_DEGREES = 0.45
     private const val PARALLAX_RATE = 6.0
@@ -374,6 +389,16 @@ object LobbyScene {
     private val focusEases = arrayOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach)
     private val cameraEases = arrayOf(focusBlend, focusAimX, focusAimY, focusAimZ, focusReach, parallaxX, parallaxY)
     private var departNanos = 0L
+    private var returnNanos = 0L
+    private var returnPush = 0.0
+    private var lastPush = 0.0
+    private var skyNanos = 0L
+    private var skyReturn = false
+    private var outNanos = 0L
+    private var skyBase = Vec3(0.0, 0.0, 0.0)
+    private var skyYaw = 0.0
+    private var joinHeld = false
+    private var heldFor: Any? = null
     private var restedPointer: Pair<Double, Double>? = null
     private var focusPointer: Pair<Double, Double>? = null
     private var releasing = false
@@ -533,6 +558,7 @@ object LobbyScene {
         driven?.let { it.mouseX.toDouble() to it.mouseY.toDouble() } ?: (LobbyCompat.mouseX(mc) to LobbyCompat.mouseY(mc))
 
     fun focus(name: String?) {
+        if (cameraLeaving()) return
         val pointer = pointer(Minecraft.getInstance())
         if (name == null) {
             if (selected != null && pointer == focusPointer) {
@@ -547,10 +573,13 @@ object LobbyScene {
     }
 
     fun clearFocus() {
+        if (cameraLeaving()) return
         val pointer = pointer(Minecraft.getInstance())
         restedPointer = pointer
         select(null, pointer)
     }
+
+    private fun cameraLeaving(): Boolean = departNanos != 0L || returnNanos != 0L
 
     private fun select(next: LobbyAvatar?, pointer: Pair<Double, Double>) {
         if (next !== selected) LOBBY_LOGGER.debug("Focus {}", next?.displayName)
@@ -568,18 +597,81 @@ object LobbyScene {
         }
         if (departNanos != 0L) return
         LOBBY_LOGGER.debug("Depart")
-        departNanos = Util.getNanos()
         focus(live?.avatars?.firstOrNull { it.isLocal }?.displayName)
+        departNanos = Util.getNanos()
         departDone = done
     }
 
     fun arrive() {
         LobbyAmbience.arrive()
+        skyReturn = skyNanos != 0L
+        if (skyReturn) {
+            returnPush = 0.0
+            returnNanos = Util.getNanos()
+        } else if (departNanos != 0L && lastPush > 0.0) {
+            returnPush = lastPush
+            returnNanos = Util.getNanos()
+        }
+        joinHeld = false
+        heldFor = null
+        skyNanos = 0L
+        outNanos = 0L
         departNanos = 0L
-        departProgress = 0f
+        departProgress = if (skyReturn) 1f else 0f
         departDone = null
         departed = null
         clearFocus()
+    }
+
+    @JvmStatic
+    fun holdForJoin(): Boolean {
+        val mc = Minecraft.getInstance()
+        if (live == null || phase != Phase.READY || embedded || saved != null || driven != null) return false
+        //? if > 1.8.9 {
+        if (mc.level != null || mc.connection != null || mc.singleplayerServer != null) return false
+        //?} else {
+        /*if (mc.level != null || (mc as MinecraftAccessor).`polyplus$getConnection`() != null || mc.singleplayerServer != null) return false
+        *///?}
+        if (ClientPlatform.currentScreen() !is PolyPlusLobbyScreen) return false
+        if (departNanos == 0L) depart {}
+        joinHeld = true
+        return true
+    }
+
+    fun keep(owner: Any): Boolean {
+        if (!joinHeld || live == null) return false
+        heldFor = owner
+        return true
+    }
+
+    fun letGo(owner: Any) {
+        if (heldFor === owner) heldFor = null
+    }
+
+    fun held(): Boolean = joinHeld && live != null
+
+    fun veil(): Float {
+        if (live == null) return 0f
+        val now = Util.getNanos()
+        return when {
+            outNanos != 0L -> smooth((now - outNanos) / 1_000_000_000.0 / WHITE_OUT_SECONDS)
+            skyNanos != 0L -> 1f - smooth((now - skyNanos) / 1_000_000_000.0 / SKY_REVEAL_SECONDS)
+            departNanos != 0L -> departProgress * departProgress
+            else -> 0f
+        }
+    }
+
+    fun whiteOut(): Boolean {
+        if (live == null || skyNanos == 0L) return false
+        if (outNanos == 0L) outNanos = Util.getNanos()
+        return true
+    }
+
+    fun whitedOut(): Boolean = outNanos != 0L && (Util.getNanos() - outNanos) / 1_000_000_000.0 >= WHITE_OUT_SECONDS
+
+    private fun smooth(value: Double): Float {
+        val t = value.coerceIn(0.0, 1.0)
+        return (t * t * (3.0 - 2.0 * t)).toFloat()
     }
 
     @JvmStatic
@@ -1515,7 +1607,11 @@ object LobbyScene {
         if (owner != null && !owner.visible) return null
         if (owner?.embedded == true) return scene
         if (mc.level != null) return null
-        return scene.takeIf { ClientPlatform.currentScreen().let { it is PolyPlusLobbyScreen || it is OneConfigUIScreen } }
+        return scene.takeIf {
+            ClientPlatform.currentScreen().let {
+                it is PolyPlusLobbyScreen || it is OneConfigUIScreen || (it is ShellScreen && it.shell == ScreenShell.Lobby) || (it != null && it === heldFor)
+            }
+        }
     }
 
     private inline fun <T> swapped(scene: Live, block: () -> T): T {
@@ -1664,16 +1760,31 @@ object LobbyScene {
         var plunge = 0.0
 
         if (departNanos != 0L) {
+            val white = departProgress >= 1f
             val leaving = ((Util.getNanos() - departNanos) / 1_000_000_000.0 / DEPART_SECONDS).coerceIn(0.0, 1.0)
             departProgress = leaving.toFloat()
+            if (white && joinHeld && skyNanos == 0L) engageSky(scene)
             val push = if (still) 0.0 else leaving * leaving
             plunge = push
-            distance = Mth.lerp(push, distance, DEPART_REACH)
-            currentFov = (CAMERA_FOV + (DEPART_FOV - CAMERA_FOV) * push).toFloat()
             if (leaving >= 1.0) {
                 departed = departDone
                 departDone = null
             }
+        } else if (returnNanos != 0L) {
+            val back = ((Util.getNanos() - returnNanos) / 1_000_000_000.0 / (if (skyReturn) SKY_RETURN_SECONDS else RETURN_SECONDS)).coerceIn(0.0, 1.0)
+            plunge = if (still) 0.0 else returnPush * (1.0 - back * back * (3.0 - 2.0 * back))
+            if (skyReturn) departProgress = (1.0 - back).toFloat()
+            if (back >= 1.0) {
+                returnNanos = 0L
+                skyReturn = false
+                departProgress = 0f
+                clearFocus()
+            }
+        }
+        lastPush = plunge
+        if (plunge > 0.0) {
+            distance = Mth.lerp(plunge, distance, DEPART_REACH)
+            currentFov = (CAMERA_FOV + (DEPART_FOV - CAMERA_FOV) * plunge).toFloat()
         }
 
         if (!finite(aim) || !distance.isFinite() || !yaw.isFinite() || !pitch.isFinite() || !currentFov.isFinite()) {
@@ -1696,15 +1807,39 @@ object LobbyScene {
             val turned = Math.toRadians(yaw)
             look = Vec3(-sin(turned) * cos(pitchRad), -sin(pitchRad), cos(turned) * cos(pitchRad))
         }
-        currentDistance = distance.toFloat()
-        settleLens(camera, look, stage)
+        var eye = camera
+        if (skyNanos != 0L) {
+            val drift = if (still) 0.0 else (Util.getNanos() - skyNanos) / 1_000_000_000.0
+            val lift = SKY_FLOAT * (1.0 - exp(-drift / SKY_FLOAT_SECONDS))
+            val heading = Math.toRadians(skyYaw)
+            yaw = skyYaw + drift * SKY_YAW_RATE
+            pitch = SKY_PITCH + SKY_PITCH_SWAY * sin(drift * 0.25)
+            eye = skyBase.add(-sin(heading) * lift * 0.5, lift, cos(heading) * lift * 0.5)
+            currentFov = CAMERA_FOV
+            val turned = Math.toRadians(yaw)
+            val tilted = Math.toRadians(pitch)
+            look = Vec3(-sin(turned) * cos(tilted), -sin(tilted), cos(turned) * cos(tilted))
+        }
+        currentDistance = (if (skyNanos != 0L) stage.distance else distance).toFloat()
+        settleLens(eye, look, stage)
+        if (skyNanos != 0L) lensRange = SKY_LENS
         LobbyWaveState.view(look, currentFov)
-        LobbyFraming.viewed(camera, look, currentFov.toDouble(), viewAspect(mc))
-        rig.setPos(camera.x, camera.y - rig.eyeHeight, camera.z)
+        LobbyFraming.viewed(eye, look, currentFov.toDouble(), viewAspect(mc))
+        rig.setPos(eye.x, eye.y - rig.eyeHeight, eye.z)
         rig.setYRot(yaw.toFloat())
         rig.setXRot(pitch.toFloat())
         rig.setOldPosAndRot()
         return look
+    }
+
+    private fun engageSky(scene: Live) {
+        val stage = scene.stage
+        val rest = restingView(Minecraft.getInstance(), stage, CRANE_SECONDS).camera
+        val top = rest.add(0.0, SKY_RISE + SKY_FLOAT + WALL_MARGIN, 0.0)
+        val room = LobbyStage.reach(scene.level, rest, top) - SKY_FLOAT - WALL_MARGIN
+        skyBase = rest.add(0.0, room.coerceIn(0.0, SKY_RISE), 0.0)
+        skyYaw = stage.yaw.toDouble()
+        skyNanos = Util.getNanos()
     }
 
     private fun wallClamp(scene: Live, aim: Vec3, look: Vec3, distance: Double, elapsed: Double): Double {
@@ -1715,6 +1850,7 @@ object LobbyScene {
     }
 
     private fun settlePointer(mc: Minecraft, scene: Live, elapsed: Double) {
+        if (departNanos != 0L) return
         val inside = pointerInside(mc)
         val x = if (inside) soften(pointerX(mc) * 2.0 - 1.0) else 0.0
         val y = if (inside) soften(pointerY(mc) * 2.0 - 1.0) else 0.0
@@ -2384,6 +2520,13 @@ object LobbyScene {
         overlayAlpha = 0f
         departProgress = 0f
         departNanos = 0L
+        returnNanos = 0L
+        lastPush = 0.0
+        skyNanos = 0L
+        skyReturn = false
+        outNanos = 0L
+        joinHeld = false
+        heldFor = null
         departDone = null
         departed = null
         selected = null
@@ -2431,6 +2574,13 @@ object LobbyScene {
         overlayAlpha = 0f
         departProgress = 0f
         departNanos = 0L
+        returnNanos = 0L
+        lastPush = 0.0
+        skyNanos = 0L
+        skyReturn = false
+        outNanos = 0L
+        joinHeld = false
+        heldFor = null
         departDone = null
         selected = null
         currentFov = CAMERA_FOV

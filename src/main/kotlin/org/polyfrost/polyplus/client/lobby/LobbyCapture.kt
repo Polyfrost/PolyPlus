@@ -7,6 +7,8 @@ import net.minecraft.client.Minecraft
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.client.gui.screens.PauseScreen
+//? if >= 26.3
+import org.polyfrost.polyplus.client.gui.screens.connection.DeathShellScreen
 //?} else {
 /*import net.minecraft.client.gui.screen.game.DeathScreen
 import net.minecraft.client.gui.screen.menu.GameMenuScreen as PauseScreen
@@ -261,7 +263,12 @@ object LobbyCapture {
         rememberPolicy(mc)
         val screen = ClientPlatform.currentScreen()
         val pausing = screen is PauseScreen || screen is OneClientPauseScreen
-        if (pausing || screen is DeathScreen) {
+        //? if >= 26.3 {
+        val dying = screen is DeathScreen || screen is DeathShellScreen
+        //?} else {
+        /*val dying = screen is DeathScreen
+        *///?}
+        if (pausing || dying) {
             (copying?.source ?: surveying?.source)?.handOver = true
         } else {
             earlyScreen = null
