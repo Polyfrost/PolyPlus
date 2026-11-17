@@ -372,8 +372,7 @@ object TerrainCard {
     fun noteWorldLoad(name: String) {
         ConnectionTarget.clear()
         val origin = ScreenRouter.originOf(ClientPlatform.currentScreen())
-        val allowed = PolyPlusScreensConfig.customConnecting || origin == ScreenShell.Lobby
-        pendingWorld = if (allowed) Claim(origin ?: ScreenRouter.fallbackShell(), name, null, null, false) else null
+        pendingWorld = if (PolyPlusScreensConfig.customConnecting) Claim(origin ?: ScreenRouter.fallbackShell(), name, null, null, false) else null
     }
 
     @JvmStatic

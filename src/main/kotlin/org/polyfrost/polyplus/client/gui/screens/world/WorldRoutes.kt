@@ -29,6 +29,7 @@ import net.minecraft.client.gui.screen.menu.world.SelectWorldScreen
 import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
 *///?}
+import org.polyfrost.polyplus.client.PolyPlusScreensConfig
 import org.polyfrost.polyplus.client.gui.screens.Routed
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 
@@ -52,11 +53,14 @@ object WorldRoutes {
         }
         val shell = origin ?: pending.takeIf { loading }
         pending = null
+        val ours = PolyPlusScreensConfig.customWorlds
         return when (screen.javaClass) {
-            CreateWorldScreen::class.java ->
+            CreateWorldScreen::class.java -> if (ours) {
                 remember(screen, CreateWorldShell(shell ?: ScreenRouter.fallbackShell(), WorldDraft26(screen as CreateWorldScreen)))
-            EditWorldScreen::class.java ->
+            } else null
+            EditWorldScreen::class.java -> if (ours) {
                 remember(screen, EditWorldShell(shell ?: ScreenRouter.fallbackShell(), EditWorldDraft26(screen as EditWorldScreen)))
+            } else null
             DirectJoinServerScreen::class.java -> shell?.let { directJoin(screen as DirectJoinServerScreen, it) }
             ConfirmScreen::class.java -> shell?.let { Routed.show(ConfirmDialogShell(it, confirmSpec(screen as ConfirmScreen))) }
             AlertScreen::class.java -> shell?.let { Routed.show(ConfirmDialogShell(it, alertSpec(screen as AlertScreen))) }
@@ -96,6 +100,7 @@ object WorldRoutes {
     fun route(screen: Screen, origin: ScreenShell?): Routed? {
         wrapperOf(screen)?.let { return it }
         if (ScreenRouter.originOf(screen) != null || isExit(screen)) shells.clear()
+        if (!PolyPlusScreensConfig.customWorlds) return null
         val shell = origin ?: ScreenRouter.fallbackShell()
         return when (screen.javaClass) {
             CreateWorldScreen::class.java -> remember(screen, CreateWorldShell(shell, WorldDraft189(screen as CreateWorldScreen)))
