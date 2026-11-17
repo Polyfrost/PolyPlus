@@ -1,10 +1,14 @@
 package org.polyfrost.polyplus.client.network.websocket
 
+import org.polyfrost.polyplus.libs.ktor.client.plugins.timeout
 import org.polyfrost.polyplus.libs.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import org.polyfrost.polyplus.libs.ktor.client.plugins.websocket.webSocket
 import org.polyfrost.polyplus.libs.ktor.client.request.bearerAuth
+import org.polyfrost.polyplus.libs.ktor.websocket.CloseReason
 import org.polyfrost.polyplus.libs.ktor.websocket.Frame
 import org.polyfrost.polyplus.libs.ktor.websocket.readText
+import org.polyfrost.polyplus.libs.coroutines.cancel
+import org.polyfrost.polyplus.libs.coroutines.withTimeoutOrNull
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.event.v1.EventManager
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
@@ -24,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -49,6 +54,7 @@ object PolyConnection {
     private val unknownPacketTypes = ConcurrentHashMap.newKeySet<String>()
 
     private var connectionCallback: (() -> Unit)? = null
+    @Volatile
     private var job: Job? = null
     @Volatile
     private var session: DefaultClientWebSocketSession? = null
@@ -96,10 +102,13 @@ object PolyConnection {
         disconnectNotified = false
         disconnectedSinceMs = 0L
         val wasRunning = job != null
-        job?.cancel()
-        job = null
-        session = null
-        drainOutgoing()
+        synchronized(this) {
+            job?.cancel()
+            job = null
+            session?.cancel()
+            session = null
+            drainOutgoing()
+        }
         if (wasRunning) {
             closeListeners.forEach { listener ->
                 runCatching(listener).onFailure { LOGGER.error("WebSocket close listener failed", it) }
@@ -141,23 +150,27 @@ object PolyConnection {
             return
         }
 
-        job?.let { existing ->
-            existing.cancel()
+        synchronized(this) {
+            job?.cancel()
+            session?.cancel()
+            session = null
+            closing = false
+            job = launchLoop()
         }
+    }
 
-        closing = false
-        job = PolyPlusClient.SCOPE.launch {
+    private fun launchLoop(): Job {
+        return PolyPlusClient.SCOPE.launch {
+            val self = currentCoroutineContext()[Job]
             var attempt = 0
             var tokenRefreshed = false
             var transientFailures = 0
             while (isActive) {
                 handshakeSucceeded = false
                 try {
-                    connectOnce()
-                    // No throw means the server closed cleanly so treat it as a drop and
-                    // reconnect unless we asked to close
+                    val reason = connectOnce()
                     if (closing || !isActive) break
-                    LOGGER.warn("PolyPlus WebSocket closed by server.")
+                    LOGGER.warn("PolyPlus WebSocket closed: {}", reason)
                     notifyDisconnected(null)
                 } catch (e: CancellationException) {
                     throw e
@@ -189,8 +202,12 @@ object PolyConnection {
                         notifyDisconnected(e)
                     }
                 } finally {
-                    session = null
-                    drainOutgoing()
+                    synchronized(this@PolyConnection) {
+                        if (job === self) {
+                            session = null
+                            drainOutgoing()
+                        }
+                    }
                 }
 
                 if (handshakeSucceeded) {
@@ -207,16 +224,24 @@ object PolyConnection {
         }
     }
 
-    private suspend fun connectOnce() {
+    private suspend fun connectOnce(): CloseReason? {
         val apiUrl = PolyPlusConfig.apiUrl.toString()
             .replace("http", "ws")
             .removeSuffix("/")
         val token = PolyAuthorization.current()
+        val owner = currentCoroutineContext()[Job]
+        var reason: CloseReason? = null
         PolyPlusClient.HTTP.webSocket("${apiUrl}/websocket", request = {
             bearerAuth(token)
+            timeout { socketTimeoutMillis = 60_000 }
         }) {
-            drainOutgoing()
-            session = this
+            val published = synchronized(this@PolyConnection) {
+                if (owner?.isActive == false) return@synchronized false
+                drainOutgoing()
+                session = this
+                true
+            }
+            if (!published) return@webSocket
             handshakeSucceeded = true
             notifyReconnected()
 
@@ -241,7 +266,12 @@ object PolyConnection {
 
                 sender.cancel()
             }
+            synchronized(this@PolyConnection) {
+                if (session === this) session = null
+            }
+            reason = withTimeoutOrNull(1_000) { closeReason.await() }
         }
+        return reason
     }
 
     private fun isAuthFailure(error: Throwable): Boolean {
