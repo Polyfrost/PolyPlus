@@ -1,6 +1,8 @@
 package org.polyfrost.polyplus.client.gui.screens.world
 
 import androidx.compose.ui.graphics.ImageBitmap
+import net.minecraft.network.chat.Component
+import org.polyfrost.oneconfig.api.platform.v1.Platform
 
 enum class WorldSection {
     Name,
@@ -16,23 +18,35 @@ enum class WorldSection {
     Experiments,
 }
 
-enum class WorldGameMode(val label: String, val info: String) {
-    Survival("Survival", "Gather, build and stay alive. Lose your items when you die."),
+enum class WorldGameMode(val label: String, private val key: String) {
+    Survival("Survival", "survival"),
+    Hardcore("Hardcore", "hardcore"),
+    Creative("Creative", "creative"),
+    Spectator("Spectator", "spectator"),
+    ;
+
     //? if > 1.8.9 {
-    Hardcore("Hardcore", "Survival on Hard with one life. When you die, you can only spectate."),
+    val info: String get() = tr("selectWorld.gameMode.$key.info")
     //?} else {
-    /*Hardcore("Hardcore", "Survival on Hard with one life. The world is deleted when you die."),
+    /*val info: String get() = "${tr("selectWorld.gameMode.$key.line1")} ${tr("selectWorld.gameMode.$key.line2")}".trim()
     *///?}
-    Creative("Creative", "Every block, free flight and nothing can hurt you."),
-    Spectator("Spectator", "Fly through anything and look around without touching it."),
 }
 
-enum class WorldDifficulty(val label: String, val info: String) {
-    Peaceful("Peaceful", "No hostile mobs and your health comes back on its own."),
-    Easy("Easy", "Hostile mobs spawn but deal less damage."),
-    Normal("Normal", "Hostile mobs spawn and deal normal damage."),
-    Hard("Hard", "Hostile mobs deal more damage and hunger can kill you."),
+enum class WorldDifficulty(val label: String) {
+    Peaceful("Peaceful"),
+    Easy("Easy"),
+    Normal("Normal"),
+    Hard("Hard"),
+    ;
+
+    //? if > 1.8.9 {
+    val info: String? get() = tr("options.difficulty.${name.lowercase()}.info")
+    //?} else {
+    /*val info: String? get() = null
+    *///?}
 }
+
+private fun tr(key: String): String = Platform.i18n().getUnformattedText(Component.translatable(key))
 
 data class WorldTypeOption(val id: String, val label: String)
 

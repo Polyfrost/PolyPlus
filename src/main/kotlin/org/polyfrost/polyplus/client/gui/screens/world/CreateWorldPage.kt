@@ -45,13 +45,6 @@ private val ADVANCED_ONLY = setOf(WorldSection.GameRules, WorldSection.DataPacks
 private const val TYPE_COLUMNS = 3
 private const val MAX_NAME = 128
 
-private val MODE_ICONS = mapOf(
-    WorldGameMode.Survival to "minecraft-block",
-    WorldGameMode.Hardcore to "alert-triangle",
-    WorldGameMode.Creative to "diamond-01",
-    WorldGameMode.Spectator to "user-01",
-)
-
 private val TYPE_INFO = mapOf(
     "minecraft:normal" to "The standard world with hills, oceans and caves.",
     "minecraft:flat" to "Flat layers of blocks. Customize the layers and biome.",
@@ -168,20 +161,8 @@ private fun WorldStep(draft: WorldDraft, onNext: () -> Unit) {
         }
     }
     SectionSpace()
-    WorldBlock("Game mode", if (draft.gameModeLocked) "This world type always uses Spectator." else "You can change this later with commands if they are allowed.") {
-        val modes = draft.gameModes
-        ChoiceGrid(modes, modes.size.coerceAtLeast(1)) { mode ->
-            ChoiceCard(
-                mode.label,
-                mode.info,
-                draft.gameMode == mode,
-                { draft.gameMode = mode },
-                Modifier.fillMaxSize(),
-                icon = MODE_ICONS[mode],
-                danger = mode == WorldGameMode.Hardcore,
-                enabled = !draft.gameModeLocked,
-            )
-        }
+    WorldBlock("Game mode", if (draft.gameModeLocked) "This world type always uses Spectator." else draft.gameMode.info) {
+        Segmented(draft.gameModes, draft.gameMode, { draft.gameMode = it }, label = { it.label }, enabled = !draft.gameModeLocked)
     }
     if (WorldSection.Difficulty !in draft.sections) return
     SectionSpace()
