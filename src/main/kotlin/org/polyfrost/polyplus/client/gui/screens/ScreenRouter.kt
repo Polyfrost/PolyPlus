@@ -6,11 +6,6 @@ import net.minecraft.client.gui.screens.Screen
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
 import org.polyfrost.polyplus.client.PolyPlusScreensConfig
-//? if > 1.8.9 {
-import net.minecraft.client.gui.screens.DeathScreen
-//?} elif = 1.8.9 {
-/*import net.minecraft.client.gui.screen.game.DeathScreen
-*///?}
 import org.polyfrost.polyplus.client.MainMenuChoice
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
@@ -44,17 +39,12 @@ object ScreenRouter {
         val origin = originOf(current)
         val inLobby = origin == ScreenShell.Lobby
         val config = PolyPlusScreensConfig
-        val connection = if (isDeath(screen)) config.customDeath else config.customConnecting || inLobby
         return (if (config.customSettings || inLobby) SettingsRoutes.route(screen, origin) else null)
             ?: (if (config.customWorlds || inLobby) WorldRoutes.route(screen, origin) else null)
-            ?: (if (connection) ConnectionRoutes.route(screen, origin) else null)
+            ?: (if (config.customConnecting || inLobby) ConnectionRoutes.route(screen, origin) else null)
             ?: (if (config.customSettings || inLobby) PackRoutes.route(screen, origin) else null)
             ?: (if (config.customRealms || inLobby) RealmsRoutes.route(screen, origin) else null)
             ?: Routed.show(screen)
-    }
-
-    private fun isDeath(screen: Screen): Boolean {
-        return screen.javaClass == DeathScreen::class.java
     }
 
     fun originOf(current: Screen?): ScreenShell? = when (current) {

@@ -7,7 +7,6 @@ import net.minecraft.client.gui.screens.Screen
 *///?}
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.ConnectScreen
-import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.client.gui.screens.DisconnectedScreen
 import net.minecraft.client.gui.screens.GenericMessageScreen
 import net.minecraft.network.chat.contents.TranslatableContents
@@ -15,7 +14,6 @@ import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
 import org.polyfrost.polyplus.client.network.p2p.P2PConnectionContext
 //?} elif = 1.8.9 {
 /*import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.screen.game.DeathScreen
 import net.minecraft.client.gui.screen.menu.multiplayer.ConnectScreen
 import net.minecraft.client.gui.screen.menu.multiplayer.DisconnectedScreen
 import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
@@ -35,14 +33,12 @@ object ConnectionRoutes {
             DisconnectedScreen::class.java -> DisconnectedShellScreen(shell, screen as DisconnectedScreen)
             GenericMessageScreen::class.java ->
                 if (startupMessage(screen)) null else StatusMessageScreen(shell, screen as GenericMessageScreen)
-            DeathScreen::class.java ->
-                if (shell == ScreenShell.InGame) DeathShellScreen(screen as DeathScreen) else null
             else -> null
         }
         return custom?.let { Routed.show(it) }
         //?} elif = 1.8.9 {
         /*val type = screen.javaClass
-        if (type != ConnectScreen::class.java && type != DisconnectedScreen::class.java && type != DeathScreen::class.java) return null
+        if (type != ConnectScreen::class.java && type != DisconnectedScreen::class.java) return null
         val shell = ScreenRouter.contextShell()
         if (!Minecraft.getInstance().isOnSameThread) {
             ClientPlatform.runOnMain { ClientPlatform.setScreen(screen) }
@@ -52,8 +48,6 @@ object ConnectionRoutes {
             ConnectScreen::class.java ->
                 if (P2PConnectionContext.hasPendingJoin()) null else ConnectingScreen(shell, screen as ConnectScreen)
             DisconnectedScreen::class.java -> DisconnectedShellScreen(shell, screen as DisconnectedScreen)
-            DeathScreen::class.java ->
-                if (shell == ScreenShell.InGame) DeathShellScreen(screen as DeathScreen) else null
             else -> null
         }
         return custom?.let { Routed.show(it) }

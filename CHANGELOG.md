@@ -1,7 +1,7 @@
 ## 2.1.0
 Requires OneConfig 1.8.0.
 
-The settings, resource packs, Create World, Edit World, connecting, death, loading and Realms screens use the lobby's style now. You can switch each one back to vanilla in settings or during onboarding.
+The settings, resource packs, Create World, Edit World, connecting, loading and Realms screens use the lobby's style now. You can switch each one back to vanilla in settings or during onboarding.
 
 ### New screens
 - Video settings has tabs for Sodium, Iris and Argentum, and Sodium add-ons can add their own pages.

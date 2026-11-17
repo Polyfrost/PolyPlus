@@ -35,14 +35,6 @@ object PolyPlusScreensConfig : Config(
     var customConnecting = true
 
     @JvmStatic
-    @Switch(
-        title = "Death screen",
-        description = "Uses OneClient's death screen.",
-        subcategory = "Screens",
-    )
-    var customDeath = true
-
-    @JvmStatic
     //? if > 1.8.9 {
     @Switch(
         title = "Realms",

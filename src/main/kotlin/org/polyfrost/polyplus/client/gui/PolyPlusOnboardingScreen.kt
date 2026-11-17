@@ -987,7 +987,6 @@ private enum class ScreenPart(val title: String, val description: String) {
     SETTINGS("Settings", "Options, controls and resource packs"),
     WORLDS("Create and edit world", "Making a new world or changing one"),
     CONNECTING("Connecting", "Joining and leaving servers and worlds"),
-    DEATH("Death screen", "What you see after you die"),
     REALMS("Realms", "Browsing and joining your Realms"),
     PAUSE("Pause screen", "The menu you get when you press Escape"),
     LOADING("Loading screen", "What shows while the game starts"),
@@ -997,7 +996,6 @@ private enum class ScreenPart(val title: String, val description: String) {
         SETTINGS -> PolyPlusScreensConfig.customSettings
         WORLDS -> PolyPlusScreensConfig.customWorlds
         CONNECTING -> PolyPlusScreensConfig.customConnecting
-        DEATH -> PolyPlusScreensConfig.customDeath
         REALMS -> PolyPlusScreensConfig.customRealms
         PAUSE -> PolyPlusPauseConfig.pauseScreenStyle != PauseScreenStyle.VANILLA
         LOADING -> PolyPlusConfig.brandedStartup
@@ -1008,7 +1006,6 @@ private enum class ScreenPart(val title: String, val description: String) {
             SETTINGS -> PolyPlusScreensConfig.customSettings = ours
             WORLDS -> PolyPlusScreensConfig.customWorlds = ours
             CONNECTING -> PolyPlusScreensConfig.customConnecting = ours
-            DEATH -> PolyPlusScreensConfig.customDeath = ours
             REALMS -> PolyPlusScreensConfig.customRealms = ours
             PAUSE -> {
                 val style = PolyPlusPauseConfig.pauseScreenStyle

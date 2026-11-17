@@ -15,8 +15,6 @@
     //? if > 1.8.9
     "client.access.ConnectionConnectScreenAccessor",
     //? if > 1.8.9
-    "client.access.ConnectionDeathScreenAccessor",
-    //? if > 1.8.9
     "client.access.ConnectionDisconnectedScreenAccessor",
     //? if > 1.8.9
     "client.access.PackEntryAccessor",
@@ -130,8 +128,6 @@
     "client.MixinMinecraftWorldLoad",
     //? if < 1.21.9 && > 1.8.9
     //"client.MixinLevelLoadingProgress",
-    //? if = 1.8.9
-    //"client.MixinMinecraftDeathRoute",
     //? if = 1.8.9
     //"client.MixinGameOptions",
     "client.MixinGameRenderer",
