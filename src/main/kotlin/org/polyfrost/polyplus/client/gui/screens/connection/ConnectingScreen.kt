@@ -75,7 +75,7 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     private val address = ConnectionTarget.subtitle()
 
     private var step by mutableStateOf(0)
-    private var label by mutableStateOf(FINDING)
+    private var label by mutableStateOf("")
     private var landing by mutableStateOf(false)
     private var lastNarration = -1L
 
@@ -142,24 +142,14 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
         val connection = access.polyplusConnection()
         val reaching = connection != null || access.polyplusChannelFuture() != null
         when ((status.contents as? TranslatableContents)?.key) {
-            "connect.connecting" -> show(if (reaching) 1 else 0, if (reaching) CONNECTING else FINDING)
-            "connect.transferring" -> show(if (reaching) 1 else 0, "Moving to another server")
-            "connect.authorizing" -> show(2, "Logging in")
-            "connect.encrypting" -> show(2, "Securing the connection")
-            "connect.negotiating" -> show(2, "Talking to the server")
-            "connect.joining" ->
-                if (connection?.packetListener is ClientConfigurationPacketListenerImpl) {
-                    landing = true
-                    show(3, "Getting the world ready")
-                }
-                else show(3, "Joining")
-            else -> show(step, status.string.ifBlank { label })
+            "connect.connecting", "connect.transferring" -> step = if (reaching) 1 else 0
+            "connect.authorizing", "connect.encrypting", "connect.negotiating" -> step = 2
+            "connect.joining" -> {
+                step = 3
+                if (connection?.packetListener is ClientConfigurationPacketListenerImpl) landing = true
+            }
         }
-    }
-
-    private fun show(next: Int, text: String) {
-        step = next
-        label = text
+        label = status.string.ifBlank { label }
     }
 
     private fun cancel() {
@@ -194,8 +184,6 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     internal fun terrainClaim(): TerrainCard.Claim = TerrainCard.Claim(shell, heading, address, server, true)
 
     private companion object {
-        const val FINDING = "Finding the server"
-        const val CONNECTING = "Connecting"
         const val NARRATION_DELAY_MS = 2000L
     }
 }
@@ -267,7 +255,7 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     private val address = ConnectionTarget.subtitle()
 
     private var step by mutableStateOf(0)
-    private var label by mutableStateOf(CONNECTING)
+    private var label by mutableStateOf(LobbyI18n.get("connect.connecting"))
     private var landing by mutableStateOf(false)
 
     override val title: String get() = heading
@@ -310,13 +298,12 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     private fun readStatus() {
         val connection = access.polyplusConnection()
         when {
-            connection == null -> show(0, CONNECTING)
+            connection == null -> show(0, LobbyI18n.get("connect.connecting"))
             connection.listener is ClientPlayNetworkHandler -> {
                 landing = true
-                show(2, "Joining")
+                show(2, LobbyI18n.get("multiplayer.downloadingTerrain"))
             }
-            connection.isEncrypted -> show(1, "Securing the connection")
-            else -> show(1, "Logging in")
+            else -> show(1, LobbyI18n.get("connect.authorizing"))
         }
     }
 
@@ -351,9 +338,5 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     }
 
     internal fun terrainClaim(): TerrainCard.Claim = TerrainCard.Claim(shell, heading, address, server, true)
-
-    private companion object {
-        const val CONNECTING = "Connecting"
-    }
 }
 *///?}
