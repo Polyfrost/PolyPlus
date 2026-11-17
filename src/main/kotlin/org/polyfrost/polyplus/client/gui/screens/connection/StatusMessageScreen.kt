@@ -4,7 +4,7 @@ package org.polyfrost.polyplus.client.gui.screens.connection
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

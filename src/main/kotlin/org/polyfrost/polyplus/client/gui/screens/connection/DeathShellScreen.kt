@@ -1,16 +1,23 @@
 package org.polyfrost.polyplus.client.gui.screens.connection
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import java.net.URI
 import java.util.Optional
+import java.util.function.Consumer
 import net.minecraft.client.Minecraft
+//? if >= 26.1 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
@@ -21,23 +28,32 @@ import org.polyfrost.polyplus.client.gui.scaledDensity
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellModal
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
+import org.polyfrost.polyplus.client.gui.screens.world.bindVanilla
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.ConnectionDeathScreenAccessor
 
 class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGame, null) {
     private val access = vanilla as ConnectionDeathScreenAccessor
+
+    init {
+        bindVanilla(vanilla)
+    }
+
+    //? if >= 1.21.11 {
     private val player = access.polyplusPlayer()
+    //?} else {
+    /*private val player = Minecraft.getInstance().player!!
+    *///?}
     private val hardcore = access.polyplusHardcore()
-    private val cause = access.polyplusCauseOfDeath()
-    private val causeUrl = cause?.let(::findUrl)
+    private val causeParts = access.polyplusCauseOfDeath()?.let(::flatten).orEmpty()
+    private var hoveredStyle: Style? = null
 
     private val details = run {
         val pos = player.blockPosition()
         val scoreValue = player.score.toString()
         DeathDetails(
             title = vanilla.title.string,
-            cause = cause?.string,
-            causeLink = causeUrl != null,
+            cause = causeParts.map { (style, text) -> spanOf(style, text) },
             scoreLabel = Component.translatable("deathScreen.score.value", "").string,
             scoreValue = scoreValue,
             coordinates = "${pos.x} / ${pos.y} / ${pos.z}",
@@ -61,6 +77,7 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
 
     override val dimBackground: Boolean get() = false
 
+    //? if >= 1.21.10
     override fun isAllowedInPortal(): Boolean = true
 
     override fun tick() {
@@ -83,10 +100,34 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
         mc.reportingContext.draftReportHandled(mc, this, { access.polyplusHandleExitToTitleScreen() }, true)
     }
 
-    private fun openCauseLink() {
-        val uri = causeUrl ?: return
-        clickUrlAction(Minecraft.getInstance(), this, uri)
+    private fun hoverCause(index: Int?) {
+        hoveredStyle = index?.let { causeParts.getOrNull(it)?.first }?.takeIf { it.hoverEvent != null || urlOf(it) != null }
     }
+
+    private fun openCauseLink(index: Int) {
+        val style = causeParts.getOrNull(index)?.first ?: return
+        val uri = urlOf(style) ?: return
+        //? if >= 1.21.8 {
+        clickUrlAction(Minecraft.getInstance(), this, uri)
+        //?} else {
+        /*handleComponentClicked(style)
+        *///?}
+    }
+
+    //? if >= 26.1 {
+    override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
+        val style = hoveredStyle ?: return
+        @Suppress("UNCHECKED_CAST")
+        (ctx.textRenderer(GuiGraphicsExtractor.HoveredTextEffects.TOOLTIP_AND_CURSOR) as? Consumer<Style>)?.accept(style)
+    }
+    //?} else {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        super.render(ctx, mouseX, mouseY, tickDelta)
+        val style = hoveredStyle ?: return
+        ctx.renderComponentHoverEffect(font, style, mouseX, mouseY)
+    }
+    *///?}
 
     @Composable
     override fun Content() {
@@ -103,20 +144,42 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
             respawned = respawned,
             onPrimary = ::respawn,
             onSecondary = ::exitToTitle,
-            onCause = ::openCauseLink,
+            onCauseHover = ::hoverCause,
+            onCauseClick = ::openCauseLink,
         )
     }
 
     private companion object {
         const val DELAY_TICKS = 20
 
-        fun findUrl(text: Component): URI? =
-            text.visit(FormattedText.StyledContentConsumer<URI> { style: Style, _: String ->
-                when (val event = style.clickEvent) {
-                    is ClickEvent.OpenUrl -> Optional.of(event.uri())
-                    else -> Optional.empty()
-                }
-            }, Style.EMPTY).orElse(null)
+        fun flatten(text: Component): List<Pair<Style, String>> {
+            val parts = ArrayList<Pair<Style, String>>()
+            text.visit(FormattedText.StyledContentConsumer<Unit> { style: Style, content: String ->
+                if (content.isNotEmpty()) parts += style to content
+                Optional.empty()
+            }, Style.EMPTY)
+            return parts
+        }
+
+        fun urlOf(style: Style): URI? {
+            //? if >= 1.21.5 {
+            return (style.clickEvent as? ClickEvent.OpenUrl)?.uri()
+            //?} else {
+            /*val event = style.clickEvent ?: return null
+            if (event.action != ClickEvent.Action.OPEN_URL) return null
+            return runCatching { URI(event.value) }.getOrNull()
+            *///?}
+        }
+
+        fun spanOf(style: Style, text: String) = DeathCauseSpan(
+            text = text,
+            color = style.color?.let { Color(0xFF000000.toInt() or it.value) } ?: Color.Unspecified,
+            bold = style.isBold,
+            italic = style.isItalic,
+            underlined = style.isUnderlined,
+            strikethrough = style.isStrikethrough,
+            link = urlOf(style) != null,
+        )
     }
 }
 //?} elif = 1.8.9 {
@@ -149,8 +212,7 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
 
     private val details = DeathDetails(
         title = LobbyI18n.get(if (hardcore) "deathScreen.title.hardcore" else "deathScreen.title"),
-        cause = if (hardcore) LobbyI18n.get("deathScreen.hardcoreInfo") else null,
-        causeLink = false,
+        cause = if (hardcore) listOf(DeathCauseSpan(LobbyI18n.get("deathScreen.hardcoreInfo"))) else emptyList(),
         scoreLabel = LobbyI18n.get("deathScreen.score") + ": ",
         scoreValue = player.score.toString(),
         coordinates = "${floor(player.x).toInt()} / ${floor(player.y).toInt()} / ${floor(player.z).toInt()}",
@@ -235,7 +297,8 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
             respawned = respawned,
             onPrimary = ::primary,
             onSecondary = ::exitToTitle,
-            onCause = {},
+            onCauseHover = {},
+            onCauseClick = {},
         )
     }
 

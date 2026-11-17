@@ -8,16 +8,13 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.TransferState;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.polyfrost.polyplus.client.PolyPlusRecentServers;
-//? if >= 26.3 {
 import com.llamalad7.mixinextras.injector.WrapWithCondition;
 import org.polyfrost.polyplus.client.gui.screens.connection.ConnectingScreen;
 import org.polyfrost.polyplus.client.gui.screens.connection.ConnectionTarget;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
-//?}
 import org.polyfrost.polyplus.client.launcher.SessionRefresh;
 import org.polyfrost.polyplus.client.network.p2p.P2PConnectionContext;
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager;
-//? if >= 26.3
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,7 +23,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ConnectScreen.class)
 public class MixinConnectScreen {
-    //? if >= 26.3 {
     @Inject(method = "startConnecting", at = @At("HEAD"), cancellable = true)
     private static void polyplus$blockWhileConnecting(
         Screen screen,
@@ -44,6 +40,7 @@ public class MixinConnectScreen {
         ConnectionTarget.note(serverData, address);
     }
 
+    //? if >= 1.21.11 {
     @WrapWithCondition(
         method = "startConnecting",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;disconnectWithProgressScreen(Z)V")
@@ -51,7 +48,23 @@ public class MixinConnectScreen {
     private static boolean polyplus$keepLobbyScene(Minecraft minecraft, boolean stopSound) {
         return !LobbyScene.holdForJoin();
     }
-    //?}
+    //?} elif >= 1.21.8 {
+    /*@WrapWithCondition(
+        method = "startConnecting",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;disconnectWithProgressScreen()V")
+    )
+    private static boolean polyplus$keepLobbyScene(Minecraft minecraft) {
+        return !LobbyScene.holdForJoin();
+    }
+    *///?} else {
+    /*@WrapWithCondition(
+        method = "startConnecting",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;disconnect()V")
+    )
+    private static boolean polyplus$keepLobbyScene(Minecraft minecraft) {
+        return !LobbyScene.holdForJoin();
+    }
+    *///?}
 
     @Inject(method = "startConnecting", at = @At("HEAD"))
     private static void polyplus$trackConnectAttempt(

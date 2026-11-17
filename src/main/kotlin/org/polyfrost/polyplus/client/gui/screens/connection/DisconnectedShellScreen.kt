@@ -1,13 +1,23 @@
 package org.polyfrost.polyplus.client.gui.screens.connection
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+//? if >= 26.3 {
 import com.mojang.blaze3d.Blaze3D
+//?} elif >= 1.21.11 {
+/*import net.minecraft.util.Util
+*///?} else {
+/*import net.minecraft.Util
+*///?}
 import net.minecraft.client.Minecraft
+//? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.ConfirmLinkScreen
 import net.minecraft.client.gui.screens.DisconnectedScreen
@@ -55,11 +65,19 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
         super.removed()
     }
 
+    //? if >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         hold.frame()
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
         hold.veil(ctx, width, height)
     }
+    //?} else {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        hold.frame()
+        super.render(ctx, mouseX, mouseY, tickDelta)
+        hold.veil(ctx, width, height)
+    }
+    *///?}
 
     override fun tick() {
         super.tick()
@@ -106,7 +124,13 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
                 }
             }
             details.report().orElse(null)?.let { report ->
-                ConnectionAction(Component.translatable("gui.open_report_dir").string) { Blaze3D.openPath(report.parent) }
+                ConnectionAction(Component.translatable("gui.open_report_dir").string) {
+                    //? if >= 26.3 {
+                    Blaze3D.openPath(report.parent)
+                    //?} else {
+                    /*Util.getPlatform().openPath(report.parent)
+                    *///?}
+                }
             }
             refreshLabel?.let { label ->
                 ConnectionAction(label, enabled = refreshEnabled) { prompt?.onPress() }

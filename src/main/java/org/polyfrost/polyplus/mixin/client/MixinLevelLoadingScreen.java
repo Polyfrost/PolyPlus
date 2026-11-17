@@ -8,12 +8,19 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-//? if >= 26.3 {
-import net.minecraft.client.multiplayer.LevelLoadTracker;
 import org.polyfrost.polyplus.client.gui.screens.connection.TerrainCard;
 import org.spongepowered.asm.mixin.Unique;
-//?}
+
+//? if >= 1.21.9 {
+import net.minecraft.client.multiplayer.LevelLoadTracker;
+//? if >= 1.21.11 {
+import net.minecraft.util.Util;
+//?} else {
+/*import net.minecraft.Util;
+*///?}
+//?} else {
+/*import java.util.function.BooleanSupplier;
+*///?}
 
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -33,31 +40,66 @@ import org.spongepowered.asm.mixin.Final;
 //?} else {
 /*@Mixin(ReceivingLevelScreen.class)
 *///?}
-public class MixinLevelLoadingScreen {
+public abstract class MixinLevelLoadingScreen {
     //? if >= 1.21.9 {
     @Shadow private LevelLoadingScreen.Reason reason;
     //?} else {
     /*@Shadow @Final private ReceivingLevelScreen.Reason reason;
     *///?}
 
-    //? if >= 26.3 {
+    @Unique
+    private TerrainCard.Claim polyplus$card;
+
+    //? if >= 1.21.9 {
     @Shadow private LevelLoadTracker loadTracker;
 
     @Shadow private float smoothedProgress;
 
-    @Unique
-    private TerrainCard.Claim polyplus$card;
+    @Shadow private long lastNarration;
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void polyplus$claimCard(LevelLoadTracker tracker, LevelLoadingScreen.Reason reason, CallbackInfo ci) {
         polyplus$card = TerrainCard.claim(reason == LevelLoadingScreen.Reason.OTHER);
     }
+    //?} else {
+    /*@Inject(method = "<init>", at = @At("RETURN"))
+    private void polyplus$claimCard(BooleanSupplier levelReceived, ReceivingLevelScreen.Reason reason, CallbackInfo ci) {
+        polyplus$card = TerrainCard.claim(reason == ReceivingLevelScreen.Reason.OTHER);
+    }
+    *///?}
 
-    @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
-    private void polyplus$drawCard(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
+    @Inject(
+        //? if >= 26.1 {
+        method = "extractRenderState",
+        //?} else {
+        /*method = "render",
+        *///?}
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void polyplus$drawCard(
+        //? if >= 26.1 {
+        GuiGraphicsExtractor graphics,
+        //?} else {
+        /*GuiGraphics graphics,
+        *///?}
+        int mouseX, int mouseY, float tickDelta, CallbackInfo ci
+    ) {
         TerrainCard.Claim card = polyplus$card;
+        //? if >= 1.21.9 {
         if (card == null || reason != LevelLoadingScreen.Reason.OTHER) return;
-        if (TerrainCard.draw(graphics, card, loadTracker.hasProgress() ? smoothedProgress : -1f)) ci.cancel();
+        if (TerrainCard.draw(graphics, card, loadTracker.hasProgress() ? smoothedProgress : -1f)) {
+            long now = Util.getMillis();
+            if (now - lastNarration > 2000L) {
+                lastNarration = now;
+                ((Screen) (Object) this).triggerImmediateNarration(true);
+            }
+            ci.cancel();
+        }
+        //?} else {
+        /*if (card == null || reason != ReceivingLevelScreen.Reason.OTHER) return;
+        if (TerrainCard.draw(graphics, card, -1f)) ci.cancel();
+        *///?}
     }
 
     @Inject(method = "onClose", at = @At("HEAD"))
@@ -65,7 +107,6 @@ public class MixinLevelLoadingScreen {
         polyplus$card = null;
         TerrainCard.release();
     }
-    //?}
 
     @Inject(
         //? if >= 26.1 {

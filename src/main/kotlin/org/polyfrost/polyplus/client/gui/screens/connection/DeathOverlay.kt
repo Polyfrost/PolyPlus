@@ -4,15 +4,10 @@ package org.polyfrost.polyplus.client.gui.screens.connection
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -36,10 +33,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -54,10 +55,19 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.Outfit
 
+internal class DeathCauseSpan(
+    val text: String,
+    val color: Color = Color.Unspecified,
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+    val underlined: Boolean = false,
+    val strikethrough: Boolean = false,
+    val link: Boolean = false,
+)
+
 internal class DeathDetails(
     val title: String,
-    val cause: String?,
-    val causeLink: Boolean,
+    val cause: List<DeathCauseSpan>,
     val scoreLabel: String,
     val scoreValue: String,
     val coordinates: String,
@@ -102,7 +112,8 @@ internal fun DeathOverlay(
     respawned: Boolean,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit,
-    onCause: () -> Unit,
+    onCauseHover: (Int?) -> Unit,
+    onCauseClick: (Int) -> Unit,
 ) {
     val vignette = stage(0, VIGNETTE_MILLIS, LinearOutSlowInEasing)
     val title = stage(TITLE_DELAY, TITLE_MILLIS)
@@ -150,7 +161,9 @@ internal fun DeathOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                details.cause?.takeIf { it.isNotBlank() }?.let { CauseLine(it, details.causeLink, type.heading.copy(fontWeight = FontWeight.Medium, shadow = shadow), theme.onMedia, onCause) }
+                if (details.cause.any { it.text.isNotBlank() }) {
+                    CauseLine(details.cause, type.heading.copy(fontWeight = FontWeight.Medium, shadow = shadow), theme.onMedia, onCauseHover, onCauseClick)
+                }
                 Text(
                     statsLine(details, theme.onMedia.copy(alpha = 0.6f), theme.warning),
                     color = theme.onMedia.copy(alpha = 0.6f),
@@ -186,21 +199,82 @@ internal fun DeathOverlay(
 }
 
 @Composable
-private fun CauseLine(cause: String, link: Boolean, style: TextStyle, color: Color, onClick: () -> Unit) {
-    if (!link) {
-        Text(cause, color = color.copy(alpha = 0.92f), style = style, textAlign = TextAlign.Center, legacyFormatting = false)
-        return
+private fun CauseLine(
+    spans: List<DeathCauseSpan>,
+    style: TextStyle,
+    color: Color,
+    onHover: (Int?) -> Unit,
+    onClick: (Int) -> Unit,
+) {
+    val hoverCallback by rememberUpdatedState(onHover)
+    val clickCallback by rememberUpdatedState(onClick)
+    var hovered by remember { mutableStateOf<Int?>(null) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val ends = remember(spans) {
+        var total = 0
+        IntArray(spans.size) { total += spans[it].text.length; total }
     }
-    val source = remember { MutableInteractionSource() }
-    val hovered by source.collectIsHoveredAsState()
+    val text = buildAnnotatedString {
+        spans.forEachIndexed { index, span ->
+            withStyle(span.spanStyle(span.link && index == hovered)) { append(span.text) }
+        }
+    }
+    DisposableEffect(Unit) { onDispose { hoverCallback(null) } }
     Text(
-        cause,
-        Modifier.hoverable(source).clickable(interactionSource = source, indication = null, onClick = onClick),
-        color = color,
-        style = style.copy(textDecoration = if (hovered) TextDecoration.Underline else TextDecoration.None),
+        text,
+        Modifier.pointerInput(spans) {
+            awaitPointerEventScope {
+                var pressed: Int? = null
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull() ?: continue
+                    val at = if (event.type == PointerEventType.Exit) null else layout?.let { spanAt(it, ends, change.position) }
+                    if (at != hovered) {
+                        hovered = at
+                        hoverCallback(at)
+                    }
+                    when (event.type) {
+                        PointerEventType.Press -> pressed = at?.takeIf { spans[it].link }?.also { change.consume() }
+                        PointerEventType.Release -> {
+                            val target = pressed
+                            pressed = null
+                            if (target != null && target == at) {
+                                change.consume()
+                                clickCallback(target)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        color = color.copy(alpha = 0.92f),
+        style = style,
         textAlign = TextAlign.Center,
-        legacyFormatting = false,
+        onTextLayout = { layout = it },
     )
+}
+
+private fun DeathCauseSpan.spanStyle(hoveredLink: Boolean): SpanStyle {
+    val decorations = buildList {
+        if (underlined || hoveredLink) add(TextDecoration.Underline)
+        if (strikethrough) add(TextDecoration.LineThrough)
+    }
+    return SpanStyle(
+        color = color,
+        fontWeight = if (bold) FontWeight.Bold else null,
+        fontStyle = if (italic) FontStyle.Italic else null,
+        textDecoration = if (decorations.isEmpty()) null else TextDecoration.combine(decorations),
+    )
+}
+
+private fun spanAt(layout: TextLayoutResult, ends: IntArray, pos: Offset): Int? {
+    val length = ends.lastOrNull() ?: return null
+    if (length == 0 || pos.y < 0f || pos.y >= layout.size.height) return null
+    val line = layout.getLineForVerticalPosition(pos.y)
+    if (pos.x < layout.getLineLeft(line) || pos.x >= layout.getLineRight(line)) return null
+    var offset = layout.getOffsetForPosition(pos).coerceIn(0, length - 1)
+    if (offset > layout.getLineStart(line) && (offset >= layout.getLineEnd(line) || layout.getBoundingBox(offset).left > pos.x)) offset--
+    return ends.indexOfFirst { offset < it }.takeIf { it >= 0 }
 }
 
 private fun statsLine(details: DeathDetails, muted: Color, highlight: Color): AnnotatedString = buildAnnotatedString {
@@ -210,4 +284,3 @@ private fun statsLine(details: DeathDetails, muted: Color, highlight: Color): An
     append("XYZ: ")
     withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(details.coordinates) }
 }
-//?}

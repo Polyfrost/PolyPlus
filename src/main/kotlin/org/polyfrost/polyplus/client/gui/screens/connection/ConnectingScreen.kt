@@ -1,17 +1,23 @@
 package org.polyfrost.polyplus.client.gui.screens.connection
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+//? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
 import net.minecraft.network.chat.CommonComponents
+import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.contents.TranslatableContents
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
@@ -29,20 +35,33 @@ object ConnectionTarget {
 
     @JvmStatic
     fun note(server: ServerData?, address: ServerAddress?) {
+        TerrainCard.forget()
         this.server = server
         this.address = server?.ip ?: address?.let { if (it.port == DEFAULT_PORT) it.host else "${it.host}:${it.port}" }
     }
 
+    fun clear() {
+        server = null
+        address = null
+    }
+
     fun title(): String? {
-        val data = server ?: return address
+        val hide = Minecraft.getInstance().options.hideServerAddress
+        val data = server ?: return if (hide) address?.let { HIDDEN } else address
         val name = data.name.trim()
-        return if (name.isEmpty() || name == I18n.get("selectServer.defaultName")) data.ip else name
+        if (name.isEmpty() || name == I18n.get("selectServer.defaultName") || (hide && name.equals(data.ip, ignoreCase = true))) {
+            return if (hide) HIDDEN else data.ip
+        }
+        return name
     }
 
     fun subtitle(): String? {
+        if (Minecraft.getInstance().options.hideServerAddress) return null
         val data = server ?: return null
         return data.ip.takeIf { it != title() }
     }
+
+    private const val HIDDEN = "Multiplayer server"
 
     private const val DEFAULT_PORT = 25565
 }
@@ -58,6 +77,7 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     private var step by mutableStateOf(0)
     private var label by mutableStateOf(FINDING)
     private var landing by mutableStateOf(false)
+    private var lastNarration = -1L
 
     override val title: String get() = heading
 
@@ -67,6 +87,17 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
 
     init {
         readStatus()
+    }
+
+    private fun narrate() {
+        val now = System.currentTimeMillis()
+        if (now - lastNarration <= NARRATION_DELAY_MS) return
+        lastNarration = now
+        //? if >= 1.21.8 {
+        Minecraft.getInstance().narrator.saySystemNow(Component.translatable("narrator.joining"))
+        //?} else {
+        /*Minecraft.getInstance().narrator.sayNow(Component.translatable("narrator.joining"))
+        *///?}
     }
 
     override fun init() {
@@ -90,11 +121,21 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
         readStatus()
     }
 
+    //? if >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
         hold.frame()
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
         hold.veil(ctx, width, height)
+        narrate()
     }
+    //?} else {
+    /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        hold.frame()
+        super.render(ctx, mouseX, mouseY, tickDelta)
+        hold.veil(ctx, width, height)
+        narrate()
+    }
+    *///?}
 
     private fun readStatus() {
         val status = access.polyplusStatus()
@@ -155,10 +196,12 @@ class ConnectingScreen(shell: ScreenShell, val vanilla: ConnectScreen) :
     private companion object {
         const val FINDING = "Finding the server"
         const val CONNECTING = "Connecting"
+        const val NARRATION_DELAY_MS = 2000L
     }
 }
 //?} elif = 1.8.9 {
 /*import androidx.compose.runtime.Composable
+import net.minecraft.client.Minecraft
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -189,16 +232,28 @@ object ConnectionTarget {
         this.address = server?.ip ?: host?.let { if (port == DEFAULT_PORT) it else "$it:$port" }
     }
 
+    fun clear() {
+        server = null
+        address = null
+    }
+
     fun title(): String? {
-        val data = server ?: return address
+        val hide = Minecraft.getInstance().options.hideServerAddress
+        val data = server ?: return if (hide) address?.let { HIDDEN } else address
         val name = data.name.trim()
-        return if (name.isEmpty() || name == LobbyI18n.get("selectServer.defaultName")) data.ip else name
+        if (name.isEmpty() || name == LobbyI18n.get("selectServer.defaultName") || (hide && name.equals(data.ip, ignoreCase = true))) {
+            return if (hide) HIDDEN else data.ip
+        }
+        return name
     }
 
     fun subtitle(): String? {
+        if (Minecraft.getInstance().options.hideServerAddress) return null
         val data = server ?: return null
         return data.ip.takeIf { it != title() }
     }
+
+    private const val HIDDEN = "Multiplayer server"
 
     private const val DEFAULT_PORT = 25565
 }

@@ -4,7 +4,6 @@ package org.polyfrost.polyplus.client.gui.screens.connection
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -53,6 +52,7 @@ import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -74,13 +74,19 @@ import org.polyfrost.polyplus.client.gui.usableSize
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import androidx.compose.runtime.snapshots.Snapshot
-//? if >= 26.3 {
+//? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} elif > 1.8.9 {
+/*import net.minecraft.client.gui.GuiGraphics
+*///?}
+//? if > 1.8.9 {
 import net.minecraft.client.gui.screens.LevelLoadingScreen
 //?} else {
 /*import net.minecraft.client.gui.GuiElement
 import net.minecraft.client.gui.screen.menu.multiplayer.DownloadingTerrainScreen
 *///?}
+//? if < 1.21.10 && > 1.8.9
+/*import net.minecraft.client.gui.screens.ReceivingLevelScreen*/
 import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
 import org.polyfrost.polyplus.client.gui.MenuBackdrop
 import org.polyfrost.polyplus.client.gui.MenuGlass
@@ -144,7 +150,7 @@ internal class SceneHold(private val owner: Any) {
         action()
     }
 
-    //? if >= 26.3 {
+    //? if >= 26.1 {
     fun veil(graphics: GuiGraphicsExtractor, width: Int, height: Int) {
         if (!kept) return
         val alpha = LobbyScene.veil()
@@ -152,7 +158,19 @@ internal class SceneHold(private val owner: Any) {
         graphics.nextStratum()
         graphics.fill(0, 0, width, height, ((alpha.coerceIn(0f, 1f) * 255f).toInt() shl 24) or 0xFFFFFF)
     }
-    //?} else {
+    //?} elif > 1.8.9 {
+    /*fun veil(graphics: GuiGraphics, width: Int, height: Int) {
+        if (!kept) return
+        val alpha = LobbyScene.veil()
+        if (alpha <= 0f) return
+        //? if >= 1.21.8 {
+        graphics.nextStratum()
+        //?} else {
+        /^graphics.flush()
+        ^///?}
+        graphics.fill(0, 0, width, height, ((alpha.coerceIn(0f, 1f) * 255f).toInt() shl 24) or 0xFFFFFF)
+    }
+    *///?} else {
     /*fun veil(width: Int, height: Int) {
         if (!kept) return
         val alpha = LobbyScene.veil()
@@ -239,7 +257,9 @@ internal fun ConnectionCard(
                 )
             }
             Spacer(Modifier.height(20.dp))
-            content()
+            ScrollContainer(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, content = content)
+            }
             Spacer(Modifier.height(24.dp))
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), content = actions)
         }
@@ -350,20 +370,33 @@ object TerrainCard {
 
     @JvmStatic
     fun noteWorldLoad(name: String) {
+        ConnectionTarget.clear()
         val origin = ScreenRouter.originOf(ClientPlatform.currentScreen())
-        val allowed = origin != null && (PolyPlusScreensConfig.customConnecting || origin == ScreenShell.Lobby)
-        pendingWorld = if (allowed) Claim(origin ?: ScreenShell.Menu, name, null, null, false) else null
+        val allowed = PolyPlusScreensConfig.customConnecting || origin == ScreenShell.Lobby
+        pendingWorld = if (allowed) Claim(origin ?: ScreenRouter.fallbackShell(), name, null, null, false) else null
     }
 
     @JvmStatic
     fun worldPending(): Boolean = pendingWorld != null
 
+    @JvmStatic
+    fun carry(claim: Claim?) {
+        if (claim != null) pendingWorld = claim
+    }
+
+    fun forget() {
+        pendingWorld = null
+    }
+
     internal fun preparing(title: Component): Claim? = pendingWorld?.takeIf { title === PREPARING }
 
-    //? if >= 26.3 {
+    //? if >= 26.1 {
     @JvmStatic
     fun draw(graphics: GuiGraphicsExtractor, claim: Claim, progress: Float): Boolean = hudLayer(claim, progress).draw(graphics)
-    //?} else {
+    //?} elif > 1.8.9 {
+    /*@JvmStatic
+    fun draw(graphics: GuiGraphics, claim: Claim, progress: Float): Boolean = hudLayer(claim, progress).draw(graphics)
+    *///?} else {
     /*@JvmStatic
     fun draw(claim: Claim, progress: Float): Boolean = hudLayer(claim, progress).draw()
     *///?}
@@ -387,9 +420,11 @@ object TerrainCard {
 
     @JvmStatic
     fun sweep(screen: Any?) {
-        //? if >= 26.3 {
+        //? if >= 1.21.10 {
         if (layer != null && screen !is LevelLoadingScreen) release()
-        //?} else {
+        //?} elif > 1.8.9 {
+        /*if (layer != null && screen !is LevelLoadingScreen && screen !is ReceivingLevelScreen) release()
+        *///?} else {
         /*if (layer != null && screen !is DownloadingTerrainScreen) release()
         *///?}
     }
@@ -451,11 +486,10 @@ private fun CardViewport(shell: ScreenShell, content: @Composable () -> Unit) {
     }
 }
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 internal const val CONNECTION_STEPS = 5
 internal const val TERRAIN_STEP = 4
 //?} else {
 /*internal const val CONNECTION_STEPS = 4
 internal const val TERRAIN_STEP = 3
 *///?}
-//?}
