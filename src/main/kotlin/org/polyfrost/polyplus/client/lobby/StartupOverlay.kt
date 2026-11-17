@@ -11,6 +11,7 @@ import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
+import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.Easing
 import java.util.concurrent.CompletableFuture
@@ -40,6 +41,13 @@ object StartupOverlay {
     private const val LOAD_SHARE = 0.72f
     private const val HOLD_SHARE = 0.26f
     private const val PROMPT_DELAY_SECONDS = 1.0
+    private const val RELOAD_FADE_SECONDS = 0.3f
+
+    //? if >= 1.21.11 {
+    private const val SCREEN_UNDER = true
+    //?} else {
+    /*private const val SCREEN_UNDER = false
+    *///?}
 
     class Box(val x: Float, val y: Float, val w: Float, val h: Float) {
         fun mix(to: Box, t: Float) = Box(lerp(x, to.x, t), lerp(y, to.y, t), lerp(w, to.w, t), lerp(h, to.h, t))
@@ -170,6 +178,49 @@ object StartupOverlay {
         //?} else {
         /*mc.setOverlay(null)
         *///?}
+    }
+
+    class ReloadState {
+        internal val startNanos = System.nanoTime()
+        internal var endNanos = 0L
+        internal var shown = 0f
+    }
+
+    @JvmStatic
+    fun ownsReload(fadeIn: Boolean): Boolean = fadeIn && enabled() && ScreenRouter.originOf(ClientPlatform.currentScreen()) != null
+
+    @JvmStatic
+    fun reloadFrame(mc: Minecraft, g: StartupGraphics, partial: Float, state: ReloadState, reload: Float, finished: Boolean): Boolean {
+        val now = System.nanoTime()
+        if (finished && state.endNanos == 0L) state.endNanos = now
+        val instant = Motion.reduced || !SCREEN_UNDER
+        val enter = if (instant) 1f else clamp(seconds(state.startNanos, now).toFloat() / RELOAD_FADE_SECONDS)
+        val leave = when {
+            state.endNanos == 0L -> 0f
+            instant -> 1f
+            else -> clamp(seconds(state.endNanos, now).toFloat() / RELOAD_FADE_SECONDS)
+        }
+        val canvas = StartupCanvas(mc, g)
+        if (leave >= 1f) {
+            canvas.drawScreenBelow(partial)
+            if (!active) StartupTextures.release(mc)
+            return true
+        }
+        StartupTextures.load(mc)
+        if (accent == 0) accent = ThemeConfig.accentColor.argb and WHITE
+        state.shown = clamp(max(state.shown, state.shown * 0.88f + (if (finished) 1f else reload) * 0.12f))
+        val alpha = min(enter, 1f - leave)
+        if (alpha < 1f) canvas.drawScreenBelow(partial)
+        canvas.begin()
+        canvas.rect(0f, 0f, canvas.width, canvas.height, tint(DARK, alpha))
+        val hero = hero(canvas)
+        canvas.brand(hero.mark, hero.word, tint(WHITE, alpha))
+        val thick = max(2f / canvas.pixelScale, 1f)
+        val lineY = hero.bottom + LINE_GAP * designUnit(canvas.width, canvas.height)
+        canvas.rect(hero.left, lineY, hero.width, thick, tint(WHITE, 0.1f * alpha))
+        canvas.rect(hero.left, lineY, hero.width * state.shown, thick, tint(accent, alpha))
+        canvas.end()
+        return false
     }
     //?} else {
     /*@JvmStatic
