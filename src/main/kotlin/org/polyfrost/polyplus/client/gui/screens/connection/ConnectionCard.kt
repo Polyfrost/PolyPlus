@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -100,7 +99,8 @@ import kotlin.math.max
 private val CardRadius = 20.dp
 private val CardWidth = 420.dp
 private val IconSize = 64.dp
-private val StepHeight = 4.dp
+private val StepHeight = 3.dp
+private const val PULSE_MILLIS = 900
 private const val OPAQUE_FLOOR = 0.94f
 private const val SCENE_DIM = 0.22f
 private const val SKY_FROST = 0.4f
@@ -108,7 +108,6 @@ private const val SETTLE_MILLIS = 300
 private const val COVER_MILLIS = 400
 private const val CARD_LEAD = 0.35f
 private const val CARD_LIFT = 14f
-private const val PULSE_MILLIS = 900
 
 internal class SceneHold(private val owner: Any) {
     val start = LobbyGlass.pageFrost.coerceIn(0f, 1f)
@@ -278,25 +277,16 @@ internal fun ConnectionSteps(label: String, step: Int, total: Int, progress: Flo
             overflow = TextOverflow.Ellipsis,
         )
         val theme = OneConfigTheme.current
-        val pulse by Motion.animateInfiniteFloat(1f, 0.35f, infiniteRepeatable(tween(PULSE_MILLIS, easing = LinearEasing), RepeatMode.Reverse))
-        Row(Modifier.fillMaxWidth().height(StepHeight), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(total) { index ->
-                val target = when {
-                    index < step -> 1f
-                    index == step -> progress?.coerceIn(0f, 1f) ?: 1f
-                    else -> 0f
-                }
-                val fill by Motion.animateFloatAsState(target, tween(Motion.standard * 2))
-                val shape = theme.shapes.pill
-                Box(Modifier.weight(1f).fillMaxHeight().clip(shape).background(theme.componentBackground, shape)) {
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(fill)
-                            .graphicsLayer { alpha = if (index == step && progress == null) pulse else 1f }
-                            .background(theme.accentBrush, shape),
-                    )
-                }
+        val fill by Motion.animateFloatAsState(((step + (progress?.coerceIn(0f, 1f) ?: 1f)) / total).coerceIn(0f, 1f), tween(Motion.standard * 2))
+        val shape = theme.shapes.pill
+        Box(Modifier.fillMaxWidth().height(StepHeight).clip(shape).background(theme.componentBackground, shape)) {
+            if (progress == null) {
+                val done by Motion.animateFloatAsState((step.toFloat() / total).coerceIn(0f, 1f), tween(Motion.standard * 2))
+                val pulse by Motion.animateInfiniteFloat(1f, 0.35f, infiniteRepeatable(tween(PULSE_MILLIS, easing = LinearEasing), RepeatMode.Reverse))
+                Box(Modifier.fillMaxHeight().fillMaxWidth(fill).graphicsLayer { alpha = pulse }.background(theme.accentBrush, shape))
+                Box(Modifier.fillMaxHeight().fillMaxWidth(done).background(theme.accentBrush, shape))
+            } else {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(fill).background(theme.accentBrush, shape))
             }
         }
     }
