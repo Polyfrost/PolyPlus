@@ -65,6 +65,13 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ThemeStyle
 import java.util.Locale
 
+//? if >= 26.3 {
+private const val MenuKey = "application"
+private const val DecimalKey = "keypad.period"
+//?} else {
+/*private const val MenuKey = "menu"
+private const val DecimalKey = "keypad.decimal"
+*///?}
 private val MaxUnit = 46.dp
 private val MinUnit = 26.dp
 private val KeyGap = 4.dp
@@ -211,7 +218,7 @@ private fun mainBlock(layout: KeymapLayout): KeyBlock = block(15f) { keys ->
     RowBuilder(5.25f, keys).apply {
         key("left.control", "Ctrl", 1.25f); key("left.win", "Win", 1.25f); key("left.alt", "Alt", 1.25f)
         key("space", "", 6.25f)
-        key("right.alt", "Alt", 1.25f); key("right.win", "Win", 1.25f); key("application", "Menu", 1.25f); key("right.control", "Ctrl", 1.25f)
+        key("right.alt", "Alt", 1.25f); key("right.win", "Win", 1.25f); key(MenuKey, "Menu", 1.25f); key("right.control", "Ctrl", 1.25f)
     }
 }
 
@@ -235,7 +242,7 @@ private val NumpadBlock = block(4f) { keys ->
     keys += KeySpec("keypad.add", "+", 3f, 2.25f, h = 2f)
     keys += KeySpec("keypad.enter", "Enter", 3f, 4.25f, h = 2f)
     keys += KeySpec("keypad.0", "0", 0f, 5.25f, w = 2f)
-    keys += KeySpec("keypad.period", ".", 2f, 5.25f)
+    keys += KeySpec(DecimalKey, ".", 2f, 5.25f)
 }
 
 private fun blockSets(layout: KeymapLayout): List<List<KeyBlock>> {
@@ -291,7 +298,7 @@ internal fun Keymap(
     onShowFree: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val index = remember(rows) { rows.filter { !it.unbound }.groupBy { it.keyId } }
+    val index = remember(rows) { rows.filter { !it.unbound }.flatMap { row -> row.allIds.map { it to row } }.groupBy({ it.first }, { it.second }) }
     val auto = KeymapStore.layout == null
     val layout = KeymapStore.layout ?: KeymapStore.detected
     val view = KeymapView(index, selected, showFree, onSelect)

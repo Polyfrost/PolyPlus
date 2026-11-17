@@ -155,7 +155,7 @@ internal fun KeyBindsSection(state: KeyBindsState, refresh: Int) {
     val conflictCount = rows.count { it.conflicts.isNotEmpty() }
     val unboundCount = rows.count { it.unbound }
     val filtered = rows.filter { row ->
-        (selectedKey == null || (!row.unbound && row.keyId == selectedKey)) &&
+        (selectedKey == null || (!row.unbound && row.uses(selectedKey))) &&
             (category == null || row.category == category) &&
             when (view) {
                 KeyBindView.All -> true
@@ -232,7 +232,7 @@ internal fun KeyBindsSection(state: KeyBindsState, refresh: Int) {
             }
         }
         if (shown.isEmpty()) {
-            val free = selectedKey != null && rows.none { !it.unbound && it.keyId == selectedKey }
+            val free = selectedKey != null && rows.none { !it.unbound && it.uses(selectedKey) }
             if (free) {
                 EmptyState(
                     "Nothing uses ${keymapLabel(selectedKey!!)}",
@@ -336,7 +336,8 @@ private fun KeyBindCard(row: KeyBindRow, capturing: Boolean) {
             )
         }
         val hint = when {
-            capturing -> "Press a key or mouse button. Escape unbinds."
+            capturing && row.chord -> "Press a key, mouse button or combination like Ctrl + K, then let go. Click this again to cancel. Escape unbinds."
+            capturing -> "Press a key or mouse button. Click this again to cancel. Escape unbinds."
             conflict -> row.conflictText
             else -> null
         }
@@ -376,8 +377,14 @@ private fun KeyChip(row: KeyBindRow, capturing: Boolean, conflict: Boolean) {
             else -> theme.textColor
         },
     )
+    if (capturing) {
+        DisposableEffect(hovered) {
+            KeyBindCapture.overChip = hovered
+            onDispose { KeyBindCapture.overChip = false }
+        }
+    }
     val label = when {
-        capturing -> "Press a key"
+        capturing -> KeyBindCapture.preview ?: "Press a key"
         row.unbound -> "Not bound"
         else -> row.key
     }
