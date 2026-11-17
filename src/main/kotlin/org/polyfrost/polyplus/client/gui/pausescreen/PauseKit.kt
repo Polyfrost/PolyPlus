@@ -174,7 +174,11 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
             Box(Modifier.fillMaxSize()) {
                 val narrow = widthPx / scale < COMPACT_WIDTH
                 val away by Motion.animateFloatAsState(if (screen.settingsOpen) 1f else 0f, tween(SETTINGS_MILLIS, easing = FastOutSlowInEasing))
-                if (screen.stepBack) StepBackScreen(screen, narrow, away) else QuickDockScreen(screen, narrow, away)
+                when {
+                    screen.stepBack -> StepBackScreen(screen, narrow, away)
+                    screen.classic -> ClassicScreen(screen, narrow, away)
+                    else -> QuickDockScreen(screen, narrow, away)
+                }
                 PauseSettingsLayer(screen, away, if (screen.stepBack) LobbyLayout.NavbarHeight else 0.dp)
                 SocialToastHost(Modifier.padding(top = (if (screen.stepBack) LobbyLayout.Top else 24.dp) - ToastDefaults.margin))
                 PlayTogetherHooks(PauseHost)
@@ -367,7 +371,13 @@ internal fun rememberMoreTrigger(open: Boolean): FocusRequester {
 }
 
 @Composable
-internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvider, routes: Boolean = false) {
+internal fun MorePopup(
+    screen: OneClientPauseScreen,
+    anchor: PopupPositionProvider,
+    routes: Boolean = false,
+    game: Boolean = routes,
+    hidden: Set<Int> = emptySet(),
+) {
     Popup(popupPositionProvider = anchor, onDismissRequest = { screen.moreOpen = false }, properties = PopupProperties(focusable = true)) {
         MorePanel(
             screen,
@@ -377,12 +387,20 @@ internal fun MorePopup(screen: OneClientPauseScreen, anchor: PopupPositionProvid
                 .trackScreenFocus()
                 .focusGroup(),
             routes,
+            game,
+            hidden,
         )
     }
 }
 
 @Composable
-internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier, routes: Boolean = false) {
+internal fun MorePanel(
+    screen: OneClientPauseScreen,
+    modifier: Modifier = Modifier,
+    routes: Boolean = false,
+    game: Boolean = routes,
+    hidden: Set<Int> = emptySet(),
+) {
     val linked = remember { pauseLinkedEntries() }
     val close = { screen.moreOpen = false }
     val menu = modifier.width(MORE_MENU_WIDTH).heightIn(max = MORE_MENU_MAX_HEIGHT)
@@ -391,12 +409,12 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
         return
     }
     val modMenu = rememberModMenu()
-    val entries = screen.capture.more.filterNot { modMenu != null && it.modMenu }
-    val game = if (routes) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
+    val entries = screen.capture.more.filterNot { (modMenu != null && it.modMenu) || it.key in hidden }
+    val gameEntries = if (game) listOfNotNull(screen.capture.entry(PauseSlot.ADVANCEMENTS), screen.capture.entry(PauseSlot.STATS)) else emptyList()
     val mods = modMenu
     val routed = linked.takeIf { routes }.orEmpty()
     val items = buildList<MenuEntry> {
-        game.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }
+        gameEntries.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }
         mods?.let { (button, logo) ->
             add(
                 MenuCustomItem {
@@ -415,11 +433,11 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
             )
         }
         if (routed.isNotEmpty()) {
-            if (game.isNotEmpty() || mods != null) add(MenuSeparator)
+            if (gameEntries.isNotEmpty() || mods != null) add(MenuSeparator)
             add(MenuHeading(LinkedModMenus.displayName ?: LINKED_MOD_CAPTION))
             routed.forEach { entry -> add(MenuCustomItem { LinkedEntry(entry, close) }) }
         }
-        if ((game.isNotEmpty() || mods != null || routed.isNotEmpty()) && entries.isNotEmpty()) add(MenuSeparator)
+        if ((gameEntries.isNotEmpty() || mods != null || routed.isNotEmpty()) && entries.isNotEmpty()) add(MenuSeparator)
         entries.groupBy { it.section }.forEach { (section, rows) ->
             add(MenuHeading(section))
             rows.forEach { entry -> add(MenuCustomItem { MoreEntry(entry, close) }) }
@@ -428,7 +446,7 @@ internal fun MorePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifi
         add(
             MenuCustomItem {
                 MenuItem(
-                    label = "Classic pause menu",
+                    label = "Vanilla pause menu",
                     onClick = screen::openClassic,
                     icon = "dots-grid",
                     size = MenuItemSize.Regular,

@@ -34,7 +34,7 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Style",
         description = "Picks how the pause screen looks.",
-        options = ["Full", "Spotlight", "Compact", "Vanilla"],
+        options = ["Full", "Spotlight", "Compact", "Vanilla", "Classic"],
         subcategory = "Style",
     )
     var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK_FLAT
@@ -43,7 +43,7 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Unfocused",
         description = "Picks how the pause screen looks when the game pauses because you clicked out of the window.",
-        options = ["Same as above", "Full", "Spotlight", "Compact", "Vanilla"],
+        options = ["Same as above", "Full", "Spotlight", "Compact", "Vanilla", "Classic"],
         subcategory = "Style",
     )
     var focusLossPauseStyle: FocusPauseStyle = FocusPauseStyle.SAME
