@@ -109,6 +109,7 @@ import org.polyfrost.polyplus.client.gui.AccountsPanelContent
 import org.polyfrost.polyplus.client.gui.BadModsDialog
 import org.polyfrost.polyplus.client.gui.FooterBrandText
 import org.polyfrost.polyplus.client.gui.MainMenuRasterAssets
+import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.Outfit
@@ -759,6 +760,8 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
     val entries = buildList<MenuEntry> {
         if (theme != null) add(MenuAction(theme.label, theme.toggle, icon = theme.icon, size = MenuItemSize.Regular))
         add(MenuAction("Replay tour", { onClose(); lobby.replayTour() }, icon = SOCIAL_ASSETS + "play-circle.svg", size = MenuItemSize.Regular))
+        add(MenuAction("Switch to OneClient v1 main menu", { onClose(); MainMenuReplacement.switchToPolyPlusMenu() }, icon = SOCIAL_ASSETS + "logo.svg", size = MenuItemSize.Regular))
+        add(MenuAction("Switch to vanilla main menu", { onClose(); MainMenuReplacement.switchToVanilla() }, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
         if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
             ModIntegrationButtons.withoutModMenu().forEach { button ->
                 add(MenuAction(button.tooltip, { onClose(); button.onClick(screen) }, icon = button.icon, size = MenuItemSize.Regular))

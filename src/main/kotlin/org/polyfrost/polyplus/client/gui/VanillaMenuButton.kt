@@ -24,9 +24,7 @@ object VanillaMenuButton {
         ScreenEvents.AFTER_INIT.addPhaseOrdering(Event.DEFAULT_PHASE, LATE_PHASE)
         ScreenEvents.AFTER_INIT.register(LATE_PHASE) { _, screen, _, _ ->
             if (screen !is TitleScreen || MainMenuReplacement.replacesTitleScreen()) return@register
-            val accessor = screen as ScreenAccessor
-            accessor.polyplusAddRenderableWidget(lobbyButton(screen.width))
-            accessor.polyplusAddRenderableWidget(polyPlusMenuButton(screen.width))
+            (screen as ScreenAccessor).polyplusAddRenderableWidget(lobbyButton(screen.width))
         }
     }
 
@@ -35,33 +33,20 @@ object VanillaMenuButton {
             .tooltip(Tooltip.create(Component.translatable("polyplus.mainmenu.switchToOneClient")))
             .bounds(screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE)
             .build()
-
-    private fun polyPlusMenuButton(screenWidth: Int): Button =
-        Button.builder(Component.literal("P+")) { MainMenuReplacement.switchToPolyPlusMenu() }
-            .tooltip(Tooltip.create(Component.translatable("polyplus.mainmenu.switchToPolyPlus")))
-            .bounds(screenWidth - 2 * (SIZE + MARGIN), MARGIN, SIZE, SIZE)
-            .build()
     //?} else {
     /*const val LEGACY_BUTTON_ID = 0x504C5553
-    const val LEGACY_POLYPLUS_BUTTON_ID = LEGACY_BUTTON_ID + 1
 
     fun register() {}
 
     @JvmStatic
     fun legacyButtons(screenWidth: Int): List<ButtonWidget> =
         if (MainMenuReplacement.replacesTitleScreen()) emptyList()
-        else listOf(
-            ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "OC"),
-            ButtonWidget(LEGACY_POLYPLUS_BUTTON_ID, screenWidth - 2 * (SIZE + MARGIN), MARGIN, SIZE, SIZE, "P+"),
-        )
+        else listOf(ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "OC"))
 
     @JvmStatic
     fun onLegacyButton(id: Int): Boolean {
-        when (id) {
-            LEGACY_BUTTON_ID -> MainMenuReplacement.switchToLobby()
-            LEGACY_POLYPLUS_BUTTON_ID -> MainMenuReplacement.switchToPolyPlusMenu()
-            else -> return false
-        }
+        if (id != LEGACY_BUTTON_ID) return false
+        MainMenuReplacement.switchToLobby()
         return true
     }
     *///?}
