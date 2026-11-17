@@ -75,6 +75,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.registerPolyPlusPixelIcons
+import org.polyfrost.polyplus.client.gui.screens.settings.OneClientSettingsPages
+import org.polyfrost.polyplus.client.gui.screens.settings.SodiumSettingsPages
 import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
 
 //? if wwaypoints
@@ -183,6 +185,8 @@ object PolyPlusClient {
         step("default settings") { DefaultSettings.initialize() }
         step("pixel icons") { registerPolyPlusPixelIcons() }
         step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
+        step("sodium settings") { SodiumSettingsPages.register() }
+        step("oneclient settings") { OneClientSettingsPages.register() }
         step("widgets") { ShellWidgetRegistry.registerBuiltIns() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }

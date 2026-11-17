@@ -22,7 +22,7 @@ object MainMenuReplacement {
     private var lobbyFailed = false
     private var vanillaServerList = false
 
-    private fun choice(): MainMenuChoice {
+    internal fun choice(): MainMenuChoice {
         val chosen = PolyPlusMainMenuConfig.mainMenu
         return if (chosen == MainMenuChoice.LOBBY && lobbyFailed) MainMenuChoice.VANILLA else chosen
     }

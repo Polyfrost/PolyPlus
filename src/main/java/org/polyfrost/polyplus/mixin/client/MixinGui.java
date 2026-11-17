@@ -8,6 +8,9 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseStage;
+import org.polyfrost.polyplus.client.gui.screens.Routed;
+import org.polyfrost.polyplus.client.gui.screens.ScreenRouter;
+import org.polyfrost.polyplus.client.gui.screens.settings.SettingsMemory;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor;
 import org.spongepowered.asm.mixin.Mixin;
@@ -63,9 +66,13 @@ public class MixinGui {
             return;
         }
         *///?}
+        if (screen == null) screen = SettingsMemory.returning();
         screen = PauseRouter.replace(screen);
         PauseStage.onScreen(screen);
         screen = MainMenuReplacement.replaceLists(screen);
+        Routed routed = ScreenRouter.route(screen);
+        if (routed.getConsumed()) return;
+        screen = routed.getScreen();
         if (MainMenuReplacement.enabled() && polyplus$opensTitleScreen(screen)) {
             if (!MainMenuReplacement.alreadyOpen()) {
                 original.call(MainMenuReplacement.create());

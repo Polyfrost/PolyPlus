@@ -12,7 +12,75 @@
   "minVersion": "0.8",
   "plugin": "org.polyfrost.polyplus.mixin.PolyPlusMixinPlugin",
   "client": [
+    //? if >= 26.3
+    "client.access.ConnectionConnectScreenAccessor",
+    //? if >= 26.3
+    "client.access.ConnectionDeathScreenAccessor",
+    //? if >= 26.3
+    "client.access.ConnectionDisconnectedScreenAccessor",
+    //? if >= 26.3
+    "client.access.PackEntryAccessor",
+    //? if >= 26.3
+    "client.access.PackModelAccessor",
+    //? if >= 26.3
+    "client.access.PackSelectionScreenAccessor",
+    //? if >= 26.3
+    "client.access.RealmsMainScreenAccessor",
+    //? if >= 26.3
+    "client.access.RealmsVisitUrlAccessor",
+    //? if = 1.8.9
+    //"client.access.LegacyConnectScreenAccessor",
+    //? if = 1.8.9
+    //"client.access.LegacyDisconnectedScreenAccessor",
+    //? if = 1.8.9
+    //"client.PackResourcePacksMixin",
+    //? if = 1.8.9
+    //"client.PackUnopenedPackMixin",
+    //? if = 1.8.9
+    //"client.access.PackResourcePacksScreenAccessor",
+    //? if = 1.8.9
+    //"client.access.PackUnopenedPackAccessor",
+    //? if = 1.8.9
+    //"client.access.WorldLegacyCreateAccessor",
+    //? if = 1.8.9
+    //"client.access.WorldLegacyEditAccessor",
+    //? if = 1.8.9
+    //"client.access.SettingsLegacyOptionsAccessor",
+    //? if = 1.8.9
+    //"client.access.SettingsLegacyVideoAccessor",
+    //? if >= 26.3
+    "client.access.SettingsGeneralChatAccessor",
+    //? if >= 26.3
+    "client.access.SettingsGeneralMouseAccessor",
+    //? if >= 26.3
+    "client.access.SettingsGeneralOnlineAccessor",
+    //? if >= 26.3
+    "client.access.SettingsInputAccessibilityAccessor",
+    //? if >= 26.3
+    "client.access.SettingsInputControlsAccessor",
+    //? if >= 26.3
+    "client.access.SettingsInputFontAccessor",
+    //? if >= 26.3
+    "client.access.SettingsOptionInstanceAccessor",
+    //? if >= 26.3
+    "client.access.SettingsOptionsSubScreenAccessor",
+    //? if >= 26.3
+    "client.access.SettingsTooltipAccessor",
+    //? if >= 26.3
+    "client.access.SettingsVideoAccessor",
+    //? if >= 26.3
+    "client.access.WorldAlertAccessor",
+    //? if >= 26.3
+    "client.access.WorldConfirmAccessor",
+    //? if >= 26.3
+    "client.access.WorldCreateScreenAccessor",
+    //? if >= 26.3
+    "client.access.WorldDirectJoinAccessor",
+    //? if >= 26.3
+    "client.access.WorldEditScreenAccessor",
     "client.MixinAbstractSelectionList",
+    //? if >= 26.3
+    "client.PackFolderRepositorySourceMixin",
     "client.MixinChatComponent",
     //? if > 1.8.9
     "client.MixinChatListener",
@@ -30,6 +98,10 @@
     //"client.MixinControlsListWidget",
     //? if = 1.8.9
     //"client.MixinControlsOptionsScreen",
+    //? if = 1.8.9
+    //"client.MixinKeyBindCaptureKeyboard",
+    //? if = 1.8.9
+    //"client.MixinKeyBindCaptureMouse",
     //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
@@ -41,8 +113,13 @@
     "client.MixinGameNarrator",
     //? if > 1.8.9
     "client.MixinGenericMessageScreen",
-    //? if > 1.8.9
     "client.MixinLevelLoadingScreen",
+    //? if >= 26.3 || = 1.8.9
+    "client.MixinGameRendererShellScene",
+    //? if >= 26.3 || = 1.8.9
+    "client.MixinMinecraftWorldLoad",
+    //? if = 1.8.9
+    //"client.MixinMinecraftDeathRoute",
     //? if = 1.8.9
     //"client.MixinGameOptions",
     "client.MixinGameRenderer",

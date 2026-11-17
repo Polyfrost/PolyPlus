@@ -100,6 +100,10 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
+import org.polyfrost.polyplus.client.gui.screens.settings.PauseSettingsLayer
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayTogetherHooks
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialHost
@@ -112,6 +116,7 @@ import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
 
 private const val MIN_SCALE = 0.72f
+private const val SETTINGS_MILLIS = 240
 private const val COMPACT_WIDTH = 1300f
 private const val OPAQUE_FLOOR = 0.94f
 private const val DANGER_REST_TINT = 0.1f
@@ -168,7 +173,9 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             Box(Modifier.fillMaxSize()) {
                 val narrow = widthPx / scale < COMPACT_WIDTH
-                if (screen.stepBack) StepBackScreen(screen, narrow) else QuickDockScreen(screen, narrow)
+                val away by Motion.animateFloatAsState(if (screen.settingsOpen) 1f else 0f, tween(SETTINGS_MILLIS, easing = FastOutSlowInEasing))
+                if (screen.stepBack) StepBackScreen(screen, narrow, away) else QuickDockScreen(screen, narrow, away)
+                PauseSettingsLayer(screen, away, if (screen.stepBack) LobbyLayout.NavbarHeight else 0.dp)
                 SocialToastHost(Modifier.padding(top = (if (screen.stepBack) LobbyLayout.Top else 24.dp) - ToastDefaults.margin))
                 PlayTogetherHooks(PauseHost)
                 Curtain()

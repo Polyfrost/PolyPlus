@@ -22,6 +22,10 @@ import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
+//? if >= 26.3 {
+import java.nio.file.Path
+import org.polyfrost.polyplus.client.gui.screens.packs.PackDrops
+//?}
 
 //? if > 1.8.9 {
 import net.minecraft.client.gui.screens.PauseScreen
@@ -55,6 +59,8 @@ class OneClientPauseScreen(
     internal var moreOpen by mutableStateOf(false)
     internal var moreLinked by mutableStateOf(false)
     internal var customizeOpen by mutableStateOf(customizing)
+    internal var settingsOpen by mutableStateOf(false)
+        private set
     internal var playerPreview by mutableStateOf(style != PauseScreenStyle.STEP_BACK_FLAT || PolyPlusPauseConfig.flatPausePlayerPreview)
     private var decided = false
     internal var resumeBounds = Rect.Zero
@@ -64,13 +70,13 @@ class OneClientPauseScreen(
     private fun overResume(): Boolean = resumeBounds.contains(pointerPosition())
 
     private fun armResume() {
-        resumeArmed = !moreOpen && !customizeOpen && overResume()
+        resumeArmed = !moreOpen && !customizeOpen && !settingsOpen && overResume()
     }
 
     private fun resumeOnRelease() {
         val armed = resumeArmed
         resumeArmed = false
-        if (armed && !moreOpen && !customizeOpen && overResume()) resume()
+        if (armed && !moreOpen && !customizeOpen && !settingsOpen && overResume()) resume()
     }
 
     override fun init() {
@@ -110,6 +116,12 @@ class OneClientPauseScreen(
         super.render(mouseX, mouseY, tickDelta)
     }
     *///?}
+
+    //? if >= 26.3 {
+    override fun onFilesDrop(files: List<Path>) {
+        if (!PackDrops.drop(files)) super.onFilesDrop(files)
+    }
+    //?}
 
     override fun tick() {
         super.tick()
@@ -164,7 +176,21 @@ class OneClientPauseScreen(
             moreOpen = false
             return true
         }
+        if (key == InputConstants.KEY_ESCAPE && settingsOpen) {
+            closeGameSettings()
+            return true
+        }
         return false
+    }
+
+    internal fun openGameSettings() {
+        moreOpen = false
+        customizeOpen = false
+        settingsOpen = true
+    }
+
+    internal fun closeGameSettings() {
+        settingsOpen = false
     }
 
     internal fun resume() {
@@ -185,6 +211,7 @@ class OneClientPauseScreen(
 
     internal fun toggleCustomize() {
         moreOpen = false
+        settingsOpen = false
         if (customizeOpen) closeCustomize() else customizeOpen = true
     }
 
