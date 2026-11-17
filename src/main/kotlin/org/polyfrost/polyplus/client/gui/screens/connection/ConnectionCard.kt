@@ -232,7 +232,7 @@ internal fun ConnectionCard(
             Modifier.widthIn(max = CardWidth).fillMaxWidth().connectionSurface(shell).padding(horizontal = 28.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (server != null) {
+            if (server?.iconBytes != null) {
                 ServerIcon(server, 0, IconSize)
                 Spacer(Modifier.height(16.dp))
             }
