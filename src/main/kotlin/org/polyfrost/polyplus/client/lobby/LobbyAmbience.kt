@@ -207,6 +207,7 @@ object LobbyAmbience {
 
     fun tick() {
         val mc = Minecraft.getInstance()
+        AmbienceQuiet.tick()
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
@@ -217,7 +218,7 @@ object LobbyAmbience {
         }
         silenced = quiet
         if (departing && !playing() && !lobbyUp(mc)) departing = false
-        val wanted = lobbyUp(mc) && audible(mc) && !mutedUnfocused(mc) && !departing && !(StartupOverlay.active && !introClaimed)
+        val wanted = lobbyUp(mc) && audible(mc) && !mutedUnfocused(mc) && !AmbienceQuiet.quiet && !departing && !(StartupOverlay.active && !introClaimed)
         if (!playing()) {
             if (!wanted || !loops() || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
             if (!begin(mc, false)) retry = RETRY_TICKS

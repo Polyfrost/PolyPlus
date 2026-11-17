@@ -47,6 +47,8 @@ internal object PauseEvergreenMedia {
         runCatching { MediaService.release() }
     }
 
+    fun playing(): Boolean = runCatching { MediaService.current?.playing == true }.getOrDefault(false)
+
     fun read(): PauseMediaTrack? = runCatching {
         val info = MediaService.current ?: return null
         PauseMediaTrack(
