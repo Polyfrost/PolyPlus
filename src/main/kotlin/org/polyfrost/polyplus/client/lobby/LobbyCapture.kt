@@ -374,7 +374,7 @@ object LobbyCapture {
     }
 
     private fun start(mc: Minecraft, level: ClientLevel, player: LocalPlayer, handOver: Boolean) {
-        begin(mc, level, player.blockPosition(), player.onGround(), player.isVehicle || player.isPassenger)
+        begin(mc, level, LobbyCompat.feet(player), player.onGround(), player.isVehicle || player.isPassenger)
         if (handOver) surveying?.source?.handOver = true
     }
 
@@ -446,7 +446,7 @@ object LobbyCapture {
             it.left = level
         }
         if (copying == null && surveying == null && !busy && rested(frequency())) {
-            begin(mc, level, player.blockPosition(), player.onGround(), player.isVehicle || player.isPassenger)
+            begin(mc, level, LobbyCompat.feet(player), player.onGround(), player.isVehicle || player.isPassenger)
         }
         val survey = surveying
         val copy = copying
@@ -647,7 +647,7 @@ object LobbyCapture {
             spot = LobbySpotState.Blocked(action, "Stand on the ground first")
             return
         }
-        val feet = player.blockPosition()
+        val feet = LobbyCompat.feet(player)
         lastSpot = feet
         early(level, feet)?.let {
             report(source, feet, "rejected ${it.name}")

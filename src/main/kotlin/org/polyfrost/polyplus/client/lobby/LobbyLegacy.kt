@@ -464,6 +464,8 @@ object LobbyCompat {
     private const val LEGACY_DATA_VERSION = 47
     private const val SNOW_LIFE = 0.015
 
+    fun feet(entity: Entity): BlockPos = BlockPos(entity)
+
     private var cameraPoint = Vec3d(0.0, 0.0, 0.0)
     private var viewLook = Vec3d(0.0, 0.0, 1.0)
     private var viewRight = Vec3d(1.0, 0.0, 0.0)

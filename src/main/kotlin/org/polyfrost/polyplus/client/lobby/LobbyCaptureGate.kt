@@ -26,7 +26,7 @@ object LobbyCaptureGate {
         private set
 
     fun tick(player: LocalPlayer) {
-        val feet = player.blockPosition()
+        val feet = LobbyCompat.feet(player)
         val oldest = (head + 1) % SPEED_WINDOW
         val moved = if (trailed >= SPEED_WINDOW) hypot((feet.x - trailX[oldest]).toDouble(), (feet.z - trailZ[oldest]).toDouble()) else 0.0
         head = oldest

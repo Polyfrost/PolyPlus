@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalDensity
 import java.net.URI
 import java.util.Optional
 import java.util.function.Consumer
+import org.polyfrost.polyplus.client.lobby.LobbyCompat
 import net.minecraft.client.Minecraft
 //? if >= 26.1 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -49,7 +50,7 @@ class DeathShellScreen(val vanilla: DeathScreen) : ShellScreen(ScreenShell.InGam
     private var hoveredStyle: Style? = null
 
     private val details = run {
-        val pos = player.blockPosition()
+        val pos = LobbyCompat.feet(player)
         val scoreValue = player.score.toString()
         DeathDetails(
             title = vanilla.title.string,

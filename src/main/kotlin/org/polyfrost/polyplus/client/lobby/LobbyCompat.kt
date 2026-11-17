@@ -93,6 +93,8 @@ object LobbyCompat {
     @Volatile
     private var quiet = false
 
+    fun feet(entity: Entity): BlockPos = entity.blockPosition()
+
     @JvmStatic
     fun quietConnection(): Boolean = quiet
 
