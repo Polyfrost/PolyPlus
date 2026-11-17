@@ -16,7 +16,7 @@ object PolyPlusScreensConfig : Config(
         description = "Uses OneClient's settings, controls and resource packs pages outside the lobby.",
         subcategory = "Screens",
     )
-    var customSettings = true
+    var customSettings = false
 
     @JvmStatic
     @Switch(
