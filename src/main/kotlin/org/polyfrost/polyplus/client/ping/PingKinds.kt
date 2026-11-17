@@ -36,10 +36,10 @@ internal val PingReply.hint: String
 
 internal val PingReply.color: Int
     get() = when (this) {
-        PingReply.SEEN -> 0x7CD992
-        PingReply.COMING -> 0x4FC3F7
-        PingReply.CANT -> 0xFF6B6B
-        PingReply.NONE -> 0x8E8E96
+        PingReply.SEEN -> 0x55FF55
+        PingReply.COMING -> 0x55FFFF
+        PingReply.CANT -> 0xFF5555
+        PingReply.NONE -> 0xAAAAAA
     }
 
 internal val PingKind.title: String
@@ -62,11 +62,11 @@ internal val PingKind.hint: String
 
 internal val PingKind.color: Int
     get() = when (this) {
-        PingKind.GO -> 0x4FC3F7
-        PingKind.ENEMY -> 0xFF5A5A
-        PingKind.LOOK -> 0xFFD54F
-        PingKind.LOOT -> 0xB388FF
-        PingKind.DANGER -> 0xFF9800
+        PingKind.GO -> 0x55FFFF
+        PingKind.ENEMY -> 0xFF5555
+        PingKind.LOOK -> 0xFFFF55
+        PingKind.LOOT -> 0xFF55FF
+        PingKind.DANGER -> 0xFFAA00
     }
 
 internal const val PING_ICON_GRID = 8

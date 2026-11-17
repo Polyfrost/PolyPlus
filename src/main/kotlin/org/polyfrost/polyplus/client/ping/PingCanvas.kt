@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.client.render.platform.Lighting
 import net.minecraft.item.ItemStack
+import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker
 *///?}
 
 //? if >= 26.1 {
@@ -23,6 +24,10 @@ typealias PingGraphics = GuiGraphicsExtractor
 /*typealias PingGraphics = Any
 *///?}
 
+//? if = 1.8.9 {
+/*private val gradientHost = GuiElement()
+*///?}
+
 internal class PingCanvas(private val graphics: PingGraphics?) {
     val lineHeight: Int = 9
 
@@ -31,6 +36,14 @@ internal class PingCanvas(private val graphics: PingGraphics?) {
         graphics?.fill(x0, y0, x1, y1, color)
         //?} else {
         /*GuiElement.fill(x0, y0, x1, y1, color)
+        *///?}
+    }
+
+    fun gradient(x0: Int, y0: Int, x1: Int, y1: Int, top: Int, bottom: Int) {
+        //? if > 1.8.9 {
+        graphics?.fillGradient(x0, y0, x1, y1, top, bottom)
+        //?} else {
+        /*(gradientHost as GuiElementInvoker).`polyplus$fillGradient`(x0, y0, x1, y1, top, bottom)
         *///?}
     }
 

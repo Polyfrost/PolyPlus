@@ -6,9 +6,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.Entity
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusPartyConfig
-import org.polyfrost.polyplus.client.gui.isMinecraftStyle
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import kotlin.math.abs
@@ -33,13 +31,9 @@ import net.minecraft.item.ItemStack
 *///?}
 
 object PingMarkers {
-    private const val SQRT2 = 1.4142135f
     private const val FADE_IN_MS = 150L
     private const val FADE_OUT_MS = 500L
     internal const val EDGE_MARGIN = 6
-    internal const val PIN_HALF = 10f
-    internal const val MIN_PIN_HALF = 8
-    private const val RING_WIDTH = 2
     internal const val CHEVRON_GAP = 2
     internal const val CHEVRON_LENGTH = 5f
     internal const val CHEVRON_HALF_WIDTH = 4.5f
@@ -57,26 +51,23 @@ object PingMarkers {
     internal const val CARD_START_SCALE = 0.9f
     private const val CARD_PAD_X = 4
     private const val CARD_PAD_Y = 3
+    private const val TITLE_GAP = 2
     internal const val CARD_MARGIN = 4
-    private const val ACCENT_WIDTH = 2
     internal const val ICON_SIZE = 16
     internal const val ICON_GAP = 4
     private const val MIN_HEIGHT_DELTA = 2.0
-    private const val SURFACE = 0xE6141418.toInt()
-    private const val PLATE = 0xB0101014.toInt()
-    private const val CARD = 0xD8101014.toInt()
+    private const val TOOLTIP_BG = 0xF0100010.toInt()
+    private const val TOOLTIP_BORDER_TOP = 0x505000FF
+    private const val TOOLTIP_BORDER_BOTTOM = 0x5028007F
     private const val SHADOW = 0x66000000
-    private const val ICON_SHADOW = 0xA0000000.toInt()
-    private const val CORNER_ROUNDING = 0.2f
     internal const val WHITE = 0xFFFFFF
-    private const val DETAIL = 0xC8C8CC
-    internal const val HINT = 0x8E8E96
+    private const val DETAIL = 0xAAAAAA
+    internal const val HINT = 0x777777
     internal const val MAX_HEADS = 3
     internal const val ROW_GAP = 2
     internal const val HEAD_CELL = PingFaces.SIDE + 2
     internal const val HEAD_GAP = 2
     internal const val GROUP_GAP = 4
-    private const val ROW_PAD_X = 2
     private const val ROW_PAD_Y = 1
     private const val REPLY_ROW_HEIGHT = HEAD_CELL + ROW_PAD_Y * 2
     private const val MAX_REPLY_LINES = 4
@@ -138,7 +129,6 @@ object PingMarkers {
         hoveredId = hovered?.ping?.id
         advanceExpansion(frames, now)
         val ordered = frames.sortedBy { if (it === hovered) 2f else expansion[it.ping.id] ?: 0f }
-        if (OneConfigTheme.active?.isMinecraftStyle != true && PingMarkersCompose.draw(canvas, graphics, ordered, now)) return
         for (frame in ordered) drawMarker(canvas, frame, now)
     }
 
@@ -364,10 +354,11 @@ object PingMarkers {
         }
     }
 
-    private fun heightText(delta: Double): String? {
-        if (abs(delta) < MIN_HEIGHT_DELTA) return null
-        val arrow = if (delta > 0) "↑" else "↓"
-        return "$arrow${abs(delta).roundToInt()}"
+    private fun placeText(distance: Double, delta: Double): String {
+        val blocks = distance.roundToInt()
+        val away = if (blocks == 1) "1 block away" else "$blocks blocks away"
+        if (abs(delta) < MIN_HEIGHT_DELTA) return away
+        return "$away, ${abs(delta).roundToInt()} ${if (delta > 0) "up" else "down"}"
     }
 
     internal fun ease(t: Float): Float {
@@ -393,11 +384,8 @@ object PingMarkers {
             headings.remove(ping.id)
             val cx = point.x.roundToInt()
             val cy = point.y.roundToInt()
-            val half = (PIN_HALF * scale).roundToInt().coerceAtLeast(MIN_PIN_HALF)
-            diamond(canvas, cx, cy + 1, half + 1, scaled(SHADOW, alpha))
-            diamond(canvas, cx, cy, half, ring)
-            diamond(canvas, cx, cy, half - RING_WIDTH - 1, scaled(SURFACE, alpha))
-            drawIcon(canvas, ping.kind, cx, cy, half, alpha)
+            val half = glyphHalf(scale)
+            pin(canvas, ping.kind, cx, cy, scale, ring, alpha)
             val t = ease(expansion[ping.id] ?: 0f)
             val labelAlpha = alpha * (1f - t)
             if (labelAlpha >= 0.05f) {
@@ -416,7 +404,7 @@ object PingMarkers {
         val angle = heading(ping.id, atan2(point.dirY, point.dirX), now)
         val dirX = cos(angle)
         val dirY = sin(angle)
-        val radius = (PIN_HALF * scale).roundToInt().coerceAtLeast(MIN_PIN_HALF)
+        val radius = glyphHalf(scale)
         val reach = radius + CHEVRON_GAP + (CHEVRON_LENGTH * scale).roundToInt()
         val label = distanceText(distance)
         val labelHeight = canvas.lineHeight + PLATE_PAD_Y * 2
@@ -428,11 +416,8 @@ object PingMarkers {
         val cx = edgeX.roundToInt()
         val cy = edgeY.roundToInt()
 
-        diamond(canvas, cx, cy + 1, radius + 1, scaled(SHADOW, alpha))
-        diamond(canvas, cx, cy, radius, ring)
-        diamond(canvas, cx, cy, radius - RING_WIDTH - 1, scaled(SURFACE, alpha))
-        drawIcon(canvas, ping.kind, cx, cy, radius, alpha)
-        val edge = radius / (abs(dirX) + abs(dirY))
+        pin(canvas, ping.kind, cx, cy, scale, ring, alpha)
+        val edge = radius / maxOf(abs(dirX), abs(dirY))
         drawChevron(canvas, cx.toFloat(), cy.toFloat(), dirX, dirY, edge, scale, ring, alpha)
 
         val labelTop = if (dirY > LABEL_FLIP) cy - radius - LABEL_GAP - labelHeight else cy + radius + LABEL_GAP
@@ -454,12 +439,6 @@ object PingMarkers {
         } else {
             groups.sumOf { (_, count) -> PingFaces.SIDE + 1 + canvas.width(count.toString()) } + (groups.size - 1) * GROUP_GAP
         }
-        val half = content / 2 + ROW_PAD_X
-        val bottom = top + REPLY_ROW_HEIGHT
-        val plate = scaled(PLATE, alpha)
-        canvas.fill(cx - half, top + 1, cx + half, bottom - 1, plate)
-        canvas.fill(cx - half + 1, top, cx + half - 1, top + 1, plate)
-        canvas.fill(cx - half + 1, bottom - 1, cx + half - 1, bottom, plate)
         var x = cx - content / 2
         val y = top + ROW_PAD_Y
         if (heads) {
@@ -481,6 +460,7 @@ object PingMarkers {
     }
 
     private fun drawHead(canvas: PingCanvas, response: PingResponse, x: Int, y: Int, alpha: Float) {
+        canvas.fill(x + 1, y + 1, x + HEAD_CELL + 1, y + HEAD_CELL + 1, scaled(SHADOW, alpha))
         canvas.fill(x, y, x + HEAD_CELL, y + HEAD_CELL, withAlpha(response.reply.color, alpha))
         val face = PingFaces.pixels(response.from)
         if (face == null) {
@@ -508,12 +488,11 @@ object PingMarkers {
         } else {
             PingTargeting.localLabel(ping.label)
         }
-        val title = if (target.isNullOrBlank()) ping.kind.title else "${ping.kind.title} · $target"
-        val sender = if (ping.own) "You" else senderName(ping)
-        val lines = ArrayList<Pair<String, Int>>(4)
-        lines += title to WHITE
-        lines += listOfNotNull(sender, ageText(ping, now)).joinToString(" · ") to DETAIL
-        lines += listOfNotNull(distanceText(frame.distance), heightText(frame.heightDelta)).joinToString(" · ") to DETAIL
+        val sender = if (ping.own) "you" else senderName(ping) ?: "a party member"
+        val lines = ArrayList<Pair<String, Int>>(6)
+        lines += (if (target.isNullOrBlank()) ping.kind.title else "${ping.kind.title}: $target") to ping.kind.color
+        lines += "Pinged by $sender ${ageText(ping, now)}" to DETAIL
+        lines += placeText(frame.distance, frame.heightDelta) to DETAIL
         for (response in ping.replies.take(MAX_REPLY_LINES)) lines += "${replierName(response.from)}: ${response.reply.title}" to DETAIL
         if (ping.replies.size > MAX_REPLY_LINES) lines += "+${ping.replies.size - MAX_REPLY_LINES} more" to DETAIL
         if (ping.own) {
@@ -533,9 +512,9 @@ object PingMarkers {
         val lineStep = canvas.lineHeight + 1
         val iconSpace = if (icon != null) ICON_SIZE + ICON_GAP else 0
         val textWidth = lines.maxOf { canvas.width(it.first) }
-        val textHeight = lines.size * lineStep - 1
+        val textHeight = lines.size * lineStep - 1 + if (lines.size > 1) TITLE_GAP else 0
         val contentHeight = if (icon != null) maxOf(textHeight, ICON_SIZE) else textHeight
-        val cardWidth = CARD_PAD_X * 2 + ACCENT_WIDTH + iconSpace + textWidth
+        val cardWidth = CARD_PAD_X * 2 + iconSpace + textWidth
         val cardHeight = CARD_PAD_Y * 2 + contentHeight
         val screenWidth = PingProjection.guiWidth().toInt()
         val screenHeight = PingProjection.guiHeight().toInt()
@@ -556,24 +535,34 @@ object PingMarkers {
         val tp = top - anchorY
         val r = l + cardWidth
         val b = tp + cardHeight
-        val plate = scaled(CARD, alpha)
-        canvas.fill(l + 1, b, r - 1, b + 1, scaled(SHADOW, alpha))
-        canvas.fill(l + 1, tp, r - 1, tp + 1, plate)
-        canvas.fill(l, tp + 1, r, b - 1, plate)
-        canvas.fill(l + 1, b - 1, r - 1, b, plate)
-        canvas.fill(l + 1, tp + 2, l + 1 + ACCENT_WIDTH, b - 2, withAlpha(ping.kind.color, alpha))
+        tooltipBox(canvas, l, tp, r, b, alpha)
 
-        val contentX = l + CARD_PAD_X + ACCENT_WIDTH
+        val contentX = l + CARD_PAD_X
         val contentY = tp + CARD_PAD_Y
         if (icon != null && alpha >= 0.5f) canvas.item(icon, contentX, contentY + (contentHeight - ICON_SIZE) / 2)
         val textX = contentX + iconSpace
         val textY = contentY + (contentHeight - textHeight) / 2
         lines.forEachIndexed { i, (text, color) ->
-            canvas.text(text, textX, textY + i * lineStep, withAlpha(color, alpha))
+            canvas.text(text, textX, textY + i * lineStep + if (i > 0) TITLE_GAP else 0, withAlpha(color, alpha))
         }
 
         if (animated) canvas.pop()
     }
+
+    private fun tooltipBox(canvas: PingCanvas, l: Int, t: Int, r: Int, b: Int, alpha: Float) {
+        val bg = scaled(TOOLTIP_BG, alpha)
+        canvas.fill(l + 1, t, r - 1, t + 1, bg)
+        canvas.fill(l + 1, b - 1, r - 1, b, bg)
+        canvas.fill(l, t + 1, r, b - 1, bg)
+        val top = scaled(TOOLTIP_BORDER_TOP, alpha)
+        val bottom = scaled(TOOLTIP_BORDER_BOTTOM, alpha)
+        canvas.fill(l + 1, t + 1, r - 1, t + 2, top)
+        canvas.fill(l + 1, b - 2, r - 1, b - 1, bottom)
+        canvas.gradient(l + 1, t + 2, l + 2, b - 2, top, bottom)
+        canvas.gradient(r - 2, t + 2, r - 1, b - 2, top, bottom)
+    }
+
+    private fun shade(rgb: Int): Int = (rgb and 0xFCFCFC) shr 2
 
     internal fun heading(id: String, target: Float, now: Long): Float {
         val previous = headings[id]
@@ -590,29 +579,30 @@ object PingMarkers {
 
     private class Heading(var angle: Float, var at: Long)
 
-    private fun drawIcon(canvas: PingCanvas, kind: PingKind, cx: Int, cy: Int, half: Int, alpha: Float) {
-        val hole = half - RING_WIDTH - 1
-        val u = (hole / 8).coerceAtLeast(1)
-        val small = hole < 7
-        val shadow = scaled(ICON_SHADOW, alpha)
-        val color = withAlpha(WHITE, alpha)
-        pingIconRects(kind, small) { x0, y0, x1, y1 ->
-            canvas.fill(cx + x0 * u + 1, cy + y0 * u + 1, cx + x1 * u + 1, cy + y1 * u + 1, shadow)
-        }
-        pingIconRects(kind, small) { x0, y0, x1, y1 ->
-            canvas.fill(cx + x0 * u, cy + y0 * u, cx + x1 * u, cy + y1 * u, color)
+    private fun glyphScale(scale: Float): Float = scale.coerceAtLeast(FAR_SCALE)
+
+    private fun glyphHalf(scale: Float): Int = ((PING_GLYPH_SIZE + 2) * glyphScale(scale) / 2f).roundToInt()
+
+    private fun pin(canvas: PingCanvas, kind: PingKind, cx: Int, cy: Int, scale: Float, color: Int, alpha: Float) {
+        val rects = pingGlyphRects(kind)
+        val offset = -(PING_GLYPH_SIZE / 2 + 1)
+        canvas.push(cx.toFloat(), cy.toFloat(), glyphScale(scale))
+        fillRects(canvas, rects.ink, offset, offset, withAlpha(shade(color), alpha))
+        fillRects(canvas, rects.fill, offset, offset, withAlpha(color, alpha))
+        canvas.pop()
+    }
+
+    private fun fillRects(canvas: PingCanvas, rects: IntArray, x: Int, y: Int, color: Int) {
+        var i = 0
+        while (i < rects.size) {
+            canvas.fill(x + rects[i], y + rects[i + 1], x + rects[i + 2], y + rects[i + 3], color)
+            i += 4
         }
     }
 
     private fun drawPlate(canvas: PingCanvas, cx: Int, top: Int, lines: List<Pair<String, Int>>, alpha: Float) {
         val visible = lines.filter { it.first.isNotEmpty() }
         if (visible.isEmpty()) return
-        val half = visible.maxOf { canvas.width(it.first) } / 2 + PLATE_PAD_X
-        val bottom = top + visible.size * (canvas.lineHeight + 1) + PLATE_PAD_Y * 2 - 1
-        val plate = scaled(PLATE, alpha)
-        canvas.fill(cx - half, top, cx + half, bottom, plate)
-        canvas.fill(cx - half + 1, top - 1, cx + half - 1, top, plate)
-        canvas.fill(cx - half + 1, bottom, cx + half - 1, bottom + 1, plate)
         visible.forEachIndexed { i, (text, color) ->
             canvas.text(text, cx - canvas.width(text) / 2, top + PLATE_PAD_Y + i * (canvas.lineHeight + 1), withAlpha(color, alpha))
         }
@@ -643,54 +633,6 @@ object PingMarkers {
         val rightY = backY - py * halfWidth
         triangle(canvas, tipX, tipY + 1f, leftX, leftY + 1f, rightX, rightY + 1f, scaled(SHADOW, alpha))
         triangle(canvas, tipX, tipY, leftX, leftY, rightX, rightY, color)
-    }
-
-    private fun diamond(canvas: PingCanvas, cx: Int, cy: Int, half: Int, color: Int) {
-        if (half <= 0) return
-        val squareTheme = OneConfigTheme.active?.isMinecraftStyle == true
-        if (squareTheme) sharpDiamond(canvas, cx, cy, half, color) else roundedDiamond(canvas, cx, cy, half, color)
-    }
-
-    private fun sharpDiamond(canvas: PingCanvas, cx: Int, cy: Int, half: Int, color: Int) {
-        for (row in -half until half) {
-            val span = half - if (row < 0) -row - 1 else row
-            if (span > 0) canvas.fill(cx - span, cy + row, cx + span, cy + row + 1, color)
-        }
-    }
-
-    private fun roundedDiamond(canvas: PingCanvas, cx: Int, cy: Int, half: Int, color: Int) {
-        val corner = half * CORNER_ROUNDING
-        val core = half - corner * SQRT2
-        for (row in -half until half) {
-            val y = abs(row + 0.5f)
-            var solid = 0
-            while (solid < half && roundedCoverage(solid + 0.5f, y, core, corner) >= 0.999f) solid++
-            if (solid > 0) canvas.fill(cx - solid, cy + row, cx + solid, cy + row + 1, color)
-            var i = solid
-            while (i < half) {
-                val coverage = roundedCoverage(i + 0.5f, y, core, corner)
-                if (coverage < 0.02f) break
-                val shade = scaled(color, coverage)
-                canvas.fill(cx + i, cy + row, cx + i + 1, cy + row + 1, shade)
-                canvas.fill(cx - i - 1, cy + row, cx - i, cy + row + 1, shade)
-                i++
-            }
-        }
-    }
-
-    private fun roundedCoverage(x: Float, y: Float, core: Float, corner: Float): Float {
-        val sum = x + y
-        val signed = if (sum <= core) {
-            (sum - core) / SQRT2
-        } else {
-            val along = ((sum - core) / 2f).let { x - it }.coerceIn(0f, core)
-            val nearX = along
-            val nearY = core - along
-            val dx = x - nearX
-            val dy = y - nearY
-            sqrt(dx * dx + dy * dy)
-        }
-        return (0.5f - (signed - corner)).coerceIn(0f, 1f)
     }
 
     private fun triangle(canvas: PingCanvas, x0: Float, y0: Float, x1: Float, y1: Float, x2: Float, y2: Float, color: Int) {
