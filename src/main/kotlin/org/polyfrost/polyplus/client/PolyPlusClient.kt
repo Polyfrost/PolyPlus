@@ -173,6 +173,7 @@ object PolyPlusClient {
         step("party config preload") { PolyPlusPartyConfig.preload() }
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
+        step("screens config preload") { PolyPlusScreensConfig.preload() }
         step("startup sounds") { StartupSounds.prepare() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("pylon raw input") { PylonRawInput.initialize() }
