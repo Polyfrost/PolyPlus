@@ -18,7 +18,11 @@ enum class WorldSection {
 
 enum class WorldGameMode(val label: String, val info: String) {
     Survival("Survival", "Gather, build and stay alive. Lose your items when you die."),
-    Hardcore("Hardcore", "Survival on Hard with one life. The world is gone when you die."),
+    //? if > 1.8.9 {
+    Hardcore("Hardcore", "Survival on Hard with one life. When you die, you can only spectate."),
+    //?} else {
+    /*Hardcore("Hardcore", "Survival on Hard with one life. The world is deleted when you die."),
+    *///?}
     Creative("Creative", "Every block, free flight and nothing can hurt you."),
     Spectator("Spectator", "Fly through anything and look around without touching it."),
 }
@@ -60,6 +64,7 @@ interface WorldDraft {
     val extraWorldTypes: List<WorldTypeOption>
     var worldType: WorldTypeOption
     val worldTypeLocked: Boolean
+    val gameRulesLocked: Boolean get() = false
     val canCustomizeType: Boolean
     fun customizeType()
 

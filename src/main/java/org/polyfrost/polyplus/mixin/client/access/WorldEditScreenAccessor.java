@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.worldselection.EditWorldScreen;

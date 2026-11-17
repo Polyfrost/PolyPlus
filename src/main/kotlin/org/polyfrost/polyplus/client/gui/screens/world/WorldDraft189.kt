@@ -90,7 +90,7 @@ internal class WorldDraft189(private val screen: CreateWorldScreen) : WorldDraft
     private fun saveName(display: String): String {
         var folder = display.trim()
         for (c in SharedConstants.INVALID_FILE_CHARS) folder = folder.replace(c, '_')
-        if (StringUtils.isEmpty(folder)) folder = "World"
+        if (StringUtils.isEmpty(folder)) folder = I18n.translate("selectWorld.newWorld")
         return CreateWorldScreen.getWorldSaveName(mc.getWorldStorageSource(), folder)
     }
 
@@ -197,7 +197,6 @@ internal class WorldDraft189(private val screen: CreateWorldScreen) : WorldDraft
     override fun openExperiments() {}
 
     override fun create() {
-        if (name.isEmpty()) return
         ClientPlatform.setScreen(null)
         if (creating) return
         creating = true
@@ -217,7 +216,7 @@ internal class WorldDraft189(private val screen: CreateWorldScreen) : WorldDraft
         settings.setGeneratorOptions(screen.generatorOptions)
         if (bonusChestValue && !hardcore) settings.enableBonusChest()
         if (commandsValue && !hardcore) settings.enableCommands()
-        mc.startGame(folder, name.trim(), settings)
+        mc.startGame(folder, name.trim().ifEmpty { folder }, settings)
     }
 
     override fun cancel() = ClientPlatform.setScreen(access.polyplusParent())

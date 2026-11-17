@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -74,6 +75,7 @@ private val TYPE_ICONS = mapOf(
 
 class CreateWorldShell(shell: ScreenShell, private val draft: WorldDraft) : WorldShellScreen(shell) {
     private val step = mutableIntStateOf(0)
+    private val invalidRules = mutableStateMapOf<String, String>()
 
     override val title: String get() = if (draft.recreated) "Recreate world" else "Create world"
 
@@ -81,12 +83,12 @@ class CreateWorldShell(shell: ScreenShell, private val draft: WorldDraft) : Worl
 
     @Composable
     override fun Body() {
-        CreateWorldContent(draft, step.intValue) { step.intValue = it }
+        CreateWorldContent(draft, step.intValue, invalidRules) { step.intValue = it }
     }
 }
 
 @Composable
-fun CreateWorldContent(draft: WorldDraft, step: Int, onStep: (Int) -> Unit) {
+fun CreateWorldContent(draft: WorldDraft, step: Int, invalidRules: MutableMap<String, String>, onStep: (Int) -> Unit) {
     var previous by remember { mutableIntStateOf(step) }
     val merged = draft.sections.none { it in ADVANCED_ONLY }
     val steps = if (merged) STEPS.take(2) else STEPS
@@ -95,8 +97,10 @@ fun CreateWorldContent(draft: WorldDraft, step: Int, onStep: (Int) -> Unit) {
         previous = step
         onStep(it.coerceIn(0, steps.size - 1))
     }
+    val rulesStep = if (merged) -1 else steps.size - 1
+    val errorSteps = if (invalidRules.isNotEmpty() && rulesStep >= 0 && !draft.gameRulesLocked) setOf(rulesStep) else emptySet()
     WorldContentColumn {
-        StepBar(steps, step, go)
+        StepBar(steps, step, go, errorSteps)
         Divider(Modifier.fillMaxWidth())
         Column(Modifier.weight(1f).fillMaxWidth()) {
             PanelPageSwitch(step, forward) { page ->
@@ -104,23 +108,33 @@ fun CreateWorldContent(draft: WorldDraft, step: Int, onStep: (Int) -> Unit) {
                     when (page) {
                         0 -> WorldStep(draft) { go(1) }
                         1 -> GenerationStep(draft, merged)
-                        else -> AdvancedStep(draft)
+                        else -> AdvancedStep(draft, invalidRules)
                     }
                 }
             }
         }
-        CreateFooter(draft, step, steps.size, go)
+        CreateFooter(draft, step, steps.size, go, if (errorSteps.isEmpty()) null else "Fix the game rules marked in ${steps[rulesStep]} first.")
     }
 }
 
 @Composable
-private fun CreateFooter(draft: WorldDraft, step: Int, count: Int, go: (Int) -> Unit) {
+private fun CreateFooter(draft: WorldDraft, step: Int, count: Int, go: (Int) -> Unit, blocked: String?) {
+    val theme = OneConfigTheme.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton("Cancel", draft::cancel, style = ControlStyle.Ghost, size = ControlSize.Large)
         Spacer(Modifier.weight(1f))
+        if (blocked != null) {
+            Text(blocked, color = theme.error, style = theme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        }
         if (step > 0) TextButton("Back", { go(step - 1) }, size = ControlSize.Large)
         if (step < count - 1) TextButton("Next", { go(step + 1) }, size = ControlSize.Large)
-        TextButton(if (draft.recreated) "Recreate world" else "Create world", draft::create, style = ControlStyle.Primary, size = ControlSize.Large)
+        TextButton(
+            if (draft.recreated) "Recreate world" else "Create world",
+            draft::create,
+            style = ControlStyle.Primary,
+            size = ControlSize.Large,
+            enabled = blocked == null,
+        )
     }
 }
 
@@ -171,7 +185,7 @@ private fun WorldStep(draft: WorldDraft, onNext: () -> Unit) {
     }
     if (WorldSection.Difficulty !in draft.sections) return
     SectionSpace()
-    WorldBlock("Difficulty", if (draft.difficultyLocked) "Hardcore worlds are always on Hard." else draft.difficulty.info) {
+    WorldBlock("Difficulty", if (draft.difficultyLocked) (if (draft.gameMode == WorldGameMode.Hardcore) "Hardcore worlds are always on Hard." else "This world type is always on Peaceful.") else draft.difficulty.info) {
         Segmented(WorldDifficulty.entries, draft.difficulty, { draft.difficulty = it }, label = { it.label }, enabled = !draft.difficultyLocked)
     }
 }
@@ -243,7 +257,7 @@ private fun TypeGrid(draft: WorldDraft, types: List<WorldTypeOption>, selected: 
 }
 
 @Composable
-private fun AdvancedStep(draft: WorldDraft) {
+private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, String>) {
     OptionsBlock(draft)
     val packs = WorldSection.DataPacks in draft.sections
     val experiments = WorldSection.Experiments in draft.sections
@@ -261,7 +275,11 @@ private fun AdvancedStep(draft: WorldDraft) {
     }
     if (WorldSection.GameRules in draft.sections) {
         SectionSpace()
-        GameRulesBlock(draft)
+        if (draft.gameRulesLocked) {
+            WorldBlock("Game rules", "This world type always uses the default game rules.") {}
+        } else {
+            GameRulesBlock(draft, invalidRules)
+        }
     }
 }
 
@@ -288,11 +306,15 @@ private fun OptionsBlock(draft: WorldDraft) {
 }
 
 @Composable
-private fun GameRulesBlock(draft: WorldDraft) {
+private fun GameRulesBlock(draft: WorldDraft, invalidRules: MutableMap<String, String>) {
     val packs = draft.dataPackCount
     val experimental = draft.experimental
     val rules = remember(draft, packs, experimental) { draft.editRules() }
-    val text = remember(rules) { mutableStateMapOf<String, String>().apply { rules.rules.forEach { put(it.id, rules.value(it)) } } }
+    val text = remember(rules) { mutableStateMapOf<String, String>().apply { rules.rules.forEach { put(it.id, invalidRules[it.id] ?: rules.value(it)) } } }
+    LaunchedEffect(rules) {
+        val ids = rules.rules.map { it.id }.toSet()
+        invalidRules.keys.retainAll(ids)
+    }
     var query by remember { mutableStateOf("") }
     val filter = query.trim().lowercase()
     val shown = rules.rules.filter {
@@ -301,7 +323,12 @@ private fun GameRulesBlock(draft: WorldDraft) {
     val changed = rules.rules.any { (text[it.id] ?: it.defaultValue) != it.defaultValue }
     val update: (WorldRule, String) -> Unit = { rule, value ->
         text[rule.id] = value
-        if (rules.accepts(rule, value) && rules.set(rule, value)) rules.apply()
+        if (rules.accepts(rule, value) && rules.set(rule, value)) {
+            invalidRules.remove(rule.id)
+            rules.apply()
+        } else {
+            invalidRules[rule.id] = value
+        }
     }
     WorldBlock(
         "Game rules",
@@ -312,11 +339,21 @@ private fun GameRulesBlock(draft: WorldDraft) {
                     text[rule.id] = rule.defaultValue
                     rules.set(rule, rule.defaultValue)
                 }
+                invalidRules.clear()
                 rules.apply()
-            }, style = ControlStyle.Ghost, enabled = changed)
+            }, style = ControlStyle.Ghost, enabled = changed || invalidRules.isNotEmpty())
         },
     ) {
         SearchField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "Search game rules", size = ControlSize.Regular)
+        val broken = rules.rules.filter { it.id in invalidRules }
+        if (broken.isNotEmpty()) {
+            Text(
+                "Not a valid number: ${broken.joinToString { it.label }}",
+                Modifier.padding(start = 4.dp),
+                color = OneConfigTheme.current.error,
+                style = OneConfigTheme.current.typography.small,
+            )
+        }
         if (shown.isEmpty()) PanelHint("No game rules match that search.")
         shown.groupBy { it.category }.forEach { (category, list) ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {

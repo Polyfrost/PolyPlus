@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.world.level.WorldDataConfiguration;
 import org.spongepowered.asm.mixin.Mixin;

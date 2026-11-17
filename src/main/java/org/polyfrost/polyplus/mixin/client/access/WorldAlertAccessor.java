@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import net.minecraft.client.gui.screens.AlertScreen;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;

@@ -1,14 +1,21 @@
 package org.polyfrost.polyplus.client.gui.screens.world
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.ImageBitmap
+//? if >= 26.3 {
 import com.mojang.blaze3d.Blaze3D
+//?} elif >= 1.21.11 {
+/*import net.minecraft.util.Util
+*///?} else {
+/*import net.minecraft.Util
+*///?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.AlertScreen
 import net.minecraft.client.gui.screens.BackupConfirmScreen
 import net.minecraft.client.gui.screens.ConfirmScreen
 import net.minecraft.client.gui.screens.DirectJoinServerScreen
+import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.components.toasts.SystemToast
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen
 import net.minecraft.client.gui.screens.worldselection.EditWorldScreen
@@ -18,12 +25,17 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.ComponentUtils
 import net.minecraft.network.chat.contents.TranslatableContents
-import net.minecraft.util.FileUtil
 import net.minecraft.world.Difficulty
 import net.minecraft.world.flag.FeatureFlags
+//? if >= 1.21.11 {
+import net.minecraft.util.FileUtil
 import net.minecraft.world.level.gamerules.GameRule
 import net.minecraft.world.level.gamerules.GameRuleType
 import net.minecraft.world.level.gamerules.GameRules
+//?} else {
+/*import net.minecraft.FileUtil
+import net.minecraft.world.level.GameRules
+*///?}
 import net.minecraft.world.level.storage.LevelResource
 import net.minecraft.world.level.storage.LevelSummary
 import org.apache.logging.log4j.LogManager
@@ -31,6 +43,8 @@ import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.apache.commons.io.FileUtils
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+//? if < 1.21.11
+/*import org.polyfrost.polyplus.mixin.client.access.ScreenBindAccessor*/
 import org.polyfrost.polyplus.mixin.client.access.WorldAlertAccessor
 import org.polyfrost.polyplus.mixin.client.access.WorldConfirmAccessor
 import org.polyfrost.polyplus.mixin.client.access.WorldCreateScreenAccessor
@@ -38,9 +52,27 @@ import org.polyfrost.polyplus.mixin.client.access.WorldDirectJoinAccessor
 import org.polyfrost.polyplus.mixin.client.access.WorldEditScreenAccessor
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.Path
 
 private val LOGGER = LogManager.getLogger("PolyPlus/WorldDraft")
 private const val VANILLA_PACK = "vanilla"
+
+internal fun bindVanilla(screen: Screen) {
+    //? if < 1.21.11 {
+    /*val mc = Minecraft.getInstance()
+    val access = screen as ScreenBindAccessor
+    access.polyplusSetMinecraft(mc)
+    access.polyplusSetFont(mc.font)
+    *///?}
+}
+
+private fun openPath(path: Path) {
+    //? if >= 26.3 {
+    Blaze3D.openPath(path)
+    //?} else {
+    /*Util.getPlatform().openPath(path)
+    *///?}
+}
 
 internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft {
     private val ui: WorldCreationUiState = screen.uiState
@@ -48,6 +80,7 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
     private val tick = mutableIntStateOf(0)
 
     init {
+        bindVanilla(screen)
         ui.addListener { tick.intValue++ }
     }
 
@@ -95,10 +128,12 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
     override val gameModeLocked: Boolean get() = read { ui.isDebug }
 
     override var difficulty: WorldDifficulty
-        get() = read { WorldDifficulty.entries[ui.difficulty.ordinal.coerceIn(0, WorldDifficulty.entries.size - 1)] }
+        get() = read { if (ui.isDebug) WorldDifficulty.Peaceful else WorldDifficulty.entries[ui.difficulty.ordinal.coerceIn(0, WorldDifficulty.entries.size - 1)] }
         set(value) = ui.setDifficulty(Difficulty.entries[value.ordinal])
 
-    override val difficultyLocked: Boolean get() = read { ui.isHardcore }
+    override val difficultyLocked: Boolean get() = read { ui.isHardcore || ui.isDebug }
+
+    override val gameRulesLocked: Boolean get() = read { ui.isDebug }
 
     override var allowCommands: Boolean
         get() = read { ui.isAllowCommands }
@@ -119,7 +154,11 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
     override val generateStructuresLocked: Boolean get() = read { ui.isDebug }
 
     private fun option(entry: WorldCreationUiState.WorldTypeEntry): WorldTypeOption {
+        //? if >= 1.21.11 {
         val id = entry.preset()?.unwrapKey()?.map { it.identifier().toString() }?.orElse(null) ?: "custom"
+        //?} else {
+        /*val id = entry.preset()?.unwrapKey()?.map { it.location().toString() }?.orElse(null) ?: "custom"
+        *///?}
         return WorldTypeOption(id, entry.describePreset().string)
     }
 
@@ -171,6 +210,7 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
     override fun cancel() = screen.popScreen()
 }
 
+//? if >= 1.21.11 {
 private class WorldRules26(private val ui: WorldCreationUiState) : WorldRules {
     private val copy: GameRules = ui.gameRules.copy(ui.settings.dataConfiguration().enabledFeatures())
     private val byId = LinkedHashMap<String, GameRule<Any>>()
@@ -210,15 +250,93 @@ private class WorldRules26(private val ui: WorldCreationUiState) : WorldRules {
 
     override fun apply() = ui.setGameRules(copy)
 }
+//?} else {
+/*private class WorldRules26(private val ui: WorldCreationUiState) : WorldRules {
+    //? if >= 1.21.4 {
+    private val copy: GameRules = ui.gameRules.copy(ui.settings.dataConfiguration().enabledFeatures())
+    //?} else {
+    /^private val copy: GameRules = ui.gameRules.copy()
+    ^///?}
+    private val toggles = HashMap<String, GameRules.Key<GameRules.BooleanValue>>()
+    private val numbers = HashMap<String, Pair<GameRules.Key<GameRules.IntegerValue>, GameRules.Type<GameRules.IntegerValue>>>()
+
+    override val rules: List<WorldRule>
+
+    init {
+        val found = ArrayList<WorldRule>()
+        fun add(key: GameRules.Key<*>, kind: WorldRuleKind, defaultValue: String) {
+            val description = Component.translatable(key.descriptionId + ".description")
+            found += WorldRule(
+                id = key.id,
+                label = Component.translatable(key.descriptionId).string,
+                description = if (ComponentUtils.isTranslationResolvable(description)) description.string else null,
+                category = Component.translatable(key.category.descriptionId).string,
+                kind = kind,
+                defaultValue = defaultValue,
+            )
+        }
+        val visitor = object : GameRules.GameRuleTypeVisitor {
+            override fun visitBoolean(key: GameRules.Key<GameRules.BooleanValue>, type: GameRules.Type<GameRules.BooleanValue>) {
+                toggles[key.id] = key
+                add(key, WorldRuleKind.Toggle, type.createRule().serialize())
+            }
+
+            override fun visitInteger(key: GameRules.Key<GameRules.IntegerValue>, type: GameRules.Type<GameRules.IntegerValue>) {
+                numbers[key.id] = key to type
+                add(key, WorldRuleKind.Number, type.createRule().serialize())
+            }
+        }
+        //? if >= 1.21.4 {
+        copy.visitGameRuleTypes(visitor)
+        //?} else {
+        /^GameRules.visitGameRuleTypes(visitor)
+        ^///?}
+        val categories = HashMap<String, String>()
+        (toggles.values + numbers.values.map { it.first }).forEach { categories[it.id] = it.category.descriptionId }
+        rules = found.sortedWith(compareBy({ categories[it.id] }, { it.label }))
+    }
+
+    override fun value(rule: WorldRule): String =
+        toggles[rule.id]?.let { copy.getRule(it).serialize() }
+            ?: numbers[rule.id]?.let { copy.getRule(it.first).serialize() }
+            ?: rule.defaultValue
+
+    override fun accepts(rule: WorldRule, value: String): Boolean {
+        if (rule.id in toggles) return value.toBooleanStrictOrNull() != null
+        val type = numbers[rule.id]?.second ?: return false
+        return type.createRule().tryDeserialize(value)
+    }
+
+    override fun set(rule: WorldRule, value: String): Boolean {
+        toggles[rule.id]?.let { key ->
+            val parsed = value.toBooleanStrictOrNull() ?: return false
+            copy.getRule(key).set(parsed, null)
+            return true
+        }
+        val key = numbers[rule.id]?.first ?: return false
+        return copy.getRule(key).tryDeserialize(value)
+    }
+
+    override fun apply() = ui.setGameRules(copy)
+}
+*///?}
 
 internal class EditWorldDraft26(private val screen: EditWorldScreen) : EditWorldDraft {
     private val mc = Minecraft.getInstance()
     private val access = screen as WorldEditScreenAccessor
     private val level = access.polyplusLevelAccess()
 
-    private val summary: LevelSummary? = runCatching { level.fixAndGetSummary() }.getOrNull()
+    init {
+        bindVanilla(screen)
+    }
 
-    override val name: String = access.polyplusNameEdit().value
+    //? if >= 26.1 {
+    private val summary: LevelSummary? = runCatching { level.fixAndGetSummary() }.getOrNull()
+    //?} else {
+    /*private val summary: LevelSummary? = runCatching { level.getSummary(level.getDataTag()) }.getOrNull()
+    *///?}
+
+    override val name: String = summary?.levelName?.takeIf { it.isNotEmpty() } ?: access.polyplusNameEdit().value
 
     override val folder: String get() = level.levelId
 
@@ -259,11 +377,15 @@ internal class EditWorldDraft26(private val screen: EditWorldScreen) : EditWorld
         level.iconFile.ifPresent { FileUtils.deleteQuietly(it.toFile()) }
     }
 
-    override fun openFolder() = Blaze3D.openPath(level.getLevelPath(LevelResource.ROOT))
+    override fun openFolder() = openPath(level.getLevelPath(LevelResource.ROOT))
 
     override fun backup() {
         val callback = access.polyplusCallback()
+        //? if >= 26.1 {
         EditWorldScreen.makeBackupAndShowToast(level).thenAcceptAsync({ callback.accept(!it) }, mc)
+        //?} else {
+        /*callback.accept(!EditWorldScreen.makeBackupAndShowToast(level))
+        *///?}
     }
 
     override fun delete() {
@@ -284,21 +406,30 @@ internal class EditWorldDraft26(private val screen: EditWorldScreen) : EditWorld
         } catch (_: IOException) {
             return
         }
-        Blaze3D.openPath(path)
+        openPath(path)
     }
 
     override fun optimize() {
         val callback = access.polyplusCallback()
+        //? if >= 26.1 {
+        val listener = BackupConfirmScreen.Listener { backup, eraseCache ->
+            EditWorldScreen.conditionallyMakeBackupAndShowToast(backup, level).thenAcceptAsync({
+                ClientPlatform.setScreen(OptimizeWorldScreen.create(mc, callback, mc.fixerUpper, level, eraseCache))
+            }, mc)
+        }
+        //?} else {
+        /*val listener = BackupConfirmScreen.Listener { backup, eraseCache ->
+            if (backup) EditWorldScreen.makeBackupAndShowToast(level)
+            ClientPlatform.setScreen(OptimizeWorldScreen.create(mc, callback, mc.fixerUpper, level, eraseCache))
+        }
+        *///?}
         ClientPlatform.setScreen(
             BackupConfirmScreen(
                 { ClientPlatform.setScreen(screen) },
-                { backup, eraseCache ->
-                    EditWorldScreen.conditionallyMakeBackupAndShowToast(backup, level).thenAcceptAsync({
-                        ClientPlatform.setScreen(OptimizeWorldScreen.create(mc, callback, mc.fixerUpper, level, eraseCache))
-                    }, mc)
-                },
+                listener,
                 Component.translatable("optimizeWorld.confirm.title"),
                 Component.translatable("optimizeWorld.confirm.description"),
+                //? if >= 1.21.4
                 Component.translatable("optimizeWorld.confirm.proceed"),
                 true,
             ),

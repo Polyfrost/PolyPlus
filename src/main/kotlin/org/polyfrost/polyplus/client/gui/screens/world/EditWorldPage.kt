@@ -37,26 +37,27 @@ import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 private const val MAX_NAME = 128
 
 class EditWorldShell(shell: ScreenShell, private val draft: EditWorldDraft) : WorldShellScreen(shell) {
+    private var name by mutableStateOf(draft.name)
+
     override val title: String get() = "Edit world"
 
     override fun back() = draft.cancel()
 
     @Composable
     override fun Body() {
-        EditWorldContent(draft)
+        EditWorldContent(draft, name) { name = it }
     }
 }
 
 @Composable
-fun EditWorldContent(draft: EditWorldDraft) {
-    var name by remember(draft) { mutableStateOf(draft.name) }
+fun EditWorldContent(draft: EditWorldDraft, name: String, onName: (String) -> Unit) {
     var hasIcon by remember(draft) { mutableStateOf(draft.hasIcon) }
     val icon = if (hasIcon) draft.icon else null
     val valid = name.isNotBlank()
     val save = { if (valid) draft.save(name) }
     WorldContentColumn {
         PanelPageColumn(Modifier.weight(1f)) {
-            EditHeader(draft, name, { name = it }, icon, valid, save)
+            EditHeader(draft, name, onName, icon, valid, save)
             SectionSpace()
             WorldBlock("Files") {
                 ActionGroup(

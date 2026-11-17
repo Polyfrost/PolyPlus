@@ -239,16 +239,17 @@ private fun ActionRow(action: WorldAction) {
 }
 
 @Composable
-internal fun StepBar(steps: List<String>, current: Int, onSelect: (Int) -> Unit) {
+internal fun StepBar(steps: List<String>, current: Int, onSelect: (Int) -> Unit, errors: Set<Int> = emptySet()) {
     val theme = OneConfigTheme.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         steps.forEachIndexed { index, label ->
             if (index > 0) Box(Modifier.weight(1f).height(1.dp).background(if (index <= current) OneConfigTheme.accent else theme.borderColor))
             val on = index == current
-            val done = index < current
+            val error = index in errors
+            val done = index < current && !error
             Row(
                 Modifier
-                    .selectableRow(on, { onSelect(index) }, "Step ${index + 1}, $label", OneConfigTheme.shape(10.dp), role = A11yRole.Tab)
+                    .selectableRow(on, { onSelect(index) }, if (error) "Step ${index + 1}, $label, has errors" else "Step ${index + 1}, $label", OneConfigTheme.shape(10.dp), role = A11yRole.Tab)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -259,11 +260,13 @@ internal fun StepBar(steps: List<String>, current: Int, onSelect: (Int) -> Unit)
                     Modifier
                         .size(24.dp)
                         .clip(circle)
-                        .background(if (on || done) OneConfigTheme.accent else Color.Transparent, circle)
-                        .border(1.dp, if (on || done) OneConfigTheme.accent else theme.borderColor, circle),
+                        .background(if (error) theme.error else if (on || done) OneConfigTheme.accent else Color.Transparent, circle)
+                        .border(1.dp, if (error) theme.error else if (on || done) OneConfigTheme.accent else theme.borderColor, circle),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (done) {
+                    if (error) {
+                        LobbyIcon("alert-triangle", ink, 14.dp)
+                    } else if (done) {
                         LobbyIcon("check", ink, 14.dp)
                     } else {
                         Text(
@@ -277,7 +280,7 @@ internal fun StepBar(steps: List<String>, current: Int, onSelect: (Int) -> Unit)
                 }
                 Text(
                     label,
-                    color = if (on) theme.textColor else theme.textColorSecondary,
+                    color = if (error) theme.error else if (on) theme.textColor else theme.textColorSecondary,
                     style = if (on) theme.typography.bodyMedium else theme.typography.body,
                     maxLines = 1,
                     softWrap = false,
