@@ -154,6 +154,7 @@ import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.stats.PlaySessions
+import org.polyfrost.polyplus.client.status.StatusPage
 import org.polyfrost.polyplus.client.utils.MacSafeArea
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.LinkedModMenus
@@ -502,6 +503,7 @@ private const val INVITE_PENDING = "pending"
 private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
     Row(Modifier.tourAnchor(lobby.anchors, TourAnchor.Tools).a11yRegion(A11yRegion.Tools), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val mc = Minecraft.getInstance()
+        ServiceStatusButton()
         NavIconButton(SOCIAL_ASSETS + "discord.svg", "Join our Discord", { ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL) })
         NotificationsButton()
         ModMenuSlot(screen)
@@ -519,6 +521,14 @@ private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
         if (!ClientPlatform.isMac) NavIconButton("maximise", "Toggle fullscreen", ::toggleFullscreen)
         QuitButton()
     }
+}
+
+@Composable
+private fun ServiceStatusButton() {
+    val status by StatusPage.status.collectAsState()
+    val current = status?.takeUnless { it.operational } ?: return
+    val tint = if (current.maintenance) OneConfigTheme.current.warning else KitDangerColor
+    NavIconButton("alert-circle", "${current.summary()}. Open status page", { ClientPlatform.openUri(StatusPage.PAGE_URL) }, tint = tint)
 }
 
 internal val NavButtonSize = 34.dp

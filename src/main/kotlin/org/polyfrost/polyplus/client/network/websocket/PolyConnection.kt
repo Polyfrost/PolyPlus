@@ -17,6 +17,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.reconnectDelay
 import org.polyfrost.polyplus.client.ping.PartyPings
+import org.polyfrost.polyplus.client.status.StatusPage
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.events.WebSocketMessage
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -305,7 +306,7 @@ object PolyConnection {
         disconnectNotified = true
         val reason = error?.message?.let { ": $it" } ?: "."
         runCatching {
-            Notifications.error("PolyPlus", "Lost connection to PolyPlus$reason Reconnecting...")
+            Notifications.error("PolyPlus", "Lost connection to PolyPlus$reason Reconnecting...${StatusPage.disconnectHint()}")
         }.onFailure { LOGGER.error("Failed to show disconnect notification", it) }
     }
 

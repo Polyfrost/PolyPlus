@@ -62,6 +62,7 @@ import org.polyfrost.polyplus.client.social.SessionsRepository
 import org.polyfrost.polyplus.client.party.Parties
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.stats.PlaySessions
+import org.polyfrost.polyplus.client.status.StatusPage
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -204,6 +205,7 @@ object PolyPlusClient {
         step("login gate") { MinecraftLoginGate.register() }
         step("session refresh") { SessionRefresh.register() }
         step("featured servers") { FeaturedServers.warmUp() }
+        step("status page") { StatusPage.start() }
         step("oneclient server api") { OneClientServerApi.initialize() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
