@@ -54,12 +54,12 @@ object MainMenuReplacement {
         PolyPlusConfig.save()
     }
 
-    fun returnToVanilla() {
+    fun useVanillaOffer() {
         PolyPlusConfig.brandedStartup = false
         PolyPlusPauseConfig.pauseScreenStyle = PauseScreenStyle.VANILLA
         PolyPlusPauseConfig.save()
         dismissVanillaOffer()
-        switchTo(MainMenuChoice.VANILLA)
+        switchTo(MainMenuChoice.POLYPLUS)
     }
 
     @JvmStatic

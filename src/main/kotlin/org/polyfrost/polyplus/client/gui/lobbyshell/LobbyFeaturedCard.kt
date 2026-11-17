@@ -84,10 +84,10 @@ private fun VanillaOfferCard(modifier: Modifier, onDismiss: () -> Unit) {
                 Text("Prefer vanilla Minecraft?", Modifier.weight(1f), style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 IconButton(icon = SOCIAL_ASSETS + "x-close.svg", contentDescription = "Dismiss", onClick = onDismiss, modifier = Modifier.size(28.dp), tooltipPlacement = TooltipPlacement.BelowStart)
             }
-            Text("Switch back to Minecraft's own main menu, pause screen and startup. To return, press the OneClient button in the top right of the title screen.", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small)
+            Text("Switch to the OneClient v1 main menu with Minecraft's own pause screen and startup. To return, press the OneClient logo in the top right of that menu.", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(text = "Keep OneClient", onClick = onDismiss, modifier = Modifier.weight(1f).height(CardActionHeight), style = ControlStyle.Tinted, shape = OneConfigTheme.shape(12.dp), size = ControlSize.Large, fillWidth = true, labelStyle = OfferActionLabel, glass = false)
-                TextButton(text = "Use vanilla Minecraft", onClick = MainMenuReplacement::returnToVanilla, modifier = Modifier.weight(1f).height(CardActionHeight), style = ControlStyle.Tinted, shape = OneConfigTheme.shape(12.dp), size = ControlSize.Large, fillWidth = true, labelStyle = OfferActionLabel, glass = false)
+                TextButton(text = "Use vanilla Minecraft", onClick = MainMenuReplacement::useVanillaOffer, modifier = Modifier.weight(1f).height(CardActionHeight), style = ControlStyle.Tinted, shape = OneConfigTheme.shape(12.dp), size = ControlSize.Large, fillWidth = true, labelStyle = OfferActionLabel, glass = false)
             }
         }
     }
