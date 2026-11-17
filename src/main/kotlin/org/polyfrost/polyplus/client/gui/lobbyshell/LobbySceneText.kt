@@ -47,9 +47,8 @@ internal fun sceneMood(entry: LobbySceneEntry): SceneMood = when {
 }
 
 internal fun sceneLine(entry: LobbySceneEntry): String {
-    if (entry.bundled) return sceneLook(entry)
-    val world = LobbySceneStore.worldName(entry).takeUnless { it.isBlank() || it.trim().equals(entry.label.trim(), ignoreCase = true) }
-    return listOfNotNull(world, sceneAge(entry.capturedAt), sceneLook(entry).takeIf { it.isNotBlank() }).joinToString(", ")
+    val world = if (entry.bundled) null else LobbySceneStore.worldName(entry).takeUnless { it.isBlank() || it.trim().equals(entry.label.trim(), ignoreCase = true) }
+    return listOfNotNull(world, scenePlace(entry).takeIf { it.isNotBlank() }, sceneTime(entry)).joinToString(" · ")
 }
 
 internal fun sceneLook(entry: LobbySceneEntry): String =

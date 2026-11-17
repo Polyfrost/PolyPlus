@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -69,7 +72,10 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Placement
 import org.polyfrost.polyplus.client.lobby.SceneMode
 
 internal const val AUTOMATIC_KEY = "automatic"
-private val HeaderHeight = 48.dp
+private val HeaderHeight = 54.dp
+private val SwatchWidth = 40.dp
+private val SwatchHeight = 30.dp
+private val SwatchBorder = Color.White.copy(alpha = 0.16f)
 private val StatusHeight = 20.dp
 private val WideGrid = 480.dp
 private const val WIDE_COLUMNS = 3
@@ -91,7 +97,8 @@ internal fun SceneCard(state: SceneBrowserState, entry: LobbySceneEntry?, canPic
         },
         Motion.finiteSpec(tween(SCENE_FADE_MILLIS)),
     )
-    Column(Modifier.fillMaxWidth().clip(shape).background(CardSurface).border(1.dp, border, shape)) {
+    val tint = if (entry == null) Modifier.background(OneConfigTheme.accent.copy(alpha = 0.07f)) else Modifier
+    Column(Modifier.fillMaxWidth().clip(shape).background(CardSurface).then(tint).border(1.dp, border, shape)) {
         val header = HeaderState(open, checked, inert)
         val click: () -> Unit = {
             when {
@@ -112,6 +119,20 @@ internal fun SceneCard(state: SceneBrowserState, entry: LobbySceneEntry?, canPic
     }
 }
 
+@Composable
+private fun SceneSwatch(entry: LobbySceneEntry?, inert: Boolean) {
+    val shape = OneConfigTheme.shape(6.dp)
+    val accent = OneConfigTheme.accent
+    val base = Modifier.size(SwatchWidth, SwatchHeight).alpha(if (inert) OneConfigTheme.current.disabledAlpha else 1f).clip(shape)
+    if (entry == null) {
+        Box(base.background(accent.copy(alpha = 0.18f)).border(1.dp, accent.copy(alpha = 0.5f), shape), contentAlignment = Alignment.Center) {
+            LobbyIcon("refresh-cw-01", accent, 14.dp)
+        }
+    } else {
+        Box(base.border(1.dp, SwatchBorder, shape)) { SceneMoodBackdrop(entry, Modifier.matchParentSize()) }
+    }
+}
+
 private class HeaderState(val open: Boolean, val checked: Boolean?, val inert: Boolean)
 
 @Composable
@@ -126,10 +147,11 @@ private fun SceneCardHeader(
     val theme = OneConfigTheme.current
     val problem = entry?.let(::sceneProblem)
     val title = entry?.label ?: "Automatic"
-    val detail = problem ?: entry?.let(::sceneLine) ?: "Best recent scene"
+    val detail = problem ?: entry?.let(::sceneLine)?.ifBlank { null } ?: if (entry == null) "Best recent scene" else "Polyfrost"
+    val age = entry?.takeUnless { it.bundled }?.let { sceneAge(it.capturedAt) }
     val checked = header.checked
     val turn by animateFloatAsState(if (header.open) 0f else 180f, Motion.finiteSpec(tween(SCENE_FADE_MILLIS)))
-    val narration = "$title, $detail"
+    val narration = listOfNotNull(title, detail, age).joinToString(", ")
     val click = when {
         header.inert -> Modifier
         checked != null -> Modifier.oneConfigClickable(narration, onClick, A11yRole.Checkbox, checked = checked, shape = shape, interactionSource = interaction)
@@ -140,16 +162,20 @@ private fun SceneCardHeader(
             .fillMaxWidth()
             .height(HeaderHeight)
             .then(click)
-            .padding(start = 14.dp, end = 6.dp),
+            .padding(start = 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (checked != null) Checkbox(checked, null)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = if (header.inert) theme.textColorSecondary else theme.textColor, style = theme.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-            Text(detail, color = if (problem != null) SocialDangerText else theme.mutedText, style = theme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        SceneSwatch(entry, header.inert)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(title, Modifier.weight(1f, fill = false), color = if (header.inert) theme.textColorSecondary else theme.textColor, style = theme.typography.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                if (entry?.favourite == true) FavouriteStar()
+            }
+            Text(detail, color = if (problem != null) SocialDangerText else theme.textColorSecondary, style = theme.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
-        if (entry?.favourite == true) FavouriteStar()
+        if (age != null) Text(age, color = theme.textColorSecondary, style = theme.typography.caption, maxLines = 1, softWrap = false)
         if (checked == null && !header.inert) ThemedIcon(SOCIAL_ASSETS + "chevron-up.svg", theme.textColorSecondary, 14.dp, Modifier.rotate(turn))
         trailing()
     }

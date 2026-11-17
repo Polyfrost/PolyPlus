@@ -31,10 +31,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
@@ -60,8 +57,10 @@ private val TileGap = 8.dp
 private val TileRadius = 11.dp
 private val TileLabelInset = 8.dp
 private val TileText = Color.White
-private val TileSubText = Color.White.copy(alpha = 0.7f)
+private val TileSubText = Color.White.copy(alpha = 0.82f)
 private val TileBorder = Color.White.copy(alpha = 0.16f)
+private val TileChip = Color.Black.copy(alpha = 0.42f)
+private val TileScrim = Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.68f))
 private val TileTextShadow = Shadow(Color(0x8C000000), Offset(0f, 1f), 4f)
 private val ServerIconSize = 28.dp
 private val ServerSelectWidth = 150.dp
@@ -199,6 +198,7 @@ internal fun SceneTile(
             .oneConfigClickable("${entry.label}, $line", onClick, A11yRole.RadioButton, enabled = enabled, selected = selected, shape = shape, interactionSource = hover.interactionSource),
     ) {
         SceneMoodBackdrop(entry, Modifier.matchParentSize())
+        Box(Modifier.matchParentSize().background(TileScrim))
         if (entry.favourite) Box(Modifier.align(Alignment.TopStart).padding(6.dp)) { FavouriteStar() }
         if (selected) {
             Box(
@@ -210,11 +210,28 @@ internal fun SceneTile(
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(TileLabelInset),
+                .padding(horizontal = TileLabelInset, vertical = 7.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            FitText(entry.label, TileText, typography.body.copy(fontWeight = FontWeight.SemiBold, shadow = TileTextShadow), 14.sp, 10.sp)
-            if (line.isNotBlank()) {
-                FitText(line, TileSubText, typography.caption.copy(shadow = TileTextShadow), typography.caption.fontSize, 9.sp)
+            Text(
+                entry.label,
+                color = TileText,
+                style = typography.label.copy(fontWeight = FontWeight.SemiBold, shadow = TileTextShadow),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    tilePlace(entry),
+                    Modifier.weight(1f),
+                    color = TileSubText,
+                    style = typography.caption.copy(shadow = TileTextShadow),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                )
+                if (!entry.bundled) shortAge(entry.capturedAt)?.let { AgeChip(it) }
             }
         }
         Box(Modifier.matchParentSize().border(if (selected) 2.dp else 1.dp, border, shape))
@@ -285,16 +302,23 @@ private fun ServerSceneRow(lobby: LobbyShell, entry: ServerEntry, options: List<
     }
 }
 
+private fun tilePlace(entry: LobbySceneEntry): String =
+    scenePlace(entry).ifBlank { if (entry.bundled) "Polyfrost" else LobbySceneStore.worldName(entry) }
+
 @Composable
-private fun FitText(text: String, color: Color, style: TextStyle, max: TextUnit, min: TextUnit) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val measurer = rememberTextMeasurer()
-        val width = constraints.maxWidth
-        val size = remember(text, width, style, max, min) {
-            var candidate = max.value
-            while (candidate > min.value && measurer.measure(text, style.copy(fontSize = candidate.sp), maxLines = 1, softWrap = false).size.width > width) candidate -= 0.5f
-            candidate.coerceAtLeast(min.value).sp
-        }
-        Text(text, color = color, style = style.copy(fontSize = size), maxLines = 2, overflow = TextOverflow.Ellipsis)
+private fun AgeChip(text: String) {
+    Box(
+        Modifier
+            .clip(OneConfigTheme.shape(4.dp))
+            .background(TileChip)
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+    ) {
+        Text(
+            text,
+            color = TileText,
+            style = OneConfigTheme.current.typography.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
