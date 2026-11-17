@@ -54,6 +54,18 @@ object PolyPlusScreensConfig : Config(
     *///?}
     var customRealms = true
 
+    @JvmStatic
+    //? if = 1.8.9 {
+    /*@Switch(
+        title = "Modern Options layout",
+        description = "Lays out the vanilla Options screen like newer versions do. Turn it off to keep it centered like 1.8.9.",
+        subcategory = "Screens",
+    )
+    *///?} else {
+    @Include
+    //?}
+    var modernOptionsLayout = true
+
     @JvmStatic @Include
     var onboardingAsked = false
 

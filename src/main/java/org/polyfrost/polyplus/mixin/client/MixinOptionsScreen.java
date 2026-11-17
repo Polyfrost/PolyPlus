@@ -5,6 +5,7 @@ package org.polyfrost.polyplus.mixin.client;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.menu.options.OptionsScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import org.polyfrost.polyplus.client.PolyPlusScreensConfig;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,11 +37,12 @@ public abstract class MixinOptionsScreen extends Screen {
 
     @ModifyExpressionValue(method = "render", at = @At(value = "CONSTANT", args = "intValue=15"))
     private int polyplus$modernTitleY(int y) {
-        return polyplus$TITLE_Y;
+        return PolyPlusScreensConfig.getModernOptionsLayout() ? polyplus$TITLE_Y : y;
     }
 
     @Inject(method = "init", at = @At("RETURN"))
     private void polyplus$removeDeadSettings(CallbackInfo ci) {
+        if (!PolyPlusScreensConfig.getModernOptionsLayout()) return;
         for (int id : polyplus$REMOVED_BUTTONS) {
             for (int i = 0; i < this.buttons.size(); i++) {
                 if (this.buttons.get(i).id == id) {
