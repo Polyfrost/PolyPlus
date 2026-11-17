@@ -137,6 +137,7 @@ import com.mojang.blaze3d.textures.GpuTexture
 //? if = 1.21.8 {
 /*import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRenderState
+import net.minecraft.world.entity.player.PlayerModelPart as SkinLayer
 *///?}
 
 //? if < 1.21.10 {
@@ -147,11 +148,13 @@ import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRen
 /*import net.minecraft.client.renderer.entity.player.PlayerRenderer
 import net.minecraft.client.renderer.entity.state.PlayerRenderState
 import net.minecraft.resources.Identifier
+import net.minecraft.world.entity.player.PlayerModelPart
 import org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAccessor
 *///?}
 
 //? if < 1.21.8 {
-/*import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
+/*import net.minecraft.world.entity.HumanoidArm
+import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 *///?}
 
 //? if = 1.21.5 {
@@ -669,7 +672,9 @@ object PlayerPreviewRenderer {
         setupUiLighting(mc)
         submitPreviewFrame(mc, state, source, pose, yawDeg)
     }
+    //?}
 
+    //? if >= 1.21.8 {
     private fun applyLocalSkinOptions(mc: Minecraft, state: AvatarRenderState, source: PlayerPreviewSource) {
         if (source != PlayerPreviewSource.LocalLive) return
         val options = mc.options
@@ -680,7 +685,9 @@ object PlayerPreviewRenderer {
         state.showLeftPants = options.isModelPartEnabled(SkinLayer.LEFT_PANTS_LEG)
         state.showRightPants = options.isModelPartEnabled(SkinLayer.RIGHT_PANTS_LEG)
         state.showCape = state.showCape && options.isModelPartEnabled(SkinLayer.CAPE)
+        //? if >= 1.21.10 {
         state.mainArm = options.mainHand().get()
+        //?}
     }
     //?}
 
@@ -709,7 +716,7 @@ object PlayerPreviewRenderer {
         state.id = PREVIEW_ENTITY_ID
         if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
         if (hidesCape(source)) state.showCape = false
-        //? if >= 1.21.10 {
+        //? if >= 1.21.8 {
         applyLocalSkinOptions(mc, state, source)
         //?}
         state.bodyRot = yawDeg
@@ -1022,11 +1029,15 @@ object PlayerPreviewRenderer {
 
     private class PreviewRemotePlayer(level: ClientLevel, profile: GameProfile) : RemotePlayer(level, profile) {
         @JvmField var skinOverride: PlayerSkin? = null
+        @JvmField var localOptions: Boolean = false
         override fun getSkin(): PlayerSkin = skinOverride ?: DefaultPlayerSkin.get(uuid)
         override fun isSpectator(): Boolean = false
         override fun isCreative(): Boolean = false
         override fun getPlayerInfo(): PlayerInfo? = null
-        override fun isModelPartShown(part: PlayerModelPart): Boolean = true
+        override fun isModelPartShown(part: PlayerModelPart): Boolean =
+            !localOptions || Minecraft.getInstance().options.isModelPartEnabled(part)
+        override fun getMainArm(): HumanoidArm =
+            if (localOptions) Minecraft.getInstance().options.mainHand().get() else HumanoidArm.RIGHT
     }
 
     private var standIn: PreviewStandIn? = null
@@ -1256,6 +1267,19 @@ object PlayerPreviewRenderer {
         boundingBoxHeight = 1.8f
         ageInTicks = previewTicks()
     }
+
+    private fun applyLegacySkinOptions(mc: Minecraft, state: PlayerRenderState, source: PlayerPreviewSource) {
+        if (source != PlayerPreviewSource.LocalLive) return
+        val options = mc.options
+        state.showHat = options.isModelPartEnabled(PlayerModelPart.HAT)
+        state.showJacket = options.isModelPartEnabled(PlayerModelPart.JACKET)
+        state.showLeftSleeve = options.isModelPartEnabled(PlayerModelPart.LEFT_SLEEVE)
+        state.showRightSleeve = options.isModelPartEnabled(PlayerModelPart.RIGHT_SLEEVE)
+        state.showLeftPants = options.isModelPartEnabled(PlayerModelPart.LEFT_PANTS_LEG)
+        state.showRightPants = options.isModelPartEnabled(PlayerModelPart.RIGHT_PANTS_LEG)
+        state.showCape = state.showCape && options.isModelPartEnabled(PlayerModelPart.CAPE)
+        state.mainArm = options.mainHand().get()
+    }
     //?}
 
     fun renderInto(fbo: RenderTarget, source: PlayerPreviewSource, yawDeg: Float, w: Int, h: Int, modelScale: Float, verticalAnchor: Float, cameraTiltDeg: Float = 0f, lights: PreviewLights? = null): Boolean {
@@ -1274,6 +1298,7 @@ object PlayerPreviewRenderer {
         bindTint(LEGACY_PREVIEW_ENTITY_ID, source)
         val state = legacyState(skin, yawDeg)
         if (hidesCape(source)) state.showCape = false
+        applyLegacySkinOptions(mc, state, source)
         val renderer = legacyPlayerRenderer(mc, skin) ?: return false
         //?}
         //? if < 1.21.4 {
@@ -1285,6 +1310,7 @@ object PlayerPreviewRenderer {
         val cape = capeOverride(source)
             ?: CosmeticAssetCache.getCapeTexture(mc.gameProfile.id)
         player.skinOverride = if (hidesCape(source)) withoutCape(skin) else cape?.let { withCape(skin, it) } ?: skin
+        player.localOptions = source == PlayerPreviewSource.LocalLive
         bindLegacyEquipment(player, source)
         player.setYRot(0f); player.yRotO = 0f
         player.yBodyRot = yawDeg; player.yBodyRotO = yawDeg
