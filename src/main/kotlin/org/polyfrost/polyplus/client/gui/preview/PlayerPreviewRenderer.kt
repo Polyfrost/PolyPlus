@@ -65,6 +65,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.client.renderer.entity.state.AvatarRenderState
 import net.minecraft.core.ClientAsset
 import net.minecraft.world.entity.HumanoidArm
+import net.minecraft.world.entity.player.PlayerModelPart as SkinLayer
 import net.minecraft.world.entity.player.PlayerSkin
 //?}
 
@@ -653,6 +654,7 @@ object PlayerPreviewRenderer {
         state.showRightPants = true
         state.showCape = (source !is PlayerPreviewSource.Override || equipmentByEntityId[player.id]?.get(BodySlot.Backpack) == null) &&
             !hidesCape(source)
+        applyLocalSkinOptions(mc, state, source)
         previewSkin(source)?.let { state.skin = LocalSkinOverride.withSkin(state.skin, it) }
         capeOverride(source)?.let { state.skin = withCape(state.skin, it) }
         state.bodyRot = yawDeg
@@ -666,6 +668,19 @@ object PlayerPreviewRenderer {
         val pose = previewPose(w, h, modelScale, verticalAnchor, bbH)
         setupUiLighting(mc)
         submitPreviewFrame(mc, state, source, pose, yawDeg)
+    }
+
+    private fun applyLocalSkinOptions(mc: Minecraft, state: AvatarRenderState, source: PlayerPreviewSource) {
+        if (source != PlayerPreviewSource.LocalLive) return
+        val options = mc.options
+        state.showHat = options.isModelPartEnabled(SkinLayer.HAT)
+        state.showJacket = options.isModelPartEnabled(SkinLayer.JACKET)
+        state.showLeftSleeve = options.isModelPartEnabled(SkinLayer.LEFT_SLEEVE)
+        state.showRightSleeve = options.isModelPartEnabled(SkinLayer.RIGHT_SLEEVE)
+        state.showLeftPants = options.isModelPartEnabled(SkinLayer.LEFT_PANTS_LEG)
+        state.showRightPants = options.isModelPartEnabled(SkinLayer.RIGHT_PANTS_LEG)
+        state.showCape = state.showCape && options.isModelPartEnabled(SkinLayer.CAPE)
+        state.mainArm = options.mainHand().get()
     }
     //?}
 
@@ -694,6 +709,9 @@ object PlayerPreviewRenderer {
         state.id = PREVIEW_ENTITY_ID
         if (source is PlayerPreviewSource.Override && equipment.get(BodySlot.Backpack) != null) state.showCape = false
         if (hidesCape(source)) state.showCape = false
+        //? if >= 1.21.10 {
+        applyLocalSkinOptions(mc, state, source)
+        //?}
         state.bodyRot = yawDeg
         state.boundingBoxWidth = PLAYER_BB_WIDTH
         state.boundingBoxHeight = PLAYER_BB_HEIGHT
@@ -1414,6 +1432,7 @@ object PlayerPreviewRenderer {
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import net.minecraft.client.Minecraft
 import net.minecraft.client.render.model.Model
+import net.minecraft.client.render.model.PlayerModelPart
 import net.minecraft.client.render.model.entity.PlayerModel
 import net.minecraft.client.render.pipeline.RenderTarget
 import net.minecraft.client.render.platform.GLX
@@ -1630,14 +1649,20 @@ object PlayerPreviewRenderer {
         GlStateManager.enableBlend()
         GlStateManager.blendFuncSeparate(770, 771, 1, 771)
         mc.textureManager.bind(skin)
-        for (part in listOf(
-            model.head, model.body, model.rightArm, model.leftArm, model.rightLeg, model.leftLeg,
-            model.hat, model.leftPants, model.rightPants, model.leftSleeve, model.rightSleeve, model.jacket,
-        )) {
+        val shown = localModelParts(mc, source)
+        val layers = listOf(
+            PlayerModelPart.HAT to model.hat,
+            PlayerModelPart.LEFT_PANTS_LEG to model.leftPants,
+            PlayerModelPart.RIGHT_PANTS_LEG to model.rightPants,
+            PlayerModelPart.LEFT_SLEEVE to model.leftSleeve,
+            PlayerModelPart.RIGHT_SLEEVE to model.rightSleeve,
+            PlayerModelPart.JACKET to model.jacket,
+        ).filter { (layer, _) -> shown == null || layer in shown }.map { it.second }
+        for (part in listOf(model.head, model.body, model.rightArm, model.leftArm, model.rightLeg, model.leftLeg) + layers) {
             part.render(MODEL_SCALE)
         }
 
-        capeFor(mc, source)?.let { cape ->
+        capeFor(mc, source)?.takeIf { shown == null || PlayerModelPart.CAPE in shown }?.let { cape ->
             mc.textureManager.bind(cape)
             GlStateManager.pushMatrix()
             GlStateManager.translatef(0f, 0f, 0.125f)
@@ -1779,6 +1804,9 @@ object PlayerPreviewRenderer {
         val id = ClientPlatform.localPlayerUuid()
         return DefaultSkinUtils.getDefaultSkin(id) to (DefaultSkinUtils.getDefaultModelType(id) == "slim")
     }
+
+    private fun localModelParts(mc: Minecraft, source: PlayerPreviewSource): Set<PlayerModelPart>? =
+        if (source == PlayerPreviewSource.LocalLive) mc.options.getPlayerModelParts() else null
 
     private fun previewSkin(source: PlayerPreviewSource): PreviewSkin? =
         (source as? PlayerPreviewSource.Override)?.skin ?: LocalSkinOverride.forPlayer(ClientPlatform.localPlayerUuid())
