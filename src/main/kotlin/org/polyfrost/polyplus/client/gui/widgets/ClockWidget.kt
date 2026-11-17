@@ -73,7 +73,6 @@ private val SKY_HEIGHT = 50.dp
 private val SKY_TOP = 12.dp
 private val SKY_END = 12.dp
 private val SKY_GAP = 8.dp
-private val SKY_DOT = 1.1.dp
 private val SKY_HORIZON = 1.dp
 private val SUN_RADIUS = 5.dp
 private val SUN_HALO = 13.dp
@@ -82,7 +81,6 @@ private val STAR_RADIUS = 0.9.dp
 private val CLOUD_PUFF = 4.dp
 private val SECONDS_THICKNESS = 2.dp
 private val SECONDS_BOTTOM = 5.dp
-private const val SKY_DOTS = 15
 private const val CLOCK_FADE_MILLIS = 180
 private const val CLOCK_DATE_SKELETON = "MMMEd"
 private val WEEKDAY = Regex("([Ec])\\1*[.]?")
@@ -102,8 +100,6 @@ private const val WASH_TAIL_DAY = 0.14f
 private const val STAR_ALPHA = 0.7f
 private const val CLOUD_ALPHA = 0.38f
 private const val WASH_SHIFT_MAX = 0.55f
-private const val ARC_TRACK_ALPHA = 0.16f
-private const val ARC_TRAVELED_ALPHA = 0.34f
 private const val HORIZON_ALPHA = 0.1f
 private const val HALO_ALPHA = 0.38f
 private const val SECONDS_TRACK_ALPHA = 0.06f
@@ -335,30 +331,32 @@ private fun SkyArc(progress: Float, day: Boolean, glyph: Color, ink: Color, nigh
             val angle = PI * t
             return Offset(cx - rx * cos(angle).toFloat(), horizon - ry * sin(angle).toFloat())
         }
-        if (night > 0f) {
-            val star = glyph.copy(alpha = STAR_ALPHA * night)
+        val starlight = ((night - 0.5f) * 2f).coerceIn(0f, 1f)
+        if (starlight > 0f) {
+            val star = glyph.copy(alpha = STAR_ALPHA * starlight)
             STARS.forEach { drawCircle(star, STAR_RADIUS.toPx() * it.scale, Offset(it.at.x * size.width, it.at.y * size.height + inset * 0.3f)) }
         }
-        if (night < 1f) {
+        val cloudiness = ((0.5f - night) * 2f).coerceIn(0f, 1f)
+        if (cloudiness > 0f) {
             val puff = CLOUD_PUFF.toPx()
-            CLOUDS.forEach { cloud(Offset(it.x * size.width, it.y * size.height), puff, Color.White.copy(alpha = CLOUD_ALPHA * (1f - night))) }
+            CLOUDS.forEach { cloud(Offset(it.x * size.width, it.y * size.height), puff, Color.White.copy(alpha = CLOUD_ALPHA * cloudiness)) }
         }
         drawLine(ink.copy(alpha = HORIZON_ALPHA), Offset(0f, horizon), Offset(size.width, horizon), SKY_HORIZON.toPx(), StrokeCap.Round)
-        val dot = SKY_DOT.toPx()
-        for (i in 0..SKY_DOTS) {
-            val t = i / SKY_DOTS.toFloat()
-            drawCircle(ink.copy(alpha = if (t <= progress) ARC_TRAVELED_ALPHA else ARC_TRACK_ALPHA), dot, point(t))
-        }
         val at = point(progress.coerceIn(0f, 1f))
         if (day) sun(at, glyph) else moon(at, glyph)
     }
 }
 
 private fun DrawScope.cloud(at: Offset, puff: Float, color: Color) {
+    val base = at.y + puff * 0.85f
+    val left = at.x - puff * 1.75f
+    val right = at.x + puff * 1.8f
     val shape = Path().apply {
-        addOval(Rect(at, puff))
-        addOval(Rect(Offset(at.x - puff * 0.95f, at.y + puff * 0.3f), puff * 0.7f))
-        addOval(Rect(Offset(at.x + puff * 1.0f, at.y + puff * 0.25f), puff * 0.78f))
+        moveTo(left + puff * 0.5f, base)
+        cubicTo(left - puff * 0.15f, base, left - puff * 0.05f, at.y - puff * 0.05f, at.x - puff * 0.85f, at.y - puff * 0.05f)
+        cubicTo(at.x - puff * 0.8f, at.y - puff * 1.25f, at.x + puff * 0.8f, at.y - puff * 1.25f, at.x + puff * 0.9f, at.y - puff * 0.1f)
+        cubicTo(right + puff * 0.1f, at.y - puff * 0.15f, right + puff * 0.2f, base, right - puff * 0.5f, base)
+        close()
     }
     drawPath(shape, color)
 }
