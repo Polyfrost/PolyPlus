@@ -25,7 +25,7 @@ object AmbienceQuiet {
             watching = watch
             if (watch) PauseEvergreenMedia.acquire() else PauseEvergreenMedia.release()
         }
-        val now = watching && PauseEvergreenMedia.playing()
+        val now = PolyPlusLobbyConfig.lobbyMusicMuted || watching && PauseEvergreenMedia.playing()
         if (now == quiet) return
         quiet = now
         runCatching { (UiSounds as Any as UiAmbienceAccess).`polyplus$setQuiet`(now) }

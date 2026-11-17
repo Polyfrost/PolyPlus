@@ -37,6 +37,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.oneconfig.internal.ui.sound.UiSounds
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import kotlin.math.roundToInt
@@ -49,12 +51,27 @@ private const val CLOSE_DELAY_MILLIS = 220L
 private const val SYNC_MILLIS = 300L
 private const val VOLUME_STEP = 5f
 
-private class MusicView(val music: LobbyMusic, val muted: Boolean, val volume: Float) {
+private class MusicView(val music: LobbyMusic, val muted: Boolean, val volume: Float, val ambience: Float, val ambienceOn: Boolean) {
     val silent: Boolean get() = muted || music == LobbyMusic.OFF
 }
 
 private fun readMusic(): MusicView =
-    MusicView(PolyPlusLobbyConfig.lobbyMusic, PolyPlusLobbyConfig.lobbyMusicMuted, PolyPlusLobbyConfig.lobbyMusicVolume)
+    MusicView(
+        PolyPlusLobbyConfig.lobbyMusic,
+        PolyPlusLobbyConfig.lobbyMusicMuted,
+        PolyPlusLobbyConfig.lobbyMusicVolume,
+        OneConfigConfig.uiAmbienceVolume,
+        OneConfigConfig.enableUIAmbience,
+    )
+
+private fun setAmbience(volume: Float) {
+    OneConfigConfig.uiAmbienceVolume = volume
+    UiSounds.refreshAmbience()
+}
+
+private fun saveAmbience() {
+    runCatching { OneConfigConfig.INSTANCE?.save() }
+}
 
 private fun toggleMusic() {
     if (PolyPlusLobbyConfig.lobbyMusic == LobbyMusic.OFF) {
@@ -129,11 +146,20 @@ internal fun LobbyMusicButton(lobby: LobbyShell, first: Boolean, last: Boolean) 
                         onVolume = {
                             dragging = true
                             PolyPlusLobbyConfig.lobbyMusicVolume = it
-                            view = MusicView(view.music, view.muted, it)
+                            view = MusicView(view.music, view.muted, it, view.ambience, view.ambienceOn)
                         },
                         onVolumeDone = {
                             dragging = false
                             PolyPlusLobbyConfig.save()
+                        },
+                        onAmbience = {
+                            dragging = true
+                            setAmbience(it)
+                            view = MusicView(view.music, view.muted, view.volume, it, view.ambienceOn)
+                        },
+                        onAmbienceDone = {
+                            dragging = false
+                            saveAmbience()
                         },
                         onSettings = settings,
                     )
@@ -149,9 +175,12 @@ private fun MusicPopover(
     modifier: Modifier,
     onVolume: (Float) -> Unit,
     onVolumeDone: () -> Unit,
+    onAmbience: (Float) -> Unit,
+    onAmbienceDone: () -> Unit,
     onSettings: () -> Unit,
 ) {
     var volume by remember { mutableFloatStateOf(view.volume) }
+    var ambience by remember { mutableFloatStateOf(view.ambience) }
     val mode = when {
         view.music == LobbyMusic.OFF -> "Off"
         view.muted -> "Muted"
@@ -170,7 +199,7 @@ private fun MusicPopover(
             Text(mode, Modifier.padding(start = 12.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         PanelSlider(
-            "Volume",
+            "Lobby music",
             volume,
             {
                 volume = it
@@ -179,6 +208,18 @@ private fun MusicPopover(
             onVolumeDone,
             step = VOLUME_STEP,
             enabled = !view.silent && view.music != LobbyMusic.MINECRAFT,
+            valueText = { "${it.roundToInt()}%" },
+        )
+        PanelSlider(
+            "OneConfig ambience",
+            ambience,
+            {
+                ambience = it
+                onAmbience(it)
+            },
+            onAmbienceDone,
+            step = VOLUME_STEP,
+            enabled = !view.muted && view.ambienceOn,
             valueText = { "${it.roundToInt()}%" },
         )
         LinkText("Music settings…", onSettings)

@@ -76,7 +76,7 @@ object PolyPlusLobbyConfig : Config(
     @JvmStatic
     @Switch(
         title = "Mute Lobby Music",
-        description = "Silence the lobby music without changing your track or volume.",
+        description = "Silence the lobby music and OneConfig's ambience without changing your track or volume.",
     )
     var lobbyMusicMuted = false
 
