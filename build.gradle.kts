@@ -531,7 +531,6 @@ tasks.withType<ProcessResources>().configureEach {
         if (isOrnithe) filter { line ->
             line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"")
                 .replace("\"java\": \">=21\"", "\"java\": \">=25\"")
-                .takeUnless { "\"rrls\"" in it }
         }
         expand(
             mapOf(
@@ -553,16 +552,6 @@ tasks.named<Jar>("sourcesJar") {
     exclude("**/*.png")
     exclude("assets/**")
     exclude("natives/**")
-}
-
-if (!isOrnithe) {
-    val rrlsStub = tasks.register<Jar>("rrlsStubJar") {
-        from(rootProject.file("src/rrls-stub"))
-        archiveFileName = "rrls-stub.jar"
-        destinationDirectory = layout.buildDirectory.dir("rrls-stub")
-    }
-    loomx.modJar.configure { NestJarsAction.addToTask(this, files(rrlsStub)) }
-    dependencies { runtimeOnly(files(rrlsStub)) }
 }
 
 tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach {

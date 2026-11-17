@@ -21,6 +21,9 @@
         ],
         "debugify": [
             "org.polyfrost.polyplus.compat.DebugifyBannableFixes"
+        ],
+        "mixinsquared": [
+            "org.polyfrost.polyplus.compat.RrlsMixinCanceller"
         ]
     },
     "languageAdapters": {
@@ -36,7 +39,6 @@
         "java": ">=21",
         "fabric-language-kotlin": ">=1.14.1",
         "oneconfigv1": ">=${oneconfig_version}",
-        "rrls": ">=2147483647",
         "compose-multiplatform": ">=1.0.6"
     },
     "breaks": {
