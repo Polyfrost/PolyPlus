@@ -250,7 +250,7 @@ object PauseMenuPanel {
 
     // the Compose pause menu mirrors a hidden vanilla one, which must not get these buttons too
     private fun vanillaMenuShown(): Boolean =
-        PolyPlusPauseConfig.pauseScreenStyle == PauseScreenStyle.VANILLA && ClientPlatform.currentScreen() !is OneClientPauseScreen
+        PauseRouter.shownStyle() == PauseScreenStyle.VANILLA && ClientPlatform.currentScreen() !is OneClientPauseScreen
 
     private const val CUSTOMIZE_LABEL = "Customize"
     private const val CUSTOMIZE_MARGIN = 4

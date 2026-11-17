@@ -222,6 +222,7 @@ class OneClientPauseScreen(
 
     internal fun restyle(next: PauseScreenStyle) {
         PolyPlusPauseConfig.pauseScreenStyle = next
+        PauseRouter.restyled(next)
         runCatching { PolyPlusPauseConfig.save() }
         if (next == PauseScreenStyle.VANILLA || next == style) return
         if (staged && next != PauseScreenStyle.STEP_BACK) PauseStage.onScreen(null)
@@ -266,6 +267,13 @@ object PauseRouter {
     private var wardrobePlayer: Any? = null
     private var wardrobeAsShown = false
     private var holding = false
+    private var shown: PauseScreenStyle? = null
+
+    fun shownStyle(): PauseScreenStyle = shown ?: PolyPlusPauseConfig.pauseScreenStyle
+
+    internal fun restyled(style: PauseScreenStyle) {
+        shown = style
+    }
 
     internal fun holdPause() {
         holding = PausePlatform.pausesWorld()
@@ -324,7 +332,8 @@ object PauseRouter {
             return screen
         }
         if (!showsMenu(screen) || ReplayProviders.inReplay) return screen
-        val style = PolyPlusPauseConfig.pauseScreenStyle
+        val style = (if (ClientPlatform.windowFocused()) null else PolyPlusPauseConfig.focusLossPauseStyle.style) ?: PolyPlusPauseConfig.pauseScreenStyle
+        shown = style
         return if (style == PauseScreenStyle.VANILLA) screen else OneClientPauseScreen(screen, style)
     }
 

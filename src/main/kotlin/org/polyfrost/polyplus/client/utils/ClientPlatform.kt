@@ -130,6 +130,14 @@ object ClientPlatform {
         return result.get()
     }
 
+    fun windowFocused(): Boolean = runCatching {
+        //? if > 1.8.9 {
+        Minecraft.getInstance().isWindowActive
+        //?} else {
+        /*Display.isActive()
+        *///?}
+    }.getOrDefault(true)
+
     fun currentScreen(): Screen? {
         val mc = Minecraft.getInstance()
         //? if >= 26.2 {

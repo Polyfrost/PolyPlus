@@ -6,6 +6,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
 import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.gui.pausescreen.FocusPauseStyle
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.gui.widgets.WidgetMigration
 
@@ -37,6 +38,15 @@ object PolyPlusPauseConfig : Config(
         subcategory = "Style",
     )
     var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK_FLAT
+
+    @JvmStatic
+    @Dropdown(
+        title = "Unfocused",
+        description = "Picks how the pause screen looks when the game pauses because you clicked out of the window.",
+        options = ["Same as above", "Full", "Spotlight", "Compact", "Vanilla"],
+        subcategory = "Style",
+    )
+    var focusLossPauseStyle: FocusPauseStyle = FocusPauseStyle.SAME
 
     @JvmStatic
     @Switch(
