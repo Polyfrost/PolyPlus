@@ -76,6 +76,7 @@ import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.registerPolyPlusPixelIcons
 import org.polyfrost.polyplus.client.gui.screens.settings.OneClientSettingsPages
+import org.polyfrost.polyplus.client.gui.screens.settings.ArgentumSettingsPages
 import org.polyfrost.polyplus.client.gui.screens.settings.SodiumSettingsPages
 import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
 
@@ -186,6 +187,7 @@ object PolyPlusClient {
         step("pixel icons") { registerPolyPlusPixelIcons() }
         step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
         step("sodium settings") { SodiumSettingsPages.register() }
+        step("argentum settings") { ArgentumSettingsPages.register() }
         step("oneclient settings") { OneClientSettingsPages.register() }
         step("widgets") { ShellWidgetRegistry.registerBuiltIns() }
         step("default mod order") { DefaultModOrder.initialize() }
