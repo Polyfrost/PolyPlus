@@ -10,6 +10,7 @@ import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import org.polyfrost.polyplus.libs.ktor.http.contentType
+import com.mojang.authlib.exceptions.InvalidCredentialsException
 import kotlinx.serialization.Serializable
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.metadata.ModOrigin
@@ -56,6 +57,13 @@ object PolyAuthorization {
     private var currentJobProfileId: UUID? = null
     private val modsReported = AtomicBoolean(false)
 
+    @Volatile
+    private var rejectedAccessToken: String? = null
+
+    class SessionRejectedException : Exception("Mojang rejected the current session")
+
+    fun isSessionRejected(): Boolean = rejectedAccessToken.let { it != null && it == localAccessToken() }
+
     suspend fun current(): String {
         requireOnlineServices()
 
@@ -97,6 +105,14 @@ object PolyAuthorization {
     private fun localProfileId(): UUID? =
         runCatching { Minecraft.getInstance().user.profileId }.getOrNull()
 
+    private fun localAccessToken(): String? = runCatching {
+        //? if > 1.8.9 {
+        Minecraft.getInstance().user.accessToken
+        //?} else {
+        /*Minecraft.getInstance().session.accessToken
+        *///?}
+    }.getOrNull()
+
     // Must be called with LOCK held
     private fun startAuthorization(profileId: UUID?): Deferred<Authorized> {
         lateinit var job: Deferred<Authorized>
@@ -133,10 +149,12 @@ object PolyAuthorization {
         val serverId = generateServerId()
         if (PolyPlusConfig.apiUrl != BackendUrl.LOCAL) {
             //? if > 1.8.9 {
-            if (authorizeSessionService(serverId, profileId, user.accessToken)) joined()
+            val accessToken = user.accessToken.orEmpty()
             //?} else {
-            /*if (authorizeSessionService(serverId, profileId, Minecraft.getInstance().session.accessToken)) joined()
+            /*val accessToken = localAccessToken().orEmpty()
             *///?}
+            if (accessToken == rejectedAccessToken) throw SessionRejectedException()
+            if (authorizeSessionService(serverId, profileId, accessToken)) joined()
         }
         try {
             login(serverId, profileId, playerName)
@@ -247,6 +265,10 @@ object PolyAuthorization {
             /*val mc = Minecraft.getInstance()
             mc.sessionService.joinServer(mc.session.profile, accessToken, serverId)
             *///?}
+        } catch (_: InvalidCredentialsException) {
+            LOGGER.warn("Mojang rejected this session (offline account or expired token); PolyPlus sign-in waits for a new one")
+            rejectedAccessToken = accessToken
+            throw SessionRejectedException()
         } catch (e: Exception) {
             LOGGER.error("Failed to authenticate with Mojang", e)
             return false

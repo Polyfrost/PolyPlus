@@ -9,6 +9,7 @@ import org.polyfrost.polyplus.libs.ktor.client.plugins.ServerResponseException
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import net.fabricmc.loader.api.FabricLoader
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.libs.sentry.Attachment
 import org.polyfrost.polyplus.libs.sentry.Hub
 import org.polyfrost.polyplus.libs.sentry.IHub
@@ -400,6 +401,7 @@ object PolyPlusSentry {
         val name = cause.javaClass.name
         if (name.contains("UserBannedException")) return@any true
         if (name.contains("AuthenticationUnavailable")) return@any true
+        if (cause is PolyAuthorization.SessionRejectedException) return@any true
         if (name.startsWith(ESSENTIAL_AUTH_EXCEPTIONS)) return@any true
         if (cause is ClientRequestException) {
             when (cause.response.status) {

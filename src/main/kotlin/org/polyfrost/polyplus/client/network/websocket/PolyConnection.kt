@@ -161,6 +161,12 @@ object PolyConnection {
                     notifyDisconnected(null)
                 } catch (e: CancellationException) {
                     throw e
+                } catch (_: PolyAuthorization.SessionRejectedException) {
+                    if (closing || !isActive) break
+                    while (isActive && PolyAuthorization.isSessionRejected()) delay(5_000L)
+                    attempt = 0
+                    tokenRefreshed = false
+                    continue
                 } catch (e: Exception) {
                     if (closing || !isActive) break
                     if (isAuthFailure(e)) {
