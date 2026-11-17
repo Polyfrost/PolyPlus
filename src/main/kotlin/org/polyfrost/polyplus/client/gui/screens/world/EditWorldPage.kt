@@ -131,7 +131,7 @@ private fun EditHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        WorldTile(name, icon, 88.dp, hardcore = draft.hardcore)
+        WorldTile(icon, 88.dp, hardcore = draft.hardcore)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextField(
                 value = name,

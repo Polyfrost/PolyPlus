@@ -28,16 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.components.ButtonDefaults
@@ -105,29 +102,21 @@ internal fun WorldBlock(
 }
 
 @Composable
-internal fun WorldTile(name: String, image: ImageBitmap?, size: Dp, modifier: Modifier = Modifier, hardcore: Boolean = false) {
+internal fun WorldTile(image: ImageBitmap?, size: Dp, modifier: Modifier = Modifier, hardcore: Boolean = false) {
     val theme = OneConfigTheme.current
     val shape = OneConfigTheme.shape(WorldKit.TileRadius)
-    val tint = if (hardcore) theme.error else OneConfigTheme.accent
     Box(
         modifier
             .size(size)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.85f), tint.copy(alpha = 0.35f))), shape)
-            .border(1.dp, theme.borderColor, shape),
+            .background(theme.componentBackground, shape)
+            .border(1.dp, if (hardcore) theme.error.copy(alpha = 0.6f) else theme.borderColor, shape),
         contentAlignment = Alignment.Center,
     ) {
         if (image != null) {
             Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
         } else {
-            val letter = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "W"
-            Text(
-                letter,
-                color = Color.White,
-                style = theme.typography.title.copy(fontSize = (size.value * 0.42f).sp, fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
-                softWrap = false,
-            )
+            LobbyIcon("minecraft-block", if (hardcore) theme.error else theme.mutedText, size * 0.42f)
         }
     }
 }

@@ -139,7 +139,7 @@ private fun WorldStep(draft: WorldDraft, onNext: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        WorldTile(draft.name, null, 72.dp, hardcore = draft.gameMode == WorldGameMode.Hardcore)
+        WorldTile(null, 72.dp, hardcore = draft.gameMode == WorldGameMode.Hardcore)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             TextField(
                 value = draft.name,
