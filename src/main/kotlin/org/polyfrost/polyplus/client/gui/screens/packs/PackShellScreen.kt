@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import com.mojang.blaze3d.platform.InputConstants
@@ -11,13 +10,11 @@ import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
-//?}
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import java.nio.file.Path
 //?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 internal class PackShellScreen(shell: ScreenShell, parent: Screen?, private val session: PackSession) : ShellScreen(shell, parent) {
     override val title: String get() = session.title
 
@@ -31,7 +28,7 @@ internal class PackShellScreen(shell: ScreenShell, parent: Screen?, private val 
 
     override fun back() = session.commit()
 
-    //? if >= 26.3 {
+    //? if > 1.8.9 {
     override fun onFilesDrop(files: List<Path>) = session.drop(files)
     //?}
 
@@ -46,4 +43,3 @@ internal class PackShellScreen(shell: ScreenShell, parent: Screen?, private val 
         }
     }
 }
-//?}

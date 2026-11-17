@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.IOException
 import java.nio.file.Files
@@ -16,9 +16,8 @@ import java.nio.file.Path
 import java.util.Locale
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
-//?}
-//? if >= 26.3 {
-import com.mojang.blaze3d.Blaze3D
+import java.util.function.Consumer
+//? if > 1.8.9 {
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.packs.PackSelectionModel
@@ -46,7 +45,6 @@ import java.nio.file.StandardCopyOption
 import javax.imageio.ImageIO
 *///?}
 
-//? if >= 26.3 || = 1.8.9 {
 
 internal enum class PackSide { Available, Selected }
 
@@ -75,7 +73,7 @@ internal enum class PackFilter(val label: String, val foldersOnly: Boolean) {
 internal class PackPlacement(val ids: List<String>, val anchor: String?, val positioned: Boolean)
 
 internal sealed interface PackDialog {
-    class Incompatible(val items: List<PackItem>, val placement: PackPlacement) : PackDialog
+    class Incompatible(val items: List<PackItem>, val placement: PackPlacement, val profile: PackProfile? = null) : PackDialog
 
     class Drop(val files: List<Path>) : PackDialog
 
@@ -93,14 +91,55 @@ internal sealed interface PackDialog {
 
     class DeletePacks(val items: List<PackItem>) : PackDialog
 
-    class Overwrite(val ids: List<String>, val target: String, val names: List<String>) : PackDialog
+    class Overwrite(val ids: List<String>, val target: String, val names: List<String>, val skipped: List<String>) : PackDialog
 
     class HardDelete(val paths: List<Path>) : PackDialog
 }
 
-//?}
+internal class PackMovePlan(val moves: List<Triple<String, Path, Path>>, val skipped: List<Path>) {
+    fun skippedNotice(): PackDialog = PackDialog.Notice(
+        if (skipped.size == 1) "Pack not moved" else "Some packs weren't moved",
+        "${PackSession.names(skipped)} ${if (skipped.size == 1) "has" else "have"} the same name as another pack going to that folder.",
+    )
 
-//? if >= 26.3 {
+    companion object {
+        fun isBlocked(move: Triple<String, Path, Path>): Boolean =
+            Files.exists(move.third, LinkOption.NOFOLLOW_LINKS) && !(PackFiles.isPack(move.second) && PackFiles.isPack(move.third))
+
+        fun blockedNotice(blocked: List<Triple<String, Path, Path>>): PackDialog = PackDialog.Notice(
+            if (blocked.size == 1) "Pack not moved" else "Some packs weren't moved",
+            blocked.joinToString(" ") {
+                val name = it.third.fileName.toString()
+                if (PackFiles.isPack(it.third)) "A pack named $name is already there." else "A folder named $name is already there."
+            },
+        )
+
+        fun of(ids: List<String>, packDir: Path, targetDir: Path): PackMovePlan =
+            of(ids, { id -> PackFolders.relative(id)?.let { runCatching { packDir.resolve(it) }.getOrNull() } }, targetDir)
+
+        fun of(ids: List<String>, sourceOf: (String) -> Path?, targetDir: Path): PackMovePlan {
+            val planned = ids.distinct().mapNotNull { id ->
+                val source = sourceOf(id) ?: return@mapNotNull null
+                if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) return@mapNotNull null
+                val destination = targetDir.resolve(source.fileName)
+                if (destination != source && destination.startsWith(source)) null else Triple(id, source, destination)
+            }
+            val claimed = HashSet<Path>()
+            val moves = ArrayList<Triple<String, Path, Path>>()
+            val skipped = ArrayList<Path>()
+            for (move in planned.sortedBy { it.second != it.third }) {
+                when {
+                    !claimed.add(move.third) -> skipped.add(move.second)
+                    move.second != move.third -> moves.add(move)
+                }
+            }
+            return PackMovePlan(moves, skipped)
+        }
+    }
+}
+
+
+//? if > 1.8.9 {
 internal class PackItem(
     val id: String,
     val title: String,
@@ -145,8 +184,12 @@ internal class PackSession(initial: PackSelectionScreen) {
     private val icons = ConcurrentHashMap<String, Optional<ImageBitmap>>()
     private val changedAt = ConcurrentHashMap<String, Long>()
     private var closed = false
+    private var removing = 0
+    private var commitPending = false
+    private var forceReload = false
     private var away = Away.None
     private var leftFrom: Any? = null
+    private val watcher = PackTreeWatcher(packDir)
 
     var host: () -> Screen? = { ClientPlatform.currentScreen() }
 
@@ -183,6 +226,10 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     val foldersEnabled: Boolean get() = resources
 
+    init {
+        prepare()
+    }
+
     fun offers(filter: PackFilter): Boolean = foldersEnabled || !filter.foldersOnly
 
     fun selected(): List<PackItem> = model.selected.toList().map(::item)
@@ -211,7 +258,9 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     fun answerIncompatible(dialog: PackDialog.Incompatible, accepted: Boolean) {
         this.dialog = null
-        if (accepted) place(dialog.placement)
+        if (!accepted) return
+        val profile = dialog.profile
+        if (profile != null) applyProfile(profile, true) else place(dialog.placement)
     }
 
     fun unselect(item: PackItem) = unselect(listOf(item.id))
@@ -228,18 +277,18 @@ internal class PackSession(initial: PackSelectionScreen) {
     }
 
     fun moveUp(item: PackItem) {
-        entry(item.id)?.takeIf { it.isSelected && it.canMoveUp() }?.moveUp()
+        entry(item.id)?.takeIf { it.isSelected && !it.isFixedPosition && it.canMoveUp() }?.moveUp()
         changed()
     }
 
     fun moveDown(item: PackItem) {
-        entry(item.id)?.takeIf { it.isSelected && it.canMoveDown() }?.moveDown()
+        entry(item.id)?.takeIf { it.isSelected && !it.isFixedPosition && it.canMoveDown() }?.moveDown()
         changed()
     }
 
     fun moveToTop(item: PackItem) {
         val current = selectedIds()
-        if (item.id !in current) return
+        if (item.id !in current || entry(item.id)?.isFixedPosition != false) return
         arrange(listOf(item.id) + current.filter { it != item.id })
         changed()
     }
@@ -247,7 +296,7 @@ internal class PackSession(initial: PackSelectionScreen) {
     fun moveToBottom(item: PackItem) {
         var steps = selectedIds().size
         while (steps-- > 0) {
-            val entry = entry(item.id)?.takeIf { it.isSelected && it.canMoveDown() } ?: break
+            val entry = entry(item.id)?.takeIf { it.isSelected && !it.isFixedPosition && it.canMoveDown() } ?: break
             entry.moveDown()
         }
         changed()
@@ -289,41 +338,65 @@ internal class PackSession(initial: PackSelectionScreen) {
     fun movePacks(ids: List<String>, target: String, overwrite: Boolean = false) {
         if (closed || !foldersEnabled) return
         dialog = null
-        val targetDir = (if (target.isEmpty()) packDir else folders.dir(target)) ?: return
-        val moves = ids.mapNotNull { id ->
-            val source = PackFolders.relative(id)?.let { runCatching { packDir.resolve(it) }.getOrNull() } ?: return@mapNotNull null
-            if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) return@mapNotNull null
-            val destination = targetDir.resolve(source.fileName)
-            if (destination == source || destination.startsWith(source)) null else Triple(id, source, destination)
-        }
-        if (moves.isEmpty()) return
-        val conflicts = moves.filter { Files.exists(it.third, LinkOption.NOFOLLOW_LINKS) }
-        if (conflicts.isNotEmpty() && !overwrite) {
-            dialog = PackDialog.Overwrite(ids, target, conflicts.map { it.third.fileName.toString() })
+        if (!PackFolders.canHoldPacks(target)) {
+            dialog = PackDialog.Notice("Pack not moved", PackFolders.TOO_DEEP)
             return
         }
+        val targetDir = (if (target.isEmpty()) packDir else folders.dir(target)) ?: return
+        val linked = ids.filter { folders.linkedFolderOf(it) != null }
+        val wanted = ids.filter { folders.linkedFolderOf(it) != target }
+        val released = if (target.isEmpty()) linked.filter { it in wanted } else emptyList()
+        val plan = PackMovePlan.of(wanted, ::fileOfId, targetDir)
+        val blocked = plan.moves.filter(PackMovePlan::isBlocked)
+        val moves = plan.moves.filter { it !in blocked }
+        if (moves.isEmpty()) {
+            if (released.isNotEmpty()) {
+                unlink(released)
+                refreshCaches()
+            }
+            if (blocked.isNotEmpty()) dialog = PackMovePlan.blockedNotice(blocked)
+            else if (plan.skipped.isNotEmpty()) dialog = plan.skippedNotice()
+            return
+        }
+        val conflicts = moves.filter { Files.exists(it.third, LinkOption.NOFOLLOW_LINKS) }
+        if (conflicts.isNotEmpty() && !overwrite) {
+            dialog = PackDialog.Overwrite(ids, target, conflicts.map { it.third.fileName.toString() }, plan.skipped.map { it.fileName.toString() })
+            return
+        }
+        val replace = conflicts.mapTo(HashSet()) { it.third }
+        val enabled = selectedIds().toSet()
         val renames = HashMap<String, String>()
         val failed = ArrayList<Path>()
         for ((id, source, destination) in moves) {
             try {
-                PackFiles.move(source, destination, overwrite)
+                PackFiles.move(source, destination, destination in replace)
                 renames[id] = idOf(destination)
+                if (destination in replace && idOf(destination) in enabled) forceReload = true
             } catch (_: Exception) {
                 failed.add(source)
             }
         }
+        unlink(released + linked.filter { it in renames })
         reloadKeeping(renames)
         if (failed.isNotEmpty()) {
             dialog = PackDialog.Notice(
                 if (failed.size == 1) "Couldn't move this pack" else "Couldn't move some packs",
                 "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.",
             )
+        } else if (blocked.isNotEmpty()) {
+            dialog = PackMovePlan.blockedNotice(blocked)
+        } else if (plan.skipped.isNotEmpty()) {
+            dialog = plan.skippedNotice()
         }
     }
 
     fun createFolder(parent: String, name: String, moving: List<String>) {
         dialog = null
         if (closed || !foldersEnabled) return
+        if (!PackFolders.canAddFolder(parent)) {
+            dialog = PackDialog.Notice("Folder not created", PackFolders.TOO_DEEP)
+            return
+        }
         val base = (if (parent.isEmpty()) packDir else folders.dir(parent)) ?: return
         val target = base.resolve(name.trim())
         try {
@@ -344,7 +417,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         val target = source.resolveSibling(name.trim())
         if (target == source) return
         val prefix = "file/$path/"
-        val affected = (selected() + available()).map { it.id }.filter { it.startsWith(prefix) }
+        val affected = PackBridges.withHidden(model) { (selected() + available()).filter { it.file != null }.map { it.id } }.filter { it.startsWith(prefix) }
         try {
             Files.move(source, target)
         } catch (_: Exception) {
@@ -391,31 +464,51 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     private fun remove(paths: List<Path>, trash: Boolean) {
         if (paths.isEmpty()) return
+        removing++
         busy = true
-        PackFiles.remove(paths, trash) { failed ->
-            busy = false
-            if (!closed) {
-                reloadKeeping(emptyMap())
-                if (failed.isNotEmpty()) {
-                    dialog = if (trash) {
-                        PackDialog.HardDelete(failed)
-                    } else {
-                        PackDialog.Notice("Couldn't delete", "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.")
-                    }
+        PackFiles.remove(paths, trash) done@{ failed ->
+            removing--
+            busy = removing > 0
+            if ((closed || commitPending) && failed.isNotEmpty()) PackDeleteNotice.show(failed)
+            if (closed) return@done
+            reloadKeeping(emptyMap())
+            if (commitPending) {
+                if (removing == 0) {
+                    commitPending = false
+                    commit()
+                }
+                return@done
+            }
+            if (failed.isNotEmpty()) {
+                dialog = if (trash) {
+                    PackDialog.HardDelete(failed)
+                } else {
+                    PackDialog.Notice("Couldn't delete", "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.")
                 }
             }
         }
     }
 
     private fun reloadKeeping(renames: Map<String, String>) {
-        val desired = selectedIds().map { renames[it] ?: it }
-        access.`polyplus$reload`()
-        for (id in desired) entry(id)?.takeIf { !it.isSelected && it.canSelect() }?.select()
-        val current = selectedIds()
-        arrange(desired.filter { it in current } + current.filter { it !in desired })
+        PackBridges.withHidden(model) {
+            val desired = selectedIds().map { renames[it] ?: it }
+            rescan()
+            for (id in desired) entry(id)?.takeIf { !it.isSelected && it.canSelect() }?.select()
+            val current = selectedIds()
+            arrange(desired.filter { it in current } + current.filter { it !in desired })
+        }
         picked = picked.mapTo(HashSet()) { renames[it] ?: it }
-        if (renames.isNotEmpty()) PackProfiles.rename(renames)
+        if (renames.isNotEmpty() && !PackProfiles.rename(renames)) PackProfileNotice.show()
+        if (!folders.remapLinks(renames)) linkNotice()
         refreshCaches()
+    }
+
+    private fun unlink(ids: List<String>) {
+        if (ids.isNotEmpty() && !folders.unlink(ids)) linkNotice()
+    }
+
+    private fun linkNotice() {
+        runCatching { Notifications.error("Couldn't update folders", "A Packed Packs folder list could not be written. Check free disk space and try again.") }
     }
 
     private fun idOf(path: Path): String = "file/" + packDir.relativize(path).toString().replace('\\', '/')
@@ -456,9 +549,15 @@ internal class PackSession(initial: PackSelectionScreen) {
     fun tick() {
         if (away != Away.None && ClientPlatform.currentScreen() === leftFrom) resume()
         if (closed) return
-        val pending = access.`polyplus$ticksToReload`() > 0L
+        if (access.`polyplus$ticksToReload`() == 1L) {
+            rescan()
+            refreshCaches()
+        }
+        if (away == Away.None && removing == 0 && watcher.poll()) {
+            rescan()
+            refreshCaches()
+        }
         screen.tick()
-        if (pending && access.`polyplus$ticksToReload`() == 0L) refreshCaches()
     }
 
     fun resume() {
@@ -468,13 +567,13 @@ internal class PackSession(initial: PackSelectionScreen) {
         when {
             closed || pending == Away.Rebuild -> rebuild()
             pending == Away.Reload -> {
-                access.`polyplus$reload`()
+                rescan()
                 refreshCaches()
             }
         }
     }
 
-    fun openFolder() = Blaze3D.openPath(packDir)
+    fun openFolder() = PackFiles.openPath(packDir)
 
     fun icon(item: PackItem): ImageBitmap? =
         icons.computeIfAbsent(item.id) { Optional.ofNullable(readIcon(item.pack)) }.orElse(null)
@@ -488,15 +587,26 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     fun commit() {
         if (closed) return
+        if (removing > 0) {
+            commitPending = true
+            dialog = null
+            return
+        }
         closed = true
+        watcher.close()
         dialog = null
-        if (resources && PackBridges.consumeForcedReload()) Minecraft.getInstance().options.resourcePacks.clear()
+        val forced = PackBridges.consumeForcedReload() || forceReload
+        if (resources && forced) Minecraft.getInstance().options.resourcePacks.clear()
         screen.onClose()
     }
 
     fun commitLater() {
         if (closed) return
+        //? if >= 1.21.4 {
         Minecraft.getInstance().schedule(Runnable { commit() })
+        //?} else {
+        /*Minecraft.getInstance().tell(Runnable { commit() })
+        *///?}
     }
 
     fun drop(files: List<Path>) {
@@ -513,23 +623,38 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     fun saveProfile(name: String) {
         dialog = null
-        PackProfiles.save(name, selected().filter { !it.fixed }.map { it.id })
+        val ids = PackBridges.withHidden(model) { selected().filter { !(it.required && it.fixed) }.map { it.id } }
+        if (!PackProfiles.save(name, ids)) PackProfileNotice.show()
         changed()
     }
 
     fun deleteProfile(profile: PackProfile, accepted: Boolean) {
         dialog = null
-        if (accepted) PackProfiles.delete(profile)
+        if (accepted && !PackProfiles.delete(profile)) PackProfileNotice.show()
         changed()
     }
 
-    fun applyProfile(profile: PackProfile) {
+    fun applyProfile(profile: PackProfile, confirmed: Boolean = false) {
         if (closed) return
+        PackBridges.withHidden(model) { applyProfileFully(profile, confirmed) }
+    }
+
+    private fun applyProfileFully(profile: PackProfile, confirmed: Boolean) {
         val known = profile.packs.filter { entry(it) != null }
+        if (!confirmed) {
+            val risky = known.mapNotNull { id -> entry(id)?.takeIf { !it.isSelected && it.canSelect() && !it.compatibility.isCompatible }?.let(::item) }
+            if (risky.isNotEmpty()) {
+                dialog = PackDialog.Incompatible(risky, PackPlacement(known, null, false), profile)
+                return
+            }
+        }
         unselect(selected().filter { it.id !in known && it.canUnselect }.map { it.id })
         for (id in known) entry(id)?.takeIf { it.canSelect() }?.select()
         val current = selectedIds()
-        arrange(known.filter { it in current } + current.filter { it !in known })
+        val order = known.distinct().filter { it in current && entry(it)?.isFixedPosition == false }
+        val rest = current.filter { it !in order && entry(it)?.isFixedPosition == false }
+        val flow = (order + rest).iterator()
+        arrange(current.map { id -> if (entry(id)?.isFixedPosition == false) flow.next() else id })
         clearPicks()
         changed()
         val missing = profile.packs.size - known.size
@@ -572,6 +697,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         leftFrom = null
         if (pending == Away.Rebuild) {
             closed = true
+            watcher.close()
             dialog = null
             runCatching { access.`polyplus$closeWatcher`() }
         } else {
@@ -589,7 +715,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         for (id in placement.ids) entry(id)?.takeIf { !it.isSelected && it.canSelect() }?.select()
         if (placement.positioned) {
             val current = selectedIds()
-            val moving = placement.ids.filter { it in current }
+            val moving = placement.ids.filter { it in current && entry(it)?.isFixedPosition == false }
             val rest = current.filter { it !in moving }
             val anchor = placement.anchor?.let { id -> if (id in moving) current.dropWhile { it != id }.firstOrNull { it !in moving } else id }
             val at = anchor?.let { rest.indexOf(it) }?.takeIf { it >= 0 } ?: rest.size
@@ -606,7 +732,7 @@ internal class PackSession(initial: PackSelectionScreen) {
                 val index = selectedIds().indexOf(id)
                 if (index <= target) break
                 val entry = entry(id) ?: break
-                if (!entry.canMoveUp()) break
+                if (entry.isFixedPosition || !entry.canMoveUp()) break
                 entry.moveUp()
             }
         }
@@ -617,16 +743,31 @@ internal class PackSession(initial: PackSelectionScreen) {
     private fun rebuild() {
         val args = modelAccess
         if (args == null) {
-            if (!closed) access.`polyplus$reload`()
+            if (!closed) rescan()
             refreshCaches()
             return
         }
         val title = screen.title
         if (!closed) runCatching { access.`polyplus$closeWatcher`() }
         screen = PackSelectionScreen(args.`polyplus$repository`(), args.`polyplus$output`(), packDir, title)
+        prepare()
         closed = false
         clearPicks()
         refreshCaches()
+    }
+
+    private fun prepare() {
+        //? if >= 1.21.10 {
+        modelAccess?.`polyplus$setOnListChanged`(Consumer {})
+        //?} else {
+        /*modelAccess?.`polyplus$setOnListChanged`(Runnable {})
+        *///?}
+        rescan()
+    }
+
+    private fun rescan() {
+        model.findNewPacks()
+        access.`polyplus$setTicksToReload`(0L)
     }
 
     private fun refreshCaches() {
@@ -659,7 +800,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         }
         if (candidates.isNotEmpty()) {
             PackSelectionScreenAccessor.`polyplus$copyPacks`(mc, candidates, packDir)
-            access.`polyplus$reload`()
+            rescan()
             refreshCaches()
         }
         if (leftover.isNotEmpty()) {
@@ -677,12 +818,13 @@ internal class PackSession(initial: PackSelectionScreen) {
     }
 
     private fun changed(item: PackItem): Long = changedAt.computeIfAbsent(item.id) {
-        val file = PackFolders.relative(item.id)?.let { runCatching { packDir.resolve(it) }.getOrNull() }
-        file?.let { runCatching { Files.getLastModifiedTime(it).toMillis() }.getOrNull() } ?: 0L
+        item.file?.let { runCatching { Files.getLastModifiedTime(it).toMillis() }.getOrNull() } ?: 0L
     }
 
     private fun item(entry: PackSelectionModel.Entry): PackItem {
         val compatibility = entry.compatibility
+        val pack = (entry as Any as PackEntryAccessor).`polyplus$pack`()
+        val file = fileOf(pack)
         return PackItem(
             id = entry.id,
             title = entry.title.string,
@@ -695,24 +837,41 @@ internal class PackSession(initial: PackSelectionScreen) {
             fixed = entry.isFixedPosition,
             canSelect = entry.canSelect(),
             canUnselect = entry.canUnselect(),
-            canMoveUp = entry.isSelected && entry.canMoveUp(),
-            canMoveDown = entry.isSelected && entry.canMoveDown(),
+            canMoveUp = entry.isSelected && !entry.isFixedPosition && entry.canMoveUp(),
+            canMoveDown = entry.isSelected && !entry.isFixedPosition && entry.canMoveDown(),
             server = entry.packSource == PackSource.SERVER,
-            folder = PackFolders.folderOf(entry.id),
-            file = fileOf(entry.id),
-            pack = (entry as Any as PackEntryAccessor).`polyplus$pack`(),
+            folder = if (resources) folders.linkedFolderOf(entry.id) ?: folderOf(file) else PackFolders.folderOf(entry.id),
+            file = file,
+            pack = pack,
             entry = entry,
         )
     }
 
-    private fun fileOf(id: String): Path? {
+    private fun fileOfId(id: String): Path? = entry(id)?.let { fileOf((it as Any as PackEntryAccessor).`polyplus$pack`()) }
+
+    private fun fileOf(pack: Pack): Path? {
         if (!resources) return null
-        val relative = PackFolders.relative(id) ?: return null
-        return runCatching { packDir.resolve(relative) }.getOrNull()?.takeIf { it.startsWith(packDir) }
+        val real = PackSources.pathOf(pack) ?: return null
+        return real.takeIf { relativeToPackDir(it) != null && Files.exists(it, LinkOption.NOFOLLOW_LINKS) }
+    }
+
+    private fun relativeToPackDir(path: Path): Path? = runCatching {
+        val base = packDir.toAbsolutePath().normalize()
+        val target = path.toAbsolutePath().normalize()
+        if (target != base && target.startsWith(base)) base.relativize(target) else null
+    }.getOrNull()
+
+    private fun folderOf(file: Path?): String {
+        val relative = file?.let(::relativeToPackDir) ?: return ""
+        return relative.parent?.toString()?.replace('\\', '/') ?: ""
     }
 
     private fun readIcon(pack: Pack): ImageBitmap? = runCatching {
+        //? if >= 26.3 {
         pack.openMetadata().use { resources ->
+        //?} else {
+        /*pack.open().use { resources ->
+        *///?}
             val supplier = resources.getRootResource("pack.png") ?: return@use null
             supplier.get().use { stream -> PolyBitmap.decode(stream.readBytes())?.asComposeImageBitmap() }
         }
@@ -790,6 +949,10 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     private val icons = ConcurrentHashMap<String, Optional<ImageBitmap>>()
     private val changedAt = ConcurrentHashMap<String, Long>()
     private var closed = false
+    private var removing = 0
+    private var commitPending = false
+    private var forceReload = false
+    private val watcher = PackTreeWatcher(repository.getDirectory().toPath())
 
     var host: () -> Screen? = { ClientPlatform.currentScreen() }
 
@@ -861,7 +1024,9 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     fun answerIncompatible(dialog: PackDialog.Incompatible, accepted: Boolean) {
         this.dialog = null
-        if (accepted) place(dialog.placement)
+        if (!accepted) return
+        val profile = dialog.profile
+        if (profile != null) applyProfile(profile, true) else place(dialog.placement)
     }
 
     fun unselect(item: PackItem) = unselect(listOf(item.id))
@@ -944,25 +1109,33 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     fun movePacks(ids: List<String>, target: String, overwrite: Boolean = false) {
         if (closed) return
         dialog = null
-        val targetDir = (if (target.isEmpty()) packDir else folders.dir(target)) ?: return
-        val moves = ids.mapNotNull { id ->
-            val source = PackFolders.relative(id)?.let { runCatching { packDir.resolve(it) }.getOrNull() } ?: return@mapNotNull null
-            if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) return@mapNotNull null
-            val destination = targetDir.resolve(source.fileName)
-            if (destination == source || destination.startsWith(source)) null else Triple(id, source, destination)
-        }
-        if (moves.isEmpty()) return
-        val conflicts = moves.filter { Files.exists(it.third, LinkOption.NOFOLLOW_LINKS) }
-        if (conflicts.isNotEmpty() && !overwrite) {
-            dialog = PackDialog.Overwrite(ids, target, conflicts.map { it.third.fileName.toString() })
+        if (!PackFolders.canHoldPacks(target)) {
+            dialog = PackDialog.Notice("Pack not moved", PackFolders.TOO_DEEP)
             return
         }
+        val targetDir = (if (target.isEmpty()) packDir else folders.dir(target)) ?: return
+        val plan = PackMovePlan.of(ids, packDir, targetDir)
+        val blocked = plan.moves.filter(PackMovePlan::isBlocked)
+        val moves = plan.moves.filter { it !in blocked }
+        if (moves.isEmpty()) {
+            if (blocked.isNotEmpty()) dialog = PackMovePlan.blockedNotice(blocked)
+            else if (plan.skipped.isNotEmpty()) dialog = plan.skippedNotice()
+            return
+        }
+        val conflicts = moves.filter { Files.exists(it.third, LinkOption.NOFOLLOW_LINKS) }
+        if (conflicts.isNotEmpty() && !overwrite) {
+            dialog = PackDialog.Overwrite(ids, target, conflicts.map { it.third.fileName.toString() }, plan.skipped.map { it.fileName.toString() })
+            return
+        }
+        val replace = conflicts.mapTo(HashSet()) { it.third }
+        val enabled = chosen.toSet()
         val renames = HashMap<String, String>()
         val failed = ArrayList<Path>()
         for ((id, source, destination) in moves) {
             try {
-                PackFiles.move(source, destination, overwrite)
+                PackFiles.move(source, destination, destination in replace)
                 renames[id] = idOf(destination)
+                if (destination in replace && idOf(destination) in enabled) forceReload = true
             } catch (_: Exception) {
                 failed.add(source)
             }
@@ -973,12 +1146,20 @@ internal class PackSession private constructor(private val exit: Screen?, privat
                 if (failed.size == 1) "Couldn't move this pack" else "Couldn't move some packs",
                 "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.",
             )
+        } else if (blocked.isNotEmpty()) {
+            dialog = PackMovePlan.blockedNotice(blocked)
+        } else if (plan.skipped.isNotEmpty()) {
+            dialog = plan.skippedNotice()
         }
     }
 
     fun createFolder(parent: String, name: String, moving: List<String>) {
         dialog = null
         if (closed) return
+        if (!PackFolders.canAddFolder(parent)) {
+            dialog = PackDialog.Notice("Folder not created", PackFolders.TOO_DEEP)
+            return
+        }
         val base = (if (parent.isEmpty()) packDir else folders.dir(parent)) ?: return
         val target = base.resolve(name.trim())
         try {
@@ -1078,7 +1259,9 @@ internal class PackSession private constructor(private val exit: Screen?, privat
         else -> null
     }
 
-    fun tick() {}
+    fun tick() {
+        if (!closed && removing == 0 && watcher.poll()) reloadKeeping(emptyMap())
+    }
 
     fun resume() {}
 
@@ -1096,7 +1279,13 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     fun commit() {
         if (closed) return
+        if (removing > 0) {
+            commitPending = true
+            dialog = null
+            return
+        }
         closed = true
+        watcher.close()
         dialog = null
         if (routed) ClientPlatform.setScreen(exit)
         nextTick { apply() }
@@ -1125,19 +1314,26 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     fun saveProfile(name: String) {
         dialog = null
-        PackProfiles.save(name, chosen.toList())
+        if (!PackProfiles.save(name, chosen.toList())) PackProfileNotice.show()
         changed()
     }
 
     fun deleteProfile(profile: PackProfile, accepted: Boolean) {
         dialog = null
-        if (accepted) PackProfiles.delete(profile)
+        if (accepted && !PackProfiles.delete(profile)) PackProfileNotice.show()
         changed()
     }
 
-    fun applyProfile(profile: PackProfile) {
+    fun applyProfile(profile: PackProfile, confirmed: Boolean = false) {
         if (closed) return
         val known = profile.packs.filter { it in packs }.distinct()
+        if (!confirmed) {
+            val risky = known.filter { it !in chosen }.mapNotNull(::item).filter { !it.compatible }
+            if (risky.isNotEmpty()) {
+                dialog = PackDialog.Incompatible(risky, PackPlacement(known, null, false), profile)
+                return
+            }
+        }
         chosen.clear()
         chosen.addAll(known)
         clearPicks()
@@ -1170,17 +1366,26 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     private fun remove(paths: List<Path>, trash: Boolean) {
         if (paths.isEmpty()) return
+        removing++
         busy = true
-        PackFiles.remove(paths, trash) { failed ->
-            busy = false
-            if (!closed) {
-                reloadKeeping(emptyMap())
-                if (failed.isNotEmpty()) {
-                    dialog = if (trash) {
-                        PackDialog.HardDelete(failed)
-                    } else {
-                        PackDialog.Notice("Couldn't delete", "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.")
-                    }
+        PackFiles.remove(paths, trash) done@{ failed ->
+            removing--
+            busy = removing > 0
+            if ((closed || commitPending) && failed.isNotEmpty()) PackDeleteNotice.show(failed)
+            if (closed) return@done
+            reloadKeeping(emptyMap())
+            if (commitPending) {
+                if (removing == 0) {
+                    commitPending = false
+                    commit()
+                }
+                return@done
+            }
+            if (failed.isNotEmpty()) {
+                dialog = if (trash) {
+                    PackDialog.HardDelete(failed)
+                } else {
+                    PackDialog.Notice("Couldn't delete", "${names(failed)} may be in use by the game. Turn it off, leave this page, then try again.")
                 }
             }
         }
@@ -1193,7 +1398,7 @@ internal class PackSession private constructor(private val exit: Screen?, privat
         chosen.clear()
         chosen.addAll(desired.filter { it in packs }.distinct())
         picked = picked.mapTo(HashSet()) { renames[it] ?: it }
-        if (renames.isNotEmpty()) PackProfiles.rename(renames)
+        if (renames.isNotEmpty() && !PackProfiles.rename(renames)) PackProfileNotice.show()
         refreshCaches()
     }
 
@@ -1223,7 +1428,7 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     private fun apply() {
         val order = chosen.mapNotNull { packs[it] }.reversed()
         val names = order.map { it.getName() }
-        if (names == initial) return
+        if (names == initial && !forceReload) return
         repository.setSelectedPacks(order)
         val options = mc.options
         options.resourcePacks.clear()
@@ -1380,7 +1585,6 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 }
 *///?}
 
-//? if >= 26.3 || = 1.8.9 {
 internal object PackParking {
     private var parked: PackSession? = null
 
@@ -1399,6 +1603,13 @@ internal object PackParking {
     }
 }
 
+internal object PackDeleteNotice {
+    fun show(failed: List<Path>) {
+        val message = "${PackSession.names(failed)} ${if (failed.size == 1) "is" else "are"} still in the pack folder. It may be in use by the game."
+        runCatching { Notifications.error("Couldn't delete", message) }
+    }
+}
+
 internal object PackDrops {
     var active: PackSession? = null
 
@@ -1408,4 +1619,3 @@ internal object PackDrops {
         return true
     }
 }
-//?}

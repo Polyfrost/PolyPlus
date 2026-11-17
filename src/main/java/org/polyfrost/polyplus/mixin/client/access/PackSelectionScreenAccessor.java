@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.access;
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -21,8 +21,8 @@ public interface PackSelectionScreenAccessor {
     @Accessor("ticksToReload")
     long polyplus$ticksToReload();
 
-    @Invoker("reload")
-    void polyplus$reload();
+    @Accessor("ticksToReload")
+    void polyplus$setTicksToReload(long ticks);
 
     @Invoker("closeWatcher")
     void polyplus$closeWatcher();

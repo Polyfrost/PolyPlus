@@ -2,19 +2,26 @@ package org.polyfrost.polyplus.client.gui.screens.packs
 
 //? if >= 26.3 {
 import com.mojang.blaze3d.Blaze3D
+//?}
+//? if >= 1.21.11 {
 import net.minecraft.client.Minecraft
 import net.minecraft.util.Util
-//?} elif = 1.8.9 {
+//?} elif > 1.8.9 {
+/*import net.minecraft.client.Minecraft
+import net.minecraft.Util
+*///?} else {
 /*import net.minecraft.client.Minecraft
 import net.minecraft.util.Utils
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.utils.v1.Multithreading
 *///?}
-//? if >= 26.3 || = 1.8.9 {
+import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.Comparator
 import java.util.Locale
 import java.util.concurrent.CompletableFuture
@@ -23,7 +30,7 @@ import java.util.concurrent.TimeUnit
 internal object PackFiles {
     private enum class Os { Windows, Mac, Linux, Other }
 
-    //? if >= 26.3 {
+    //? if > 1.8.9 {
     private val os: Os
         get() = when (Util.getPlatform()) {
             Util.OS.WINDOWS -> Os.Windows
@@ -34,8 +41,12 @@ internal object PackFiles {
 
     private fun onMain(action: () -> Unit) = Minecraft.getInstance().execute { action() }
 
+    //? if >= 26.3 {
     fun openPath(path: Path) = Blaze3D.openPath(path)
-    //?} elif = 1.8.9 {
+    //?} else {
+    /*fun openPath(path: Path) = Util.getPlatform().openPath(path)
+    *///?}
+    //?} else {
     /*private val os: Os
         get() = when (Utils.getOS()) {
             Utils.OS.WINDOWS -> Os.Windows
@@ -72,10 +83,37 @@ internal object PackFiles {
     fun isEmptyDir(dir: Path): Boolean =
         runCatching { Files.list(dir).use { !it.findAny().isPresent } }.getOrDefault(false)
 
+    fun isPack(path: Path): Boolean = when {
+        Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) -> Files.isRegularFile(path.resolve("pack.mcmeta"))
+        else -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+    }
+
     fun move(source: Path, target: Path, overwrite: Boolean) {
-        if (overwrite && Files.exists(target, LinkOption.NOFOLLOW_LINKS)) deleteHard(target)
         Files.createDirectories(target.parent)
-        Files.move(source, target)
+        if (!overwrite || !Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            Files.move(source, target)
+            return
+        }
+        if (!isPack(target) || !isPack(source)) throw IOException("${target.fileName} is not a pack")
+        if (!Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+            try {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                return
+            } catch (_: AtomicMoveNotSupportedException) {
+            }
+        }
+        val backup = (0..99).asSequence()
+            .map { target.resolveSibling(".polyplus-replaced-$it-${target.fileName}") }
+            .firstOrNull { !Files.exists(it, LinkOption.NOFOLLOW_LINKS) }
+            ?: throw IOException("No free name to set ${target.fileName} aside")
+        Files.move(target, backup)
+        try {
+            Files.move(source, target)
+        } catch (error: Exception) {
+            runCatching { Files.move(backup, target) }
+            throw error
+        }
+        runCatching { deleteHard(backup) }
     }
 
     fun deleteHard(path: Path) {
@@ -126,10 +164,9 @@ internal object PackFiles {
             else -> return false
         }
         return try {
-            val process = ProcessBuilder(command).redirectErrorStream(true).start()
-            process.inputStream.use { it.readAllBytes() }
+            val process = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(File(if (os == Os.Windows) "NUL" else "/dev/null")).start()
             if (!process.waitFor(20, TimeUnit.SECONDS)) {
-                process.destroy()
+                process.destroyForcibly()
                 false
             } else {
                 process.exitValue() == 0 && !Files.exists(path, LinkOption.NOFOLLOW_LINKS)
@@ -147,4 +184,3 @@ internal object PackFiles {
     private val INVALID = setOf('\\', '/', ':', '*', '?', '"', '<', '>', '|')
     private val RESERVED = setOf("CON", "PRN", "AUX", "NUL") + (1..9).flatMap { listOf("COM$it", "LPT$it") }
 }
-//?}

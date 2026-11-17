@@ -1,6 +1,5 @@
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.nio.file.Files
@@ -11,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 internal class PackFolderMeta(val description: String, val hidden: Boolean, val icon: String?)
 
-internal class PackFolder(val path: String, val name: String, val description: String, val packs: List<PackItem>) {
+internal class PackFolder(val path: String, val name: String, val description: String, val packs: List<PackItem>, val linked: Int = 0) {
     val enabled: Int get() = packs.count { it.selected }
 }
 
@@ -19,10 +18,30 @@ internal class PackFolders(private val session: PackSession) {
     private val metas = ConcurrentHashMap<String, PackFolderMeta>()
     private val listings = ConcurrentHashMap<String, List<String>>()
 
+    @Volatile
+    private var links: Map<String, String>? = null
+
     fun clear() {
         metas.clear()
         listings.clear()
+        links = null
     }
+
+    fun linkedFolderOf(id: String): String? = links()[id]
+
+    fun remapLinks(renames: Map<String, String>): Boolean =
+        renames.isEmpty() || PackLinks.remap(session.packDir, MAX_DEPTH, renames)
+
+    fun unlink(ids: Collection<String>): Boolean {
+        val current = links()
+        val targets = ids.mapNotNull { id -> current[id]?.let { id to it } }.toMap()
+        if (targets.isEmpty()) return true
+        links = null
+        return PackLinks.unlink(session.packDir, MAX_DEPTH, targets)
+    }
+
+    private fun links(): Map<String, String> =
+        links ?: (if (PackBridges.packedPacksLinks) PackLinks.read(session.packDir, MAX_DEPTH) else emptyMap()).also { links = it }
 
     fun children(all: List<PackItem>, parent: String): List<PackFolder> {
         val prefix = if (parent.isEmpty()) "" else "$parent/"
@@ -37,7 +56,8 @@ internal class PackFolders(private val session: PackSession) {
             .map { name ->
                 val path = prefix + name
                 val meta = meta(path)
-                PackFolder(path, name, meta.description, all.filter { it.folder == path || it.folder.startsWith("$path/") }) to meta.hidden
+                val packs = all.filter { it.folder == path || it.folder.startsWith("$path/") }
+                PackFolder(path, name, meta.description, packs, packs.count { linkedFolderOf(it.id) == it.folder }) to meta.hidden
             }
             .filter { !it.second }
             .map { it.first }
@@ -101,6 +121,16 @@ internal class PackFolders(private val session: PackSession) {
         private const val PACK_MANAGER_META = "folder.json"
         private val EMPTY = PackFolderMeta("", false, null)
 
+        const val MAX_DEPTH = 6
+
+        const val TOO_DEEP = "Folders can only go 6 levels deep."
+
+        fun depthOf(path: String): Int = if (path.isEmpty()) 0 else path.count { it == '/' } + 1
+
+        fun canHoldPacks(path: String): Boolean = depthOf(path) <= MAX_DEPTH
+
+        fun canAddFolder(parent: String): Boolean = depthOf(parent) < MAX_DEPTH
+
         fun relative(id: String): String? = id.takeIf { it.startsWith("file/") }?.removePrefix("file/")
 
         fun folderOf(id: String): String = relative(id)?.substringBeforeLast('/', "") ?: ""
@@ -112,4 +142,3 @@ internal class PackFolders(private val session: PackSession) {
         fun join(parent: String, name: String): String = if (parent.isEmpty()) name else "$parent/$name"
     }
 }
-//?}

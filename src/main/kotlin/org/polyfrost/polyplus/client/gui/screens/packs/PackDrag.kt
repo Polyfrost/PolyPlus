@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.Spring
@@ -43,16 +42,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import kotlinx.coroutines.launch
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-//?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 internal class PackDragPayload(
     val from: PackSide,
     val ids: List<String>,
     val item: PackItem?,
     val folder: PackFolder?,
     val sources: Set<String>,
+    val movable: Boolean = true,
 ) {
     val count: Int get() = ids.size
 }
@@ -74,10 +72,12 @@ internal class PackLanding(
 
 private class PackRowSpot(val rect: Rect, val fixed: Boolean)
 
+private class PackFolderSpot(val path: String, val rect: Rect, val within: PackSide?)
+
 internal class PackDragState {
     private val columns = HashMap<PackSide, Rect>()
     private val rows = HashMap<PackSide, LinkedHashMap<String, PackRowSpot>>()
-    private val folders = HashMap<String, Pair<String, Rect>>()
+    private val folders = HashMap<String, PackFolderSpot>()
     private val scrolls = HashMap<PackSide, ScrollState>()
 
     var payload by mutableStateOf<PackDragPayload?>(null)
@@ -139,8 +139,8 @@ internal class PackDragState {
         rows[side]?.remove(id)
     }
 
-    fun folderSpot(key: String, path: String, coordinates: LayoutCoordinates) {
-        folders[key] = path to rootRect(coordinates)
+    fun folderSpot(key: String, path: String, coordinates: LayoutCoordinates, within: PackSide? = null) {
+        folders[key] = PackFolderSpot(path, rootRect(coordinates), within)
     }
 
     fun forgetFolder(key: String) {
@@ -154,7 +154,7 @@ internal class PackDragState {
 
     fun onScreen(rect: Rect): Boolean = columns.values.any { it.contains(rect.center) }
 
-    fun folderRect(path: String): Rect? = folders.values.firstOrNull { it.first == path }?.second
+    fun folderRect(path: String): Rect? = folders.values.firstNotNullOfOrNull { spot -> visible(spot)?.takeIf { spot.path == path } }
 
     fun start(payload: PackDragPayload, at: Offset, card: Rect) {
         landing = null
@@ -172,7 +172,7 @@ internal class PackDragState {
 
     fun finish(): Pair<PackDragPayload, PackDropTarget?>? {
         val drag = payload ?: return null
-        val drop = target
+        val drop = resolve(pointer)
         val from = cardTopLeft
         payload = null
         target = null
@@ -198,16 +198,21 @@ internal class PackDragState {
             if (pointer.x !in rect.left..rect.right) continue
             val scroll = scrolls[side] ?: continue
             val band = minOf(EDGE, rect.height / 4f)
-            if (pointer.y in rect.top..(rect.top + band)) return scroll to -STEP
-            if (pointer.y in (rect.bottom - band)..rect.bottom) return scroll to STEP
+            val by = when (pointer.y) {
+                in rect.top..(rect.top + band) -> -STEP
+                in (rect.bottom - band)..rect.bottom -> STEP
+                else -> continue
+            }
+            target = resolve(pointer)
+            return scroll to by
         }
         return null
     }
 
     private fun resolve(at: Offset): PackDropTarget? {
         val drag = payload ?: return null
-        if (folderDrops && drag.folder == null) {
-            val folder = folders.values.firstOrNull { it.second.contains(at) }?.first
+        if (folderDrops && drag.folder == null && drag.movable) {
+            val folder = folders.values.firstOrNull { visible(it)?.contains(at) == true }?.path
             if (folder != null) return if (drag.sources.all { it == folder }) null else PackDropTarget.Folder(folder)
         }
         val side = columns.entries.firstOrNull { it.value.contains(at) }?.key ?: return null
@@ -234,6 +239,12 @@ internal class PackDragState {
         val trail = list.size - list.takeLastWhile { it.value.fixed }.size
         index = index.coerceIn(lead, maxOf(lead, trail))
         return list.getOrNull(index)?.key
+    }
+
+    private fun visible(spot: PackFolderSpot): Rect? {
+        val side = spot.within ?: return spot.rect.takeUnless { it.isEmpty }
+        val column = columns[side] ?: return null
+        return spot.rect.intersect(column).takeUnless { it.width <= 0f || it.height <= 0f }
     }
 
     private fun rootRect(coordinates: LayoutCoordinates): Rect {
@@ -349,4 +360,3 @@ private fun PointerKeyboardModifiers.toggles(): Boolean = isCtrlPressed || isMet
 private const val DOUBLE_CLICK_MS = 350L
 
 private val DRAG_THRESHOLD = 4.dp
-//?}

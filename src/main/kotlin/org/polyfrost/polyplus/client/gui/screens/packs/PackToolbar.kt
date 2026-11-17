@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,10 +34,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Select
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
-//?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 @Composable
 internal fun PackToolbar(session: PackSession, query: String, onQuery: (String) -> Unit, counts: Map<PackFilter, Int>) {
     val theme = OneConfigTheme.current
@@ -78,7 +75,7 @@ private fun PackOverflow(session: PackSession, extra: List<PackOnlineAction>) {
         if (session.canOpenPackedPacks()) add(MenuAction("Pack options in Packed Packs", session::openPackedPacks, icon = "settings"))
         if (session.foldersEnabled) {
             add(MenuSeparator)
-            add(MenuAction("New folder", { session.dialog = PackDialog.NewFolder(session.folder, emptyList()) }, icon = "plus"))
+            add(MenuAction("New folder", { session.dialog = PackDialog.NewFolder(session.folder, emptyList()) }, icon = "plus", enabled = PackFolders.canAddFolder(session.folder), disabledReason = PackFolders.TOO_DEEP))
             add(MenuAction("Show every pack in one list", { session.flat = !session.flat }, checked = session.flat))
         }
         add(MenuSeparator)
@@ -117,4 +114,3 @@ private fun profileEntries(session: PackSession): List<MenuEntry> {
 }
 
 internal fun packCount(count: Int): String = if (count == 1) "1 pack" else "$count packs"
-//?}

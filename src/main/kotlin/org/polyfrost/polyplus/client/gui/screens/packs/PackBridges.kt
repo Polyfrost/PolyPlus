@@ -1,32 +1,88 @@
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 {
-import com.mojang.blaze3d.platform.InputConstants
+//? if > 1.8.9 {
 import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.packs.PackSelectionModel
 import net.minecraft.client.gui.screens.packs.PackSelectionScreen
+//? if >= 1.21.10 {
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.input.KeyEvent
+//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.server.packs.repository.PackRepository
 import org.polyfrost.polyplus.mixin.client.access.PackModelAccessor
 import org.polyfrost.polyplus.mixin.client.access.PackSelectionScreenAccessor
+import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.nio.file.Path
 import java.util.function.Consumer
 //?}
 
-//? if >= 26.3 || = 1.8.9 {
 internal class PackOnlineAction(val icon: String, val label: String, val run: () -> Unit)
-//?}
 
-//? if >= 26.3 {
+//? if > 1.8.9 {
 internal object PackBridges {
     private val loader get() = FabricLoader.getInstance()
 
-    val packedPacksLoaded: Boolean by lazy { loader.isModLoaded("packed_packs") }
+    private const val PACKED_PACKS = "io.github.fishstiz.packed_packs.gui"
+
+    private class PackedPacks(val args: Constructor<*>, val screen: Constructor<*>, val withClient: Boolean)
+
+    private val packedPacksPresent: Boolean by lazy { loader.isModLoaded("packed_packs") }
+
+    private val packedPacks: PackedPacks? by lazy {
+        if (!packedPacksPresent) return@lazy null
+        val argsType = listOf("$PACKED_PACKS.screens.PackSelectionScreenArgs", "$PACKED_PACKS.metadata.PackSelectionScreenArgs")
+            .firstNotNullOfOrNull { name -> runCatching { Class.forName(name) }.getOrNull() } ?: return@lazy null
+        runCatching {
+            val args = argsType.getConstructor(PackRepository::class.java, Consumer::class.java, Path::class.java, Component::class.java)
+            val screenType = Class.forName("$PACKED_PACKS.screens.PackedPacksScreen")
+            val direct = runCatching { screenType.getConstructor(Screen::class.java, argsType) }.getOrNull()
+            if (direct != null) {
+                PackedPacks(args, direct, false)
+            } else {
+                PackedPacks(args, screenType.getConstructor(Minecraft::class.java, Screen::class.java, argsType), true)
+            }
+        }.getOrNull()
+    }
+
+    private val packedPacksOptions: Constructor<*>? by lazy {
+        if (!packedPacksPresent) return@lazy null
+        runCatching { Class.forName("$PACKED_PACKS.screens.OptionsScreen").getConstructor(Screen::class.java) }.getOrNull()
+    }
+
+    val packedPacksLoaded: Boolean get() = packedPacks != null || packedPacksOptions != null
+
+    val packedPacksLinks: Boolean by lazy {
+        packedPacksPresent && runCatching {
+            Class.forName("io.github.fishstiz.packed_packs.pack.PackNodeRepository", false, PackBridges::class.java.classLoader)
+        }.isSuccess
+    }
+
+    private val filterHidden: Method? by lazy {
+        if (!packedPacksPresent) return@lazy null
+        runCatching {
+            Class.forName("io.github.fishstiz.packed_packs.transform.interfaces.FilterableModel")
+                .getMethod("packed_packs\$filterHidden", Boolean::class.javaPrimitiveType)
+        }.getOrNull()
+    }
+
+    private var showingHidden = 0
+
+    fun <T> withHidden(model: PackSelectionModel, block: () -> T): T {
+        val method = filterHidden?.takeIf { it.declaringClass.isInstance(model) } ?: return block()
+        if (showingHidden == 0 && runCatching { method.invoke(model, false) }.isFailure) return block()
+        showingHidden++
+        try {
+            return block()
+        } finally {
+            if (--showingHidden == 0) runCatching { method.invoke(model, true) }
+        }
+    }
 
     private val respackoptsLoaded: Boolean by lazy { loader.isModLoaded("respackopts") }
 
@@ -98,18 +154,17 @@ internal object PackBridges {
         }
     }
 
-    fun packedPacksScreen(screen: PackSelectionScreen, previous: Screen?): Screen? {
-        if (!packedPacksLoaded) return null
+    fun packedPacksScreen(screen: PackSelectionScreen, previous: Screen?): Screen? =
+        packedPacksMain(screen, previous) ?: packedPacksOptions?.let { options -> runCatching { options.newInstance(previous) as Screen }.getOrNull() }
+
+    private fun packedPacksMain(screen: PackSelectionScreen, previous: Screen?): Screen? {
+        val bridge = packedPacks ?: return null
         val access = screen as Any as PackSelectionScreenAccessor
         val model = access.`polyplus$model`() as Any as? PackModelAccessor ?: return null
         return runCatching {
-            val argsType = Class.forName("io.github.fishstiz.packed_packs.gui.screens.PackSelectionScreenArgs")
-            val args = argsType
-                .getConstructor(PackRepository::class.java, Consumer::class.java, Path::class.java, Component::class.java)
-                .newInstance(model.`polyplus$repository`(), model.`polyplus$output`(), access.`polyplus$packDir`(), screen.title)
-            Class.forName("io.github.fishstiz.packed_packs.gui.screens.PackedPacksScreen")
-                .getConstructor(Screen::class.java, argsType)
-                .newInstance(previous, args) as Screen
+            val args = bridge.args.newInstance(model.`polyplus$repository`(), model.`polyplus$output`(), access.`polyplus$packDir`(), screen.title)
+            val created = if (bridge.withClient) bridge.screen.newInstance(Minecraft.getInstance(), previous, args) else bridge.screen.newInstance(previous, args)
+            created as Screen
         }.getOrNull()
     }
 
@@ -123,12 +178,18 @@ internal object PackBridges {
     }
 
     private fun press(button: Button) {
+        //? if >= 1.21.10 {
         runCatching { button.onPress(KeyEvent(InputConstants.KEY_RETURN, 0, 0)) }
+        //?} else {
+        /*runCatching { button.onPress() }
+        *///?}
     }
 }
-//?} elif = 1.8.9 {
+//?} else {
 /*internal object PackBridges {
     val packedPacksLoaded: Boolean get() = false
+
+    val packedPacksLinks: Boolean get() = false
 
     fun consumeForcedReload(): Boolean = false
 }

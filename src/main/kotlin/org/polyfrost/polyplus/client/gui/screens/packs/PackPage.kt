@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -54,10 +53,8 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.card
 import org.polyfrost.polyplus.client.gui.screens.settings.SettingsPageHeader
 import org.polyfrost.polyplus.client.gui.screens.world.ConfirmDialog
 import org.polyfrost.polyplus.client.gui.screens.world.DialogSpec
-//?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 private val IconSize = 36.dp
 private val RowMinHeight = 52.dp
 private const val TICK_MILLIS = 50L
@@ -67,4 +64,3 @@ internal fun PackHeader(title: String, subtitle: String) {
     SettingsPageHeader(title, subtitle)
 }
 
-//?}

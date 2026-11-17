@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.mixin.client;
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.resource.pack.ResourcePacks;
+import org.polyfrost.polyplus.client.gui.screens.packs.PackFolders;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -19,9 +20,6 @@ import java.util.List;
 
 @Mixin(ResourcePacks.class)
 public abstract class PackResourcePacksMixin {
-    @Unique
-    private static final int POLYPLUS$MAX_DEPTH = 6;
-
     @Shadow @Final private static FileFilter FILE_FILTER;
     @Shadow @Final private File directory;
 
@@ -35,7 +33,7 @@ public abstract class PackResourcePacksMixin {
 
     @Unique
     private static void polyplus$walk(File dir, int depth, List<File> found) {
-        if (depth >= POLYPLUS$MAX_DEPTH) return;
+        if (depth >= PackFolders.MAX_DEPTH) return;
         File[] children = dir.listFiles();
         if (children == null) return;
         Arrays.sort(children);

@@ -2,7 +2,6 @@
 
 package org.polyfrost.polyplus.client.gui.screens.packs
 
-//? if >= 26.3 || = 1.8.9 {
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
@@ -97,10 +96,8 @@ import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.card
 import org.polyfrost.polyplus.client.gui.screens.world.ConfirmDialog
 import org.polyfrost.polyplus.client.gui.screens.world.DialogSpec
-//?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 
-//? if >= 26.3 || = 1.8.9 {
 private val PackIconSize = 36.dp
 private val PackRowHeight = 52.dp
 private val RowSpacing = 2.dp
@@ -265,7 +262,7 @@ private fun PackColumn(side: PackSide, path: String, lines: List<PackLine>, empt
                 Text(items.size.toString(), color = theme.mutedText, style = theme.typography.small, maxLines = 1, softWrap = false)
             }
             if (side == PackSide.Available) {
-                if (view.foldered) {
+                if (view.foldered && PackFolders.canAddFolder(path)) {
                     IconButton("plus", "New folder", { session.dialog = PackDialog.NewFolder(path, emptyList()) }, size = ControlSize.Compact)
                 }
                 IconButton("select-all", "Turn on every pack shown", { session.transfer(side, items.filter { it.canSelect }.map { it.id }) }, size = ControlSize.Compact, enabled = items.any { it.canSelect })
@@ -292,7 +289,7 @@ private fun PackColumn(side: PackSide, path: String, lines: List<PackLine>, empt
                             if (line is PackLine.Item && drag.gapBefore(side, line.item.id)) key("gap") { DropGap(drag) }
                             key(line.key) {
                                 when (line) {
-                                    is PackLine.Folder -> PackFolderRow(line.folder, view)
+                                    is PackLine.Folder -> PackFolderRow(line.folder, side, view)
                                     is PackLine.Item -> PackRow(line.item, side, visible, { it in movableIds }, view)
                                 }
                             }
@@ -400,7 +397,8 @@ private fun PackRow(item: PackItem, side: PackSide, visible: List<String>, movab
                         null
                     } else {
                         val sources = ids.mapNotNull { id -> view.everything.firstOrNull { it.id == id }?.folder }.toSet()
-                        PackDragPayload(side, ids, item, null, sources)
+                        val filed = ids.all { id -> view.everything.firstOrNull { it.id == id }?.file != null }
+                        PackDragPayload(side, ids, item, null, sources, filed)
                     }
                 },
                 onClick = { click ->
@@ -475,6 +473,10 @@ private fun PackActions(item: PackItem, side: PackSide, visible: List<String>, v
     }
 }
 
+private const val OUTSIDE_REASON = "This pack isn't in the main pack folder."
+
+internal val PackItem.external: Boolean get() = file == null && !required && !server && id.startsWith("file/")
+
 private fun packMenu(item: PackItem, side: PackSide, visible: List<String>, view: PackView): List<MenuEntry> {
     val session = view.session
     val group = if (item.id in session.picked) session.dragIds(side, item.id, visible) else listOf(item.id)
@@ -492,6 +494,14 @@ private fun packMenu(item: PackItem, side: PackSide, visible: List<String>, view
         }
         if (!many && session.optionsFor(item)) add(MenuAction("Options", { session.openOptions(item) }, icon = "settings"))
         val files = groupItems.filter { it.file != null }
+        val outside = session.foldersEnabled && files.isEmpty() && groupItems.any { it.external }
+        if (outside) {
+            add(MenuSeparator)
+            add(MenuAction("Show in folder", {}, icon = "external-link", enabled = false, disabledReason = OUTSIDE_REASON))
+            add(MenuAction("Move to folder", {}, icon = "move", enabled = false, disabledReason = OUTSIDE_REASON))
+            add(MenuSeparator)
+            add(MenuAction("Delete", {}, icon = "trash", danger = true, enabled = false, disabledReason = OUTSIDE_REASON))
+        }
         if (session.foldersEnabled && files.isNotEmpty()) {
             add(MenuSeparator)
             if (!many) add(MenuAction("Show in folder", { session.showInFolder(item) }, icon = "external-link"))
@@ -499,11 +509,11 @@ private fun packMenu(item: PackItem, side: PackSide, visible: List<String>, view
             val here = files.map { it.folder }.toSet()
             val destinations = buildList<MenuEntry> {
                 if (here != setOf("")) add(MenuAction("Main pack folder", { session.movePacks(ids, "") }, icon = "folder"))
-                session.folders.allPaths(view.everything).filter { here != setOf(it) }.forEach { path ->
+                session.folders.allPaths(view.everything).filter { here != setOf(it) && PackFolders.canHoldPacks(it) }.forEach { path ->
                     add(MenuAction(path, { session.movePacks(ids, path) }, icon = "folder"))
                 }
                 if (isNotEmpty()) add(MenuSeparator)
-                add(MenuAction("New folder", { session.dialog = PackDialog.NewFolder(session.folder, ids) }, icon = "plus"))
+                add(MenuAction("New folder", { session.dialog = PackDialog.NewFolder(session.folder, ids) }, icon = "plus", enabled = PackFolders.canAddFolder(session.folder), disabledReason = PackFolders.TOO_DEEP))
             }
             add(MenuAction("Move to folder", {}, icon = "move", children = destinations))
         }
@@ -522,7 +532,7 @@ private fun folderMenu(folder: PackFolder, view: PackView): List<MenuEntry> {
         add(MenuAction("Open", { session.folder = folder.path }, icon = "folder"))
         add(MenuAction("Turn on every pack", { session.transfer(PackSide.Available, ids) }, icon = "plus", enabled = ids.isNotEmpty()))
         add(MenuSeparator)
-        add(MenuAction("New folder inside", { session.dialog = PackDialog.NewFolder(folder.path, emptyList()) }, icon = "plus"))
+        add(MenuAction("New folder inside", { session.dialog = PackDialog.NewFolder(folder.path, emptyList()) }, icon = "plus", enabled = PackFolders.canAddFolder(folder.path), disabledReason = PackFolders.TOO_DEEP))
         add(MenuAction("Rename", { session.dialog = PackDialog.RenameFolder(folder.path) }, icon = "text-input"))
         session.folders.dir(folder.path)?.let { dir -> add(MenuAction("Show in folder", { PackFiles.reveal(dir) }, icon = "external-link")) }
         add(MenuSeparator)
@@ -531,7 +541,7 @@ private fun folderMenu(folder: PackFolder, view: PackView): List<MenuEntry> {
 }
 
 @Composable
-private fun PackFolderRow(folder: PackFolder, view: PackView) {
+private fun PackFolderRow(folder: PackFolder, side: PackSide, view: PackView) {
     val session = view.session
     val drag = view.drag
     val accent = OneConfigTheme.accent
@@ -544,7 +554,7 @@ private fun PackFolderRow(folder: PackFolder, view: PackView) {
     Box(
         Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { drag.folderSpot(key, folder.path, it) }
+            .onGloballyPositioned { drag.folderSpot(key, folder.path, it, side) }
             .animatePlacement(false)
             .alpha(if (hidden) 0.4f else 1f)
             .contextMenu(entries = { folderMenu(folder, view) })
@@ -741,6 +751,19 @@ private fun StackedCard(modifier: Modifier, shape: Shape) {
 
 @Composable
 private fun PackDialogs(session: PackSession) {
+    var replacing by remember { mutableStateOf<String?>(null) }
+    val current = session.dialog
+    if (current !is PackDialog.SaveProfile && replacing != null) replacing = null
+    val pendingReplace = replacing
+    if (current is PackDialog.SaveProfile && pendingReplace != null) {
+        ConfirmDialog(
+            DialogSpec("Replace profile?", "A profile named $pendingReplace already exists. Replace it?", "Replace", "Cancel", true) {},
+        ) { accepted ->
+            replacing = null
+            if (accepted) session.saveProfile(pendingReplace) else session.dialog = null
+        }
+        return
+    }
     when (val dialog = session.dialog) {
         is PackDialog.Incompatible -> ConfirmDialog(
             DialogSpec(
@@ -760,7 +783,7 @@ private fun PackDialogs(session: PackSession) {
         is PackDialog.SaveProfile -> TextPromptDialog(
             "Save profile",
             "",
-            { session.saveProfile(it) },
+            { name -> if (PackProfiles.exists(name)) replacing = name.trim() else session.saveProfile(name) },
             { session.dialog = null },
             subtitle = "Saves the packs you have turned on and their order.",
             placeholder = "Profile name",
@@ -800,7 +823,8 @@ private fun PackDialogs(session: PackSession) {
             DialogSpec(
                 "Delete ${dialog.folder.name}?",
                 buildString {
-                    append(if (dialog.folder.packs.isEmpty()) "This folder has other files in it." else "This folder has ${packCount(dialog.folder.packs.size)} in it.")
+                    val physical = dialog.folder.packs.size - dialog.folder.linked
+                    append(if (physical == 0) "This folder has other files in it." else "This folder has ${packCount(physical)} in it.")
                     append(' ')
                     append(if (PackFiles.trashSupported) "Everything inside goes to the ${PackFiles.trashLabel}." else "Everything inside is deleted for good.")
                 },
@@ -824,7 +848,7 @@ private fun PackDialogs(session: PackSession) {
         is PackDialog.Overwrite -> ConfirmDialog(
             DialogSpec(
                 "Replace existing files?",
-                "${dialog.names.joinToString(", ")} already ${if (dialog.names.size == 1) "exists" else "exist"} in ${if (dialog.target.isEmpty()) "the main pack folder" else PackFolders.nameOf(dialog.target)}. Replacing deletes the old ${if (dialog.names.size == 1) "copy" else "copies"} for good.",
+                "${dialog.names.joinToString(", ")} already ${if (dialog.names.size == 1) "exists" else "exist"} in ${if (dialog.target.isEmpty()) "the main pack folder" else PackFolders.nameOf(dialog.target)}. Replacing deletes the old ${if (dialog.names.size == 1) "copy" else "copies"} for good.${if (dialog.skipped.isEmpty()) "" else " ${dialog.skipped.joinToString(", ")} won't move, because another pack you're moving has the same name."}",
                 "Replace",
                 "Cancel",
                 true,
@@ -842,4 +866,3 @@ private fun PackDialogs(session: PackSession) {
         null -> {}
     }
 }
-//?}
