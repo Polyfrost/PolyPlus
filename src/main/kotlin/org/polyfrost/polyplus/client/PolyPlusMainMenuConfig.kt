@@ -40,7 +40,7 @@ object PolyPlusMainMenuConfig : Config(
     @Dropdown(
         title = "Main Menu",
         description = "Choose which main menu the game starts on.",
-        options = ["Lobby", "PolyPlus", "Vanilla"],
+        options = ["Lobby", "OneClient v1", "Vanilla"],
     )
     var mainMenu: MainMenuChoice = MainMenuChoice.LOBBY
 
@@ -55,7 +55,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Switch(
         title = "Swap Quickplay and Player Preview",
-        description = "Show Quickplay on the right and your player preview on the left in the PolyPlus menu.",
+        description = "Show Quickplay on the right and your player preview on the left in the OneClient v1 main menu.",
         subcategory = "Elements",
     )
     var swapMainMenuSideColumns = false
@@ -139,7 +139,7 @@ object PolyPlusMainMenuConfig : Config(
     @JvmStatic
     @Dropdown(
         title = "Menu Backdrop",
-        description = "Choose what appears behind the PolyPlus menu.",
+        description = "Choose what appears behind the OneClient v1 main menu.",
         options = ["PolyPlus", "Minecraft Panorama", "Vanilla Panorama"],
         subcategory = "Background",
     )

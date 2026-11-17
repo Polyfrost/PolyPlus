@@ -137,7 +137,7 @@ private fun HomePage(lobby: LobbyShell, state: CustomizeState) {
             DrillRow("package-01", "Widgets", null, { state.open(CustomizePage.Widgets) })
         }
         PanelSection("Main menu") {
-            DrillRow("logo", "Switch to PolyPlus main menu", null, { state.close(); MainMenuReplacement.switchToPolyPlusMenu() })
+            DrillRow("logo", "Switch to OneClient v1 main menu", null, { state.close(); MainMenuReplacement.switchToPolyPlusMenu() })
             DrillRow("minecraft-block", "Switch to vanilla main menu", null, { state.close(); MainMenuReplacement.switchToVanilla() })
         }
     }
