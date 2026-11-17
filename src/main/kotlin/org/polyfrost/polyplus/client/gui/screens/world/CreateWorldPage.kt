@@ -100,7 +100,7 @@ fun CreateWorldContent(draft: WorldDraft, step: Int, invalidRules: MutableMap<St
                 PanelPageColumn {
                     when (page) {
                         0 -> WorldStep(draft) { go(1) }
-                        1 -> GenerationStep(draft, merged)
+                        1 -> GenerationStep(draft)
                         else -> AdvancedStep(draft, invalidRules)
                     }
                 }
@@ -115,6 +115,7 @@ private fun CreateFooter(draft: WorldDraft, step: Int, count: Int, go: (Int) -> 
     val theme = OneConfigTheme.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton("Cancel", draft::cancel, style = ControlStyle.Ghost, size = ControlSize.Large)
+        TextButton("Use vanilla screen", draft::useVanilla, style = ControlStyle.Ghost, size = ControlSize.Large)
         Spacer(Modifier.weight(1f))
         if (blocked != null) {
             Text(blocked, color = theme.error, style = theme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
@@ -164,15 +165,18 @@ private fun WorldStep(draft: WorldDraft, onNext: () -> Unit) {
     WorldBlock("Game mode", if (draft.gameModeLocked) "This world type always uses Spectator." else draft.gameMode.info) {
         Segmented(draft.gameModes, draft.gameMode, { draft.gameMode = it }, label = { it.label }, enabled = !draft.gameModeLocked)
     }
-    if (WorldSection.Difficulty !in draft.sections) return
-    SectionSpace()
-    WorldBlock("Difficulty", if (draft.difficultyLocked) (if (draft.gameMode == WorldGameMode.Hardcore) "Hardcore worlds are always on Hard." else "This world type is always on Peaceful.") else draft.difficulty.info) {
-        Segmented(WorldDifficulty.entries, draft.difficulty, { draft.difficulty = it }, label = { it.label }, enabled = !draft.difficultyLocked)
+    if (WorldSection.Difficulty in draft.sections) {
+        SectionSpace()
+        WorldBlock("Difficulty", if (draft.difficultyLocked) (if (draft.gameMode == WorldGameMode.Hardcore) "Hardcore worlds are always on Hard." else "This world type is always on Peaceful.") else draft.difficulty.info) {
+            Segmented(WorldDifficulty.entries, draft.difficulty, { draft.difficulty = it }, label = { it.label }, enabled = !draft.difficultyLocked)
+        }
     }
+    SectionSpace()
+    OptionsBlock(draft)
 }
 
 @Composable
-private fun GenerationStep(draft: WorldDraft, merged: Boolean) {
+private fun GenerationStep(draft: WorldDraft) {
     var more by remember { mutableStateOf(draft.extraWorldTypes.any { it.id == draft.worldType.id }) }
     val selected = draft.worldType
     val locked = draft.worldTypeLocked
@@ -215,10 +219,6 @@ private fun GenerationStep(draft: WorldDraft, merged: Boolean) {
             prominent = true,
         )
     }
-    if (merged) {
-        SectionSpace()
-        OptionsBlock(draft)
-    }
 }
 
 @Composable
@@ -239,11 +239,9 @@ private fun TypeGrid(draft: WorldDraft, types: List<WorldTypeOption>, selected: 
 
 @Composable
 private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, String>) {
-    OptionsBlock(draft)
     val packs = WorldSection.DataPacks in draft.sections
     val experiments = WorldSection.Experiments in draft.sections
     if (packs || experiments) {
-        SectionSpace()
         WorldBlock("Packs and experiments") {
             Column(Modifier.fillMaxWidth().card(WorldKit.CardRadius).padding(4.dp)) {
                 if (packs) {
@@ -255,7 +253,7 @@ private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, Str
         }
     }
     if (WorldSection.GameRules in draft.sections) {
-        SectionSpace()
+        if (packs || experiments) SectionSpace()
         if (draft.gameRulesLocked) {
             WorldBlock("Game rules", "This world type always uses the default game rules.") {}
         } else {

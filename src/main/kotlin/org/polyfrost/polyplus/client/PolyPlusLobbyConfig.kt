@@ -15,6 +15,7 @@ import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.lobby.LobbyReveal
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.lobby.LobbyTime
+import org.polyfrost.polyplus.compat.Mods
 import org.polyfrost.polyplus.compat.SparkCompat
 import kotlin.math.roundToInt
 
@@ -75,7 +76,7 @@ object PolyPlusLobbyConfig : Config(
     @JvmStatic
     @Switch(
         title = "Mute Lobby Music",
-        description = "Silence the lobby music without changing your track or volume.",
+        description = "Silence the lobby music and OneConfig's ambience without changing your track or volume.",
     )
     var lobbyMusicMuted = false
 
@@ -85,6 +86,13 @@ object PolyPlusLobbyConfig : Config(
         description = "Fade out the lobby music while the game window isn't focused.",
     )
     var muteLobbyMusicUnfocused = false
+
+    @JvmStatic
+    @Switch(
+        title = "Mute During Media",
+        description = "Fade out the lobby music and OneConfig's ambience while music or a video plays on your computer.",
+    )
+    var muteAmbienceDuringMedia = true
 
     @JvmStatic
     @Switch(
@@ -152,6 +160,7 @@ object PolyPlusLobbyConfig : Config(
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("quitClickTwice") { quitWithoutConfirmation }
+        hideIf("muteAmbienceDuringMedia") { !Mods.evergreenHud }
         inheritMusicVolume()
     }
 

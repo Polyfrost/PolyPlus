@@ -99,7 +99,7 @@ object LobbyAmbience {
     private const val FAILED_TICKS = 200
     private const val HANDOFF_SECONDS = 3.2
     private const val INITIAL_FADE_NANOS = 400_000_000L
-    private const val AMBIENCE_GAIN = 0.5f
+    private const val AMBIENCE_GAIN = 0.16f
     private val EASE = 1f - exp(-TICK_SECONDS / EASE_SECONDS)
     private val OUTDOOR = listOf(Layer.DAY, Layer.NIGHT, Layer.GOLDEN, Layer.AURORA)
     private val NETHER_BIOMES = setOf("nether_wastes", "crimson_forest", "warped_forest", "soul_sand_valley", "basalt_deltas", "hell")
@@ -207,6 +207,7 @@ object LobbyAmbience {
 
     fun tick() {
         val mc = Minecraft.getInstance()
+        AmbienceQuiet.tick()
         //? if > 1.8.9
         LobbySoundGate.expire()
         clock++
@@ -217,7 +218,7 @@ object LobbyAmbience {
         }
         silenced = quiet
         if (departing && !playing() && !lobbyUp(mc)) departing = false
-        val wanted = lobbyUp(mc) && audible(mc) && !mutedUnfocused(mc) && !departing && !(StartupOverlay.active && !introClaimed)
+        val wanted = lobbyUp(mc) && audible(mc) && !mutedUnfocused(mc) && !AmbienceQuiet.quiet && !departing && !(StartupOverlay.active && !introClaimed)
         if (!playing()) {
             if (!wanted || !loops() || LobbyScene.phase != LobbyScene.Phase.READY || --retry > 0) return
             if (!begin(mc, false)) retry = RETRY_TICKS

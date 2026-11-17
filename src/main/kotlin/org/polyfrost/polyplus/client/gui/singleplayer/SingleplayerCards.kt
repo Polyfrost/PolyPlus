@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -51,7 +54,6 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.DetailRow
 import org.polyfrost.polyplus.client.gui.lobbyshell.EmptyState
-import org.polyfrost.polyplus.client.gui.lobbyshell.LastPlayedStrip
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.hostWorldAllowed
@@ -82,9 +84,9 @@ private fun rememberWorldClick(state: SingleplayerState, world: SingleplayerWorl
     }
 
 @Composable
-private fun WorldBanner(icon: ImageBitmap?, height: Dp) {
+private fun WorldBanner(icon: ImageBitmap?, modifier: Modifier) {
     val fallback = OneConfigTheme.accent.copy(alpha = BANNER_FALLBACK_ALPHA)
-    Box(Modifier.fillMaxWidth().height(height).background(fallback)) {
+    Box(modifier.background(fallback)) {
         icon?.let {
             Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.None)
         }
@@ -112,8 +114,9 @@ private fun WorldTagItems(world: SingleplayerWorld) {
 }
 
 @Composable
-private fun WorldTags(world: SingleplayerWorld, modifier: Modifier = Modifier) {
+private fun WorldTags(world: SingleplayerWorld, lastPlayed: Boolean, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (lastPlayed) Badge("LAST PLAYED", tone = BadgeTone.Accent, style = BadgeStyle.Solid)
         WorldTagItems(world)
     }
 }
@@ -142,7 +145,7 @@ private fun worldMenuItems(state: SingleplayerState, world: SingleplayerWorld, o
 )
 
 @Composable
-internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit, modifier: Modifier) {
+internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHost: (String) -> Unit, modifier: Modifier, lastPlayed: Boolean = false) {
     val banner = 104.dp
     val tile = 52.dp
     val overhang = 12.dp
@@ -155,10 +158,10 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
             .background(CardSurface)
             .border(1.dp, SocialBorderColor, shape)
             .contextMenu { worldMenuItems(state, world, onHost) }
-            .selectableCard(state.selected === world, click, world.name, shape, recipe = ControlDefaults.Media),
+            .selectableCard(state.selected === world, click, if (lastPlayed) "Last played, ${world.name}" else world.name, shape, recipe = ControlDefaults.Media),
     ) {
         Column(Modifier.fillMaxSize()) {
-            WorldBanner(icon, banner)
+            WorldBanner(icon, Modifier.fillMaxWidth().height(banner))
             Column(
                 Modifier.fillMaxWidth().weight(1f).padding(start = 12.dp, end = 12.dp, top = overhang + 8.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
@@ -167,32 +170,8 @@ internal fun WorldCard(state: SingleplayerState, world: SingleplayerWorld, onHos
                 TextButton(text = world.primaryLabel, onClick = { state.flows.play(world) }, style = ControlStyle.Primary, size = ControlSize.Large, enabled = world.canPlay)
             }
         }
-        WorldTags(world, Modifier.padding(10.dp))
+        WorldTags(world, lastPlayed, Modifier.padding(10.dp))
         Box(Modifier.offset(x = 12.dp, y = banner - tile + overhang)) { WorldTile(icon, tile) }
-    }
-}
-
-@Composable
-internal fun LastPlayedWorldStrip(state: SingleplayerState, onHost: (String) -> Unit) {
-    val world = state.lastPlayedWorld ?: return
-    LastPlayedStrip(
-        tag = "Last played",
-        name = world.name,
-        selected = state.selected === world,
-        onClick = rememberWorldClick(state, world),
-        menu = { worldMenuItems(state, world, onHost) },
-        actionLabel = world.primaryLabel,
-        onAction = { state.flows.play(world) },
-        actionEnabled = world.canPlay,
-        thumb = { WorldTile(state.icons[world.id], 40.dp) },
-        tags = { WorldTagItems(world) },
-    ) {
-        val status = world.status
-        if (status != null) {
-            Text(status, color = world.statusTone.color, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-        } else {
-            Text(world.meta, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
-        }
     }
 }
 

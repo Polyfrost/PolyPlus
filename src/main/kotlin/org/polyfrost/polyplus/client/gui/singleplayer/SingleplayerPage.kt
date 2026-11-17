@@ -40,6 +40,8 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.Locale
 import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
 
+private object LastPlayedKey
+
 @Composable
 internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSelect: (String) -> Unit, onHost: (String) -> Unit) {
     val host = ClientPlatform.currentScreen()
@@ -60,7 +62,6 @@ internal fun SingleplayerPage(selectedWorldId: String?, onBack: () -> Unit, onSe
             verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
         ) {
             WorldsHeader(state, onBack)
-            if (!state.narrowed) LastPlayedWorldStrip(state, onHost)
             WorldsBody(state, onHost, Modifier.weight(1f).fillMaxWidth())
         }
         WorldDetailsPanel(state, onHost, Modifier.width(LobbyLayout.UnitWidth).fillMaxHeight().padding(bottom = LobbyLayout.RightColumnBottom))
@@ -98,17 +99,18 @@ private fun WorldsBody(state: SingleplayerState, onHost: (String) -> Unit, modif
         }
         else -> {
             val visible = state.visible()
+            val hero = state.lastPlayedWorld.takeUnless { state.narrowed }
             when {
-                visible.isNotEmpty() -> WorldGrid(state, visible, onHost, modifier)
+                visible.isNotEmpty() || hero != null -> WorldGrid(state, hero, visible, onHost, modifier)
                 state.narrowed -> NoMatchState("worlds", state.filter.takeIf { it != WorldFilter.All }?.label?.lowercase(Locale.ROOT), state.query, modifier.panel())
-                else -> EmptyState("No other worlds", modifier.panel(), "Your last played world is above.")
+                else -> EmptyState("No worlds yet", modifier.panel(), "Create a world to start playing.")
             }
         }
     }
 }
 
 @Composable
-private fun WorldGrid(state: SingleplayerState, worlds: List<SingleplayerWorld>, onHost: (String) -> Unit, modifier: Modifier) {
+private fun WorldGrid(state: SingleplayerState, hero: SingleplayerWorld?, worlds: List<SingleplayerWorld>, onHost: (String) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val rowHeight = PageGrid.rowHeight(maxHeight)
         val grid = rememberLazyGridState()
@@ -120,6 +122,11 @@ private fun WorldGrid(state: SingleplayerState, worlds: List<SingleplayerWorld>,
                 horizontalArrangement = Arrangement.spacedBy(PageGrid.Gap),
                 verticalArrangement = Arrangement.spacedBy(PageGrid.Gap),
             ) {
+                if (hero != null) {
+                    item(key = LastPlayedKey) {
+                        WorldCard(state, hero, onHost, Modifier.fillMaxWidth().height(rowHeight), lastPlayed = true)
+                    }
+                }
                 items(worlds, key = { it.id }) { world ->
                     WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
                 }

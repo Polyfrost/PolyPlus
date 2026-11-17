@@ -220,6 +220,21 @@ internal class WorldDraft189(private val screen: CreateWorldScreen) : WorldDraft
     }
 
     override fun cancel() = ClientPlatform.setScreen(access.polyplusParent())
+
+    override fun useVanilla() {
+        access.polyplusSetWorldName(name)
+        access.polyplusSetSeed(seed)
+        access.polyplusSetStructures(generateStructures)
+        access.polyplusSetBonusChest(bonusChestValue)
+        access.polyplusSetAllowCommands(commandsValue)
+        access.polyplusSetCheatsEnabled(cheatsEnabled)
+        if (!debug) {
+            access.polyplusSetGeneratorType(typeId)
+            access.polyplusSetGameModeName(modeName)
+            access.polyplusSetHardcore(hardcore)
+        }
+        WorldRoutes.openVanilla(screen)
+    }
 }
 
 internal class EditWorldDraft189(screen: EditWorldScreen) : EditWorldDraft {

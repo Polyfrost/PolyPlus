@@ -39,11 +39,11 @@ object ScreenRouter {
         val origin = originOf(current)
         val inLobby = origin == ScreenShell.Lobby
         val config = PolyPlusScreensConfig
-        return (if (config.customSettings || inLobby) SettingsRoutes.route(screen, origin) else null)
+        return (if (config.customSettings) SettingsRoutes.route(screen, origin) else null)
             ?: (if (config.customWorlds || inLobby) WorldRoutes.route(screen, origin) else null)
-            ?: (if (config.customConnecting || inLobby) ConnectionRoutes.route(screen, origin) else null)
-            ?: (if (config.customSettings || inLobby) PackRoutes.route(screen, origin) else null)
-            ?: (if (config.customRealms || inLobby) RealmsRoutes.route(screen, origin) else null)
+            ?: (if (config.customConnecting) ConnectionRoutes.route(screen, origin) else null)
+            ?: (if (config.customSettings) PackRoutes.route(screen, origin) else null)
+            ?: (if (config.customRealms) RealmsRoutes.route(screen, origin) else null)
             ?: Routed.show(screen)
     }
 
