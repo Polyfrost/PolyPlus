@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.http.AccountApi
 import org.polyfrost.polyplus.client.network.http.responses.LinkedAccountInfo
@@ -45,6 +46,7 @@ object DiscordLink {
         val waiting: Boolean = false,
         val unlinking: Boolean = false,
         val unavailable: Unavailable? = null,
+        val joinServer: Boolean = true,
     )
 
     private val _state = MutableStateFlow(State())
@@ -99,6 +101,7 @@ object DiscordLink {
                     if ((link.providerUserId to link.linkedAt) == before) continue
                     _state.update { it.copy(link = link, loaded = true, unavailable = null) }
                     notify("Discord linked as ${link.label()}")
+                    if (_state.value.joinServer) ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL)
                     return@launch
                 }
                 notify("Didn't hear back from Discord. Try linking again.")
@@ -111,6 +114,10 @@ object DiscordLink {
         }
         waitJob = job
         job.start()
+    }
+
+    fun setJoinServer(join: Boolean) {
+        _state.update { it.copy(joinServer = join) }
     }
 
     fun cancelLink() {
