@@ -239,7 +239,7 @@ internal fun ConnectionCard(
             Text(
                 title,
                 color = SocialTextPrimary,
-                style = OneConfigTheme.current.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = OneConfigTheme.current.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
