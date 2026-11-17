@@ -134,6 +134,7 @@ import org.polyfrost.polyplus.client.gui.menuwardrobe.WardrobePage
 import org.polyfrost.polyplus.client.gui.platformLabel
 import org.polyfrost.polyplus.client.gui.rememberAccountsPanelState
 import org.polyfrost.polyplus.client.gui.serveredit.ServerEditDialog
+import org.polyfrost.polyplus.client.gui.screens.settings.SettingsLobbyPage
 import org.polyfrost.polyplus.client.gui.singleplayer.SingleplayerPage
 import org.polyfrost.polyplus.client.gui.replays.ReplaysPage
 import org.polyfrost.polyplus.client.gui.news.NewsFeed
@@ -183,7 +184,7 @@ private val TABS = listOf(
 )
 
 private fun LobbyTab.activeOn(page: LobbyPage): Boolean = when (this.page) {
-    LobbyPage.Home -> page != LobbyPage.Wardrobe && page != LobbyPage.Social && page != LobbyPage.Marketplace && page != LobbyPage.Stats && page != LobbyPage.News
+    LobbyPage.Home -> page != LobbyPage.Wardrobe && page != LobbyPage.Social && page != LobbyPage.Marketplace && page != LobbyPage.Stats && page != LobbyPage.News && page != LobbyPage.Settings
     else -> this.page == page
 }
 
@@ -310,6 +311,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         LobbyPage.Social -> SocialPage { lobby.show(LobbyPage.Home) }
         LobbyPage.Stats -> StatsPage(lobby) { lobby.show(LobbyPage.Home) }
         LobbyPage.News -> NewsPage { lobby.show(LobbyPage.Home) }
+        LobbyPage.Settings -> SettingsLobbyPage(lobby)
     } }
     LobbyDarkChrome { Navbar(lobby, screen) }
     val home = lobby.page == LobbyPage.Home
@@ -364,7 +366,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             }
         }
     }
-    val playAway by Motion.animateFloatAsState(if (((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
+    val playAway by Motion.animateFloatAsState(if (((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe || lobby.page == LobbyPage.Settings) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
     if (playAway < 1f) {
         PlayUnit(
             lobby,

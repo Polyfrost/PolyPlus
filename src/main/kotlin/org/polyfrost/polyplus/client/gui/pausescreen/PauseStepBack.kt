@@ -80,11 +80,12 @@ private val FLAT_PREVIEW_COLUMN = 300.dp
 private val FLAT_TAG_ROOM = 56.dp
 private val FLAT_TAG_GAP = 4.dp
 private val BAR_HEAD = 30.dp
+private val AWAY_SHIFT = 48.dp
 
 private enum class PauseNavTab { Game, Wardrobe, Social }
 
 @Composable
-internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean) {
+internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
     val reveal = rememberReveal()
     val place = rememberPlace()
     val state = rememberPauseState()
@@ -101,11 +102,18 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
         Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
     }
     BoxWithConstraints(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
-        if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, maxWidth, maxHeight, if (narrow) 368.dp else 472.dp)
+        val roomWidth = maxWidth
+        val roomHeight = maxHeight
+        Box(Modifier.matchParentSize().graphicsLayer { alpha = 1f - away }) {
+            if (screen.staged) AvatarTag(place.title) else if (screen.playerPreview) FlatAvatar(place.title, roomWidth, roomHeight, if (narrow) 368.dp else 472.dp)
+        }
         LobbyDarkChrome { StepBackNav(screen) }
         LobbyDarkChrome {
             val scroll = rememberScrollState()
-            ScrollContainer(scroll, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp).width(if (narrow) 340.dp else 400.dp), scrollbar = false) {
+            ScrollContainer(scroll, Modifier.align(Alignment.CenterEnd).padding(end = if (narrow) 28.dp else 72.dp, top = 68.dp).width(if (narrow) 340.dp else 400.dp).graphicsLayer {
+                alpha = 1f - away
+                translationX = away * AWAY_SHIFT.toPx()
+            }, scrollbar = false) {
                 Column(Modifier.fillMaxWidth()) {
                     SectionHeader(place.eyebrow, contentPadding = PaddingValues(0.dp))
                     Spacer(Modifier.height(6.dp))
@@ -127,7 +135,8 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
             Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
-                .width(toolsWidth),
+                .width(toolsWidth)
+                .graphicsLayer { alpha = 1f - away },
             verticalArrangement = Arrangement.spacedBy(TOOLS_GAP),
         ) {
             PauseWidgetColumn(screen, toolsWidth, widgetRoom.coerceAtLeast(0.dp))

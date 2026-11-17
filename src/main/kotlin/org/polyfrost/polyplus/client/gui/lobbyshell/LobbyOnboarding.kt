@@ -8,6 +8,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusScreensConfig
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.OnboardingFlow
 import org.polyfrost.polyplus.client.gui.OnboardingHost
@@ -23,7 +24,8 @@ internal fun onboardingPending(): Boolean =
         PrivacyConsent.needsPrompt() ||
         OnboardingFeatures.needsModSettingsChoice() ||
         OnboardingFeatures.needsMotionBlurChoice() ||
-        OnboardingFeatures.needsGuides()
+        OnboardingFeatures.needsGuides() ||
+        !PolyPlusScreensConfig.onboardingAsked
 
 @Composable
 internal fun BoxScope.LobbySetup(lobby: LobbyShell) {

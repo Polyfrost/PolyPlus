@@ -21,6 +21,10 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.StartupAccessibility
 import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
+//? if > 1.8.9 {
+import java.nio.file.Path
+import org.polyfrost.polyplus.client.gui.screens.packs.PackDrops
+//?}
 
 class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfigComposeScreen(previous = null) {
     constructor() : this(LobbyPage.Home)
@@ -37,6 +41,12 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
         lobby.open()
         super.init()
     }
+
+    //? if > 1.8.9 {
+    override fun onFilesDrop(files: List<Path>) {
+        if (!PackDrops.drop(files)) super.onFilesDrop(files)
+    }
+    //?}
 
     override fun removed() {
         lobby.close()

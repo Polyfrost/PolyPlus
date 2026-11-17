@@ -12,6 +12,11 @@ import net.minecraft.resources.Identifier;
 import org.polyfrost.polyplus.client.lobby.LobbySky;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+//? if >= 1.21.10 && < 26.3 {
+/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.mojang.blaze3d.shaders.ShaderType;
+import org.polyfrost.polyplus.client.lobby.LobbyVulkanFlip;
+*///?}
 //? if = 1.21.4 {
 /*import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -32,6 +37,18 @@ public class MixinShaderManagerLobby {
     *///?}
         return !LobbySky.ownsPostEffect(id);
     }
+
+    //? if >= 1.21.11 && < 26.3 {
+    /*@ModifyReturnValue(method = "getShader", at = @At("RETURN"))
+    private String polyplus$flipLobbyForVulkan(String original, Identifier id, ShaderType type) {
+        return LobbyVulkanFlip.patch(id.getNamespace(), id.getPath(), type == ShaderType.FRAGMENT, original);
+    }
+    *///?} elif = 1.21.10 {
+    /*@ModifyReturnValue(method = "getShader", at = @At("RETURN"))
+    private String polyplus$flipLobbyForVulkan(String original, ResourceLocation id, ShaderType type) {
+        return LobbyVulkanFlip.patch(id.getNamespace(), id.getPath(), type == ShaderType.FRAGMENT, original);
+    }
+    *///?}
 
     //? if = 1.21.4 {
     /*@WrapWithCondition(method = "getProgram", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/ShaderManager;tryTriggerRecovery(Ljava/lang/Exception;)V"))

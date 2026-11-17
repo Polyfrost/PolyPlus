@@ -28,6 +28,8 @@ import org.lwjgl.opengl.GL11
 *///?} elif = 1.21.4 {
 /*import net.minecraft.client.renderer.CompiledShaderProgram
 *///?}
+//? if < 1.21.5 && > 1.8.9
+/*import com.mojang.blaze3d.platform.GlUtil*/
 //? if < 1.21.8 {
 /*import java.nio.ByteBuffer
 *///?}
@@ -130,7 +132,7 @@ object LobbySky {
     //?} elif >= 1.21.5 {
     /*private fun gpuName(): String = RenderSystem.getDevice().renderer
     *///?} elif > 1.8.9 {
-    /*private fun gpuName(): String = com.mojang.blaze3d.platform.GlUtil.getRenderer()
+    /*private fun gpuName(): String = GlUtil.getRenderer()
     *///?} else {
     /*private fun gpuName(): String = GL11.glGetString(GL11.GL_RENDERER).orEmpty()
     *///?}

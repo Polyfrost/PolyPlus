@@ -8,6 +8,9 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseStage;
+import org.polyfrost.polyplus.client.gui.screens.Routed;
+import org.polyfrost.polyplus.client.gui.screens.ScreenRouter;
+import org.polyfrost.polyplus.client.gui.screens.settings.SettingsMemory;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,6 +18,12 @@ import org.spongepowered.asm.mixin.Unique;
 
 //? if >= 26.2 {
 import net.minecraft.client.gui.Gui;
+//?}
+
+//? if > 1.8.9 {
+import net.minecraft.client.gui.screens.DeathScreen;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 //?}
 
 //? if = 26.2 {
@@ -63,9 +72,13 @@ public class MixinGui {
             return;
         }
         *///?}
+        if (screen == null) screen = SettingsMemory.returning();
         screen = PauseRouter.replace(screen);
         PauseStage.onScreen(screen);
         screen = MainMenuReplacement.replaceLists(screen);
+        Routed routed = ScreenRouter.route(screen);
+        if (routed.getConsumed()) return;
+        screen = routed.getScreen();
         if (MainMenuReplacement.enabled() && polyplus$opensTitleScreen(screen)) {
             if (!MainMenuReplacement.alreadyOpen()) {
                 original.call(MainMenuReplacement.create());
@@ -76,6 +89,15 @@ public class MixinGui {
         original.call(screen);
         if (leavingPause) ((MinecraftAccessor) Minecraft.getInstance()).polyplus$setAttackDelay(0);
     }
+
+    //? if > 1.8.9 {
+    @ModifyVariable(method = "setScreen", at = @At("STORE"), argsOnly = true)
+    private Screen polyplus$routeDeathScreen(Screen screen) {
+        if (screen == null || screen.getClass() != DeathScreen.class) return screen;
+        Routed routed = ScreenRouter.route(screen);
+        return routed.getConsumed() ? screen : routed.getScreen();
+    }
+    //?}
 
     @Unique
     private static boolean polyplus$opensTitleScreen(Screen screen) {

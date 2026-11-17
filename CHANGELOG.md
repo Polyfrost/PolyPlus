@@ -1,3 +1,33 @@
+## 2.1.0
+- Needs OneConfig 1.8.0
+- Settings, resource packs, Create World, Edit World, connecting, death, loading and Realms screens now match the lobby. Each one can be switched back to vanilla in settings or during onboarding
+- Sodium, Iris and Argentum get their own tabs in Video settings, along with pages from Sodium add-ons
+- Controls has a keyboard map, and OneConfig shortcuts can be set to key combinations
+- The resource packs screen has folders, drag and drop, and pack profiles, and works with Packed Packs
+- These new screens work on every version from 1.21.1 to 26.3, and all but Realms work on 1.8.9
+- Pin servers to the lobby home and sort them into folders
+- Customize the lobby, including a different scene for each server. The main menu switches moved here too
+- The wardrobe has a new look
+- Realms show up on the Multiplayer page
+- The dock has a music button and a Discord button
+- Quit options are easier to find, and clicking Quit twice closes the game
+- The account manager was rebuilt and can link your Discord account. Linking opens the server invite afterwards
+- Lobby and pause widgets were reworked. The clock brightens during the day
+- The main menu can use the vanilla panorama as its background
+- A notification tells you how long the game took to start
+- The pause menu's Mods row opens OneConfig, and Mod Menu moved under More
+- Spotlight can keep panning the camera the whole time
+- Play Together explains why a friend on another version can't join
+- Player previews follow your skin layer, cape and main hand settings
+- Scene cards and the scene list are easier to read
+- Fixed the lobby showing upside down with VulkanMod
+- Fixed skins not refreshing after switching accounts
+- Fixed your hand showing in the lobby
+- Fixed formatting codes showing in pause menu text
+- Fixed Enter not opening Social after closing a popup
+- Fixed other widgets moving when one is turned on or off
+- Stopped retrying sign-ins that Mojang has already rejected
+
 ## 2.0.11
 - Fix external sounds mixin
 - Disable Remove Reloading Screen (RRLS) instead of refusing to launch with it

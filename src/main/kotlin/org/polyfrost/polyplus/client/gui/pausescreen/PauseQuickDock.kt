@@ -81,8 +81,8 @@ private fun guiScale(): Int {
 }
 
 @Composable
-internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Boolean) {
-    val reveal = rememberReveal()
+internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
+    val reveal = rememberReveal() * (1f - away)
     val rise = if (Motion.reduced) 0f else (1f - reveal) * RISE_PIXELS
     val place = rememberPlace()
     val state = rememberPauseState()

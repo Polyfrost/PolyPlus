@@ -94,6 +94,9 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigUITheme
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.oneconfig.internal.ui.screens.ModCard as OneConfigModCard
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
+import org.polyfrost.polyplus.client.PolyPlusScreensConfig
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.BlockHighlightDraft
 import org.polyfrost.polyplus.client.features.BlockHighlightPresets
@@ -243,12 +246,14 @@ internal fun OnboardingFlow(
     }
     val sprintStep = needsSettings && OnboardingFeatures.polySprintAvailable
     val watermarkStep = remember { LauncherEnvironment.isOneClient && !PolyPlusConfig.watermarkAsked }
+    val screensStep = remember { needsSettings || !PolyPlusScreensConfig.onboardingAsked }
     var guides by remember { mutableStateOf(owedGuides) }
     val pages = remember(guides) {
         buildList {
             if (accessibilityStep) add(OnboardingStep.Accessibility)
             if (needsTerms) add(OnboardingStep.Terms)
             if (needsSettings) add(OnboardingStep.LookAndFeel)
+            if (screensStep) add(OnboardingStep.Screens)
             if (needsSettings) add(OnboardingStep.ModOrder)
             if (showsModSettings) {
                 if (sprintStep) add(OnboardingStep.Sprint)
@@ -271,6 +276,7 @@ internal fun OnboardingFlow(
     }
     var toggleSprint by remember { mutableStateOf(PolyPlusConfig.onboardingToggleSprint) }
     var watermark by remember { mutableStateOf(PolyPlusConfig.watermarkEnabled) }
+    var screens by remember { mutableStateOf(ScreenPart.shown.associateWith { it.read() }) }
     var alphabeticalMods by remember { mutableStateOf(DefaultModOrder.alphabetical()) }
     var grassMode by remember { mutableIntStateOf(OnboardingFeatures.BETTER_GRASS_OFF) }
     var fireHeight by remember { mutableStateOf(modReads.fireHeight ?: PolyPlusConfig.onboardingFireOverlayHeight) }
@@ -418,6 +424,12 @@ internal fun OnboardingFlow(
             PolyPlusConfig.watermarkEnabled = watermark
             PolyPlusConfig.watermarkAsked = true
         }
+        if (screensStep) {
+            screens.forEach { (part, ours) -> part.write(ours) }
+            PolyPlusScreensConfig.onboardingAsked = true
+            PolyPlusScreensConfig.save()
+            PolyPlusPauseConfig.save()
+        }
         OnboardingFeatures.markGuidesShown(guides.map { it.card })
         PolyPlusConfig.onboardingCompleted = true
         PolyPlusConfig.save()
@@ -505,6 +517,7 @@ internal fun OnboardingFlow(
                     uiStyle, { uiStyle = it },
                     guiScale, maxGuiScale, { chosenGuiScale = it },
                 )
+            OnboardingStep.Screens -> ScreensPage(screens) { screens = it }
             OnboardingStep.ModOrder -> ModOrderPage(alphabeticalMods) { alphabeticalMods = it }
             OnboardingStep.Sprint -> SprintPage(toggleSprint) { toggleSprint = it }
             is OnboardingStep.Mods -> {
@@ -967,6 +980,141 @@ private fun WatermarkPage(watermark: Boolean, onWatermark: (Boolean) -> Unit) {
             ChoiceButton("Show", MAIN_MENU_ASSETS + "logo.svg", watermark, 198f, option = true) { onWatermark(true) }
             ChoiceButton("Hide", MAIN_MENU_ASSETS + "x-close.svg", !watermark, 198f, option = true) { onWatermark(false) }
         }
+    }
+}
+
+private enum class ScreenPart(val title: String, val description: String) {
+    SETTINGS("Settings", "Options, controls and resource packs"),
+    WORLDS("Create and edit world", "Making a new world or changing one"),
+    CONNECTING("Connecting", "Joining and leaving servers and worlds"),
+    DEATH("Death screen", "What you see after you die"),
+    REALMS("Realms", "Browsing and joining your Realms"),
+    PAUSE("Pause screen", "The menu you get when you press Escape"),
+    LOADING("Loading screen", "What shows while the game starts"),
+    ;
+
+    fun read(): Boolean = when (this) {
+        SETTINGS -> PolyPlusScreensConfig.customSettings
+        WORLDS -> PolyPlusScreensConfig.customWorlds
+        CONNECTING -> PolyPlusScreensConfig.customConnecting
+        DEATH -> PolyPlusScreensConfig.customDeath
+        REALMS -> PolyPlusScreensConfig.customRealms
+        PAUSE -> PolyPlusPauseConfig.pauseScreenStyle != PauseScreenStyle.VANILLA
+        LOADING -> PolyPlusConfig.brandedStartup
+    }
+
+    fun write(ours: Boolean) {
+        when (this) {
+            SETTINGS -> PolyPlusScreensConfig.customSettings = ours
+            WORLDS -> PolyPlusScreensConfig.customWorlds = ours
+            CONNECTING -> PolyPlusScreensConfig.customConnecting = ours
+            DEATH -> PolyPlusScreensConfig.customDeath = ours
+            REALMS -> PolyPlusScreensConfig.customRealms = ours
+            PAUSE -> {
+                val style = PolyPlusPauseConfig.pauseScreenStyle
+                PolyPlusPauseConfig.pauseScreenStyle = when {
+                    !ours -> PauseScreenStyle.VANILLA
+                    style == PauseScreenStyle.VANILLA -> PauseScreenStyle.STEP_BACK_FLAT
+                    else -> style
+                }
+            }
+            LOADING -> PolyPlusConfig.brandedStartup = ours
+        }
+    }
+
+    companion object {
+        //? if > 1.8.9 {
+        val shown: List<ScreenPart> = entries
+        //?} else {
+        /*val shown: List<ScreenPart> = entries - REALMS
+        *///?}
+    }
+}
+
+@Composable
+private fun ScreensPage(choices: Map<ScreenPart, Boolean>, onChoices: (Map<ScreenPart, Boolean>) -> Unit) {
+    Header("Continuing with", "Screens")
+    Column(Modifier.offset(CARD_MARGIN.dp, SCREENS_TOP.dp).width(SCREENS_WIDTH.dp)) {
+        Row(Modifier.height(32.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                SCREENS_TEXT,
+                modifier = Modifier.weight(1f),
+                color = SocialTextSecondary,
+                style = OneConfigTheme.current.typography.label.copy(fontWeight = FontWeight.Light),
+                maxLines = 2,
+            )
+            Spacer(Modifier.width(12.dp))
+            TextButton(
+                "Use all",
+                { onChoices(ScreenPart.shown.associateWith { true }) },
+                Modifier.width(SCREENS_ACTION_WIDTH.dp),
+                size = ControlSize.Compact,
+                enabled = choices.values.any { !it },
+                contentDescription = "Use all of OneClient's screens",
+            )
+            Spacer(Modifier.width(8.dp))
+            TextButton(
+                "Use none",
+                { onChoices(ScreenPart.shown.associateWith { false }) },
+                Modifier.width(SCREENS_ACTION_WIDTH.dp),
+                size = ControlSize.Compact,
+                enabled = choices.values.any { it },
+                contentDescription = "Use none of OneClient's screens",
+            )
+        }
+        Spacer(Modifier.height(SCREENS_HEADER_GAP.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(SCREEN_ROW_GAP.dp)) {
+            ScreenPart.shown.forEach { part ->
+                ScreenRow(part, choices[part] ?: true) { onChoices(choices + (part to it)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScreenRow(part: ScreenPart, ours: Boolean, onOurs: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .width(SCREENS_WIDTH.dp)
+            .height(SCREEN_ROW_HEIGHT.dp)
+            .themedSurface(SurfaceKind.Card)
+            .padding(horizontal = SCREEN_ROW_PADDING.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            part.title,
+            modifier = Modifier.width(SCREEN_TITLE_WIDTH.dp),
+            style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium),
+            maxLines = 1,
+            softWrap = false,
+        )
+        Text(
+            part.description,
+            modifier = Modifier.weight(1f),
+            color = SocialTextSecondary,
+            style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Light),
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(12.dp))
+        Chip(
+            "OneClient",
+            ours,
+            { if (!ours) onOurs(true) },
+            Modifier.size(SCREEN_CHIP_WIDTH.dp, SCREEN_CHIP_HEIGHT.dp),
+            size = ControlSize.Compact,
+            role = A11yRole.Option,
+            contentDescription = "${part.title}: OneClient",
+        )
+        Spacer(Modifier.width(CARD_CHIP_GAP.dp))
+        Chip(
+            "Vanilla",
+            !ours,
+            { if (ours) onOurs(false) },
+            Modifier.size(SCREEN_CHIP_WIDTH.dp, SCREEN_CHIP_HEIGHT.dp),
+            size = ControlSize.Compact,
+            role = A11yRole.Option,
+            contentDescription = "${part.title}: Vanilla",
+        )
     }
 }
 
@@ -2355,6 +2503,8 @@ private fun pageSpeech(step: OnboardingStep, page: Int, waiting: Boolean): Strin
         OnboardingStep.Terms ->
             "Welcome to OneClient. Agree to the Terms of Service and Privacy Policy to use online features. $TERMS_NOTE"
         OnboardingStep.LookAndFeel -> "Look and Feel. Choose the UI colors, UI style and GUI scale."
+        OnboardingStep.Screens ->
+            "Screens. $SCREENS_TEXT " + ScreenPart.shown.joinToString(", ") { it.title } + "."
         OnboardingStep.ModOrder -> "Mod Sorting. $MOD_ORDER_TEXT"
         OnboardingStep.Sprint -> "Toggle Sprint. $SPRINT_TEXT"
         is OnboardingStep.Mods -> "Mods: " + step.cards.joinToString(" and ") { modCardTitle(it) } + "."
@@ -2428,6 +2578,7 @@ private sealed interface OnboardingStep {
     data object Accessibility : OnboardingStep
     data object Terms : OnboardingStep
     data object LookAndFeel : OnboardingStep
+    data object Screens : OnboardingStep
     data object ModOrder : OnboardingStep
     data object Sprint : OnboardingStep
 
@@ -2647,6 +2798,17 @@ private const val MOD_ORDER_TEXT = "Choose how the mods list is sorted. Recommen
 private const val SPRINT_TEXT = "Turn sprinting into a toggle so you keep running after you let go of the key."
 private const val WATERMARK_TEXT =
     "Show the OneClient logo in inventories and options screens. You can move, resize or recolor it later in settings."
+private const val SCREENS_TEXT = "Choose which screens OneClient replaces. Pick Vanilla to keep Minecraft's original for that screen."
+private const val SCREENS_TOP = 122f
+private const val SCREENS_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f
+private const val SCREENS_ACTION_WIDTH = 96f
+private const val SCREENS_HEADER_GAP = 14f
+private const val SCREEN_ROW_HEIGHT = 44f
+private const val SCREEN_ROW_GAP = 6f
+private const val SCREEN_ROW_PADDING = 14f
+private const val SCREEN_TITLE_WIDTH = 190f
+private const val SCREEN_CHIP_WIDTH = 92f
+private const val SCREEN_CHIP_HEIGHT = 28f
 private const val WATERMARK_PREVIEW_WIDTH = 232f
 private const val WATERMARK_PREVIEW_HEIGHT = 56f
 private const val WATERMARK_LOGO_SIZE = 28f

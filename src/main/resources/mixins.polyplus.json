@@ -12,7 +12,83 @@
   "minVersion": "0.8",
   "plugin": "org.polyfrost.polyplus.mixin.PolyPlusMixinPlugin",
   "client": [
+    //? if > 1.8.9
+    "client.access.ConnectionConnectScreenAccessor",
+    //? if > 1.8.9
+    "client.access.ConnectionDeathScreenAccessor",
+    //? if > 1.8.9
+    "client.access.ConnectionDisconnectedScreenAccessor",
+    //? if > 1.8.9
+    "client.access.PackEntryAccessor",
+    //? if > 1.8.9
+    "client.access.PackResourcesAccessor",
+    //? if > 1.8.9
+    "client.access.PackPathSupplierAccessor",
+    //? if > 1.8.9
+    "client.access.PackFileSupplierAccessor",
+    //? if > 1.8.9
+    "client.access.PackModelAccessor",
+    //? if > 1.8.9
+    "client.access.PackSelectionScreenAccessor",
+    //? if > 1.8.9
+    "client.access.RealmsMainScreenAccessor",
+    //? if > 1.8.9
+    "client.access.RealmsVisitUrlAccessor",
+    //? if = 1.8.9
+    //"client.access.LegacyConnectScreenAccessor",
+    //? if = 1.8.9
+    //"client.access.LegacyDisconnectedScreenAccessor",
+    //? if = 1.8.9
+    //"client.PackResourcePacksMixin",
+    //? if = 1.8.9
+    //"client.PackUnopenedPackMixin",
+    //? if = 1.8.9
+    //"client.access.PackResourcePacksScreenAccessor",
+    //? if = 1.8.9
+    //"client.access.PackUnopenedPackAccessor",
+    //? if = 1.8.9
+    //"client.access.WorldLegacyCreateAccessor",
+    //? if = 1.8.9
+    //"client.access.WorldLegacyEditAccessor",
+    //? if = 1.8.9
+    //"client.access.SettingsLegacyOptionsAccessor",
+    //? if = 1.8.9
+    //"client.access.SettingsLegacyVideoAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsGeneralChatAccessor",
+    //? if > 1.8.9 && < 26.1
+    //"client.access.SettingsOptionsScreenAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsGeneralMouseAccessor",
+    //? if >= 26.2
+    "client.access.SettingsGeneralOnlineAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsInputAccessibilityAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsInputControlsAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsInputFontAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsOptionInstanceAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsOptionsSubScreenAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsTooltipAccessor",
+    //? if > 1.8.9
+    "client.access.SettingsVideoAccessor",
+    //? if > 1.8.9
+    "client.access.WorldAlertAccessor",
+    //? if > 1.8.9
+    "client.access.WorldConfirmAccessor",
+    //? if > 1.8.9
+    "client.access.WorldCreateScreenAccessor",
+    //? if > 1.8.9
+    "client.access.WorldDirectJoinAccessor",
+    //? if > 1.8.9
+    "client.access.WorldEditScreenAccessor",
     "client.MixinAbstractSelectionList",
+    //? if > 1.8.9
+    "client.PackFolderRepositorySourceMixin",
     "client.MixinChatComponent",
     //? if > 1.8.9
     "client.MixinChatListener",
@@ -30,6 +106,14 @@
     //"client.MixinControlsListWidget",
     //? if = 1.8.9
     //"client.MixinControlsOptionsScreen",
+    //? if = 1.8.9
+    //"client.MixinKeyBindCaptureKeyboard",
+    //? if = 1.8.9
+    //"client.MixinKeyBindCaptureMouse",
+    //? if > 1.8.9 && < 26.1
+    //"client.MixinKeyBindCaptureChar",
+    //? if > 1.8.9
+    "client.MixinRealmsConnect",
     //? if > 1.8.9
     "client.MixinCubeMap",
     "client.MixinDisconnectedScreen",
@@ -41,8 +125,13 @@
     "client.MixinGameNarrator",
     //? if > 1.8.9
     "client.MixinGenericMessageScreen",
-    //? if > 1.8.9
     "client.MixinLevelLoadingScreen",
+    "client.MixinGameRendererShellScene",
+    "client.MixinMinecraftWorldLoad",
+    //? if < 1.21.9 && > 1.8.9
+    //"client.MixinLevelLoadingProgress",
+    //? if = 1.8.9
+    //"client.MixinMinecraftDeathRoute",
     //? if = 1.8.9
     //"client.MixinGameOptions",
     "client.MixinGameRenderer",
@@ -143,6 +232,8 @@
     //? if >= 1.21.5
     "client.access.RenderPipelinesAccessor",
     "client.access.ScreenAccessor",
+    //? if > 1.8.9 && < 1.21.11
+    //"client.access.ScreenBindAccessor",
     //? if > 1.8.9
     "client.access.SoundEngineAccessor",
     //? if > 1.8.9

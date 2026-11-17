@@ -92,6 +92,7 @@ private class ReorderList(private val scope: CoroutineScope) {
     private val heights = HashMap<String, Float>()
     private val targets = HashMap<String, Float>()
     private val slides = HashMap<String, Animatable<Float, AnimationVector1D>>()
+    private var lastOrder: List<String> = emptyList()
 
     val shown: List<String> get() = override ?: base
 
@@ -106,8 +107,12 @@ private class ReorderList(private val scope: CoroutineScope) {
         ids.forEachIndexed { i, id -> heights[id] = sizes[i] }
         val known = shown.filter { it in live }
         val placed = known.toSet()
-        val slots = slotsOf(known + ids.filter { it !in placed })
+        val order = known + ids.filter { it !in placed }
+        val slots = slotsOf(order)
         val held = dragging
+        val reordered = order != lastOrder && order.size == lastOrder.size && order.toSet() == lastOrder.toSet()
+        val animate = held != null || settling != null || reordered
+        lastOrder = order
         return ids.map { id ->
             val slot = slots[id] ?: 0f
             val slide = slides[id]
@@ -115,7 +120,7 @@ private class ReorderList(private val scope: CoroutineScope) {
                 slides[id] = Animatable(slot)
                 targets[id] = slot
             } else if (targets.put(id, slot) != slot && id != held) {
-                scope.launch { glide(slide, slot) }
+                if (animate) scope.launch { glide(slide, slot) } else slides[id] = Animatable(slot)
             }
             slot
         }

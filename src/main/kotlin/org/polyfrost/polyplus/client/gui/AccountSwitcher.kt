@@ -3,6 +3,8 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.polyplus.client.gui.screens.ShellModal
+import org.polyfrost.polyplus.client.gui.screens.shellModalSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -79,6 +80,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PanelHint
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageSwitch
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelSection
+import org.polyfrost.polyplus.client.gui.lobbyshell.PanelToggle
 import org.polyfrost.polyplus.client.gui.lobbyshell.card
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
@@ -217,7 +219,7 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
         onClose()
     }
     EscapeCloses { if (!state.back()) close() }
-    CompositionLocalProvider(LocalDensity provides scaledDensity(CARD_UI_SCALE)) {
+    CompositionLocalProvider(LocalDensity provides scaledDensity(ShellModal.UI_SCALE)) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -228,10 +230,7 @@ internal fun AccountSwitcherContent(actions: AccountActions, onClose: () -> Unit
         ) {
             Row(
                 Modifier
-                    .fillMaxWidth(0.7f)
-                    .widthIn(max = CARD_MAX_WIDTH)
-                    .fillMaxHeight(0.8f)
-                    .heightIn(max = CARD_MAX_HEIGHT)
+                    .shellModalSize()
                     .panel(CARD_RADIUS)
                     .notFocusable()
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
@@ -414,6 +413,9 @@ private fun DiscordRow() {
             state.loaded -> TextButton(text = "Link", onClick = DiscordLink::startLink, size = ControlSize.Compact, style = ControlStyle.Primary)
             else -> Spinner(theme.textColorSecondary)
         }
+    }
+    if (link == null && state.loaded && !signedOut) {
+        PanelToggle("Join the Polyfrost Discord", state.joinServer, DiscordLink::setJoinServer)
     }
 }
 
@@ -628,12 +630,9 @@ private fun copyToClipboard(text: String) {
 }
 
 private val HEAD_SIZE = 28.dp
-private val CARD_MAX_WIDTH = 980.dp
-private val CARD_MAX_HEIGHT = 640.dp
 private val PREVIEW_MAX_WIDTH = 320.dp
 private val CARD_RADIUS = 20.dp
 private const val PREVIEW_SHARE = 0.38f
-private const val CARD_UI_SCALE = 1.3f
 private const val SKELETON_ROWS = 2
 private const val SKELETON_MS = 700
 private const val SKELETON_LOW = 0.06f

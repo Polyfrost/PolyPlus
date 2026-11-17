@@ -224,7 +224,7 @@ private fun SceneListItem(state: SceneBrowserState, item: SceneItem, canPick: Bo
     when (item) {
         SceneItem.Automatic -> SceneCard(state, null, canPick)
         SceneItem.NoCaptures -> Box(Modifier.padding(horizontal = 4.dp)) { SceneNote("Good spots are saved here after you play your worlds.", OneConfigTheme.current.mutedText) }
-        is SceneItem.Header -> SectionHeader(item.title, Modifier.padding(start = 4.dp, top = 4.dp))
+        is SceneItem.Header -> SectionHeader(item.title, Modifier.padding(start = 4.dp, top = 10.dp), rule = true)
         is SceneItem.Scene -> SceneCard(state, item.entry, canPick)
     }
 }

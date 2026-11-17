@@ -40,6 +40,7 @@ import net.minecraft.world.level.levelgen.Heightmap
 //? if > 1.8.9
 import net.minecraft.world.level.storage.LevelResource
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
+import org.polyfrost.polyplus.client.gui.screens.connection.DeathShellScreen
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.serverapi.OneClientServerApi
@@ -261,7 +262,8 @@ object LobbyCapture {
         rememberPolicy(mc)
         val screen = ClientPlatform.currentScreen()
         val pausing = screen is PauseScreen || screen is OneClientPauseScreen
-        if (pausing || screen is DeathScreen) {
+        val dying = screen is DeathScreen || screen is DeathShellScreen
+        if (pausing || dying) {
             (copying?.source ?: surveying?.source)?.handOver = true
         } else {
             earlyScreen = null

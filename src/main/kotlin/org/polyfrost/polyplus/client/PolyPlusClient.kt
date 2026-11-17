@@ -75,6 +75,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.registerPolyPlusPixelIcons
+import org.polyfrost.polyplus.client.gui.screens.settings.OneClientSettingsPages
+import org.polyfrost.polyplus.client.gui.screens.settings.ArgentumSettingsPages
+import org.polyfrost.polyplus.client.gui.screens.settings.SodiumSettingsPages
 import org.polyfrost.polyplus.client.gui.widgets.ShellWidgetRegistry
 
 //? if wwaypoints
@@ -170,6 +173,7 @@ object PolyPlusClient {
         step("party config preload") { PolyPlusPartyConfig.preload() }
         step("config preload") { PolyPlusConfig.preload() }
         step("main menu config preload") { PolyPlusMainMenuConfig.preload() }
+        step("screens config preload") { PolyPlusScreensConfig.preload() }
         step("startup sounds") { StartupSounds.prepare() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("pylon raw input") { PylonRawInput.initialize() }
@@ -183,6 +187,9 @@ object PolyPlusClient {
         step("default settings") { DefaultSettings.initialize() }
         step("pixel icons") { registerPolyPlusPixelIcons() }
         step("oneconfig ui") { PolyPlusOneConfigIntegration.register() }
+        step("sodium settings") { SodiumSettingsPages.register() }
+        step("argentum settings") { ArgentumSettingsPages.register() }
+        step("oneclient settings") { OneClientSettingsPages.register() }
         step("widgets") { ShellWidgetRegistry.registerBuiltIns() }
         step("default mod order") { DefaultModOrder.initialize() }
         step("advanced mod cards") { AdvancedModCards.initialize() }

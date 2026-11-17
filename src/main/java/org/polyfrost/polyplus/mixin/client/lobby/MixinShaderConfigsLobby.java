@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 //? if >= 26.3 {
 import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import com.mojang.renderpearl.api.pipeline.ShaderType;
+import org.polyfrost.polyplus.client.lobby.LobbyVulkanFlip;
 //?} else {
 /*import com.mojang.blaze3d.shaders.ShaderType;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,6 +23,11 @@ public abstract class MixinShaderConfigsLobby {
         if (original != null) return original;
         Identifier sodium = LobbySodiumUniforms.sodiumId(id);
         return sodium == null ? null : LobbySodiumUniforms.patch(((ShaderSource) (Object) this).getShader(sodium, type), type);
+    }
+
+    @ModifyReturnValue(method = "getShader", at = @At("RETURN"))
+    private String polyplus$flipLobbyForVulkan(String original, Identifier id, ShaderType type) {
+        return LobbyVulkanFlip.patch(id.getNamespace(), id.getPath(), type == ShaderType.FRAGMENT, original);
     }
 }
 //?} else {
