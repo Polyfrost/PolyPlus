@@ -187,8 +187,8 @@ private fun InboxList(state: SocialPageState, snapshot: SocialSnapshot, modifier
     val items = inboxItems(snapshot, state.source)
     Column(modifier.panel().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PanelTitle("Waiting on you")
-            if (snapshot.waiting > 0) Text(snapshot.countLabel(snapshot.waiting, SocialList.Incoming), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            PanelTitle("Invites and requests")
+            if (snapshot.waiting > 0) Text("${snapshot.countLabel(snapshot.waiting, SocialList.Incoming)} new", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         }
         val paging = listPaging(state.source, snapshot, true, SocialList.Incoming, SocialList.Outgoing)
         if (items.isEmpty()) {

@@ -243,7 +243,7 @@ internal fun requestItems(snapshot: SocialSnapshot, source: SocialSource): List<
     snapshot.requests.sortedByDescending { it.incoming }.map { request ->
         InboxItem(
             "request-${request.id}",
-            "Friend requests",
+            if (request.incoming) "Friend requests" else "Sent requests",
             request.person,
             request.person.name,
             if (request.incoming) "Wants to be friends" else "Request sent",
