@@ -98,6 +98,7 @@ object AdaptiveBlurDefaults {
         //mc.screen
 
     private fun onSample(averageFps: Float) {
+        abortWindow()
         if (sampled) return
         val refreshRate = refreshRate()
         recommendedMode = when {
