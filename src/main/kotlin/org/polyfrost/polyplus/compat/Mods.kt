@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.compat
 import net.fabricmc.loader.api.FabricLoader
 
 object Mods {
+    val cera: Boolean by lazy { loaded("cera") }
     val chatting: Boolean by lazy { loaded("chatting") }
     val distantHorizons: Boolean by lazy { loaded("distanthorizons") }
     val entityModelFeatures: Boolean by lazy { loaded("entity_model_features") }
