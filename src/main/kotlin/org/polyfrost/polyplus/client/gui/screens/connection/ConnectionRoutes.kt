@@ -54,6 +54,13 @@ object ConnectionRoutes {
         *///?}
     }
 
+    fun isConnectionScreen(screen: Screen?): Boolean =
+        //? if > 1.8.9 {
+        screen is ConnectingScreen || screen is StatusMessageScreen || screen is DisconnectedShellScreen
+        //?} else {
+        /*screen is ConnectingScreen || screen is DisconnectedShellScreen
+        *///?}
+
     //? if > 1.8.9 {
     private fun startupMessage(screen: Screen): Boolean =
         (screen.title.contents as? TranslatableContents)?.key == "gui.loadingMinecraft"
