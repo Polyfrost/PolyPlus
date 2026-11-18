@@ -310,8 +310,45 @@ val relocateKtor = tasks.register<ShadowJar>("relocateKtor") {
     isReproducibleFileOrder = true
 }
 
+val serializationRelocatedPackage = "org.polyfrost.polyplus.libs.serialization"
+
+val serializationShade: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+val mainClassesDirs = sourceSets.main.get().output.classesDirs
+
+val relocateSerialization = tasks.register<ShadowJar>("relocateSerialization") {
+    group = "build"
+    description = "Relocates kotlinx.serialization in PolyPlus and its Ktor into $serializationRelocatedPackage"
+
+    configurations = listOf(serializationShade)
+    from(mainClassesDirs) { include("**/*.class") }
+    from(zipTree(relocateKtor.flatMap { it.archiveFile }))
+    relocate("kotlinx.serialization", serializationRelocatedPackage)
+
+    exclude(
+        "META-INF/MANIFEST.MF",
+        "META-INF/versions/9/module-info.class",
+        "META-INF/com.android.tools/**",
+        "META-INF/proguard/**",
+        "module-info.class",
+    )
+
+    archiveBaseName = "serialization-relocated"
+    archiveVersion = ""
+    archiveClassifier = ""
+    destinationDirectory = layout.buildDirectory.dir("relocated")
+
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 tasks.jar {
-    for (relocated in listOf(relocateSentry, relocateKtor)) {
+    exclude { it.name.endsWith(".class") && mainClassesDirs.any { dir -> it.file.startsWith(dir) } }
+    for (relocated in listOf(relocateSentry, relocateSerialization)) {
         from(zipTree(relocated.flatMap { it.archiveFile })) {
             exclude("META-INF/MANIFEST.MF")
         }
@@ -401,6 +438,9 @@ dependencies {
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
     for (module in ktorModules) ktorShade(module)
     implementation(files(relocateKtor.flatMap { it.archiveFile }))
+    for (module in listOf("kotlinx-serialization-core-jvm", "kotlinx-serialization-json-jvm")) {
+        serializationShade("org.jetbrains.kotlinx:$module:${flkProvidedVersions.getValue("org.jetbrains.kotlinx:$module")}")
+    }
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$flkCoroutinesVersion")
     for ((module, version) in flkProvidedVersions) {
         compileOnly("$module:$version")
