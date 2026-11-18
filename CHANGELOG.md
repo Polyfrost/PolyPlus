@@ -1,2 +1,20 @@
-## 2.1.5
-- Fix hard crash with wWaypoints again
+## 2.1.6
+- Pick up your player in the lobby by holding or dragging them, then let go to drop them
+- Herobrine now plays a cave sound when he shows up
+- Added a search bar to Settings
+- Every setting in Settings now has a button to reset it to its default
+- Renamed the Keyboard tab in Controls to Keybinds
+- The tab bar in Settings shows a scrollbar when the tabs don't fit
+- The FOV slider is back on 1.8.9 when Argentum is installed
+- OneClient's settings pages are now in the OneConfig sidebar, and the vanilla Options screen has a button that opens them
+- Custom screens now tell you where to switch back to the vanilla screen
+- Direct connect, Refresh and the other server actions on the Multiplayer screen are now buttons in the header instead of a menu
+- Added a Social menu size setting, and the Social menu is smaller by default
+- Added switches to turn off the vignette in the lobby and on the pause screen
+- Added a switch to turn off the Classic pause screen's opening animation
+- Pause screen widgets can now sit in the top right or bottom left on the Classic and Compact styles
+- Classic now comes before Vanilla in the pause style list
+- Press OneConfig's keybind in the lobby (Right Shift by default) to open OneConfig
+- The Socials keybind now defaults to Shift + `
+- Server resource packs now show a loading screen while they load instead of freezing the game
+- Fixed the pack screen getting stuck after pressing Original Pack Screen in Packed Packs
