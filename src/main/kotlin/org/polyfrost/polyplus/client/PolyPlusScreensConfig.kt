@@ -61,6 +61,9 @@ object PolyPlusScreensConfig : Config(
     @JvmStatic @Include
     var onboardingAsked = false
 
+    @JvmStatic @Include
+    var vanillaHintShows = 0
+
     init {
         preload()
     }

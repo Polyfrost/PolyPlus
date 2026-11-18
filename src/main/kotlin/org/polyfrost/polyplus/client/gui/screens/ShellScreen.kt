@@ -10,6 +10,7 @@ import net.minecraft.client.gui.screens.Screen
 *///?}
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
+import org.polyfrost.polyplus.client.gui.screens.world.WorldShellScreen
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if > 1.8.9 {
@@ -32,6 +33,10 @@ abstract class ShellScreen(
     open val chrome: Boolean get() = true
 
     open val revealLift: Boolean get() = true
+
+    internal val switchable: Boolean get() = chrome && !(this is WorldShellScreen && shell == ScreenShell.Lobby)
+
+    internal val switchHint: Boolean by lazy { switchable && VanillaScreenHint.claim() }
 
     override val pausesGame: Boolean get() = shell == ScreenShell.InGame
 

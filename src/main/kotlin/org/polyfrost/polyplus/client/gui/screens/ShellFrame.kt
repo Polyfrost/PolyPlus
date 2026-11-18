@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,16 +44,21 @@ import androidx.compose.ui.unit.dp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusScreensConfig
 import org.polyfrost.polyplus.client.gui.MenuBackdrop
 import org.polyfrost.polyplus.client.gui.MenuGlass
 import org.polyfrost.polyplus.client.gui.MenuPanorama
 import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.PanelSurface
+import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.SocialBorderColor
 import org.polyfrost.polyplus.client.gui.SocialWindowScrim
@@ -83,15 +89,40 @@ private const val OPAQUE_FLOOR = 0.94f
 private val FrameMaxWidth = 1240.dp
 private val HeaderHeight = 38.dp
 private val NavHead = 34.dp
+private const val SWITCH_HINT_SHOWS = 3
+private const val SWITCH_HINT_TEXT = "Prefer the vanilla screen? You can switch back in OneClient \u203A Screens."
+
+private val LocalVanillaSwitch = staticCompositionLocalOf<ShellScreen?> { null }
+
+internal object VanillaScreenHint {
+    var dismissed by mutableStateOf(false)
+        private set
+
+    fun claim(): Boolean {
+        if (PolyPlusScreensConfig.vanillaHintShows >= SWITCH_HINT_SHOWS) return false
+        PolyPlusScreensConfig.vanillaHintShows++
+        runCatching { PolyPlusScreensConfig.save() }
+        return true
+    }
+
+    fun dismiss() {
+        dismissed = true
+        PolyPlusScreensConfig.vanillaHintShows = SWITCH_HINT_SHOWS
+        runCatching { PolyPlusScreensConfig.save() }
+    }
+}
 
 @Composable
 fun ShellFrame(host: ScreenHost, title: String, content: @Composable () -> Unit) {
     val chrome = (host as? ShellScreen)?.chrome ?: true
     val lift = (host as? ShellScreen)?.revealLift ?: true
-    when (host.shell) {
-        ScreenShell.Lobby -> PageViewport { LobbyFrame(title, host::back, chrome, lift, content) }
-        ScreenShell.Menu -> ModalViewport { MenuFrame(title, host::back, chrome, content) }
-        ScreenShell.InGame -> ModalViewport { InGameFrame(title, host::back, chrome, content) }
+    val switch = (host as? ShellScreen)?.takeIf { it.switchable }
+    CompositionLocalProvider(LocalVanillaSwitch provides switch) {
+        when (host.shell) {
+            ScreenShell.Lobby -> PageViewport { LobbyFrame(title, host::back, chrome, lift, content) }
+            ScreenShell.Menu -> ModalViewport { MenuFrame(title, host::back, chrome, content) }
+            ScreenShell.InGame -> ModalViewport { InGameFrame(title, host::back, chrome, content) }
+        }
     }
 }
 
@@ -104,6 +135,7 @@ internal fun ShellPanel(
     close: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val switch = LocalVanillaSwitch.current
     Column(
         modifier
             .shellSurface(shell)
@@ -117,9 +149,47 @@ internal fun ShellPanel(
         ) {
             if (!close) BackButton(onBack)
             PageTitle(title, Modifier.weight(1f))
+            if (switch != null) {
+                IconButton(
+                    SOCIAL_ASSETS + "settings-02.svg",
+                    "Switch to the vanilla screen",
+                    PolyPlusOneConfigIntegration::openScreensSettings,
+                    tooltipPlacement = TooltipPlacement.BelowEnd,
+                )
+            }
             if (close) IconButton(SOCIAL_ASSETS + "x-close.svg", "Close", onBack, tooltipPlacement = TooltipPlacement.BelowEnd)
         }
-        Column(Modifier.weight(1f).fillMaxWidth(), content = content)
+        if (switch != null && switch.switchHint && !VanillaScreenHint.dismissed) SwitchHint()
+        CompositionLocalProvider(LocalVanillaSwitch provides null) {
+            Column(Modifier.weight(1f).fillMaxWidth(), content = content)
+        }
+    }
+}
+
+@Composable
+private fun SwitchHint() {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            SWITCH_HINT_TEXT,
+            Modifier.weight(1f),
+            color = OneConfigTheme.current.mutedText,
+            style = OneConfigTheme.current.typography.small,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+        )
+        TextButton("Open", PolyPlusOneConfigIntegration::openScreensSettings, style = ControlStyle.Ghost, size = ControlSize.Compact)
+        IconButton(
+            SOCIAL_ASSETS + "x-close.svg",
+            "Got it",
+            VanillaScreenHint::dismiss,
+            size = ControlSize.Compact,
+            tooltipPlacement = TooltipPlacement.BelowEnd,
+        )
     }
 }
 
