@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Mixin(targets = "com.wwaypoints.client.screen.UiToast", remap = false)
 public class MixinUiToast {
     @ModifyArg(
-            method = "post",
+            method = "post*",
             at = @At(value = "INVOKE", target = "Lcom/wwaypoints/client/screen/UiToast;<init>(Ljava/lang/String;Ljava/lang/String;Lcom/wwaypoints/client/screen/UiToast$Level;Lcom/wwaypoints/client/screen/UiToast$Icon;JJ)V"),
             index = 0,
             remap = false
