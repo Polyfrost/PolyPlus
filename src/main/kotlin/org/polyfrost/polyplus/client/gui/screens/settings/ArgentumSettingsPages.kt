@@ -107,7 +107,7 @@ private fun ArgentumPage(entry: SettingsEntry, parent: () -> Screen?) {
             revision++
         }
     }
-    val groups = remember(revision) { ArgentumBridge.guard(null) { it.groups(entry.id) } }
+    val groups = remember(revision) { argentumGroups(entry.id) }
     if (groups == null) {
         ArgentumFallback(parent)
         return
