@@ -49,6 +49,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.Divider
+import org.polyfrost.polyplus.client.PolyPlusPartyConfig
 import org.polyfrost.polyplus.client.gui.HostFlowState
 import org.polyfrost.polyplus.client.gui.LocalComposerFocus
 import org.polyfrost.polyplus.client.gui.SocialToastHost
@@ -254,7 +255,9 @@ internal fun SocialWindow(window: SocialWindowState, onClose: () -> Unit) {
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
         if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
-        val scale = max(min(widthPx / DESIGN_WIDTH, heightPx / DESIGN_HEIGHT), MIN_SCALE)
+        val fit = min(widthPx / DESIGN_WIDTH, heightPx / DESIGN_HEIGHT)
+        val factor = PolyPlusPartyConfig.socialMenuSize.factor
+        val scale = max(fit * factor, MIN_SCALE * factor)
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         val layout = remember(widthPx, heightPx, scale) { SocialWindowLayout((widthPx / scale).dp, (heightPx / scale).dp) }
         window.singlePane = layout.singlePane

@@ -7,6 +7,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Include
 import org.polyfrost.oneconfig.api.config.v1.annotations.Slider
 import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.gui.gamesocial.SocialMenuSize
 import org.polyfrost.polyplus.client.party.HostJoinPolicy
 import org.polyfrost.polyplus.client.party.SceneSharing
 
@@ -57,6 +58,15 @@ object PolyPlusPartyConfig : Config(
         description = "Join your party leader after a 5 second countdown you can cancel. When off, you get a prompt instead.",
     )
     var partyPlayTogetherJoin = true
+
+    @JvmStatic
+    @Dropdown(
+        title = "Social Menu Size",
+        description = "How much of the screen the Social menu takes up.",
+        options = ["Small", "Medium", "Large"],
+        subcategory = "Social Menu",
+    )
+    var socialMenuSize: SocialMenuSize = SocialMenuSize.MEDIUM
 
     @JvmStatic
     @Switch(
