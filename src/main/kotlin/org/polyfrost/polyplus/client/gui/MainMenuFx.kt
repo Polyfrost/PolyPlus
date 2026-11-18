@@ -22,14 +22,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.unit.dp
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.lobby.GlassRegistry
@@ -38,7 +37,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 //? if = 1.8.9
 //import org.lwjgl.input.Mouse
@@ -58,9 +56,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?}
 
 private const val PARALLAX_EASE = 0.02f
-private const val BLUR_SPREAD = 2.6f
-private const val MIN_SPOT_ALPHA = 1f / 255f
-private val MenuBlur = 40.dp
 
 private val GlowA = Color(0xFF1878F1)
 private val GlowB = Color(0xFF24D3EE)
@@ -150,8 +145,8 @@ internal fun MenuBackdrop(modifier: Modifier, glass: MenuGlass) {
     }
     Canvas(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
         val mouse = easedMenuMouse()
-        drawMenuBackground(time, mouse)
-        if (frosted && OneConfigPrefs.backgroundBlur) drawFrost(glass.panels.values, origin, time, mouse)
+        val frost = if (frosted && OneConfigPrefs.backgroundBlur) frostBounds(glass.panels.values, origin) else emptyList()
+        drawMenuBackground(time, mouse, frost)
     }
 }
 
@@ -181,22 +176,14 @@ internal object MenuFxPass {
     }
 }
 
-private fun DrawScope.drawFrost(panels: Collection<LobbyGlass.Panel>, origin: Offset, time: Float, mouse: Offset) {
-    if (panels.isEmpty()) return
-    val blur = MenuBlur.toPx()
-    val clip = Path()
-    for (panel in panels) {
-        val centerX = panel.centerX * size.width - origin.x
-        val centerY = panel.centerY * size.height - origin.y
-        val halfWidth = panel.halfWidth * size.width
-        val halfHeight = panel.halfHeight * size.height
-        if (halfWidth <= 0f || halfHeight <= 0f) continue
-        val bounds = Rect(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight)
-        val radius = (panel.radius * size.height).coerceIn(0f, minOf(halfWidth, halfHeight))
-        clip.reset()
-        clip.addRoundRect(RoundRect(bounds, CornerRadius(radius)))
-        clipPath(clip) { drawMenuBackground(time, mouse, blur, bounds) }
-    }
+private fun DrawScope.frostBounds(panels: Collection<LobbyGlass.Panel>, origin: Offset): List<RoundRect> = panels.mapNotNull { panel ->
+    val centerX = panel.centerX * size.width - origin.x
+    val centerY = panel.centerY * size.height - origin.y
+    val halfWidth = panel.halfWidth * size.width
+    val halfHeight = panel.halfHeight * size.height
+    if (halfWidth <= 0f || halfHeight <= 0f) return@mapNotNull null
+    val radius = (panel.radius * size.height).coerceIn(0f, minOf(halfWidth, halfHeight))
+    RoundRect(Rect(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight), CornerRadius(radius))
 }
 
 private fun menuMouse(): Offset {
@@ -215,7 +202,7 @@ private fun menuMouse(): Offset {
     return Offset(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
 }
 
-fun DrawScope.drawMenuBackground(time: Float, mouse: Offset, blur: Float = 0f, within: Rect = Rect.Zero) {
+fun DrawScope.drawMenuBackground(time: Float, mouse: Offset, frost: List<RoundRect> = emptyList()) {
     drawRect(FxPageBackground)
     val mdx = (mouse.x - 0.5f) * size.width
     val mdy = (mouse.y - 0.5f) * size.height
@@ -224,22 +211,11 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset, blur: Float = 0f, w
         val cy = size.height * (b.ay + cos(time * b.sy + b.psi) * b.driftY) + mdy * b.par
         val radius = size.width * b.rF * (1f + 0.12f * sin(time * 0.6f + b.phi))
         val alpha = (b.baseAlpha * (0.75f + 0.25f * sin(time * 0.9f + b.psi))).coerceIn(0f, 1f)
-        coolGlowLayers(time * 0.05f + b.hueOffset, alpha) { color, a -> drawSoftSpot(color, a, Offset(cx, cy), radius, blur, within) }
+        coolGlowLayers(time * 0.05f + b.hueOffset, alpha) { color, a -> drawSoftGlow(color, Offset(cx, cy), radius, a) }
     }
     drawAurora(time)
-    drawParticles(time, mouse, blur, within)
+    drawParticles(time, mouse, frost)
     drawVignette()
-}
-
-private fun DrawScope.drawSoftSpot(color: Color, alpha: Float, center: Offset, radius: Float, blur: Float, within: Rect) {
-    if (blur <= 0f) {
-        drawSoftGlow(color, center, radius, alpha)
-        return
-    }
-    val spread = sqrt(radius * radius + BLUR_SPREAD * BLUR_SPREAD * blur * blur)
-    val faded = alpha * (radius / spread) * (radius / spread)
-    if (faded < MIN_SPOT_ALPHA || !within.inflate(spread).contains(center)) return
-    drawSoftGlow(color, center, spread, faded)
 }
 
 private fun DrawScope.drawAurora(time: Float) {
@@ -288,18 +264,26 @@ private val Particles: List<Particle> = (0 until PARTICLE_COUNT).map { i ->
     )
 }
 
-private fun DrawScope.drawParticles(time: Float, mouse: Offset, blur: Float, within: Rect) {
+private fun DrawScope.drawParticles(time: Float, mouse: Offset, frost: List<RoundRect>) {
     val mdx = (mouse.x - 0.5f) * size.width
     val mdy = (mouse.y - 0.5f) * size.height
-    for (p in Particles) {
-        var y = (p.seedY - time * p.speed) % 1f
-        if (y < 0f) y += 1f
-        val twinkle = 0.5f + 0.5f * sin(time * p.twSpeed + p.phase)
-        val alpha = 0.35f * twinkle
-        val par = p.size * 0.0006f
-        val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
-        drawSoftSpot(Color.White, alpha, center, p.size * 3f, blur, within)
+    fun DrawScope.punch(i: Int) {
+        if (i < frost.size) {
+            val r = frost[i]
+            clipRect(r.left, r.top, r.right, r.bottom, ClipOp.Difference) { punch(i + 1) }
+            return
+        }
+        for (p in Particles) {
+            var y = (p.seedY - time * p.speed) % 1f
+            if (y < 0f) y += 1f
+            val twinkle = 0.5f + 0.5f * sin(time * p.twSpeed + p.phase)
+            val alpha = 0.35f * twinkle
+            val par = p.size * 0.0006f
+            val center = Offset(size.width * p.x + mdx * par, size.height * y + mdy * par)
+            drawSoftGlow(Color.White, center, p.size * 3f, alpha)
+        }
     }
+    punch(0)
 }
 
 private val VignetteStops = Array(GLOW_STEPS + 1) { i ->

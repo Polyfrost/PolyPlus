@@ -90,16 +90,6 @@ uniform vec4 Radius1;
 uniform vec4 Radius2;
 *///?}
 
-vec4 panelAt(int index) {
-    vec4 panels[12] = vec4[12](Panel0, Panel1, Panel2, Panel3, Panel4, Panel5, Panel6, Panel7, Panel8, Panel9, Panel10, Panel11);
-    return panels[index];
-}
-
-float radiusAt(int index) {
-    vec4 radii[3] = vec4[3](Radius0, Radius1, Radius2);
-    return radii[index / 4][index - index / 4 * 4];
-}
-
 //? if >= 26.3 {
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
@@ -236,9 +226,8 @@ float lensCoc(float z) {
     return smoothstep(COC_DEADZONE, COC_FULL, (z - focus) / max(z, 0.001)) * Lens.y;
 }
 
-float panelCoverage(int index, vec2 pixel) {
-    vec4 panel = panelAt(index);
-    float radius = radiusAt(index) * OutSize.y;
+float panelCoverage(vec4 panel, float radius, vec2 pixel) {
+    radius *= OutSize.y;
     vec2 centre = vec2(panel.x, 1.0 - panel.y) * OutSize;
     vec2 half_size = panel.zw * OutSize;
     vec2 outside = abs(pixel - centre) - half_size;
@@ -256,13 +245,18 @@ float frostAmount() {
     }
     float amount = Glass.x;
     vec2 pixel = texCoord * OutSize;
-    int count = int(Glass.z);
-    for (int index = 0; index < count; index++) {
-        if (amount >= 1.0) {
-            break;
-        }
-        amount = max(amount, panelCoverage(index, pixel));
-    }
+    if (Glass.z > 0.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel0, Radius0.x, pixel));
+    if (Glass.z > 1.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel1, Radius0.y, pixel));
+    if (Glass.z > 2.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel2, Radius0.z, pixel));
+    if (Glass.z > 3.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel3, Radius0.w, pixel));
+    if (Glass.z > 4.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel4, Radius1.x, pixel));
+    if (Glass.z > 5.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel5, Radius1.y, pixel));
+    if (Glass.z > 6.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel6, Radius1.z, pixel));
+    if (Glass.z > 7.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel7, Radius1.w, pixel));
+    if (Glass.z > 8.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel8, Radius2.x, pixel));
+    if (Glass.z > 9.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel9, Radius2.y, pixel));
+    if (Glass.z > 10.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel10, Radius2.z, pixel));
+    if (Glass.z > 11.5 && amount < 1.0) amount = max(amount, panelCoverage(Panel11, Radius2.w, pixel));
     return amount * Glass.y;
 }
 
