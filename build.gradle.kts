@@ -465,6 +465,16 @@ tasks.withType<JavaCompile>().configureEach {
     }
 }
 
+abstract class KotlinCompileLimit : BuildService<BuildServiceParameters.None>
+
+val kotlinCompileLimit = gradle.sharedServices.registerIfAbsent("kotlinCompileLimit", KotlinCompileLimit::class) {
+    maxParallelUsages = 3
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    usesService(kotlinCompileLimit)
+}
+
 tasks.named<JavaCompile>("compileJava") {
     finalizedBy("checkstyleMain")
 }
