@@ -265,7 +265,7 @@ private fun builtInEntries(): List<SettingsEntry> {
         } else {
             SettingsPlacement.End
         }
-        val tabLabel = if (category == SettingsCategory.Controls) "Keyboard" else null
+        val tabLabel = if (category == SettingsCategory.Controls) KEYBINDS_TITLE else null
         SettingsEntry(category.entryId, category.label, category.icon, placement = placement, external = external, category = category, tabLabel = tabLabel)
     }
 }

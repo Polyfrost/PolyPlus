@@ -51,6 +51,7 @@ private val TwoColumnWidth = 620.dp
 private val SectionGap = 20.dp
 private const val REFRESH_MILLIS = 500L
 private const val MAX_QUERY = 64
+internal const val KEYBINDS_TITLE = "Keybinds"
 
 internal object InputSettingsPages : SettingsPageProvider {
     private val categories = setOf(SettingsCategory.Controls, SettingsCategory.Skin, SettingsCategory.Accessibility, SettingsCategory.Language)
@@ -131,7 +132,7 @@ private fun ControlsPage() {
     val changed: () -> Unit = { revision++ }
     val keys = remember { KeyBindsState() }
     InputPageScroll { columns ->
-        InputPageHeader("Keyboard", "Changes apply as you make them.")
+        InputPageHeader(KEYBINDS_TITLE, "Changes apply as you make them.")
         KeyBindsKeymap(keys, refresh)
         sections.forEach { SectionBlock(it, columns, changed) }
         KeyBindsSection(keys, refresh)
