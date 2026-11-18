@@ -39,6 +39,7 @@ object ModConfigDefaults {
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_entity_renderers", false, alwaysReapply = true),
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.dynamic_resources", false, alwaysReapply = true),
         Default("modernfix", "modernfix-mixins.properties", "mixin.perf.faster_item_rendering", true),
+        Default("modernfix", "modernfix-mixins.properties", "mixin.feature.spam_thread_dump", false, alwaysReapply = true),
         Default("ferritecore", "ferritecore.mixin.properties", "useSmallThreadingDetector", true),
         Default("vmp", "vmp.properties", "show_async_loading_messages", false),
         Default("fastquit", "fastquit.toml", "showToasts", false),
