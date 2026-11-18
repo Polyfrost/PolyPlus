@@ -1,4 +1,2 @@
-## 2.1.4
-- Fix hard crash with wWaypoints
-- Improve lobby rendering performance
-- Fix FPS limit not working sometimes
+## 2.1.5
+- Fix hard crash with wWaypoints again
