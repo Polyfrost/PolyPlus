@@ -58,6 +58,7 @@ object MojangSkinService {
     private const val READBACK_ATTEMPTS = 5
     private const val READBACK_DELAY_MS = 1_000L
     private const val UPLOAD_GRACE_MS = 60_000L
+    private const val REFRESH_COOLDOWN_MS = 60_000L
     private const val TEXTURE_WAIT_MS = 30_000L
     private const val TEXTURE_POLL_MS = 250L
     private const val MAX_LOGGED_BODY = 500
@@ -85,6 +86,8 @@ object MojangSkinService {
     @Volatile
     private var override: SkinOverride? = null
     private var overrideChecks = 0
+    private var lastRefreshOwner: UUID? = null
+    private var lastRefreshAt = 0L
 
     var changedSkinVersion by mutableIntStateOf(0)
         private set
@@ -222,6 +225,10 @@ object MojangSkinService {
             } else if (current != null && System.currentTimeMillis() - current.uploadedAt < UPLOAD_GRACE_MS) {
                 return
             }
+            val now = System.currentTimeMillis()
+            if (owner == lastRefreshOwner && now - lastRefreshAt < REFRESH_COOLDOWN_MS) return
+            lastRefreshOwner = owner
+            lastRefreshAt = now
             ++overrideChecks
         }
         val token = accessToken() ?: return
