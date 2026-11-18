@@ -32,7 +32,10 @@ object PackRoutes {
     fun route(screen: Screen, origin: ScreenShell?): Routed? {
         if (screen !is PackSelectionScreen) return null
         if (screen.javaClass != PackSelectionScreen::class.java && screen.javaClass.name != PACK_MANAGER_SCREEN) return null
-        return Routed.show(PackShellScreen(origin ?: ScreenRouter.fallbackShell(), ClientPlatform.currentScreen(), PackSession(screen)))
+        val current = ClientPlatform.currentScreen()
+        val parent = PackDetour.backFrom(current) ?: current
+        val shell = origin ?: ScreenRouter.originOf(parent) ?: ScreenRouter.fallbackShell()
+        return Routed.show(PackShellScreen(shell, parent, PackSession(screen)))
     }
 
     private const val PACK_MANAGER_SCREEN = "dev.microcontrollers.packmanager.gui.FolderedPackSelectionScreen"
