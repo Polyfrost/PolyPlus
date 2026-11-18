@@ -2150,7 +2150,7 @@ object LobbyScene {
 
     private val projector = Projector()
 
-    private fun sightAvatar(avatar: LobbyAvatar, right: Vec3) {
+    private fun sightAvatar(avatar: LobbyAvatar, right: Vec3, eye: Vec3, yaw: Float) {
         val feet = avatar.position()
         val middle = avatar.bbHeight / 2.0
         projector.project(feet.x, feet.y, feet.z)
@@ -2161,6 +2161,7 @@ object LobbyScene {
         val headY = projector.y
         projector.project(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
         LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
+        LobbyGrab.sight(avatar, feetX, feetY, headX, headY, projector.x, eye, yaw)
     }
 
     private fun sectionsSettled(mc: Minecraft): Boolean = LobbyCompat.sectionsDone(mc)
@@ -2176,6 +2177,7 @@ object LobbyScene {
         scene.sightEye = eye
         var next: ArrayList<Label>? = null
         LobbyAntics.lose()
+        LobbyGrab.lose()
         projector.begin(renderer, currentFov)
         for (avatar in scene.avatars) {
             if (avatar.arrival != LobbyAvatar.Arrival.LANDED || avatar.dismissed || !ahead(eye, look, avatar)) continue
@@ -2185,7 +2187,7 @@ object LobbyScene {
             projector.project(feet.x, feet.y + (avatar.bbHeight + HEAD_LABEL_OFFSET), feet.z)
             val screenX = projector.x.toFloat()
             val screenY = projector.y.toFloat()
-            if (avatar.isLocal && driven == null) sightAvatar(avatar, right)
+            if (avatar.isLocal && driven == null) sightAvatar(avatar, right, eye, scene.rig.yRot)
             val label = Label(avatar.displayName, screenX, screenY, avatar.isLocal, sight.invite, avatar.whereabouts)
             (next ?: ArrayList<Label>(scene.avatars.size).also { next = it }) += label
         }
@@ -2329,7 +2331,9 @@ object LobbyScene {
             //? if > 1.8.9
             stageProps(scene)
             if (driven == null) tickSceneEntities(scene.level)
-            LobbyAntics.tick(scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null })
+            val local = scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null }
+            LobbyAntics.tick(local)
+            LobbyGrab.tick(local)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()
@@ -2445,6 +2449,10 @@ object LobbyScene {
     private fun idle(avatar: LobbyAvatar, speaker: LobbyAvatar?, time: Double, elapsed: Double) {
         if (avatar.arrival != LobbyAvatar.Arrival.LANDED) return
         val gaze = avatar.gaze
+        if (LobbyGrab.steer(avatar)) {
+            gaze.drive(avatar, elapsed)
+            return
+        }
         val spectral = avatar.spectral
         gaze.wander(time, if (spectral) HOLOGRAM_TURN_RANGE else HEAD_TURN_RANGE, avatar.landedTick.coerceAtLeast(0L) / TICKS_PER_SECOND)
         val rest = avatar.rest.yaw
@@ -2538,6 +2546,7 @@ object LobbyScene {
         runCatching { LobbyWardrobe.reset() }
         runCatching { LobbyHerobrine.stop() }
         runCatching { LobbyAntics.reset() }
+        runCatching { LobbyGrab.reset() }
         runCatching { detach(mc) }
         runCatching { owner?.finish(LobbyPhase.FAILED) }
         runCatching { LobbyEvents.ended() }
@@ -2598,6 +2607,7 @@ object LobbyScene {
         LobbyWardrobe.reset()
         LobbyHerobrine.stop()
         LobbyAntics.reset()
+        LobbyGrab.reset()
         LobbyHologram.reset()
         LobbyFraming.reset()
         if (!inside) scene.avatars.firstOrNull { it.isLocal }?.let { PetManager.despawn(it.uuid) }

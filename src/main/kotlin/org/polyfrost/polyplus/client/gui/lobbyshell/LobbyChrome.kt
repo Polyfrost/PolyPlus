@@ -50,10 +50,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -146,6 +148,7 @@ import org.polyfrost.polyplus.client.gui.themeToggle
 import org.polyfrost.polyplus.client.gui.toggleFullscreen
 import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
+import org.polyfrost.polyplus.client.lobby.LobbyGrab
 import org.polyfrost.polyplus.client.lobby.LobbyHologram
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
@@ -173,6 +176,7 @@ import androidx.compose.ui.text.style.TextOverflow
 private const val FROST_MILLIS = 220
 private const val REVEAL_MILLIS = 700
 private const val PLAY_SLIDE_MILLIS = 240
+private const val AVATAR_HOLD_MS = 250L
 
 private class LobbyTab(val label: String, val page: LobbyPage)
 
@@ -777,8 +781,48 @@ private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = point
             val event = awaitPointerEvent()
             if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue
             val at = event.changes.firstOrNull()?.position ?: continue
-            if (lobby.calm() && LobbyAntics.click(at.x / size.width.toDouble(), (at.y + notch) / (size.height + notch).toDouble())) event.changes.forEach { it.consume() }
+            if (!lobby.calm() || !LobbyGrab.touches(sceneX(at), sceneY(at, notch))) continue
+            event.changes.forEach { it.consume() }
+            avatarGesture(at, notch)
         }
+    }
+}
+
+private fun AwaitPointerEventScope.sceneX(at: Offset): Double = at.x / size.width.toDouble()
+
+private fun AwaitPointerEventScope.sceneY(at: Offset, notch: Int): Double = (at.y + notch) / (size.height + notch).toDouble()
+
+private suspend fun AwaitPointerEventScope.avatarGesture(press: Offset, notch: Int) {
+    var grabbing = false
+    var waiting = true
+    val frame = size
+    try {
+        while (true) {
+            val event = if (waiting) withTimeoutOrNull(AVATAR_HOLD_MS) { awaitPointerEvent() } else awaitPointerEvent()
+            if (size != frame) {
+                if (grabbing) LobbyGrab.cancel()
+                grabbing = false
+                return
+            }
+            if (event == null) {
+                waiting = false
+                grabbing = LobbyGrab.grab(sceneX(press), sceneY(press, notch))
+                continue
+            }
+            event.changes.forEach { it.consume() }
+            if (event.type == PointerEventType.Release || !event.buttons.isPrimaryPressed) {
+                if (!grabbing) LobbyAntics.click(sceneX(press), sceneY(press, notch))
+                return
+            }
+            val at = event.changes.firstOrNull()?.position ?: continue
+            if (!grabbing && waiting && (at - press).getDistance() > viewConfiguration.touchSlop) {
+                waiting = false
+                grabbing = LobbyGrab.grab(sceneX(press), sceneY(press, notch))
+            }
+            if (grabbing) LobbyGrab.drag(sceneX(at), sceneY(at, notch))
+        }
+    } finally {
+        if (grabbing) LobbyGrab.release()
     }
 }
 
