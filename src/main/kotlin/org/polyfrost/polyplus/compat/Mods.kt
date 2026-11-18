@@ -9,6 +9,7 @@ object Mods {
     val evergreenHud: Boolean by lazy { loaded("evergreenhud") }
     val exploitPreventer: Boolean by lazy { loaded("exploitpreventer") }
     val flashback: Boolean by lazy { loaded("flashback") }
+    val guiSlider: Boolean by lazy { loaded("gui_slider") }
     val iris: Boolean by lazy { loaded("iris") }
     val notEnoughAnimations: Boolean by lazy { loaded("notenoughanimations") }
     val replayMod: Boolean by lazy { loaded("replaymod") }

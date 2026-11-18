@@ -44,5 +44,8 @@
     "breaks": {
         "auto-reauth": "*",
         "wwaypoints": "<0.8.0"
+    },
+    "conflicts": {
+        "rrls": "*"
     }
 }

@@ -23,6 +23,8 @@ internal interface SettingsPageProvider {
 
     @Composable
     fun Page(category: SettingsCategory, parent: () -> Screen?)
+
+    fun search(category: SettingsCategory, parent: () -> Screen?): List<SettingsSearchItem> = emptyList()
 }
 
 internal enum class SettingsGroup { Game, OneClient }
@@ -73,6 +75,8 @@ internal interface SettingsEntryProvider {
     fun opened(categoryId: String) {}
 
     fun closed(categoryId: String) {}
+
+    fun search(entry: SettingsEntry, parent: () -> Screen?): List<SettingsSearchItem> = emptyList()
 }
 
 internal class SettingsTab(val entry: SettingsEntry, val provider: SettingsEntryProvider?, val label: String) {

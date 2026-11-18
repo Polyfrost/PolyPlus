@@ -9,9 +9,10 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import org.polyfrost.polyplus.mixin.client.access.SettingsOptionInstanceAccessor
 import org.polyfrost.polyplus.mixin.client.access.SettingsTooltipAccessor
 import kotlin.math.roundToInt
+import net.fabricmc.loader.api.FabricLoader
+import java.lang.reflect.Field
 //? if < 26.2 {
-/*import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.client.gui.components.CycleButton
+/*import net.minecraft.client.gui.components.CycleButton
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 *///?}
@@ -24,7 +25,38 @@ internal object SettingsOptionRows {
         val option = instance as OptionInstance<Any>
         val caption = caption(option)
         val kind = kindOf(option, caption) ?: return null
-        return SettingRow(keyOf(option), caption, hint ?: hint(option), kind, enabled, wide)
+        return SettingRow(keyOf(option), caption, hint ?: hint(option), kind, enabled, wide, reset(option))
+    }
+
+    fun reset(option: OptionInstance<Any>): SettingReset? {
+        val field = initialValue ?: return null
+        val default = runCatching { field.get(option) }.getOrNull() ?: return null
+        return SettingReset(option.get() == default) {
+            assign(option, default)
+            save()
+        }
+    }
+
+    //? if >= 26.2 {
+    @Suppress("UNCHECKED_CAST")
+    private fun assign(option: OptionInstance<Any>, value: Any) {
+        val values: Any = option.values()
+        if (values is OptionInstance.CycleableValueSet<*>) (values as OptionInstance.CycleableValueSet<Any>).valueSetter().set(option, value) else option.set(value)
+    }
+    //?} else {
+    /*private fun assign(option: OptionInstance<Any>, value: Any) {
+        val values = LegacyValues.valuesOf(option)
+        if (values != null && LegacyValues.cycleable(values)) LegacyValues.set(values, option, value) else option.set(value)
+    }
+    *///?}
+
+    private val initialValue: Field? by lazy {
+        val mapped = runCatching {
+            FabricLoader.getInstance().mappingResolver.mapFieldName("intermediary", "net.minecraft.class_7172", "field_37866", "Ljava/lang/Object;")
+        }.getOrNull()
+        listOfNotNull("initialValue", mapped).distinct().firstNotNullOfOrNull { name ->
+            runCatching { OptionInstance::class.java.getDeclaredField(name).apply { isAccessible = true } }.getOrNull()
+        }
     }
 
     fun keyOf(option: OptionInstance<*>): String {

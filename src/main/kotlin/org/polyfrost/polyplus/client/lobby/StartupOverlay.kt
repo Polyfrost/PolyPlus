@@ -12,6 +12,7 @@ import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
+import org.polyfrost.polyplus.client.gui.screens.connection.ConnectionRoutes
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.Easing
 import java.util.concurrent.CompletableFuture
@@ -187,7 +188,17 @@ object StartupOverlay {
     }
 
     @JvmStatic
-    fun ownsReload(fadeIn: Boolean): Boolean = fadeIn && enabled() && ScreenRouter.originOf(ClientPlatform.currentScreen()) != null
+    fun ownsReload(fadeIn: Boolean): Boolean {
+        if (!fadeIn || !enabled()) return false
+        val mc = Minecraft.getInstance()
+        val screen = ClientPlatform.currentScreen()
+        if (ScreenRouter.originOf(screen) == null || ConnectionRoutes.isConnectionScreen(screen)) return false
+        //? if > 1.8.9 {
+        return mc.connection == null || mc.isLocalServer
+        //?} else {
+        /*return mc.getNetworkHandler() == null || mc.isIntegratedServerRunning
+        *///?}
+    }
 
     @JvmStatic
     fun reloadFrame(mc: Minecraft, g: StartupGraphics, partial: Float, state: ReloadState, reload: Float, finished: Boolean): Boolean {

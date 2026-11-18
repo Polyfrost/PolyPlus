@@ -22,6 +22,7 @@ import org.polyfrost.polyplus.client.gui.familyVariant
 import org.polyfrost.polyplus.client.gui.isGlassStyle
 import org.polyfrost.polyplus.client.gui.isLightTheme
 import org.polyfrost.polyplus.client.gui.isMinecraftStyle
+import org.polyfrost.polyplus.compat.Mods
 import java.util.concurrent.ConcurrentHashMap
 
 object OnboardingFeatures {
@@ -348,6 +349,7 @@ object OnboardingFeatures {
     }
 
     fun applyGuiScale(value: Int, persist: Boolean = true) {
+        if (Mods.guiSlider) return
         runCatching {
             val mc = Minecraft.getInstance()
             //? if > 1.8.9 {

@@ -64,6 +64,8 @@ internal class SodiumBridge private constructor() : SodiumBackend {
     private val validatedValue = statefulClass.getMethod("getValidatedValue")
     private val appliedValue = statefulClass.getMethod("getAppliedValue")
     private val modifyValue = statefulClass.getMethod("modifyValue", Any::class.java)
+    private val defaultValue: Method? = runCatching { statefulClass.getMethod("getDefaultValue") }.getOrNull()
+    private val dependentGet: Method? = runCatching { sodium("client.config.value.DependentValue").getMethod("get", configClass) }.getOrNull()
 
     private val booleanClass = sodium("client.config.structure.BooleanOption")
 
@@ -181,7 +183,15 @@ internal class SodiumBridge private constructor() : SodiumBackend {
             enumClass.isInstance(option) -> choice(option)
             else -> return null
         } ?: return null
-        return SettingRow(key, label, hint, kind, enabled)
+        return SettingRow(key, label, hint, kind, enabled, reset = reset(option))
+    }
+
+    private fun reset(option: Any): SettingReset? {
+        val read = defaultValue ?: return null
+        val get = dependentGet ?: return null
+        val config = config() ?: return null
+        val default = runCatching { call(get, call(read, option), config) }.getOrNull() ?: return null
+        return SettingReset(call(validatedValue, option) == default) { modify(option, default) }
     }
 
     private fun slider(option: Any): SettingKind? {

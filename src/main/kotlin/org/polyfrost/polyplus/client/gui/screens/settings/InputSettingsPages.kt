@@ -51,11 +51,25 @@ private val TwoColumnWidth = 620.dp
 private val SectionGap = 20.dp
 private const val REFRESH_MILLIS = 500L
 private const val MAX_QUERY = 64
+internal const val KEYBINDS_TITLE = "Keybinds"
 
 internal object InputSettingsPages : SettingsPageProvider {
     private val categories = setOf(SettingsCategory.Controls, SettingsCategory.Skin, SettingsCategory.Accessibility, SettingsCategory.Language)
 
     override fun handles(category: SettingsCategory): Boolean = InputSettingsPlatform.available && category in categories
+
+    override fun search(category: SettingsCategory, parent: () -> Screen?): List<SettingsSearchItem> = when (category) {
+        SettingsCategory.Controls -> InputSettingsPlatform.controlsSections().searchItems() + keyBindItems()
+        SettingsCategory.Skin -> InputSettingsPlatform.skinSections().searchItems()
+        SettingsCategory.Accessibility -> InputSettingsPlatform.accessibilitySections().searchItems()
+        SettingsCategory.Language -> listOf(InputSettingsPlatform.fontSection()).searchItems()
+        else -> emptyList()
+    }
+
+    private fun keyBindItems(): List<SettingsSearchItem> = KeyBindsPlatform.rows().map { row ->
+        val detail = if (row.unbound) row.owner else row.owner + " " + row.key
+        SettingsSearchItem(row.name, detail, row.category, KEYBIND_FOCUS + row.id, row.name)
+    }
 
     @Composable
     override fun Page(category: SettingsCategory, parent: () -> Screen?) {
@@ -118,7 +132,7 @@ private fun ControlsPage() {
     val changed: () -> Unit = { revision++ }
     val keys = remember { KeyBindsState() }
     InputPageScroll { columns ->
-        InputPageHeader("Keyboard", "Changes apply as you make them.")
+        InputPageHeader(KEYBINDS_TITLE, "Changes apply as you make them.")
         KeyBindsKeymap(keys, refresh)
         sections.forEach { SectionBlock(it, columns, changed) }
         KeyBindsSection(keys, refresh)

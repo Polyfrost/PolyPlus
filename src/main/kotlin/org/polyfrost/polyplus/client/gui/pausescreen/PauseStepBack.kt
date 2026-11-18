@@ -61,6 +61,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyRoster
 import org.polyfrost.polyplus.client.gui.lobbyshell.PlayButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.Wordmark
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.social.GroupsRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -98,8 +99,10 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                 .graphicsLayer { alpha = reveal }
                 .background(Brush.horizontalGradient(0.5f to ink.copy(alpha = 0f), 0.66f to ink.copy(alpha = 0.72f), 0.8f to ink.copy(alpha = 0.92f), 1f to ink.copy(alpha = 0.96f))),
         )
-        Box(Modifier.graphicsLayer { alpha = reveal }.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(0f to ink.copy(alpha = 0.92f), 0.42f to ink.copy(alpha = 0.74f), 1f to ink.copy(alpha = 0f))))
-        Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
+        if (PolyPlusPauseConfig.pauseVignette) {
+            Box(Modifier.graphicsLayer { alpha = reveal }.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(0f to ink.copy(alpha = 0.92f), 0.42f to ink.copy(alpha = 0.74f), 1f to ink.copy(alpha = 0f))))
+            Box(Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = reveal }.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(ink.copy(alpha = 0f), ink.copy(alpha = 0.6f)))))
+        }
     }
     BoxWithConstraints(Modifier.matchParentSize().graphicsLayer { alpha = reveal }) {
         val roomWidth = maxWidth

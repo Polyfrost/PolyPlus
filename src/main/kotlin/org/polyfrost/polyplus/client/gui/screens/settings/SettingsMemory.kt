@@ -16,6 +16,10 @@ internal data class SettingsSelection(val category: String, val tab: String? = n
 object SettingsMemory {
     private var selection: SettingsSelection? = null
     private var host: Screen? = null
+    private var target: Screen? = null
+    private var liveScreen: Screen? = null
+    private var liveParent: Screen? = null
+    private var liveSelection: SettingsSelection? = null
     private var awaitingClose = false
     private var hostInWorld = false
 
@@ -24,6 +28,7 @@ object SettingsMemory {
     internal fun leaving(selection: SettingsSelection, host: Screen?) {
         this.selection = selection
         this.host = host
+        target = host
         hostInWorld = ClientPlatform.inWorld()
         awaitingClose = false
     }
@@ -36,6 +41,28 @@ object SettingsMemory {
     fun openClosingFrom(host: Screen?, entry: String, open: () -> Unit) {
         leaving(entry, host)
         returnOnClose(host, open)
+    }
+
+    internal fun showing(screen: Screen?, parent: Screen?, selection: SettingsSelection) {
+        liveScreen = screen
+        liveParent = parent
+        liveSelection = selection
+    }
+
+    internal fun hidden(screen: Screen?) {
+        if (liveScreen !== screen) return
+        liveScreen = null
+        liveParent = null
+        liveSelection = null
+    }
+
+    fun openReturningTo(host: Screen?, open: () -> Unit) {
+        val live = liveSelection
+        if (host != null && host === liveScreen && live != null) leaving(live, liveParent) else leaving(SettingsCategory.Video.entryId, host)
+        target = host
+        awaitingClose = host != null
+        if (host is OneClientPauseScreen || ClientPlatform.inWorld()) PauseRouter.holdPause()
+        open()
     }
 
     fun returnOnClose(host: Screen?, open: () -> Unit) {
@@ -51,13 +78,14 @@ object SettingsMemory {
         awaitingClose = false
         if (!OneConfigUI.isOneConfigScreen(ClientPlatform.currentScreen())) return null
         if (ClientPlatform.inWorld() != hostInWorld) return null
-        return host
+        return target
     }
 
     internal fun restore(host: Any?): SettingsSelection {
         val saved = selection.takeIf { host != null && this.host === host }
         selection = null
         this.host = null
+        target = null
         awaitingClose = false
         return saved ?: SettingsSelection(SettingsCategory.Video.entryId)
     }

@@ -687,6 +687,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         val previous = host()
         val target = PackBridges.packedPacksScreen(screen, previous) ?: return
         leave(Away.Rebuild, previous)
+        PackDetour.open(target, previous ?: ClientPlatform.currentScreen())
         ClientPlatform.setScreen(target)
     }
 

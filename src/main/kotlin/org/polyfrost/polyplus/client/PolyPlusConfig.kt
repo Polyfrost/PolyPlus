@@ -445,7 +445,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         subcategory = "Keybinds",
         description = "Open the PolyPlus Socials menu",
     )
-    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_TAB), null, KeyModifiers.SHIFT, 0L) { state ->
+    var socialsMenuKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_GRAVE), null, KeyModifiers.SHIFT, 0L) { state ->
         if (state) {
             SocialOverlay.toggle()
         }

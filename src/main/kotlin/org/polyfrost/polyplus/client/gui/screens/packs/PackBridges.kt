@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.gui.screens.packs
 
 //? if > 1.8.9 {
+import java.lang.ref.WeakReference
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.Button
@@ -183,6 +184,24 @@ internal object PackBridges {
         //?} else {
         /*runCatching { button.onPress() }
         *///?}
+    }
+}
+
+internal object PackDetour {
+    private var away: WeakReference<Screen>? = null
+    private var back: WeakReference<Screen>? = null
+
+    fun open(target: Screen, from: Screen?) {
+        away = WeakReference(target)
+        back = from?.let(::WeakReference)
+    }
+
+    fun backFrom(current: Screen?): Screen? {
+        if (current == null || current !== away?.get()) return null
+        val target = back?.get()
+        away = null
+        back = null
+        return target
     }
 }
 //?} else {

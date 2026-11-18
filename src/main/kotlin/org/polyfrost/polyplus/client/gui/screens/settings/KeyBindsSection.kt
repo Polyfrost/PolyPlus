@@ -1,8 +1,9 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalOneConfigUiApi::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 
 package org.polyfrost.polyplus.client.gui.screens.settings
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -21,13 +22,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
@@ -65,6 +72,8 @@ private val ChipHeight = 30.dp
 private val RowMinHeight = 56.dp
 private const val MAX_QUERY = 64
 private const val MOUSE_PREFIX = "key.mouse."
+private const val REVEAL_DELAY_MILLIS = 150L
+internal const val KEYBIND_FOCUS = "keybind:"
 
 internal enum class KeyBindSearch(val label: String, val placeholder: String) {
     Name("Name", "Search by name"),
@@ -145,6 +154,25 @@ internal fun KeyBindsSection(state: KeyBindsState, refresh: Int) {
     var sort by remember { mutableStateOf(KeyBindSort.Default) }
     var category by remember { mutableStateOf<String?>(null) }
     var confirmReset by remember { mutableStateOf(false) }
+    var reveal by remember { mutableIntStateOf(0) }
+    val requester = remember { BringIntoViewRequester() }
+    val focus = LocalSettingsFocus.current
+    LaunchedEffect(focus) {
+        snapshotFlow { focus.key }.collect {
+            val name = focus.take(KEYBIND_FOCUS) ?: return@collect
+            query = name.take(MAX_QUERY)
+            mode = KeyBindSearch.Name
+            view = KeyBindView.All
+            category = null
+            state.selectedKey = null
+            reveal++
+        }
+    }
+    LaunchedEffect(reveal) {
+        if (reveal == 0) return@LaunchedEffect
+        delay(REVEAL_DELAY_MILLIS)
+        requester.bringIntoView()
+    }
     val selectedKey = state.selectedKey
     val target = KeyBindCapture.target
     val revision = KeyBindCapture.revision
@@ -168,7 +196,7 @@ internal fun KeyBindsSection(state: KeyBindsState, refresh: Int) {
     val flat = sort != KeyBindSort.Default
     val theme = OneConfigTheme.current
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(KeyBindsPlatform.text("controls.keybinds.title"), Modifier.padding(start = 4.dp).weight(1f), contentPadding = PaddingValues(0.dp))
             SearchField(

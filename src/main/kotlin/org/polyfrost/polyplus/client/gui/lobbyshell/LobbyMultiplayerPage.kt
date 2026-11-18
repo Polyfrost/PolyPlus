@@ -69,7 +69,6 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 /*import org.polyfrost.polyplus.client.lobby.LobbyMotd*/
 import net.minecraft.network.chat.Component
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuItemSize
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuList
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
@@ -124,6 +123,18 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeStyle
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private enum class ServerFilter(val label: String) {
     All("All"),
@@ -356,8 +367,7 @@ private fun ServerBrowser(lobby: LobbyShell, onBack: () -> Unit, onDirect: () ->
             filters = { UnderlineTabs(ServerFilter.entries.map { TabItem(it, it.label) }, filter) { filter = it } },
         ) {
             TextButton(text = "Add server", icon = LobbyIcons.PLUS, onClick = lobby::addServer, size = ControlSize.Large, style = ControlStyle.Primary)
-            if (filter == ServerFilter.All) SortMenu(servers)
-            ServersMenu(lobby, listView, onDirect, remember(lobby) { lobby.serverListModButtons() }) {
+            ServerActions(lobby, filter == ServerFilter.All, listView, onDirect, remember(lobby) { lobby.serverListModButtons() }) {
                 listView = it
                 PolyPlusLobbyConfig.serverListView = it
                 PolyPlusLobbyConfig.save()
@@ -420,37 +430,76 @@ private fun sortLabel(sort: ServerFolders.Sort): String = when (sort) {
 private const val SORT_MENU_WIDTH = 220
 
 @Composable
-private fun ServersMenu(lobby: LobbyShell, listView: Boolean, onDirect: () -> Unit, modButtons: List<ServerListModButton>, onLayout: (Boolean) -> Unit) {
+private fun ServerActions(
+    lobby: LobbyShell,
+    sortable: Boolean,
+    listView: Boolean,
+    onDirect: () -> Unit,
+    modButtons: List<ServerListModButton>,
+    onLayout: (Boolean) -> Unit,
+) {
     val realms = PolyPlusMainMenuConfig.realmsSupported() && !PolyPlusMainMenuConfig.hideMainMenuRealms
-    NavPopupButton(SOCIAL_ASSETS + "dots-vertical.svg", "More", gap = MENU_GAP) { close ->
-        LobbyUserTheme {
-            val entries = buildList<MenuEntry> {
-                add(MenuAction("Direct connect", onDirect, icon = SOCIAL_ASSETS + "globe-01.svg", size = MenuItemSize.Regular))
-                if (realms) add(MenuAction("Realms", lobby::openRealms, icon = REALM_ICON, badge = LobbyRealms.invites.takeIf { it > 0 }?.toString(), size = MenuItemSize.Regular))
-                add(
-                    MenuAction(
-                        "Refresh",
-                        {
-                            lobby.servers.refresh()
-                            LobbyRealms.refresh(force = true)
-                        },
-                        icon = LobbyIcons.REFRESH,
-                        size = MenuItemSize.Regular,
-                    ),
-                )
-                if (listView) add(MenuAction("Show as grid", { onLayout(false) }, icon = GRID_ICON, size = MenuItemSize.Regular))
-                else add(MenuAction("Show as list", { onLayout(true) }, icon = LIST_ICON, size = MenuItemSize.Regular))
-                modButtons.forEach { button ->
-                    add(MenuAction(button.label, button.press, detail = button.mod, enabled = button.enabled, size = MenuItemSize.Regular))
+    BoxWithConstraints {
+        Row(
+            Modifier.widthIn(max = (maxWidth - SEARCH_MIN_WIDTH - ACTION_GAP).coerceAtLeast(0.dp)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ACTION_GAP),
+        ) {
+            TextButton(text = "Direct connect", onClick = onDirect, size = ControlSize.Large, style = ControlStyle.Secondary)
+            if (modButtons.isNotEmpty()) {
+                val scroll = rememberScrollState()
+                ScrollContainer(
+                    scroll,
+                    Modifier.weight(1f, fill = false).wheelScrollsHorizontally(scroll),
+                    orientation = Orientation.Horizontal,
+                    scrollbar = false,
+                    fadingEdges = true,
+                    smoothWheel = false,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ACTION_GAP)) {
+                        modButtons.forEach { button ->
+                            TextButton(text = button.label, onClick = button.press, size = ControlSize.Large, style = ControlStyle.Secondary, enabled = button.enabled)
+                        }
+                    }
                 }
             }
-            MenuList(entries, close, Modifier.width(MENU_WIDTH.dp), MenuItemSize.Regular)
+            if (realms) {
+                val invites = LobbyRealms.invites
+                NavIconButton(REALM_ICON, if (invites > 0) "Realms, $invites ${if (invites == 1) "invite" else "invites"}" else "Realms", lobby::openRealms)
+            }
+            NavIconButton(LobbyIcons.REFRESH, "Refresh", {
+                lobby.servers.refresh()
+                LobbyRealms.refresh(force = true)
+            })
+            if (sortable) SortMenu(lobby.servers)
+            NavIconButton(if (listView) GRID_ICON else LIST_ICON, if (listView) "Show as grid" else "Show as list", { onLayout(!listView) })
         }
     }
 }
 
-private const val MENU_WIDTH = 260
+private fun Modifier.wheelScrollsHorizontally(state: ScrollState): Modifier = pointerInput(state) {
+    var target = 0f
+    coroutineScope {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.type != PointerEventType.Scroll) continue
+                val delta = event.changes.fold(Offset.Zero) { sum, change -> sum + change.scrollDelta }
+                if (abs(delta.y) <= abs(delta.x)) continue
+                val forward = delta.y > 0f
+                if (if (forward) !state.canScrollForward else !state.canScrollBackward) continue
+                event.changes.forEach { it.consume() }
+                if (!state.isScrollInProgress || (target > state.value) != forward) target = state.value.toFloat()
+                target = (target + delta.y * density).coerceIn(0f, state.maxValue.toFloat())
+                launch { if (Motion.reduced) state.scrollTo(target.roundToInt()) else state.animateScrollTo(target.roundToInt()) }
+            }
+        }
+    }
+}
+
 private val MENU_GAP = 8.dp
+private val ACTION_GAP = 8.dp
+private val SEARCH_MIN_WIDTH = 200.dp
 
 @Composable
 private fun ServerGrid(lobby: LobbyShell, shown: List<ServerEntry>, canReorder: Boolean, onDelete: (ServerEntry) -> Unit, modifier: Modifier) {

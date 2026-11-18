@@ -137,6 +137,12 @@ internal object PauseHost : SocialHost {
 internal fun rememberFrame(): State<Long> = produceState(0L) { while (true) withFrameNanos { value = it } }
 
 @Composable
+internal fun <T> rememberLive(read: () -> T): T {
+    val state = produceState(read()) { while (true) withFrameNanos { value = read() } }
+    return state.value
+}
+
+@Composable
 internal fun rememberReveal(): Float {
     val frame by rememberFrame()
     var start by remember { mutableLongStateOf(0L) }

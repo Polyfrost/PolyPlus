@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.client.player.RemotePlayer
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
 //? if > 1.8.9 {
 import net.minecraft.client.resources.DefaultPlayerSkin
 //?} else {
@@ -19,6 +20,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.entity.particle.ParticleType
 *///?}
 import net.minecraft.resources.Identifier
+import net.minecraft.sounds.SoundEvents
 import net.minecraft.tags.BlockTags
 //? if >= 1.21.10 {
 import net.minecraft.world.entity.player.PlayerSkin
@@ -129,6 +131,8 @@ object LobbyHerobrine {
     private const val FORCED_MAX_SCREEN_Y = 0.9
     private const val FORCED_CLEAR = 2.5
     private const val FORCED_STEP = 1.0
+    private const val CAVE_PITCH = 1f
+    private const val CAVE_VOLUME = 0.6f
 
     private val LEAN_RADIANS = Math.toRadians(LEAN_DEGREES)
     private val HEAD_TILT_RADIANS = Math.toRadians(HEAD_TILT_DEGREES)
@@ -509,6 +513,17 @@ object LobbyHerobrine {
         shownAt = System.nanoTime()
         state = State.STANDING
         shownLast = true
+        rumble()
+    }
+
+    private fun rumble() {
+        runCatching {
+            //? if > 1.8.9 {
+            Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(SoundEvents.AMBIENT_CAVE.value(), CAVE_PITCH, CAVE_VOLUME))
+            //?} else {
+            /*Minecraft.getInstance().soundManager.play(SimpleSoundInstance.forUI(Identifier("ambient.cave.cave"), CAVE_PITCH, CAVE_VOLUME))
+            *///?}
+        }
     }
 
     private fun vanish(level: ClientLevel) {

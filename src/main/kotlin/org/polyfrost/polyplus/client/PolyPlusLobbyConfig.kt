@@ -53,6 +53,13 @@ object PolyPlusLobbyConfig : Config(
     var lobbyTime: LobbyTime = LobbyTime.CAPTURED
 
     @JvmStatic
+    @Switch(
+        title = "Vignette",
+        description = "Darken the edges of the lobby background.",
+    )
+    var lobbyVignette = true
+
+    @JvmStatic
     @Dropdown(
         title = "Lobby Music",
         description = "Choose the music that plays in the lobby.",

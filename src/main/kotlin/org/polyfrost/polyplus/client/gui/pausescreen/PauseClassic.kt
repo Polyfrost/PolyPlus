@@ -40,6 +40,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.rowFrame
@@ -75,8 +76,10 @@ private fun classicLayout(entries: List<PauseEntry>): ClassicLayout {
 
 @Composable
 internal fun BoxScope.ClassicScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
-    val reveal = rememberReveal() * (1f - away)
+    val animate = rememberLive { PolyPlusPauseConfig.classicOpenAnimation }
+    val reveal = (if (animate) rememberReveal() else 1f) * (1f - away)
     val rise = if (Motion.reduced) 0f else (1f - reveal) * CLASSIC_RISE
+    val widgetsUp = rememberLive { PolyPlusPauseConfig.classicWidgetCorner } == PauseWidgetCorner.TOP_RIGHT
     val place = rememberPlace()
     val state = rememberPauseState()
     val layout = classicLayout(screen.capture.entries)
@@ -103,13 +106,18 @@ internal fun BoxScope.ClassicScreen(screen: OneClientPauseScreen, narrow: Boolea
         PauseWidgetColumn(
             screen,
             pauseWidgetWidth(narrow),
-            (maxHeight - CLASSIC_MARGIN * 2 - CLASSIC_CUSTOMIZE_DROP).coerceAtLeast(0.dp),
+            (maxHeight - CLASSIC_MARGIN * 2 - if (widgetsUp) 0.dp else CLASSIC_CUSTOMIZE_DROP).coerceAtLeast(0.dp),
             Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = CLASSIC_MARGIN, start = CLASSIC_MARGIN)
+                .align(if (widgetsUp) Alignment.TopEnd else Alignment.BottomStart)
+                .padding(
+                    top = if (widgetsUp) CLASSIC_MARGIN else 0.dp,
+                    bottom = if (widgetsUp) 0.dp else CLASSIC_MARGIN,
+                    start = if (widgetsUp) 0.dp else CLASSIC_MARGIN,
+                    end = if (widgetsUp) CLASSIC_MARGIN else 0.dp,
+                )
                 .graphicsLayer {
                     alpha = reveal
-                    translationY = rise * density
+                    translationY = (if (widgetsUp) -rise else rise) * density
                 }
                 .blockPointer(),
         )

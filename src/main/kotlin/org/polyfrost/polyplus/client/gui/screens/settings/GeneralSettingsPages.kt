@@ -45,6 +45,12 @@ private const val GENERAL_REFRESH_MILLIS = 500L
 internal object GeneralSettingsPages : SettingsPageProvider {
     override fun handles(category: SettingsCategory): Boolean = GeneralOptions.supports(category)
 
+    override fun search(category: SettingsCategory, parent: () -> Screen?): List<SettingsSearchItem> =
+        GeneralOptions.sections(category, parent).flatMap { block ->
+            listOf(block.section).searchItems() +
+                block.actions.map { SettingsSearchItem(SettingsLabels.label(it.key, it.label), it.hint, block.section.title, actionFocusKey(it.key)) }
+        }
+
     @Composable
     override fun Page(category: SettingsCategory, parent: () -> Screen?) {
         var revision by remember { mutableIntStateOf(0) }
@@ -99,11 +105,13 @@ private fun GeneralBlock(block: GeneralSection, columns: Int, changed: () -> Uni
             }
             block.actions.forEach { action ->
                 key(action.key) {
-                    TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
-                        DrillRow(null, SettingsLabels.label(action.key, action.label), null, {
-                            action.run()
-                            changed()
-                        }, enabled = action.enabled)
+                    SettingsFocusTarget(actionFocusKey(action.key)) {
+                        TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
+                            DrillRow(null, SettingsLabels.label(action.key, action.label), null, {
+                                action.run()
+                                changed()
+                            }, enabled = action.enabled)
+                        }
                     }
                 }
             }

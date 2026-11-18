@@ -44,14 +44,16 @@ internal object InputSettingsPlatform {
     fun skinSections(): List<SettingSection> {
         val o = options
         val parts = PlayerModelPart.entries.map { part ->
-            SettingRow("part-" + part.id, part.getName().string, null, SettingKind.Toggle(o.isModelPartEnabled(part)) {
+            val enabled = o.isModelPartEnabled(part)
+            val set = { on: Boolean ->
                 //? if >= 1.21.4 {
-                o.setModelPart(part, it)
+                o.setModelPart(part, on)
                 //?} else {
-                /*o.toggleModelPart(part, it)
+                /*o.toggleModelPart(part, on)
                 *///?}
                 o.save()
-            })
+            }
+            SettingRow("part-" + part.id, part.getName().string, null, SettingKind.Toggle(enabled, set), reset = SettingReset(enabled) { set(true) })
         }
         return listOf(
             SettingSection(text("options.skinCustomisation.title"), parts),
@@ -150,7 +152,7 @@ internal object InputSettingsPlatform {
             toggle.set(it == 1)
             save()
         }
-        return SettingRow(base.key, base.label, base.hint, kind, base.enabled)
+        return SettingRow(base.key, base.label, base.hint, kind, base.enabled, reset = base.reset)
     }
 }
 //?} elif = 1.8.9 {

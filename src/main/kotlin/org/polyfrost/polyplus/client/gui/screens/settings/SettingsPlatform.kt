@@ -298,9 +298,10 @@ internal object SettingsPlatform {
         }
         val labels = listOf(text("options.fullscreen.current")) + (0 until modeCount(monitor)).map { modeLabel(monitor, it) }
         val selected = window.preferredFullscreenVideoMode.map { modeIndex(monitor, it) }.orElse(-1) + 1
+        val reset = SettingReset(selected <= 0) { window.setPreferredFullscreenVideoMode(Optional.empty()) }
         return SettingRow(FULLSCREEN_KEY, caption, hint, SettingKind.Choice(labels, selected) { index ->
             window.setPreferredFullscreenVideoMode(if (index <= 0) Optional.empty() else Optional.of(modeAt(monitor, index - 1)))
-        })
+        }, reset = reset)
     }
 
     //? if >= 26.2 {

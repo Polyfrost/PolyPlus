@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.options.OptionsScreen
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 //?} else
@@ -23,10 +24,20 @@ object VanillaMenuButton {
     fun register() {
         ScreenEvents.AFTER_INIT.addPhaseOrdering(Event.DEFAULT_PHASE, LATE_PHASE)
         ScreenEvents.AFTER_INIT.register(LATE_PHASE) { _, screen, _, _ ->
-            if (screen !is TitleScreen || MainMenuReplacement.replacesTitleScreen()) return@register
-            (screen as ScreenAccessor).polyplusAddRenderableWidget(lobbyButton(screen.width))
+            val button = when {
+                screen is OptionsScreen -> optionsButton(screen.width)
+                screen is TitleScreen && !MainMenuReplacement.replacesTitleScreen() -> lobbyButton(screen.width)
+                else -> return@register
+            }
+            (screen as ScreenAccessor).polyplusAddRenderableWidget(button)
         }
     }
+
+    private fun optionsButton(screenWidth: Int): Button =
+        Button.builder(PolyPlusBadge.badgeIcon) { PolyPlusOneConfigIntegration.openOneClientSettings() }
+            .tooltip(Tooltip.create(Component.translatableWithFallback("polyplus.options.oneclient", "OneClient settings")))
+            .bounds(screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE)
+            .build()
 
     private fun lobbyButton(screenWidth: Int): Button =
         Button.builder(PolyPlusBadge.badgeIcon) { MainMenuReplacement.switchToLobby() }
@@ -47,6 +58,19 @@ object VanillaMenuButton {
     fun onLegacyButton(id: Int): Boolean {
         if (id != LEGACY_BUTTON_ID) return false
         MainMenuReplacement.switchToLobby()
+        return true
+    }
+
+    const val LEGACY_OPTIONS_BUTTON_ID = 0x504C5554
+
+    @JvmStatic
+    fun legacyOptionsButton(screenWidth: Int): ButtonWidget =
+        ButtonWidget(LEGACY_OPTIONS_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "OC")
+
+    @JvmStatic
+    fun onLegacyOptionsButton(id: Int): Boolean {
+        if (id != LEGACY_OPTIONS_BUTTON_ID) return false
+        PolyPlusOneConfigIntegration.openOneClientSettings()
         return true
     }
     *///?}
