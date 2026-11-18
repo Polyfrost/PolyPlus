@@ -181,6 +181,8 @@
     //? if > 1.8.9
     "client.access.AbstractSelectionListAccessor",
     //? if > 1.8.9
+    "client.access.JoinMultiplayerScreenAccessor",
+    //? if > 1.8.9
     "client.access.AbstractWidgetAccessor",
     //? if > 1.8.9
     "client.access.ButtonAccessor",

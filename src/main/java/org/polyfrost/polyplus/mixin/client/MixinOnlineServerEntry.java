@@ -17,6 +17,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServerVanillaRenderer;
 import org.polyfrost.polyplus.client.featured.FeaturedServers;
 import org.polyfrost.polyplus.client.featured.ServerFolders;
 import org.polyfrost.polyplus.mixin.client.access.AbstractSelectionListAccessor;
+import org.polyfrost.polyplus.mixin.client.access.JoinMultiplayerScreenAccessor;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -53,9 +54,6 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
 
     @Shadow @Final private JoinMultiplayerScreen screen;
     @Shadow @Final private ServerData serverData;
-    //? if >= 1.21.10 {
-    @Shadow @Final ServerSelectionList this$0;
-    //?}
     @Unique private FeaturedServerRowRegistry.Row polyplus$row;
 
     @Override
@@ -311,7 +309,7 @@ public abstract class MixinOnlineServerEntry implements FeaturedServerEntryAcces
         var servers = screen.getServers();
         var neighbor = servers.get(group.get(to));
         servers.swap(group.get(from), group.get(to));
-        ((FeaturedServerListAccess) this$0).polyplus$moveSavedRow((ServerSelectionList.OnlineServerEntry) (Object) this, neighbor);
+        ((FeaturedServerListAccess) ((JoinMultiplayerScreenAccessor) screen).polyplus$serverSelectionList()).polyplus$moveSavedRow((ServerSelectionList.OnlineServerEntry) (Object) this, neighbor);
         ci.cancel();
     }
     //?}
