@@ -15,7 +15,8 @@ object GenericModNames {
         "PolyWeather" to "Weather Changer",
         "PolyZoom" to "Zoom",
         "Zoomify" to "Zoom",
-        "Chatting" to "Chat",
+        "Chatting" to "Chat Visuals",
+        "ChatTweaks" to "Chat Tweaks",
         "BehindYouV3" to "Snap Look",
         "BehindYou (SnapLook)" to "Snap Look",
         "OverflowAnimations" to "Old Animations",
@@ -30,11 +31,16 @@ object GenericModNames {
         "Legacy GUI Blur" to "GUI Blur",
         "ItemPhysic Lite" to "Item Physics",
         "ItemPhysicLite" to "Item Physics",
+        "ItemPhysic Lite Config" to "Item Physics",
         "AppleSkin" to "Saturation",
         "WaveyCapes" to "Wavey Capes",
         "LegacyWaveyCapes" to "Wavey Capes",
-        "Gamma Utils" to "Full Bright",
-        "FullBright" to "Full Bright",
+        "Gamma Utils" to "Fullbright",
+        "FullBright" to "Fullbright",
+        "wWaypoints" to "Waypoints",
+        "Detail Armor Bar" to "Detailed Armor Bar",
+        "Detail Armor Bar Reconstructed" to "Detailed Armor Bar",
+        "Tipper" to "AutoTip",
     )
 
     fun initialize() {
