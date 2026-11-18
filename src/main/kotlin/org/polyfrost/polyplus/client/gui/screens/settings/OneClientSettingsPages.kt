@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 //? if > 1.8.9 {
@@ -23,6 +25,7 @@ import net.minecraft.client.gui.screens.Screen
 *///?}
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
+import org.polyfrost.oneconfig.api.config.v1.Property
 import org.polyfrost.oneconfig.api.config.v1.Tree
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
@@ -34,6 +37,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigDestination
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.internal.ui.api.ConfigRegistry
+import org.polyfrost.oneconfig.internal.ui.components.localizedString
 import org.polyfrost.oneconfig.internal.ui.screens.ConfigScreen
 import org.polyfrost.oneconfig.internal.ui.shell.LocalShell
 import org.polyfrost.oneconfig.internal.ui.shell.ShellController
@@ -42,6 +46,7 @@ import java.util.concurrent.Executors
 private val OneClientGutter = 25.dp
 private val OneClientSearchWidth = 200.dp
 private const val ONECLIENT_ENTRY_PREFIX = "oneclient:config:"
+private const val ONECLIENT_FOCUS = "oneclient:option:"
 
 internal object OneClientSettingsPages : SettingsEntryProvider {
     private val logger = LogManager.getLogger("PolyPlus/OneClientSettings")
@@ -61,17 +66,39 @@ internal object OneClientSettingsPages : SettingsEntryProvider {
         }
     }
 
+    override fun search(entry: SettingsEntry, parent: () -> Screen?): List<SettingsSearchItem> {
+        val tree = tree(entry.id.removePrefix(ONECLIENT_ENTRY_PREFIX)) ?: return emptyList()
+        val out = mutableListOf<SettingsSearchItem>()
+        tree.onAllProps { _, prop ->
+            if (prop.display == Property.Display.HIDDEN || prop.getMetadata<Any?>("keybindsPageOnly") == true) return@onAllProps
+            if (prop.title == null && prop.getMetadata<String>("titleKey").isNullOrBlank()) return@onAllProps
+            val title = localizedString(prop.getMetadata("titleKey"), prop.title).trim()
+            if (title.isEmpty()) return@onAllProps
+            val description = if (prop.description == null && prop.getMetadata<String>("descriptionKey").isNullOrBlank()) {
+                null
+            } else {
+                localizedString(prop.getMetadata("descriptionKey"), prop.description)
+            }
+            out += SettingsSearchItem(title, description, null, ONECLIENT_FOCUS + prop.id, title)
+        }
+        return out
+    }
+
     @Composable
     override fun Page(entry: SettingsEntry, parent: () -> Screen?) {
         val id = entry.id.removePrefix(ONECLIENT_ENTRY_PREFIX)
         val revision = ConfigRegistry.revision
         val tree = remember(id, revision) { tree(id) }
+        val focus = LocalSettingsFocus.current
         DisposableEffect(id) {
             shell.search.clear()
             onDispose {
                 shell.search.clear()
                 save(id)
             }
+        }
+        LaunchedEffect(focus) {
+            snapshotFlow { focus.key }.collect { focus.take(ONECLIENT_FOCUS)?.let { shell.search.update(it) } }
         }
         CompositionLocalProvider(LocalShell provides shell, LocalSettingsOwner provides SettingsOwner.OneClient) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -80,7 +107,7 @@ internal object OneClientSettingsPages : SettingsEntryProvider {
                     if (tree == null) {
                         OneClientMissing(id)
                     } else {
-                        key(revision, tree) { ConfigScreen(tree, pageKey = "polyplus-settings/$id") }
+                        key(revision, tree) { ConfigScreen(tree, pageKey = "polyplus-settings/$id", configId = id) }
                     }
                 }
             }

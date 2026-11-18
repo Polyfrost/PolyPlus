@@ -42,6 +42,9 @@ internal class SettingRow(
     val kind: SettingKind,
     val enabled: Boolean = true,
     val wide: Boolean = false,
+    val reset: SettingReset? = null,
 )
+
+internal class SettingReset(val atDefault: Boolean, val apply: () -> Unit)
 
 internal class SettingSection(val title: String, val rows: List<SettingRow>)

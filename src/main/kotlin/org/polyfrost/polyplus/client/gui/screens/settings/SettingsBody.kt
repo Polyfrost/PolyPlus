@@ -1,11 +1,14 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
+@file:OptIn(ExperimentalOneConfigUiApi::class, ExperimentalFoundationApi::class)
 
 package org.polyfrost.polyplus.client.gui.screens.settings
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +23,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -34,10 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +66,10 @@ import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.EmptyState
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
+import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.oneconfig.api.ui.v1.components.SearchField
 import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
 import org.polyfrost.oneconfig.api.ui.v1.components.Select
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
@@ -94,6 +104,11 @@ private val RowGap = 2.dp
 private val ColumnGap = 8.dp
 private const val SEGMENT_LIMIT = 5
 private const val REFRESH_MILLIS = 500L
+private const val MAX_QUERY = 64
+private const val FOCUS_SETTLE_MILLIS = 150L
+private const val FOCUS_HOLD_MILLIS = 2500L
+private const val FOCUS_ALPHA = 0.14f
+private const val ACTION_FOCUS = "action:"
 
 @Composable
 internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) {
@@ -101,6 +116,8 @@ internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) 
     val restored = remember { resolve(nodes, SettingsMemory.restore(parent())) }
     var category by remember { mutableStateOf(restored.category) }
     val tabs = remember { mutableStateMapOf<String, String>().apply { restored.tab?.let { put(restored.category, it) } } }
+    var query by remember { mutableStateOf("") }
+    val focus = remember { SettingsFocus() }
     val node = nodes.firstOrNull { it.id == category } ?: nodes.firstOrNull { it.entry.external == null } ?: nodes.first()
     val tab = node.tabs.firstOrNull { it.id == tabs[node.id] && it.entry.external == null }
         ?: node.tabs.firstOrNull { it.entry.external == null }
@@ -112,40 +129,78 @@ internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) 
     DisposableEffect(shown) { onDispose { SettingsMemory.hidden(shown) } }
     val activate = { entry: SettingsEntry ->
         val external = entry.external
+        query = ""
+        focus.key = null
         if (external != null) external(leaving()) else category = entry.id
     }
     val pick = { picked: SettingsTab ->
         val external = picked.entry.external
         if (external != null) external(leaving()) else tabs[node.id] = picked.id
     }
+    val open = { hit: SettingsHit ->
+        val external = hit.tab.entry.external
+        query = ""
+        if (external != null) {
+            external(leaving())
+        } else {
+            category = hit.node.id
+            tabs[hit.node.id] = hit.tab.id
+            focus.query = hit.item?.query
+            focus.key = hit.item?.focus
+        }
+    }
+    val searching = query.isNotBlank()
+    if (searching) EscapeCloses { query = "" }
     Row(modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        SettingsRail(nodes.map { it.entry }, node.id, activate, Modifier.width(RailWidth).fillMaxHeight())
+        Column(Modifier.width(RailWidth).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SearchField(query, { query = it.take(MAX_QUERY) }, Modifier.fillMaxWidth(), placeholder = "Search settings", size = ControlSize.Regular)
+            SettingsRail(nodes.map { it.entry }, if (searching) "" else node.id, activate, Modifier.fillMaxWidth().weight(1f))
+        }
         Divider(vertical = true)
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            key(node.id) {
-                CategorySession(node)
-                if (node.tabs.size > 1) {
-                    val tabScroll = rememberScrollState()
-                    ScrollContainer(
-                        tabScroll,
-                        Modifier.fillMaxWidth().wheelScrollsHorizontally(tabScroll),
-                        orientation = Orientation.Horizontal,
-                        scrollbar = false,
-                        fadingEdges = true,
-                        smoothWheel = false,
-                    ) {
-                        UnderlineTabs(node.tabs.map { it.item() }, tab.id) { id -> node.tabs.firstOrNull { it.id == id }?.let(pick) }
-                    }
-                    Spacer(Modifier.height(TabGap))
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            Column(Modifier.fillMaxSize().then(if (searching) Modifier.unplaced() else Modifier)) {
+                CompositionLocalProvider(LocalSettingsFocus provides focus) {
+                    CategoryContent(node, tab, pick, leaving)
                 }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    CompositionLocalProvider(LocalSettingsOwner provides tab.entry.owner) {
-                        key(tab.id) { EntryPage(tab.entry, tab.provider, leaving) }
-                    }
-                }
+            }
+            if (searching) {
+                val index = remember(nodes) { SettingsSearch.index(nodes, parent) }
+                val hits = remember(index, query) { SettingsSearch.filter(index, query) }
+                SettingsSearchResults(hits, open)
             }
         }
     }
+}
+
+@Composable
+private fun ColumnScope.CategoryContent(node: SettingsNode, tab: SettingsTab, pick: (SettingsTab) -> Unit, leaving: () -> Screen?) {
+    key(node.id) {
+        CategorySession(node)
+        if (node.tabs.size > 1) {
+            val tabScroll = rememberScrollState()
+            ScrollContainer(
+                tabScroll,
+                Modifier.fillMaxWidth().wheelScrollsHorizontally(tabScroll),
+                orientation = Orientation.Horizontal,
+                scrollbar = false,
+                fadingEdges = true,
+                smoothWheel = false,
+            ) {
+                UnderlineTabs(node.tabs.map { it.item() }, tab.id) { id -> node.tabs.firstOrNull { it.id == id }?.let(pick) }
+            }
+            Spacer(Modifier.height(TabGap))
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            CompositionLocalProvider(LocalSettingsOwner provides tab.entry.owner) {
+                key(tab.id) { EntryPage(tab.entry, tab.provider, leaving) }
+            }
+        }
+    }
+}
+
+private fun Modifier.unplaced(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, placeable.height) {}
 }
 
 private fun resolve(nodes: List<SettingsNode>, saved: SettingsSelection): SettingsSelection {
@@ -252,7 +307,7 @@ private fun SettingsRail(entries: List<SettingsEntry>, selected: String, activat
     }
 }
 
-private val SettingsGroup.title: String
+internal val SettingsGroup.title: String
     get() = when (this) {
         SettingsGroup.Game -> "Game"
         SettingsGroup.OneClient -> "OneClient"
@@ -384,7 +439,60 @@ internal fun lines(rows: List<SettingRow>, columns: Int): List<List<SettingRow>>
 }
 
 @Composable
+internal fun SettingsFocusTarget(focusKey: String, content: @Composable () -> Unit) {
+    val focus = LocalSettingsFocus.current
+    val focused = focus.key == focusKey
+    val requester = remember { BringIntoViewRequester() }
+    if (focused) {
+        LaunchedEffect(Unit) {
+            delay(FOCUS_SETTLE_MILLIS)
+            requester.bringIntoView()
+            delay(FOCUS_HOLD_MILLIS)
+            if (focus.key == focusKey) focus.key = null
+        }
+    }
+    val theme = OneConfigTheme.current
+    val highlight = if (focused) Modifier.background(OneConfigTheme.accent.copy(alpha = FOCUS_ALPHA), theme.sideBarNavigationEntryShape) else Modifier
+    Box(Modifier.fillMaxWidth().bringIntoViewRequester(requester).then(highlight)) { content() }
+}
+
+internal fun actionFocusKey(key: String): String = ACTION_FOCUS + key
+
+@Composable
 internal fun SettingControl(row: SettingRow, changed: () -> Unit) {
+    SettingsFocusTarget(row.key) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Box(Modifier.weight(1f)) { SettingKindControl(row, changed) }
+            row.reset?.let { reset -> ResetButton(reset, row.enabled, changed) }
+        }
+    }
+}
+
+@Composable
+private fun ResetButton(reset: SettingReset, enabled: Boolean, changed: () -> Unit) {
+    val theme = OneConfigTheme.current
+    Row(Modifier.alpha(if (reset.atDefault) 0f else 1f)) {
+        IconButton(
+            "undo",
+            "Reset to default",
+            {
+                reset.apply()
+                changed()
+            },
+            enabled = enabled && !reset.atDefault,
+            size = ControlSize.Compact,
+            restTint = theme.textColorSecondary,
+            tooltip = "Reset to default",
+        )
+    }
+}
+
+@Composable
+private fun SettingKindControl(row: SettingRow, changed: () -> Unit) {
     val label = SettingsLabels.label(row.key, row.label)
     TooltipBox(row.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
         when (val kind = row.kind) {

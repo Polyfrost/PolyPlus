@@ -57,6 +57,19 @@ internal object InputSettingsPages : SettingsPageProvider {
 
     override fun handles(category: SettingsCategory): Boolean = InputSettingsPlatform.available && category in categories
 
+    override fun search(category: SettingsCategory, parent: () -> Screen?): List<SettingsSearchItem> = when (category) {
+        SettingsCategory.Controls -> InputSettingsPlatform.controlsSections().searchItems() + keyBindItems()
+        SettingsCategory.Skin -> InputSettingsPlatform.skinSections().searchItems()
+        SettingsCategory.Accessibility -> InputSettingsPlatform.accessibilitySections().searchItems()
+        SettingsCategory.Language -> listOf(InputSettingsPlatform.fontSection()).searchItems()
+        else -> emptyList()
+    }
+
+    private fun keyBindItems(): List<SettingsSearchItem> = KeyBindsPlatform.rows().map { row ->
+        val detail = if (row.unbound) row.owner else row.owner + " " + row.key
+        SettingsSearchItem(row.name, detail, row.category, KEYBIND_FOCUS + row.id, row.name)
+    }
+
     @Composable
     override fun Page(category: SettingsCategory, parent: () -> Screen?) {
         when (category) {

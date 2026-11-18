@@ -3,7 +3,8 @@
 package org.polyfrost.polyplus.client.gui.screens.settings
 
 //? if = 1.8.9 {
-/*import androidx.compose.foundation.layout.Arrangement
+/*import net.minecraft.client.options.GameOptions
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -71,6 +72,14 @@ internal object ArgentumSettingsPages : SettingsEntryProvider {
         ArgentumBridge.guard(Unit) { it.apply() }
     }
 
+    override fun search(entry: SettingsEntry, parent: () -> Screen?): List<SettingsSearchItem> {
+        val groups = argentumGroups(entry.id) ?: return emptyList()
+        return groups.flatMap { group ->
+            group.rows.map { SettingsSearchItem(SettingsLabels.label(it.key, it.label), it.hint, group.title, it.key) } +
+                group.actions.map { SettingsSearchItem(it.label, it.hint, group.title, actionFocusKey(it.key)) }
+        }
+    }
+
     @Composable
     override fun Page(entry: SettingsEntry, parent: () -> Screen?) {
         if (ArgentumBridge.get() == null) {
@@ -80,6 +89,14 @@ internal object ArgentumSettingsPages : SettingsEntryProvider {
         ArgentumPage(entry, parent)
     }
 }
+
+private fun argentumGroups(id: String): List<ArgentumGroup>? = ArgentumBridge.guard(null) { bridge ->
+    val groups = bridge.groups(id) ?: return@guard null
+    if (bridge.pages().firstOrNull()?.id == id) listOf(fovGroup()) + groups else groups
+}
+
+private fun fovGroup(): ArgentumGroup =
+    ArgentumGroup(null, listOfNotNull(SettingsLegacyOptions.row(GameOptions.Option.FOV, wide = true)), emptyList())
 
 @Composable
 private fun ArgentumPage(entry: SettingsEntry, parent: () -> Screen?) {
@@ -145,11 +162,13 @@ private fun ArgentumGroupBlock(group: ArgentumGroup, columns: Int, parent: () ->
             }
             group.actions.forEach { action ->
                 key(action.key) {
-                    TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
-                        DrillRow(null, action.label, null, {
-                            action.run(parent())
-                            changed()
-                        }, enabled = action.enabled)
+                    SettingsFocusTarget(actionFocusKey(action.key)) {
+                        TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
+                            DrillRow(null, action.label, null, {
+                                action.run(parent())
+                                changed()
+                            }, enabled = action.enabled)
+                        }
                     }
                 }
             }

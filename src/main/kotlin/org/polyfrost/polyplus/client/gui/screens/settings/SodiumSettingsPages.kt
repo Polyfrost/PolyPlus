@@ -96,6 +96,16 @@ internal object SodiumSettingsPages : SettingsEntryProvider {
         }
     }
 
+    override fun search(entry: SettingsEntry, parent: () -> Screen?): List<SettingsSearchItem> {
+        val ref = pages[entry.id] ?: return emptyList()
+        val groups = SodiumBridge.guard(null) { it.groups(ref.page, parent) } ?: return emptyList()
+        val all = if (ref.id == firstPageId) listOf(fovGroup()) + groups else groups
+        return all.flatMap { group ->
+            group.rows.map { SettingsSearchItem(SettingsLabels.label(it.key, it.label), it.hint, group.title, it.key) } +
+                group.actions.map { SettingsSearchItem(it.label, it.hint, group.title, actionFocusKey(it.key)) }
+        }
+    }
+
     @Composable
     override fun Page(entry: SettingsEntry, parent: () -> Screen?) {
         val ref = pages[entry.id]
@@ -176,11 +186,13 @@ private fun SodiumGroupBlock(group: SodiumGroup, columns: Int, parent: () -> Scr
             }
             group.actions.forEach { action ->
                 key(action.key) {
-                    TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
-                        DrillRow(null, action.label, null, {
-                            action.run(parent())
-                            changed()
-                        }, enabled = action.enabled)
+                    SettingsFocusTarget(actionFocusKey(action.key)) {
+                        TooltipBox(action.hint, placement = TooltipPlacement.AboveCenter, maxWidth = 320.dp) {
+                            DrillRow(null, action.label, null, {
+                                action.run(parent())
+                                changed()
+                            }, enabled = action.enabled)
+                        }
                     }
                 }
             }
