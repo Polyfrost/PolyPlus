@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.lobby.GlassRegistry
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import kotlin.math.PI
@@ -215,7 +216,7 @@ fun DrawScope.drawMenuBackground(time: Float, mouse: Offset, frost: List<RoundRe
     }
     drawAurora(time)
     drawParticles(time, mouse, frost)
-    drawVignette()
+    if (PolyPlusLobbyConfig.lobbyVignette) drawVignette()
 }
 
 private fun DrawScope.drawAurora(time: Float) {

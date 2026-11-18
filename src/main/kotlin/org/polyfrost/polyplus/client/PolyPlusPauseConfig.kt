@@ -82,6 +82,14 @@ object PolyPlusPauseConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Vignette",
+        description = "Darkens the top and bottom edges behind the menu.",
+        subcategory = "Style",
+    )
+    var pauseVignette = true
+
+    @JvmStatic
+    @Switch(
         title = "Host World button",
         description = "Swaps Open to LAN for Host World.",
         subcategory = "Menu",
@@ -109,7 +117,10 @@ object PolyPlusPauseConfig : Config(
         hideIf("vanillaPausePlayerPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         hideIf("compactPauseMenuPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         addDependency("compactPauseMenuPanel", "vanillaPausePlayerPanel", true)
+        hideIf("pauseVignette") { !isStepBack(pauseScreenStyle) && !isStepBack(focusLossPauseStyle.style ?: pauseScreenStyle) }
     }
+
+    private fun isStepBack(style: PauseScreenStyle): Boolean = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
 
     private fun migrateFromSplitConfigs() {
         if (migratedFromSplitConfigs) return

@@ -413,7 +413,7 @@ void main() {
     color = mix(color, color * color * (3.0 - 2.0 * color), 0.3);
     color += vec3(0.012, 0.0, 0.036) * (1.0 - clamp(luma * 2.2, 0.0, 1.0));
     vec2 centred = texCoord - 0.5;
-    float vignette = 1.0 - smoothstep(0.32, 0.92, length(centred * vec2(1.15, 1.0)));
+    float vignette = mix(1.0, 1.0 - smoothstep(0.32, 0.92, length(centred * vec2(1.15, 1.0))), Params.x);
     color *= mix(mix(0.72, 0.42, Mood.y), 1.0, vignette);
     if (revealMode() == 1) {
         color *= mix(REVEAL_FLOOR, 1.0, smoothstep(0.0, REVEAL_FADE, Lens.w));

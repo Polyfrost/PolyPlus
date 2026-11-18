@@ -50,6 +50,7 @@ import org.joml.Vector3fc
 //? if < 1.21.8
 /*import org.joml.Vector4f*/
 import org.lwjgl.system.MemoryUtil
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.lobby.shader.DepthModel
 import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridge
 import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridges
@@ -226,10 +227,11 @@ object LobbySky {
         val pack = bridge.packActive()
         val model = if (pack) bridge.depthModel() else NATIVE_DEPTH
         val quality = if (reducedEffects) 1f else 0f
+        val vignette = if (PolyPlusLobbyConfig.lobbyVignette) 1f else 0f
         if (model == NATIVE_DEPTH || model == DepthModel.UNKNOWN) {
-            data.putFloat(1f).putFloat(quality).putFloat(NEAR).putFloat(depthFar)
+            data.putFloat(vignette).putFloat(quality).putFloat(NEAR).putFloat(depthFar)
         } else {
-            data.putFloat(1f).putFloat(quality).putFloat(depthFar).putFloat(NEAR)
+            data.putFloat(vignette).putFloat(quality).putFloat(depthFar).putFloat(NEAR)
         }
         data.putFloat(mood.aurora).putFloat(mood.night).putFloat(mood.exposure).putFloat(mood.golden)
         val lens = if (pack && bridge.packDepthOfField()) DEPTH_OF_FIELD * PACK_DEPTH_OF_FIELD else DEPTH_OF_FIELD
