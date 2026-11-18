@@ -1,6 +1,7 @@
 package org.polyfrost.polyplus.client.cosmetics
 
 import androidx.compose.runtime.getValue
+import com.google.common.hash.Hashing
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import org.polyfrost.polyplus.libs.ktor.client.call.body
@@ -61,10 +62,22 @@ object MojangSkinService {
     private const val TEXTURE_POLL_MS = 250L
     private const val MAX_LOGGED_BODY = 500
     private val TEXTURE_HASH = Regex("^[0-9a-f]{32,64}$")
+    private const val DEFAULT_SKIN_PREFIX = "minecraft:textures/entity/"
 
     private val requestLock = Mutex()
 
-    private class SkinOverride(val owner: UUID, val skin: MojangSkin, val uploadedAt: Long = System.currentTimeMillis())
+    private class SkinOverride(
+        val owner: UUID,
+        val skin: MojangSkin,
+        stale: Set<String>,
+        val uploadedAt: Long = System.currentTimeMillis(),
+    ) {
+        val stale: Set<String> = stale - setOfNotNull(skin.textureHash)
+        // Modern versions name downloaded skins "skins/<sha1(hash)>", 1.8.9 uses "skins/<hash>".
+        val replaceablePaths: Set<String> = (this.stale + setOfNotNull(skin.textureHash)).flatMapTo(HashSet()) {
+            listOf("minecraft:skins/$it", "minecraft:skins/" + Hashing.sha1().hashUnencodedChars(it).toString())
+        }
+    }
 
     // Writes to override and overrideChecks happen under overrideLock; bumping overrideChecks drops in-flight join checks.
     private val overrideLock = Any()
@@ -154,7 +167,7 @@ object MojangSkinService {
             val skin = reported ?: readBack(token, previous)
             if (skin != null) {
                 synchronized(overrideLock) {
-                    override = SkinOverride(owner, skin)
+                    override = SkinOverride(owner, skin, staleHashes(owner) + listOfNotNull(previous))
                     overrideChecks++
                 }
                 changedSkinVersion++
@@ -193,27 +206,44 @@ object MojangSkinService {
         return PreviewSkin(texture, skin.model == SkinModel.Slim)
     }
 
+    @JvmStatic
+    fun isStaleLocalSkin(playerId: UUID, textureId: String?): Boolean {
+        val current = override ?: return false
+        if (textureId == null || current.owner != playerId) return false
+        return textureId.startsWith(DEFAULT_SKIN_PREFIX) || textureId in current.replaceablePaths
+    }
+
     fun refreshLocalOverride() {
         val owner = ClientPlatform.localPlayerUuid()
-        val (current, check) = synchronized(overrideLock) {
-            val current = override ?: return
-            if (current.owner != owner) {
+        val check = synchronized(overrideLock) {
+            val current = override
+            if (current != null && current.owner != owner) {
                 clearLocalOverride()
+            } else if (current != null && System.currentTimeMillis() - current.uploadedAt < UPLOAD_GRACE_MS) {
                 return
             }
-            if (System.currentTimeMillis() - current.uploadedAt < UPLOAD_GRACE_MS) return
-            current to ++overrideChecks
+            ++overrideChecks
         }
         val token = accessToken() ?: return
         PolyPlusClient.SCOPE.launch {
             val active = runSuspendCatching { readProfile(token) }.getOrNull() ?: return@launch
-            if (active.textureHash == current.skin.textureHash && active.model == current.skin.model) return@launch
+            val current = override?.takeIf { it.owner == owner }
+            if (current != null && active.textureHash == current.skin.textureHash && active.model == current.skin.model) return@launch
+            if (current == null && LocalAccountSkin.launchSkin()?.let { active.textureHash == it.textureHash && active.model == it.model } == true) return@launch
             if (!textureLoaded(active)) return@launch
             synchronized(overrideLock) {
                 if (check != overrideChecks || owner != ClientPlatform.localPlayerUuid()) return@launch
-                override = SkinOverride(owner, active, uploadedAt = 0L)
+                override = SkinOverride(owner, active, staleHashes(owner), uploadedAt = 0L)
             }
             changedSkinVersion++
+        }
+    }
+
+    private fun staleHashes(owner: UUID): Set<String> {
+        val current = override?.takeIf { it.owner == owner }
+        return buildSet {
+            current?.let { addAll(it.stale); it.skin.textureHash?.let(::add) }
+            LocalAccountSkin.launchSkin()?.textureHash?.let(::add)
         }
     }
 
