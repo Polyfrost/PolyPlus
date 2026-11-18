@@ -74,11 +74,12 @@ internal fun CosmeticThumbnail(
     }
 }
 
-private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource) = when (type) {
-    CosmeticType.Aura -> true
-    CosmeticType.Cape ->
-        (source as? PlayerPreviewSource.Override)?.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true
-    else -> false
+private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource): Boolean {
+    if (type == CosmeticType.Aura) return true
+    val override = source as? PlayerPreviewSource.Override ?: return false
+    if (override.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true) return true
+    if (override.pet?.let { it.animations.isNotEmpty() || it.controller != null } == true) return true
+    return override.equipment.equipped().any { it.cosmetic.animation != null || it.cosmetic.textureFrameCount > 1 }
 }
 
 private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)
