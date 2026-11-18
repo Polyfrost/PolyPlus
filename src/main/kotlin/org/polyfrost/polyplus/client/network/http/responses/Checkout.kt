@@ -12,4 +12,5 @@ data class CreateCheckoutRequest(
 @Serializable
 data class CreateCheckoutResponse(
     val url: String,
+    val completed: Boolean = false,
 )

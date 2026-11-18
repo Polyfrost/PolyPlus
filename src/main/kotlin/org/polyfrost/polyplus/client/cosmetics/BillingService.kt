@@ -21,6 +21,8 @@ object BillingService {
 
     class AlreadyOwnedException(message: String) : Exception(message)
 
+    enum class CheckoutOutcome { Opened, Completed }
+
     suspend fun createCheckout(productIds: List<String>): Result<CreateCheckoutResponse> {
         val products = productIds.filter { it.isNotBlank() }
         if (products.isEmpty()) {
@@ -51,10 +53,15 @@ object BillingService {
             ?: "You already own this item."
     }
 
-    suspend fun checkoutAndOpen(productIds: List<String>): Result<String> =
+    suspend fun checkoutAndOpen(productIds: List<String>): Result<CheckoutOutcome> =
         createCheckout(productIds).map { response ->
-            ClientPlatform.openUri(response.url)
-            response.url
+            if (response.completed) {
+                PolyPlusClient.refreshCosmetics()
+                CheckoutOutcome.Completed
+            } else {
+                ClientPlatform.openUri(response.url)
+                CheckoutOutcome.Opened
+            }
         }
 
     suspend fun fetchTransactions(): Result<List<TransactionInfo>> =

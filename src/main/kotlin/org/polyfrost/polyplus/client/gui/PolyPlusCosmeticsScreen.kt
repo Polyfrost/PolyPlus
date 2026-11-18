@@ -24,6 +24,7 @@ import org.polyfrost.polyplus.client.gui.wardrobe.MinecraftCapesOnlyScreen
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeShell
 import org.polyfrost.polyplus.client.gui.wardrobe.cartName
 import org.polyfrost.polyplus.client.gui.wardrobe.checkoutFailureMessage
+import org.polyfrost.polyplus.client.gui.wardrobe.checkoutSuccessMessage
 import org.polyfrost.polyplus.client.gui.wardrobe.cosmeticCartKey
 import org.polyfrost.polyplus.client.gui.wardrobe.equip
 import org.polyfrost.polyplus.client.gui.wardrobe.rememberCosmeticItems
@@ -95,9 +96,10 @@ internal fun PolyPlusCosmeticsScreen() {
             ClientPlatform.runOnMain {
                 checkoutPending = false
                 status = result.fold(
-                    onSuccess = { "Checkout opened in your browser." },
+                    onSuccess = ::checkoutSuccessMessage,
                     onFailure = ::checkoutFailureMessage,
                 )
+                if (result.getOrNull() == BillingService.CheckoutOutcome.Completed) cart.removeAll { it.storeProductId in productIds }
             }
         }
     }

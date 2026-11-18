@@ -80,6 +80,11 @@ internal fun selectedStoreVariant(
         ?: variants.first()
 }
 
+internal fun checkoutSuccessMessage(outcome: BillingService.CheckoutOutcome): String = when (outcome) {
+    BillingService.CheckoutOutcome.Opened -> "Checkout opened in your browser."
+    BillingService.CheckoutOutcome.Completed -> "Added to your cosmetics."
+}
+
 internal fun checkoutFailureMessage(error: Throwable): String =
     if (error is BillingService.AlreadyOwnedException) {
         error.message ?: "You already own this item."

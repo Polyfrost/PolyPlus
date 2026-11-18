@@ -19,6 +19,7 @@ import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeSelection
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeSort
 import org.polyfrost.polyplus.client.gui.wardrobe.cartName
 import org.polyfrost.polyplus.client.gui.wardrobe.checkoutFailureMessage
+import org.polyfrost.polyplus.client.gui.wardrobe.checkoutSuccessMessage
 import org.polyfrost.polyplus.client.gui.wardrobe.cosmeticCartKey
 import org.polyfrost.polyplus.client.gui.wardrobe.fullyOwned
 import org.polyfrost.polyplus.client.gui.wardrobe.selectedStoreVariant
@@ -297,7 +298,8 @@ internal class MarketplaceState {
             val result = BillingService.checkoutAndOpen(productIds)
             ClientPlatform.runOnMain {
                 checkoutPending = false
-                notice = result.fold(onSuccess = { "Checkout opened in your browser." }, onFailure = ::checkoutFailureMessage)
+                notice = result.fold(onSuccess = ::checkoutSuccessMessage, onFailure = ::checkoutFailureMessage)
+                if (result.getOrNull() == BillingService.CheckoutOutcome.Completed) cart.removeAll { it.storeProductId in productIds }
             }
         }
     }
