@@ -29,6 +29,7 @@ data class StoreVariant(
     @SerialName("variant_order") val variantOrder: Int = 0,
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
+    @SerialName("preview_url") val previewUrl: String? = null,
 )
 
 @Serializable
@@ -42,12 +43,16 @@ data class CosmeticStoreInfo(
     val sale: SaleInfo? = null,
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
+    @SerialName("preview_url") val previewUrl: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val tags: CosmeticTags = CosmeticTags(),
     val variants: List<StoreVariant>? = null,
 ) {
     val variantList: List<StoreVariant>
-        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))
+        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name, previewUrl = previewUrl))
+
+    fun previewUrlFor(variantId: Int): String? =
+        variantList.firstOrNull { it.id == variantId }?.previewUrl ?: previewUrl.takeIf { variantId == id }
 
     val free: Boolean get() = (finalPrice ?: 0f) <= 0f
 
@@ -76,6 +81,7 @@ data class CosmeticStoreView(
     val sale: SaleInfo? = null,
     @SerialName("asset_id") val assetId: Int? = null,
     @SerialName("cover_asset_id") val coverAssetId: Int? = null,
+    @SerialName("preview_url") val previewUrl: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val tags: CosmeticTags = CosmeticTags(),
     val variants: List<StoreVariant>? = null,
@@ -85,5 +91,5 @@ data class CosmeticStoreView(
     val discountRate: Int? get() = sale?.percent?.takeIf { it > 0 }
 
     val variantList: List<StoreVariant>
-        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name))
+        get() = variants?.takeIf { it.isNotEmpty() } ?: listOf(StoreVariant(id, name, previewUrl = previewUrl))
 }

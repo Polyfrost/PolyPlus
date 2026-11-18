@@ -105,6 +105,8 @@ import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.polyplus.client.gui.AnimatedPreviewImage
+import org.polyfrost.polyplus.client.gui.rememberAnimatedPreview
 
 @Composable
 internal fun WardrobeGrid(
@@ -234,6 +236,7 @@ internal fun WardrobeGrid(
                             variants = variants,
                             selectedVariantId = variant.id,
                             onPickVariant = { onPickStoreVariant(info.id, it) },
+                            previewUrl = info.previewUrlFor(variant.id),
                             menu = listOf(
                                 MenuAction("Preview", { onShop(info) }),
                                 MenuAction("Add to cart", { onAddToCart(info, variant) }, enabled = !inCart && !owned && variant.id !in ownedIds),
@@ -457,6 +460,7 @@ private fun WardrobeCard(
     selectedVariantId: Int? = null,
     onPickVariant: (Int) -> Unit = {},
     menu: List<MenuEntry> = emptyList(),
+    previewUrl: String? = null,
     thumbnail: @Composable (Modifier) -> Unit,
 ) {
     val theme = OneConfigTheme.current
@@ -500,7 +504,15 @@ private fun WardrobeCard(
                     modifier = Modifier.fillMaxWidth().height(maxWidth)
                         .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(5.dp), glass = false),
                 ) {
-                    thumbnail(Modifier.fillMaxSize())
+                    val preview = rememberAnimatedPreview(previewUrl?.takeIf { hovered })
+                    val animating = hovered && preview != null
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (animating) 0f else 1f }) {
+                        thumbnail(Modifier.fillMaxSize())
+                    }
+                    if (animating && preview != null) {
+                        AnimatedPreviewImage(preview, Modifier.fillMaxSize().clip(OneConfigTheme.shape(5.dp)))
+                    }
+                    if (previewUrl != null) AnimatedTag(Modifier.align(Alignment.TopStart).padding(4.dp))
                     if (hovered && variants.size > 1) {
                         VariantSwatches(
                             variants = variants,
@@ -683,6 +695,18 @@ private val CardOutline = CardSelectionStyle(ringWidth = 1.dp, fillAlpha = 0f, r
 private val OutlineOnHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)
 
 private val NoHoverFill = ControlIndication(hoverAlpha = 0f)
+
+@Composable
+private fun AnimatedTag(modifier: Modifier) {
+    Text(
+        "ANIMATED",
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.55f), OneConfigTheme.shape(4.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+        color = Color.White,
+        style = TextStyle(fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp),
+    )
+}
 
 @Composable
 private fun CardBadgeTab(badge: CardBadge, modifier: Modifier) {
