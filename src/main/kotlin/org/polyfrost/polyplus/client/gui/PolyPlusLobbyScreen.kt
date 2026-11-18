@@ -14,6 +14,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?}
 import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
+import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
+import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
+import org.polyfrost.oneconfig.internal.OneConfigConfig
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyShell
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyRoot
@@ -71,6 +74,10 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
         if (lobby.setup && OnboardingKeyCapture.capture(key)) return true
         if (lobby.skipIntro()) return true
+        if (!lobby.setup && !TextInputFocus.isTyping && opensOneConfig(key, modifiers)) {
+            PolyPlusOneConfigIntegration.openSettingsReturning()
+            return true
+        }
         if (key == InputConstants.KEY_ESCAPE) {
             if (lobby.escape()) return true
             //? if = 1.8.9 {
@@ -130,7 +137,14 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
 
     internal fun showPage(page: LobbyPage) = lobby.show(page)
 
+    private fun opensOneConfig(key: Int, modifiers: Int): Boolean {
+        val bind = OneConfigConfig.oneConfigKeybind
+        if (bind.keyCodes?.contains(key) != true || bind.mouseBtns?.isNotEmpty() == true) return false
+        return bind.test(KeybindManager.heldKeys + key, emptySet(), (modifiers and MODIFIER_MASK).toByte())
+    }
+
     private companion object {
+        const val MODIFIER_MASK = 0xF
         val navigationKeys = intArrayOf(
             InputConstants.KEY_TAB, InputConstants.KEY_UP, InputConstants.KEY_DOWN, InputConstants.KEY_LEFT, InputConstants.KEY_RIGHT,
         )

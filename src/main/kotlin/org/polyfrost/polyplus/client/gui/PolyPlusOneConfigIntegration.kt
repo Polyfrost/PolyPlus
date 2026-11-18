@@ -114,6 +114,8 @@ object PolyPlusOneConfigIntegration {
     @JvmStatic
     fun openScreensSettings() = openReturning { OneConfigUI.open(screensPage) }
 
+    fun openSettingsReturning() = openReturning { OneConfigUI.open() }
+
     private fun openReturning(open: () -> Unit) {
         val host = ClientPlatform.currentScreen()?.takeUnless { OneConfigUI.isOneConfigScreen(it) }
         SettingsMemory.openReturningTo(host, open)
