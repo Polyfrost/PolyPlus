@@ -5,6 +5,7 @@ import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.contentType
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.PolyPlusConfig
@@ -54,11 +55,14 @@ object CosmeticCatalog {
 
     fun allEmoteDefinitions(): Collection<CosmeticDefinition> = emoteDefinitions.values
 
-    fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[uuid]
+    private fun accountId(uuid: UUID): UUID =
+        if (uuid == Minecraft.getInstance().player?.uuid) ClientPlatform.localPlayerUuid() else uuid
+
+    fun getRemoteEquipped(uuid: UUID): Map<BodySlot, Int>? = remoteEquipped[accountId(uuid)]
 
     fun remoteEquippedIds(): Set<Int> = remoteEquipped.values.flatMapTo(HashSet()) { it.values }
 
-    fun getParticleColor(uuid: UUID): Int? = particleColors[uuid]
+    fun getParticleColor(uuid: UUID): Int? = particleColors[accountId(uuid)]
 
     fun setParticleColor(uuid: UUID, color: Int) {
         particleColors[uuid] = color
@@ -68,7 +72,7 @@ object CosmeticCatalog {
         particleColors.remove(uuid)
     }
 
-    fun isPolyPlusUser(uuid: UUID): Boolean = uuid in polyPlusUsers
+    fun isPolyPlusUser(uuid: UUID): Boolean = accountId(uuid) in polyPlusUsers
 
     fun setPolyPlusUser(uuid: UUID, online: Boolean) {
         if (online) polyPlusUsers.add(uuid) else polyPlusUsers.remove(uuid)
@@ -79,7 +83,7 @@ object CosmeticCatalog {
     }
 
     fun getActiveId(uuid: UUID, slot: BodySlot): Int? =
-        remoteEquipped[uuid]?.get(slot)
+        remoteEquipped[accountId(uuid)]?.get(slot)
 
     fun localEquipped(): EquippedCosmetics = localEquipped
 

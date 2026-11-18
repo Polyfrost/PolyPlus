@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.client
 
+import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.config.v1.Config
 import org.polyfrost.oneconfig.api.config.v1.annotations.Dropdown
@@ -136,7 +137,8 @@ object PolyPlusCosmeticsConfig : Config(
     }
 
     private fun isSelf(owner: UUID): Boolean =
-        runCatching { ClientPlatform.localPlayerUuid() }.getOrNull() == owner
+        owner == Minecraft.getInstance().player?.uuid ||
+            runCatching { ClientPlatform.localPlayerUuid() }.getOrNull() == owner
 
     init {
         preload()

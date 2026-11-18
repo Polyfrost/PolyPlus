@@ -422,11 +422,11 @@ object CosmeticSync {
         }
 
         //? if >= 1.21.1 {
-        reconcileAttachedCosmetics(player, uuid)
-        reconcilePet(uuid)
+        reconcileAttachedCosmetics(player, player.uuid)
+        reconcilePet(player.uuid)
         //?} elif = 1.8.9 {
-        /*reconcileAttachedCosmetics(player, uuid)
-        reconcilePet(uuid)
+        /*reconcileAttachedCosmetics(player, player.uuid)
+        reconcilePet(player.uuid)
         *///?}
 
         // every other type is reconciled from the catalog above
@@ -479,7 +479,7 @@ object CosmeticSync {
         val level = Minecraft.getInstance().level ?: return
         for (player in level.players()) {
             val uuid = player.uuid
-            if (!uuid.isRealPlayer()) continue
+            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player) continue
             if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
             reconcileAttachedCosmetics(player, uuid)
             reconcilePet(uuid)
@@ -558,7 +558,7 @@ object CosmeticSync {
         val level = Minecraft.getInstance().world ?: return
         for (player in level.players) {
             val uuid = player.uuid
-            if (!uuid.isRealPlayer()) continue
+            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player) continue
             if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
             reconcileAttachedCosmetics(player as? AbstractClientPlayer ?: continue, uuid)
             reconcilePet(uuid)
@@ -670,12 +670,15 @@ object CosmeticSync {
     private fun findPlayer(uuid: UUID): AbstractClientPlayer? {
         //? if > 1.8.9 {
         val level = Minecraft.getInstance().level ?: return null
-        return level.players().firstOrNull { it.uuid == uuid }
+        return level.players().firstOrNull { it.uuid == uuid } ?: localPlayerFor(uuid)
         //?} else {
         /*val level = Minecraft.getInstance().world ?: return null
-        return level.players.firstOrNull { it.uuid == uuid } as? AbstractClientPlayer
+        return level.players.firstOrNull { it.uuid == uuid } as? AbstractClientPlayer ?: localPlayerFor(uuid)
         *///?}
     }
+
+    private fun localPlayerFor(uuid: UUID): AbstractClientPlayer? =
+        Minecraft.getInstance().player?.takeIf { uuid == ClientPlatform.localPlayerUuid() }
 
     private fun normalizePlayerUuid(uuidString: String): String? {
         val uuid = runCatching { UUID.fromString(uuidString) }.getOrNull() ?: return null

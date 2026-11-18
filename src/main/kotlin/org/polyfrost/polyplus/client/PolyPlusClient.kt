@@ -323,7 +323,8 @@ object PolyPlusClient {
             runSuspendCatching { CosmeticService.syncLocalActive() }
                 .onFailure { LOGGER.error("Local active cosmetics sync failed", it) }
             //?} else {
-            /*runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
+            /*CosmeticCatalog.applyRemoteEquipped(ClientPlatform.localPlayerUuid(), CosmeticCatalog.localEquipped().equipped)
+            runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
                 .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }
             *///?}
         } finally {
