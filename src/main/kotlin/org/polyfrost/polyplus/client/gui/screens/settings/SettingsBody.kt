@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,6 +70,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
@@ -104,6 +106,10 @@ internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) 
         ?: node.tabs.firstOrNull { it.entry.external == null }
         ?: node.tabs.first()
     val leaving: () -> Screen? = { parent().also { SettingsMemory.leaving(SettingsSelection(node.id, tab.id), it) } }
+    val selection = SettingsSelection(node.id, tab.id)
+    val shown = remember { ClientPlatform.currentScreen() }
+    SideEffect { SettingsMemory.showing(shown, parent(), selection) }
+    DisposableEffect(shown) { onDispose { SettingsMemory.hidden(shown) } }
     val activate = { entry: SettingsEntry ->
         val external = entry.external
         if (external != null) external(leaving()) else category = entry.id

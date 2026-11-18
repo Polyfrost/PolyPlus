@@ -152,6 +152,8 @@
     //"client.MixinInventoryMenuScreen",
     //? if = 1.8.9
     //"client.MixinOptionsScreen",
+    //? if = 1.8.9
+    //"client.MixinOptionsScreenButton",
     "client.MixinOnlineServerEntry",
     "client.ping.MixinPingHud",
     "client.ping.MixinPingPick",

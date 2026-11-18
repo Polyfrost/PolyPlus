@@ -15,14 +15,18 @@ import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.api.ui.v1.page.PageGroup
 import org.polyfrost.oneconfig.api.ui.v1.page.PageText
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.screens.ModConfig
+import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
+import org.polyfrost.polyplus.client.gui.screens.settings.SettingsMemory
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 object PolyPlusOneConfigIntegration {
     private const val MODS_PAGE = "oneconfig:mods"
     private const val BRAND_LOGO = "assets/polyplus/brand/oneclient.svg"
     private const val MOD_ICONS = "assets/polyplus/modicons/"
+    private const val ONECLIENT_GROUP_ORDER = 150
 
     private val modIcons = setOf(
         "betterhurtcam", "betternightvision", "betterscreens", "blur", "confirmdisconnect", "countdown", "crosshairtweaks",
@@ -44,8 +48,42 @@ object PolyPlusOneConfigIntegration {
         override fun Content() = ProvidePopupSounds(false) { PolyPlusCosmeticsScreen() }
     }
 
+    private val oneClientGroup = PageGroup.create(
+        "polyplus:oneclient",
+        PageText.translatable("polyplus.pagegroup.oneclient", "OneClient"),
+        ONECLIENT_GROUP_ORDER,
+    )
+
+    private class OneClientPageSpec(val slug: String, val file: String, val title: String, val icon: String)
+
+    private class OneClientConfigPage(spec: OneClientPageSpec, override val order: Int, group: PageGroup) : OneConfigPage(
+        "polyplus:oneclient/${spec.slug}",
+        PageText.translatable("polyplus.page.oneclient.${spec.slug}", spec.title),
+        spec.icon,
+        group,
+    ) {
+        private val configId = "${PolyPlusConstants.ID}${spec.file}.json"
+
+        @Composable
+        override fun Content() = ModConfig(configId)
+    }
+
+    private val oneClientPages: List<OneConfigPage> = listOf(
+        OneClientPageSpec("general", "", "General", "settings"),
+        OneClientPageSpec("cosmetics", "-cosmetics", "Cosmetics", "assets/polyplus/ico/stars.svg"),
+        OneClientPageSpec("lobby", "-lobby", "Lobby", SOCIAL_ASSETS + "minecraft-block.svg"),
+        OneClientPageSpec("mainmenu", "-mainmenu", "Main menu", "layers"),
+        OneClientPageSpec("party", "-party", "Party", SOCIAL_ASSETS + "users-01.svg"),
+        OneClientPageSpec("pause", "-pause", "Pause screen", SOCIAL_ASSETS + "pause-circle.svg"),
+        OneClientPageSpec("screens", "-screens", "Screens", "cog"),
+    ).mapIndexed { index, spec -> OneClientConfigPage(spec, index, oneClientGroup) }
+
+    private val generalPage = oneClientPages.first()
+    private val screensPage = oneClientPages.last()
+
     fun register() {
         if (OneConfigPages.byId(wardrobePage.id) == null) OneConfigPages.register(wardrobePage)
+        oneClientPages.forEach { OneConfigPages.registerIfAbsent(it) }
         ModCardIcons.register { modId, defaultIcon -> modCardIcon(modId, defaultIcon) }
         ModSortModes.register(DefaultModOrder.recommendedMode)
         ChangelogSources.register(ModpackChangelog)
@@ -69,6 +107,17 @@ object PolyPlusOneConfigIntegration {
 
     @JvmStatic
     fun openSettings() = OneConfigUI.open()
+
+    @JvmStatic
+    fun openOneClientSettings() = openReturning { OneConfigUI.open(generalPage) }
+
+    @JvmStatic
+    fun openScreensSettings() = openReturning { OneConfigUI.open(screensPage) }
+
+    private fun openReturning(open: () -> Unit) {
+        val host = ClientPlatform.currentScreen()?.takeUnless { OneConfigUI.isOneConfigScreen(it) }
+        SettingsMemory.openReturningTo(host, open)
+    }
 
     private fun modCardIcon(modId: String, defaultIcon: String?): String? {
         val id = when (val base = modId.replaceFirst(Regex("(v\\d+)?\\.(json|toml)$"), "")) {
