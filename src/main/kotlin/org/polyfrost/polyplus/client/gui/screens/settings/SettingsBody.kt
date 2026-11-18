@@ -182,7 +182,7 @@ private fun ColumnScope.CategoryContent(node: SettingsNode, tab: SettingsTab, pi
                 tabScroll,
                 Modifier.fillMaxWidth().wheelScrollsHorizontally(tabScroll),
                 orientation = Orientation.Horizontal,
-                scrollbar = false,
+                scrollbar = tabScroll.maxValue > 0,
                 fadingEdges = true,
                 smoothWheel = false,
             ) {
