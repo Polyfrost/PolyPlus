@@ -8,6 +8,7 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Switch
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.gui.pausescreen.FocusPauseStyle
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseWidgetCorner
 import org.polyfrost.polyplus.client.gui.widgets.WidgetMigration
 
 object PolyPlusPauseConfig : Config(
@@ -34,7 +35,7 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Style",
         description = "Picks how the pause screen looks.",
-        options = ["Full", "Spotlight", "Compact", "Vanilla", "Classic"],
+        options = ["Full", "Spotlight", "Compact", "Classic", "Vanilla"],
         subcategory = "Style",
     )
     var pauseScreenStyle: PauseScreenStyle = PauseScreenStyle.STEP_BACK_FLAT
@@ -43,7 +44,7 @@ object PolyPlusPauseConfig : Config(
     @Dropdown(
         title = "Unfocused",
         description = "Picks how the pause screen looks when the game pauses because you clicked out of the window.",
-        options = ["Same as above", "Full", "Spotlight", "Compact", "Vanilla", "Classic"],
+        options = ["Same as above", "Full", "Spotlight", "Compact", "Classic", "Vanilla"],
         subcategory = "Style",
     )
     var focusLossPauseStyle: FocusPauseStyle = FocusPauseStyle.SAME
@@ -90,6 +91,32 @@ object PolyPlusPauseConfig : Config(
 
     @JvmStatic
     @Switch(
+        title = "Open animation",
+        description = "Fades and slides the menu in when you pause.",
+        subcategory = "Style",
+    )
+    var classicOpenAnimation = true
+
+    @JvmStatic
+    @Dropdown(
+        title = "Widget position",
+        description = "Where the widgets sit on the Classic pause screen.",
+        options = ["Top right", "Bottom left"],
+        subcategory = "Style",
+    )
+    var classicWidgetCorner: PauseWidgetCorner = PauseWidgetCorner.BOTTOM_LEFT
+
+    @JvmStatic
+    @Dropdown(
+        title = "Widget position",
+        description = "Where the widgets sit on the Compact pause screen.",
+        options = ["Top right", "Bottom left"],
+        subcategory = "Style",
+    )
+    var compactWidgetCorner: PauseWidgetCorner = PauseWidgetCorner.TOP_RIGHT
+
+    @JvmStatic
+    @Switch(
         title = "Host World button",
         description = "Swaps Open to LAN for Host World.",
         subcategory = "Menu",
@@ -118,7 +145,12 @@ object PolyPlusPauseConfig : Config(
         hideIf("compactPauseMenuPanel") { pauseScreenStyle != PauseScreenStyle.VANILLA }
         addDependency("compactPauseMenuPanel", "vanillaPausePlayerPanel", true)
         hideIf("pauseVignette") { !isStepBack(pauseScreenStyle) && !isStepBack(focusLossPauseStyle.style ?: pauseScreenStyle) }
+        hideIf("classicOpenAnimation") { !uses(PauseScreenStyle.CLASSIC) }
+        hideIf("classicWidgetCorner") { !uses(PauseScreenStyle.CLASSIC) }
+        hideIf("compactWidgetCorner") { !uses(PauseScreenStyle.COMPACT) }
     }
+
+    private fun uses(style: PauseScreenStyle): Boolean = pauseScreenStyle == style || focusLossPauseStyle.style == style
 
     private fun isStepBack(style: PauseScreenStyle): Boolean = style == PauseScreenStyle.STEP_BACK || style == PauseScreenStyle.STEP_BACK_FLAT
 

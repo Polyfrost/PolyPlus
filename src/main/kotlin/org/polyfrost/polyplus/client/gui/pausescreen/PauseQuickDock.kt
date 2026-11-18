@@ -46,6 +46,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.StatusDot
 import org.polyfrost.oneconfig.api.ui.v1.components.KeyCap
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.lobbyshell.InviteButton
 import org.polyfrost.polyplus.client.gui.lobbyshell.PartyInviteCards
@@ -176,18 +177,24 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
 private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, narrow: Boolean, reveal: Float, rise: Float) {
     val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
     val width = pauseWidgetWidth(narrow)
+    val top = rememberLive { PolyPlusPauseConfig.compactWidgetCorner } == PauseWidgetCorner.TOP_RIGHT
     BoxWithConstraints(Modifier.matchParentSize()) {
-        val room = maxHeight - CARD_MARGIN - lift - DOCK_RESERVE
+        val room = if (top) maxHeight - CARD_MARGIN - lift - DOCK_RESERVE else maxHeight - CARD_MARGIN * 2 - CUSTOMIZE_DROP
         PauseWidgetColumn(
             screen,
             width,
             room.coerceAtLeast(0.dp),
             Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = CARD_MARGIN, end = CARD_MARGIN)
+                .align(if (top) Alignment.TopEnd else Alignment.BottomStart)
+                .padding(
+                    top = if (top) CARD_MARGIN else 0.dp,
+                    bottom = if (top) 0.dp else CARD_MARGIN,
+                    start = if (top) 0.dp else CARD_MARGIN,
+                    end = if (top) CARD_MARGIN else 0.dp,
+                )
                 .graphicsLayer {
                     alpha = reveal
-                    translationY = -rise * density
+                    translationY = (if (top) -rise else rise) * density
                 }
                 .blockPointer(),
         )
