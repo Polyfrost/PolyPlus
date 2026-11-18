@@ -195,6 +195,8 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     val isAway: Boolean get() = away != Away.None && !closed
 
+    val isClosed: Boolean get() = closed
+
     val title: String = initial.title.string
 
     val packDir: Path get() = access.`polyplus$packDir`()
@@ -957,6 +959,8 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     var host: () -> Screen? = { ClientPlatform.currentScreen() }
 
     val isAway: Boolean get() = false
+
+    val isClosed: Boolean get() = closed
 
     val title: String = I18n.translate("resourcePack.title")
 

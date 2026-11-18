@@ -10,6 +10,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 //? if > 1.8.9 {
 import java.nio.file.Path
 //?}
@@ -27,6 +28,11 @@ internal class PackShellScreen(shell: ScreenShell, parent: Screen?, private val 
     }
 
     override fun back() = session.commit()
+
+    override fun tick() {
+        super.tick()
+        if (session.isClosed && ClientPlatform.currentScreen() === this) ClientPlatform.setScreen(parent)
+    }
 
     //? if > 1.8.9 {
     override fun onFilesDrop(files: List<Path>) = session.drop(files)
