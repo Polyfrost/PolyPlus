@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
@@ -53,6 +54,10 @@ internal object SodiumSettingsPages : SettingsEntryProvider {
     @Volatile
     private var pages: Map<String, SodiumPageRef> = emptyMap()
 
+    @Volatile
+    var firstPageId: String? = null
+        private set
+
     fun register() {
         if (Mods.loaded("sodium")) SettingsPages.register(this)
     }
@@ -61,6 +66,7 @@ internal object SodiumSettingsPages : SettingsEntryProvider {
         if (!bridge.usable()) return@guard emptyList()
         val refs = bridge.pages()
         pages = refs.associateBy { it.id }
+        firstPageId = refs.firstOrNull { it.external == null }?.id
         val video = SettingsCategory.Video.entryId
         var previous: String? = null
         refs.map { ref ->
@@ -110,7 +116,9 @@ private fun SodiumPage(ref: SodiumPageRef, title: String, parent: () -> Screen?)
             revision++
         }
     }
-    val groups = remember(revision) { SodiumBridge.guard(null) { it.groups(ref.page, parent) } }
+    val groups = remember(revision) {
+        SodiumBridge.guard(null) { it.groups(ref.page, parent) }?.let { if (ref.id == SodiumSettingsPages.firstPageId) listOf(fovGroup()) + it else it }
+    }
     if (groups == null) {
         SodiumFallback(parent)
         return
@@ -127,6 +135,9 @@ private fun SodiumPage(ref: SodiumPageRef, title: String, parent: () -> Screen?)
         }
     }
 }
+
+// Sodium replaces the vanilla video page, and vanilla keeps FOV on its main options screen, which PolyPlus has no equivalent of
+private fun fovGroup(): SodiumGroup = SodiumGroup(null, listOfNotNull(SettingsOptionRows.row(Minecraft.getInstance().options.fov(), wide = true, hint = "Applies immediately, without Apply.")), emptyList())
 
 @Composable
 private fun SodiumHeader(ref: SodiumPageRef, title: String, dirty: Boolean, changed: () -> Unit) {

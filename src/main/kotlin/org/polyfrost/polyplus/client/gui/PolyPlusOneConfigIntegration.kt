@@ -77,7 +77,6 @@ object PolyPlusOneConfigIntegration {
             "tntcountdown" -> "countdown"
             "itemphysicliteconfig.mixins", "oitemphysic" -> "itemphysiclite"
             "hypixelautotip" -> "tipper"
-            "legacy_skin_layers", "legacy-skin-layers", "skinlayers3d" -> return null
             else -> base
         }
         if (id.startsWith("polyplus")) return MOD_ICONS + "polyplus.svg"

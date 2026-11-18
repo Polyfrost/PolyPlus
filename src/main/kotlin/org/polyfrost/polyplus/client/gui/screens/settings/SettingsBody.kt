@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,6 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,8 +45,13 @@ import net.minecraft.client.gui.screens.Screen
 //?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
@@ -109,7 +119,15 @@ internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) 
             key(node.id) {
                 CategorySession(node)
                 if (node.tabs.size > 1) {
-                    Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    val tabScroll = rememberScrollState()
+                    ScrollContainer(
+                        tabScroll,
+                        Modifier.fillMaxWidth().wheelScrollsHorizontally(tabScroll),
+                        orientation = Orientation.Horizontal,
+                        scrollbar = false,
+                        fadingEdges = true,
+                        smoothWheel = false,
+                    ) {
                         UnderlineTabs(node.tabs.map { it.item() }, tab.id) { id -> node.tabs.firstOrNull { it.id == id }?.let(pick) }
                     }
                     Spacer(Modifier.height(TabGap))
@@ -141,6 +159,28 @@ private fun CategorySession(node: SettingsNode) {
         val providers = node.providers
         providers.forEach { runCatching { it.opened(node.id) } }
         onDispose { providers.forEach { runCatching { it.closed(node.id) } } }
+    }
+}
+
+// Compose only scrolls a horizontal row from horizontal wheel input, which most mice never send
+private fun Modifier.wheelScrollsHorizontally(state: ScrollState): Modifier = pointerInput(state) {
+    // retargeting keeps the distance of a glide that a newer scroll event interrupts
+    var target = 0f
+    coroutineScope {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.type != PointerEventType.Scroll) continue
+                val delta = event.changes.fold(Offset.Zero) { sum, change -> sum + change.scrollDelta }
+                if (abs(delta.y) <= abs(delta.x)) continue
+                val forward = delta.y > 0f
+                if (if (forward) !state.canScrollForward else !state.canScrollBackward) continue
+                event.changes.forEach { it.consume() }
+                if (!state.isScrollInProgress || (target > state.value) != forward) target = state.value.toFloat()
+                target = (target + delta.y * density).coerceIn(0f, state.maxValue.toFloat())
+                launch { if (Motion.reduced) state.scrollTo(target.roundToInt()) else state.animateScrollTo(target.roundToInt()) }
+            }
+        }
     }
 }
 

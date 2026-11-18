@@ -41,6 +41,7 @@ object GenericModNames {
         "Detail Armor Bar" to "Detailed Armor Bar",
         "Detail Armor Bar Reconstructed" to "Detailed Armor Bar",
         "Tipper" to "AutoTip",
+        "3d-Skin-Layers" to "3D Skin Layers",
     )
 
     fun initialize() {
