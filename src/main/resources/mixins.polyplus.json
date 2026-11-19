@@ -171,6 +171,8 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinScreenWatermark",
+    //? if > 1.8.9
+    "client.MixinWatermarkMouse",
     "client.MixinServerSelectionList",
     //? if = 1.8.9
     //"client.MixinSession",
