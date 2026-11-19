@@ -5,6 +5,9 @@ import com.google.gson.JsonPrimitive
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.serialization.JsonOps
 //?}
+//? if = 1.8.9 {
+/*import net.minecraft.client.options.GameOptions
+*///?}
 //? if = 1.8.9
 //import org.polyfrost.polyplus.client.render.PoseStack
 import net.minecraft.client.Minecraft
@@ -50,7 +53,8 @@ object ClientPlatform {
         val codec = Minecraft.getInstance().options.framerateLimit().codec()
         highestAccepted(VANILLA_UNLIMITED_FRAMERATE, MAX_UNLIMITED_FRAMERATE) { codec.parse(JsonOps.INSTANCE, JsonPrimitive(it)).result().isPresent }
         //?} else {
-        /*VANILLA_UNLIMITED_FRAMERATE
+        /*// Mods like Argentum raise the slider's top, and with it the value that means Unlimited, above vanilla's 260
+        maxOf(VANILLA_UNLIMITED_FRAMERATE, GameOptions.Option.FRAMERATE_LIMIT.getMax().toInt())
         *///?}
     }
 

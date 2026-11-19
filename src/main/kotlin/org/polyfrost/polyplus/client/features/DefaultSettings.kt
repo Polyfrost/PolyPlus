@@ -99,7 +99,6 @@ object DefaultSettings {
 
     private val TICK_TASKS = buildList {
         add(Task(VANILLA_OPTIONS_ID, "Minecraft options", { true }, ::applyVanillaOptions))
-        //? if > 1.8.9 {
         add(
             Task(
                 id = "vanilla-framerate-unlimited",
@@ -109,7 +108,6 @@ object DefaultSettings {
                 coveredByLegacyFlag = false,
             ),
         )
-        //?}
         //? if >= 1.21.11 {
         add(
             Task(
@@ -359,14 +357,19 @@ object DefaultSettings {
         options.save()
     }
 
-    //? if > 1.8.9 {
     private fun liftRealFramerateCap() {
+        //? if > 1.8.9 {
         val option = Minecraft.getInstance().options.framerateLimit()
         if (option.get() != 260 || ClientPlatform.unlimitedFramerate == 260) return
         option.set(ClientPlatform.unlimitedFramerate)
         Minecraft.getInstance().options.save()
+        //?} else {
+        /*val options = Minecraft.getInstance().options ?: return
+        if (options.fpsLimit != 260 || ClientPlatform.unlimitedFramerate == 260) return
+        options.fpsLimit = ClientPlatform.unlimitedFramerate
+        options.save()
+        *///?}
     }
-    //?}
 
     //? if >= 1.21.11 {
     private fun disableTextureFiltering() {
