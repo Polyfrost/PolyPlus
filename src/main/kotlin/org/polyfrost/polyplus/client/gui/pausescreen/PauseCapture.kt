@@ -115,7 +115,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
 
     //? if > 1.8.9 {
     private fun read(): List<PauseEntry> {
-        val shown = vanilla.children().filterIsInstance<AbstractWidget>().filter { it.visible && !PauseMenuPanel.drawnElsewhere(it) && !shownAsRecording(it) }
+        val shown = vanilla.children().filterIsInstance<AbstractWidget>().filter { it.visible && !PauseMenuPanel.drawnElsewhere(it) && !shownAsRecording(it) && !isWorldOptions(it) }
         val mirrored = shown.filter(::mirrorable)
         uncaptured = shown.count { !mirrored.contains(it) && it !is AbstractStringWidget }
         val resolved = mirrored.map { it to slotOf(it) }.toMutableList()
@@ -127,6 +127,9 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         }
         return resolved.map { (widget, slotted) -> entryFor(widget, slotted) }
     }
+
+    private fun isWorldOptions(widget: AbstractWidget): Boolean =
+        (widget.message.contents as? TranslatableContents)?.key == WORLD_OPTIONS_KEY
 
     private fun shownAsRecording(widget: AbstractWidget): Boolean {
         val prefixes = ReplayProviders.available.flatMap { runCatching { it.controlKeyPrefixes }.getOrDefault(emptyList()) }
@@ -150,7 +153,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         return when (key) {
             "menu.returnToGame" -> Slotted(PauseSlot.RESUME, GROUP_GAME, GLYPH_ROW)
             "menu.options" -> Slotted(PauseSlot.OPTIONS, GROUP_GAME, "cog")
-            "options.worldOptions.button", "menu.shareToLan", "menu.multiplayerOptions.button", "polyplus.hostWorld" ->
+            "menu.shareToLan", "menu.multiplayerOptions.button", "polyplus.hostWorld" ->
                 Slotted(PauseSlot.WORLD, GROUP_GAME, GLYPH_WORLD)
             "gui.advancements" -> Slotted(PauseSlot.ADVANCEMENTS, GROUP_GAME, "star")
             "gui.stats" -> Slotted(PauseSlot.STATS, GROUP_GAME, "align")
@@ -263,6 +266,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         const val GLYPH_LEAVE = "assets/polyplus/mainmenu/log-out-04.svg"
         const val UNNAMED = "Mod button"
         const val MOD_MENU_KEY = "modmenu.title"
+        const val WORLD_OPTIONS_KEY = "options.worldOptions.button"
         const val MOD_MENU_PACKAGE = "com.terraformersmc.modmenu."
         val VANILLA_QUIT_KEYS = setOf("menu.returnToMenu", "menu.disconnect", "gui.toTitle")
         //? if = 1.8.9 {

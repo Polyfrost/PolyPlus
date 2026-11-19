@@ -159,6 +159,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
 private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
     val capture = screen.capture
     capture.entry(PauseSlot.OPTIONS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
+    if (screen.canWorldOptions) MenuRow(asset("globe-01"), "World options", height = rowHeight, onClick = screen::openWorldOptions)
     capture.entry(PauseSlot.WORLD)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
     if (screen.canHost) MenuRow(asset("log-in-04"), PauseWorldAccess.hostLabel, height = rowHeight, onClick = screen::openHost)
     capture.entry(PauseSlot.ADVANCEMENTS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }

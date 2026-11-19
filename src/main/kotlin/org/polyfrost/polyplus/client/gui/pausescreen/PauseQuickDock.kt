@@ -142,7 +142,8 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
             if (screen.online) DockItem(asset("message-chat-circle"), "Social", badge = socialDotLabel(groups.any { it.unread }, invites.isNotEmpty()), onClick = screen::openSocial)
             DockItem(asset("diamond-01"), "Wardrobe", onClick = screen::openWardrobe)
             screen.capture.entry(PauseSlot.OPTIONS)?.let { DockItem(it.glyph, "Options", enabled = it.enabled, onClick = it.press) }
-            screen.capture.entry(PauseSlot.WORLD)?.let { DockItem(it.glyph, "World", enabled = it.enabled, onClick = it.press) }
+            if (screen.canWorldOptions) DockItem(asset("globe-01"), "World options", width = 88.dp, onClick = screen::openWorldOptions)
+            screen.capture.entry(PauseSlot.WORLD)?.let { DockItem(asset("users-01"), it.label, width = 88.dp, enabled = it.enabled, onClick = it.press) }
             if (screen.canHost) DockItem(asset("log-in-04"), "Host", onClick = screen::openHost)
             Box(Modifier.focusRequester(rememberMoreTrigger(screen.moreOpen))) {
                 DockItem(asset("dots-vertical"), "More", active = screen.moreOpen) { screen.moreLinked = false; screen.moreOpen = !screen.moreOpen }

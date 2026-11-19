@@ -215,6 +215,8 @@
     "client.access.SimplePreparableReloadListenerInvoker",
     //? if = 1.8.9
     //"client.access.MinecraftServerAccessor",
+    //? if > 1.8.9 && < 26.2
+    //"client.access.PrimaryLevelDataAccessor",
     "client.access.OnlineServerEntryInvoker",
     //? if > 1.8.9
     "client.access.OptionsAccessor",
