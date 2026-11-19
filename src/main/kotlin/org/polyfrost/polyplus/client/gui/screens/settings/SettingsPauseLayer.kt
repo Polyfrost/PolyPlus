@@ -18,7 +18,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyDarkChrome
-import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseView
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellPanel
 import org.polyfrost.polyplus.client.gui.screens.shellModalSize
@@ -27,7 +27,7 @@ private val EnterLift = 24.dp
 private val EdgeMargin = 28.dp
 
 @Composable
-internal fun BoxScope.PauseSettingsLayer(screen: OneClientPauseScreen, progress: Float, topInset: Dp) {
+internal fun BoxScope.PauseSettingsLayer(screen: PauseView, progress: Float, topInset: Dp) {
     val open = screen.settingsOpen
     if (!open && progress <= 0f) return
     if (open) EscapeCloses(screen::closeGameSettings)
@@ -55,7 +55,7 @@ internal fun BoxScope.PauseSettingsLayer(screen: OneClientPauseScreen, progress:
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
                 close = true,
             ) {
-                SettingsBody({ screen })
+                SettingsBody({ screen.host })
             }
         }
     }

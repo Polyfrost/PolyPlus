@@ -56,6 +56,7 @@ import org.polyfrost.polyplus.client.PolyPlusScreensConfig
 import org.polyfrost.polyplus.client.gui.MenuBackdrop
 import org.polyfrost.polyplus.client.gui.MenuGlass
 import org.polyfrost.polyplus.client.gui.MenuPanorama
+import org.polyfrost.polyplus.client.gui.LocalScreenFit
 import org.polyfrost.polyplus.client.gui.MenuScale
 import org.polyfrost.polyplus.client.gui.PanelSurface
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
@@ -113,8 +114,12 @@ internal object VanillaScreenHint {
 }
 
 @Composable
-fun ShellFrame(host: ScreenHost, title: String, content: @Composable () -> Unit) {
-    val chrome = (host as? ShellScreen)?.chrome ?: true
+fun ShellFrame(
+    host: ScreenHost,
+    title: String,
+    chrome: Boolean = (host as? ShellScreen)?.chrome ?: true,
+    content: @Composable () -> Unit,
+) {
     val lift = (host as? ShellScreen)?.revealLift ?: true
     val switch = (host as? ShellScreen)?.takeIf { it.switchable }
     CompositionLocalProvider(LocalVanillaSwitch provides switch) {
@@ -224,7 +229,8 @@ private fun RootSize(content: @Composable BoxScope.(widthPx: Float, heightPx: Fl
 private fun PageViewport(content: @Composable BoxScope.() -> Unit) {
     RootSize { widthPx, heightPx ->
         val outer = LocalDensity.current
-        val scale = MenuScale.scale(minOf(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT))
+        val fit = LocalScreenFit.current
+        val scale = MenuScale.scale(minOf(widthPx / fit / LobbyLayout.DESIGN_WIDTH, heightPx / fit / LobbyLayout.DESIGN_HEIGHT)) * fit
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             Box(Modifier.fillMaxSize(), content = content)

@@ -1,0 +1,22 @@
+{
+  "vertex": "minecraft:core/blit_screen",
+  "fragment": "polyplus:core/live_scene_grade",
+  "samplers": [
+    {
+      "name": "InSampler"
+    }
+  ],
+  "uniforms": [
+    {
+      "name": "ColorModulator",
+      "type": "float",
+      "count": 4,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ]
+}

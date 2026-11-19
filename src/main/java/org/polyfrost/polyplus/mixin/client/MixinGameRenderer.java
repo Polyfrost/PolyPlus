@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 //? if >= 1.21.11 {
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Minecraft;
+import org.polyfrost.polyplus.client.gui.onboarding.live.LivePreviewFrames;
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -37,6 +38,7 @@ public class MixinGameRenderer {
         /*RenderTarget rt = mc.getMainRenderTarget();
         *///?}
         if (rt != null) PlayerPreviewOffscreen.renderAll(rt);
+        if (rt != null) LivePreviewFrames.renderAll(rt);
     }
     //?}
 }

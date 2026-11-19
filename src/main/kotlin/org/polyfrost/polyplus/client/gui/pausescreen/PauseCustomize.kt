@@ -94,7 +94,7 @@ private fun pauseOptionSections(): List<OptionSection> {
 }
 
 @Composable
-internal fun CustomizeButton(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
+internal fun CustomizeButton(screen: PauseView, modifier: Modifier = Modifier) {
     IconButton(
         icon = "paintbrush",
         contentDescription = "Customize",
@@ -105,12 +105,12 @@ internal fun CustomizeButton(screen: OneClientPauseScreen, modifier: Modifier = 
 }
 
 @Composable
-internal fun BoxScope.CustomizeDismiss(screen: OneClientPauseScreen) {
+internal fun BoxScope.CustomizeDismiss(screen: PauseView) {
     Box(Modifier.matchParentSize().notFocusable().oneConfigClickable(null, screen::closeCustomize, indication = false, pointerIcon = null))
 }
 
 @Composable
-internal fun PauseCustomizePanel(screen: OneClientPauseScreen, modifier: Modifier = Modifier) {
+internal fun PauseCustomizePanel(screen: PauseView, modifier: Modifier = Modifier) {
     val close = screen::closeCustomize
     EscapeCloses(close)
     val theme = OneConfigTheme.current

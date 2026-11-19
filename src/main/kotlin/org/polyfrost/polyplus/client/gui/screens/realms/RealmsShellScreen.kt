@@ -305,8 +305,57 @@ class RealmsShellScreen(shell: ScreenShell, val vanilla: RealmsMainScreen) :
             }, mc)
     }
 
+    internal val view: RealmsView = object : RealmsView {
+        override val availability get() = this@RealmsShellScreen.availability
+        override val servers get() = this@RealmsShellScreen.servers
+        override val onlinePlayers get() = this@RealmsShellScreen.onlinePlayers
+        override val inviteCount get() = this@RealmsShellScreen.inviteCount
+        override val trialAvailable get() = this@RealmsShellScreen.trialAvailable
+        override val newsLink get() = this@RealmsShellScreen.newsLink
+        override val unreadNews get() = this@RealmsShellScreen.unreadNews
+        override val notices get() = this@RealmsShellScreen.notices
+        override val slow get() = this@RealmsShellScreen.slow
+        override val tab get() = this@RealmsShellScreen.tab
+        override val invites get() = this@RealmsShellScreen.invites
+        override val invitesFailed get() = this@RealmsShellScreen.invitesFailed
+        override val inviteProblem get() = this@RealmsShellScreen.inviteProblem
+        override val answering get() = this@RealmsShellScreen.answering
+        override var leaving: RealmsServer?
+            get() = this@RealmsShellScreen.leaving
+            set(value) {
+                this@RealmsShellScreen.leaving = value
+            }
+
+        override fun recheck() = this@RealmsShellScreen.recheck()
+        override fun openAvailabilityDetails() = this@RealmsShellScreen.openAvailabilityDetails()
+        override fun refresh() = this@RealmsShellScreen.refresh()
+        override fun selectTab(next: RealmsTab) = this@RealmsShellScreen.selectTab(next)
+        override fun isMine(server: RealmsServer) = this@RealmsShellScreen.isMine(server)
+        override fun play(server: RealmsServer) {
+            this@RealmsShellScreen.play(server)
+        }
+        override fun configure(server: RealmsServer) = this@RealmsShellScreen.configure(server)
+        override fun invite(server: RealmsServer) = this@RealmsShellScreen.invite(server)
+        override fun setUp(server: RealmsServer) = this@RealmsShellScreen.setUp(server)
+        override fun renew(server: RealmsServer) {
+            this@RealmsShellScreen.renew(server)
+        }
+        override fun leave(server: RealmsServer) = this@RealmsShellScreen.leave(server)
+        override fun buy() {
+            this@RealmsShellScreen.buy()
+        }
+        override fun joinWithCode() = this@RealmsShellScreen.joinWithCode()
+        override fun openNews() = this@RealmsShellScreen.openNews()
+        override fun openNotice(notice: RealmsNotice) {
+            this@RealmsShellScreen.openNotice(notice)
+        }
+        override fun dismissNotice(id: UUID) = this@RealmsShellScreen.dismissNotice(id)
+        override fun loadInvites() = this@RealmsShellScreen.loadInvites()
+        override fun answer(invite: PendingInvite, accept: Boolean) = this@RealmsShellScreen.answer(invite, accept)
+    }
+
     @Composable
-    override fun Body() = RealmsBody(this)
+    override fun Body() = RealmsBody(view)
 
     private companion object {
         const val SLOW_MILLIS = 15_000L

@@ -130,7 +130,27 @@ object ClientWatermark {
     @Composable
     private fun Content() {
         val current = style ?: return
-        val unit = with(LocalDensity.current) { current.unit.toDp() }
+        Placed(with(LocalDensity.current) { current.unit.toDp() }, current)
+    }
+
+    @Composable
+    internal fun Sample(guiUnit: Dp) {
+        val scale = (PolyPlusConfig.watermarkScale / 100f).coerceIn(MIN_SCALE, MAX_SCALE)
+        Placed(
+            guiUnit * scale,
+            Style(
+                0f,
+                PolyPlusConfig.watermarkPosition,
+                PolyPlusConfig.watermarkOffsetX,
+                PolyPlusConfig.watermarkOffsetY,
+                PolyPlusConfig.watermarkAccentColor,
+                PolyPlusConfig.watermarkColor.argb,
+            ),
+        )
+    }
+
+    @Composable
+    private fun Placed(unit: Dp, current: Style) {
         val color = if (current.accent) OneConfigTheme.accent else Color(current.color)
         val offsetX = if (centeredX(current.position)) 0f else current.offsetX
         val offsetY = if (centeredY(current.position)) 0f else current.offsetY

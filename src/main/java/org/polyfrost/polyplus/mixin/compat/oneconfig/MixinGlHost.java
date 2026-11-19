@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 //? if < 1.21.11 {
 /*import net.minecraft.client.Minecraft;
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewOffscreen;
+import org.polyfrost.polyplus.client.gui.onboarding.live.LivePreviewFrames;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -28,6 +29,7 @@ public class MixinGlHost {
         /^RenderTarget rt = mc.getRenderTarget();
         ^///?}
         if (rt != null) PlayerPreviewOffscreen.renderAll(rt);
+        if (rt != null) LivePreviewFrames.renderAll(rt);
     }
     *///?}
 }

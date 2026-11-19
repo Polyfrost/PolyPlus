@@ -106,10 +106,12 @@ object AdaptiveBlurDefaults {
             averageFps < refreshRate + HEADROOM_MARGIN -> OnboardingFeatures.MOTION_BLUR_PERFORMANCE
             else -> OnboardingFeatures.MOTION_BLUR_QUALITY
         }
-        if (!PolyPlusConfig.adaptiveBlurApplied && !OnboardingFeatures.needsMotionBlurChoice()) {
+        sampled = true
+        if (PolyPlusConfig.onboardingCompleted && OnboardingFeatures.adoptRecommendedMotionBlur()) {
+            PolyPlusConfig.save()
+        } else if (!PolyPlusConfig.adaptiveBlurApplied && !OnboardingFeatures.needsMotionBlurChoice()) {
             apply(averageFps, refreshRate)
         }
-        sampled = true
     }
 
     private fun apply(averageFps: Float, refreshRate: Int) {

@@ -2,13 +2,8 @@
 
 package org.polyfrost.polyplus.client.features
 
-import com.mojang.blaze3d.platform.InputConstants
-//? if > 1.8.9 {
-import net.minecraft.client.KeyMapping
-//?} else {
-/*import net.minecraft.client.options.GameOptions
-import net.minecraft.client.options.KeyBinding as KeyMapping
-import net.minecraft.client.render.Window
+//? if <= 1.8.9 {
+/*import net.minecraft.client.render.Window
 *///?}
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
@@ -73,7 +68,11 @@ object OnboardingFeatures {
 
     val ModCard.available: Boolean
         get() = when (this) {
+            //? if >= 1.21.5 {
             ModCard.GRASS -> betterGrassAvailable
+            //?} else {
+            /*ModCard.GRASS -> false
+            *///?}
             ModCard.FIRE_OVERLAY -> fireOverlayAvailable
             ModCard.SHIELD_HEIGHT -> shieldHeightAvailable
             ModCard.MOUNT -> mountOpacityAvailable
@@ -84,14 +83,8 @@ object OnboardingFeatures {
             ModCard.DYNAMIC_LIGHTS -> dynamicLightsAvailable
         }
 
-    val modsPageAvailable: Boolean
-        get() = polySprintAvailable || modCardCount > 0
-
     val availableCards: List<ModCard>
         get() = ModCard.entries.filter { it.available }
-
-    val modCardCount: Int
-        get() = availableCards.size
 
     @JvmStatic
     fun needsModSettingsChoice(): Boolean =
@@ -133,64 +126,17 @@ object OnboardingFeatures {
     private val ModCard.pending: Boolean
         get() = !settled && PolyPlusConfig.onboardingModSettingsVersion >= introducedIn && available
 
-    val guidedCards: List<ModCard> = listOf(
-        ModCard.GRASS,
-        ModCard.FIRE_OVERLAY,
-        ModCard.SHIELD_HEIGHT,
-        ModCard.MOUNT,
-        ModCard.BLOCK_HIGHLIGHT
-    )
-
-    internal fun guideFlag(card: ModCard): Int = guidedCards.indexOf(card).let { if (it < 0) 0 else 1 shl it }
-
-    @JvmStatic
-    fun pendingGuides(): List<ModCard> {
-        if (!PolyPlusConfig.onboardingCompleted) return emptyList()
-        return guidedCards.filter { card ->
-            guideNeeded(
-                card,
-                shown = PolyPlusConfig.onboardingGuidesShown,
-                completedVersion = PolyPlusConfig.onboardingModSettingsVersion,
-                available = card.available,
-                movedFromDefault = card.movedFromDefault(),
-            )
-        }
-    }
-
-    internal fun guideNeeded(
-        card: ModCard,
-        shown: Int,
-        completedVersion: Int,
-        available: Boolean,
-        movedFromDefault: Boolean,
-    ): Boolean = card in guidedCards &&
-        shown and guideFlag(card) == 0 &&
-        available &&
-        completedVersion >= card.introducedIn &&
-        movedFromDefault
-
-    @JvmStatic
-    fun needsGuides(): Boolean = pendingGuides().isNotEmpty()
-
-    fun markGuidesShown(cards: Collection<ModCard>) {
-        PolyPlusConfig.onboardingGuidesShown = cards.fold(PolyPlusConfig.onboardingGuidesShown) { mask, card ->
-            mask or guideFlag(card)
-        }
-    }
-
-    private fun ModCard.movedFromDefault(): Boolean = when (this) {
-        ModCard.GRASS -> (currentBetterGrassMode() ?: BETTER_GRASS_FANCY) != BETTER_GRASS_FANCY
-        ModCard.FIRE_OVERLAY ->
-            (currentFireOverlayHeight() ?: FIRE_OVERLAY_MAX) < FIRE_OVERLAY_MAX - 0.001 ||
-                (currentFireOverlayOpacity() ?: FIRE_OPACITY_VANILLA) < FIRE_OPACITY_VANILLA - 0.5f
-        ModCard.SHIELD_HEIGHT -> (currentShieldHeight() ?: SHIELD_HEIGHT_MAX) < SHIELD_HEIGHT_MAX - 0.001f
-        ModCard.MOUNT -> (currentHorseOpacity() ?: HORSE_OPACITY_MAX) < HORSE_OPACITY_MAX - 0.001f
-        else -> false
-    }
-
     @JvmStatic
     fun needsMotionBlurChoice(): Boolean =
         polyBlurAvailable && PolyPlusConfig.onboardingMotionBlurMode == MOTION_BLUR_UNSET
+
+    fun adoptRecommendedMotionBlur(): Boolean {
+        if (!needsMotionBlurChoice() || !AdaptiveBlurDefaults.sampled) return false
+        PolyPlusConfig.onboardingMotionBlurMode = AdaptiveBlurDefaults.recommendedMode
+        PolyPlusConfig.onboardingPolyBlurApplied = false
+        PolyPlusConfig.adaptiveBlurApplied = true
+        return true
+    }
 
     fun initialize() {
         eventHandler { _: TickEvent.End ->
@@ -220,13 +166,29 @@ object OnboardingFeatures {
         }
     }
 
-    fun applySavedSettings() {
+    fun resetForSetup() {
+        PolyPlusConfig.onboardingCompleted = false
+        PolyPlusConfig.onboardingFeaturesApplied = false
+        PolyPlusConfig.onboardingModSettingsVersion = 0
+        PolyPlusConfig.onboardingBetterGrassSettled = false
+        PolyPlusConfig.onboardingFireOverlaySettled = false
+        PolyPlusConfig.onboardingShieldHeightSettled = false
+        PolyPlusConfig.onboardingMountOpacitySettled = false
+        PolyPlusConfig.onboardingWaveyCapesSettled = false
+        PolyPlusConfig.onboardingSkinLayersSettled = false
+        PolyPlusConfig.onboardingGammaSettled = false
+        PolyPlusConfig.onboardingBlockHighlightSettled = false
+        PolyPlusConfig.onboardingDynamicLightsSettled = false
+        PolyPlusConfig.save()
+    }
+
+    fun applySavedSettings(applySprint: Boolean, applyBlur: Boolean) {
         applyCoreSettings()
         if (polySprintAvailable) {
-            applyToggleSprint(PolyPlusConfig.onboardingToggleSprint)
+            if (applySprint) applyToggleSprint(PolyPlusConfig.onboardingToggleSprint)
             PolyPlusConfig.onboardingSprintApplied = true
         }
-        if (applyMotionBlur(PolyPlusConfig.onboardingMotionBlurMode, PolyPlusConfig.onboardingMotionBlur)) {
+        if (applyBlur && applyMotionBlur(PolyPlusConfig.onboardingMotionBlurMode, PolyPlusConfig.onboardingMotionBlur)) {
             PolyPlusConfig.onboardingPolyBlurApplied = true
         }
         applyPendingModOptions(force = true)
@@ -710,32 +672,6 @@ object OnboardingFeatures {
         gamma.javaClass.getMethod("isSmoothTransitionEnabled").invoke(gamma) as Boolean
     }.getOrNull()
 
-    fun gammaToggleKey(): KeyMapping? = runCatching {
-        //? if > 1.8.9 {
-        Minecraft.getInstance().options.keyMappings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
-        //?} else {
-        /*Minecraft.getInstance().options.keyBindings.firstOrNull { it.name == GAMMA_TOGGLE_KEY }
-        *///?}
-    }.getOrNull()
-
-    fun gammaToggleKeyLabel(): String? = runCatching {
-        //? if > 1.8.9 {
-        gammaToggleKey()?.translatedKeyMessage?.string
-        //?} else {
-        /*gammaToggleKey()?.let { GameOptions.getKeyName(it.keyCode) }
-        *///?}
-    }.getOrNull()
-
-    fun bindGammaToggleKey(key: InputConstants.Key): Boolean = runCatching {
-        val mapping = gammaToggleKey() ?: error("Gamma Utils has no toggle binding")
-        mapping.setKey(key)
-        KeyMapping.resetMapping()
-        Minecraft.getInstance().options.save()
-        true
-    }.onFailure {
-        logModApplyFailure("gamma-utils-key", "Could not rebind the Gamma Utils toggle key", it)
-    }.getOrDefault(false)
-
     fun applyGamma(percent: Float, toggled: Float, smooth: Boolean): Boolean = runCatching {
         val gamma = gammaSettings()
         gamma.javaClass.getMethod("setSmoothTransitionStatus", Boolean::class.javaPrimitiveType)
@@ -929,7 +865,6 @@ object OnboardingFeatures {
 
     private const val GAMMA_UTILS = "io.github.sjouwer.gammautils.GammaUtils"
     private const val GAMMA_MANAGER = "io.github.sjouwer.gammautils.GammaManager"
-    private const val GAMMA_TOGGLE_KEY = "key.gammautils.gammaToggle"
     const val GAMMA_MIN = 100f
     const val GAMMA_MAX = 1500f
 

@@ -86,7 +86,7 @@ private val AWAY_SHIFT = 48.dp
 private enum class PauseNavTab { Game, Wardrobe, Social }
 
 @Composable
-internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
+internal fun BoxScope.StepBackScreen(screen: PauseView, narrow: Boolean, away: Float = 0f) {
     val reveal = rememberReveal()
     val place = rememberPlace()
     val state = rememberPauseState()
@@ -156,7 +156,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
 }
 
 @Composable
-private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
+private fun StepBackRows(screen: PauseView, rowHeight: Dp) {
     val capture = screen.capture
     capture.entry(PauseSlot.OPTIONS)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
     capture.entry(PauseSlot.WORLD)?.let { MenuRow(it.glyph, it.label, height = rowHeight, enabled = it.enabled, tooltip = it.tooltip, onClick = it.press) }
@@ -180,7 +180,7 @@ private fun StepBackRows(screen: OneClientPauseScreen, rowHeight: Dp) {
 }
 
 @Composable
-private fun StepBackNav(screen: OneClientPauseScreen) {
+private fun StepBackNav(screen: PauseView) {
     val groups by GroupsRepository.groups.collectAsState()
     val invites by PartyRepository.incomingInvites.collectAsState()
     Row(
@@ -214,7 +214,7 @@ private fun StepBackNav(screen: OneClientPauseScreen) {
 }
 
 @Composable
-private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
+private fun PartyBar(screen: PauseView, modifier: Modifier) {
     val party by PartyRepository.party.collectAsState()
     Row(
         modifier.height(LobbyLayout.BarHeight).pauseGlass().padding(start = (LobbyLayout.BarHeight - BAR_HEAD) / 2, end = 12.dp),
@@ -235,7 +235,7 @@ private fun PartyBar(screen: OneClientPauseScreen, modifier: Modifier) {
                 }
             }
         }
-        Box(Modifier.centerVerticallyExact()) { PartyActions(current, onVoice = { SocialOverlay.openVoice(screen) }.takeIf { screen.online }) }
+        Box(Modifier.centerVerticallyExact()) { PartyActions(current, onVoice = { SocialOverlay.openVoice(screen.host) }.takeIf { screen.online }) }
         if (screen.online) PartyInviteCards(PauseHost)
     }
 }

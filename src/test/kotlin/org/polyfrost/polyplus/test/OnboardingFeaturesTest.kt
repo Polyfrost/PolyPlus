@@ -2,15 +2,11 @@ package org.polyfrost.polyplus.test
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
-import org.polyfrost.polyplus.client.gui.betterGrassPreviewPath
-import org.polyfrost.polyplus.client.gui.gammaPreviewPaths
-import org.polyfrost.polyplus.client.gui.modGuidePaths
 
 class OnboardingFeaturesTest {
     private val everyCard = OnboardingFeatures.ModCard.entries.toList()
@@ -158,58 +154,6 @@ class OnboardingFeaturesTest {
         current: Boolean = false,
         completedVersion: Int = OnboardingFeatures.MOD_SETTINGS_VERSION,
     ) = OnboardingFeatures.settledAfterRun(card, offered, available, touched, current, completedVersion)
-
-    @Test
-    fun `every better grass preview path resolves`() {
-        OnboardingFeatures.BETTER_GRASS_MODES.forEach { mode ->
-            val path = betterGrassPreviewPath(mode)
-            assertNotNull(javaClass.classLoader.getResource(path), path)
-        }
-    }
-
-    @Test
-    fun `every mod guide screenshot resolves`() {
-        modGuidePaths.forEach { path ->
-            assertNotNull(javaClass.classLoader.getResource(path), path)
-        }
-    }
-
-    @Test
-    fun `a guide is owed once, for a mod that is off its default and already onboarded`() {
-        val card = OnboardingFeatures.ModCard.MOUNT
-
-        assertTrue(guideNeeded(card))
-        assertFalse(guideNeeded(card, movedFromDefault = false), "nothing was changed")
-        assertFalse(guideNeeded(card, shown = OnboardingFeatures.guideFlag(card)), "shown twice")
-        assertFalse(guideNeeded(card, available = false), "the mod is gone")
-        assertFalse(guideNeeded(card, completedVersion = 0), "the card is still ahead of them")
-    }
-
-    @Test
-    fun `every guided card claims its own bit and no other`() {
-        val flags = OnboardingFeatures.guidedCards.map(OnboardingFeatures::guideFlag)
-
-        assertEquals(flags.distinct(), flags)
-        assertTrue(flags.all { it != 0 && it and (it - 1) == 0 }, "flags are $flags")
-        (OnboardingFeatures.ModCard.entries - OnboardingFeatures.guidedCards.toSet()).forEach { card ->
-            assertEquals(0, OnboardingFeatures.guideFlag(card), card.name)
-        }
-    }
-
-    private fun guideNeeded(
-        card: OnboardingFeatures.ModCard,
-        shown: Int = 0,
-        completedVersion: Int = OnboardingFeatures.MOD_SETTINGS_VERSION,
-        available: Boolean = true,
-        movedFromDefault: Boolean = true,
-    ) = OnboardingFeatures.guideNeeded(card, shown, completedVersion, available, movedFromDefault)
-
-    @Test
-    fun `both fullbright preview frames resolve`() {
-        gammaPreviewPaths.forEach { path ->
-            assertNotNull(javaClass.classLoader.getResource(path), path)
-        }
-    }
 
     @Test
     fun `an option is only offered when it is there and writable`() {

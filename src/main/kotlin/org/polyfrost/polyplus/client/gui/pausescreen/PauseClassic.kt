@@ -75,7 +75,7 @@ private fun classicLayout(entries: List<PauseEntry>): ClassicLayout {
 }
 
 @Composable
-internal fun BoxScope.ClassicScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
+internal fun BoxScope.ClassicScreen(screen: PauseView, narrow: Boolean, away: Float = 0f) {
     val animate = rememberLive { PolyPlusPauseConfig.classicOpenAnimation }
     val reveal = (if (animate) rememberReveal() else 1f) * (1f - away)
     val rise = if (Motion.reduced) 0f else (1f - reveal) * CLASSIC_RISE
@@ -159,7 +159,7 @@ private fun ClassicHeader(title: String, state: PauseState, modifier: Modifier) 
 }
 
 @Composable
-private fun ClassicGrid(screen: OneClientPauseScreen, layout: ClassicLayout) {
+private fun ClassicGrid(screen: PauseView, layout: ClassicLayout) {
     val capture = screen.capture
     Column(Modifier.fillMaxWidth().blockPointer(), verticalArrangement = Arrangement.spacedBy(CLASSIC_GAP)) {
         ClassicButton(
@@ -207,7 +207,7 @@ private fun RowScope.EntryButton(entry: PauseEntry?) {
 }
 
 @Composable
-private fun ClassicExtras(screen: OneClientPauseScreen, layout: ClassicLayout) {
+private fun ClassicExtras(screen: PauseView, layout: ClassicLayout) {
     val groups by GroupsRepository.groups.collectAsState()
     val invites by PartyRepository.incomingInvites.collectAsState()
     val hostInGrid = screen.capture.entry(PauseSlot.WORLD) == null && layout.beside == null
@@ -228,14 +228,14 @@ private fun ClassicExtras(screen: OneClientPauseScreen, layout: ClassicLayout) {
 }
 
 @Composable
-private fun MoreButton(screen: OneClientPauseScreen, layout: ClassicLayout, modifier: Modifier) {
+private fun MoreButton(screen: PauseView, layout: ClassicLayout, modifier: Modifier) {
     Box(modifier.focusRequester(rememberMoreTrigger(screen.moreOpen && !screen.moreLinked))) {
         ClassicButton("More", Modifier.fillMaxWidth()) { toggleMore(screen) }
         if (screen.moreOpen) MorePopup(screen, rememberToolAnchor(true), routes = true, game = false, hidden = layout.hidden)
     }
 }
 
-private fun toggleMore(screen: OneClientPauseScreen) {
+private fun toggleMore(screen: PauseView) {
     screen.moreLinked = false
     screen.moreOpen = !screen.moreOpen
 }

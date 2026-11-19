@@ -56,11 +56,11 @@ internal class PauseEntry(
             enabled == other.enabled && tooltip == other.tooltip && sprite === other.sprite
 }
 
-internal class PauseCapture(private val vanilla: PauseScreen) {
-    var entries by mutableStateOf<List<PauseEntry>>(emptyList())
+internal class PauseCapture(private val vanilla: PauseScreen) : PauseMenu {
+    override var entries by mutableStateOf<List<PauseEntry>>(emptyList())
         private set
 
-    var uncaptured by mutableStateOf(0)
+    override var uncaptured by mutableStateOf(0)
         private set
 
     private var refreshedAt = 0L
@@ -70,9 +70,9 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
     val width: Int get() = vanilla.width
     val height: Int get() = vanilla.height
 
-    fun entry(slot: PauseSlot): PauseEntry? = entries.firstOrNull { it.slot == slot }
+    override fun entry(slot: PauseSlot): PauseEntry? = entries.firstOrNull { it.slot == slot }
 
-    val more: List<PauseEntry> get() = entries.filter { it.slot == PauseSlot.MORE }
+    override val more: List<PauseEntry> get() = entries.filter { it.slot == PauseSlot.MORE }
 
     fun sync(width: Int, height: Int) {
         //? if >= 1.21.11 {

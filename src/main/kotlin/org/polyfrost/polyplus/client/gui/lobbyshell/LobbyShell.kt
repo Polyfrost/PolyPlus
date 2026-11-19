@@ -38,6 +38,7 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.SocialPageState
 import org.polyfrost.polyplus.client.gui.replays.ReplayLibrary
 import org.polyfrost.polyplus.client.gui.replays.watchSafely
 import org.polyfrost.polyplus.client.host.HostWorldManager
+import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.lobby.LobbyFraming
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
@@ -159,6 +160,15 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     private fun startTour() {
         if (PolyPlusLobbyConfig.tourSeen || tour != null) return
         tour = LobbyTour(PrivacyConsent.allowsOnlineServices())
+    }
+
+    fun redoSetup() {
+        if (setup) return
+        tour = null
+        OnboardingFeatures.resetForSetup()
+        show(LobbyPage.Home)
+        setup = true
+        LobbyFraming.onboarding = true
     }
 
     fun replayTour() {

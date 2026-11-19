@@ -23,8 +23,6 @@ internal fun onboardingPending(): Boolean =
         StartupAccessibility.pending() ||
         PrivacyConsent.needsPrompt() ||
         OnboardingFeatures.needsModSettingsChoice() ||
-        OnboardingFeatures.needsMotionBlurChoice() ||
-        OnboardingFeatures.needsGuides() ||
         !PolyPlusScreensConfig.onboardingAsked
 
 @Composable

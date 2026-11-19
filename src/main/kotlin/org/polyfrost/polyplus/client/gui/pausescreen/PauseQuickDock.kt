@@ -82,7 +82,7 @@ private fun guiScale(): Int {
 }
 
 @Composable
-internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Boolean, away: Float = 0f) {
+internal fun BoxScope.QuickDockScreen(screen: PauseView, narrow: Boolean, away: Float = 0f) {
     val reveal = rememberReveal() * (1f - away)
     val rise = if (Motion.reduced) 0f else (1f - reveal) * RISE_PIXELS
     val place = rememberPlace()
@@ -174,7 +174,7 @@ internal fun BoxScope.QuickDockScreen(screen: OneClientPauseScreen, narrow: Bool
 }
 
 @Composable
-private fun BoxScope.ToolsCard(screen: OneClientPauseScreen, narrow: Boolean, reveal: Float, rise: Float) {
+private fun BoxScope.ToolsCard(screen: PauseView, narrow: Boolean, reveal: Float, rise: Float) {
     val lift = with(LocalDensity.current) { (HUD_GUI_PIXELS * guiScale()).toDp() }
     val width = pauseWidgetWidth(narrow)
     val top = rememberLive { PolyPlusPauseConfig.compactWidgetCorner } == PauseWidgetCorner.TOP_RIGHT
@@ -213,7 +213,7 @@ private fun DockRule() {
 }
 
 @Composable
-private fun DockResume(screen: OneClientPauseScreen, where: String, narrow: Boolean) {
+private fun DockResume(screen: PauseView, where: String, narrow: Boolean) {
     val shape = OneConfigTheme.shape(12.dp)
     val ink = OneConfigTheme.current.accentTextColor
     Column(

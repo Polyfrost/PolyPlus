@@ -256,9 +256,65 @@ class OneClientPauseScreen(
 
     private val hostLabel: String get() = PauseWorldAccess.hostLabel
 
+    internal val view: PauseView = object : PauseView {
+        private val screen = this@OneClientPauseScreen
+        override val host: Screen get() = screen
+        override val capture: PauseMenu get() = screen.capture
+        override val stepBack: Boolean get() = screen.stepBack
+        override val classic: Boolean get() = screen.classic
+        override val staged: Boolean get() = screen.staged
+        override var moreOpen: Boolean
+            get() = screen.moreOpen
+            set(value) {
+                screen.moreOpen = value
+            }
+        override var moreLinked: Boolean
+            get() = screen.moreLinked
+            set(value) {
+                screen.moreLinked = value
+            }
+        override var customizeOpen: Boolean
+            get() = screen.customizeOpen
+            set(value) {
+                screen.customizeOpen = value
+            }
+        override val settingsOpen: Boolean get() = screen.settingsOpen
+        override var playerPreview: Boolean
+            get() = screen.playerPreview
+            set(value) {
+                screen.playerPreview = value
+            }
+        override var resumeBounds: Rect
+            get() = screen.resumeBounds
+            set(value) {
+                screen.resumeBounds = value
+            }
+        override val fromVanilla: Boolean get() = screen.fromVanilla
+        override val online: Boolean get() = screen.online
+        override val canHost: Boolean get() = screen.canHost
+
+        override fun resume() = screen.resume()
+        override fun closeIfCurrent() = screen.closeIfCurrent()
+        override fun resyncMenu() = screen.resyncMenu()
+        override fun toggleCustomize() = screen.toggleCustomize()
+        override fun closeCustomize() = screen.closeCustomize()
+        override fun openClassic() = screen.openClassic()
+        override fun restyle(next: PauseScreenStyle) = screen.restyle(next)
+        override fun openSocial() {
+            screen.openSocial()
+        }
+        override fun openHost() {
+            screen.openHost()
+        }
+        override fun openWardrobe() = screen.openWardrobe()
+        override fun openSettings() = screen.openSettings()
+        override fun openMods() = screen.openMods()
+        override fun closeGameSettings() = screen.closeGameSettings()
+    }
+
     @Composable
     override fun Content() {
-        ProvidePopupSounds(false) { PauseRoot(this) }
+        ProvidePopupSounds(false) { PauseRoot(view) }
     }
 }
 

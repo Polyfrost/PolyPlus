@@ -100,6 +100,7 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.SocialToastHost
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
+import org.polyfrost.polyplus.client.gui.LocalScreenFit
 import org.polyfrost.polyplus.client.gui.screens.settings.PauseSettingsLayer
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -151,7 +152,7 @@ internal fun rememberReveal(): Float {
 }
 
 @Composable
-internal fun PauseRoot(screen: OneClientPauseScreen) {
+internal fun PauseRoot(screen: PauseView) {
     var measured by remember { mutableStateOf(IntSize.Zero) }
     BoxWithConstraints(
         Modifier
@@ -174,7 +175,8 @@ internal fun PauseRoot(screen: OneClientPauseScreen) {
         val widthPx = if (measured.width > 0) measured.width.toFloat() else maxWidth.value * outer.density
         val heightPx = if (measured.height > 0) measured.height.toFloat() else maxHeight.value * outer.density
         if (!usableSize(widthPx, heightPx)) return@BoxWithConstraints
-        val scale = max(min(widthPx / LobbyLayout.DESIGN_WIDTH, heightPx / LobbyLayout.DESIGN_HEIGHT), MIN_SCALE)
+        val fit = LocalScreenFit.current
+        val scale = max(min(widthPx / fit / LobbyLayout.DESIGN_WIDTH, heightPx / fit / LobbyLayout.DESIGN_HEIGHT), MIN_SCALE) * fit
         val density = remember(scale, outer.fontScale) { Density(usableScale(scale), usableScale(outer.fontScale)) }
         CompositionLocalProvider(LocalDensity provides density, LocalRootSize provides Size(widthPx, heightPx)) {
             Box(Modifier.fillMaxSize()) {
@@ -344,7 +346,7 @@ private fun LinkedEntry(entry: LinkedModMenus.Entry, onDone: () -> Unit) {
 }
 
 @Composable
-internal fun LinkedModRow(screen: OneClientPauseScreen, height: Dp) {
+internal fun LinkedModRow(screen: PauseView, height: Dp) {
     val linked = remember { pauseLinkedEntries() }
     if (linked.isEmpty()) return
     val logo = remember { decodeModLogo(LinkedModMenus.logo) }
@@ -378,7 +380,7 @@ internal fun rememberMoreTrigger(open: Boolean): FocusRequester {
 
 @Composable
 internal fun MorePopup(
-    screen: OneClientPauseScreen,
+    screen: PauseView,
     anchor: PopupPositionProvider,
     routes: Boolean = false,
     game: Boolean = routes,
@@ -401,7 +403,7 @@ internal fun MorePopup(
 
 @Composable
 internal fun MorePanel(
-    screen: OneClientPauseScreen,
+    screen: PauseView,
     modifier: Modifier = Modifier,
     routes: Boolean = false,
     game: Boolean = routes,
@@ -428,7 +430,7 @@ internal fun MorePanel(
                         label = "Mods",
                         onClick = {
                             close()
-                            button.onClick(screen)
+                            screen.host?.let { button.onClick(it) }
                         },
                         icon = button.icon,
                         size = MenuItemSize.Regular,
@@ -478,7 +480,7 @@ private fun uncapturedHint(count: Int): String? = when (count) {
 }
 
 @Composable
-internal fun BoxScope.MoreDismiss(screen: OneClientPauseScreen) {
+internal fun BoxScope.MoreDismiss(screen: PauseView) {
     Box(Modifier.matchParentSize().notFocusable().oneConfigClickable(null, { screen.moreOpen = false }, indication = false, pointerIcon = null))
 }
 

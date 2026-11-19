@@ -352,9 +352,17 @@ object StartupOverlay {
         quad(StartupTextures.word(word.h * pixelScale), word.x, word.y, word.w, word.h, argb)
     }
 
-    private fun hero(canvas: StartupCanvas): Lockup {
-        val w = canvas.width
-        val h = canvas.height
+    internal class LoadingFrame(val mark: Box, val word: Box, val line: Box, val background: Int, val track: Int, val accent: Int)
+
+    internal fun loadingFrame(width: Float, height: Float, thickness: Float): LoadingFrame {
+        val hero = hero(width, height)
+        val line = Box(hero.left, hero.bottom + LINE_GAP * designUnit(width, height), hero.width, thickness)
+        return LoadingFrame(hero.mark, hero.word, line, tint(DARK, 1f), track(0.1f, 0f), tint(ThemeConfig.accentColor.argb and WHITE, 1f))
+    }
+
+    private fun hero(canvas: StartupCanvas): Lockup = hero(canvas.width, canvas.height)
+
+    private fun hero(w: Float, h: Float): Lockup {
         val scale = min(w * HERO_WIDTH_SHARE, h * HERO_HEIGHT_SHARE) / (LOCKUP_MARK + LOCKUP_GAP + WORD_HEIGHT * WORD_ASPECT)
         val markSize = LOCKUP_MARK * scale
         val gap = LOCKUP_GAP * scale

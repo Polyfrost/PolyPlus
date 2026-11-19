@@ -8,11 +8,6 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.ModCardOrder
 import org.polyfrost.oneconfig.api.ui.v1.ModSortMode
 import org.polyfrost.oneconfig.api.ui.v1.ModSortModes
-import org.polyfrost.oneconfig.internal.ui.api.ConfigData
-import org.polyfrost.oneconfig.internal.ui.api.ConfigRegistry
-import org.polyfrost.oneconfig.internal.ui.api.ModFavorites
-import org.polyfrost.oneconfig.internal.ui.api.modCardGroupRank
-import org.polyfrost.oneconfig.internal.ui.components.asRenderText
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -26,8 +21,6 @@ object DefaultModOrder {
     private const val FILE_NAME = "mod-order"
 
     private const val ORDER_SEED = "239252252"
-
-    private const val HUD_CARD_PREFIX = "oneconfig.hud:"
 
     private const val RECOMMENDED_MODE = "polyplus:recommended"
 
@@ -66,17 +59,6 @@ object DefaultModOrder {
         if (!firstSync && PolyPlusConfig.alphabeticalModOrder == alphabetical) return
         PolyPlusConfig.alphabeticalModOrder = alphabetical
         PolyPlusConfig.save()
-    }
-
-    fun preview(alphabetical: Boolean): List<ConfigData> {
-        val order = if (alphabetical) emptyList() else bundledOrder()
-        return ConfigRegistry.modCardConfigs.sortedWith(
-            compareBy<ConfigData> { modCardGroupRank(it.id) }
-                .thenByDescending { ModFavorites.isFavorite(it.id) }
-                .thenBy { order.indexOf(it.id) }
-                .thenBy { it.id.startsWith(HUD_CARD_PREFIX) }
-                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title.asRenderText() },
-        )
     }
 
     fun apply() {

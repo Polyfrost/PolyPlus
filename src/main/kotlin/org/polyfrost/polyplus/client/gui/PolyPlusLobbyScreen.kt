@@ -72,7 +72,6 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
         if (key in navigationKeys) keyNavigated = true
         LobbyAntics.key(key, lobby.calm())
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
-        if (lobby.setup && OnboardingKeyCapture.capture(key)) return true
         if (lobby.skipIntro()) return true
         if (!lobby.setup && !TextInputFocus.isTyping && opensOneConfig(key, modifiers)) {
             PolyPlusOneConfigIntegration.openSettingsReturning()

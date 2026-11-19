@@ -27,7 +27,7 @@ import com.mojang.authlib.services.ProfileResult;
 //? if >= 1.21.10
 import net.minecraft.client.particle.ParticleEngine;
 
-//? if < 1.21.8 && > 1.8.9 {
+//? if < 26.2 && > 1.8.9 {
 /*import com.mojang.blaze3d.pipeline.RenderTarget;
 *///?}
 
@@ -83,7 +83,7 @@ public interface MinecraftAccessor {
     void polyplus$setParticleEngine(ParticleEngine engine);
     //?}
 
-    //? if < 1.21.8 && > 1.8.9 {
+    //? if < 26.2 && > 1.8.9 {
     /*@Mutable
     @Accessor("mainRenderTarget")
     void polyplus$setMainRenderTarget(RenderTarget target);

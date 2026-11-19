@@ -43,14 +43,14 @@ private val LOGGER = LoggerFactory.getLogger("${PolyPlusConstants.ID}/pause-widg
 
 internal fun pauseWidgetWidth(narrow: Boolean): Dp = if (narrow) PAUSE_WIDGET_NARROW_WIDTH else PAUSE_WIDGET_WIDTH
 
-private class PauseWidgetScope(private val screen: OneClientPauseScreen, override val width: Dp) : WidgetScope {
+private class PauseWidgetScope(private val screen: PauseView, override val width: Dp) : WidgetScope {
     override val surface: WidgetSurface get() = WidgetSurface.PAUSE
 
     override val reducedMotion: Boolean get() = Motion.reduced
 
     override fun openScreen(factory: (Screen) -> Screen?) {
         val next = try {
-            factory(screen)
+            factory(screen.host ?: return)
         } catch (t: Throwable) {
             LOGGER.error("A pause widget failed to build the screen it asked to open", t)
             return
@@ -66,7 +66,7 @@ private class PauseWidgetScope(private val screen: OneClientPauseScreen, overrid
 }
 
 @Composable
-internal fun PauseWidgetColumn(screen: OneClientPauseScreen, width: Dp, maxHeight: Dp, modifier: Modifier = Modifier) {
+internal fun PauseWidgetColumn(screen: PauseView, width: Dp, maxHeight: Dp, modifier: Modifier = Modifier) {
     val scope = remember(screen, width) { PauseWidgetScope(screen, width) }
     WidgetColumn(WidgetSurface.PAUSE, width, maxHeight, { radius -> pauseGlass(radius) }, scope, modifier)
 }

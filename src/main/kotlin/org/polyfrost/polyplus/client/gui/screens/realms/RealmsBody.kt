@@ -98,7 +98,7 @@ private const val INVITES_ICON = SOCIAL_ASSETS + "log-in-04.svg"
 private const val OFFLINE_ICON = SOCIAL_ASSETS + "globe-01.svg"
 
 @Composable
-internal fun RealmsBody(screen: RealmsShellScreen) {
+internal fun RealmsBody(screen: RealmsView) {
     val availability = screen.availability
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(PageGrid.Gap)) {
         when {
@@ -127,7 +127,7 @@ internal fun RealmsBody(screen: RealmsShellScreen) {
 }
 
 @Composable
-private fun ColumnScope.StateBlock(
+internal fun ColumnScope.StateBlock(
     title: String,
     text: String? = null,
     icon: String? = REALM_ICON,
@@ -146,7 +146,7 @@ private fun ColumnScope.StateBlock(
 }
 
 @Composable
-private fun ColumnScope.Unavailable(screen: RealmsShellScreen, result: RealmsAvailability.Result) {
+private fun ColumnScope.Unavailable(screen: RealmsView, result: RealmsAvailability.Result) {
     when (result.type()) {
         RealmsAvailability.Type.INCOMPATIBLE_CLIENT -> StateBlock(
             "Realms doesn't support this version",
@@ -169,7 +169,7 @@ private fun ColumnScope.Unavailable(screen: RealmsShellScreen, result: RealmsAva
 }
 
 @Composable
-private fun Toolbar(screen: RealmsShellScreen) {
+private fun Toolbar(screen: RealmsView) {
     val tabs = listOf(
         TabItem(RealmsTab.Realms, "Your realms"),
         TabItem(RealmsTab.Invites, "Invites", badge = screen.inviteCount.takeIf { it > 0 }?.toString()),
@@ -191,7 +191,7 @@ private fun Toolbar(screen: RealmsShellScreen) {
 }
 
 @Composable
-private fun BuyButton(screen: RealmsShellScreen) {
+private fun BuyButton(screen: RealmsView) {
     TextButton(
         if (screen.trialAvailable) "Start free trial" else "Buy a realm",
         icon = LobbyIcons.PLUS,
@@ -202,7 +202,7 @@ private fun BuyButton(screen: RealmsShellScreen) {
 }
 
 @Composable
-private fun NoticeCard(screen: RealmsShellScreen, notice: RealmsNotice) {
+private fun NoticeCard(screen: RealmsView, notice: RealmsNotice) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -219,7 +219,7 @@ private fun NoticeCard(screen: RealmsShellScreen, notice: RealmsNotice) {
 }
 
 @Composable
-private fun ColumnScope.RealmList(screen: RealmsShellScreen) {
+private fun ColumnScope.RealmList(screen: RealmsView) {
     val servers = screen.servers
     when {
         servers == null && screen.slow -> StateBlock(
@@ -239,7 +239,7 @@ private fun ColumnScope.RealmList(screen: RealmsShellScreen) {
 }
 
 @Composable
-private fun RealmGrid(screen: RealmsShellScreen, servers: List<RealmsServer>) {
+private fun RealmGrid(screen: RealmsView, servers: List<RealmsServer>) {
     val friends by FriendsRepository.friends.collectAsState()
     @Suppress("UNUSED_EXPRESSION") friends
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -257,7 +257,7 @@ private fun RealmGrid(screen: RealmsShellScreen, servers: List<RealmsServer>) {
 }
 
 @Composable
-private fun RealmCard(screen: RealmsShellScreen, server: RealmsServer, modifier: Modifier) {
+private fun RealmCard(screen: RealmsView, server: RealmsServer, modifier: Modifier) {
     val hover = rememberHoverState()
     val mine = screen.isMine(server)
     val here = screen.onlinePlayers?.playersIn(server.id).orEmpty()
@@ -362,7 +362,7 @@ private fun PeopleLine(online: Int, friends: List<UUID>) {
 }
 
 @Composable
-private fun RealmActions(screen: RealmsShellScreen, server: RealmsServer, mine: Boolean, setup: Boolean) {
+private fun RealmActions(screen: RealmsView, server: RealmsServer, mine: Boolean, setup: Boolean) {
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         val primary = Modifier.weight(1f)
         when {
@@ -447,7 +447,7 @@ private fun realmEntry(server: RealmsServer, mine: Boolean, online: Int): RealmE
 }
 
 @Composable
-private fun ColumnScope.InviteList(screen: RealmsShellScreen) {
+private fun ColumnScope.InviteList(screen: RealmsView) {
     val invites = screen.invites
     screen.inviteProblem?.let {
         Text(it, color = SocialDangerText, style = OneConfigTheme.current.typography.small)
@@ -474,7 +474,7 @@ private fun ColumnScope.InviteList(screen: RealmsShellScreen) {
 }
 
 @Composable
-private fun InviteRow(screen: RealmsShellScreen, invite: PendingInvite) {
+private fun InviteRow(screen: RealmsView, invite: PendingInvite) {
     val busy = invite.inviteId in screen.answering
     val hover = rememberHoverState()
     Row(

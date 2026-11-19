@@ -2,8 +2,11 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigPrefs
+
+internal val LocalScreenFit = staticCompositionLocalOf { 1f }
 
 internal object MenuScale {
     private const val MIN_FACTOR = 0.5f
