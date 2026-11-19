@@ -14,6 +14,8 @@ import org.polyfrost.polyplus.client.render.PoseStack
 //? if = 1.21.1 || = 1.8.9 {
 /*import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess
 *///?}
+//? if = 1.8.9
+//import org.polyfrost.polyplus.compat.OverflowAnimationsCompat
 
 enum class PlayerModelBone(val serializedName: String) {
     ROOT("root"),
@@ -41,7 +43,7 @@ enum class PlayerModelBone(val serializedName: String) {
             /*if (bone == ROOT) continue*/
             //? if = 1.8.9 {
             /*if (bone == ROOT) {
-                if (model.sneaking) poseStack.translate(0f, 0.2f, 0f)
+                if (model.sneaking && !OverflowAnimationsCompat.dropsSneakOffset()) poseStack.translate(0f, 0.2f, 0f)
                 continue
             }
             *///?}
