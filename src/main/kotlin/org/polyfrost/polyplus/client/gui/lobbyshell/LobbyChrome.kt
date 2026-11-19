@@ -783,7 +783,7 @@ private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = point
             val at = event.changes.firstOrNull()?.position ?: continue
             if (!lobby.calm() || !LobbyGrab.touches(sceneX(at), sceneY(at, notch))) continue
             event.changes.forEach { it.consume() }
-            avatarGesture(at, notch)
+            avatarGesture(lobby, at, notch)
         }
     }
 }
@@ -792,7 +792,7 @@ private fun AwaitPointerEventScope.sceneX(at: Offset): Double = at.x / size.widt
 
 private fun AwaitPointerEventScope.sceneY(at: Offset, notch: Int): Double = (at.y + notch) / (size.height + notch).toDouble()
 
-private suspend fun AwaitPointerEventScope.avatarGesture(press: Offset, notch: Int) {
+private suspend fun AwaitPointerEventScope.avatarGesture(lobby: LobbyShell, press: Offset, notch: Int) {
     var grabbing = false
     var waiting = true
     val frame = size
@@ -811,7 +811,7 @@ private suspend fun AwaitPointerEventScope.avatarGesture(press: Offset, notch: I
             }
             event.changes.forEach { it.consume() }
             if (event.type == PointerEventType.Release || !event.buttons.isPrimaryPressed) {
-                if (!grabbing) LobbyAntics.click(sceneX(press), sceneY(press, notch))
+                if (!grabbing && LobbyAntics.click(sceneX(press), sceneY(press, notch))) lobby.show(LobbyPage.Wardrobe)
                 return
             }
             val at = event.changes.firstOrNull()?.position ?: continue
