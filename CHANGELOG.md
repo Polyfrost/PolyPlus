@@ -14,3 +14,4 @@
 - Fixed your player on the pause screen breaking on servers whose resource pack changes player rendering, like CubeCraft
 - Fixed cosmetics sitting too low while sneaking with OverflowAnimations' 1.7 sneak
 - Fixed onboarding changing your GUI scale when GUI Slider is installed
+- Fixed the lobby not loading when Picture Mode is installed
