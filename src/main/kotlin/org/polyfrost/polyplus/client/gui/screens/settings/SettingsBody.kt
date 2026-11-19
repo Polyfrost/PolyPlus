@@ -82,6 +82,9 @@ import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
+import org.polyfrost.polyplus.client.gui.screens.worldoptions.WorldOptions
+import org.polyfrost.polyplus.client.gui.screens.worldoptions.WorldOptionsPlatform
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelSlider
@@ -109,6 +112,7 @@ private const val FOCUS_SETTLE_MILLIS = 150L
 private const val FOCUS_HOLD_MILLIS = 2500L
 private const val FOCUS_ALPHA = 0.14f
 private const val ACTION_FOCUS = "action:"
+private const val WORLD_OPTIONS_ID = "minecraft:worldoptions"
 
 @Composable
 internal fun SettingsBody(parent: () -> Screen?, modifier: Modifier = Modifier) {
@@ -257,6 +261,11 @@ private fun EntryPage(entry: SettingsEntry, provider: SettingsEntryProvider?, pa
 
 private fun builtInEntries(): List<SettingsEntry> {
     val controlsInPlace = SettingsPages.provider(SettingsCategory.Controls) != null
+    val world = if (WorldOptionsPlatform.available) {
+        listOf(SettingsEntry(WORLD_OPTIONS_ID, "World options", SOCIAL_ASSETS + "globe-01.svg", external = { host -> WorldOptions.open(host) }))
+    } else {
+        emptyList()
+    }
     return SettingsCategory.entries.filter { it != SettingsCategory.Mods && SettingsPlatform.supports(it) }.map { category ->
         val inPlace = category == SettingsCategory.Video || SettingsPages.provider(category) != null
         val external: ((Screen?) -> Unit)? = if (inPlace) null else { host -> host?.let { SettingsPlatform.open(category, it) } }
@@ -267,7 +276,7 @@ private fun builtInEntries(): List<SettingsEntry> {
         }
         val tabLabel = if (category == SettingsCategory.Controls) KEYBINDS_TITLE else null
         SettingsEntry(category.entryId, category.label, category.icon, placement = placement, external = external, category = category, tabLabel = tabLabel)
-    }
+    } + world
 }
 
 private fun trailingEntries(): List<SettingsEntry> = listOf(

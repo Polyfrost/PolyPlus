@@ -19,6 +19,8 @@ import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.polyplus.compat.replay.ReplayProviders
 import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.screens.worldoptions.WorldOptions
+import org.polyfrost.polyplus.client.gui.screens.worldoptions.WorldOptionsPlatform
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -233,6 +235,10 @@ class OneClientPauseScreen(
     internal fun openSocial() = SocialOverlay.open(this)
 
     internal fun openHost() = SocialOverlay.openHostCurrentWorld(this)
+
+    internal val canWorldOptions: Boolean get() = WorldOptionsPlatform.available
+
+    internal fun openWorldOptions() = WorldOptions.open(this)
 
     internal fun openWardrobe() {
         PauseRouter.holdPause()

@@ -217,6 +217,7 @@ object PlayerPreviewRenderer {
     private val equipmentByEntityId = ConcurrentHashMap<Int, CosmeticEquipment>()
     private val clockStart = System.nanoTime()
     private const val NANOS_PER_TICK = 50_000_000.0
+    private const val PREVIEW_DEPTH = 450f
 
     private fun previewTicks(): Float = ((System.nanoTime() - clockStart) / NANOS_PER_TICK).toFloat()
     private val tintByEntityId = ConcurrentHashMap<Int, PreviewTint>()
@@ -574,7 +575,7 @@ object PlayerPreviewRenderer {
     private fun previewPose(w: Int, h: Int, modelScale: Float, verticalAnchor: Float, bbH: Float): PoseStack {
         val scale = h * modelScale
         val pose = PoseStack()
-        pose.translate(w / 2f, h * verticalAnchor, 0f)
+        pose.translate(w / 2f, h * verticalAnchor, PREVIEW_DEPTH)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
         if (poseTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(poseTiltDeg.toDouble()).toFloat()))
@@ -1352,7 +1353,7 @@ object PlayerPreviewRenderer {
         val bbH = 1.8f
         val scale = h * modelScale
         val pose = PoseStack()
-        pose.translate(w / 2f, h * verticalAnchor, 0f)
+        pose.translate(w / 2f, h * verticalAnchor, PREVIEW_DEPTH)
         pose.scale(scale, scale, -scale)
         pose.translate(0f, bbH / 2f, 0f)
         if (cameraTiltDeg != 0f) pose.rotateBy(Quaternionf().rotateX(Math.toRadians(cameraTiltDeg.toDouble()).toFloat()))

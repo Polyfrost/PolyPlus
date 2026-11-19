@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.oneconfig.api.notifications.v1.Notifications
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.IOException
 import java.nio.file.Files
@@ -251,7 +252,7 @@ internal class PackSession(initial: PackSelectionScreen) {
     fun request(placement: PackPlacement) {
         if (closed) return
         val risky = placement.ids.mapNotNull { id -> entry(id)?.takeIf { !it.isSelected && !it.compatibility.isCompatible }?.let(::item) }
-        if (risky.isNotEmpty()) {
+        if (PolyPlusConfig.packVersionWarnings && risky.isNotEmpty()) {
             dialog = PackDialog.Incompatible(risky, placement)
             return
         }
@@ -645,7 +646,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         val known = profile.packs.filter { entry(it) != null }
         if (!confirmed) {
             val risky = known.mapNotNull { id -> entry(id)?.takeIf { !it.isSelected && it.canSelect() && !it.compatibility.isCompatible }?.let(::item) }
-            if (risky.isNotEmpty()) {
+            if (PolyPlusConfig.packVersionWarnings && risky.isNotEmpty()) {
                 dialog = PackDialog.Incompatible(risky, PackPlacement(known, null, false), profile)
                 return
             }
@@ -1020,7 +1021,7 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     fun request(placement: PackPlacement) {
         if (closed) return
         val risky = placement.ids.filter { it !in chosen }.mapNotNull(::item).filter { !it.compatible }
-        if (risky.isNotEmpty()) {
+        if (PolyPlusConfig.packVersionWarnings && risky.isNotEmpty()) {
             dialog = PackDialog.Incompatible(risky, placement)
             return
         }
@@ -1334,7 +1335,7 @@ internal class PackSession private constructor(private val exit: Screen?, privat
         val known = profile.packs.filter { it in packs }.distinct()
         if (!confirmed) {
             val risky = known.filter { it !in chosen }.mapNotNull(::item).filter { !it.compatible }
-            if (risky.isNotEmpty()) {
+            if (PolyPlusConfig.packVersionWarnings && risky.isNotEmpty()) {
                 dialog = PackDialog.Incompatible(risky, PackPlacement(known, null, false), profile)
                 return
             }

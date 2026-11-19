@@ -22,6 +22,7 @@ import net.minecraft.world.World
 import net.minecraft.client.render.Effect as EffectInstance
 import net.minecraft.client.render.PostChain
 import org.lwjgl.opengl.GL11
+import org.polyfrost.polyplus.compat.CeraCompat
 *///?}
 //? if < 1.21.8 && >= 1.21.5 {
 /*import com.mojang.blaze3d.systems.RenderPass
@@ -437,7 +438,7 @@ object LobbySky {
         return value / (4f - 3f * value)
     }
 
-    fun legacyLightmap(level: World, pixels: IntArray, flicker: Float) {
+    fun legacyLightmap(level: World, pixels: IntArray, flicker: Float, tickDelta: Float) {
         val darken = level.calculateAmbientLight(1f)
         val skyFactor = skyLightFactor(darken * SKY_DARK_FLOOR + SKY_DARK_BASE)
         val blockFactor = flicker * 0.1f + BLOCK_FLICKER_BASE
@@ -461,6 +462,7 @@ object LobbySky {
                 pixels[sky * LIGHT_CELLS + block] = (-0x1000000) or (channel(color.x) shl 16) or (channel(color.y) shl 8) or channel(color.z)
             }
         }
+        CeraCompat.applyLightmap(level, pixels, flicker, tickDelta, gamma)
     }
     *///?}
 

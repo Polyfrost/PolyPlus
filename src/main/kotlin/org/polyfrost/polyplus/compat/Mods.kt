@@ -3,14 +3,17 @@ package org.polyfrost.polyplus.compat
 import net.fabricmc.loader.api.FabricLoader
 
 object Mods {
+    val cera: Boolean by lazy { loaded("cera") }
     val chatting: Boolean by lazy { loaded("chatting") }
     val distantHorizons: Boolean by lazy { loaded("distanthorizons") }
     val entityModelFeatures: Boolean by lazy { loaded("entity_model_features") }
     val evergreenHud: Boolean by lazy { loaded("evergreenhud") }
     val exploitPreventer: Boolean by lazy { loaded("exploitpreventer") }
     val flashback: Boolean by lazy { loaded("flashback") }
+    val guiSlider: Boolean by lazy { loaded("gui_slider") }
     val iris: Boolean by lazy { loaded("iris") }
     val notEnoughAnimations: Boolean by lazy { loaded("notenoughanimations") }
+    val overflowAnimations: Boolean by lazy { loaded("overflowanimations") }
     val replayMod: Boolean by lazy { loaded("replaymod") }
     val vulkanMod: Boolean by lazy { loaded("vulkanmod") }
     val wwaypoints: Boolean by lazy { loaded("wwaypoints") }

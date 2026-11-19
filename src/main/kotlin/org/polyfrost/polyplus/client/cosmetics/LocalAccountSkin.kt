@@ -6,6 +6,7 @@ import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
 //? if >= 1.21.10 {
@@ -94,8 +95,21 @@ object LocalAccountSkin {
         }
     }
 
+    fun launchSkin(): MojangSkin? = runCatching {
+        val texture = launchTexture(profile()) ?: return null
+        MojangSkin(texture.url, SkinModel.fromSerialized(texture.getMetadata("model")))
+    }.getOrNull()
+
     //? if > 1.8.9 {
     private fun launchProfile(id: UUID): GameProfile? = runCatching { Minecraft.getInstance().gameProfile }.getOrNull()?.takeIf { it.id == id }
+
+    private fun launchTexture(profile: GameProfile) = Minecraft.getInstance()
+        //? if >= 1.21.10 {
+        .services().sessionService()
+        //?} else {
+        /*.minecraftSessionService
+        *///?}
+        .getTextures(profile).skin()
 
     private fun fetch(id: UUID, name: String): GameProfile? = Minecraft.getInstance()
         //? if >= 1.21.10 {
@@ -114,6 +128,9 @@ object LocalAccountSkin {
 
     private fun fetch(id: UUID, name: String): GameProfile? =
         Minecraft.getInstance().sessionService.fillProfileProperties(GameProfile(id, name), true)
+
+    private fun launchTexture(profile: GameProfile) =
+        Minecraft.getInstance().sessionService.getTextures(profile, false)[MinecraftProfileTexture.Type.SKIN]
     *///?}
 
     //? if >= 1.21.10 {

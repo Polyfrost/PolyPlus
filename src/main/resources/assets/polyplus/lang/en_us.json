@@ -3,6 +3,7 @@
   "polyplus.mainmenu.switchToOneClient": "OneClient Menu",
   "polyplus.featured.sponsored": "Sponsored",
   "polyplus.featured.restore": "Restore",
+  "polyplus.reconnect": "Reconnect",
   "polyplus.serverFolder": "Folder",
   "polyplus.serverFolder.hint": "Folder (optional)",
   "polyplus.serverFolder.pick": "Pick an existing folder",

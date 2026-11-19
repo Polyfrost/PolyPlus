@@ -156,7 +156,7 @@ class PlayerSkinCache {
 
     fun apply(playerId: UUID, profile: GameProfile, original: PlayerSkin): PlayerSkin {
         val cape = CapeResolver.capeChange(playerId, profile, original)
-        val skin = LocalSkinOverride.forPlayer(playerId)
+        val skin = LocalSkinOverride.forPlayer(playerId)?.takeIf { MojangSkinService.isStaleLocalSkin(playerId, bodyId(original)) }
         val hit = last
         if (hit != null && hit.original === original && hit.cape == cape && hit.skin == skin) return hit.result
 
@@ -165,5 +165,12 @@ class PlayerSkinCache {
         last = Entry(original, cape, skin, result)
         return result
     }
+
+    private fun bodyId(skin: PlayerSkin): String =
+        //? if >= 1.21.10 {
+        skin.body().texturePath().toString()
+        //?} else {
+        /*skin.texture().toString()
+        *///?}
 }
 //?}

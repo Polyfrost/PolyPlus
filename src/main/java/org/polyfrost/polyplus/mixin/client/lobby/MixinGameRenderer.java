@@ -217,7 +217,7 @@ public class MixinGameRenderer {
         ci.cancel();
         if (!lightMapDirty) return;
         lightMapDirty = false;
-        LobbySky.INSTANCE.legacyLightmap(Minecraft.getInstance().world, lightMapPixels, lightMapFlicker);
+        LobbySky.INSTANCE.legacyLightmap(Minecraft.getInstance().world, lightMapPixels, lightMapFlicker, tickDelta);
         lightmapTexture.upload();
     }
 

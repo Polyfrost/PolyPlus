@@ -91,8 +91,7 @@
     //? if > 1.8.9
     "client.MixinChatListener",
     "client.MixinChatScreen",
-    //? if = 1.8.9
-    //"client.MixinClientBrandRetriever",
+    "client.MixinClientBrandRetriever",
     "client.MixinClientHandshakePacketListenerImpl",
     //? if > 1.8.9
     "client.MixinClientLanguage",
@@ -172,6 +171,8 @@
     "client.MixinRenderTarget",
     "client.MixinScreen",
     "client.MixinScreenWatermark",
+    //? if > 1.8.9
+    "client.MixinWatermarkMouse",
     "client.MixinServerSelectionList",
     //? if = 1.8.9
     //"client.MixinSession",
@@ -214,6 +215,8 @@
     "client.access.SimplePreparableReloadListenerInvoker",
     //? if = 1.8.9
     //"client.access.MinecraftServerAccessor",
+    //? if > 1.8.9 && < 26.2
+    //"client.access.PrimaryLevelDataAccessor",
     "client.access.OnlineServerEntryInvoker",
     //? if > 1.8.9
     "client.access.OptionsAccessor",

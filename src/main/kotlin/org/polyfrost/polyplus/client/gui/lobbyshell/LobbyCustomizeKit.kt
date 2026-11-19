@@ -57,6 +57,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.ToggleControl
 import org.polyfrost.oneconfig.api.ui.v1.components.ToggleRow
+import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
+import org.polyfrost.oneconfig.api.ui.v1.components.playUiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -285,7 +287,7 @@ internal fun PanelSlider(
         enabled = enabled,
         label = label,
         valueText = valueText,
-        onValueChangeFinished = onValueChangeFinished,
+        onValueChangeFinished = { onValueChangeFinished().also { playUiSound(UiSound.Click) } },
         sound = null,
     )
 }

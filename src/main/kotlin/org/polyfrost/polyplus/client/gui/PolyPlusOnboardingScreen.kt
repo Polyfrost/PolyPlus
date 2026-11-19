@@ -117,6 +117,7 @@ import org.polyfrost.polyplus.client.legal.LegalDocuments
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.compat.Mods
 import org.polyfrost.polyplus.privacy.LauncherEnvironment
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
@@ -138,6 +139,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
+import org.polyfrost.oneconfig.api.ui.v1.components.playUiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.cardSelection
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
@@ -324,7 +326,7 @@ internal fun OnboardingFlow(
     var chosenGuiScale by remember {
         mutableIntStateOf(
             //? if > 1.8.9 {
-            Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
+            if (Mods.guiSlider) mcGuiScale() else Minecraft.getInstance().options.guiScale().get().coerceIn(0, maxGuiScale),
             //?} else {
             /*Minecraft.getInstance().options.guiScale.coerceIn(0, maxGuiScale),
             *///?}
@@ -739,8 +741,8 @@ private fun LookAndFeelPage(
     Header("Let’s configure the", "Look & Feel")
     val colorsHeight = LABEL_HEIGHT + 32f
     val styleHeight = LABEL_HEIGHT + 155f
-    val scaleHeight = LABEL_HEIGHT + 32f
-    val total = colorsHeight + SECTION_GAP + styleHeight + SECTION_GAP + scaleHeight
+    val scaleHeight = if (Mods.guiSlider) 0f else LABEL_HEIGHT + 32f + SECTION_GAP
+    val total = colorsHeight + SECTION_GAP + styleHeight + scaleHeight
     var y = CONTENT_TOP + ((CONTENT_BOTTOM - CONTENT_TOP) - total) / 2f
     SectionHeader("UI Colors", Modifier.offset(232.dp, y.dp).width(198.dp), eyebrow = false)
     Row(Modifier.offset(232.dp, (y + LABEL_HEIGHT).dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -755,7 +757,7 @@ private fun LookAndFeelPage(
         }
     }
     y += styleHeight + SECTION_GAP
-    GuiScaleSection(y, guiScale, maxGuiScale, onGuiScale)
+    if (!Mods.guiSlider) GuiScaleSection(y, guiScale, maxGuiScale, onGuiScale)
 }
 
 @Composable
@@ -1524,7 +1526,7 @@ internal fun OnboardingSlider(
         onValueChange = onProgress,
         modifier = Modifier.width(width.dp),
         enabled = enabled,
-        onValueChangeFinished = onRelease,
+        onValueChangeFinished = { onRelease().also { playUiSound(UiSound.Click) } },
         size = ControlSize.Compact,
         keyStep = keyStep,
         contentDescription = label,

@@ -95,6 +95,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache;
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment;
 import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride;
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService;
+import org.polyfrost.polyplus.client.cosmetics.MojangSkinService;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
@@ -169,15 +170,24 @@ public abstract class MixinAbstractClientPlayer extends PlayerEntity implements 
 
     @ModifyReturnValue(method = "getSkinTextureLocation()Lnet/minecraft/resource/Identifier;", at = @At("RETURN"))
     private Identifier polyplus$replaceSkinTexture(Identifier original) {
-        PreviewSkin skin = LocalSkinOverride.forPlayer(((ClientPlayerEntity) (Object) this).getUuid());
+        PreviewSkin skin = polyplus$localSkin();
         return skin != null ? skin.getTexture() : original;
     }
 
     @ModifyReturnValue(method = "getModelType", at = @At("RETURN"))
     private String polyplus$replaceSkinModel(String original) {
-        PreviewSkin skin = LocalSkinOverride.forPlayer(((ClientPlayerEntity) (Object) this).getUuid());
+        PreviewSkin skin = polyplus$localSkin();
         if (skin == null) return original;
         return skin.getSlim() ? "slim" : "default";
+    }
+
+    @Unique
+    private PreviewSkin polyplus$localSkin() {
+        UUID playerId = ((ClientPlayerEntity) (Object) this).getUuid();
+        PreviewSkin skin = LocalSkinOverride.forPlayer(playerId);
+        if (skin == null) return null;
+        PlayerInfo info = getInfo();
+        return info == null || MojangSkinService.isStaleLocalSkin(playerId, info.getSkinTexture().toString()) ? skin : null;
     }
 
     @Unique

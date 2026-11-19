@@ -75,11 +75,27 @@ internal class ArgentumBridge private constructor() {
     private val styledClass = embeddium("gui.framework.TextComponent\$Styled")
     private val styledInner = styledClass.getMethod("inner")
 
+    private val postConstruction: ((MutableList<Any>) -> Unit)? = runCatching {
+        val eventClass = celeritas("api.OptionGUIConstructionEvent")
+        val constructor = eventClass.getConstructor(List::class.java)
+        val bus = eventClass.getField("BUS").get(null)
+        val post = bus.javaClass.getMethod("post", celeritas("api.eventbus.EmbeddiumEvent"))
+        val poster: (MutableList<Any>) -> Unit = { pages -> post.invoke(bus, constructor.newInstance(pages)) }
+        poster
+    }.getOrNull()
+
     private var session: List<Any>? = null
 
     private fun call(method: Method, target: Any?, vararg args: Any?): Any? = method.invoke(target, *args)
 
-    private fun session(): List<Any> = session ?: (call(createPages, null) as List<*>).filterNotNull().also { session = it }
+    private fun session(): List<Any> = session ?: collectPages().also { session = it }
+
+    private fun collectPages(): List<Any> {
+        val pages = (call(createPages, null) as List<*>).filterNotNull().toMutableList()
+        val base = pages.toList()
+        postConstruction?.let { post -> runCatching { post(pages) }.onFailure { pages.retainAll(base.toSet()) } }
+        return pages
+    }
 
     private fun options(): List<Any> = session().flatMap { (call(pageOptions, it) as List<*>).filterNotNull() }
 

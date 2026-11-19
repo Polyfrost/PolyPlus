@@ -20,8 +20,10 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?}
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.ConfirmLinkScreen
+import net.minecraft.client.gui.screens.ConnectScreen
 import net.minecraft.client.gui.screens.DisconnectedScreen
 import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
@@ -100,6 +102,12 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
         }
     }
 
+    private fun reconnect() {
+        val data = server ?: return
+        val back = parent ?: return
+        ConnectScreen.startConnecting(back, Minecraft.getInstance(), ServerAddress.parseString(data.ip), data, false, null)
+    }
+
     private fun leaveLabel(): String =
         if (Minecraft.getInstance().allowsMultiplayer()) access.polyplusButtonText().string
         else Component.translatable("gui.toTitle").string
@@ -136,6 +144,7 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
                 ConnectionAction(label, enabled = refreshEnabled) { prompt?.onPress() }
             }
             if (canRejoin) ConnectionAction("Rejoin world", primary = true) { P2PSessionManager.rejoin() }
+            if (server != null) ConnectionAction(Component.translatable("polyplus.reconnect").string, onClick = ::reconnect)
             ConnectionAction(leaveLabel(), primary = !canRejoin, onClick = ::leave)
         }
     }
@@ -145,6 +154,8 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screen.menu.multiplayer.ConnectScreen
 import net.minecraft.client.gui.screen.menu.multiplayer.DisconnectedScreen
 import net.minecraft.client.gui.widget.ButtonWidget
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
@@ -215,6 +226,12 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
         hold.leave { ClientPlatform.setScreen(parent) }
     }
 
+    private fun reconnect() {
+        val data = server ?: return
+        val back = parent ?: return
+        ClientPlatform.setScreen(ConnectScreen(back, Minecraft.getInstance(), data.entry))
+    }
+
     @Composable
     override fun Content() {
         if (hold.kept) HeldSceneFrame(hold) { Body() } else super.Content()
@@ -233,6 +250,7 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
                 ConnectionAction(label, enabled = refreshEnabled) { prompt?.onPress() }
             }
             if (canRejoin) ConnectionAction("Rejoin world", primary = true) { P2PSessionManager.rejoin() }
+            if (server != null) ConnectionAction(LobbyI18n.get("polyplus.reconnect"), onClick = ::reconnect)
             ConnectionAction(LobbyI18n.get("gui.toMenu"), primary = !canRejoin, onClick = ::leave)
         }
     }

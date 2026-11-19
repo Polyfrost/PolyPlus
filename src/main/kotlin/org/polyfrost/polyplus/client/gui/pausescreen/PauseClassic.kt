@@ -185,6 +185,8 @@ private fun ClassicGrid(screen: OneClientPauseScreen, layout: ClassicLayout) {
             val world = capture.entry(PauseSlot.WORLD) ?: layout.beside
             if (world != null) {
                 EntryButton(world)
+            } else if (screen.canWorldOptions) {
+                ClassicButton("World options", Modifier.weight(1f), onClick = screen::openWorldOptions)
             } else if (screen.canHost) {
                 ClassicButton(PauseWorldAccess.hostLabel, Modifier.weight(1f), onClick = screen::openHost)
             }
@@ -210,12 +212,14 @@ private fun RowScope.EntryButton(entry: PauseEntry?) {
 private fun ClassicExtras(screen: OneClientPauseScreen, layout: ClassicLayout) {
     val groups by GroupsRepository.groups.collectAsState()
     val invites by PartyRepository.incomingInvites.collectAsState()
-    val hostInGrid = screen.capture.entry(PauseSlot.WORLD) == null && layout.beside == null
+    val worldInGrid = screen.capture.entry(PauseSlot.WORLD) != null || layout.beside != null
+    val hostInGrid = !worldInGrid && !screen.canWorldOptions
     Row(Modifier.wrapContentWidth(unbounded = true).blockPointer(), horizontalArrangement = Arrangement.spacedBy(CLASSIC_GAP), verticalAlignment = Alignment.CenterVertically) {
         if (screen.online) {
             ExtraButton(asset("message-chat-circle"), "Social", badge = socialDotLabel(groups.any { it.unread }, invites.isNotEmpty()), onClick = screen::openSocial)
         }
         ExtraButton(asset("diamond-01"), "Wardrobe", onClick = screen::openWardrobe)
+        if (screen.canWorldOptions && worldInGrid) ExtraButton(asset("globe-01"), "World options", onClick = screen::openWorldOptions)
         if (screen.canHost && !hostInGrid) ExtraButton(asset("log-in-04"), "Host", onClick = screen::openHost)
         if (layout.help.isNotEmpty()) {
             ExtraButton("settings", "Mods", onClick = screen::openMods)

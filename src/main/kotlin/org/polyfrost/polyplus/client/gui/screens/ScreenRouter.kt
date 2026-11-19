@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.gui.screens.packs.PackRoutes
 import org.polyfrost.polyplus.client.gui.screens.realms.RealmsRoutes
 import org.polyfrost.polyplus.client.gui.screens.settings.SettingsRoutes
 import org.polyfrost.polyplus.client.gui.screens.world.WorldRoutes
+import org.polyfrost.polyplus.client.gui.screens.worldoptions.WorldOptionsRoutes
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
@@ -43,6 +44,7 @@ object ScreenRouter {
             ?: (if (config.customWorlds || inLobby) WorldRoutes.route(screen, origin) else null)
             ?: (if (config.customConnecting) ConnectionRoutes.route(screen, origin) else null)
             ?: (if (config.customSettings) PackRoutes.route(screen, origin) else null)
+            ?: (if (config.customSettings) WorldOptionsRoutes.route(screen, origin) else null)
             ?: (if (config.customRealms) RealmsRoutes.route(screen, origin) else null)
             ?: Routed.show(screen)
     }
