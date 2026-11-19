@@ -139,6 +139,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import org.polyfrost.oneconfig.api.ui.v1.components.SurfaceKind
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
+import org.polyfrost.oneconfig.api.ui.v1.components.playUiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.cardSelection
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableCard
@@ -1525,7 +1526,7 @@ internal fun OnboardingSlider(
         onValueChange = onProgress,
         modifier = Modifier.width(width.dp),
         enabled = enabled,
-        onValueChangeFinished = onRelease,
+        onValueChangeFinished = { onRelease().also { playUiSound(UiSound.Click) } },
         size = ControlSize.Compact,
         keyStep = keyStep,
         contentDescription = label,

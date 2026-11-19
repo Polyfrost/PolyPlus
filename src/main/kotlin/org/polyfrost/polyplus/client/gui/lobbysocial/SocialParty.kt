@@ -70,6 +70,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
 import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
+import org.polyfrost.oneconfig.api.ui.v1.components.playUiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 
@@ -320,7 +322,7 @@ private fun VolumeRow(
             modifier = Modifier.weight(1f),
             range = 0f..SLIDER_MAX_PERCENT,
             step = SLIDER_STEP_PERCENT,
-            onValueChangeFinished = onRelease,
+            onValueChangeFinished = { onRelease().also { playUiSound(UiSound.Click) } },
             sound = null,
         )
         Text("${percent.roundToInt()}%", style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
