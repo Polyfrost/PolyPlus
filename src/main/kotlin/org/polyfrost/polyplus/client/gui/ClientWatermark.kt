@@ -142,6 +142,7 @@ object ClientWatermark {
     private class Bounds(val left: Float, val top: Float, val width: Float, val height: Float)
 
     private var dragging = false
+    private var dragScreen: Screen? = null
     private var grabX = 0f
     private var grabY = 0f
 
@@ -189,6 +190,7 @@ object ClientWatermark {
         grabX = x - area.left
         grabY = y - area.top
         dragging = true
+        dragScreen = screen
         return true
     }
 
@@ -196,12 +198,17 @@ object ClientWatermark {
     fun onRelease(): Boolean {
         if (!dragging) return false
         dragging = false
+        dragScreen = null
         PolyPlusConfig.save()
         return true
     }
 
     private fun drag(screen: Screen) {
         if (!dragging) return
+        if (screen !== dragScreen) {
+            onRelease()
+            return
+        }
         val (x, y) = mouse(screen)
         val scale = scaleFactor()
         val area = bounds(screen)
