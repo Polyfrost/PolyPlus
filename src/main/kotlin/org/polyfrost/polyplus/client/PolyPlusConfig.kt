@@ -112,6 +112,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var startupTimeNotification = false
 
+    @JvmStatic
+    @Switch(
+        title = "Resource Pack Version Warnings",
+        description = "Ask for confirmation before enabling a resource pack made for a different Minecraft version. Turn this off to enable such packs right away.",
+    )
+    var packVersionWarnings = true
+
     @JvmStatic @Include
     var vanillaOfferDismissed = false
 
