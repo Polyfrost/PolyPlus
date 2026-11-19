@@ -1,3 +1,20 @@
+## 2.2.0
+- Added a World Options screen on every version
+- Added a Reconnect button to the screen you see after losing connection to a server
+- Added a switch to stop the warning about resource packs made for another Minecraft version
+- Drag the OneClient watermark around while your inventory is open
+- Click your player on the main menu to open the Wardrobe
+- Sliders in OneClient's menus now click when you let go of them
+- Animated cosmetics play their preview when you hover over them in the store
+- Free carts skip the checkout page
+- Some mods have plainer names on their cards, like Screenshots, Block Highlight, Damage Tint, Text Shadows and Nick Hider
+- Argentum Extras, Sarcio and Cera options now show up in Settings on 1.8.9
+- Resource packs with a custom lightmap now light the 1.8.9 lobby if you have Cera
+- Unlimited framerate on 1.8.9 is really unlimited now, even when another mod raises the slider's limit
+- Fixed your player on the pause screen breaking on servers whose resource pack changes player rendering, like CubeCraft
+- Fixed cosmetics sitting too low while sneaking with OverflowAnimations' 1.7 sneak
+- Fixed onboarding changing your GUI scale when GUI Slider is installed
+
 ## 2.1.6
 - Pick up your player in the lobby by holding or dragging them, then let go to drop them
 - Herobrine now plays a cave sound when he shows up
