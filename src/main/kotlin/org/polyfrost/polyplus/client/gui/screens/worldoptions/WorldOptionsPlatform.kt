@@ -153,19 +153,21 @@ internal object WorldOptionsPlatform {
         *///?}
     }
 
+    //? if >= 1.21.10 {
+    private fun isOwner(server: IntegratedServer, player: Player): Boolean = server.isSingleplayerOwner(player.nameAndId())
+    //?} else {
+    /*private fun isOwner(server: IntegratedServer, player: Player): Boolean = server.isSingleplayerOwner(player.gameProfile)
+    *///?}
+
     //? if >= 1.21.11 {
     private const val GAMEMASTER = 0
     private const val OWNER = 1
-
-    private fun isOwner(server: IntegratedServer, player: Player): Boolean = server.isSingleplayerOwner(player.nameAndId())
 
     private fun hasPermission(player: Player, level: Int): Boolean =
         player.permissions().hasPermission(if (level == OWNER) Permissions.COMMANDS_OWNER else Permissions.COMMANDS_GAMEMASTER)
     //?} else {
     /*private const val GAMEMASTER = 2
     private const val OWNER = 4
-
-    private fun isOwner(server: IntegratedServer, player: Player): Boolean = server.isSingleplayerOwner(player.gameProfile)
 
     private fun hasPermission(player: Player, level: Int): Boolean = player.hasPermissions(level)
     *///?}
