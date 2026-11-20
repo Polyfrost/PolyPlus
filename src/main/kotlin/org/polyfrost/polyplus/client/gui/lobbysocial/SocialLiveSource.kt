@@ -10,6 +10,7 @@ import org.polyfrost.polyplus.client.gui.ConversationReadEffect
 import org.polyfrost.polyplus.client.gui.CreateGroupDialog
 import org.polyfrost.polyplus.client.gui.InviteToGroupDialog
 import org.polyfrost.polyplus.client.gui.SocialNotices
+import org.polyfrost.polyplus.client.gui.messageClock
 import org.polyfrost.polyplus.client.gui.conversationTitle
 import org.polyfrost.polyplus.client.network.http.responses.Friend
 import org.polyfrost.polyplus.client.network.http.responses.GroupKind
@@ -49,7 +50,6 @@ private const val WORLD_INVITE_MESSAGE = "Invited you to their world"
 private const val DAYS_PER_WEEK = 7L
 
 private val SINCE_FORMAT = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH).withZone(ZoneId.systemDefault())
-private val CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 private val WEEKDAY_FORMAT = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 private val DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
 
@@ -70,7 +70,7 @@ private fun clockTime(sentAt: String): String? = runCatching {
     val sent = Instant.parse(sentAt).atZone(ZoneId.systemDefault())
     val days = ChronoUnit.DAYS.between(sent.toLocalDate(), LocalDate.now(sent.zone))
     when {
-        days < 1 -> CLOCK_FORMAT.format(sent)
+        days < 1 -> messageClock(sent)
         days == 1L -> "Yesterday"
         days < DAYS_PER_WEEK -> WEEKDAY_FORMAT.format(sent)
         else -> DATE_FORMAT.format(sent)

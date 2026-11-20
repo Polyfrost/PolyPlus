@@ -65,7 +65,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAccessor
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 
@@ -263,7 +266,7 @@ private fun MessageRow(message: GroupMessage, outgoing: Boolean, incomingInvites
             if (showSender) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(PlayerNamesRepository.displayName(message.sender), style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, softWrap = false)
-                    Text(if (pending) "Sending..." else clockFor(message.sentAt), color = SocialTextSecondary, style = OneConfigTheme.current.typography.small)
+                    Text(if (pending) "Sending..." else timeFor(message.sentAt), color = SocialTextSecondary, style = OneConfigTheme.current.typography.small)
                 }
             }
             SocialEmojiText(message.content, fontSize = 16.sp, color = SocialTextPrimary)
@@ -511,13 +514,11 @@ private fun dayLabelFor(sentAt: String): String = runCatching {
     }
 }.getOrDefault(sentAt.take(10))
 
-private fun clockFor(sentAt: String): String = runCatching {
-    DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(sentAt))
-}.getOrDefault("")
+private val MESSAGE_CLOCK: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+    .withLocale(Locale.getDefault(Locale.Category.FORMAT))
+    .withZone(ZoneId.systemDefault())
 
-internal fun timeFor(sentAt: String): String = runCatching {
-    val instant = Instant.parse(sentAt)
-    DateTimeFormatter.ofPattern("h:mm a")
-        .withZone(ZoneId.systemDefault())
-        .format(instant)
-}.getOrDefault("")
+internal fun messageClock(time: TemporalAccessor): String =
+    MESSAGE_CLOCK.format(time).replace('\u202F', ' ').replace('\u00A0', ' ')
+
+internal fun timeFor(sentAt: String): String = runCatching { messageClock(Instant.parse(sentAt)) }.getOrDefault("")
