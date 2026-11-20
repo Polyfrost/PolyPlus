@@ -9,6 +9,8 @@ import net.minecraft.client.KeyMapping
 /*import net.minecraft.client.options.KeyBinding as KeyMapping
 import org.lwjgl.opengl.Display
 *///?}
+//? if >= 1.21.4
+import net.minecraft.client.InactivityFpsLimit
 import net.minecraft.client.Minecraft
 //? if >= 1.21.11
 import net.minecraft.client.TextureFilteringMethod
@@ -108,6 +110,17 @@ object DefaultSettings {
                 coveredByLegacyFlag = false,
             ),
         )
+        //? if >= 1.21.4 {
+        add(
+            Task(
+                id = "vanilla-inactivity-fps-minimized",
+                label = "Minecraft options",
+                isPresent = { true },
+                apply = ::reduceFpsOnlyWhenMinimized,
+                coveredByLegacyFlag = false,
+            ),
+        )
+        //?}
         //? if >= 1.21.11 {
         add(
             Task(
@@ -370,6 +383,16 @@ object DefaultSettings {
         options.save()
         *///?}
     }
+
+    //? if >= 1.21.4 {
+    private fun reduceFpsOnlyWhenMinimized() {
+        val options = Minecraft.getInstance().options ?: return
+        if (options.inactivityFpsLimit().get() != InactivityFpsLimit.AFK) return
+        options.inactivityFpsLimit().set(InactivityFpsLimit.MINIMIZED)
+        options.save()
+        logger.info("Set Reduce FPS to only apply while minimized")
+    }
+    //?}
 
     //? if >= 1.21.11 {
     private fun disableTextureFiltering() {
