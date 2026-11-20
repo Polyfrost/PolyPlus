@@ -630,12 +630,14 @@ val changelogFile = rootProject.file("CHANGELOG.md")
 
 fun currentChangelogSection(): String? {
     if (!changelogFile.exists()) return null
-    val headingPattern = Regex("^##\\s+v?" + Regex.escape(modVersion) + "(\\s.*)?$")
+    val headingPattern = Regex("^##\\s+\\[?v?" + Regex.escape(modVersion) + "]?(\\s.*)?$")
     val lines = changelogFile.readLines()
     val start = lines.indexOfFirst { headingPattern.matches(it.trimEnd()) }
     if (start < 0) return null
     val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
-    return lines.subList(start + 1, end).joinToString("\n").trim().takeIf { it.isNotEmpty() }
+    val section = lines.subList(start + 1, end)
+    if (section.none { it.isNotBlank() && !it.trimStart().startsWith("#") }) return null
+    return section.joinToString("\n").trim()
 }
 
 val validateChangelog = tasks.register("validateChangelog") {
