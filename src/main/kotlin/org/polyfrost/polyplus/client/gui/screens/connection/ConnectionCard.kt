@@ -256,7 +256,7 @@ internal fun ConnectionCard(
                 )
             }
             Spacer(Modifier.height(20.dp))
-            ScrollContainer(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+            ScrollContainer(modifier = Modifier.fillMaxWidth().weight(1f, fill = false), scrollbar = false) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, content = content)
             }
             Spacer(Modifier.height(24.dp))
