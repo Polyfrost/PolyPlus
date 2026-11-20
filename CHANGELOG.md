@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed the connection status text and progress bar sitting off center
 - Fixed the Add Server screen rejecting addresses with spaces at the start or end
+- Fixed the lobby world vanishing into the sky a few seconds in when using Iris shaders on 1.21.1 and 1.21.4
 
 ## [2.2.0] - 2026-11-19
 

@@ -40,7 +40,7 @@ import net.minecraft.client.renderer.FogRenderer
 *///?}
 //? if >= 1.21.4 && < 1.21.8
 /*import net.minecraft.client.renderer.FogParameters*/
-//? if < 1.21.4 && > 1.8.9
+//? if < 1.21.5 && > 1.8.9
 /*import com.mojang.blaze3d.systems.RenderSystem*/
 //? if = 1.8.9 {
 /*import org.polyfrost.polyplus.mixin.client.access.LevelChunkInvoker
@@ -2003,6 +2003,8 @@ object LobbyScene {
         val mc = Minecraft.getInstance()
         //? if > 1.8.9
         if (mc.noRender) return
+        //? if < 1.21.5 && > 1.8.9
+        /^RenderSystem.depthMask(true)^/
         guarded("render") {
             sample(mc)
             begin(scene)
