@@ -104,13 +104,13 @@ private class ServerEditForm(server: ServerData?) {
     var folder by mutableStateOf(server?.ip?.let(ServerFolders::folderOf).orEmpty())
     val folderNames = ServerFolders.names()
 
-    val addressValid: Boolean get() = ServerAddress.isValidAddress(address.text)
+    val target: String get() = address.text.trim()
+    val addressValid: Boolean get() = ServerAddress.isValidAddress(target)
     val displayName: String get() = name.text.ifEmpty { I18n.get(DEFAULT_NAME_KEY) }
-    val captureBlocked: Boolean get() = LobbySceneStore.serverPolicy(address.text) == ServerApiProtocol.ScenePolicy.DENY
-    val captureOn: Boolean get() = !captureBlocked && (captureDraft ?: (LobbySceneStore.serverChoice(if (isNew) address.text else initialAddress) != false))
+    val captureBlocked: Boolean get() = LobbySceneStore.serverPolicy(target) == ServerApiProtocol.ScenePolicy.DENY
+    val captureOn: Boolean get() = !captureBlocked && (captureDraft ?: (LobbySceneStore.serverChoice(if (isNew) target else initialAddress) != false))
 
     fun applyCapture() {
-        val target = address.text
         val draft = captureDraft
         when {
             draft != null && !captureBlocked -> LobbySceneStore.setServerChoice(target, if (draft) null else false)
@@ -141,7 +141,7 @@ internal fun ServerEditDialog(
     val save: () -> Unit = save@{
         if (form.finished || form.confirmingDelete || !form.addressValid) return@save
         form.finished = true
-        ServerEditStore.save(server, serverIndex, form.displayName, form.address.text, form.packStatus, form.folder.takeIf { form.showFolder })
+        ServerEditStore.save(server, serverIndex, form.displayName, form.target, form.packStatus, form.folder.takeIf { form.showFolder })
         if (form.showCapture) form.applyCapture()
         onDone()
     }
@@ -152,7 +152,7 @@ internal fun ServerEditDialog(
         onDelete?.invoke()
     }
 
-    DriveServerProbe(probe, form.address.text, form.addressValid, debounce = form.address.text != form.initialAddress)
+    DriveServerProbe(probe, form.target, form.addressValid, debounce = form.target != form.initialAddress)
 
     ModalDialog(
         onDismiss = cancel,
