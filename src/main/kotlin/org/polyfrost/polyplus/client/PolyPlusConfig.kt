@@ -119,6 +119,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var packVersionWarnings = true
 
+    @JvmStatic
+    @Switch(
+        title = "OneClient Section in OneConfig",
+        description = "Show the OneClient pages in the OneConfig sidebar. These settings stay available from the Mods tab and Minecraft's options.",
+    )
+    var oneConfigSection = true
+
     @JvmStatic @Include
     var vanillaOfferDismissed = false
 
@@ -556,6 +563,11 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
         addCallback("acceptedLegalTerms") {
             PrivacyEnforcement.onConfigChanged(acceptedLegalTerms)
+        }
+
+        addCallback<Boolean>("oneConfigSection") { shown ->
+            PolyPlusOneConfigIntegration.showSection(shown)
+            false
         }
 
         hideIf("voiceLinuxRtc") { !EosRtcSupport.isLinux }

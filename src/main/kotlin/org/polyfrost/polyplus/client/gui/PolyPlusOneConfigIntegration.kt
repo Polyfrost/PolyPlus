@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.gui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import net.minecraft.client.gui.screens.TitleScreen
 import org.polyfrost.oneconfig.api.ui.v1.ChangelogSources
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -17,6 +18,7 @@ import org.polyfrost.oneconfig.api.ui.v1.page.PageText
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.internal.ui.screens.ModConfig
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.screens.settings.SettingsMemory
@@ -54,6 +56,12 @@ object PolyPlusOneConfigIntegration {
         ONECLIENT_GROUP_ORDER,
     )
 
+    private val sectionShown by lazy { mutableStateOf(PolyPlusConfig.oneConfigSection) }
+
+    fun showSection(shown: Boolean) {
+        sectionShown.value = shown
+    }
+
     private class OneClientPageSpec(val slug: String, val file: String, val title: String, val icon: String)
 
     private class OneClientConfigPage(spec: OneClientPageSpec, override val order: Int, group: PageGroup) : OneConfigPage(
@@ -63,6 +71,8 @@ object PolyPlusOneConfigIntegration {
         group,
     ) {
         private val configId = "${PolyPlusConstants.ID}${spec.file}.json"
+
+        override val showInSidebar: Boolean get() = sectionShown.value
 
         @Composable
         override fun Content() = ModConfig(configId)
