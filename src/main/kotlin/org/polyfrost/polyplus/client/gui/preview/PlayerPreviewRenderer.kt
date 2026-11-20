@@ -164,7 +164,7 @@ import com.mojang.blaze3d.buffers.BufferUsage
 
 //? if < 1.21.5 {
 /*import com.mojang.blaze3d.platform.NativeImage
-import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
+import org.polyfrost.compose.minecraft.render.RenderTargetFbo
 *///?}
 
 //? if = 1.21.4 {

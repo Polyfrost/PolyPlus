@@ -24,7 +24,8 @@ import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
-import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
+import org.polyfrost.compose.minecraft.hud.HudLayer
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeOptions
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -85,7 +86,7 @@ object ClientWatermark {
 
     private var style by mutableStateOf<Style?>(null)
 
-    private val layer = ComposeHudLayer("client_watermark") { Content() }.apply { acceptsInput = false }
+    private val layer = HudLayer("client_watermark", OneConfigComposeOptions) { Content() }.apply { acceptsInput = false }
 
     @JvmStatic
     fun visibleOn(screen: Screen): Boolean =

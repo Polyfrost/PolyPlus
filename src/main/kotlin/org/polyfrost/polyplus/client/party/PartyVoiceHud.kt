@@ -6,13 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import org.polyfrost.compose.backend.PolyImageBitmap
-import org.polyfrost.compose.composables.PolyBox
-import org.polyfrost.compose.composables.PolyCanvas
-import org.polyfrost.compose.composables.PolyColumn
-import org.polyfrost.compose.composables.PolyMcText
+import org.polyfrost.compose.composables.NodeBox
+import org.polyfrost.compose.composables.NodeCanvas
+import org.polyfrost.compose.composables.NodeColumn
+import org.polyfrost.compose.composables.NodeMcText
+import org.polyfrost.compose.composables.NodeRow
+import org.polyfrost.compose.composables.NodeText
 import org.polyfrost.compose.composables.PolyModifier
-import org.polyfrost.compose.composables.PolyRow
-import org.polyfrost.compose.composables.PolyText
 import org.polyfrost.compose.composables.align
 import org.polyfrost.compose.composables.clip
 import org.polyfrost.compose.composables.padding
@@ -192,9 +192,9 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
         val padded = if (fixed) hudBackground().size(staticW, staticH).clip() else hudBackground()
         val horizontal = layoutMode == LAYOUT_HORIZONTAL
         val content = if (fixed) PolyModifier.align(alignment) else PolyModifier
-        PolyBox(modifier = padded.padding(padLeft, padTop, padRight, padBottom)) {
+        NodeBox(modifier = padded.padding(padLeft, padTop, padRight, padBottom)) {
             if (horizontal) {
-                PolyRow((spacing + HORIZONTAL_EXTRA_GAP) * scale, content) {
+                NodeRow((spacing + HORIZONTAL_EXTRA_GAP) * scale, content) {
                     for (row in list) key(row.id) { Entry(row, scale, PolyAlign.Center) }
                 }
             } else {
@@ -203,7 +203,7 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
                     ALIGN_RIGHT -> PolyAlign.Right
                     else -> PolyAlign.Center
                 }
-                PolyColumn(spacing * scale, content) {
+                NodeColumn(spacing * scale, content) {
                     for (row in list) key(row.id) { Entry(row, scale, rowAlign) }
                 }
             }
@@ -215,10 +215,10 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
         rev.value
         val centered = PolyModifier.align(PolyAlign.Center)
         val names = showNames || !showHeads
-        PolyRow(ENTRY_GAP * scale, PolyModifier.align(align)) {
+        NodeRow(ENTRY_GAP * scale, PolyModifier.align(align)) {
             if (showHeads) {
                 val side = headSize * scale
-                PolyCanvas(centered.size(side, side)) { x, y, width, _ -> drawHead(row, x, y, width, scale) }
+                NodeCanvas(centered.size(side, side)) { x, y, width, _ -> drawHead(row, x, y, width, scale) }
             }
             if (names) Label(row.name, PolyColor(textColor, textChroma, textChromaSpeed), scale)
             if (showMutedIcon && row.muted) Icon(micOff, scale)
@@ -240,7 +240,7 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
                 if (textItalic) append("§o")
                 if (textUnderline) append("§n")
             }
-            PolyMcText(
+            NodeMcText(
                 text = if (style.isEmpty()) cased else "$style${cased.replace("§", "")}§r",
                 outlineColor = if (showShadow && fullShadow) PolyColor(shadowColor, shadowChroma, shadowChromaSpeed) else null,
                 color = color,
@@ -250,7 +250,7 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
                 literal = style.isEmpty(),
             )
         } else {
-            PolyText(
+            NodeText(
                 cased,
                 color = color,
                 fontSize = FONT_SIZE * scale,
@@ -266,7 +266,7 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
     @Composable
     private fun Icon(strokes: List<FloatArray>, scale: Float) {
         val side = ICON_SIZE * scale
-        PolyCanvas(PolyModifier.align(PolyAlign.Center).size(side, side)) { x, y, width, _ -> drawStrokes(strokes, x, y, width) }
+        NodeCanvas(PolyModifier.align(PolyAlign.Center).size(side, side)) { x, y, width, _ -> drawStrokes(strokes, x, y, width) }
     }
 
     private fun RenderContext.drawHead(row: VoiceRow, x: Float, y: Float, side: Float, scale: Float) {

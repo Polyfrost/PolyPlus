@@ -4,7 +4,7 @@ package org.polyfrost.polyplus.mixin.compat.oneconfig;
 /*import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen;
+import org.polyfrost.compose.minecraft.screen.ComposeScreen;
 import org.polyfrost.polyplus.client.gui.MenuPanorama;
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;

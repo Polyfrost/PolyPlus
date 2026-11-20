@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.mixin.compat.blur;
 
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen;
+import org.polyfrost.compose.minecraft.screen.ComposeScreen;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;
 import org.polyfrost.polyplus.client.utils.ClientPlatform;
 import org.spongepowered.asm.mixin.Mixin;

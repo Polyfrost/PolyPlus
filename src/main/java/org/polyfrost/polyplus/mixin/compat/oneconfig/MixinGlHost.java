@@ -15,7 +15,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 ^///?}
 *///?}
 
-@Mixin(targets = "org.polyfrost.oneconfig.internal.ui.compose.GlHost", remap = false)
+@Mixin(targets = "org.polyfrost.compose.minecraft.render.gl.GlHost", remap = false)
 public class MixinGlHost {
     //? if < 1.21.11 {
     /*@Inject(method = "draw(I)V", at = @At("HEAD"), remap = false)

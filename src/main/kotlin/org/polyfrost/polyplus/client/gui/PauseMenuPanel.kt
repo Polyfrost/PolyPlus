@@ -13,7 +13,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
+import org.polyfrost.compose.minecraft.canvas.InlinePolyCanvas
 import org.polyfrost.compose.backend.PolyCanvas
 import org.polyfrost.compose.backend.asComposeImageBitmap
 import org.polyfrost.compose.render.PolyBitmap
