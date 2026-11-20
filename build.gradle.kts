@@ -419,20 +419,6 @@ dependencies {
         // Loom strips the nested Kotlin jars from a remapped copy, so the plain copy above must stay the only candidate
         exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
     }
-    for (module in listOf(
-        "commands",
-        "config",
-        "config-impl",
-        "hud",
-        "notifications",
-        "poly-compose",
-        "utils",
-        "internal",
-        "ui",
-        "events"
-    )) {
-        implementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
-    }
 
     sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
