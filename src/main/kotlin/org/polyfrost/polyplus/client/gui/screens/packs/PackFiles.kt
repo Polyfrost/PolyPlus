@@ -84,37 +84,89 @@ internal object PackFiles {
         runCatching { Files.list(dir).use { !it.findAny().isPresent } }.getOrDefault(false)
 
     fun isPack(path: Path): Boolean = when {
-        Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) -> Files.isRegularFile(path.resolve("pack.mcmeta"))
-        else -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+        Files.isDirectory(path) -> Files.isRegularFile(path.resolve("pack.mcmeta"))
+        else -> Files.isRegularFile(path)
     }
 
-    fun move(source: Path, target: Path, overwrite: Boolean) {
+    fun move(source: Path, target: Path, overwrite: Boolean, absoluteLink: Boolean = false) {
+        //? if > 1.8.9 {
+        val hop = if (absoluteLink) linkHops(source).firstOrNull() else null
+        if (hop != null && (Files.isSymbolicLink(hop) || (!Files.isDirectory(hop) && !hop.fileName.toString().endsWith(".zip")))) {
+            throw IOException("${source.fileName} links to ${hop.fileName}, which Minecraft can't load at the top level")
+        }
+        //?}
         Files.createDirectories(target.parent)
         if (!overwrite || !Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-            Files.move(source, target)
+            moveEntry(source, target, absoluteLink)
             return
         }
         if (!isPack(target) || !isPack(source)) throw IOException("${target.fileName} is not a pack")
+        if (!Files.isSymbolicLink(target) && Files.isSameFile(source, target)) {
+            throw IOException("${source.fileName} links to ${target.fileName}")
+        }
+        val replaced = anchored(target)
+        if (linkHops(source).any { it.startsWith(replaced) }) throw IOException("${source.fileName} links to ${target.fileName}")
         if (!Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
             try {
-                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                moveEntry(source, target, absoluteLink, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
                 return
             } catch (_: AtomicMoveNotSupportedException) {
             }
         }
-        val backup = (0..99).asSequence()
-            .map { target.resolveSibling(".polyplus-replaced-$it-${target.fileName}") }
-            .firstOrNull { !Files.exists(it, LinkOption.NOFOLLOW_LINKS) }
-            ?: throw IOException("No free name to set ${target.fileName} aside")
+        val backup = freeSibling(target, ".polyplus-replaced")
         Files.move(target, backup)
         try {
-            Files.move(source, target)
+            moveEntry(source, target, absoluteLink)
         } catch (error: Exception) {
             runCatching { Files.move(backup, target) }
             throw error
         }
         runCatching { deleteHard(backup) }
     }
+
+    private fun moveEntry(source: Path, target: Path, absoluteLink: Boolean, vararg options: StandardCopyOption) {
+        val link = if (Files.isSymbolicLink(source)) Files.readSymbolicLink(source) else null
+        if (link == null || link.isAbsolute) return run { Files.move(source, target, *options) }
+        val resolved = anchored(source.toAbsolutePath().parent.toRealPath().resolve(link))
+        val rebased = if (absoluteLink) resolved
+        else runCatching { target.toAbsolutePath().parent.toRealPath().relativize(resolved) }.getOrDefault(resolved)
+        if (rebased == link) return run { Files.move(source, target, *options) }
+        val staged = Files.createSymbolicLink(freeSibling(target, ".polyplus-link"), rebased)
+        try {
+            Files.delete(source)
+        } catch (error: Exception) {
+            runCatching { Files.delete(staged) }
+            throw error
+        }
+        try {
+            Files.move(staged, target, *options)
+        } catch (error: Exception) {
+            runCatching { Files.createSymbolicLink(source, link) }
+            runCatching { Files.delete(staged) }
+            throw error
+        }
+    }
+
+    private fun anchored(path: Path): Path = runCatching {
+        val absolute = path.toAbsolutePath()
+        val name = absolute.fileName.toString()
+        if (name == "." || name == "..") absolute.toRealPath() else absolute.parent.toRealPath().resolve(absolute.fileName)
+    }.getOrElse { path.toAbsolutePath().normalize() }
+
+    private fun linkHops(source: Path): List<Path> {
+        val hops = ArrayList<Path>()
+        var link = source
+        while (Files.isSymbolicLink(link) && hops.size < PackFolders.MAX_LINK_HOPS) {
+            link = anchored(link.resolveSibling(Files.readSymbolicLink(link)))
+            hops.add(link)
+        }
+        return hops
+    }
+
+    private fun freeSibling(target: Path, prefix: String): Path = (0..99).asSequence()
+        .map { target.resolveSibling("$prefix-$it-${target.fileName}") }
+        .firstOrNull { !Files.exists(it, LinkOption.NOFOLLOW_LINKS) }
+        ?: throw IOException("No free name beside ${target.fileName}")
 
     fun deleteHard(path: Path) {
         if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {

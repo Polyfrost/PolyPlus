@@ -4,12 +4,13 @@ package org.polyfrost.polyplus.mixin.client;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
@@ -48,42 +49,49 @@ public abstract class PackFolderRepositorySourceMixin {
     @Inject(method = "loadPacks", at = @At("TAIL"))
     private void polyplus$loadNestedPacks(Consumer<Pack> result, CallbackInfo ci) {
         if (this.packType != PackType.CLIENT_RESOURCES || polyplus$deferToOthers()) return;
-        polyplus$walk(this.folder, 0, result);
+        polyplus$walk(this.folder, 0, result, new HashSet<>());
     }
 
     @Unique
-    private void polyplus$walk(Path dir, int depth, Consumer<Pack> result) {
+    private void polyplus$walk(Path dir, int depth, Consumer<Pack> result, Set<Path> ancestors) {
         if (depth > PackFolders.MAX_DEPTH) return;
+        Path real;
+        try {
+            real = dir.toRealPath();
+        } catch (IOException e) {
+            return;
+        }
+        if (!ancestors.add(real)) return;
         List<Path> groups = new ArrayList<>();
         try (DirectoryStream<Path> children = Files.newDirectoryStream(dir)) {
             for (Path child : children) {
+                if (polyplus$forbidden(child)) continue;
                 Pack.ResourcesSupplier resources = depth == 0 ? null : polyplus$detect(child);
                 if (resources != null) {
                     String id = "file/" + this.folder.relativize(child).toString().replace('\\', '/');
                     PackLocationInfo info = new PackLocationInfo(id, Component.literal(child.getFileName().toString()), this.packSource, Optional.empty());
                     Pack pack = Pack.readMetaAndCreate(info, resources, this.packType, POLYPLUS$CONFIG);
                     if (pack != null) result.accept(pack);
-                } else if (Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)
+                } else if (Files.isDirectory(child)
                     && !child.getFileName().toString().startsWith(".")
                     && !Files.isRegularFile(child.resolve("pack.mcmeta"))) {
                     groups.add(child);
                 }
             }
         } catch (IOException ignored) {
-            return;
         }
-        for (Path group : groups) polyplus$walk(group, depth + 1, result);
+        for (Path group : groups) polyplus$walk(group, depth + 1, result, ancestors);
+        ancestors.remove(real);
     }
 
     @Unique
     private Pack.ResourcesSupplier polyplus$detect(Path entry) {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            if (attributes.isSymbolicLink()) return null;
+            BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class);
             if (attributes.isDirectory()) {
                 if (!Files.isRegularFile(entry.resolve("pack.mcmeta"))) return null;
                 List<ForbiddenSymlinkInfo> issues = new ArrayList<>();
-                this.validator.validateKnownDirectory(entry, issues);
+                this.validator.validateKnownDirectory(entry.toRealPath(), issues);
                 return issues.isEmpty() ? new PathPackResources.PathResourcesSupplier(entry) : null;
             }
             if (attributes.isRegularFile() && entry.getFileName().toString().endsWith(".zip")) {
@@ -92,6 +100,23 @@ public abstract class PackFolderRepositorySourceMixin {
         } catch (IOException ignored) {
         }
         return null;
+    }
+
+    @Unique
+    private boolean polyplus$forbidden(Path entry) {
+        try {
+            List<ForbiddenSymlinkInfo> issues = new ArrayList<>();
+            Path link = entry;
+            for (int hops = 0; Files.isSymbolicLink(link); hops++) {
+                if (hops >= PackFolders.MAX_LINK_HOPS) return true;
+                this.validator.validateSymlink(link, issues);
+                if (!issues.isEmpty()) return true;
+                link = link.resolveSibling(Files.readSymbolicLink(link));
+            }
+            return false;
+        } catch (IOException e) {
+            return true;
+        }
     }
 
     @Unique

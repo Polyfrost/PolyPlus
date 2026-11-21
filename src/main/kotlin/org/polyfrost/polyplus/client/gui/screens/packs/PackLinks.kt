@@ -6,7 +6,6 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
-import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
@@ -62,12 +61,15 @@ internal object PackLinks {
 
     private fun metas(packDir: Path, maxDepth: Int): List<Pair<String, Path>> {
         val out = ArrayList<Pair<String, Path>>()
+        val ancestors = HashSet<Path>()
         fun walk(dir: Path, prefix: String, depth: Int) {
             if (depth > maxDepth) return
+            val real = runCatching { dir.toRealPath() }.getOrNull() ?: return
+            if (!ancestors.add(real)) return
             val children = runCatching {
                 Files.list(dir).use { stream ->
                     stream
-                        .filter { Files.isDirectory(it, LinkOption.NOFOLLOW_LINKS) && !it.fileName.toString().startsWith(".") }
+                        .filter { Files.isDirectory(it) && !it.fileName.toString().startsWith(".") && !PackFolders.forbidden(it) }
                         .filter { !Files.isRegularFile(it.resolve("pack.mcmeta")) }
                         .toList()
                 }
@@ -78,6 +80,7 @@ internal object PackLinks {
                 if (Files.isRegularFile(file)) out.add(path to file)
                 walk(child, path, depth + 1)
             }
+            ancestors.remove(real)
         }
         walk(packDir, "", 1)
         return out

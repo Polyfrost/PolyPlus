@@ -128,14 +128,19 @@ internal class PackMovePlan(val moves: List<Triple<String, Path, Path>>, val ski
             val claimed = HashSet<Path>()
             val moves = ArrayList<Triple<String, Path, Path>>()
             val skipped = ArrayList<Path>()
-            for (move in planned.sortedBy { it.second != it.third }) {
+            for (move in planned.sortedBy { !inPlace(it) }) {
                 when {
                     !claimed.add(move.third) -> skipped.add(move.second)
-                    move.second != move.third -> moves.add(move)
+                    !inPlace(move) -> moves.add(move)
                 }
             }
             return PackMovePlan(moves, skipped)
         }
+
+        private fun inPlace(move: Triple<String, Path, Path>): Boolean =
+            move.second == move.third || runCatching { entryOf(move.second) == entryOf(move.third) }.getOrDefault(false)
+
+        private fun entryOf(path: Path): Path = path.toAbsolutePath().parent.toRealPath().resolve(path.fileName)
     }
 }
 
@@ -372,7 +377,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         val failed = ArrayList<Path>()
         for ((id, source, destination) in moves) {
             try {
-                PackFiles.move(source, destination, destination in replace)
+                PackFiles.move(source, destination, destination in replace, absoluteLink = destination.parent == packDir)
                 renames[id] = idOf(destination)
                 if (destination in replace && idOf(destination) in enabled) forceReload = true
             } catch (_: Exception) {
@@ -855,6 +860,8 @@ internal class PackSession(initial: PackSelectionScreen) {
 
     private fun fileOf(pack: Pack): Path? {
         if (!resources) return null
+        val link = PackFolders.relative(pack.id)?.let { runCatching { packDir.resolve(it) }.getOrNull() }
+        if (link != null && Files.isSymbolicLink(link)) return link
         val real = PackSources.pathOf(pack) ?: return null
         return real.takeIf { relativeToPackDir(it) != null && Files.exists(it, LinkOption.NOFOLLOW_LINKS) }
     }
@@ -1139,7 +1146,7 @@ internal class PackSession private constructor(private val exit: Screen?, privat
         val failed = ArrayList<Path>()
         for ((id, source, destination) in moves) {
             try {
-                PackFiles.move(source, destination, destination in replace)
+                PackFiles.move(source, destination, destination in replace, absoluteLink = destination.parent == packDir)
                 renames[id] = idOf(destination)
                 if (destination in replace && idOf(destination) in enabled) forceReload = true
             } catch (_: Exception) {

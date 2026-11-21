@@ -13,10 +13,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.nio.file.Files;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Mixin(ResourcePacks.class)
 public abstract class PackResourcePacksMixin {
@@ -27,26 +30,42 @@ public abstract class PackResourcePacksMixin {
     private void polyplus$discoverNestedPacks(CallbackInfoReturnable<List<File>> cir) {
         if (!this.directory.isDirectory()) return;
         List<File> found = new ArrayList<>(cir.getReturnValue());
-        polyplus$walk(this.directory, 0, found);
+        polyplus$walk(this.directory, 0, found, new HashSet<>());
         cir.setReturnValue(found);
     }
 
     @Unique
-    private static void polyplus$walk(File dir, int depth, List<File> found) {
+    private static void polyplus$walk(File dir, int depth, List<File> found, Set<Path> ancestors) {
         if (depth >= PackFolders.MAX_DEPTH) return;
+        Path real;
+        try {
+            real = dir.toPath().toRealPath();
+        } catch (IOException e) {
+            return;
+        }
+        if (!ancestors.add(real)) return;
         File[] children = dir.listFiles();
-        if (children == null) return;
+        if (children == null) {
+            ancestors.remove(real);
+            return;
+        }
         Arrays.sort(children);
         for (File child : children) {
             if (!child.isDirectory() || child.getName().startsWith(".")) continue;
-            if (Files.isSymbolicLink(child.toPath()) || new File(child, "pack.mcmeta").isFile()) continue;
+            if (new File(child, "pack.mcmeta").isFile()) continue;
+            try {
+                if (ancestors.contains(child.toPath().toRealPath())) continue;
+            } catch (IOException e) {
+                continue;
+            }
             File[] packs = child.listFiles(FILE_FILTER);
             if (packs != null) {
                 Arrays.sort(packs);
                 found.addAll(Arrays.asList(packs));
             }
-            polyplus$walk(child, depth + 1, found);
+            polyplus$walk(child, depth + 1, found, ancestors);
         }
+        ancestors.remove(real);
     }
 }
 *///?}

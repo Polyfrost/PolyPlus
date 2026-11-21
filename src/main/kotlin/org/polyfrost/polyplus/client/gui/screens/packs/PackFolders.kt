@@ -3,10 +3,12 @@ package org.polyfrost.polyplus.client.gui.screens.packs
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.nio.file.Files
-import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+//? if > 1.8.9 {
+import net.minecraft.client.Minecraft
+//?}
 
 internal class PackFolderMeta(val description: String, val hidden: Boolean, val icon: String?)
 
@@ -66,12 +68,18 @@ internal class PackFolders(private val session: PackSession) {
 
     fun allPaths(all: List<PackItem>): List<String> {
         val out = ArrayList<String>()
+        val ancestors = HashSet<Path>()
         fun walk(parent: String) {
+            if (depthOf(parent) >= MAX_DEPTH) return
             for (child in children(all, parent)) {
+                val real = runCatching { dir(child.path)?.toRealPath() }.getOrNull() ?: continue
+                if (!ancestors.add(real)) continue
                 out.add(child.path)
                 walk(child.path)
+                ancestors.remove(real)
             }
         }
+        runCatching { session.packDir.toRealPath() }.getOrNull()?.let(ancestors::add)
         walk("")
         return out
     }
@@ -80,7 +88,7 @@ internal class PackFolders(private val session: PackSession) {
 
     fun exists(path: String): Boolean = path.isEmpty() || dir(path) != null
 
-    fun dir(path: String): Path? = runCatching { session.packDir.resolve(path) }.getOrNull()?.takeIf { Files.isDirectory(it, LinkOption.NOFOLLOW_LINKS) }
+    fun dir(path: String): Path? = runCatching { session.packDir.resolve(path) }.getOrNull()?.takeIf { Files.isDirectory(it) }
 
     fun iconFile(path: String): Path? {
         val dir = dir(path) ?: return null
@@ -92,11 +100,16 @@ internal class PackFolders(private val session: PackSession) {
 
     private fun listing(parent: String): List<String> = listings.computeIfAbsent(parent) {
         val dir = if (parent.isEmpty()) session.packDir else dir(parent) ?: return@computeIfAbsent emptyList()
+        val ancestors = generateSequence(parent) { if (it.isEmpty()) null else it.substringBeforeLast('/', "") }
+            .mapNotNull { runCatching { (if (it.isEmpty()) session.packDir else session.packDir.resolve(it)).toRealPath() }.getOrNull() }
+            .toHashSet()
         runCatching {
             Files.list(dir).use { stream ->
                 stream
-                    .filter { Files.isDirectory(it, LinkOption.NOFOLLOW_LINKS) && !it.fileName.toString().startsWith(".") }
+                    .filter { Files.isDirectory(it) && !it.fileName.toString().startsWith(".") }
                     .filter { !Files.isRegularFile(it.resolve("pack.mcmeta")) }
+                    .filter { !forbidden(it) }
+                    .filter { runCatching { it.toRealPath() !in ancestors }.getOrDefault(false) }
                     .map { it.fileName.toString() }
                     .toList()
             }
@@ -138,6 +151,25 @@ internal class PackFolders(private val session: PackSession) {
         fun parentOf(path: String): String = path.substringBeforeLast('/', "")
 
         fun nameOf(path: String): String = path.substringAfterLast('/')
+
+        const val MAX_LINK_HOPS = 40
+
+        fun forbidden(dir: Path): Boolean {
+            //? if > 1.8.9 {
+            return runCatching {
+                val validator = Minecraft.getInstance().directoryValidator()
+                var link = dir
+                var hops = 0
+                while (Files.isSymbolicLink(link)) {
+                    if (hops++ >= MAX_LINK_HOPS || validator.validateSymlink(link).isNotEmpty()) return true
+                    link = link.resolveSibling(Files.readSymbolicLink(link))
+                }
+                false
+            }.getOrDefault(true)
+            //?} else {
+            /*return false
+            *///?}
+        }
 
         fun join(parent: String, name: String): String = if (parent.isEmpty()) name else "$parent/$name"
     }
