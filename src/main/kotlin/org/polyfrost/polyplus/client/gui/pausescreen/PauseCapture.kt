@@ -27,6 +27,7 @@ import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.mixin.client.access.AbstractWidgetAccessor
 import org.polyfrost.polyplus.mixin.client.access.ButtonAccessor
 import org.polyfrost.polyplus.mixin.client.access.ImageButtonAccessor
+import org.polyfrost.polyplus.mixin.client.access.PauseScreenAccessor
 import org.polyfrost.polyplus.mixin.client.access.SpriteIconButtonAccessor
 import org.polyfrost.polyplus.mixin.client.access.TooltipAccessor
 //?} else {
@@ -149,6 +150,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
     private class Slotted(val slot: PauseSlot, val group: String, val glyph: String)
 
     private fun slotOf(widget: AbstractWidget): Slotted {
+        if (widget === (vanilla as PauseScreenAccessor).`polyplus$disconnectButton`()) return Slotted(PauseSlot.QUIT, GROUP_GAME, GLYPH_LEAVE)
         val key = (widget.message.contents as? TranslatableContents)?.key
         return when (key) {
             "menu.returnToGame" -> Slotted(PauseSlot.RESUME, GROUP_GAME, GLYPH_ROW)

@@ -190,6 +190,8 @@
     //? if > 1.8.9
     "client.access.ButtonAccessor",
     //? if > 1.8.9
+    "client.access.PauseScreenAccessor",
+    //? if > 1.8.9
     "client.access.CameraAccessor",
     //? if > 1.8.9
     "client.access.ChannelAccessor",
