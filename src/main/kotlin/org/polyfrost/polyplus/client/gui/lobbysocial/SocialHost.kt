@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import net.minecraft.client.multiplayer.ServerData
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.compose.host.BackStack
 import org.polyfrost.polyplus.client.party.LeaderFollow
 
 internal interface SocialHost {
@@ -28,9 +28,9 @@ internal fun LeaderJoinEffect(host: SocialHost) {
 
 internal object SocialEscape {
     val popupOpen: Boolean
-        get() = EscapeStack.hasOpen
+        get() = BackStack.hasOpen
 
-    fun closePopup(): Boolean = EscapeStack.closeTop()
+    fun closePopup(): Boolean = BackStack.closeTop()
 
     fun closeDialog(): Boolean {
         if (!SocialPageState.dialogOpen) return false

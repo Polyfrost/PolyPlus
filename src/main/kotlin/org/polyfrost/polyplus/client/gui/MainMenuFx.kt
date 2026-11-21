@@ -5,7 +5,7 @@ package org.polyfrost.polyplus.client.gui
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigPrefs
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
-import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
+import org.polyfrost.compose.minecraft.canvas.InlinePolyCanvas
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

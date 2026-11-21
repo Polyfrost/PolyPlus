@@ -65,7 +65,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.platform.Font
+import org.polyfrost.compose.text.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
@@ -126,7 +126,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Chip
 import org.polyfrost.oneconfig.api.ui.v1.components.ChipDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.compose.host.BackStack
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButtonStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.LinkText
@@ -2460,7 +2460,7 @@ internal object OnboardingKeys {
     fun handle(key: Int): Boolean {
         if (OnboardingKeyCapture.pending != null) return false
         when (key) {
-            InputConstants.KEY_ESCAPE -> if (!EscapeStack.dispatch()) (back ?: return false)()
+            InputConstants.KEY_ESCAPE -> if (!BackStack.dispatch()) (back ?: return false)()
             InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
                 if (LobbyA11y.keyboardFocused()) return false
                 if (System.currentTimeMillis() - pageAt < PAGE_SETTLE_MS) return true

@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.platform.InlinePolyCanvas
+import org.polyfrost.compose.minecraft.canvas.InlinePolyCanvas
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 
 //? if >= 26.1 {

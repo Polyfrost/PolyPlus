@@ -3,6 +3,7 @@
 package org.polyfrost.polyplus.client.lobby
 
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -115,7 +116,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
-import org.polyfrost.oneconfig.internal.ui.compose.impls.OneConfigUIScreen
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
@@ -1610,7 +1610,7 @@ object LobbyScene {
         if (mc.level != null) return null
         return scene.takeIf {
             ClientPlatform.currentScreen().let {
-                it is PolyPlusLobbyScreen || it is OneConfigUIScreen || (it is ShellScreen && it.shell == ScreenShell.Lobby) || (it != null && it === heldFor)
+                it is PolyPlusLobbyScreen || OneConfigUI.isOneConfigScreen(it) || (it is ShellScreen && it.shell == ScreenShell.Lobby) || (it != null && it === heldFor)
             }
         }
     }

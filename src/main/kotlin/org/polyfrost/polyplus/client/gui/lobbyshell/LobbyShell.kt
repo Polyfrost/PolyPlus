@@ -21,7 +21,7 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.compose.host.BackStack
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
@@ -398,14 +398,14 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     fun escape(): Boolean {
         when {
             accountsOpen -> escapeAccounts()
-            EscapeStack.closeTop() || escapeForm() || SocialEscape.closeDialog() -> Unit
+            BackStack.closeTop() || escapeForm() || SocialEscape.closeDialog() -> Unit
             page != LobbyPage.Home -> show(LobbyPage.Home)
             else -> return false
         }
         return true
     }
 
-    private fun covered(): Boolean = accountsOpen || EscapeStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
+    private fun covered(): Boolean = accountsOpen || BackStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
 
     fun calm(): Boolean = !setup && tour == null && !customizeOpen && !covered() && !SocialPageState.dialogOpen && !TextInputFocus.isTyping
 

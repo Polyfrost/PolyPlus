@@ -20,7 +20,7 @@ import net.minecraft.client.gui.screen.ProgressScreen
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.render.platform.GlStateManager
 import org.polyfrost.oneconfig.internal.legacy.LegacyPanoramaTracker
-import org.polyfrost.oneconfig.internal.ui.compose.opengl.StoredGLState
+import org.polyfrost.compose.minecraft.render.gl.StoredGLState
 import org.polyfrost.polyplus.mixin.client.access.GuiElementInvoker
 import org.polyfrost.polyplus.mixin.client.access.TitleScreenInvoker
 *///?}

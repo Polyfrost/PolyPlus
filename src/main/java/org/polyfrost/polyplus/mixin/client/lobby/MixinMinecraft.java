@@ -106,7 +106,7 @@ import net.minecraft.client.render.platform.GLX;
 import net.minecraft.client.render.platform.GlStateManager;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.text.Text;
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen;
+import org.polyfrost.compose.minecraft.screen.ComposeScreen;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseRouter;
 import org.polyfrost.polyplus.client.lobby.LobbyCapture;
 import org.polyfrost.polyplus.client.lobby.LobbyScene;

@@ -77,6 +77,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.reorderContainer
 import org.polyfrost.oneconfig.api.ui.v1.components.reorderOverlay
 import org.polyfrost.oneconfig.api.ui.v1.components.reorderableItem
 import org.polyfrost.oneconfig.api.ui.v1.theme.legibleOn
+import org.polyfrost.oneconfig.internal.ui.components.wheelScrollDp
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.items
@@ -127,7 +128,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.unit.coerceAtLeast
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -484,7 +484,7 @@ private fun Modifier.wheelScrollsHorizontally(state: ScrollState): Modifier = po
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 if (event.type != PointerEventType.Scroll) continue
-                val delta = event.changes.fold(Offset.Zero) { sum, change -> sum + change.scrollDelta }
+                val delta = event.wheelScrollDp()
                 if (abs(delta.y) <= abs(delta.x)) continue
                 val forward = delta.y > 0f
                 if (if (forward) !state.canScrollForward else !state.canScrollBackward) continue

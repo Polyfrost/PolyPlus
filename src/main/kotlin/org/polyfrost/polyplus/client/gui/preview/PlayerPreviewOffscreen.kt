@@ -18,8 +18,8 @@ import org.polyfrost.compose.backend.drawPoly
 import org.polyfrost.compose.render.RenderContext
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.platform.isOneConfigComposeScreen
-import org.polyfrost.oneconfig.internal.ui.OffscreenTarget
-import org.polyfrost.oneconfig.internal.ui.TextureRenderer
+import org.polyfrost.compose.minecraft.render.OffscreenTarget
+import org.polyfrost.compose.minecraft.render.TextureRenderer
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
 

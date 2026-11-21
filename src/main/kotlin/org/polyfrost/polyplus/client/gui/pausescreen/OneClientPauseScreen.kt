@@ -12,7 +12,7 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.EscapeStack
+import org.polyfrost.compose.host.BackStack
 import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
@@ -174,7 +174,7 @@ class OneClientPauseScreen(
     *///?}
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
-        if (key == InputConstants.KEY_ESCAPE && EscapeStack.closeTop()) return true
+        if (key == InputConstants.KEY_ESCAPE && BackStack.closeTop()) return true
         if (key == InputConstants.KEY_ESCAPE && moreOpen) {
             moreOpen = false
             return true

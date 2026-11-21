@@ -86,7 +86,8 @@ import net.minecraft.client.gui.screen.menu.multiplayer.DownloadingTerrainScreen
 *///?}
 //? if < 1.21.10 && > 1.8.9
 /*import net.minecraft.client.gui.screens.ReceivingLevelScreen*/
-import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
+import org.polyfrost.compose.minecraft.hud.HudLayer
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeOptions
 import org.polyfrost.polyplus.client.gui.MenuBackdrop
 import org.polyfrost.polyplus.client.gui.MenuGlass
 import org.polyfrost.polyplus.client.gui.MenuPanorama
@@ -348,7 +349,7 @@ object TerrainCard {
 
     private var shown by mutableStateOf<Shown?>(null)
 
-    private var layer: ComposeHudLayer? = null
+    private var layer: HudLayer? = null
 
     @JvmStatic
     fun claim(fresh: Boolean): Claim? {
@@ -390,12 +391,12 @@ object TerrainCard {
     fun draw(claim: Claim, progress: Float): Boolean = hudLayer(claim, progress).draw()
     *///?}
 
-    private fun hudLayer(claim: Claim, progress: Float): ComposeHudLayer {
+    private fun hudLayer(claim: Claim, progress: Float): HudLayer {
         val next = progress.takeIf { it >= 0f }
         val current = shown
         if (current == null || current.claim !== claim || current.progress != next) shown = Shown(claim, next)
         Snapshot.sendApplyNotifications()
-        return layer ?: ComposeHudLayer("polyplus_terrain") { Content() }.apply { acceptsInput = false }.also { layer = it }
+        return layer ?: HudLayer("polyplus_terrain", OneConfigComposeOptions) { Content() }.apply { acceptsInput = false }.also { layer = it }
     }
 
     @JvmStatic

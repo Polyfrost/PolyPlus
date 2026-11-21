@@ -22,7 +22,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuInput
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuState
-import org.polyfrost.oneconfig.api.ui.v1.platform.ComposeHudLayer
+import org.polyfrost.compose.minecraft.hud.HudLayer
+import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeOptions
 import org.polyfrost.polyplus.client.ping.PingGraphics
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -73,7 +74,7 @@ object WheelOverlay {
     private var scrollAccum = 0.0
     private var started = false
 
-    private val layer = ComposeHudLayer("radial_wheel") { Content() }.apply { acceptsInput = false }
+    private val layer = HudLayer("radial_wheel", OneConfigComposeOptions) { Content() }.apply { acceptsInput = false }
 
     val isOpen: Boolean get() = session != null
 
