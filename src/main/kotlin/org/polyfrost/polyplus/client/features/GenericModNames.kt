@@ -46,7 +46,10 @@ object GenericModNames {
         "Custom Block Highlight" to "Block Highlight",
         "DamageTint" to "Damage Tint",
         "Sciophobia" to "Text Shadows",
-        "Simple Nick Hider" to "Nick Hider"
+        "Simple Nick Hider" to "Nick Hider",
+        "LegacySkinLayers" to "3D Skin Layers",
+        "BetterHurtCam" to "Hurtcam",
+        "GlintColorizer" to "Glint Customizer"
     )
 
     fun initialize() {
