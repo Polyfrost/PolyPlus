@@ -39,11 +39,9 @@ import net.minecraft.client.resource.language.I18n
 import net.minecraft.client.resource.pack.ResourcePacks
 import org.polyfrost.oneconfig.utils.v1.Multithreading
 import org.polyfrost.polyplus.mixin.client.access.PackUnopenedPackAccessor
-import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.StandardCopyOption
-import javax.imageio.ImageIO
+import java.util.zip.ZipFile
 *///?}
 
 
@@ -950,7 +948,8 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     private val packs = LinkedHashMap<String, ResourcePacks.UnopenedPack>()
     private val chosen = ArrayList<String>()
     private val initial: List<String>
-    private val icons = ConcurrentHashMap<String, Optional<ImageBitmap>>()
+    private val packIcons = ConcurrentHashMap<String, ImageBitmap>()
+    private val folderIcons = ConcurrentHashMap<String, Optional<ImageBitmap>>()
     private val changedAt = ConcurrentHashMap<String, Long>()
     private var closed = false
     private var removing = 0
@@ -1273,15 +1272,17 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     fun openFolder() = PackFiles.openPath(packDir)
 
-    fun icon(item: PackItem): ImageBitmap? =
-        icons.computeIfAbsent(item.id) { Optional.ofNullable(readIcon(item)) }.orElse(null)
+    fun icon(item: PackItem): ImageBitmap? {
+        val pack = item.pack ?: return defaultIcon()
+        return packIcons.getOrPut(item.id) { readIcon(fileOf(pack)) ?: return defaultIcon() }
+    }
 
-    fun cachedIcon(item: PackItem): ImageBitmap? = icons[item.id]?.orElse(null)
+    fun cachedIcon(item: PackItem): ImageBitmap? = packIcons[item.id]
 
     fun folderIcon(path: String): ImageBitmap? =
-        icons.computeIfAbsent("folder:$path") { Optional.ofNullable(folders.iconFile(path)?.let(::decode)) }.orElse(null)
+        folderIcons.computeIfAbsent(path) { Optional.ofNullable(folders.iconFile(path)?.let(::decode)) }.orElse(null)
 
-    fun cachedFolderIcon(path: String): ImageBitmap? = icons["folder:$path"]?.orElse(null)
+    fun cachedFolderIcon(path: String): ImageBitmap? = folderIcons[path]?.orElse(null)
 
     fun commit() {
         if (closed) return
@@ -1448,7 +1449,8 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     }
 
     private fun refreshCaches() {
-        icons.clear()
+        packIcons.clear()
+        folderIcons.clear()
         changedAt.clear()
         folders.clear()
         changed()
@@ -1557,16 +1559,19 @@ internal class PackSession private constructor(private val exit: Screen?, privat
 
     private fun format(pack: ResourcePacks.UnopenedPack): Int = runCatching { pack.getFormat() }.getOrDefault(LEGACY_FORMAT)
 
-    private fun readIcon(item: PackItem): ImageBitmap? = runCatching {
-        val pack = item.pack
-        val image = if (pack == null) repository.defaultPack.getIcon() else (pack as Any as PackUnopenedPackAccessor).`polyplus$icon`()
-        image?.let(::bitmap)
+    private fun readIcon(file: File): ImageBitmap? = runCatching {
+        // Read pack.png directly because Packed Packs can leave the vanilla icon field unset until bindIcon
+        if (file.isDirectory) return@runCatching decode(file.toPath().resolve("pack.png"))
+        ZipFile(file).use { zip ->
+            val entry = zip.getEntry("pack.png") ?: return@use null
+            zip.getInputStream(entry).use { stream -> PolyBitmap.decode(stream.readAllBytes())?.asComposeImageBitmap() }
+        }
     }.getOrNull()
 
-    private fun bitmap(image: BufferedImage): ImageBitmap? {
-        val out = ByteArrayOutputStream()
-        if (!ImageIO.write(image, "png", out)) return null
-        return PolyBitmap.decode(out.toByteArray())?.asComposeImageBitmap()
+    private fun defaultIcon(): ImageBitmap? = packIcons.getOrPut(DEFAULT_ID) {
+        runCatching {
+            repository.defaultPack.getIcon()?.let { PolyBitmap.fromAwt(it).asComposeImageBitmap() }
+        }.getOrNull() ?: return null
     }
 
     private fun decode(file: Path): ImageBitmap? = runCatching {
