@@ -54,7 +54,7 @@ object GenericModNames {
         "HyLobby" to "Hypixel Lobby",
         "HyBridge" to "Hypixel Bridge",
         "HyBedWars" to "Hypixel BedWars",
-        "HyChatter" to "Hypixel Chat"
+        "HyChatter" to "Hypixel Chat",
     )
 
     fun initialize() {
