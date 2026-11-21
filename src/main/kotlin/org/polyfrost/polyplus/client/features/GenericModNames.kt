@@ -49,7 +49,12 @@ object GenericModNames {
         "Simple Nick Hider" to "Nick Hider",
         "LegacySkinLayers" to "3D Skin Layers",
         "BetterHurtCam" to "Hurtcam",
-        "GlintColorizer" to "Glint Customizer"
+        "GlintColorizer" to "Glint Customizer",
+        "HyInfo" to "Hypixel Info",
+        "HyLobby" to "Hypixel Lobby",
+        "HyBridge" to "Hypixel Bridge",
+        "HyBedWars" to "Hypixel BedWars",
+        "HyChatter" to "Hypixel Chat"
     )
 
     fun initialize() {
