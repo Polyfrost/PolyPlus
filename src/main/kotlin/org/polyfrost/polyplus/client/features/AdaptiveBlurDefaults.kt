@@ -117,15 +117,7 @@ object AdaptiveBlurDefaults {
 
         runCatching {
             when {
-                averageFps < refreshRate - LOW_FPS_MARGIN -> {
-                    OnboardingFeatures.setBoolean(instance, "setEnabled", false)
-                    logger.info(
-                        "Avg main-menu FPS {} below refresh {} - {}; disabling blur",
-                        averageFps, refreshRate, LOW_FPS_MARGIN,
-                    )
-                }
                 averageFps < refreshRate + HEADROOM_MARGIN -> {
-                    OnboardingFeatures.setBoolean(instance, "setEnabled", true)
                     OnboardingFeatures.setInt(instance, "setBlurType", UNITY_BLUR_TYPE)
                     OnboardingFeatures.setFloat(instance, "setMotionBlurSamples", REDUCED_SAMPLES)
                     OnboardingFeatures.setBoolean(instance, "setBlurHand", false)
