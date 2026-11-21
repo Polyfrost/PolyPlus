@@ -5,12 +5,14 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.0] - 2026-11-21
 
 ### Added
 - A switch to hide the OneClient section from the OneConfig sidebar. Those settings stay in the Mods tab and Minecraft's options
 
 ### Changed
+- Updated to OneConfig 1.9.0, which needs PolyCompose installed
+- Scrolling in OneClient's menus moves the same distance as in OneConfig
 - The menu music and startup sound are 5 dB louder
 - Minecraft's Reduce FPS setting switches from AFK to Minimized, so it no longer caps your FPS while you're away from the keyboard
 - Socials messages show the time the way your system clock does, in the lobby and in game
