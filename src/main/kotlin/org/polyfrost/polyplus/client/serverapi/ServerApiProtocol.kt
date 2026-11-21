@@ -11,7 +11,9 @@ object ServerApiProtocol {
     private const val SERVERBOUND_HELLO = 0x00
     private const val CLIENTBOUND_WELCOME = 0x00
     private const val CLIENTBOUND_LOBBY_SCENES = 0x01
+    private const val CLIENTBOUND_RESTRICTIONS = 0x02
     private const val MAX_STRING_BYTES = 256
+    private const val MAX_RESTRICTIONS = 256
 
     enum class ScenePolicy {
         UNSET,
@@ -27,6 +29,9 @@ object ServerApiProtocol {
     data class Welcome(val protocolVersion: Int, val serverApiVersion: String) : Clientbound
     data class LobbyScenes(val policy: ScenePolicy) : Clientbound
 
+    /** Mod ids and HUD ids the server switches off, replacing the previous ones */
+    data class Restrictions(val mods: List<String>, val huds: List<String>) : Clientbound
+
     fun encodeHello(clientVersion: String, minecraftVersion: String): ByteArray =
         Writer()
             .varInt(SERVERBOUND_HELLO)
@@ -40,6 +45,7 @@ object ServerApiProtocol {
         return when (reader.varInt()) {
             CLIENTBOUND_WELCOME -> Welcome(reader.varInt(), reader.string())
             CLIENTBOUND_LOBBY_SCENES -> LobbyScenes(ScenePolicy.fromWire(reader.varInt()))
+            CLIENTBOUND_RESTRICTIONS -> Restrictions(reader.strings(), reader.strings())
             else -> null
         }
     }
@@ -78,6 +84,12 @@ object ServerApiProtocol {
                 if (b and 0x80 == 0) return value
             }
             throw IllegalArgumentException("VarInt is too long")
+        }
+
+        fun strings(): List<String> {
+            val count = varInt()
+            require(count in 0..MAX_RESTRICTIONS) { "Bad list length $count" }
+            return List(count) { string() }
         }
 
         fun string(): String {
