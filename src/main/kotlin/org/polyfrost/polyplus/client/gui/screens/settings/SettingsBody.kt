@@ -40,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,6 +79,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TooltipBox
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.oneconfig.internal.ui.components.wheelScrollDp
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -236,7 +236,7 @@ private fun Modifier.wheelScrollsHorizontally(state: ScrollState): Modifier = po
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 if (event.type != PointerEventType.Scroll) continue
-                val delta = event.changes.fold(Offset.Zero) { sum, change -> sum + change.scrollDelta }
+                val delta = event.wheelScrollDp()
                 if (abs(delta.y) <= abs(delta.x)) continue
                 val forward = delta.y > 0f
                 if (if (forward) !state.canScrollForward else !state.canScrollBackward) continue
