@@ -385,11 +385,7 @@ internal fun OnboardingFlow(
             PolyPlusConfig.onboardingDynamicLightsMode =
                 chosen(ModCard.DYNAMIC_LIGHTS, dynamicLights, PolyPlusConfig.onboardingDynamicLightsMode)
             if (dynamicLights != modReads.dynamicLights) touched += ModCard.DYNAMIC_LIGHTS
-            PolyPlusConfig.onboardingBlockHighlightConfig = chosen(
-                ModCard.BLOCK_HIGHLIGHT,
-                blockHighlight,
-                PolyPlusConfig.onboardingBlockHighlightConfig,
-            )
+            if (ModCard.BLOCK_HIGHLIGHT in touched) PolyPlusConfig.onboardingBlockHighlightConfig = blockHighlight
             val available = OnboardingFeatures.availableCards
             fun settled(card: ModCard, current: Boolean) =
                 OnboardingFeatures.settledAfterRun(
@@ -1348,36 +1344,34 @@ private fun BlockHighlightPage(
         BlockHighlightPreview(json, names[base], EDITOR_PREVIEW_WIDTH, EDITOR_HEIGHT)
         Column(Modifier.width(CARD_CONTENT_WIDTH.dp), verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp)) {
             CardStepper(
-                "Start from",
+                "Preset",
                 if (edited) "Custom" else BlockHighlightPresets.LABELS[base],
                 onPrevious = { pick((base - 1).mod(names.size)) },
                 onNext = { pick((base + 1).mod(names.size)) },
             )
             SwatchRow(
-                "Outline", draft.outlineStart, draft.outlineEnd, !draft.outlineRainbow,
-                { change { outlineStart = it } }, { change { outlineEnd = it } },
+                "Colour", draft.outlineColor, draft.outlineRainbow,
+                { change { outlineColor = it } }, { change { outlineRainbow = it } },
             )
             CardSlider("Opacity", draft.outlineOpacity, { "%.0f%%".fmt(it * 100f) }) {
                 change { outlineOpacity = it }
             }
             val widthSpan = CBH_WIDTH_MAX - CBH_WIDTH_MIN
-            CardSlider("Width", (draft.outlineWidth - CBH_WIDTH_MIN) / widthSpan, { "%.1f".fmt(((CBH_WIDTH_MIN + it * widthSpan) * 2f).roundToInt() / 2f) }) {
+            CardSlider("Thickness", (draft.outlineWidth - CBH_WIDTH_MIN) / widthSpan, { "%.1f".fmt(((CBH_WIDTH_MIN + it * widthSpan) * 2f).roundToInt() / 2f) }) {
                 change { outlineWidth = ((CBH_WIDTH_MIN + it * widthSpan) * 2f).roundToInt() / 2f }
             }
-            CardToggle("Rainbow", draft.outlineRainbow) { change { outlineRainbow = it } }
-            CardToggle("See-through", draft.seeThrough) { change { seeThrough = it } }
+            CardToggle("Through walls", draft.seeThrough) { change { seeThrough = it } }
+            CardToggle("Animations", draft.animations) { change { animations = it } }
             CardToggle("Fill", draft.fill) { change { fill = it } }
-            Column(verticalArrangement = Arrangement.spacedBy(CARD_ROW_GAP.dp)) {
+            if (draft.fill) {
                 SwatchRow(
-                    "Fill colour", draft.fillStart, draft.fillEnd, !draft.fillRainbow,
-                    { change { fillStart = it } }, { change { fillEnd = it } }, draft.fill,
+                    "Fill colour", draft.fillColor, draft.fillRainbow,
+                    { change { fillColor = it } }, { change { fillRainbow = it } },
                 )
-                CardSlider("Fill opacity", draft.fillOpacity, { "%.0f%%".fmt(it * 100f) }, draft.fill) {
+                CardSlider("Fill opacity", draft.fillOpacity, { "%.0f%%".fmt(it * 100f) }) {
                     change { fillOpacity = it }
                 }
-                CardToggle("Fill rainbow", draft.fillRainbow, draft.fill) { change { fillRainbow = it } }
             }
-            CardToggle("Animations", draft.animations) { change { animations = it } }
         }
     }
 }
@@ -1408,52 +1402,32 @@ private fun CardStepper(label: String, text: String, onPrevious: () -> Unit, onN
 @Composable
 private fun SwatchRow(
     label: String,
-    start: Int,
-    end: Int,
-    enabled: Boolean,
-    onStart: (Int) -> Unit,
-    onEnd: (Int) -> Unit,
-    interactive: Boolean = true,
+    color: Int,
+    rainbow: Boolean,
+    onColor: (Int) -> Unit,
+    onRainbow: (Boolean) -> Unit,
 ) {
-    val clickable = enabled && interactive
-    var editingEnd by remember { mutableStateOf(false) }
-    val disabledAlpha = OneConfigTheme.current.disabledAlpha
-    Row(
-        Modifier.height(CARD_ROW_HEIGHT.dp).graphicsLayer { alpha = if (clickable) 1f else disabledAlpha },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.height(CARD_ROW_HEIGHT.dp), verticalAlignment = Alignment.CenterVertically) {
         CardLabel(label)
         Spacer(Modifier.width(CARD_ROW_GUTTER.dp))
-        Swatch(start, "$label start colour: ${colourName(start)}", selected = !editingEnd, clickable) { editingEnd = false }
-        Spacer(Modifier.width(SWATCH_GAP.dp))
-        Swatch(end, "$label end colour: ${colourName(end)}", selected = editingEnd, clickable) { editingEnd = true }
-        Spacer(Modifier.width(SWATCH_GROUP_GAP.dp))
-        SWATCH_PALETTE.forEachIndexed { index, rgb ->
-            if (index > 0) Spacer(Modifier.width(SWATCH_GAP.dp))
-            Swatch(rgb, "Set ${if (editingEnd) "end" else "start"} colour to ${colourName(rgb)}", selected = null, clickable) {
-                if (editingEnd) onEnd(rgb) else onStart(rgb)
-            }
+        SWATCH_PALETTE.forEach { rgb ->
+            Swatch(SolidColor(Color(0xFF000000.toInt() or rgb)), "$label: ${colourName(rgb)}", selected = !rainbow && rgb == color) { onColor(rgb) }
+            Spacer(Modifier.width(SWATCH_GAP.dp))
         }
+        Swatch(RainbowSwatch, "$label: rainbow", selected = rainbow) { onRainbow(!rainbow) }
     }
 }
 
 @Composable
-private fun Swatch(rgb: Int, label: String, selected: Boolean?, enabled: Boolean, onClick: () -> Unit) {
+private fun Swatch(fill: Brush, label: String, selected: Boolean, onClick: () -> Unit) {
     val shape = OneConfigTheme.shape(4.dp)
-    val marked = selected == true
     Box(
         Modifier
             .size(SWATCH_SIZE.dp)
             .clip(shape)
-            .background(Color(0xFF000000.toInt() or rgb))
-            .border(if (marked) 2.dp else SocialPanelBorderWidth, if (marked) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
-            .then(
-                if (enabled) {
-                    Modifier.oneConfigClickable(label, onClick, if (selected == null) A11yRole.Button else A11yRole.Option, selected = selected, shape = shape, indication = false)
-                } else {
-                    Modifier
-                },
-            ),
+            .background(fill)
+            .border(if (selected) 2.dp else SocialPanelBorderWidth, if (selected) SolidColor(OneConfigTheme.accent) else SocialPanelBorderBrush, shape)
+            .oneConfigClickable(label, onClick, A11yRole.Option, selected = selected, shape = shape, indication = false),
     )
 }
 
@@ -2553,7 +2527,7 @@ private enum class ModGuide(
     BLOCK_OUTLINE(
         ModCard.BLOCK_HIGHLIGHT,
         "Custom Block Highlight",
-        "Mods \u2192 Custom Block Highlight \u2192 Extras \u2192 Presets",
+        "Mods \u2192 Custom Block Highlight \u2192 Behaviour \u2192 Presets",
         "Configure the outline or choose from presets",
         "block-outline.png",
     )
@@ -2649,16 +2623,9 @@ private class ModReads(
                 gammaSmooth = ifAvailable(OnboardingFeatures.gammaUtilsAvailable) {
                     OnboardingFeatures.currentGammaSmooth()
                 },
+                // Always open on the vanilla preset; an existing CBH config is only replaced if the page is edited
                 blockHighlight = ifAvailable(BlockHighlightPresets.available) {
-                    // The title screen can compose before DefaultSettings' first tick (1.8.9 reloads
-                    // resources synchronously), so show the vanilla preset those tasks are about to apply.
-                    runCatching {
-                        if (BlockHighlightPresets.markerPath().exists() && !BlockHighlightPresets.isModDefault()) {
-                            BlockHighlightPresets.currentJson()
-                        } else {
-                            BlockHighlightPresets.presetJson(BlockHighlightPresets.DEFAULT)
-                        }
-                    }.getOrNull()
+                    runCatching { BlockHighlightPresets.presetJson(BlockHighlightPresets.DEFAULT) }.getOrNull()
                 },
                 dynamicLights = ifAvailable(OnboardingFeatures.dynamicLightsAvailable) {
                     OnboardingFeatures.currentDynamicLightsMode()
@@ -2734,11 +2701,13 @@ private const val CBH_WIDTH_MAX = 10f
 private const val SWATCH_SIZE = 20f
 private const val SLIDER_KEY_STEP = 0.05f
 private const val SWATCH_GAP = 3f
-private const val SWATCH_GROUP_GAP = 12f
 private val SWATCH_PALETTE = listOf(
     0x000000, 0xFFFFFF, 0xE5484D, 0xF5A524, 0xF5E142, 0x46C35A, 0x5BCEFA, 0x9B6BF2,
 )
-private const val EDITOR_HEIGHT = 11 * CARD_ROW_HEIGHT + 10 * CARD_ROW_GAP
+private val RainbowSwatch = Brush.sweepGradient(
+    listOf(0xFFFF0000, 0xFFFFFF00, 0xFF00FF00, 0xFF00FFFF, 0xFF0000FF, 0xFFFF00FF, 0xFFFF0000).map { Color(it) },
+)
+private const val EDITOR_HEIGHT = 9 * CARD_ROW_HEIGHT + 8 * CARD_ROW_GAP
 private const val EDITOR_TOP = CARD_TOP + (CARD_HEIGHT - EDITOR_HEIGHT) / 2f
 private const val EDITOR_PREVIEW_WIDTH = PANEL_WIDTH - CARD_MARGIN * 2f - CARD_GAP - CARD_CONTENT_WIDTH
 private const val BLOCK_SPIN_START = 0.6f

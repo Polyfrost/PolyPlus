@@ -66,14 +66,28 @@ class BlockHighlightStyleTest {
     @Test
     fun `the editor writes colours opaque and keeps everything it does not expose`() {
         val draft = BlockHighlightDraft(config())
-        draft.outlineStart = 0x5BCEFA
+        draft.outlineColor = 0x5BCEFA
         draft.outlineOpacity = 0.5f
 
         val style = BlockHighlightStyle.parse(draft.toJson())
-        assertEquals(0x5BCEFA, style.layers.last().colors.first)
+        assertEquals(0x5BCEFA to 0x5BCEFA, style.layers.last().colors.at(0))
         assertEquals(128, style.layers.last().colors.alpha)
         assertEquals(7.5f, style.layers.first().width, "the secondary layer rides along")
         assertTrue(draft.toJson().contains("-10760454"), "stored as opaque ARGB like java.awt.Color#getRGB")
+    }
+
+    @Test
+    fun `picking a colour turns a rainbow or gradient solid, as CBH 2_94 reads it`() {
+        val rainbow = BlockHighlightStyle.parse(config(fill = true)).fill!!.colors
+        assertTrue(rainbow.at(0).first != rainbow.at(0).second, "a rainbow gradient offsets its end colour")
+
+        val draft = BlockHighlightDraft(config(fill = true))
+        draft.fillColor = 0x46C35A
+        assertFalse(draft.fillRainbow)
+        assertEquals(0x46C35A to 0x46C35A, BlockHighlightStyle.parse(draft.toJson()).fill!!.colors.at(0))
+
+        val noGradient = config().replace("\"col1\": -1, \"col2\": -1,", "\"col1\": -1, \"col2\": -16777216, \"gradient\": false,")
+        assertEquals(0xFFFFFF to 0xFFFFFF, BlockHighlightStyle.parse(noGradient).layers.first().colors.at(0))
     }
 
     @Test

@@ -49,25 +49,21 @@ object BlockHighlightPresets {
         runCatching { name to presetJson(name) }.getOrNull()
     }.toMap()
 
-    fun apply(name: String) {
-        val preset = manager().getMethod("loadPreset", String::class.java).invoke(null, name)
-            ?: error("Custom Block Highlight has no '$name' preset")
-        activate(preset)
-    }
+    fun apply(name: String) = applyJson(presetJson(name))
 
     fun applyJson(json: String) {
         val manager = manager()
-        val config = manager.getMethod("loadFromJsonString", String::class.java).invoke(null, json)
-            ?: error("Custom Block Highlight rejected the onboarding config")
-        activate(config)
-    }
-
-    private fun activate(preset: Any) {
-        val manager = manager()
-        val configClass = config()
-        configClass.getField("ACTIVE_INSTANCE").set(null, preset)
-        configClass.getMethod("applyValuesToOptionInstances").invoke(preset)
-        manager.getMethod("save").invoke(null)
+        val load = runCatching { manager.getMethod("loadFromClipboard", String::class.java) }.getOrNull()
+        if (load != null) {
+            check(load.invoke(null, json) == true) { "Custom Block Highlight rejected the onboarding config" }
+        } else {
+            val config = manager.getMethod("loadFromJsonString", String::class.java).invoke(null, json)
+                ?: error("Custom Block Highlight rejected the onboarding config")
+            val configClass = config()
+            configClass.getField("ACTIVE_INSTANCE").set(null, config)
+            configClass.getMethod("applyValuesToOptionInstances").invoke(config)
+            manager.getMethod("save").invoke(null)
+        }
         markerPath().let { if (!it.exists()) it.createFile() }
     }
 }
@@ -86,10 +82,16 @@ class BlockHighlightStyle(
         }
     }
 
-    class Colors(val first: Int, val second: Int, val alpha: Int, val rainbow: Rainbow?) {
-        fun at(millis: Long): Pair<Int, Int> =
-            if (rainbow == null) first to second
-            else rainbow.color(millis, true) to rainbow.color(millis, false)
+    class Colors(val first: Int, val second: Int, val alpha: Int, val rainbow: Rainbow?, val gradient: Boolean = true) {
+        fun at(millis: Long): Pair<Int, Int> {
+            val start = rainbow?.color(millis, true) ?: first
+            val end = when {
+                !gradient -> start
+                rainbow != null -> rainbow.color(millis, false)
+                else -> second
+            }
+            return start to end
+        }
     }
 
     class Layer(
@@ -155,11 +157,14 @@ class BlockHighlightStyle(
             val rainbow = getAsJsonObject("rainbowSettings")?.takeIf { it.bool("enabled", false) }?.let {
                 Rainbow(it.float("speed", 5f), it.float("delay", 250f).toInt(), it.float("saturation", 1f), it.float("brightness", 1f))
             }
+            val first = int("col1", 0) and 0xFFFFFF
+            val second = int("col2", 0) and 0xFFFFFF
             return Colors(
-                int("col1", 0) and 0xFFFFFF,
-                int("col2", 0) and 0xFFFFFF,
+                first,
+                second,
                 int("alpha", 255).coerceIn(0, 255),
                 rainbow,
+                bool("gradient", first != second || rainbow != null),
             )
         }
 
@@ -182,18 +187,15 @@ class BlockHighlightDraft(json: String) {
     private val root: JsonObject = JsonParser.parseString(json).asJsonObject
     private val primary get() = root.obj("primary")
     private val lineColor get() = primary.obj("color")
-    private val fillColor get() = root.obj("fillCol")
+    private val fillCol get() = root.obj("fillCol")
 
     fun toJson(): String = root.toString()
 
     fun matches(json: String): Boolean = root == JsonParser.parseString(json)
 
-    var outlineStart: Int
+    var outlineColor: Int
         get() = lineColor.rgb("col1")
-        set(value) = lineColor.setRgb("col1", value)
-    var outlineEnd: Int
-        get() = lineColor.rgb("col2")
-        set(value) = lineColor.setRgb("col2", value)
+        set(value) = lineColor.setSolid(value)
     var outlineOpacity: Float
         get() = lineColor.int("alpha", 255) / 255f
         set(value) = lineColor.addProperty("alpha", (value.coerceIn(0f, 1f) * 255).roundToInt())
@@ -217,18 +219,15 @@ class BlockHighlightDraft(json: String) {
             root.addProperty("fillEnabled", value)
             if (value) root.addProperty("fillDepthTest", if (seeThrough) DEPTH_ALWAYS else DEPTH_NORMAL)
         }
-    var fillStart: Int
-        get() = fillColor.rgb("col1")
-        set(value) = fillColor.setRgb("col1", value)
-    var fillEnd: Int
-        get() = fillColor.rgb("col2")
-        set(value) = fillColor.setRgb("col2", value)
+    var fillColor: Int
+        get() = fillCol.rgb("col1")
+        set(value) = fillCol.setSolid(value)
     var fillOpacity: Float
-        get() = fillColor.int("alpha", 255) / 255f
-        set(value) = fillColor.addProperty("alpha", (value.coerceIn(0f, 1f) * 255).roundToInt())
+        get() = fillCol.int("alpha", 255) / 255f
+        set(value) = fillCol.addProperty("alpha", (value.coerceIn(0f, 1f) * 255).roundToInt())
     var fillRainbow: Boolean
-        get() = fillColor.obj("rainbowSettings").bool("enabled", false)
-        set(value) = fillColor.obj("rainbowSettings").addProperty("enabled", value)
+        get() = fillCol.obj("rainbowSettings").bool("enabled", false)
+        set(value) = fillCol.obj("rainbowSettings").addProperty("enabled", value)
 
     var animations: Boolean
         get() = ANIMATIONS.any { root.bool(it, false) }
@@ -256,6 +255,12 @@ class BlockHighlightDraft(json: String) {
 
         fun JsonObject.rgb(key: String) = int(key, 0) and 0xFFFFFF
 
-        fun JsonObject.setRgb(key: String, rgb: Int) = addProperty(key, (0xFF shl 24) or (rgb and 0xFFFFFF))
+        fun JsonObject.setSolid(rgb: Int) {
+            val argb = (0xFF shl 24) or (rgb and 0xFFFFFF)
+            addProperty("col1", argb)
+            addProperty("col2", argb)
+            addProperty("gradient", false)
+            obj("rainbowSettings").addProperty("enabled", false)
+        }
     }
 }
