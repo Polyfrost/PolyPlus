@@ -354,7 +354,7 @@ tasks.jar {
             exclude("META-INF/MANIFEST.MF")
         }
     }
-    val bundledProjects = setOf(":molang")
+    val bundledProjects = setOf(":nameplate-engine", ":molang")
     val bundledJars = configurations.runtimeClasspath.get().incoming.artifactView {
         componentFilter { it is ProjectComponentIdentifier && it.projectPath in bundledProjects }
     }.files
@@ -384,6 +384,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation(project(":molang"))
+    implementation(project(":nameplate-engine"))
     annotationProcessor("io.github.llamalad7:mixinextras-common:$mixinExtrasVersion")
     "com.github.bawnorton.mixinsquared:mixinsquared-fabric:$mixinSquaredVersion".let {
         annotationProcessor(it)
