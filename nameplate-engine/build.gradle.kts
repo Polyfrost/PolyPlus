@@ -27,7 +27,14 @@ kotlin {
             api(project(":molang"))
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${property("deps.kotlinx_serialization")}")
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
+}
+
+tasks.named<Test>("jvmTest") {
+    useJUnitPlatform()
 }
 
 tasks.named<Detekt>("detekt") {

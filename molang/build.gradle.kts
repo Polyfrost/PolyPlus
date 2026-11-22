@@ -18,6 +18,16 @@ kotlin {
             browser()
         }
     }
+
+    sourceSets {
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+    }
+}
+
+tasks.named<Test>("jvmTest") {
+    useJUnitPlatform()
 }
 
 tasks.named<Detekt>("detekt") {
