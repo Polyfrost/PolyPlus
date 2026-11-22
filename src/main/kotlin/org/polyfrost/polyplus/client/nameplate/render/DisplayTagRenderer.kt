@@ -102,7 +102,7 @@ object DisplayTagRenderer {
 
         poseStack.pushPose()
         try {
-            val frame = NameplateFrame(poseStack, collector, x - block.nameLineX + dx, y - block.nameLineY + dy, alpha, lightCoords, block)
+            val frame = NameplateFrame(poseStack, collector, x - block.nameLineX + dx, y - block.nameLineY + dy, alpha, lightCoords, block, PlayerNameplateRenderer.plateAlpha(alpha))
             NameplateDecorations.submit(
                 frame,
                 nameplate,

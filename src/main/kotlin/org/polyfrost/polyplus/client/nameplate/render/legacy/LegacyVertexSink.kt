@@ -142,7 +142,7 @@ object LegacyVertexSink : NameplateVertexSink {
         }
     }
 
-    fun drawRecorded(overText: Boolean, depthMask: Boolean) {
+    fun drawRecorded(overText: Boolean, depthMask: Boolean, fade: Float) {
         val count = sort(overText)
         if (count == 0) {
             return
@@ -152,10 +152,11 @@ object LegacyVertexSink : NameplateVertexSink {
             GL11.glEnable(GL11.GL_POLYGON_OFFSET_FILL)
             GL11.glPolygonOffset(0f, if (overText) -TEXT_GAP_UNITS else TEXT_GAP_UNITS)
             GlStateManager.depthMask(false)
+            GlStateManager.alphaFunc(GL11.GL_GREATER, ALPHA_REF * fade)
             emit(count, depthPass = false, direct)
             GlStateManager.colorMask(false, false, false, false)
             GlStateManager.depthMask(true)
-            GlStateManager.alphaFunc(GL11.GL_GREATER, DEPTH_ALPHA_REF)
+            GlStateManager.alphaFunc(GL11.GL_GREATER, DEPTH_ALPHA_REF * fade)
             emit(count, depthPass = true, direct)
         } finally {
             GL11.glPolygonOffset(0f, 0f)

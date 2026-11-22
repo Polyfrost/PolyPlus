@@ -85,6 +85,11 @@ object PlayerNameplateRenderer {
         return NameplatePaint.text(nameplate, block, NameplateContext.externalTextColor)
     }
 
+    fun plateAlpha(alpha: Float): Float {
+        val opacity = maxOf(VANILLA_BACKGROUND_OPACITY, Minecraft.getInstance().options.getBackgroundOpacity(VANILLA_BACKGROUND_OPACITY))
+        return alpha * minOf(1f, PLATE_OPACITY * opacity / VANILLA_BACKGROUND_OPACITY)
+    }
+
     internal fun decorate(
         tag: NameplateTag,
         layout: NameplateText.Layout,
@@ -99,9 +104,7 @@ object PlayerNameplateRenderer {
         val block = NameplateTextCache.placed(tag.profileName, layout, background)
         val plate = NameplatePaint.plate(tag.nameplate, block, tag.frame, tag.state)
         val alpha = NameplateFrame.alphaOf(color)
-        val opacity = Minecraft.getInstance().options.getBackgroundOpacity(VANILLA_BACKGROUND_OPACITY)
-        val plateAlpha = alpha * minOf(1f, PLATE_OPACITY * opacity / VANILLA_BACKGROUND_OPACITY)
-        val frame = NameplateFrame(poseStack, collector, x + plate.dx, y + plate.dy, alpha, lightCoords, block, plateAlpha)
+        val frame = NameplateFrame(poseStack, collector, x + plate.dx, y + plate.dy, alpha, lightCoords, block, plateAlpha(alpha))
         NameplateDecorations.submit(frame, tag.nameplate, tag.frame, tag.state, tag.detailed, tag.badge, layout.badgeX)
         return frame
     }

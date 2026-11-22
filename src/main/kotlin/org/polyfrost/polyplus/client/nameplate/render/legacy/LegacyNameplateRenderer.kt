@@ -17,7 +17,7 @@ import java.util.UUID
 object LegacyNameplateRenderer {
     private const val SNEAK_TEXT_ALPHA = 0x7F
     private const val SNEAK_ALPHA = SNEAK_TEXT_ALPHA / 255f
-    private const val PLATE_OPACITY = 0.7f
+    const val PLATE_OPACITY: Float = 0.7f
     private const val ALPHA_SHIFT = 24
     private const val RGB = 0xFFFFFF
 
@@ -131,7 +131,7 @@ object LegacyNameplateRenderer {
         LegacyVertexSink.record()
         try {
             NameplateDecorations.submit(frame, bound.nameplate, bound.frame, bound.state, bound.detailed, bound.badge, tag.gapX)
-            depthTested { LegacyVertexSink.drawRecorded(overText = false, depthMask) }
+            depthTested { LegacyVertexSink.drawRecorded(overText = false, depthMask, PLATE_OPACITY) }
         } finally {
             LegacyVertexSink.stopRecording()
             GlStateManager.clearColor()
@@ -140,7 +140,7 @@ object LegacyNameplateRenderer {
 
     private fun finishDecorations(depthMask: Boolean) {
         try {
-            depthTested { LegacyVertexSink.drawRecorded(overText = true, depthMask) }
+            depthTested { LegacyVertexSink.drawRecorded(overText = true, depthMask, PLATE_OPACITY) }
         } finally {
             LegacyVertexSink.clear()
             GlStateManager.clearColor()

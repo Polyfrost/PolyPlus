@@ -92,12 +92,14 @@ object NameplateGuiRenderer {
         val width = layout.textWidth
         val rect = PolyNametagPadding.backgroundRect(width, TagBlock.GLYPH_HEIGHT)
         val block = TagBlock.line(width, layout.nameX, layout.nameWidth).placed(layout.prefixWidth, rect)
-        val frame = NameplateFrame(poseStack, collector, x, 0f, NameplateFrame.alphaOf(TEXT_COLOR), FULL_BRIGHT, block)
+        val alpha = NameplateFrame.alphaOf(TEXT_COLOR)
+        val plateAlpha = PlayerNameplateRenderer.plateAlpha(alpha)
+        val frame = NameplateFrame(poseStack, collector, x, 0f, alpha, FULL_BRIGHT, block, plateAlpha)
         if (background != 0) {
             submitBackground(frame, rect, background)
         }
         val plate = NameplatePaint.plate(nameplate, block, tag.frame, tag.state)
-        val moved = NameplateFrame(poseStack, collector, x + plate.dx, plate.dy.toFloat(), NameplateFrame.alphaOf(TEXT_COLOR), FULL_BRIGHT, block)
+        val moved = NameplateFrame(poseStack, collector, x + plate.dx, plate.dy.toFloat(), alpha, FULL_BRIGHT, block, plateAlpha)
         NameplateDecorations.submit(moved, nameplate, tag.frame, tag.state, tag.detailed, tag.badge, layout.badgeX)
         if (mode == NameplateBundle.TextMode.VANILLA) {
             frame.submitText(x, 0f, text, false, Font.DisplayMode.NORMAL, FULL_BRIGHT, color, outline)
@@ -151,6 +153,7 @@ import org.lwjgl.opengl.GL11
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyNameplateBinding
 import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyNameplateLetters
+import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyNameplateRenderer
 import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyNameplateText
 import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyPass
 import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyPolyNametag
@@ -234,7 +237,7 @@ object NameplateGuiRenderer {
             if (!nameplate.variant.ownsBackground) {
                 background(half)
             }
-            decorate(NameplateFrame(x, y, 1f, 0, block), tag, gapX)
+            decorate(NameplateFrame(x, y, 1f, 0, block, LegacyNameplateRenderer.PLATE_OPACITY), tag, gapX)
             PolyPlusBadge.inlineSuppressed = true
             val alpha = LegacyPolyNametag.textColor(TEXT_COLOR) ushr ALPHA_SHIFT
             val player = Minecraft.getInstance().player
@@ -248,7 +251,7 @@ object NameplateGuiRenderer {
                 }
             }
             PolyPlusBadge.inlineSuppressed = false
-            LegacyVertexSink.drawRecorded(overText = true, depthMask = true)
+            LegacyVertexSink.drawRecorded(overText = true, depthMask = true, LegacyNameplateRenderer.PLATE_OPACITY)
             return true
         } catch (e: RuntimeException) {
             NameplateGate.fail(nameplate, e)
@@ -261,7 +264,7 @@ object NameplateGuiRenderer {
         try {
             NameplateDecorations.submit(frame, tag.nameplate, tag.frame, tag.state, tag.detailed, tag.badge, gapX)
             LegacyVertexSink.stopRecording()
-            LegacyVertexSink.drawRecorded(overText = false, depthMask = true)
+            LegacyVertexSink.drawRecorded(overText = false, depthMask = true, LegacyNameplateRenderer.PLATE_OPACITY)
         } finally {
             LegacyVertexSink.stopRecording()
             GlStateManager.clearColor()
