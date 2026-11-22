@@ -97,7 +97,8 @@ object NameplateMaterialDraw {
             frame.submitGeometry(order, slot.renderType, quad)
         }
         val depth = slot.depthType
-        if (depth != null && ARGB.alpha(color) == OPAQUE) {
+        val opaque = ARGB.alpha(vertexColor(registered.blend, frame.alpha * opacity.coerceIn(0, OPAQUE) / CHANNEL)) == OPAQUE
+        if (depth != null && opaque) {
             //? if >= 26.3 {
             frame.submitGeometry(DEPTH_ORDER - pool.index % DEPTH_SLOTS, depth, quad)
             //?} else {
