@@ -384,7 +384,10 @@ object LobbyEntrance {
     fun landing(level: ClientLevel, feet: Vec3): Double? {
         if (level.obstacle(feet.x, feet.z, feet.y) != null) return null
         val ground = level.ground(feet.x, feet.z, feet.y, MAX_FALL) ?: return null
-        return ground.takeIf { level.getFluidState(LobbyCompat.blockAt(feet.x, it + SNAP, feet.z)).isEmpty }
+        val support = LobbyCompat.blockAt(feet.x, ground - SNAP, feet.z)
+        if (level.getBlockState(support).getCollisionShape(level, support).isEmpty) return null
+        val top = LobbyCompat.blockAt(feet.x, feet.y, feet.z).y
+        return ground.takeIf { (support.y..top).all { y -> level.getFluidState(BlockPos(support.x, y, support.z)).isEmpty } }
     }
 
     private fun headroom(level: ClientLevel, feet: Vec3): Double {

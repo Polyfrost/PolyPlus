@@ -137,7 +137,7 @@ object LobbyGrab {
 
     fun grab(x: Double, y: Double): Boolean {
         val avatar = seen ?: return false
-        if (held != null || !touches(x, y) || !usable(avatar)) return false
+        if (held != null || !visible || !ready() || !usable(avatar)) return false
         if (abs(perRight) < MIN_SCALE || abs(perUp) < MIN_SCALE) return false
         if (avatar.arrival != LobbyAvatar.Arrival.LANDED) avatar.halt()
         strolling = null
@@ -179,7 +179,14 @@ object LobbyGrab {
 
     fun tick(level: ClientLevel, avatar: LobbyAvatar?) {
         this.level = level
-        strolling?.let { if (it !== avatar || it.arrival != LobbyAvatar.Arrival.ARRIVING) strolling = null }
+        strolling?.let {
+            if (it !== avatar || it.arrival != LobbyAvatar.Arrival.ARRIVING) {
+                strolling = null
+            } else if (LobbyWardrobe.open) {
+                strolling = null
+                it.arriveNow()
+            }
+        }
         val hold = held
         if (hold != null) {
             if (avatar === hold.avatar && usable(avatar)) step(hold) else cancel()
@@ -252,10 +259,19 @@ object LobbyGrab {
         hold.tickNanos = System.nanoTime()
         val avatar = hold.avatar
         val head = avatar.yHeadRot
-        avatar.place(hold.anchor.add(right.x * hold.u, hold.v, right.z * hold.u), avatar.yBodyRot)
+        avatar.place(within(avatar.rest.pos, hold.anchor.add(right.x * hold.u, hold.v, right.z * hold.u)), avatar.yBodyRot)
         avatar.yHeadRot = head
         avatar.pose = Pose.STANDING
         if (controller(avatar).playbackSnapshot()?.emote !== pose()) play(hold)
+    }
+
+    private fun within(rest: Vec3, at: Vec3): Vec3 {
+        val dx = at.x - rest.x
+        val dz = at.z - rest.z
+        val reach = sqrt(dx * dx + dz * dz)
+        if (reach <= MAX_REACH) return at
+        val share = MAX_REACH / reach
+        return Vec3(rest.x + dx * share, at.y, rest.z + dz * share)
     }
 
     private fun swing(hold: Hold, fromU: Double, fromV: Double): Double {
