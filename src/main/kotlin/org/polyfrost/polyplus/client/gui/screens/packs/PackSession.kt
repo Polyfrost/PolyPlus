@@ -884,7 +884,7 @@ internal class PackSession(initial: PackSelectionScreen) {
         /*pack.open().use { resources ->
         *///?}
             val supplier = resources.getRootResource("pack.png") ?: return@use null
-            supplier.get().use { stream -> PolyBitmap.decode(stream.readBytes())?.asComposeImageBitmap() }
+            supplier.get().use { stream -> PolyBitmap.decode(stream.readAllBytes())?.asComposeImageBitmap() }
         }
     }.getOrNull()
 

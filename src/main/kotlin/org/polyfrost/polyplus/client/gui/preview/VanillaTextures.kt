@@ -18,10 +18,10 @@ object VanillaTextures {
         //? if > 1.8.9 {
         val resource = Minecraft.getInstance().resourceManager.getResource(location).orElse(null)
             ?: return@runCatching null
-        PolyBitmap.decode(resource.open().use { it.readBytes() })
+        PolyBitmap.decode(resource.open().use { it.readAllBytes() })
         //?} else {
         /*val resource = Minecraft.getInstance().resourceManager.getResource(location)
-        PolyBitmap.decode(resource.asStream().use { it.readBytes() })
+        PolyBitmap.decode(resource.asStream().use { it.readAllBytes() })
         *///?}
     }.getOrNull()
 }
