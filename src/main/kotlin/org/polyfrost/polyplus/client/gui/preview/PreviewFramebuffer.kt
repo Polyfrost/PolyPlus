@@ -130,14 +130,12 @@ object PreviewFramebuffer {
         /*RenderSystem.outputColorTextureOverride = colorView
         RenderSystem.outputDepthTextureOverride = depthView
         *///?}
-        //? if >= 26.1 {
         val scissor = RenderSystem.getScissorStateForRenderTypeDraws()
         val hadScissor = scissor.enabled()
         val scX = scissor.x()
         val scY = scissor.y()
         val scW = scissor.width()
         val scH = scissor.height()
-        //?}
         RenderSystem.disableScissorForRenderTypeDraws()
         //? if >= 26.2 {
         val modelViewStack = RenderSystem.getModelViewStack()
@@ -160,9 +158,7 @@ object PreviewFramebuffer {
             RenderSystem.restoreProjectionMatrix()
             savedLights?.let { RenderSystem.setShaderLights(it) }
             savedFog?.let { RenderSystem.setShaderFog(it) }
-            //? if >= 26.1 {
             if (hadScissor) RenderSystem.enableScissorForRenderTypeDraws(scX, scY, scW, scH)
-            //?}
         }
     }
     //?}
