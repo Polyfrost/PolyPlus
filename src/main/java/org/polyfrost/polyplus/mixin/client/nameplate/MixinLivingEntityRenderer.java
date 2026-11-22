@@ -1,24 +1,23 @@
 package org.polyfrost.polyplus.mixin.client.nameplate;
 
 //? if >= 1.21.4 {
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;
 import org.polyfrost.polyplus.client.nameplate.NameplateSelfVisibility;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 //?} elif > 1.8.9 {
-/*import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;
 import org.polyfrost.polyplus.client.nameplate.NameplateSelfVisibility;
 import org.polyfrost.polyplus.client.nameplate.render.NameplateBufferAdapter;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 *///?} else {
 /*import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
@@ -34,31 +33,24 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 *///?}
 
 @Mixin(LivingEntityRenderer.class)
 public class MixinLivingEntityRenderer {
     //? if >= 1.21.4 {
-    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At("HEAD"), cancellable = true)
-    private void polyplus$showOwnNameplate(LivingEntity entity, double distanceToCameraSq, CallbackInfoReturnable<Boolean> cir) {
-        if (NameplateSelfVisibility.appliesTo(entity)) {
-            cir.setReturnValue(NameplateSelfVisibility.shouldShow(entity, distanceToCameraSq));
-        }
+    @ModifyReturnValue(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At("RETURN"))
+    private boolean polyplus$showOwnNameplate(boolean shown, LivingEntity entity, double distanceToCameraSq) {
+        return shown || NameplateSelfVisibility.appliesTo(entity) && NameplateSelfVisibility.shouldShow(entity, distanceToCameraSq);
     }
     //?} elif > 1.8.9 {
-    /*@Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("HEAD"), cancellable = true)
-    private void polyplus$showOwnNameplate(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (NameplateSelfVisibility.appliesTo(entity)) {
-            cir.setReturnValue(NameplateBufferAdapter.showOwnName(entity));
-        }
+    /*@ModifyReturnValue(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("RETURN"))
+    private boolean polyplus$showOwnNameplate(boolean shown, LivingEntity entity) {
+        return shown || NameplateSelfVisibility.appliesTo(entity) && NameplateBufferAdapter.showOwnName(entity);
     }
     *///?} else {
-    /*@Inject(method = "shouldRenderNameTag(Lnet/minecraft/entity/living/LivingEntity;)Z", at = @At("HEAD"), cancellable = true)
-    private void polyplus$showOwnNameplate(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (NameplateSelfVisibility.appliesTo(entity)) {
-            cir.setReturnValue(NameplateSelfVisibility.shouldShow(entity));
-        }
+    /*@ModifyReturnValue(method = "shouldRenderNameTag(Lnet/minecraft/entity/living/LivingEntity;)Z", at = @At("RETURN"))
+    private boolean polyplus$showOwnNameplate(boolean shown, LivingEntity entity) {
+        return shown || NameplateSelfVisibility.appliesTo(entity) && NameplateSelfVisibility.shouldShow(entity);
     }
 
     @WrapOperation(
