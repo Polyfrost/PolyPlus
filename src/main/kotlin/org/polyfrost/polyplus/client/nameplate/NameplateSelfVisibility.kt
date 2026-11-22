@@ -22,7 +22,7 @@ object NameplateSelfVisibility {
 
     @JvmStatic
     fun appliesTo(entity: LivingEntity): Boolean {
-        if (polyNametagLoaded) return false
+        if (!NameplateFeature.LISTED || polyNametagLoaded) return false
         val player = Minecraft.getInstance().player ?: return false
         return entity === player && NameplateRegistry.boundFor(player.uuid) != null
     }
