@@ -191,6 +191,14 @@ object LegacyMaterialTexture {
         entry.image = image
     }
 
+    fun clear() {
+        for (slots in entries.values) {
+            slots.forEach { it.texture.clearGlId() }
+        }
+        entries.clear()
+        keys.clear()
+    }
+
     private fun sweep(now: Long) {
         if (now - lastSweep < SWEEP_NANOS) {
             return

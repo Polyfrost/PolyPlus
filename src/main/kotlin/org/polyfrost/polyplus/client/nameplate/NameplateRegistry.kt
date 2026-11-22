@@ -6,7 +6,11 @@ import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 //? if >= 1.21.1 {
 import org.polyfrost.polyplus.client.nameplate.render.material.NameplateMaterialAssets
-//?}
+//?} else {
+/*import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyMaterialGpu
+import org.polyfrost.polyplus.client.nameplate.render.legacy.LegacyMaterialTexture
+*///?}
+import org.polyfrost.polyplus.client.nameplate.render.NameplateStrips
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
@@ -60,6 +64,11 @@ object NameplateRegistry {
         }
         released.forEach(::releaseAssets)
         bound.clear()
+        NameplateStrips.clear()
+        //? if < 1.21.1 {
+        /*LegacyMaterialGpu.releaseAll()
+        LegacyMaterialTexture.clear()
+        *///?}
     }
 
     fun retain(keep: Set<Int>): Boolean {

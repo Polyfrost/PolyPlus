@@ -120,6 +120,7 @@ object LegacyMaterialGpu {
     private var heldLit = UNKNOWN
 
     fun prepare(bundle: NameplateBundle, op: LayerPainter.Painted, material: MaterialOp, palette: ResolvedPalette): Draw? {
+        listen()
         if (op.opacity <= 0 || !LegacyVertexSink.isRecording || NameplateIris.shadowPass()) {
             return null
         }
@@ -288,7 +289,6 @@ object LegacyMaterialGpu {
             return null
         }
         lastCompile = now
-        listen()
         val program = compile(shader, material)
         if (program == null) {
             failed += key
@@ -421,7 +421,11 @@ object LegacyMaterialGpu {
             return
         }
         val manager = Minecraft.getInstance().resourceManager as? ReloadableResourceManager ?: return
-        manager.addListener(ResourceReloadListener { releaseAll() })
+        manager.addListener(ResourceReloadListener {
+            releaseAll()
+            LegacyMaterialTexture.clear()
+            NameplateMaterialAssets.onResourcesReloaded()
+        })
         listening = true
     }
 

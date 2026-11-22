@@ -107,11 +107,18 @@ object NameplateStrips {
         if (texture == null || now - lastActive < IDLE_NANOS) {
             return
         }
+        clear()
+        LOGGER.info("Nameplate strip atlas released: no nameplate drew a strip for 60 s")
+    }
+
+    fun clear() {
+        if (texture == null) {
+            return
+        }
         release()
         texture = null
         rows.clear()
         keys.fill(null)
-        LOGGER.info("Nameplate strip atlas released: no nameplate drew a strip for 60 s")
     }
 
     private fun freeRow(now: Long): Int {

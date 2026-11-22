@@ -519,6 +519,11 @@ object NameplateMaterialAssets {
         is TextureRef.Atlas -> if (Minecraft.getInstance().isOnSameThread) atlasPixels(ref.sprite) else null
     }
 
+    fun onResourcesReloaded() {
+        vanillaPixels.clear()
+        atlasPixels.clear()
+    }
+
     fun atlasSprite(name: String): String {
         val namespace = name.substringBefore(':', VANILLA_NAMESPACE)
         val path = name.substringAfter(':')
