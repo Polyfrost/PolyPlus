@@ -341,7 +341,7 @@ object NameplateBufferAdapter {
         val hides = mode != NameplateBundle.TextMode.VANILLA
         val background = NameplateContext.rewrittenBackground
         if (seeThrough) {
-            return drawText(font, name, text, x, y, color, dropShadow, pose, buffers, displayMode, background, 0, lightCoords, hides, original)
+            return drawText(font, name, text, x, y, color, dropShadow, pose, buffers, displayMode, background, 0, lightCoords, false, original)
         }
 
         val layout = NameplateText.layout(font, text, bound.profileName)

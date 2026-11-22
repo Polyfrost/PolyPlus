@@ -164,6 +164,10 @@ object LegacyNameplateRenderer {
                 return original.call(font, text, x, y, if (sneak) (color and RGB) or (SNEAK_TEXT_ALPHA shl ALPHA_SHIFT) else color)
             }
             val alpha = if (sneak) SNEAK_TEXT_ALPHA else LegacyPolyNametag.textColor(color) ushr ALPHA_SHIFT
+            if (pass == LegacyPass.SEE_THROUGH) {
+                LegacyNameplateText.drawStyled(font, tag.line, style, x.toFloat(), y + LegacyPolyNametag.offsetY, alpha, pass, tag.outline)
+                return x + tag.line.textWidth
+            }
             val drawX = x.toFloat() + tag.plateX
             val drawY = y + LegacyPolyNametag.offsetY + tag.plateY
             if (tag.mode == NameplateBundle.TextMode.VANILLA) {

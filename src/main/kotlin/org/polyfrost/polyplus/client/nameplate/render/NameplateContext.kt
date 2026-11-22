@@ -35,17 +35,6 @@ class NameplateContext private constructor() {
     var outlineColor: Int = 0
         private set
 
-    var seeThrough: Boolean = false
-        private set
-    var seeThroughPose: Matrix4fc? = null
-        private set
-    var seeThroughColor: Int = 0
-        private set
-    var seeThroughLightCoords: Int = 0
-        private set
-    var seeThroughDropShadow: Boolean = false
-        private set
-
     fun end() {
         active = false
     }
@@ -69,9 +58,7 @@ class NameplateContext private constructor() {
             context.hidesText = hidesText
             context.outlineRgb = outlineRgb
             context.submitted = false
-            context.seeThrough = false
             context.pose = null
-            context.seeThroughPose = null
             context.text = null
             return context
         }
@@ -102,13 +89,7 @@ class NameplateContext private constructor() {
             }
 
             var outline = outlineColor
-            if (seeThrough) {
-                context.seeThrough = true
-                context.seeThroughPose = pose
-                context.seeThroughColor = color
-                context.seeThroughLightCoords = lightCoords
-                context.seeThroughDropShadow = dropShadow
-            } else {
+            if (!seeThrough) {
                 context.submitted = true
                 context.pose = pose
                 context.x = x
@@ -128,8 +109,9 @@ class NameplateContext private constructor() {
             }
 
             val background = if (context.ownsBackground) 0 else backgroundColor
-            val rewritten = if (context.hidesText) ARGB.color(0, color) else color
-            if (context.hidesText) {
+            val hides = context.hidesText && !seeThrough
+            val rewritten = if (hides) ARGB.color(0, color) else color
+            if (hides) {
                 outline = 0
             }
             rewrittenColor = rewritten

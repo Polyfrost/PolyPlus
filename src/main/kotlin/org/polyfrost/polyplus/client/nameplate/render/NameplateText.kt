@@ -26,9 +26,7 @@ import org.polyfrost.polyplus.nameplate.engine.api.text.TextStyling
 import java.util.Collections
 import java.util.Optional
 import java.util.WeakHashMap
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
 //? if >= 1.21.10 {
 import net.minecraft.network.chat.FontDescription
 //?}
@@ -440,58 +438,6 @@ object NameplateLetters {
             NameplatePaint.scaleAlpha(context.color, opacity),
             if (context.outlineColor == 0) 0 else NameplatePaint.scaleAlpha(context.outlineColor, opacity),
         )
-        submitSeeThrough(frame, context, run, x, y, 0f, 0f, opacity, 0, 1f)
-    }
-
-    private fun submitSeeThrough(
-        frame: NameplateFrame,
-        context: NameplateContext,
-        text: FormattedCharSequence,
-        pivotX: Float,
-        pivotY: Float,
-        offsetX: Float,
-        offsetY: Float,
-        opacity: Int,
-        rotation: Int,
-        scale: Float,
-    ) {
-        val seeThroughPose = context.seeThroughPose
-        if (!context.seeThrough || seeThroughPose == null) {
-            return
-        }
-        val poseStack = frame.poseStack
-        poseStack.pushPose()
-        poseStack.last().pose().set(seeThroughPose)
-        var x = pivotX
-        var y = pivotY
-        if (rotation != 0) {
-            //? if >= 26.3 {
-            poseStack.rotate(Axis.ZP.rotationDegrees(rotation.toFloat()))
-            //?} else {
-            /*poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.toFloat()))
-            *///?}
-            val radians = Math.toRadians(rotation.toDouble())
-            val cos = cos(radians).toFloat()
-            val sin = sin(radians).toFloat()
-            x = pivotX * cos + pivotY * sin
-            y = pivotY * cos - pivotX * sin
-        }
-        if (scale != 1f) {
-            poseStack.scale(scale, scale, 1f)
-            x /= scale
-            y /= scale
-        }
-        frame.submitText(
-            x + offsetX,
-            y + offsetY,
-            text,
-            context.seeThroughDropShadow,
-            Font.DisplayMode.SEE_THROUGH,
-            context.seeThroughLightCoords,
-            NameplatePaint.scaleAlpha(context.seeThroughColor, opacity),
-            0,
-        )
-        poseStack.popPose()
     }
 
     private fun ownedSubmits(layout: NameplateText.Layout): Int {
@@ -596,9 +542,6 @@ object NameplateLetters {
             outline,
         )
         poseStack.popPose()
-
-        val plain = if (shadow < 0) slice else LetterSlice(text, glyph, glyph + 1, if (ownColor != LetterFrame.KEEP) LetterStyle(ownColor, LetterFrame.KEEP) else null)
-        submitSeeThrough(frame, context, plain, centerX, centerY, -half, -HALF_HEIGHT, opacity, rotation, scale)
     }
 
     private class LetterStyle(private val color: Int, private val shadow: Int) {

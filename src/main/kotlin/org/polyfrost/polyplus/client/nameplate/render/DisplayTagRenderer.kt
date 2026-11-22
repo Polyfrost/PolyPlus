@@ -86,11 +86,13 @@ object DisplayTagRenderer {
             outline = ARGB.color(visible, PortraitGuard.vertex(resolved.outline))
         }
         val plate = NameplatePaint.plate(nameplate, block, binding.frame, binding.state)
-        draw.draw(restyled, outline, plate.dx, plate.dy)
+        val dx = if (seeThrough) 0 else plate.dx
+        val dy = if (seeThrough) 0 else plate.dy
+        draw.draw(restyled, outline, dx, dy)
 
         poseStack.pushPose()
         try {
-            val frame = NameplateFrame(poseStack, collector, x - block.nameLineX + plate.dx, y - block.nameLineY + plate.dy, alpha, lightCoords, block)
+            val frame = NameplateFrame(poseStack, collector, x - block.nameLineX + dx, y - block.nameLineY + dy, alpha, lightCoords, block)
             NameplateDecorations.submit(
                 frame,
                 nameplate,
