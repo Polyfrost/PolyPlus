@@ -53,8 +53,8 @@ object NameplatePaint {
     *///?}
     private val painter = LayerPainter(PixelGrid(), cache, textures, materialFallbacks = false)
 
-    private val texts = WeakHashMap<NameplateBundle.Variant, HashMap<Int, LruMap<ResolvedText>>>()
-    private val badges = WeakHashMap<NameplateBundle.Variant, LruMap<ResolvedBadge>>()
+    private val texts = WeakHashMap<NameplateBundle.Variant, Externals>()
+    private val badges = WeakHashMap<NameplateBundle.Variant, PlacementCache<ResolvedBadge>>()
     private val droppedVariants: MutableSet<NameplateBundle.Variant> = Collections.newSetFromMap(WeakHashMap())
     private val reportedDrops = HashSet<String>()
     private val memos = WeakHashMap<BoundNameplate, PaintMemo>()
@@ -137,15 +137,7 @@ object NameplatePaint {
             return ResolvedText.VANILLA
         }
 
-        val byExternal = texts.getOrPut(nameplate.variant) { HashMap() }
-        var entries = byExternal[externalRgb]
-        if (entries == null) {
-            if (byExternal.size >= MAX_EXTERNALS) {
-                byExternal.clear()
-            }
-            entries = LruMap()
-            byExternal[externalRgb] = entries
-        }
+        val entries = texts.getOrPut(nameplate.variant) { Externals() }.cache(externalRgb)
 
         val sampled = styling.needsBackdrop
         val key = if (sampled) placementKey(block.width, block.height, block.nameLineY, block.nameX, block.nameWidth) else 0L
@@ -171,7 +163,7 @@ object NameplatePaint {
 
     fun badge(nameplate: BoundNameplate, block: TagBlock, x: Int, y: Int): ResolvedBadge {
         val key = placementKey(block.width, block.height, y, x, 0)
-        return badges.getOrPut(nameplate.variant) { LruMap() }.getOrPut(key) {
+        return badges.getOrPut(nameplate.variant) { PlacementCache() }.getOrPut(key) {
             val pixels = BackdropPixels.collect(
                 backdrop(nameplate, block),
                 block.width,
@@ -236,7 +228,83 @@ object NameplatePaint {
     private const val PAINT_CALL = "paint"
     private const val PALETTE_CALL = "palette"
 
-    private class LruMap<V> : LinkedHashMap<Long, V>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, V>?): Boolean = size > STYLING_CAPACITY
+    private const val INITIAL_SLOTS = 16
+    private const val SPREAD = 16
+
+    private class Externals {
+        private val rgbs = IntArray(MAX_EXTERNALS)
+        private val caches = arrayOfNulls<PlacementCache<ResolvedText>>(MAX_EXTERNALS)
+        private var count = 0
+
+        fun cache(rgb: Int): PlacementCache<ResolvedText> {
+            for (i in 0 until count) {
+                val cache = caches[i]
+                if (rgbs[i] == rgb && cache != null) {
+                    return cache
+                }
+            }
+            if (count >= MAX_EXTERNALS) {
+                caches.fill(null)
+                count = 0
+            }
+            val created = PlacementCache<ResolvedText>()
+            rgbs[count] = rgb
+            caches[count] = created
+            count++
+            return created
+        }
+    }
+
+    private class PlacementCache<V : Any> {
+        var keys = LongArray(INITIAL_SLOTS)
+        var values = arrayOfNulls<Any>(INITIAL_SLOTS)
+        var size = 0
+
+        @Suppress("UNCHECKED_CAST")
+        inline fun getOrPut(key: Long, create: () -> V): V {
+            var slot = find(key)
+            values[slot]?.let { return it as V }
+            val created = create()
+            if (size >= STYLING_CAPACITY) {
+                clear()
+            } else if ((size + 1) * 2 > keys.size) {
+                grow()
+            }
+            slot = find(key)
+            keys[slot] = key
+            values[slot] = created
+            size++
+            return created
+        }
+
+        fun find(key: Long): Int {
+            val mask = keys.size - 1
+            val hash = (key xor (key ushr Int.SIZE_BITS)).toInt()
+            var slot = (hash xor (hash ushr SPREAD)) and mask
+            while (values[slot] != null && keys[slot] != key) {
+                slot = (slot + 1) and mask
+            }
+            return slot
+        }
+
+        fun clear() {
+            keys = LongArray(INITIAL_SLOTS)
+            values = arrayOfNulls(INITIAL_SLOTS)
+            size = 0
+        }
+
+        fun grow() {
+            val oldKeys = keys
+            val oldValues = values
+            keys = LongArray(oldKeys.size * 2)
+            values = arrayOfNulls(oldKeys.size * 2)
+            for (i in oldKeys.indices) {
+                if (oldValues[i] != null) {
+                    val slot = find(oldKeys[i])
+                    keys[slot] = oldKeys[i]
+                    values[slot] = oldValues[i]
+                }
+            }
+        }
     }
 }

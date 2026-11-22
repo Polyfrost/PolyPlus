@@ -5,6 +5,8 @@ import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.client.renderer.texture.TextureAtlas
+import net.minecraft.client.renderer.texture.TextureAtlasSprite
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
@@ -68,12 +70,15 @@ object NameplateMaterialAssets {
         var lastUsed = System.nanoTime()
     }
 
+    private class AtlasRects(val atlas: TextureAtlas, val width: Int, val height: Int, val sprites: Array<TextureAtlasSprite?>, val rects: FloatArray)
+
     private val prepared: MutableMap<NameplateBundle, Prepared> = Collections.synchronizedMap(WeakHashMap())
     private val installed = HashMap<NameplateBundle, Prepared>()
     private val registered = HashMap<Identifier, Int>()
     private val programs = ConcurrentHashMap<String, NameplateShaderProgram>()
     private val uses = HashMap<String, Use>()
     private val vanillaPixels = HashMap<String, TexturePixels?>()
+    private val atlasRects = WeakHashMap<MaterialLayer, AtlasRects?>()
     private val logged = HashSet<String>()
     private var lastSweep = System.nanoTime()
 
@@ -190,22 +195,38 @@ object NameplateMaterialAssets {
     }
 
     fun atlasRects(layer: MaterialLayer): FloatArray? {
+        val cached = atlasRects[layer]
+        if (cached == null && atlasRects.containsKey(layer)) {
+            return null
+        }
         val refs = layer.material.textures
-        if (refs.none { it is TextureRef.Atlas }) {
+        if (cached == null && refs.none { it is TextureRef.Atlas }) {
+            atlasRects[layer] = null
             return null
         }
         val atlas = NameplateAtlasSprites.blockAtlas() ?: return null
         //? if >= 1.21.5 {
         val texture = atlas.texture
-        val width = texture.getWidth(0)
-        val height = texture.getHeight(0)
-        //?}
+        val atlasWidth = texture.getWidth(0)
+        val atlasHeight = texture.getHeight(0)
+        //?} else {
+        /*val atlasWidth = 0
+        val atlasHeight = 0
+        *///?}
+        if (cached != null && cached.atlas === atlas && cached.width == atlasWidth && cached.height == atlasHeight && sameSprites(atlas, refs, cached.sprites)) {
+            return cached.rects
+        }
+        val sprites = arrayOfNulls<TextureAtlasSprite>(MaterialLimits.MAX_TEXTURE_SAMPLES)
         val rects = FloatArray(MaterialLimits.MAX_TEXTURE_SAMPLES * RECT)
         for ((k, ref) in refs.withIndex()) {
             if (ref !is TextureRef.Atlas || k >= MaterialLimits.MAX_TEXTURE_SAMPLES) continue
             val sprite = NameplateAtlasSprites.sprite(atlas, ref.sprite) ?: continue
+            sprites[k] = sprite
             val at = k * RECT
-            //? if < 1.21.5 {
+            //? if >= 1.21.5 {
+            val width = atlasWidth
+            val height = atlasHeight
+            //?} else {
             /*val width = sprite.contents().width() / (sprite.u1 - sprite.u0)
             val height = sprite.contents().height() / (sprite.v1 - sprite.v0)
             *///?}
@@ -214,11 +235,23 @@ object NameplateMaterialAssets {
             rects[at + 2] = sprite.contents().width().toFloat()
             rects[at + 3] = sprite.contents().height().toFloat()
         }
+        atlasRects[layer] = AtlasRects(atlas, atlasWidth, atlasHeight, sprites, rects)
         return rects
+    }
+
+    private fun sameSprites(atlas: TextureAtlas, refs: List<TextureRef>, sprites: Array<TextureAtlasSprite?>): Boolean {
+        for (k in 0 until minOf(refs.size, MaterialLimits.MAX_TEXTURE_SAMPLES)) {
+            val ref = refs[k]
+            if (ref is TextureRef.Atlas && NameplateAtlasSprites.sprite(atlas, ref.sprite) !== sprites[k]) {
+                return false
+            }
+        }
+        return true
     }
 
     fun onResourcesReloaded() {
         vanillaPixels.clear()
+        atlasRects.clear()
         NameplateAtlasSprites.clear()
     }
 
