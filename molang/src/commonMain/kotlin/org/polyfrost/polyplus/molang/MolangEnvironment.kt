@@ -5,6 +5,7 @@ class MolangEnvironment(
     params: Collection<String> = emptyList(),
     private val unavailable: Map<String, String> = emptyMap(),
     val floatVariables: Boolean = false,
+    val rules: MolangRules = MolangRules.STRICT,
 ) {
     private val querySlots: Map<String, Int> = queries.withIndex().associate { (i, name) -> name to i }
     private val paramSlots: Map<String, Int> = params.withIndex().associate { (i, name) -> name to i }
@@ -32,7 +33,7 @@ class MolangEnvironment(
 
     internal fun claimVariable(name: String): Int {
         variableSlots[name]?.let { return it }
-        if (variableSlots.size >= MolangLimits.MAX_VARIABLES) return NONE
+        if (variableSlots.size >= rules.maxVariables) return NONE
         val slot = variableSlots.size
         variableSlots[name] = slot
         return slot

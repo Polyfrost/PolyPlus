@@ -5,6 +5,8 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
 
     private val folder by lazy { MolangRuntime(environment) }
 
+    private val lenient: Boolean = environment.rules.lenient
+
     fun script(script: MolangNode.Script): MolangOp =
         if (script.simple) expression(script.statements[0]) else sequence(script.statements)
 
@@ -78,7 +80,12 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
             if (slot == MolangEnvironment.NONE) ConstOp(0.0) else VariableOp(slot)
         }
         MATH -> problem("${node.name} is a function; call it with ( )", node.column, MolangProblem.UNCALLED, named(node.name))
-        else -> problem("unknown name ${node.name}", node.column, MolangProblem.UNKNOWN_NAME, named(node.name))
+        else -> if (lenient) {
+            val slot = variable(node)
+            if (slot == MolangEnvironment.NONE) ConstOp(0.0) else VariableOp(slot)
+        } else {
+            problem("unknown name ${node.name}", node.column, MolangProblem.UNKNOWN_NAME, named(node.name))
+        }
     }
 
     private fun query(node: MolangNode.Member): MolangOp {
@@ -102,7 +109,9 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
         val prefix = when (node.root) {
             in VARIABLE_ROOTS -> "v."
             in TEMP_ROOTS -> "t."
-            else -> {
+            else -> if (lenient && node.root != MATH && node.path.isNotEmpty()) {
+                "${node.root}."
+            } else {
                 problem("only v. and t. variables can be assigned, not ${node.name}", node.column, MolangProblem.ASSIGN, named(node.name))
                 return MolangEnvironment.NONE
             }
@@ -114,10 +123,10 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
         val slot = environment.claimVariable(prefix + node.path.joinToString("."))
         if (slot == MolangEnvironment.NONE) {
             problem(
-                "more than ${MolangLimits.MAX_VARIABLES} variables",
+                "more than ${environment.rules.maxVariables} variables",
                 node.column,
                 MolangProblem.VARIABLES,
-                values = mapOf(LIMIT to MolangLimits.MAX_VARIABLES),
+                values = mapOf(LIMIT to environment.rules.maxVariables),
             )
         }
         return slot
@@ -150,6 +159,10 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
         val args = node.args.map { expression(it) }
         val function = MolangFunctions.find(name)
             ?: return problem("unknown function math.$name", node.callee.column, MolangProblem.UNKNOWN_MATH, mapOf(FUNCTION to name))
+        if (lenient && args.size !in function.minArgs..function.maxArgs) {
+            val fitted = Array(args.size.coerceIn(function.minArgs, function.maxArgs)) { args.getOrNull(it) ?: ConstOp(0.0) }
+            return folded(CallOp(function, fitted), *fitted)
+        }
         if (args.size !in function.minArgs..function.maxArgs) {
             val count = if (function.minArgs == function.maxArgs) {
                 "${function.minArgs}"
@@ -178,7 +191,9 @@ internal class MolangResolver(private val environment: MolangEnvironment, privat
         names: Map<String, String> = emptyMap(),
         values: Map<String, Int> = emptyMap(),
     ): MolangOp {
-        problems += MolangIssue(path, "$message at column $column", problem, column, names, values)
+        if (!lenient) {
+            problems += MolangIssue(path, "$message at column $column", problem, column, names, values)
+        }
         return ConstOp(0.0)
     }
 

@@ -1,6 +1,6 @@
 package org.polyfrost.polyplus.molang
 
-internal class MolangParser(private val tokens: List<Token>) {
+internal class MolangParser(private val tokens: List<Token>, private val rules: MolangRules = MolangRules.STRICT) {
     private var index = 0
     private var nodes = 0
     private var depth = 0
@@ -158,12 +158,12 @@ internal class MolangParser(private val tokens: List<Token>) {
 
     private inline fun <T> nested(body: () -> T): T {
         depth++
-        if (depth > MolangLimits.MAX_DEPTH) {
+        if (depth > rules.maxDepth) {
             throw MolangSyntaxException(
-                "nested deeper than ${MolangLimits.MAX_DEPTH}",
+                "nested deeper than ${rules.maxDepth}",
                 peek().column,
                 MolangProblem.TOO_DEEP,
-                values = mapOf("limit" to MolangLimits.MAX_DEPTH),
+                values = mapOf("limit" to rules.maxDepth),
             )
         }
         val result = body()
@@ -173,12 +173,12 @@ internal class MolangParser(private val tokens: List<Token>) {
 
     private fun <T : MolangNode> counted(node: T): T {
         nodes++
-        if (nodes > MolangLimits.MAX_NODES) {
+        if (nodes > rules.maxNodes) {
             throw MolangSyntaxException(
-                "more than ${MolangLimits.MAX_NODES} nodes",
+                "more than ${rules.maxNodes} nodes",
                 node.column,
                 MolangProblem.TOO_BIG,
-                values = mapOf("limit" to MolangLimits.MAX_NODES),
+                values = mapOf("limit" to rules.maxNodes),
             )
         }
         return node

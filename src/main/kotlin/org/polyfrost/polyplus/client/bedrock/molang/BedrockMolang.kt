@@ -6,6 +6,7 @@ import com.google.gson.JsonPrimitive
 import org.polyfrost.polyplus.molang.MolangCompiler
 import org.polyfrost.polyplus.molang.MolangEnvironment
 import org.polyfrost.polyplus.molang.MolangProgram
+import org.polyfrost.polyplus.molang.MolangRules
 import org.polyfrost.polyplus.molang.MolangRuntime
 
 enum class BedrockQuery(val id: String) {
@@ -30,7 +31,7 @@ enum class BedrockQuery(val id: String) {
 }
 
 class BedrockMolang {
-    private val environment = MolangEnvironment(BedrockQuery.all.map { it.id }, floatVariables = true)
+    private val environment = MolangEnvironment(BedrockQuery.all.map { it.id }, floatVariables = true, rules = MolangRules.BEDROCK)
     private val runtime = MolangRuntime(environment)
     private var keys: Array<String> = emptyArray()
     private var loaded: DoubleArray = DoubleArray(0)

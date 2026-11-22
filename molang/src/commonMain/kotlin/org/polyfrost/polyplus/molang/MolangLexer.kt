@@ -33,17 +33,17 @@ internal enum class TokenKind(val text: String) {
 
 internal class Token(val kind: TokenKind, val column: Int, val text: String = "", val number: Double = 0.0)
 
-internal class MolangLexer(private val source: String) {
+internal class MolangLexer(private val source: String, private val maxChars: Int = MolangLimits.MAX_SOURCE_CHARS) {
     private var index = 0
     private val tokens = ArrayList<Token>()
 
     fun tokens(): List<Token> {
-        if (source.length > MolangLimits.MAX_SOURCE_CHARS) {
+        if (source.length > maxChars) {
             throw MolangSyntaxException(
-                "longer than ${MolangLimits.MAX_SOURCE_CHARS} characters",
+                "longer than $maxChars characters",
                 1,
                 MolangProblem.TOO_LONG,
-                values = mapOf("limit" to MolangLimits.MAX_SOURCE_CHARS),
+                values = mapOf("limit" to maxChars),
             )
         }
         while (true) {
