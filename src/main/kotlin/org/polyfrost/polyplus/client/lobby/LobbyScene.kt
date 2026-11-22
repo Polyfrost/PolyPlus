@@ -1146,7 +1146,7 @@ object LobbyScene {
         //? if > 1.8.9
         built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
         //? if > 1.8.9
-        LobbyCats.onSceneShown(level, stage, built.props)
+        LobbyCats.onSceneShown(level, stage, built.props, viewAspect(mc))
         runCatching { LobbyHerobrine.onSceneShown(level, stage) }
         built
     }
@@ -2342,7 +2342,7 @@ object LobbyScene {
             LobbyAntics.tick(local)
             LobbyGrab.tick(local)
             //? if > 1.8.9
-            if (driven == null) LobbyCats.tick(scene.level)
+            if (driven == null) LobbyCats.tick(scene.level, Motion.reduced)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()

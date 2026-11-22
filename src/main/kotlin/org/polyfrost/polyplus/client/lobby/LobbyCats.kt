@@ -46,7 +46,6 @@ object LobbyCats {
     private const val PICKS = 4
     private const val CAST_CLEARANCE = 1.3
     private const val LENS_CLEARANCE = 1.2
-    private const val ASPECT = 16.0 / 9.0
     private const val MIN_DEPTH = 1.5
     private const val SIGHT_HEIGHT = 0.35
     private const val SIGHT_SLACK = 0.3
@@ -172,24 +171,26 @@ object LobbyCats {
     private var ground: Playground? = null
     private val cats = ArrayList<Kitty>()
     private var warned = false
+    private var quiet = false
 
     fun owns(entity: Entity): Boolean = cats.any { it.body === entity }
 
     private fun column(x: Double, z: Double): Long = BlockPos.asLong(floor(x).toInt(), 0, floor(z).toInt())
 
-    fun onSceneShown(level: ClientLevel, stage: LobbyStage, props: List<Entity>) {
+    fun onSceneShown(level: ClientLevel, stage: LobbyStage, props: List<Entity>, aspect: Double) {
         stop()
         try {
             val forced = java.lang.Boolean.getBoolean(FORCE_PROPERTY)
             if (!forced && Random.nextDouble() >= CHANCE) return
             if (!village(level, LobbyCompat.blockAt(stage.aim), props)) return
-            pending = playground(level, stage, props)
+            pending = playground(level, stage, props, aspect)
         } catch (error: Throwable) {
             failed("prepare", error)
         }
     }
 
-    fun tick(level: ClientLevel) {
+    fun tick(level: ClientLevel, still: Boolean) {
+        quiet = still
         try {
             pending?.let { if (LobbyScene.revealStarted() && !LobbyScene.unrevealed(floor(it.center.x).toInt(), floor(it.center.z).toInt())) spawn(level, it) }
             if (cats.removeAll { it.body.isRemoved }) cats.forEach { if (it.mate?.body?.isRemoved == true) it.mate = null }
@@ -245,9 +246,9 @@ object LobbyCats {
         return false
     }
 
-    private fun playground(level: ClientLevel, stage: LobbyStage, props: List<Entity>): Playground? {
+    private fun playground(level: ClientLevel, stage: LobbyStage, props: List<Entity>, aspect: Double): Playground? {
         val camera = stage.camera()
-        val view = LobbyEntrance.view(camera, stage.yaw.toDouble(), stage.pitch.toDouble(), LobbyStage.CAMERA_FOV.toFloat(), ASPECT)
+        val view = LobbyEntrance.view(camera, stage.yaw.toDouble(), stage.pitch.toDouble(), LobbyStage.CAMERA_FOV.toFloat(), aspect)
         val cast = (stage.slots + stage.background).map { it.pos } + props.map { it.position() }
         val origin = LobbyCompat.blockAt(stage.aim)
         val spots = ArrayList<Vec3>()
@@ -257,9 +258,31 @@ object LobbyCats {
                 if (fits(level, view, stage.aim, cast, feet)) spots += feet
             }
         }
-        val roomy = spots.map { spot -> spot to spots.filter { near(it, spot) } }.filter { it.second.size >= MIN_ROOM }
+        val patches = patches(spots)
+        val roomy = spots.map { spot -> spot to spots.filter { patches[it] == patches[spot] && near(it, spot) } }.filter { it.second.size >= MIN_ROOM }
         val (center, area) = roomy.sortedByDescending { it.second.size }.take(PICKS).randomOrNull() ?: return null
         return Playground(camera, center, area, if (Random.nextDouble() < THIRD_CAT) 3 else 2)
+    }
+
+    private fun patches(spots: List<Vec3>): Map<Vec3, Int> {
+        val byColumn = spots.associateBy { column(it.x, it.z) }
+        val patch = HashMap<Vec3, Int>()
+        for (start in spots) {
+            if (start in patch) continue
+            val id = patch.size
+            val queue = ArrayDeque(listOf(start))
+            patch[start] = id
+            while (queue.isNotEmpty()) {
+                val spot = queue.removeFirst()
+                for (direction in Direction.Plane.HORIZONTAL) {
+                    val next = byColumn[column(spot.x + direction.stepX, spot.z + direction.stepZ)] ?: continue
+                    if (next in patch || abs(next.y - spot.y) > MAX_STEP) continue
+                    patch[next] = id
+                    queue += next
+                }
+            }
+        }
+        return patch
     }
 
     private fun near(a: Vec3, b: Vec3): Boolean = hypot(a.x - b.x, a.z - b.z) <= PLAY_RADIUS && abs(a.y - b.y) <= PLAY_RISE
@@ -324,6 +347,7 @@ object LobbyCats {
     private fun behave(kitty: Kitty) {
         kitty.age++
         kitty.energy = (kitty.energy + if (kitty.act.playing) -PLAY_DRAIN else REST_GAIN).coerceIn(0.0, 1.0)
+        if (quiet && kitty.act.playing && kitty.act != Act.POUNCE) rest(kitty)
         if (--kitty.ticks <= 0) finish(kitty)
         val from = kitty.body.position()
         when (kitty.act) {
@@ -374,6 +398,14 @@ object LobbyCats {
 
     private fun choose(kitty: Kitty) {
         val partner = cats.filter { it !== kitty && it.act.calm }.randomOrNull()
+        if (quiet) {
+            pick(
+                3.0 to { sit(kitty) },
+                3.0 to { groom(kitty) },
+                2.0 to { lounge(kitty) },
+            )
+            return
+        }
         if (kitty.energy < PLAYFUL) {
             pick(
                 3.0 to { sit(kitty) },
