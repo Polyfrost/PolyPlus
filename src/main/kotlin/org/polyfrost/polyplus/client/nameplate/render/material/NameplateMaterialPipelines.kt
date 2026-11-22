@@ -28,6 +28,7 @@ import org.polyfrost.polyplus.mixin.client.nameplate.PipelineCacheAccessor
 import org.polyfrost.polyplus.nameplate.engine.api.material.Material
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -49,8 +50,8 @@ object NameplateMaterialPipelines {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
         ClientPlatform.runOnMain {
-            compile(entry)
             NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+            compile(entry)
         }
         return entry.status
     }
@@ -85,9 +86,7 @@ object NameplateMaterialPipelines {
         val next = Generation(++generations, cache, NameplateShaderSource(includes))
         generation = next
         for (entry in entries.values) {
-            if (entry.status != NameplateShaderStatus.FAILED) {
-                entry.status = NameplateShaderStatus.PENDING
-            }
+            entry.status = NameplateShaderStatus.PENDING
             compile(entry)
         }
     }
@@ -113,16 +112,21 @@ object NameplateMaterialPipelines {
         entry.generation = current.id
         current.acquire()
         val device = RenderSystem.getDevice()
-        val futures = try {
-            entry.pipelines.map { device.compilePipeline(it, current.source, Util.backgroundExecutor()) }
-        } catch (e: RuntimeException) {
-            current.release()
-            fail(entry, List(entry.pipelines.size) { null }, e)
-            return
+        val futures = entry.pipelines.map { pipeline ->
+            try {
+                device.compilePipeline(pipeline, current.source, Util.backgroundExecutor())
+            } catch (e: RuntimeException) {
+                CompletableFuture.failedFuture<CompiledRenderPipeline.Pending>(e)
+            }
         }
         CompletableFuture.allOf(*futures.toTypedArray()).whenCompleteAsync({ _, _ ->
             try {
                 finish(entry, current, futures)
+            } catch (e: Throwable) {
+                if (current === generation && entry.generation == current.id && entry.status == NameplateShaderStatus.PENDING) {
+                    fail(entry, List(entry.pipelines.size) { null }, e)
+                }
+                throw e
             } finally {
                 current.release()
             }
@@ -134,8 +138,8 @@ object NameplateMaterialPipelines {
         val compiled = futures.map { future ->
             try {
                 future.join().finishCompile()
-            } catch (failure: RuntimeException) {
-                error = error ?: failure
+            } catch (failure: Throwable) {
+                error = error ?: ((failure as? CompletionException)?.cause ?: failure)
                 null
             }
         }
@@ -320,8 +324,8 @@ object NameplateMaterialPipelines {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
         ClientPlatform.runOnMain {
-            schedule(entry)
             NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+            schedule(entry)
         }
         return entry.status
     }
@@ -357,9 +361,7 @@ object NameplateMaterialPipelines {
         parked.clear()
         queue.clear()
         for (entry in entries.values) {
-            if (entry.status != NameplateShaderStatus.FAILED) {
-                entry.status = NameplateShaderStatus.PENDING
-            }
+            entry.status = NameplateShaderStatus.PENDING
             entry.compiled = 0
             entry.queued = false
             schedule(entry)
@@ -569,8 +571,8 @@ object NameplateMaterialPipelines {
             LOGGER.warn("Nameplate material {} was registered twice with different shader source; keeping the first", program.hash)
         }
         ClientPlatform.runOnMain {
-            enqueue(entry)
             NameplateIris.assign(entry.pipelines, program.emissive || program.blend == Material.Blend.ADDITIVE)
+            enqueue(entry)
         }
         return entry.status
     }
@@ -597,9 +599,7 @@ object NameplateMaterialPipelines {
         generation++
         queue.clear()
         for (entry in entries.values) {
-            if (entry.status != NameplateShaderStatus.FAILED) {
-                entry.status = NameplateShaderStatus.PENDING
-            }
+            entry.status = NameplateShaderStatus.PENDING
             enqueue(entry)
         }
     }
@@ -810,9 +810,7 @@ object NameplateMaterialPipelines {
         queue.clear()
         for (entry in entries.values) {
             entry.close()
-            if (entry.status != NameplateShaderStatus.FAILED) {
-                entry.status = NameplateShaderStatus.PENDING
-            }
+            entry.status = NameplateShaderStatus.PENDING
             enqueue(entry)
         }
     }
