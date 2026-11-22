@@ -74,20 +74,30 @@ object DisplayTagRenderer {
         val alpha = visible / CHANNEL_MAX
 
         val nameplate = binding.nameplate
-        val layout = NameplateText.layout(Minecraft.getInstance().font, text, binding.profileName)
-        val beside = binding.badge && nameplate.variant.badge.placement.kind != BadgeStyling.Placement.Kind.PLACED
-        val shape = block(info, flags, binding, layout.nameX, layout.nameWidth, beside)
-        val block = shape.placed(layout.prefixWidth, PixelRect.vanillaBackground(shape.width, shape.height))
-
-        val resolved = NameplatePaint.text(nameplate, block, ResolvedText.UNSET)
-        val restyled = NameplateText.restyleLine(text, layout.nameStart, layout.nameEnd, resolved, dropShadow)
+        val block: TagBlock
+        val restyled: FormattedCharSequence
         var outline = outlineColor
-        if (outline == 0 && !seeThrough && resolved.outline != ResolvedText.UNSET) {
-            outline = ARGB.color(visible, PortraitGuard.vertex(resolved.outline))
+        val dx: Int
+        val dy: Int
+        try {
+            val layout = NameplateText.layout(Minecraft.getInstance().font, text, binding.profileName)
+            val beside = binding.badge && nameplate.variant.badge.placement.kind != BadgeStyling.Placement.Kind.PLACED
+            val shape = block(info, flags, binding, layout.nameX, layout.nameWidth, beside)
+            block = shape.placed(layout.prefixWidth, PixelRect.vanillaBackground(shape.width, shape.height))
+
+            val resolved = NameplatePaint.text(nameplate, block, ResolvedText.UNSET)
+            restyled = NameplateText.restyleLine(text, layout.nameStart, layout.nameEnd, resolved, dropShadow)
+            if (outline == 0 && !seeThrough && resolved.outline != ResolvedText.UNSET) {
+                outline = ARGB.color(visible, PortraitGuard.vertex(resolved.outline))
+            }
+            val plate = NameplatePaint.plate(nameplate, block, binding.frame, binding.state)
+            dx = if (seeThrough) 0 else plate.dx
+            dy = if (seeThrough) 0 else plate.dy
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            draw.draw(text, outlineColor, 0, 0)
+            return
         }
-        val plate = NameplatePaint.plate(nameplate, block, binding.frame, binding.state)
-        val dx = if (seeThrough) 0 else plate.dx
-        val dy = if (seeThrough) 0 else plate.dy
         draw.draw(restyled, outline, dx, dy)
 
         poseStack.pushPose()

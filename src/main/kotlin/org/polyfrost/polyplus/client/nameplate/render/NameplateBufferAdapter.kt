@@ -294,9 +294,19 @@ object NameplateBufferAdapter {
         }
 
         val nameplate = bound.nameplate
-        val text = PlayerNameplateRenderer.resolveText(bound, name, player.uuid)
-        val textMode = NameplateText.mode(nameplate.variant)
-        val opened = NameplateContext.begin(nameplate.variant.ownsBackground, textMode != NameplateBundle.TextMode.VANILLA, text.outline)
+        val textMode: NameplateBundle.TextMode
+        val restyled: Component
+        val opened: NameplateContext?
+        try {
+            val text = PlayerNameplateRenderer.resolveText(bound, name, player.uuid)
+            textMode = NameplateText.mode(nameplate.variant)
+            restyled = NameplateText.restyle(name, bound.profileName, text, NameplateContext.externalDropShadow)
+            opened = NameplateContext.begin(nameplate.variant.ownsBackground, textMode != NameplateBundle.TextMode.VANILLA, text.outline)
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            draw.draw(name)
+            return
+        }
         if (opened == null) {
             draw.draw(name)
             return
@@ -306,7 +316,7 @@ object NameplateBufferAdapter {
         mode = textMode
         context = opened
         try {
-            draw.draw(NameplateText.restyle(name, bound.profileName, text, NameplateContext.externalDropShadow))
+            draw.draw(restyled)
         } finally {
             opened.end()
             tag = null
@@ -344,17 +354,20 @@ object NameplateBufferAdapter {
             return drawText(font, name, text, x, y, color, dropShadow, pose, buffers, displayMode, background, 0, lightCoords, false, original)
         }
 
-        val layout = NameplateText.layout(font, text, bound.profileName)
-        scratch.setIdentity()
-        scratch.last().pose().set(pose)
-        val frame = PlayerNameplateRenderer.decorate(bound, layout, scratch, buffers, x, y, color, lightCoords)
-
         val outline = NameplateContext.rewrittenOutline
-        val drawn = drawText(font, name, text, x, y, color, dropShadow, pose, buffers, displayMode, background, outline, lightCoords, hides, original)
-        if (hides) {
-            NameplateLetters.submit(frame, open, text, layout, bound, mode)
+        try {
+            val layout = NameplateText.layout(font, text, bound.profileName)
+            scratch.setIdentity()
+            scratch.last().pose().set(pose)
+            val frame = PlayerNameplateRenderer.decorate(bound, layout, scratch, buffers, x, y, color, lightCoords)
+            if (hides) {
+                NameplateLetters.submit(frame, open, text, layout, bound, mode)
+            }
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(bound.nameplate, e)
+            return original.call(font, name, x, y, color, dropShadow, pose, buffers, displayMode, backgroundColor, lightCoords)
         }
-        return drawn
+        return drawText(font, name, text, x, y, color, dropShadow, pose, buffers, displayMode, background, outline, lightCoords, hides, original)
     }
 
     @JvmStatic

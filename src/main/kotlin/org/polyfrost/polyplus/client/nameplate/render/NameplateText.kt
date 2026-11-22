@@ -518,30 +518,33 @@ object NameplateLetters {
         val centerY = frame.y + letters.dy[letter] + HALF_HEIGHT
         val poseStack = frame.poseStack
         poseStack.pushPose()
-        poseStack.translate(centerX, centerY, 0f)
-        val rotation = letters.rotation[letter]
-        if (rotation != 0) {
-            //? if >= 26.3 {
-            poseStack.rotate(Axis.ZP.rotationDegrees(rotation.toFloat()))
-            //?} else {
-            /*poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.toFloat()))
-            *///?}
+        try {
+            poseStack.translate(centerX, centerY, 0f)
+            val rotation = letters.rotation[letter]
+            if (rotation != 0) {
+                //? if >= 26.3 {
+                poseStack.rotate(Axis.ZP.rotationDegrees(rotation.toFloat()))
+                //?} else {
+                /*poseStack.mulPose(Axis.ZP.rotationDegrees(rotation.toFloat()))
+                *///?}
+            }
+            val scale = letters.scaleOf(letter)
+            if (scale != 1f) {
+                poseStack.scale(scale, scale, 1f)
+            }
+            frame.submitText(
+                -half,
+                -HALF_HEIGHT,
+                slice,
+                dropShadow,
+                Font.DisplayMode.NORMAL,
+                context.lightCoords,
+                color,
+                outline,
+            )
+        } finally {
+            poseStack.popPose()
         }
-        val scale = letters.scaleOf(letter)
-        if (scale != 1f) {
-            poseStack.scale(scale, scale, 1f)
-        }
-        frame.submitText(
-            -half,
-            -HALF_HEIGHT,
-            slice,
-            dropShadow,
-            Font.DisplayMode.NORMAL,
-            context.lightCoords,
-            color,
-            outline,
-        )
-        poseStack.popPose()
     }
 
     private class LetterStyle(private val color: Int, private val shadow: Int) {

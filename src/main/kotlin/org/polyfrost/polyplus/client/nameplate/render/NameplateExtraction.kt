@@ -58,15 +58,20 @@ object NameplateExtraction {
     fun playerTag(player: Player, distanceSq: Double): NameplateTag? {
         val uuid = player.uuid
         val nameplate = NameplateGate.bound(uuid) ?: return null
-        val frame = NameplateClock.frame(nameplate)
-        return NameplateTag(
-            nameplate,
-            profileName(player),
-            PolyPlusBadge.shouldBadge(uuid),
-            NameplateDetail.detailed(player.id, distanceSq),
-            frame,
-            NameplateReactions.state(player, nameplate, frame),
-        )
+        return try {
+            val frame = NameplateClock.frame(nameplate)
+            NameplateTag(
+                nameplate,
+                profileName(player),
+                PolyPlusBadge.shouldBadge(uuid),
+                NameplateDetail.detailed(player.id, distanceSq),
+                frame,
+                NameplateReactions.state(player, nameplate, frame),
+            )
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            null
+        }
     }
 
     fun displayTag(display: Display.TextDisplay, info: Display.TextDisplay.CachedInfo, distanceSq: Double): DisplayTagBinding? {
@@ -84,18 +89,23 @@ object NameplateExtraction {
         if (!DisplayPick.closest(player, display, profileName)) {
             return null
         }
-        val frame = NameplateClock.frame(nameplate)
-        return DisplayTagBinding(
-            nameplate,
-            profileName,
-            lines[nameLine].contents(),
-            nameLine,
-            lines.size,
-            PolyPlusBadge.shouldBadge(uuid),
-            NameplateDetail.detailed(display.id, distanceSq),
-            frame,
-            NameplateReactions.state(player, nameplate, frame),
-        )
+        return try {
+            val frame = NameplateClock.frame(nameplate)
+            DisplayTagBinding(
+                nameplate,
+                profileName,
+                lines[nameLine].contents(),
+                nameLine,
+                lines.size,
+                PolyPlusBadge.shouldBadge(uuid),
+                NameplateDetail.detailed(display.id, distanceSq),
+                frame,
+                NameplateReactions.state(player, nameplate, frame),
+            )
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            null
+        }
     }
 
     fun textVisible(text: Display.TextDisplay.TextRenderState, progress: Float): Boolean =

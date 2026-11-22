@@ -31,23 +31,42 @@ object PlayerNameplateRenderer {
         }
 
         val nameplate = tag.nameplate
-        val entry = NameplateTextCache.entry(name, tag.profileName)
-        val text = resolveText(nameplate, entry)
-        val mode = NameplateText.mode(nameplate.variant)
-        val context = NameplateContext.begin(nameplate.variant.ownsBackground, mode != NameplateBundle.TextMode.VANILLA, text.outline)
+        val entry: NameplateTextCache.Entry
+        val restyled: Component
+        val mode: NameplateBundle.TextMode
+        val context: NameplateContext?
+        try {
+            entry = NameplateTextCache.entry(name, tag.profileName)
+            val text = resolveText(nameplate, entry)
+            mode = NameplateText.mode(nameplate.variant)
+            restyled = entry.restyled(text, NameplateContext.externalDropShadow)
+            context = NameplateContext.begin(nameplate.variant.ownsBackground, mode != NameplateBundle.TextMode.VANILLA, text.outline)
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            draw.draw(name)
+            return
+        }
         if (context == null) {
             draw.draw(name)
             return
         }
 
         try {
-            draw.draw(entry.restyled(text, NameplateContext.externalDropShadow))
+            draw.draw(restyled)
         } finally {
             context.end()
         }
 
-        if (context.submitted) {
+        if (!context.submitted) {
+            return
+        }
+        try {
             submitNameplate(context, tag, entry, mode, collector, poseStack)
+        } catch (e: RuntimeException) {
+            NameplateGate.fail(nameplate, e)
+            if (mode != NameplateBundle.TextMode.VANILLA) {
+                draw.draw(name)
+            }
         }
     }
 
