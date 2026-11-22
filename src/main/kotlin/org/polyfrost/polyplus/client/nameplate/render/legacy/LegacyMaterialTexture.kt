@@ -24,6 +24,7 @@ object LegacyMaterialTexture {
     private const val ALPHA_SHIFT = 24
     private const val IDLE_NANOS = 3_000_000_000L
     private const val SWEEP_NANOS = 1_000_000_000L
+    private const val MAX_SLOTS = 8
 
     private data class Key(val layer: MaterialLayer, val x0: Int, val y0: Int, val width: Int, val height: Int)
 
@@ -32,7 +33,7 @@ object LegacyMaterialTexture {
         var lastUsed = 0L
     }
 
-    private val entries = HashMap<Key, Entry>()
+    private val entries = HashMap<Key, ArrayList<Entry>>()
     private val keys = WeakHashMap<PixelImage, Key>()
     private var lastSweep = 0L
     private var failed = false
@@ -128,10 +129,23 @@ object LegacyMaterialTexture {
             return null
         }
         val key = keys[image] ?: bounds(layer, image)?.also { keys[image] = it } ?: return null
-        val entry = entries[key] ?: create(key) ?: return null
-        if (entry.image !== image) {
-            upload(entry, image)
+        val slots = entries.getOrPut(key) { ArrayList(1) }
+        var oldest: Entry? = null
+        for (i in slots.indices) {
+            val slot = slots[i]
+            if (slot.image === image) {
+                return slot
+            }
+            if (oldest == null || slot.lastUsed < oldest.lastUsed) {
+                oldest = slot
+            }
         }
+        val entry = if (slots.size < MAX_SLOTS || oldest == null) {
+            create(key)?.also(slots::add) ?: return null
+        } else {
+            oldest
+        }
+        upload(entry, image)
         return entry
     }
 
@@ -156,7 +170,7 @@ object LegacyMaterialTexture {
     }
 
     private fun create(key: Key): Entry? = try {
-        Entry(DynamicTexture(key.width, key.height), key.x0, key.y0, key.width, key.height).also { entries[key] = it }
+        Entry(DynamicTexture(key.width, key.height), key.x0, key.y0, key.width, key.height)
     } catch (e: RuntimeException) {
         failed = true
         LOGGER.error("Nameplate material fallback textures could not be created; materials draw as quads", e)
@@ -182,10 +196,13 @@ object LegacyMaterialTexture {
             return
         }
         lastSweep = now
-        entries.values.removeAll { entry ->
-            val idle = now - entry.lastUsed >= IDLE_NANOS
-            if (idle) entry.texture.clearGlId()
-            idle
+        entries.values.removeAll { slots ->
+            slots.removeAll { entry ->
+                val idle = now - entry.lastUsed >= IDLE_NANOS
+                if (idle) entry.texture.clearGlId()
+                idle
+            }
+            slots.isEmpty()
         }
     }
 }

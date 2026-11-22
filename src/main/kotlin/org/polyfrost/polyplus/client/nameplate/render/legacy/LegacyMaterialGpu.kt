@@ -66,6 +66,7 @@ object LegacyMaterialGpu {
     private const val FOG_EXP = 2
     private const val FOG_EXP2 = 3
     private const val GL_EXP2 = 0x0801
+    private const val UNKNOWN = -1
 
     private val forceCpu: Boolean = java.lang.Boolean.getBoolean(NameplateCanvas.CPU_PROPERTY)
 
@@ -114,6 +115,9 @@ object LegacyMaterialGpu {
     private var listening = false
     private var lastCompile = 0L
     private var lastSweep = 0L
+    private var holding = false
+    private var heldFog = UNKNOWN
+    private var heldLit = UNKNOWN
 
     fun prepare(bundle: NameplateBundle, op: LayerPainter.Painted, material: MaterialOp, palette: ResolvedPalette): Draw? {
         if (op.opacity <= 0 || !LegacyVertexSink.isRecording || NameplateIris.shadowPass()) {
@@ -209,11 +213,11 @@ object LegacyMaterialGpu {
         }
         val fog = program.location(FOG)
         if (fog >= 0) {
-            GLX.uniform1i(fog, fogMode())
+            GLX.uniform1i(fog, heldFogMode())
         }
         val lit = program.location(LIT)
         if (lit >= 0) {
-            GLX.uniform1i(lit, if (lightMapEnabled()) 1 else 0)
+            GLX.uniform1i(lit, heldLightMap())
         }
         for ((k, texture) in draw.textures.withIndex()) {
             GlStateManager.activeTexture(GLX.GL_TEXTURE0 + FIRST_UNIT + k)
@@ -235,6 +239,16 @@ object LegacyMaterialGpu {
         if (draw.program.additive) {
             GlStateManager.blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
         }
+    }
+
+    internal fun holdState() {
+        holding = true
+        heldFog = UNKNOWN
+        heldLit = UNKNOWN
+    }
+
+    internal fun releaseState() {
+        holding = false
     }
 
     @JvmStatic
@@ -421,6 +435,28 @@ object LegacyMaterialGpu {
         } else {
             LOGGER.info("Nameplate {} layer {} draws on the CPU fallback ({})", bundle.id, material.layerId, mode)
         }
+    }
+
+    private fun heldFogMode(): Int {
+        if (holding && heldFog != UNKNOWN) {
+            return heldFog
+        }
+        val mode = fogMode()
+        if (holding) {
+            heldFog = mode
+        }
+        return mode
+    }
+
+    private fun heldLightMap(): Int {
+        if (holding && heldLit != UNKNOWN) {
+            return heldLit
+        }
+        val lit = if (lightMapEnabled()) 1 else 0
+        if (holding) {
+            heldLit = lit
+        }
+        return lit
     }
 
     private fun fogMode(): Int {

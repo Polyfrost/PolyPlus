@@ -117,6 +117,7 @@ object LegacyNameplateDeferral {
             GlStateManager.enableDepthTest()
             GlStateManager.depthFunc(GL11.GL_LEQUAL)
             GlStateManager.enableAlphaTest()
+            LegacyMaterialGpu.holdState()
             for (entry in pending) {
                 replay(entry, tickDelta)
             }
@@ -124,6 +125,7 @@ object LegacyNameplateDeferral {
             broken = true
             LOGGER.error("Deferred nameplate drawing failed; nameplates draw with the entities from now on", e)
         } finally {
+            LegacyMaterialGpu.releaseState()
             replaying = false
             clear()
             saved.restore()
