@@ -11,6 +11,7 @@ import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.nameplate.engine.api.bundle.NameplateBundle
 import org.polyfrost.polyplus.nameplate.engine.api.tag.NameplateHash
+import java.util.IdentityHashMap
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -28,6 +29,7 @@ object NameplateRegistry {
 
     private val installed = ConcurrentHashMap<Int, Installed>()
     private val bound = ConcurrentHashMap<UUID, BoundNameplate>()
+    private val owners = IdentityHashMap<NameplateBundle, MutableSet<Int>>()
     private val lastUnknownRefresh = AtomicLong(0L)
     private val failureLogged = AtomicBoolean(false)
 
@@ -36,12 +38,10 @@ object NameplateRegistry {
     }
 
     fun install(id: Int, hash: String, key: String, bundle: NameplateBundle) {
-        //? if >= 1.21.1 {
-        NameplateMaterialAssets.install(bundle)
-        //?}
         val previous = installed.put(id, Installed(hash, key, bundle))
+        acquire(id, bundle)
         if (previous != null && previous.bundle !== bundle) {
-            releaseAssets(previous.bundle)
+            release(id, previous.bundle)
         }
     }
 
@@ -52,14 +52,27 @@ object NameplateRegistry {
     fun installedBundle(id: Int, hash: String): NameplateBundle? = installed[id]?.takeIf { it.hash == hash }?.bundle
 
     fun clear() {
-        installed.values.forEach { releaseAssets(it.bundle) }
         installed.clear()
+        val released = synchronized(owners) {
+            val bundles = ArrayList(owners.keys)
+            owners.clear()
+            bundles
+        }
+        released.forEach(::releaseAssets)
         bound.clear()
     }
 
     fun retain(keep: Set<Int>): Boolean {
-        installed.filterKeys { it !in keep }.values.forEach { releaseAssets(it.bundle) }
-        val evicted = installed.keys.retainAll(keep)
+        val trial = NameplateTryOn.active()?.choices
+        var evicted = false
+        val iterator = installed.entries.iterator()
+        while (iterator.hasNext()) {
+            val (id, entry) = iterator.next()
+            if (id in keep || trial?.any { it.id == id } == true) continue
+            iterator.remove()
+            release(id, entry.bundle)
+            evicted = true
+        }
         NameplateLoader.retain(installed.values.mapTo(HashSet()) { it.key })
         return evicted
     }
@@ -101,6 +114,36 @@ object NameplateRegistry {
         if (definition.type != CosmeticType.Nameplate) return null
         val bundle = installed[id]?.bundle ?: return null
         return bind(player, bundle, bundle.variant(definition.variantKey))
+    }
+
+    private fun acquire(id: Int, bundle: NameplateBundle) {
+        val first = synchronized(owners) {
+            val ids = owners.getOrPut(bundle) { HashSet() }
+            val unused = ids.isEmpty()
+            ids += id
+            unused
+        }
+        if (first) {
+            installAssets(bundle)
+        }
+    }
+
+    private fun release(id: Int, bundle: NameplateBundle) {
+        val last = synchronized(owners) {
+            val ids = owners[bundle] ?: return
+            ids -= id
+            if (ids.isEmpty()) owners.remove(bundle)
+            ids.isEmpty()
+        }
+        if (last) {
+            releaseAssets(bundle)
+        }
+    }
+
+    private fun installAssets(bundle: NameplateBundle) {
+        //? if >= 1.21.1 {
+        NameplateMaterialAssets.install(bundle)
+        //?}
     }
 
     private fun releaseAssets(bundle: NameplateBundle) {
