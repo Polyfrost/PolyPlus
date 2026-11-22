@@ -40,7 +40,7 @@ object NameplateLoader {
 
     private class Parsed(val hash: String, val bundle: NameplateBundle?)
 
-    private class BundleFiles(val texts: Map<String, String>, val bytes: Map<String, ByteArray>)
+    private class BundleFiles(val texts: Map<String, String>, val bytes: Map<String, ByteArray>, val issues: List<BundleIssue>)
 
     private val parsed = ConcurrentHashMap<String, Parsed>()
     private val loggedSkips: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -78,12 +78,16 @@ object NameplateLoader {
 
     private fun parse(dir: Path): BundleLoad = try {
         val files = readFiles(dir)
-        val result = BundleLoader(CAPABILITIES).load(BundleSource.of(files.texts), BundleBytes.of(files.bytes))
-        //? if >= 1.21.1 || = 1.8.9 {
-        NameplateMaterialAssets.prepare(result, files.bytes)
-        //?} else {
-        /*result
-        *///?}
+        if (files.issues.isNotEmpty()) {
+            BundleLoad.Invalid(files.issues)
+        } else {
+            val result = BundleLoader(CAPABILITIES).load(BundleSource.of(files.texts), BundleBytes.of(files.bytes))
+            //? if >= 1.21.1 || = 1.8.9 {
+            NameplateMaterialAssets.prepare(result, files.bytes)
+            //?} else {
+            /*result
+            *///?}
+        }
     } catch (e: Exception) {
         BundleLoad.Invalid(listOf(BundleIssue("bundle", "could not be read: $e")))
     }
@@ -103,20 +107,20 @@ object NameplateLoader {
                 val json = path.name.endsWith(JSON_EXTENSION, ignoreCase = true)
                 val png = path.name.endsWith(PNG_EXTENSION, ignoreCase = true)
                 if (!json && !png) continue
-                if (texts.size + bytes.size >= ARCHIVE_LIMITS.maxEntries) break
                 val normalized = path.toAbsolutePath().normalize()
                 if (!normalized.startsWith(root)) continue
+                val relative = root.relativize(normalized).toString().replace('\\', '/')
+                if (texts.size + bytes.size >= ARCHIVE_LIMITS.maxEntries) {
+                    return refused("bundle", "has more than ${ARCHIVE_LIMITS.maxEntries} JSON and PNG files")
+                }
                 val size = Files.size(normalized)
                 if (size > MAX_FILE_BYTES) {
-                    LOGGER.warn("Ignoring nameplate file {}: larger than {} bytes", normalized, MAX_FILE_BYTES)
-                    continue
+                    return refused(relative, "is $size bytes; files can be at most $MAX_FILE_BYTES bytes")
                 }
                 if (total + size > ARCHIVE_LIMITS.maxExtractedBytes) {
-                    LOGGER.warn("Ignoring nameplate file {}: the bundle is over {} bytes", normalized, ARCHIVE_LIMITS.maxExtractedBytes)
-                    continue
+                    return refused("bundle", "has over ${ARCHIVE_LIMITS.maxExtractedBytes} bytes of JSON and PNG files")
                 }
                 total += size
-                val relative = root.relativize(normalized).toString().replace('\\', '/')
                 if (json) {
                     texts[relative] = Files.readString(normalized)
                 } else {
@@ -124,8 +128,10 @@ object NameplateLoader {
                 }
             }
         }
-        return BundleFiles(texts, bytes)
+        return BundleFiles(texts, bytes, emptyList())
     }
+
+    private fun refused(path: String, message: String): BundleFiles = BundleFiles(emptyMap(), emptyMap(), listOf(BundleIssue(path, message)))
 
     private fun bundleRoot(dir: Path): Path {
         if (Files.isRegularFile(dir.resolve(MANIFEST))) return dir
