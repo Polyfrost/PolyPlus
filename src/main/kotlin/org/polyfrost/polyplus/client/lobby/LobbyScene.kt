@@ -1145,6 +1145,8 @@ object LobbyScene {
         val built = Live(listener, level, gameMode, rig, stage, stage.portraitShot(level), avatars, mood, captured, posts)
         //? if > 1.8.9
         built.props += runCatching { LobbyEntities.load(level, root, stage) }.getOrElse { emptyList() }
+        //? if > 1.8.9
+        LobbyCats.onSceneShown(level, stage, built.props)
         runCatching { LobbyHerobrine.onSceneShown(level, stage) }
         built
     }
@@ -2339,6 +2341,8 @@ object LobbyScene {
             val local = scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null }
             LobbyAntics.tick(local)
             LobbyGrab.tick(local)
+            //? if > 1.8.9
+            if (driven == null) LobbyCats.tick(scene.level)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()
@@ -2550,6 +2554,8 @@ object LobbyScene {
         runCatching { LobbyFraming.reset() }
         runCatching { LobbyWardrobe.reset() }
         runCatching { LobbyHerobrine.stop() }
+        //? if > 1.8.9
+        runCatching { LobbyCats.stop() }
         runCatching { LobbyAntics.reset() }
         runCatching { LobbyGrab.reset() }
         runCatching { detach(mc) }
@@ -2611,6 +2617,8 @@ object LobbyScene {
         leftTag = null
         LobbyWardrobe.reset()
         LobbyHerobrine.stop()
+        //? if > 1.8.9
+        LobbyCats.stop()
         LobbyAntics.reset()
         LobbyGrab.reset()
         LobbyHologram.reset()

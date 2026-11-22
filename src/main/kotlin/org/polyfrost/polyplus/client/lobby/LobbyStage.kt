@@ -508,6 +508,15 @@ data class LobbyStage(
             *///?}
         }
 
+        fun underInterface(view: LobbyEntrance.View, feet: Vec3, height: Double, width: Double): Boolean {
+            val low = pixels(view, feet)
+            val high = pixels(view, feet.add(0.0, height, 0.0))
+            val half = (low.second - high.second) * width / height / 2.0
+            val box = Box(low.first - half, high.second, low.first + half, low.second)
+            if (box.left < SWAY_PIXELS || box.right > SCREEN_WIDTH - SWAY_PIXELS || box.top < 0.0 || box.bottom > SCREEN_HEIGHT) return true
+            return PERSISTENT_UI.any { box.swayed().hits(it) }
+        }
+
         private fun underInterface(figure: Figure): Boolean {
             val box = figure.whole
             if (box.left < SWAY_PIXELS || box.right > SCREEN_WIDTH - SWAY_PIXELS) return true
