@@ -350,6 +350,7 @@
     "client.pause.MixinPauseHand",
     "client.pause.MixinPauseCulling",
     "client.pause.MixinPauseRenderer",
+    //? if > 1.8.9
     "client.nameplate.MixinAvatarRenderer",
     //? if >= 1.21.4
     "client.nameplate.MixinAvatarRenderState",
