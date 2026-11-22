@@ -438,9 +438,9 @@ object LobbyAmbience {
 
     private fun read(mc: Minecraft, id: Identifier): ByteArray? = runCatching {
         //? if > 1.8.9 {
-        mc.resourceManager.getResource(id).orElse(null)?.open()?.use { it.readBytes() }
+        mc.resourceManager.getResource(id).orElse(null)?.open()?.use { it.readAllBytes() }
         //?} else {
-        /*mc.resourceManager.getResource(id).asStream().use { it.readBytes() }
+        /*mc.resourceManager.getResource(id).asStream().use { it.readAllBytes() }
         *///?}
     }.getOrNull()
 

@@ -214,7 +214,7 @@ internal class PauseCapture(private val vanilla: PauseScreen) {
         val location = Identifier.fromNamespaceAndPath(id.namespace, "textures/gui/sprites/${id.path}.png")
         val resource = Minecraft.getInstance().resourceManager.getResource(location).orElse(null)
             ?: return@runCatching null
-        PolyBitmap.decode(resource.open().use { it.readBytes() })?.asComposeImageBitmap()
+        PolyBitmap.decode(resource.open().use { it.readAllBytes() })?.asComposeImageBitmap()
     }.getOrNull()
     //?} else {
     /*private fun read(): List<PauseEntry> {
