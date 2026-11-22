@@ -6,6 +6,7 @@ import net.minecraft.client.render.TextRenderer
 import net.minecraft.client.render.platform.GlStateManager
 import net.minecraft.client.render.vertex.Tesselator
 import net.minecraft.entity.Entity
+import org.lwjgl.opengl.GL11
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.nameplate.render.NameplateDecorations
 import org.polyfrost.polyplus.client.nameplate.render.NameplateFrame
@@ -92,7 +93,7 @@ object LegacyNameplateRenderer {
             return drawText(font, tag, text, x, y, color, original, LegacyPass.SEE_THROUGH, sneak = false)
         }
         try {
-            return drawText(font, tag, text, x, y, color, original, LegacyPass.DEPTH, sneak = true)
+            return depthTested { drawText(font, tag, text, x, y, color, original, LegacyPass.DEPTH, sneak = true) }
         } finally {
             finishDecorations(depthMask = false)
         }
@@ -130,7 +131,7 @@ object LegacyNameplateRenderer {
         LegacyVertexSink.record()
         try {
             NameplateDecorations.submit(frame, bound.nameplate, bound.frame, bound.state, bound.detailed, bound.badge, tag.gapX)
-            LegacyVertexSink.drawRecorded(overText = false, depthMask)
+            depthTested { LegacyVertexSink.drawRecorded(overText = false, depthMask) }
         } finally {
             LegacyVertexSink.stopRecording()
             GlStateManager.clearColor()
@@ -139,10 +140,22 @@ object LegacyNameplateRenderer {
 
     private fun finishDecorations(depthMask: Boolean) {
         try {
-            LegacyVertexSink.drawRecorded(overText = true, depthMask)
+            depthTested { LegacyVertexSink.drawRecorded(overText = true, depthMask) }
         } finally {
             LegacyVertexSink.clear()
             GlStateManager.clearColor()
+        }
+    }
+
+    private inline fun <T> depthTested(draw: () -> T): T {
+        val enabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST)
+        GlStateManager.enableDepthTest()
+        try {
+            return draw()
+        } finally {
+            if (!enabled) {
+                GlStateManager.disableDepthTest()
+            }
         }
     }
 
