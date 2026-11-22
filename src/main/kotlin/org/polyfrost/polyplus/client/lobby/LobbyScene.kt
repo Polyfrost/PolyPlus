@@ -1698,6 +1698,12 @@ object LobbyScene {
 
     private fun still(): Boolean = driven == null && Motion.reduced
 
+    fun strollHome(avatar: LobbyAvatar): Boolean {
+        val scene = live ?: return false
+        val mc = Minecraft.getInstance()
+        return LobbyEntrance.stroll(scene.level, avatar, scene.avatars, tick()) { restingView(mc, scene.stage, it) }
+    }
+
     private fun restingView(mc: Minecraft, stage: LobbyStage, time: Double): LobbyEntrance.View {
         val crane = if (still()) 0.0 else 1.0 - (time / CRANE_SECONDS).coerceIn(0.0, 1.0)
         val eased = 1.0 - crane * crane * crane
@@ -2165,7 +2171,7 @@ object LobbyScene {
         val headX = projector.x
         val headY = projector.y
         projector.project(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
-        LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
+        if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
         LobbyGrab.sight(avatar, feetX, feetY, headX, headY, projector.x, eye, yaw)
     }
 
@@ -2185,7 +2191,7 @@ object LobbyScene {
         LobbyGrab.lose()
         projector.begin(renderer, currentFov)
         for (avatar in scene.avatars) {
-            if (avatar.arrival != LobbyAvatar.Arrival.LANDED || avatar.dismissed || !ahead(eye, look, avatar)) continue
+            if ((avatar.arrival != LobbyAvatar.Arrival.LANDED && !LobbyGrab.homeward(avatar)) || avatar.dismissed || !ahead(eye, look, avatar)) continue
             val sight = (if (driven == null) scene.sight[avatar] else null) ?: survey(scene, eye, avatar)
             if (!sight.clear) continue
             val feet = avatar.position()
@@ -2338,7 +2344,7 @@ object LobbyScene {
             if (driven == null) tickSceneEntities(scene.level)
             val local = scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null }
             LobbyAntics.tick(local)
-            LobbyGrab.tick(local)
+            LobbyGrab.tick(scene.level, local)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
             //? if >= 1.21.10
             scene.level.tickBlockEntities()
